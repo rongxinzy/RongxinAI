@@ -11,6 +11,7 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
+import { CoreSkillId } from '@shared/skills/constants';
 import { ChevronDown, Folder, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -71,10 +72,12 @@ type CoworkAttachment = DraftAttachment;
 const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
 /**
  * Chat mode injects a skill's instructions into a direct LLM request but cannot run skill
- * scripts. Keep this as an explicit allowlist of skills that remain useful as guidance alone.
+ * scripts. The chat-capable skills are exactly the core skills backing the sidebar quick-skill
+ * shortcuts, so derive the allowlist from CoreSkillId — a hardcoded list drifts whenever a
+ * new core skill is added (the shortcut then reports the skill as unavailable).
  * Replace it with capability-based filtering once skills expose that metadata.
  */
-const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx', 'frontend-design', 'deep-research']);
+const CHAT_SKILL_IDS: ReadonlySet<string> = new Set(Object.values(CoreSkillId));
 const IMAGE_EXTENSIONS = new Set([
   '.png',
   '.jpg',

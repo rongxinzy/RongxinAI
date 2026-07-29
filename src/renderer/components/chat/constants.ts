@@ -1,4 +1,4 @@
-import { FileText, Globe, Presentation, Table, Telescope } from 'lucide-react';
+import { FileText, Globe, GraduationCap, Presentation, Table, Telescope } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 /**
@@ -30,6 +30,13 @@ export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
     icon: Telescope,
     labelKey: 'chatSkillDeepResearch',
     placeholderKey: 'chatSkillPlaceholderDeepResearch',
+  },
+  {
+    id: 'academic-research',
+    skillId: 'deli-autoresearch',
+    icon: GraduationCap,
+    labelKey: 'chatSkillAcademicResearch',
+    placeholderKey: 'chatSkillPlaceholderAcademicResearch',
   },
   {
     id: 'docs',

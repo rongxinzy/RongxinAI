@@ -20,7 +20,7 @@ interface SkillChipProps {
 
 /**
  * Removable chip for one active skill. Core skills (the Chat quick-skill
- * entries) show their semantic label (PPT / 深度研究 / …) and icon; other
+ * entries) show their semantic label (PPT / 深度调研 / …) and icon; other
  * skills fall back to displayName/name with their own icon or a puzzle
  * glyph.
  */

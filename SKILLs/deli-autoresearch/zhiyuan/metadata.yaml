@@ -1,0 +1,5 @@
+name: 学术研究
+description: 面向长周期自主研究任务的协议框架：通过状态持久化、停滞检测与心跳看门狗机制，支撑文献综述、论文写作等无人值守的多日研究流程。
+author: Deli
+license: Apache-2.0
+skillmd: ./SKILL.md

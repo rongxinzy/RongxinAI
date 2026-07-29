@@ -11,6 +11,7 @@ export const CoreSkillId = {
   Docx: 'docx',
   Xlsx: 'xlsx',
   DeepResearch: 'deep-research',
+  DeliAutoResearch: 'deli-autoresearch',
   FrontendDesign: 'frontend-design',
 } as const;
 

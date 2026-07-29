@@ -24,7 +24,7 @@ import ActiveSkillBadge from './ActiveSkillBadge';
 
 vi.mock('../../services/i18n', () => {
   const translations: Record<string, string> = {
-    chatSkillDeepResearch: '深度研究',
+    chatSkillDeepResearch: '深度调研',
     clearSkill: '移除技能',
     clearAll: '全部清除',
     clearAllSkills: '清除全部技能',
@@ -126,7 +126,7 @@ test('renders core skills as blue pill chips with the semantic shortcut label', 
   );
 
   // Name contract: the shortcut labelKey wins over the raw skill name.
-  expect(html).toContain('深度研究');
+  expect(html).toContain('深度调研');
   expect(html).not.toContain('deep-research-raw-name');
 
   // Style contract: blue capsule, not the PR #184 grey square token.
@@ -178,7 +178,7 @@ test('renders the quick action skill chip when only a quick action is selected',
     }),
   );
 
-  expect(html).toContain('深度研究');
+  expect(html).toContain('深度调研');
   expect(countRemoveButtons(html)).toBe(1);
 });
 
@@ -196,6 +196,6 @@ test('hides the quick action fallback chip while real skills are active', () => 
   );
 
   expect(html).toContain('Plain Name');
-  expect(html).not.toContain('深度研究');
+  expect(html).not.toContain('深度调研');
   expect(countRemoveButtons(html)).toBe(1);
 });
