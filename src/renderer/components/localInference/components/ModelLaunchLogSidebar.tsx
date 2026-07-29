@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { LocalInferenceLogViewer } from './LocalInferenceLogViewer';
 import { cn } from '@shared/lib/utils';
 import { Download, X } from 'lucide-react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent, TransitionEvent as ReactTransitionEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
@@ -22,6 +22,7 @@ const MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH = 560;
 const MODEL_LAUNCH_LOG_MAIN_CONTENT_MIN_WIDTH = 520;
 const MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT = 900;
 const MODEL_LAUNCH_LOG_DETAIL_SEPARATOR = ' ';
+const MODEL_LAUNCH_LOG_TRANSITION_FALLBACK_MS = 50;
 
 const LlamaCppProcessLogMessage = {
   Stdout: 'llama-server stdout',
@@ -49,6 +50,8 @@ export function ModelLaunchLogSidebar({
   const [isEntered, setIsEntered] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isFullscreenExitPending, setIsFullscreenExitPending] = useState(false);
+  const [isFullscreenClosePending, setIsFullscreenClosePending] = useState(false);
+  const [isFullscreenLayoutReleasing, setIsFullscreenLayoutReleasing] = useState(false);
   const sidebarRef = useRef<HTMLElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
@@ -75,6 +78,8 @@ export function ModelLaunchLogSidebar({
 
   useEffect(() => {
     if (state.visible) {
+      setIsFullscreenClosePending(false);
+      setIsFullscreenLayoutReleasing(false);
       setSidebarWidth(getMaxSidebarWidth(containerWidth));
       setIsPresent(true);
       const frame = window.requestAnimationFrame(() => {
@@ -85,27 +90,59 @@ export function ModelLaunchLogSidebar({
     }
 
     setIsEntered(false);
+    if (isFullscreen) {
+      setIsFullscreenClosePending(true);
+      return;
+    }
+
     const timeout = window.setTimeout(() => {
       setIsPresent(false);
-      if (isFullscreen) onFullscreenChange(false);
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [containerWidth, isFullscreen, onFullscreenChange, state.visible]);
+  }, [containerWidth, isFullscreen, isFullscreenClosePending, state.visible]);
 
   const isPanelEntered = state.visible && isEntered;
   const isPanelClosing = !state.visible && isPresent;
-  const isVisualFullscreen = isFullscreen || isFullscreenExitPending;
+  const isVisualFullscreen =
+    isFullscreen || isFullscreenExitPending || isFullscreenClosePending || isFullscreenLayoutReleasing;
   const isCompact = containerWidth > 0 && containerWidth < MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT;
+  const isFullscreenCloseTransition = isVisualFullscreen && isPanelClosing;
+
   useEffect(() => {
     if (!isFullscreenExitPending) return;
 
     const timeout = window.setTimeout(() => {
       setIsFullscreenExitPending(false);
+      setIsFullscreenLayoutReleasing(true);
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
 
     return () => window.clearTimeout(timeout);
   }, [isFullscreenExitPending]);
+
+  useEffect(() => {
+    if (!isFullscreenClosePending) return;
+
+    const timeout = window.setTimeout(() => {
+      if (state.visible) return;
+      setIsPresent(false);
+      setIsFullscreenClosePending(false);
+      setIsFullscreenLayoutReleasing(true);
+      onFullscreenChange(false);
+    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS + MODEL_LAUNCH_LOG_TRANSITION_FALLBACK_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [isFullscreenClosePending, onFullscreenChange, state.visible]);
+
+  useEffect(() => {
+    if (!isFullscreenLayoutReleasing) return;
+
+    const timeout = window.setTimeout(() => {
+      setIsFullscreenLayoutReleasing(false);
+    }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS + MODEL_LAUNCH_LOG_TRANSITION_FALLBACK_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [isFullscreenLayoutReleasing]);
 
   const handleToggleFullscreen = () => {
     if (isFullscreen) {
@@ -120,6 +157,7 @@ export function ModelLaunchLogSidebar({
 
   const handleClose = () => {
     setIsFullscreenExitPending(false);
+    if (isFullscreen) setIsFullscreenClosePending(true);
     onClose();
   };
 
@@ -171,17 +209,41 @@ export function ModelLaunchLogSidebar({
     window.addEventListener('pointercancel', handlePointerEnd);
   };
 
+  const handleSidebarTransitionEnd = (event: ReactTransitionEvent<HTMLElement>) => {
+    if (event.target !== event.currentTarget || event.propertyName !== 'transform') return;
+    if (!isFullscreenClosePending || state.visible) return;
+
+    setIsPresent(false);
+    setIsFullscreenClosePending(false);
+    setIsFullscreenLayoutReleasing(true);
+    onFullscreenChange(false);
+  };
+
+  const handleLayoutReleaseTransitionEnd = (event: ReactTransitionEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget || event.propertyName !== 'width') return;
+    setIsFullscreenLayoutReleasing(false);
+  };
+
   return (
     <>
       {isVisualFullscreen ? (
-        <div aria-hidden="true" className="shrink-0" style={{ width: sidebarWidth }} />
+        <div
+          aria-hidden="true"
+          className="shrink-0 transition-[width] ease-in-out"
+          style={{
+            width: isFullscreenLayoutReleasing ? 0 : sidebarWidth,
+            transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
+          }}
+          onTransitionEnd={handleLayoutReleaseTransitionEnd}
+        />
       ) : null}
       <aside
         aria-hidden={!state.visible}
         ref={sidebarRef}
+        onTransitionEnd={handleSidebarTransitionEnd}
         className={cn(
           'flex h-full bg-background ease-in-out',
-          'overflow-hidden transition-[width]',
+          'overflow-hidden transition-[width,transform]',
           isVisualFullscreen
             ? 'absolute inset-y-0 right-0 z-30 shadow-xl'
             : isCompact
@@ -189,14 +251,22 @@ export function ModelLaunchLogSidebar({
               : 'relative shrink-0',
         )}
         style={{
-          width: isFullscreen
+          width: isFullscreen || isFullscreenClosePending
             ? '100%'
             : isFullscreenExitPending
               ? sidebarWidth
               : isPanelEntered
                 ? sidebarWidth
                 : 0,
-          transitionProperty: 'width',
+          transform:
+            (isFullscreen || isFullscreenClosePending) && !state.visible
+              ? 'translateX(100%)'
+              : 'translateX(0)',
+          transitionProperty: !isPresent
+            ? 'none'
+            : isFullscreenCloseTransition
+              ? 'transform'
+              : 'width',
           transitionTimingFunction: 'ease-in-out',
           transitionDuration: `${LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS}ms`,
         }}
@@ -218,11 +288,9 @@ export function ModelLaunchLogSidebar({
           <div
             className={cn(
               'flex h-full shrink-0 flex-col overflow-hidden transition-[transform,opacity] ease-in-out',
-              isFullscreen && isPanelClosing
-                ? 'translate-x-full opacity-0'
-                : isPanelEntered || isPanelClosing
-                  ? 'translate-x-0 opacity-100'
-                  : 'translate-x-8 opacity-0',
+              isPanelEntered || isPanelClosing
+                ? 'translate-x-0 opacity-100'
+                : 'translate-x-8 opacity-0',
             )}
             style={{
               width: '100%',
