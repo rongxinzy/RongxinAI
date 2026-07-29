@@ -171,7 +171,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             <PlusMenuSkillsIcon className="size-4" />
             <span className="truncate">{i18nService.t('skills')}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
+          <DropdownMenuSubContent align="center" className="w-56">
             {enabledSkills.length === 0 ? (
               <DropdownMenuItem disabled>{i18nService.t('noSkillsAvailable')}</DropdownMenuItem>
             ) : (
@@ -209,7 +209,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
               <PlusMenuExpertsIcon className="size-4" />
               <span className="truncate">{i18nService.t('sessionExperts')}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-56">
+            <DropdownMenuSubContent align="center" className="w-56">
               {availableExperts.map(expert => (
                 <DropdownMenuCheckboxItem
                   key={expert.id}
@@ -245,7 +245,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             <PlusMenuConnectorsIcon className="size-4" />
             <span className="truncate">{i18nService.t('connectors')}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-56">
+          <DropdownMenuSubContent align="center" className="w-56">
             {mcpLoading ? (
               <DropdownMenuItem disabled>{i18nService.t('loading')}</DropdownMenuItem>
             ) : mcpServers.length === 0 ? (
