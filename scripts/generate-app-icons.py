@@ -20,6 +20,10 @@ MASTER_ICON = PROJECT_ROOT / "build" / "icons" / "app-icon-master.png"
 CANVAS_SIZE = 1024
 ICON_BOUNDS = (64, 64, 960, 960)
 ICON_RADIUS = 220
+# Windows applies its own taskbar icon padding. Keep this inset minimal so the
+# visible brand mark occupies the same visual scale as neighboring applications.
+WINDOWS_ICON_BOUNDS = (12, 12, 1012, 1012)
+WINDOWS_ICON_RADIUS = 246
 PNG_SIZES = (16, 24, 32, 48, 64, 128, 256, 512, 1024)
 ICO_SIZES = ((16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256))
 
@@ -54,17 +58,17 @@ def make_gradient() -> Image.Image:
     return gradient
 
 
-def make_master_icon() -> Image.Image:
+def make_master_icon(bounds: tuple[int, int, int, int], radius: int) -> Image.Image:
     canvas = Image.new("RGBA", (CANVAS_SIZE, CANVAS_SIZE), (0, 0, 0, 0))
     mask = Image.new("L", (CANVAS_SIZE, CANVAS_SIZE), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(ICON_BOUNDS, radius=ICON_RADIUS, fill=255)
+    ImageDraw.Draw(mask).rounded_rectangle(bounds, radius=radius, fill=255)
 
     canvas.alpha_composite(Image.composite(make_gradient(), Image.new("RGBA", canvas.size), mask))
 
     border = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     ImageDraw.Draw(border).rounded_rectangle(
-        ICON_BOUNDS,
-        radius=ICON_RADIUS,
+        bounds,
+        radius=radius,
         outline=(208, 213, 221, 210),
         width=12,
     )
@@ -91,14 +95,15 @@ def main() -> None:
     WINDOWS_ICON.parent.mkdir(parents=True, exist_ok=True)
     MAC_ICON.parent.mkdir(parents=True, exist_ok=True)
 
-    master = make_master_icon()
+    master = make_master_icon(ICON_BOUNDS, ICON_RADIUS)
+    windows_master = make_master_icon(WINDOWS_ICON_BOUNDS, WINDOWS_ICON_RADIUS)
     master.save(MASTER_ICON, optimize=True)
 
     for size in PNG_SIZES:
         resized = master.resize((size, size), Image.Resampling.LANCZOS)
         resized.save(PNG_DIR / f"{size}x{size}.png", optimize=True)
 
-    master.save(WINDOWS_ICON, format="ICO", sizes=ICO_SIZES)
+    windows_master.save(WINDOWS_ICON, format="ICO", sizes=ICO_SIZES)
     master.save(MAC_ICON, format="ICNS")
 
     print(f"Generated application icon master: {MASTER_ICON}")

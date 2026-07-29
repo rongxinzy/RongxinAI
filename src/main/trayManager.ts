@@ -21,7 +21,9 @@ function getTrayIconPath(): string {
     return path.join(basePath, 'tray-icon-mac.png');
   }
   if (isWin) {
-    return path.join(basePath, 'tray-icon.ico');
+    return app.isPackaged
+      ? path.join(process.resourcesPath, 'app-icons', 'icon.ico')
+      : path.join(__dirname, '..', 'build', 'icons', 'win', 'icon.ico');
   }
   // Linux
   return path.join(basePath, 'tray-icon.png');
