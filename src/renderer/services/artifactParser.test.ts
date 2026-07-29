@@ -136,6 +136,76 @@ describe('detectArtifactsFromMessages', () => {
     expect(artifacts[0].needsFileLoad).toBe(false);
   });
 
+  test('detects bare Windows PPTX paths in assistant messages', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-1',
+          type: 'assistant',
+          content: 'Created D:/workspace/presentations/刘德华_AndyLau.pptx',
+          timestamp: Date.now(),
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.type).toBe('document');
+    expect(artifacts[0].artifact.filePath).toBe('D:/workspace/presentations/刘德华_AndyLau.pptx');
+    expect(artifacts[0].needsFileLoad).toBe(true);
+  });
+
+  test('detects bare POSIX PPTX paths in assistant messages', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-1',
+          type: 'assistant',
+          content: 'Created /home/user/presentations/report.pptx',
+          timestamp: Date.now(),
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.filePath).toBe('/home/user/presentations/report.pptx');
+  });
+
+  test('deduplicates file links against their embedded paths', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-1',
+          type: 'assistant',
+          content: '[report.pptx](file:///D:/workspace/report.pptx)',
+          timestamp: Date.now(),
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.filePath).toBe('D:/workspace/report.pptx');
+  });
+
+  test('does not detect bare paths in thinking messages', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-thinking-1',
+          type: 'assistant',
+          content: 'Creating D:/workspace/report.pptx',
+          timestamp: Date.now(),
+          metadata: { isThinking: true },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(0);
+  });
+
   test('keeps explicit write-tool outputs as artifacts', () => {
     const artifacts = detectArtifactsFromMessages(
       [

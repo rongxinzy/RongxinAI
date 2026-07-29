@@ -373,6 +373,14 @@ export function detectArtifactsFromMessages(
         }
       }
 
+      const filePaths = parseFilePathsFromText(msg.content, msg.id, sessionId);
+      for (const artifact of filePaths) {
+        const normalized = artifact.filePath ? normalizeFilePathForDedup(artifact.filePath) : '';
+        if (artifact.filePath && !seenFilePaths.has(normalized)) {
+          seenFilePaths.add(normalized);
+          detected.push({ artifact, needsFileLoad: true });
+        }
+      }
     }
   }
 
