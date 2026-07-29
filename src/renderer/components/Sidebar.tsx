@@ -4,7 +4,7 @@ import { Checkbox } from '@shared/components/ui/checkbox';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { Cpu, Settings, TriangleAlert } from 'lucide-react';
-import { Clock, MessageCircle, PanelLeft, Pencil, Puzzle, Search, Trash2 } from 'lucide-react';
+import { Clock, MessageCircle, PanelLeft, Pencil, Puzzle, Search, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -23,7 +23,11 @@ import {
   selectUnreadSessionIds,
 } from '../store/selectors/coworkSelectors';
 import { selectWorkMode } from '../store/selectors/workModeSelectors';
-import { clearLoadingSessionId, setCurrentSession, setLoadingSessionId } from '../store/slices/coworkSlice';
+import {
+  clearLoadingSessionId,
+  setCurrentSession,
+  setLoadingSessionId,
+} from '../store/slices/coworkSlice';
 import { WorkMode } from '../store/workMode/constants';
 import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
@@ -34,7 +38,6 @@ import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSideba
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import Modal from './common/Modal';
-import CoworkSearchModal from './cowork/CoworkSearchModal';
 import LoginButton from './LoginButton';
 
 interface SidebarProps {
@@ -85,7 +88,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   const currentSessionId = useSelector(selectCurrentSessionId);
   const unreadSessionIds = useSelector(selectUnreadSessionIds);
   const workMode = useSelector(selectWorkMode);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  // Inline sidebar search stays mounted so filtering does not shift the list.
+  // The full result set is fetched while typing so filtering stays instant.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchCorpus, setSearchCorpus] = useState<CoworkSessionSummary[]>([]);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchControlRef = useRef<HTMLDivElement>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [recentlyDeletedSessionIds, setRecentlyDeletedSessionIds] = useState<string[]>([]);
@@ -93,34 +102,53 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const [agentScrollEdges, setAgentScrollEdges] = useState({ top: false, bottom: false });
-  const handleWorkModeChange = useCallback((checked: boolean) => {
-    const mode = checked ? WorkMode.Chat : WorkMode.Work;
-    dispatch(setWorkMode(mode));
-    if (mode === WorkMode.Chat) {
-      onShowCowork();
-    }
-    setIsBatchMode(false);
-    setSelectedIds(new Set());
-    setShowBatchDeleteConfirm(false);
-    void configService.updateConfig({ workMode: mode });
-  }, [dispatch, onShowCowork]);
+  const handleWorkModeChange = useCallback(
+    (checked: boolean) => {
+      const mode = checked ? WorkMode.Chat : WorkMode.Work;
+      dispatch(setWorkMode(mode));
+      if (mode === WorkMode.Chat) {
+        onShowCowork();
+      }
+      setIsBatchMode(false);
+      setSelectedIds(new Set());
+      setShowBatchDeleteConfirm(false);
+      void configService.updateConfig({ workMode: mode });
+    },
+    [dispatch, onShowCowork],
+  );
 
   // Filter sessions by workMode — chat sessions only visible in chat mode
   const sessions = React.useMemo(
     () =>
-      workMode === WorkMode.Chat
-        ? chatSessions
-        : allSessions.filter(s => s.mode !== WorkMode.Chat),
+      workMode === WorkMode.Chat ? chatSessions : allSessions.filter(s => s.mode !== WorkMode.Chat),
     [allSessions, chatSessions, workMode],
   );
 
   // Chat mode: map sessions to AgentSidebarTaskNode for AgentTaskRow rendering
   const unreadSessionIdSet = React.useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
+  const searchQueryTrimmed = searchQuery.trim().toLowerCase();
+  // Search results come from searchCorpus (global, cross-agent) and may NOT be in
+  // the mode-filtered Redux `sessions`, so resolve clicks via this corpus map.
+  const searchSessionById = React.useMemo(() => {
+    const map = new Map<string, CoworkSessionSummary>();
+    searchCorpus.forEach(s => map.set(s.id, s));
+    return map;
+  }, [searchCorpus]);
   const chatTaskNodes = React.useMemo(() => {
     if (workMode !== WorkMode.Chat) return [];
-    const sorted = sortAgentSidebarTasks(sessions, streamingSessionIds);
+    const scoped = searchQueryTrimmed
+      ? sessions.filter(s => s.title.toLowerCase().includes(searchQueryTrimmed))
+      : sessions;
+    const sorted = sortAgentSidebarTasks(scoped, streamingSessionIds);
     return sorted.map(s => toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet));
-  }, [workMode, sessions, currentSessionId, unreadSessionIdSet, streamingSessionIds]);
+  }, [
+    workMode,
+    sessions,
+    currentSessionId,
+    unreadSessionIdSet,
+    streamingSessionIds,
+    searchQueryTrimmed,
+  ]);
 
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
@@ -134,7 +162,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     const handleSearch = () => {
       onShowCowork();
-      setIsSearchOpen(true);
+      setSearchActive(true);
+      window.setTimeout(() => searchInputRef.current?.focus(), 0);
     };
     window.addEventListener('cowork:shortcut:search', handleSearch);
     return () => {
@@ -142,9 +171,42 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [onShowCowork]);
 
+  // Clicking outside the search control clears the active query.
+  useEffect(() => {
+    if (!searchActive) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (searchControlRef.current?.contains(event.target as Node)) return;
+      setSearchActive(false);
+      setSearchQuery('');
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [searchActive]);
+
+  // Load the searchable corpus ONCE when search is activated, then filter it
+  // client-side as the user types. Fetching per keystroke re-triggered the
+  // loading overlay (a full-size absolute layer) and a tree rebuild on every
+  // change, most visibly a stutter when deleting the last character (query 1 to 0).
+  // With a single load, typing and clearing are synchronous filters.
+  useEffect(() => {
+    if (!searchActive) {
+      setSearchCorpus([]);
+      return;
+    }
+    let cancelled = false;
+    void coworkService.listSessionsForSearch(100, 0).then(result => {
+      if (cancelled) return;
+      setSearchCorpus(result?.success ? (result.sessions ?? []) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchActive]);
+
   useEffect(() => {
     if (!isCollapsed) return;
-    setIsSearchOpen(false);
+    setSearchActive(false);
+    setSearchQuery('');
     setIsBatchMode(false);
     setSelectedIds(new Set());
     setShowBatchDeleteConfirm(false);
@@ -328,6 +390,75 @@ const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [updateAgentScrollEdges]);
 
+  const renderSearchControl = (isChatMode = false) => (
+    <div className={cn('shrink-0 bg-surface-raised', !isChatMode && 'px-3')}>
+      <div
+        ref={searchControlRef}
+        role={searchActive ? undefined : 'button'}
+        tabIndex={searchActive ? undefined : 0}
+        aria-label={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
+        onClick={() => {
+          if (!searchActive) {
+            setSearchActive(true);
+            window.setTimeout(() => searchInputRef.current?.focus(), 0);
+          }
+        }}
+        onKeyDown={event => {
+          if (!searchActive && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault();
+            setSearchActive(true);
+            window.setTimeout(() => searchInputRef.current?.focus(), 0);
+          }
+        }}
+        className={cn(
+          'inline-flex h-8 w-full items-center justify-start gap-2 overflow-hidden rounded-lg px-3 text-left text-[14px] font-normal text-muted-foreground',
+          searchActive
+            ? 'cursor-text bg-background'
+            : 'cursor-pointer transition-colors hover:bg-black/3 dark:hover:bg-white/4',
+        )}
+      >
+        <Search className="h-4 w-4 shrink-0" />
+        {searchActive ? (
+          <>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={event => setSearchQuery(event.target.value)}
+              onKeyDown={event => {
+                if (event.key === 'Escape') {
+                  setSearchActive(false);
+                  setSearchQuery('');
+                  searchInputRef.current?.blur();
+                }
+              }}
+              placeholder={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
+              className="h-full min-h-0 min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] font-normal leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label={i18nService.t('clearSearch')}
+                onClick={event => {
+                  event.stopPropagation();
+                  setSearchQuery('');
+                  searchInputRef.current?.focus();
+                }}
+                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </>
+        ) : (
+          <span className="flex-1 truncate text-[14px] leading-none">
+            {i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <aside
       className={`relative shrink-0 overflow-hidden bg-surface-raised ${
@@ -344,11 +475,19 @@ const Sidebar: React.FC<SidebarProps> = ({
           transitionDuration: `${SIDEBAR_COLLAPSE_TRANSITION_MS}ms`,
         }}
       >
-        <div className="pt-3 pb-3">
+        <div className={cn('pt-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
           <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
             <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-              <img src="zhiyuan-logo-light.svg" alt="知远" className="logo-light h-5 w-auto select-none" />
-              <img src="zhiyuan-logo-dark.svg" alt="知远" className="logo-dark h-5 w-auto select-none" />
+              <img
+                src="zhiyuan-logo-light.svg"
+                alt="知远"
+                className="logo-light h-5 w-auto select-none"
+              />
+              <img
+                src="zhiyuan-logo-dark.svg"
+                alt="知远"
+                className="logo-dark h-5 w-auto select-none"
+              />
             </div>
             <Button
               type="button"
@@ -361,7 +500,12 @@ const Sidebar: React.FC<SidebarProps> = ({
               <PanelLeft className="h-4 w-4" />
             </Button>
           </div>
-          <div className="mt-[5px] space-y-0.5 px-3 pb-3">
+          <div
+            className={cn(
+              'mt-[5px] space-y-0.5 px-3',
+              workMode === WorkMode.Chat ? 'pb-0' : 'pb-3',
+            )}
+          >
             <div
               className="relative h-7 w-full cursor-pointer"
               onClick={() => handleWorkModeChange(workMode !== WorkMode.Chat)}
@@ -410,7 +554,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  setIsSearchOpen(false);
                   onShowLocalInference();
                 }}
                 className={
@@ -424,24 +567,11 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {i18nService.t('localInferenceTitle')}
               </Button>
             )}
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                onShowCowork();
-                setIsSearchOpen(true);
-              }}
-              className={sidebarNavItemClassName}
-            >
-              <Search className="h-4 w-4 shrink-0" />
-              {i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
-            </Button>
             {workMode !== WorkMode.Chat && (
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  setIsSearchOpen(false);
                   onShowScheduledTasks();
                 }}
                 className={
@@ -461,7 +591,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                   type="button"
                   variant="ghost"
                   onClick={() => {
-                    setIsSearchOpen(false);
                     onShowExpert();
                   }}
                   className={
@@ -479,6 +608,8 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
         <div className="relative min-h-0 flex-1">
+          {workMode !== WorkMode.Chat && renderSearchControl()}
+
           <div
             ref={agentScrollContainerRef}
             className="scrollbar-hidden h-full overflow-y-auto px-3 pb-10"
@@ -495,13 +626,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onVisibleSessionsChange={
                   workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
                 }
+                onDismissSearch={() => {
+                  setSearchActive(false);
+                  setSearchQuery('');
+                }}
                 workMode={WorkMode.Work}
+                searchQuery={searchQuery}
+                searchCorpus={searchCorpus}
               />
             </div>
             {workMode === WorkMode.Chat && (
               <>
-                <ChatSkillShortcuts />
-                <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
+                <div>
+                  <ChatSkillShortcuts />
+                </div>
+                {renderSearchControl(true)}
+                <div className="sticky top-0 z-30 flex h-9 items-center bg-surface-raised px-1.5">
                   <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
                     {i18nService.t('chatRecentTitle')}
                   </h2>
@@ -510,7 +650,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center justify-center py-10 px-4 text-sm text-muted-foreground">
                     {i18nService.t('loading')}
                   </div>
-                ) : chatTaskNodes.length === 0 ? (
+                ) : chatTaskNodes.length === 0 && !searchQuery.trim() ? (
                   <div className="flex flex-col items-center justify-center py-10 px-4">
                     <MessageCircle className="size-10 text-muted-foreground mb-3" />
                     <p className="text-sm font-medium text-muted-foreground mb-1">
@@ -528,14 +668,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                         task={task}
                         isBatchMode={isBatchMode}
                         isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
+                        isNested={false}
                         onSelect={() => {
-                          const session = sessions.find(s => s.id === task.id);
-                          if (session) void handleSelectSession(session);
+                          const session =
+                            searchSessionById.get(task.id) ?? sessions.find(s => s.id === task.id);
+                          if (session) {
+                            setSearchActive(false);
+                            setSearchQuery('');
+                            void handleSelectSession(session);
+                          }
                         }}
                         onDelete={() => handleDeleteSession(task.id)}
                         onShare={async () => {
-                          const session = sessions.find(s => s.id === task.id);
+                          const session =
+                            searchSessionById.get(task.id) ?? sessions.find(s => s.id === task.id);
                           if (session) {
+                            setSearchActive(false);
+                            setSearchQuery('');
                             await handleSelectSession(session);
                             window.setTimeout(() => {
                               window.dispatchEvent(
@@ -579,14 +728,6 @@ const Sidebar: React.FC<SidebarProps> = ({
             onMouseDown={handleResizeStart}
           />
         )}
-        <CoworkSearchModal
-          isOpen={isSearchOpen}
-          onClose={() => setIsSearchOpen(false)}
-          sessions={sessions}
-          currentSessionId={currentSessionId}
-          onSelectSession={handleSelectSession}
-          workMode={workMode}
-        />
         {isBatchMode ? (
           <div className="px-3 pb-3 pt-1 flex items-center justify-between">
             <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">

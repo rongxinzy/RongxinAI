@@ -68,7 +68,11 @@ const sortTasks = (tasks: CoworkSessionSummary[]) =>
     return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
   });
 
-export const useWorkspaceSidebarState = (workMode: WorkModeType = WorkMode.Work) => {
+export const useWorkspaceSidebarState = (
+  workMode: WorkModeType = WorkMode.Work,
+  searchQuery = '',
+  searchCorpus: CoworkSessionSummary[] = [],
+) => {
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const sessions = useSelector(selectCoworkSessions);
@@ -316,6 +320,58 @@ export const useWorkspaceSidebarState = (workMode: WorkModeType = WorkMode.Work)
     [buildWorkspaceNodes, scheduledExpandedIds, scheduledExpandedTaskIds],
   );
 
+  const searching = searchQuery.trim().length > 0;
+  const searchSource = useMemo<Record<string, CoworkSessionSummary[]>>(() => {
+    if (!searching) return {};
+    const byWorkspace = new Map<string, CoworkSessionSummary[]>();
+    for (const session of searchCorpus) {
+      if (!modeMatches(session, workMode)) continue;
+      const key = session.workspaceId ?? '__none__';
+      const list = byWorkspace.get(key);
+      if (list) list.push(session);
+      else byWorkspace.set(key, [session]);
+    }
+    return Object.fromEntries(byWorkspace);
+  }, [searchCorpus, searching, workMode]);
+
+  const searchedWorkspaceNodes = useMemo(() => {
+    if (!searching) return { workspaceNodes, scheduledWorkspaceNodes };
+    const query = searchQuery.trim().toLowerCase();
+    const buildSearchNodes = (nodes: WorkspaceSidebarNode[], scheduled: boolean) =>
+      nodes.flatMap(node => {
+        const tasks = sortTasks(
+          (searchSource[node.id] ?? []).filter(
+            session =>
+              isScheduledSessionTitle(session.title) === scheduled &&
+              session.title.toLowerCase().includes(query),
+          ),
+        );
+        if (tasks.length === 0) return [];
+        return [
+          {
+            ...node,
+            isExpanded: true,
+            isTaskListExpanded: true,
+            canExpandTasks: false,
+            canCollapseTasks: false,
+            tasks: tasks.map(session => toTaskNode(session, currentSessionId, unreadSet)),
+          },
+        ];
+      });
+    return {
+      workspaceNodes: buildSearchNodes(workspaceNodes, false),
+      scheduledWorkspaceNodes: buildSearchNodes(scheduledWorkspaceNodes, true),
+    };
+  }, [
+    currentSessionId,
+    searchQuery,
+    searchSource,
+    searching,
+    unreadSet,
+    workspaceNodes,
+    scheduledWorkspaceNodes,
+  ]);
+
   const collapseScheduledTasks = useCallback((workspaceId: string) => {
     setScheduledExpandedTaskIds(current => current.filter(id => id !== workspaceId));
   }, []);
@@ -328,8 +384,8 @@ export const useWorkspaceSidebarState = (workMode: WorkModeType = WorkMode.Work)
   }, []);
 
   return {
-    workspaceNodes,
-    scheduledWorkspaceNodes,
+    workspaceNodes: searchedWorkspaceNodes.workspaceNodes,
+    scheduledWorkspaceNodes: searchedWorkspaceNodes.scheduledWorkspaceNodes,
     patchTaskPreview,
     removeTaskPreview,
     retryLoadTasks,
