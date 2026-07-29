@@ -22,13 +22,13 @@ import {
   Link,
   Pencil,
   PlusCircle,
-  Puzzle,
   Search,
   Upload,
   XCircle,
 } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
+import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import { isSkillTab, SkillTab } from './constants';
 
 interface SkillsPageToolbarProps {
@@ -67,7 +67,7 @@ export function SkillsPageToolbar({
   return (
     <header className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Puzzle className="size-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <PlusMenuSkillsIcon className="size-8 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-foreground">{i18nService.t('skills')}</h2>
           <p className="text-sm text-muted-foreground">{i18nService.t('skillsDescription')}</p>

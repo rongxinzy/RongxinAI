@@ -6,9 +6,10 @@ import {
   InputGroupText,
 } from '@shared/components/ui/input-group';
 import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
-import { Cable, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
+import { PlusMenuConnectorsIcon } from '../cowork/plusMenuIcons';
 import { McpTab, type McpTab as McpTabType } from './constants';
 
 interface McpManagerToolbarProps {
@@ -57,7 +58,7 @@ export function McpManagerToolbar({
   return (
     <header className="flex flex-col gap-4 border-b border-border">
       <div className="flex items-center gap-3">
-        <Cable className="size-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <PlusMenuConnectorsIcon className="size-8 shrink-0 text-muted-foreground" />
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-foreground">{i18nService.t('connectors')}</h2>
           <p className="text-sm text-muted-foreground">{i18nService.t('connectorsDescription')}</p>
