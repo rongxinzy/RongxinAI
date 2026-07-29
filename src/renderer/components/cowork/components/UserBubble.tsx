@@ -1,5 +1,6 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
 import { Button } from '@shared/components/ui/button';
+import { Puzzle } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -61,7 +62,18 @@ export const UserBubble: React.FC<{
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <Message from="user" className="ml-auto items-end">
           <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
-            {displayContent}
+            <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
+              {messageSkills.map(skill => (
+                <span
+                  key={skill.id}
+                  className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground"
+                >
+                  <Puzzle className="size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{skill.name}</span>
+                </span>
+              ))}
+              <span className="whitespace-pre-wrap wrap-break-word">{displayContent}</span>
+            </div>
           </MessageContent>
         </Message>
 
@@ -94,18 +106,6 @@ export const UserBubble: React.FC<{
           className={`flex items-center gap-2 mt-1 text-[11px] text-muted-foreground select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           aria-hidden={!isHovered}
         >
-          {messageSkills.length > 0 && (
-            <div className="flex items-center gap-1">
-              {messageSkills.map(skill => (
-                <span
-                  key={skill.id}
-                  className="px-1.5 py-0.5 text-[10px] rounded bg-surface-raised text-muted-foreground"
-                >
-                  {skill.name}
-                </span>
-              ))}
-            </div>
-          )}
           <span>{formatMessageDateTime(message.timestamp)}</span>
           {modelLabel && <span className="opacity-70">{modelLabel}</span>}
         </div>
