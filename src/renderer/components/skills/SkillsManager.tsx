@@ -92,6 +92,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
   const importInputRef = useRef<HTMLInputElement>(null);
   const marketplaceLoadedRef = useRef(false);
+  const marketplaceScrollRootRef = useRef<HTMLDivElement>(null);
+  const marketplaceLoadMoreRef = useRef<HTMLDivElement>(null);
 
   const refreshMarketplace = useCallback(async (forceRefresh = false) => {
     setIsLoadingMarketplace(true);
@@ -110,36 +112,47 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     }
   }, []);
 
-  const loadMarketplacePage = useCallback(
-    async (pageNumber: number) => {
-      if (
-        pageNumber < 1 ||
-        isLoadingMarketplace ||
-        isLoadingMoreMarketplace ||
-        (pageNumber > marketplacePageNumber && !marketplaceHasMore)
-      ) {
-        return;
-      }
+  const loadMoreMarketplaceSkills = useCallback(async () => {
+    if (
+      isLoadingMarketplace ||
+      isLoadingMoreMarketplace ||
+      !marketplaceHasMore ||
+      activeTab !== SkillTab.Marketplace
+    ) {
+      return;
+    }
 
-      setIsLoadingMoreMarketplace(true);
-      try {
-        const page = await skillService.fetchMarketplaceSkills({
-          pageNumber,
-          pageSize: SKILL_PAGE_SIZE,
-        });
-        setMarketplaceSkills(page.skills);
-        setMarketplacePageNumber(pageNumber);
-        setMarketplaceHasMore(page.hasMore);
-      } catch (error) {
-        setSkillActionError(
-          error instanceof Error ? error.message : i18nService.t('skillMarketplaceLoadFailed'),
-        );
-      } finally {
-        setIsLoadingMoreMarketplace(false);
-      }
-    },
-    [isLoadingMarketplace, isLoadingMoreMarketplace, marketplaceHasMore, marketplacePageNumber],
-  );
+    setIsLoadingMoreMarketplace(true);
+    try {
+      const nextPageNumber = marketplacePageNumber + 1;
+      const page = await skillService.fetchMarketplaceSkills({
+        pageNumber: nextPageNumber,
+        pageSize: SKILL_PAGE_SIZE,
+      });
+      setMarketplaceSkills(prevSkills => {
+        const mergedSkills = [...prevSkills];
+        const existingIds = new Set(prevSkills.map(skill => skill.id));
+        for (const skill of page.skills) {
+          if (!existingIds.has(skill.id)) mergedSkills.push(skill);
+        }
+        return mergedSkills;
+      });
+      setMarketplacePageNumber(nextPageNumber);
+      setMarketplaceHasMore(page.hasMore);
+    } catch (error) {
+      setSkillActionError(
+        error instanceof Error ? error.message : i18nService.t('skillMarketplaceLoadFailed'),
+      );
+    } finally {
+      setIsLoadingMoreMarketplace(false);
+    }
+  }, [
+    activeTab,
+    isLoadingMarketplace,
+    isLoadingMoreMarketplace,
+    marketplaceHasMore,
+    marketplacePageNumber,
+  ]);
 
   const showToast = (message: string) => {
     window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
@@ -173,6 +186,26 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       marketplaceLoadedRef.current = false;
     });
   }, [activeTab, refreshMarketplace]);
+
+  useEffect(() => {
+    if (activeTab !== SkillTab.Marketplace || !marketplaceHasMore || isLoadingMarketplace) return;
+
+    const root = marketplaceScrollRootRef.current;
+    const target = marketplaceLoadMoreRef.current;
+    if (!root || !target) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          void loadMoreMarketplaceSkills();
+        }
+      },
+      { root, rootMargin: '200px 0px', threshold: 0 },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeTab, isLoadingMarketplace, loadMoreMarketplaceSkills, marketplaceHasMore]);
 
   useEffect(() => {
     if (!isRemoteImportOpen) return;
@@ -744,7 +777,6 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
           <SkillsPageToolbar
             activeTab={activeTab}
             installedCount={installedSkills.length}
-            marketplaceCount={marketplaceSkills.length}
             searchQuery={skillSearchQuery}
             isAddMenuOpen={isAddSkillMenuOpen}
             isDownloading={isDownloadingSkill}
@@ -887,7 +919,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 {i18nService.t('downloadingSkill')}
               </div>
             ) : (
-              <div className="h-full overflow-y-auto pr-2">
+              <div ref={marketplaceScrollRootRef} className="h-full overflow-y-auto pr-2">
                 <MarketplaceSkillGrid
                   skills={filteredMarketplaceSkills}
                   installedSkillIds={installedSkillIds}
@@ -904,13 +936,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                     {i18nService.t('downloadingSkill')}
                   </div>
                 )}
-                <ListPagination
-                  page={marketplacePageNumber}
-                  hasNext={marketplaceHasMore}
-                  disabled={isLoadingMoreMarketplace}
-                  className="py-4"
-                  onPageChange={page => void loadMarketplacePage(page)}
-                />
+                {marketplaceHasMore && <div ref={marketplaceLoadMoreRef} className="h-1 w-full" />}
               </div>
             ))}
         </div>
