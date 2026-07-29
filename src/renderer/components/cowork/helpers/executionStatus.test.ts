@@ -142,3 +142,99 @@ test('recognizes only an explicitly marked final answer', () => {
   expect(getFinalAnswerIndex([activeTool, answer])).toBe(-1);
   expect(getFinalAnswerIndex([activeTool, answer, finalAnswer])).toBe(2);
 });
+
+test('uses the last completed answer as a fallback after the turn completes', () => {
+  const completedAnswer: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'answer-1',
+      type: 'assistant',
+      content: 'Completed answer',
+      timestamp: 1,
+      metadata: { isStreaming: false, isFinal: true },
+    },
+  };
+  const trailingThinking: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'thinking-1',
+      type: 'assistant',
+      content: 'Trailing internal step',
+      timestamp: 2,
+      metadata: { isThinking: true, isStreaming: false, isFinal: true },
+    },
+  };
+
+  expect(getFinalAnswerIndex([completedAnswer, trailingThinking], false)).toBe(-1);
+  expect(getFinalAnswerIndex([completedAnswer, trailingThinking], true)).toBe(0);
+});
+
+test('does not use a streaming answer as the completed fallback', () => {
+  const completedAnswer: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'answer-0',
+      type: 'assistant',
+      content: 'Prior completed answer',
+      timestamp: 0,
+      metadata: { isStreaming: false, isFinal: true },
+    },
+  };
+  const streamingAnswer: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'answer-1',
+      type: 'assistant',
+      content: 'Still streaming',
+      timestamp: 1,
+      metadata: { isStreaming: true, isFinal: false },
+    },
+  };
+
+  expect(getFinalAnswerIndex([completedAnswer, streamingAnswer], true)).toBe(-1);
+});
+
+test('does not use the completed fallback while a tool is incomplete', () => {
+  const completedAnswer: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'answer-1',
+      type: 'assistant',
+      content: 'Intermediate answer',
+      timestamp: 1,
+      metadata: { isStreaming: false, isFinal: true },
+    },
+  };
+
+  expect(
+    getFinalAnswerIndex(
+      [completedAnswer, toolGroup('read-1', 'read', { path: 'src/app.ts' })],
+      true,
+    ),
+  ).toBe(-1);
+});
+
+test('keeps an explicit final answer when completed steps follow it', () => {
+  const finalAnswer: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'answer-1',
+      type: 'assistant',
+      content: 'Final answer',
+      timestamp: 1,
+      metadata: { isStreaming: false, isFinal: true, isFinalAnswer: true },
+    },
+  };
+  const trailingThinking: AssistantTurnItem = {
+    type: 'assistant',
+    message: {
+      id: 'thinking-1',
+      type: 'assistant',
+      content: 'Trailing internal step',
+      timestamp: 2,
+      metadata: { isThinking: true, isStreaming: false, isFinal: true },
+    },
+  };
+
+  expect(getFinalAnswerIndex([finalAnswer, trailingThinking])).toBe(0);
+});

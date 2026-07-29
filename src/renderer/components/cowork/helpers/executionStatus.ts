@@ -61,13 +61,34 @@ export const getCurrentExecutionStatus = (
   return null;
 };
 
-export const getFinalAnswerIndex = (items: AssistantTurnItem[]): number => {
+export const getFinalAnswerIndex = (
+  items: AssistantTurnItem[],
+  allowCompletedFallback = false,
+): number => {
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
     if (
       item.type === 'assistant' &&
       !item.message.metadata?.isThinking &&
       item.message.metadata?.isFinalAnswer === true &&
+      hasText(item.message.content)
+    ) {
+      return index;
+    }
+  }
+  const hasStreamingAnswer = items.some(
+    item =>
+      item.type === 'assistant' &&
+      !item.message.metadata?.isThinking &&
+      item.message.metadata?.isStreaming,
+  );
+  if (!allowCompletedFallback || hasStreamingAnswer || getCurrentExecutionStatus(items)) return -1;
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (
+      item.type === 'assistant' &&
+      !item.message.metadata?.isThinking &&
+      !item.message.metadata?.isStreaming &&
       hasText(item.message.content)
     ) {
       return index;

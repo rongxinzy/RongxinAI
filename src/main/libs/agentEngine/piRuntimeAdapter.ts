@@ -42,6 +42,7 @@ import {
   type PiAskUserQuestionInput,
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
+import { buildPiConversationPrompt } from './piConversationContext';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import type {
   CoworkContinueOptions,
@@ -58,6 +59,7 @@ interface PiSession {
   prompt(text: string): Promise<void>;
   abort(): Promise<void>;
   abortBash(): void;
+  reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
@@ -101,6 +103,9 @@ interface ActivePiSession {
   modelRuntime: PiModelRuntime | null;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
+  requestedSkillIds: string[] | undefined;
+  requestedExpertIds: string[];
+  resourceState: PiResourceState;
   /** Message id for the visible answer (text) bubble of the current turn. */
   assistantMessageId: string | null;
   /** Message id for the thinking bubble of the current turn. */
@@ -142,6 +147,11 @@ interface PiModules {
 
 interface PiResourceLoader {
   reload(): Promise<void>;
+}
+
+interface PiResourceState {
+  systemPrompt: string;
+  skillIds: string[] | undefined;
 }
 
 interface PiModelRuntime {
@@ -203,6 +213,23 @@ const MESSAGE_UPDATE_THROTTLE_MS = 200;
  * and flush the latest content on finalize.
  */
 const STORE_UPDATE_THROTTLE_MS = 250;
+
+const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined =>
+  skillIds === undefined
+    ? undefined
+    : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
+
+const normalizeExpertIds = (expertIds: string[] | undefined): string[] =>
+  expertIds === undefined
+    ? []
+    : [...new Set(expertIds.map(expertId => expertId.trim()).filter(Boolean))];
+
+const haveSameStringList = (left: string[] | undefined, right: string[] | undefined): boolean =>
+  left === right ||
+  (left !== undefined &&
+    right !== undefined &&
+    left.length === right.length &&
+    left.every((value, index) => value === right[index]));
 
 // ── PiRuntimeAdapter ──
 
@@ -315,26 +342,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       // pi's formatSkillsForPrompt — no manual injection here to avoid
       // duplicating the skills section.
       const basePrompt = options.systemPrompt?.trim() || '';
-      const history = options.conversationHistory;
-      const historyBlock =
-        history && history.length > 0
-          ? [
-              '=== PREVIOUS CONVERSATION (context only, do not re-execute) ===',
-              ...history.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`),
-              '=== END PREVIOUS CONVERSATION ===',
-            ].join('\n')
-          : '';
-      const effectiveSystemPrompt = [basePrompt, historyBlock].filter(Boolean).join('\n\n');
+      const resourceState: PiResourceState = {
+        systemPrompt: basePrompt,
+        skillIds: normalizeSkillIds(options.skillIds),
+      };
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
       // default resource loader supplies the Pi Coding Assistant identity,
       // so override that loader per session to keep expert contexts isolated.
-      const resourceLoader = await this.createPiResourceLoader(
-        pi,
-        workspaceRoot,
-        effectiveSystemPrompt,
-        options.skillIds,
-      );
+      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState);
       sessionOptions.resourceLoader = resourceLoader;
 
       // Resolve model early — needed by both MCP proxy and subagent tool
@@ -410,7 +426,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         piSession: session,
         abortController,
         modelRuntime: resolvedModel.modelRuntime,
-        requestedSystemPrompt: options.systemPrompt?.trim() || '',
+        requestedSystemPrompt: basePrompt,
+        requestedSkillIds: resourceState.skillIds,
+        requestedExpertIds: normalizeExpertIds(options.expertIds),
+        resourceState,
         assistantMessageId: null,
         thinkingMessageId: null,
         answerText: '',
@@ -460,14 +479,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         `[PiRuntime] continueSession: session ${sessionId} not active or was aborted, restoring context via prompt`,
       );
       const storedSession = this.store?.getSession(sessionId);
-      // Load previous messages and embed them as context prepended to the PI prompt.
-      // The user message saved/emitted to the renderer stays the clean original prompt.
       const history = storedSession?.messages ?? [];
-      const contextParts = history
-        .filter(m => m.type === 'user' || m.type === 'assistant')
-        .map(m => `${m.type === 'user' ? 'User' : 'Assistant'}: ${m.content}`);
-      const piPrompt =
-        contextParts.length > 0 ? `${contextParts.join('\n\n')}\n\nUser: ${prompt}` : prompt;
+      const piPrompt = buildPiConversationPrompt(history, prompt);
       return this.startSession(sessionId, prompt, {
         ...options,
         systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
@@ -480,20 +493,49 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     }
 
     const requestedSystemPrompt = options.systemPrompt?.trim();
-    if (
-      requestedSystemPrompt !== undefined &&
-      requestedSystemPrompt !== active.requestedSystemPrompt
-    ) {
+    const requestedSkillIds =
+      options.skillIds === undefined
+        ? active.requestedSkillIds
+        : normalizeSkillIds(options.skillIds);
+    const requestedExpertIds =
+      options.expertIds === undefined
+        ? active.requestedExpertIds
+        : normalizeExpertIds(options.expertIds);
+    if (!haveSameStringList(requestedExpertIds, active.requestedExpertIds)) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       return this.startSession(sessionId, prompt, {
         ...options,
-        conversationHistory: history
-          .filter(
-            (message): message is CoworkMessage & { type: 'user' | 'assistant' } =>
-              message.type === 'user' || message.type === 'assistant',
-          )
-          .map(message => ({ role: message.type, content: message.content })),
+        systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
+        skillIds: requestedSkillIds,
+        expertIds: requestedExpertIds,
+        _piPromptOverride: buildPiConversationPrompt(history, prompt),
       });
+    }
+
+    const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
+    const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
+    const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
+    if (promptChanged || skillsChanged) {
+      const previousSystemPrompt = active.resourceState.systemPrompt;
+      const previousSkillIds = active.resourceState.skillIds;
+      active.resourceState.systemPrompt = nextSystemPrompt;
+      active.resourceState.skillIds = requestedSkillIds;
+      try {
+        // Pi reloads the existing ResourceLoader without replacing transcript
+        // state, model, MCP tools, or custom expert tools.
+        await active.piSession.reload();
+        active.requestedSystemPrompt = nextSystemPrompt;
+        active.requestedSkillIds = requestedSkillIds;
+        console.debug(
+          `[PiRuntime] reloaded session resources after ${promptChanged ? 'prompt' : 'skill'} change`,
+        );
+      } catch (error) {
+        active.resourceState.systemPrompt = previousSystemPrompt;
+        active.resourceState.skillIds = previousSkillIds;
+        const message = error instanceof Error ? error.message : String(error);
+        this.emit('error', sessionId, classifyCoworkError(message));
+        throw error;
+      }
     }
 
     // Reset turn state
@@ -617,8 +659,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   private async createPiResourceLoader(
     pi: PiModules,
     cwd: string,
-    systemPrompt: string,
-    skillIds?: string[],
+    resourceState: PiResourceState,
   ): Promise<PiResourceLoader> {
     const resourceLoader = new pi.DefaultResourceLoader({
       cwd,
@@ -628,16 +669,21 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
       noSkills: true,
       additionalSkillPaths: this.resolveZhiyuanSkillDirs(),
-      skillsOverride:
-        skillIds === undefined
-          ? undefined
-          : (base: { skills: Array<{ name?: string; id?: string }>; diagnostics: unknown[] }) => ({
+      skillsOverride: (base: {
+        skills: Array<{ name?: string; id?: string }>;
+        diagnostics: unknown[];
+      }) =>
+        resourceState.skillIds === undefined
+          ? base
+          : {
               ...base,
               skills: base.skills.filter(
-                skill => skillIds.includes(skill.id || '') || skillIds.includes(skill.name || ''),
+                skill =>
+                  resourceState.skillIds?.includes(skill.id || '') ||
+                  resourceState.skillIds?.includes(skill.name || ''),
               ),
-            }),
-      systemPromptOverride: () => systemPrompt || '',
+            },
+      systemPromptOverride: () => resourceState.systemPrompt,
       // Pi bypasses tool promptGuidelines when systemPromptOverride is non-empty.
       // Append this policy so it remains present for both default and custom prompts.
       appendSystemPromptOverride: (): string[] => [PiAskUserQuestionSystemPrompt],
@@ -709,8 +755,6 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         active.answerText = '';
         active.thinkingText = '';
         active.thinkingLifecycle.reset();
-        active.lastCompletedAnswerMessageId = null;
-        active.lastCompletedAnswerText = '';
         break;
 
       case 'message_start':
@@ -1554,7 +1598,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           subOptions.resourceLoader = await this.createPiResourceLoader(
             pi,
             subOptions.cwd as string,
-            systemPrompt,
+            { systemPrompt, skillIds: undefined },
           );
           if (modelRuntime) {
             subOptions.modelRuntime = modelRuntime;
