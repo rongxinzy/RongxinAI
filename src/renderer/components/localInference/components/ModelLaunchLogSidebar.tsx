@@ -4,7 +4,7 @@ import { LocalInferenceLogViewer } from './LocalInferenceLogViewer';
 import { cn } from '@shared/lib/utils';
 import { Download, X } from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
 import {
@@ -17,8 +17,9 @@ import type { ModelLaunchLogPanelState } from '../hooks/useModelLaunchLogs';
 import { ModelLaunchLogPanelStatus } from '../hooks/useModelLaunchLogs';
 
 const MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH = 300;
-const MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH = 720;
+const MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH = 560;
 const MODEL_LAUNCH_LOG_MAIN_CONTENT_MIN_WIDTH = 520;
+const MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT = 900;
 const MODEL_LAUNCH_LOG_DETAIL_SEPARATOR = ' ';
 
 const LlamaCppProcessLogMessage = {
@@ -42,11 +43,33 @@ export function ModelLaunchLogSidebar({
   const [isPresent, setIsPresent] = useState(state.visible);
   const [isEntered, setIsEntered] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(getMaxSidebarWidth);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
+
+  useEffect(() => {
+    const container = sidebarRef.current?.parentElement;
+    if (!container) return;
+
+    const updateContainerWidth = () => {
+      setContainerWidth(container.getBoundingClientRect().width);
+    };
+    updateContainerWidth();
+
+    if (typeof ResizeObserver === 'undefined') return;
+    const resizeObserver = new ResizeObserver(updateContainerWidth);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (containerWidth <= 0) return;
+    setSidebarWidth(current => Math.min(current, getMaxSidebarWidth(containerWidth)));
+  }, [containerWidth]);
 
   useEffect(() => {
     if (state.visible) {
-      setSidebarWidth(getMaxSidebarWidth());
+      setSidebarWidth(getMaxSidebarWidth(containerWidth));
       setIsPresent(true);
       const frame = window.requestAnimationFrame(() => {
         setIsEntered(true);
@@ -61,10 +84,11 @@ export function ModelLaunchLogSidebar({
     }, LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [state.visible]);
+  }, [containerWidth, state.visible]);
 
   const isPanelEntered = state.visible && isEntered;
   const isPanelPresent = state.visible || isPresent;
+  const isCompact = containerWidth > 0 && containerWidth < MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT;
   const handleDownloadLogs = () => {
     if (state.logs.length === 0) return;
 
@@ -96,7 +120,7 @@ export function ModelLaunchLogSidebar({
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
       const nextWidth = startWidth + startX - moveEvent.clientX;
-      setSidebarWidth(clampSidebarWidth(nextWidth));
+      setSidebarWidth(clampSidebarWidth(nextWidth, getMaxSidebarWidth(containerWidth)));
     };
 
     const handlePointerEnd = () => {
@@ -116,9 +140,11 @@ export function ModelLaunchLogSidebar({
   return (
     <aside
       aria-hidden={!state.visible}
+      ref={sidebarRef}
       className={cn(
-        'relative flex h-full shrink-0 border-l bg-background ease-in-out',
+        'flex h-full border-l bg-background ease-in-out',
         'overflow-hidden transition-[width,border-color]',
+        isCompact ? 'absolute inset-y-0 right-0 z-20 shadow-xl' : 'relative shrink-0',
         isPanelPresent ? 'border-border' : 'border-transparent',
       )}
       style={{
@@ -219,18 +245,30 @@ function ModelLaunchLogSidebarToolbar({
     </header>
   );
 }
-function clampSidebarWidth(width: number): number {
-  return Math.min(Math.max(width, MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH), getMaxSidebarWidth());
+function clampSidebarWidth(width: number, maxWidth = getMaxSidebarWidth()): number {
+  return Math.min(
+    Math.max(width, MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH),
+    Math.max(MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH, maxWidth),
+  );
 }
 
-function getMaxSidebarWidth(): number {
-  if (typeof window === 'undefined') return MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH;
+function getMaxSidebarWidth(containerWidth = 0): number {
+  const availableWidth =
+    containerWidth > 0
+      ? containerWidth
+      : typeof window === 'undefined'
+        ? MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH
+        : window.innerWidth;
+
+  if (availableWidth < MODEL_LAUNCH_LOG_COMPACT_BREAKPOINT) {
+    return Math.min(MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH, availableWidth);
+  }
 
   return Math.max(
     MODEL_LAUNCH_LOG_SIDEBAR_MIN_WIDTH,
     Math.min(
       MODEL_LAUNCH_LOG_SIDEBAR_MAX_WIDTH,
-      window.innerWidth - MODEL_LAUNCH_LOG_MAIN_CONTENT_MIN_WIDTH,
+      availableWidth - MODEL_LAUNCH_LOG_MAIN_CONTENT_MIN_WIDTH,
     ),
   );
 }
