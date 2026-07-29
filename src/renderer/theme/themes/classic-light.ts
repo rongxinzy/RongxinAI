@@ -36,6 +36,8 @@ export const classicLight: ThemeDefinition = {
     'model-tag-green-background': 'oklch(0.96 0.025 155)',
     'model-tag-green-foreground': 'oklch(0.45 0.1 155)',
     'model-tag-green-border': 'oklch(0.89 0.05 155)',
+    'skill-blue-background': 'oklch(0.9567 0.0211 252.5)',
+    'skill-blue-foreground': 'oklch(0.6234 0.2055 256.39)',
     'text-primary': 'oklch(0.147 0.004 49.25)',
     'text-muted-foreground': 'oklch(0.553 0.013 58.071)',
     'text-muted': 'oklch(0.553 0.013 58.071)',

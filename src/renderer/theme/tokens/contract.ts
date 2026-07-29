@@ -40,6 +40,8 @@ export const TOKEN_CONTRACT = {
   'model-tag-green-background': '--zy-model-tag-green-background',
   'model-tag-green-foreground': '--zy-model-tag-green-foreground',
   'model-tag-green-border': '--zy-model-tag-green-border',
+  'skill-blue-background': '--zy-skill-blue-background',
+  'skill-blue-foreground': '--zy-skill-blue-foreground',
 
   // ── Text hierarchy ──
   'text-primary': '--zy-text-primary',
