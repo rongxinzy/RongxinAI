@@ -122,9 +122,8 @@ export function MarketplacePanel({
       const contentPaddingBottom = content
         ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
         : 0;
-      const gridTop = gridRect.top - viewportRect.top + contentViewport.scrollTop;
-      const panelTop =
-        panel.getBoundingClientRect().top - viewportRect.top + contentViewport.scrollTop;
+      const gridTop = gridRect.top - viewportRect.top;
+      const panelTop = panel.getBoundingClientRect().top - viewportRect.top;
       const nextPanelMinHeight = Math.max(
         0,
         Math.floor(contentViewport.clientHeight - panelTop - contentPaddingBottom),
