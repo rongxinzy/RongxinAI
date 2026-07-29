@@ -1,5 +1,6 @@
+# feature_request.yml
 name: Feature Request
-about: Suggest an idea for ZhiYuanAgent
+description: Suggest an idea for ZhiYuan Agent
 title: '[Feature] '
 labels: ['enhancement']
 body:
