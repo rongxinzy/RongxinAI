@@ -40,16 +40,13 @@ export const PlusMenuSkillsIcon: React.FC<PlusMenuIconProps> = ({ className }) =
   </svg>
 );
 
-/** 会话专家：人物与肩部星标。 */
+/** 会话专家：学位帽人物（学者意象）。 */
 export const PlusMenuExpertsIcon: React.FC<PlusMenuIconProps> = ({ className }) => (
   <svg {...baseProps} className={className}>
-    <circle cx="7" cy="5.6" r="2.3" />
-    <path d="M2.8 13.4c.7-2.4 2.3-3.6 4.2-3.6s3.5 1.2 4.2 3.6" />
-    <path
-      d="M12.4 2.2l.65 1.3 1.45.2-1.05 1 .25 1.45-1.3-.7-1.3.7.25-1.45-1.05-1 1.45-.2z"
-      fill="currentColor"
-      stroke="none"
-    />
+    <path d="M8 2.4l6 2.5-6 2.5-6-2.5z" />
+    <path d="M5.3 6.3v2.2c0 1 1.2 1.7 2.7 1.7s2.7-.7 2.7-1.7V6.3" />
+    <path d="M14 5v2.8" />
+    <path d="M3.7 13.8c.7-1.9 2.3-2.9 4.3-2.9s3.6 1 4.3 2.9" />
   </svg>
 );
 
