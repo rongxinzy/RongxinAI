@@ -23,7 +23,6 @@ import path from 'path';
 
 import type { OpenClawSessionPatch } from '../common/openclawSession';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
-import { buildScheduledTaskEnginePrompt } from '../scheduledTask/enginePrompt';
 import {
   migrateScheduledTaskRunsToOpenclaw,
   migrateScheduledTasksToOpenclaw,
@@ -43,6 +42,7 @@ import {
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
+  type CoworkSessionExpertSnapshot,
   CoworkSessionExpertSource,
 } from '../shared/cowork/sessionExperts';
 import { ApiIpc, CoworkStreamIpc, McpIpc, SkillsIpc } from '../shared/ipc/channels';
@@ -59,7 +59,8 @@ import { searchAnySearchGateway } from './libs/anysearchGateway';
 import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './libs/anysearchGatewayCredentials';
 import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
-import { applyCoworkLanguagePrompt, type CoworkPromptLanguage } from './coworkLanguagePrompt';
+import type { CoworkPromptLanguage } from './coworkLanguagePrompt';
+import { composeCoworkSystemPrompt } from './coworkPrompt/composer';
 import {
   type CoworkExecutionMode,
   type CoworkMessageType,
@@ -2547,30 +2548,32 @@ const getIMGatewayManager = () => {
   return imGatewayManager;
 };
 
-function mergeCoworkSystemPrompt(
-  systemPrompt?: string,
-  skipZhiyuanIdentity = false,
-): string | undefined {
-  const zhiyuanIdentity = [
-    'You are 知远智能体 (ZhiYuan Agent).',
-    'The official Chinese product name is 知远智能体, and the official English product name is ZhiYuan Agent.',
-    '知远智能体 (ZhiYuan Agent) is a product of 北京容芯致远. Mention the company only when the user asks about product ownership, company background, or brand affiliation.',
-    'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
-    'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
-    'Do not use any other product name, model name, runtime name, or preset role as your identity.',
-    'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
-  ].join('\n');
-  const sections = [
-    skipZhiyuanIdentity ? null : zhiyuanIdentity,
-    buildScheduledTaskEnginePrompt(),
-    systemPrompt?.trim() || '',
-  ].filter(Boolean);
-  if (sections.length === 0) return undefined;
-
+const resolveCoworkPromptLanguage = (): CoworkPromptLanguage => {
   const configuredLanguage = getStore().get<AppConfigSettings>('app_config')?.language;
-  const language: CoworkPromptLanguage = configuredLanguage === 'en' ? 'en' : 'zh';
-  return applyCoworkLanguagePrompt(sections.join('\n\n'), language);
-}
+  return configuredLanguage === 'en' ? 'en' : 'zh';
+};
+
+const haveSameExpertSnapshots = (
+  left: CoworkSessionExpertSnapshot[],
+  right: CoworkSessionExpertInput[],
+): boolean =>
+  left.length === right.length &&
+  left.every(
+    (expert, index) =>
+      expert.expertId === right[index]?.expertId &&
+      expert.contentHash === right[index]?.contentHash,
+  );
+
+const haveSameExpertIds = (
+  experts: CoworkSessionExpertSnapshot[],
+  requestedExpertIds: string[],
+): boolean => {
+  const normalizedIds = [...new Set(requestedExpertIds.map(id => id.trim()).filter(Boolean))];
+  return (
+    experts.length === normalizedIds.length &&
+    experts.every((expert, index) => expert.expertId === normalizedIds[index])
+  );
+};
 
 const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpertInput[] => {
   const snapshots: CoworkSessionExpertInput[] = [];
@@ -4112,16 +4115,16 @@ if (!gotTheLock) {
         const expertSnapshots = resolveSessionExpertSnapshots(
           options.expertIds ?? fallbackExpertIds,
         );
-        const expertPrompt = expertSnapshots.map(expert => expert.promptSnapshot).join('\n\n');
-        const isExpertSession = expertSnapshots.length > 0;
-        const sessionPrompt = [
-          selectedAgent && !isExpertSession ? selectedAgent.systemPrompt : undefined,
-          options.systemPrompt ?? config.systemPrompt,
-          expertPrompt,
-        ]
-          .filter((prompt): prompt is string => Boolean(prompt?.trim()))
-          .join('\n\n');
-        const systemPrompt = mergeCoworkSystemPrompt(sessionPrompt, isExpertSession);
+        // The renderer already includes the selected non-expert agent prompt when
+        // present. Treat that request value as the source prompt instead of
+        // appending the same agent prompt again in the main process.
+        const basePrompt =
+          options.systemPrompt ?? selectedAgent?.systemPrompt ?? config.systemPrompt;
+        const systemPrompt = composeCoworkSystemPrompt({
+          basePrompt,
+          expertSnapshots,
+          language: resolveCoworkPromptLanguage(),
+        });
         const workspace = options.workspaceId
           ? coworkStoreInstance.getWorkspace(options.workspaceId)
           : null;
@@ -4293,23 +4296,29 @@ if (!gotTheLock) {
         const runtime = getPiRuntimeAdapter();
         const store = getCoworkStore();
         let existingSession = store.getSession(options.sessionId);
-        if (options.expertIds !== undefined && existingSession) {
-          const expertSnapshots = resolveSessionExpertSnapshots(options.expertIds);
-          let basePrompt = existingSession.systemPrompt;
-          for (const expert of existingSession.experts) {
-            basePrompt = basePrompt.split(expert.promptSnapshot).join('');
+        if (existingSession) {
+          const previousExpertSnapshots = existingSession.experts;
+          const expertSnapshots =
+            options.expertIds === undefined ||
+            haveSameExpertIds(previousExpertSnapshots, options.expertIds)
+              ? previousExpertSnapshots
+              : resolveSessionExpertSnapshots(options.expertIds);
+          const nextSystemPrompt = composeCoworkSystemPrompt({
+            basePrompt: existingSession.systemPrompt || options.systemPrompt,
+            expertSnapshots,
+            previousExpertSnapshots,
+            language: resolveCoworkPromptLanguage(),
+          });
+          const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
+          if (expertsChanged) {
+            store.replaceSessionExperts(options.sessionId, expertSnapshots);
           }
-          const expertPrompt = expertSnapshots.map(expert => expert.promptSnapshot).join('\n\n');
-          const sessionPrompt = [basePrompt, expertPrompt]
-            .filter((prompt): prompt is string => Boolean(prompt?.trim()))
-            .join('\n\n');
-          const nextSystemPrompt = mergeCoworkSystemPrompt(
-            sessionPrompt,
-            expertSnapshots.length > 0,
-          );
-          store.replaceSessionExperts(options.sessionId, expertSnapshots);
-          store.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt || '' });
-          existingSession = store.getSession(options.sessionId);
+          if (nextSystemPrompt !== existingSession.systemPrompt) {
+            store.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt });
+          }
+          if (expertsChanged || nextSystemPrompt !== existingSession.systemPrompt) {
+            existingSession = store.getSession(options.sessionId);
+          }
         }
         if (options.imageAttachments?.length) {
           console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
@@ -4341,12 +4350,12 @@ if (!gotTheLock) {
           ]),
         ];
 
-        const configuredLanguage = getStore().get<AppConfigSettings>('app_config')?.language;
-        const language: CoworkPromptLanguage = configuredLanguage === 'en' ? 'en' : 'zh';
-        const runtimeSystemPrompt = applyCoworkLanguagePrompt(
-          existingSession?.systemPrompt || options.systemPrompt,
-          language,
-        );
+        const runtimeSystemPrompt = existingSession
+          ? existingSession.systemPrompt
+          : composeCoworkSystemPrompt({
+              basePrompt: options.systemPrompt,
+              language: resolveCoworkPromptLanguage(),
+            });
 
         runtime
           .continueSession(options.sessionId, options.prompt, {

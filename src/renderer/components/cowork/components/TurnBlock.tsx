@@ -43,6 +43,7 @@ export const TurnBlock: React.FC<{
   mapDisplayText?: (value: string) => string;
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
+  isTurnComplete?: boolean;
 }> = ({
   turn,
   artifacts,
@@ -50,6 +51,7 @@ export const TurnBlock: React.FC<{
   mapDisplayText,
   showTypingIndicator = false,
   showCopyButtons = true,
+  isTurnComplete = true,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
@@ -149,10 +151,10 @@ export const TurnBlock: React.FC<{
           key={item.message.id}
           className={mutedExecution ? 'text-muted-foreground' : undefined}
           isStreaming={isStreaming}
-          defaultOpen={true}
+          defaultOpen={isStreaming}
           autoClose={false}
           duration={durationSeconds}
-          showConnector
+          showConnector={!isLastInSequence}
         >
           <ReasoningTrigger
             getThinkingMessage={(s, d) => {
@@ -161,7 +163,7 @@ export const TurnBlock: React.FC<{
               return <p>思考内容</p>;
             }}
           />
-          <ReasoningContent>{content}</ReasoningContent>
+          <ReasoningContent className="pl-4">{content}</ReasoningContent>
         </Reasoning>
       );
     }
@@ -277,16 +279,19 @@ export const TurnBlock: React.FC<{
     );
   };
   const visibleGroups = groups.filter(group => !isEmptyAnswerGroup(group));
-  const executionSummary = getExecutionSummary(visibleAssistantItems);
-  const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems);
-  const finalAnswerStarted =
-    finalAnswerIndex === visibleAssistantItems.length - 1 &&
-    lastAnswerGroupIndex >= 0 &&
-    lastAnswerGroupIndex === groups.length - 1 &&
-    !isEmptyAnswerGroup(groups[lastAnswerGroupIndex]);
-  const previousGroups = finalAnswerStarted ? groups.slice(0, lastAnswerGroupIndex) : [];
-  const finalAnswerGroup = finalAnswerStarted ? groups[lastAnswerGroupIndex] : null;
-  const previousItems = previousGroups.flatMap(group => group.items);
+  const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems, isTurnComplete);
+  const finalAnswerItem = finalAnswerIndex >= 0 ? visibleAssistantItems[finalAnswerIndex] : null;
+  const executionItems =
+    finalAnswerIndex >= 0
+      ? visibleAssistantItems.filter((_, index) => index !== finalAnswerIndex)
+      : [];
+  const executionSummary = getExecutionSummary(executionItems);
+
+  const isExecutionStep = (item: (typeof visibleAssistantItems)[number] | undefined) =>
+    item?.type === 'tool_group' ||
+    item?.type === 'tool_result' ||
+    item?.type === 'system' ||
+    (item?.type === 'assistant' && Boolean(item.message.metadata?.isThinking));
 
   const renderExecutionGroup = (
     group: (typeof groups)[number],
@@ -308,7 +313,10 @@ export const TurnBlock: React.FC<{
           : SparklesIcon
       : SparklesIcon;
     return (
-      <ChainOfThought key={groupKey} defaultOpen={false}>
+      <ChainOfThought
+        key={`${groupKey}-${isStreaming ? 'active' : 'complete'}`}
+        defaultOpen={isStreaming}
+      >
         <ChainOfThoughtHeader icon={headerIcon}>
           {isStreaming ? (
             <Shimmer duration={1}>{getExecutionStatusText(group.status!)}</Shimmer>
@@ -329,26 +337,18 @@ export const TurnBlock: React.FC<{
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-3">
-            {finalAnswerStarted && previousItems.length > 0 && (
+            {finalAnswerItem && executionItems.length > 0 && (
               <ExecutionSummary summary={executionSummary}>
-                {previousGroups.map(group =>
-                  group.items.map((item, index) => {
-                    const isAnswer =
-                      item.type === 'assistant' && !item.message.metadata?.isThinking;
-                    return renderItem(
-                      item,
-                      index,
-                      false,
-                      true,
-                      !isAnswer,
-                      isAnswer || index === group.items.length - 1,
-                    );
-                  }),
-                )}
+                {executionItems.map((item, index) => {
+                  const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
+                  const connectsToNextStep =
+                    isExecutionStep(item) && isExecutionStep(executionItems[index + 1]);
+                  return renderItem(item, index, false, true, !isAnswer, !connectsToNextStep);
+                })}
               </ExecutionSummary>
             )}
-            {finalAnswerStarted && finalAnswerGroup
-              ? renderExecutionGroup(finalAnswerGroup, 'final-answer', true)
+            {finalAnswerItem
+              ? renderItem(finalAnswerItem, finalAnswerIndex, true)
               : visibleGroups.map((group, index) =>
                   renderExecutionGroup(
                     group,

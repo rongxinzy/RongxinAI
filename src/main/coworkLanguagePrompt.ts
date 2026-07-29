@@ -27,20 +27,21 @@ const buildLanguagePrompt = (language: CoworkPromptLanguage): string => {
   ].join('\n');
 };
 
-const removePreviousLanguagePrompt = (systemPrompt: string): string => {
-  const start = systemPrompt.indexOf(LANGUAGE_PROMPT_START);
-  if (start < 0) return systemPrompt.trim();
-
-  const end = systemPrompt.indexOf(LANGUAGE_PROMPT_END, start);
-  if (end < 0) return systemPrompt.slice(0, start).trim();
-
-  return `${systemPrompt.slice(0, start)}${systemPrompt.slice(end + LANGUAGE_PROMPT_END.length)}`.trim();
+export const stripCoworkLanguagePrompts = (systemPrompt: string): string => {
+  let result = systemPrompt;
+  while (true) {
+    const start = result.indexOf(LANGUAGE_PROMPT_START);
+    if (start < 0) return result.trim();
+    const end = result.indexOf(LANGUAGE_PROMPT_END, start);
+    if (end < 0) return result.slice(0, start).trim();
+    result = `${result.slice(0, start)}${result.slice(end + LANGUAGE_PROMPT_END.length)}`;
+  }
 };
 
 export const applyCoworkLanguagePrompt = (
   systemPrompt: string | undefined,
   language: CoworkPromptLanguage,
 ): string => {
-  const basePrompt = removePreviousLanguagePrompt(systemPrompt?.trim() || '');
+  const basePrompt = stripCoworkLanguagePrompts(systemPrompt?.trim() || '');
   return [basePrompt, buildLanguagePrompt(language)].filter(Boolean).join('\n\n');
 };

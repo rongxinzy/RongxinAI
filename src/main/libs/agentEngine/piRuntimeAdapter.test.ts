@@ -11,6 +11,7 @@ const hoisted = vi.hoisted(() => {
     prompt: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     abortBash: vi.fn(),
+    reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn().mockReturnValue(() => {}),
   };
@@ -332,15 +333,64 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
 
-    it('should recreate an active session when its system prompt changes', async () => {
+    it('should reload an active session when its system prompt changes', async () => {
       await adapter.startSession('test', 'First', { systemPrompt: 'You are the original expert.' });
       await adapter.continueSession('test', 'Second', {
         systemPrompt: 'You are the replacement expert.',
       });
 
-      expect(mockSession.abort).toHaveBeenCalled();
-      expect(mockDefaultResourceLoader).toHaveBeenCalledTimes(2);
+      expect(mockSession.reload).toHaveBeenCalledOnce();
+      expect(mockSession.abort).not.toHaveBeenCalled();
+      expect(mockDefaultResourceLoader).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not reload or recreate an active session when resources are unchanged', async () => {
+      const options = { systemPrompt: 'Stable prompt', skillIds: ['skill-b', 'skill-a'] };
+      await adapter.startSession('test', 'First', options);
+      await adapter.continueSession('test', 'Second', options);
+      await adapter.continueSession('test', 'Third', options);
+
+      expect(mockSession.reload).not.toHaveBeenCalled();
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(mockSession.prompt).toHaveBeenCalledTimes(3);
+    });
+
+    it('should reload skill selection without replacing the active session', async () => {
+      await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
+          skills: Array<{ id: string }>;
+        };
+      };
+
+      expect(
+        loaderOptions.skillsOverride({
+          skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
+          diagnostics: [],
+        }).skills,
+      ).toEqual([{ id: 'skill-a' }]);
+
+      await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
+
+      expect(mockSession.reload).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(
+        loaderOptions.skillsOverride({
+          skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
+          diagnostics: [],
+        }).skills,
+      ).toEqual([{ id: 'skill-b' }]);
+    });
+
+    it('should recreate the session when expert tool topology changes', async () => {
+      await adapter.startSession('test', 'First', { expertIds: ['expert-a'] });
+      await adapter.continueSession('test', 'Second', { expertIds: ['expert-b'] });
+
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      expect(mockSession.reload).not.toHaveBeenCalled();
     });
   });
 
@@ -770,6 +820,45 @@ describe('PiRuntimeAdapter', () => {
           isFinalAnswer: true,
         },
       });
+    });
+
+    it('should preserve the latest answer across a trailing thinking-only internal turn', async () => {
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
+
+      await adapter.startSession('test', 'Hi');
+      driveAssistantTurn('Answer before trailing reasoning');
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Checking completion.' }],
+        },
+      });
+      listener!({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'thinking', thinking: 'Checking completion.' }],
+          stopReason: 'length',
+        },
+      });
+      listener!({ type: 'agent_end' });
+
+      expect(
+        updates.some(
+          update =>
+            update.content === 'Answer before trailing reasoning' &&
+            update.metadata?.isFinalAnswer === true,
+        ),
+      ).toBe(true);
     });
 
     it('should render thinking as a separate isThinking message, not as the answer', async () => {

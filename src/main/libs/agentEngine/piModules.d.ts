@@ -35,6 +35,7 @@ declare module '@earendil-works/pi-coding-agent' {
     session: {
       prompt(text: string): Promise<void>;
       abort(): Promise<void>;
+      reload(): Promise<void>;
       setModel(model: unknown): Promise<void>;
       subscribe(
         listener: (event: {
