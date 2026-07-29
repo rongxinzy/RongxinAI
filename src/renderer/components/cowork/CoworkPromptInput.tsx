@@ -1280,8 +1280,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           </PromptInputFooter>
         </PromptInput>
         {showFolderSelector && (
-          <div className="relative mt-1.5 flex justify-center">
-            <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="center">
+          <div className="relative mt-1.5 flex justify-start">
+            <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="top" align="start">
               <PromptInputButton
                 className={`gap-1.5 rounded-md text-muted-foreground hover:bg-surface-raised hover:text-foreground ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
               >
