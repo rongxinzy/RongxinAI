@@ -144,6 +144,8 @@ const CUSTOM_PROVIDER_KEYS = [
   'custom_9',
 ] as const;
 
+const OFFICIAL_WEBSITE_URL = 'https://www.rongxzyai.com';
+
 const providerKeys = [
   ...Object.values(ProviderName).filter(
     id => id !== ProviderName.Custom && id !== ProviderName.ZhiyuanServer,
@@ -5080,6 +5082,22 @@ const Settings: React.FC<SettingsProps> = ({
                   className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
                 >
                   github.com/rongxinzy/RongxinAI
+                </a>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                <span className="text-sm text-foreground">
+                  {i18nService.t('aboutOfficialWebsite')}
+                </span>
+                <a
+                  href={OFFICIAL_WEBSITE_URL}
+                  onClick={event => {
+                    event.preventDefault();
+                    void window.electron.shell.openExternal(OFFICIAL_WEBSITE_URL);
+                  }}
+                  rel="noopener noreferrer"
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                >
+                  {OFFICIAL_WEBSITE_URL}
                 </a>
               </div>
               <div className="flex items-center justify-between px-4 py-3">

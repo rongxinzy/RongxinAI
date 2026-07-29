@@ -648,6 +648,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handleTabChange = (value: string) => {
     const nextTab = value as LocalInferenceTab;
     if (nextTab === activeTab) return;
+    launchLogs.closePanel();
     setTabDirection(
       LOCAL_INFERENCE_TAB_ORDER.indexOf(nextTab) >=
         LOCAL_INFERENCE_TAB_ORDER.indexOf(activeTab)
