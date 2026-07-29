@@ -1,6 +1,5 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
 import { Button } from '@shared/components/ui/button';
-import { Puzzle } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -9,6 +8,7 @@ import type {
   CoworkMessage,
   CoworkMessageMetadata,
 } from '../../../types/cowork';
+import { PlusMenuSkillsIcon } from '../plusMenuIcons';
 import type { Skill } from '../../../types/skill';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
@@ -68,7 +68,7 @@ export const UserBubble: React.FC<{
                   key={skill.id}
                   className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground"
                 >
-                  <Puzzle className="size-3.5 shrink-0 text-muted-foreground" />
+                  <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{skill.name}</span>
                 </span>
               ))}

@@ -78,11 +78,3 @@ export const PlusMenuExpertGlyphIcon: React.FC<PlusMenuIconProps> = ({ className
     <path d="M3.4 13.4c.8-2.5 2.5-3.8 4.6-3.8s3.8 1.3 4.6 3.8" />
   </svg>
 );
-
-/** 连接器行缺省图标：带引脚的节点。 */
-export const PlusMenuServerGlyphIcon: React.FC<PlusMenuIconProps> = ({ className }) => (
-  <svg {...baseProps} className={className}>
-    <rect x="4.5" y="4.5" width="7" height="7" rx="1.5" />
-    <path d="M6.5 4.5V2.5M9.5 4.5V2.5M6.5 13.5v-2M9.5 13.5v-2M4.5 6.5h-2M4.5 9.5h-2M13.5 6.5h-2M13.5 9.5h-2" />
-  </svg>
-);

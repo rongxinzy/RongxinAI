@@ -10,6 +10,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
+import { Switch } from '@shared/components/ui/switch';
 import { Cable, Plus } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -26,7 +27,6 @@ import {
   PlusMenuExpertsIcon,
   PlusMenuFilesIcon,
   PlusMenuManageIcon,
-  PlusMenuServerGlyphIcon,
   PlusMenuSkillGlyphIcon,
   PlusMenuSkillsIcon,
 } from './plusMenuIcons';
@@ -63,6 +63,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const dispatch = useDispatch();
   const [open, setOpen] = useState(false);
   const [mcpLoading, setMcpLoading] = useState(false);
+  const [pendingServerId, setPendingServerId] = useState<string | null>(null);
   const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
 
   const skills = useSelector((state: RootState) => state.skill.skills);
@@ -72,13 +73,14 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
 
   const enabledSkills = useMemo(() => skills.filter(skill => skill.enabled), [skills]);
-  const serverRegistryIds = useMemo(
+  const serverRegistryIdsKey = useMemo(
     () =>
-      mcpServers
-        .map(server => server.registryId ?? server.id)
-        .filter((id, index, ids) => ids.indexOf(id) === index)
-        .sort()
-        .join(','),
+      JSON.stringify(
+        mcpServers
+          .map(server => server.registryId ?? server.id)
+          .filter((id, index, ids) => ids.indexOf(id) === index)
+          .sort(),
+      ),
     [mcpServers],
   );
 
@@ -129,14 +131,14 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   }, [open, dispatch]);
 
   useEffect(() => {
-    if (!open || !serverRegistryIds) return;
+    const requestedIds = JSON.parse(serverRegistryIdsKey) as string[];
+    if (!open || requestedIds.length === 0) return;
     let cancelled = false;
 
     const loadServerIcons = async () => {
       const marketplace = await mcpService.fetchMarketplace();
       if (!marketplace || cancelled) return;
 
-      const requestedIds = serverRegistryIds.split(',');
       const iconEntries = marketplace.registry.filter(
         entry => requestedIds.includes(entry.id) && entry.iconPath,
       );
@@ -154,7 +156,27 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, serverRegistryIds]);
+  }, [open, serverRegistryIdsKey]);
+
+  const handleToggleServer = useCallback(
+    async (serverId: string, enabled: boolean) => {
+      if (pendingServerId) return;
+      setPendingServerId(serverId);
+      try {
+        const updatedServers = await mcpService.setServerEnabled(serverId, enabled);
+        dispatch(setMcpServers(updatedServers));
+      } catch (error) {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
+          }),
+        );
+      } finally {
+        setPendingServerId(null);
+      }
+    },
+    [dispatch, pendingServerId],
+  );
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
@@ -194,8 +216,10 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                 <DropdownMenuCheckboxItem
                   key={skill.id}
                   checked={activeSkillIds.includes(skill.id)}
-                  closeOnClick={false}
-                  onCheckedChange={() => dispatch(toggleActiveSkill(skill.id))}
+                  onCheckedChange={() => {
+                    dispatch(toggleActiveSkill(skill.id));
+                    setOpen(false);
+                  }}
                 >
                   {skill.iconUrl ? (
                     <img
@@ -267,7 +291,14 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
               <DropdownMenuItem disabled>{i18nService.t('noConnectorsAvailable')}</DropdownMenuItem>
             ) : (
               mcpServers.map(server => (
-                <div key={server.id} className="flex items-center gap-1.5 px-1.5 py-1 text-sm">
+                <DropdownMenuItem
+                  key={server.id}
+                  closeOnClick={false}
+                  disabled={pendingServerId === server.id}
+                  onClick={() => {
+                    void handleToggleServer(server.id, !server.enabled);
+                  }}
+                >
                   {serverIcons[server.registryId ?? server.id] ? (
                     <img
                       src={serverIcons[server.registryId ?? server.id]}
@@ -275,10 +306,16 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                       className="size-4 object-contain"
                     />
                   ) : (
-                    <PlusMenuServerGlyphIcon className="size-4" />
+                    <Cable className="size-4" />
                   )}
                   <span className="truncate">{server.name}</span>
-                </div>
+                  <Switch
+                    size="sm"
+                    checked={server.enabled}
+                    className="pointer-events-none ml-auto"
+                    aria-label={server.name}
+                  />
+                </DropdownMenuItem>
               ))
             )}
             <DropdownMenuSeparator />

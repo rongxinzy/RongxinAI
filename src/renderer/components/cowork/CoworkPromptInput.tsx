@@ -11,7 +11,7 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { ChevronDown, Folder, Puzzle, TriangleAlert, X } from 'lucide-react';
+import { ChevronDown, Folder, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -60,6 +60,7 @@ import FolderSelectorPopover from './FolderSelectorPopover';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
+import { PlusMenuSkillsIcon } from './plusMenuIcons';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -1168,7 +1169,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   key={skill.id}
                   className="group inline-flex min-w-0 shrink items-center gap-1 rounded-md bg-muted py-1 pl-1 pr-1.5 text-sm text-foreground"
                 >
-                  <Puzzle className="size-3.5 shrink-0 text-muted-foreground group-hover:hidden" />
+                  <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground group-hover:hidden" />
                   <Button
                     type="button"
                     variant="ghost"

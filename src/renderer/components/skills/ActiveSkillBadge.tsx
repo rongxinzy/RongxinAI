@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { Puzzle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -9,6 +9,7 @@ import { RootState } from '../../store';
 import { clearSelection } from '../../store/slices/quickActionSlice';
 import { clearActiveSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import type { Skill } from '../../types/skill';
+import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import { findChatSkillShortcut } from '../chat/constants';
 
 interface SkillChipProps {
@@ -41,7 +42,7 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
       ) : ShortcutIcon ? (
         <ShortcutIcon className="size-3.5" />
       ) : (
-        <Puzzle className="size-3.5" />
+        <PlusMenuSkillsIcon className="size-3.5" />
       )}
       <span className="max-w-24 truncate">{label}</span>
       <button

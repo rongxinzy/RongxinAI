@@ -9,11 +9,12 @@ import {
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
 import { Separator } from '@shared/components/ui/separator';
-import { Check, Cog, Puzzle } from 'lucide-react';
+import { Check, Cog } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
+import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
 import { skillService } from '../../services/skill';
 import { RootState } from '../../store';
 import { Skill } from '../../types/skill';
@@ -129,7 +130,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                         {isActive ? (
                           <Check className="h-4 w-4" />
                         ) : (
-                          <Puzzle className="h-4 w-4 text-muted-foreground" />
+                          <PlusMenuSkillsIcon className="h-4 w-4 text-muted-foreground" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
