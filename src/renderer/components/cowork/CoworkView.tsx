@@ -14,6 +14,7 @@ import {
   ChatExecution,
   resolveChatExecution,
 } from '../../services/chatExecutionRouter';
+import { resolveSkillPlaceholderKey } from '../chat/constants';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
@@ -1392,7 +1393,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 disabled={false}
                 placeholder={
                   workMode === WorkMode.Chat
-                    ? i18nService.t('chatPlaceholder')
+                    ? i18nService.t(resolveSkillPlaceholderKey(activeSkillIds) ?? 'chatPlaceholder')
                     : i18nService.t('coworkPlaceholder')
                 }
                 size="large"
