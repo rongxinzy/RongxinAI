@@ -14,7 +14,7 @@ import {
   setCurrentSession,
   setLoadingSessionId,
 } from '../../store/slices/coworkSlice';
-import { CoworkSessionStatusValue } from '../../types/cowork';
+import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import CreateProjectDialog from '../cowork/CreateProjectDialog';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
@@ -29,7 +29,10 @@ interface MyAgentSidebarTreeProps {
   onToggleSelection: (sessionId: string) => void;
   onEnterBatchMode: (sessionId: string) => void;
   onVisibleSessionsChange?: (ids: string[]) => void;
+  onDismissSearch?: () => void;
   workMode?: 'work' | 'chat';
+  searchQuery?: string;
+  searchCorpus?: CoworkSessionSummary[];
 }
 
 const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
@@ -40,7 +43,10 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   onToggleSelection,
   onEnterBatchMode,
   onVisibleSessionsChange,
+  onDismissSearch,
   workMode = 'work',
+  searchQuery = '',
+  searchCorpus = [],
 }) => {
   const dispatch = useDispatch();
   const {
@@ -55,7 +61,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     collapseScheduledTasks,
     toggleExpanded,
     toggleScheduledExpanded,
-  } = useWorkspaceSidebarState(workMode);
+  } = useWorkspaceSidebarState(workMode, searchQuery, searchCorpus);
 
   useEffect(() => {
     onVisibleSessionsChange?.([
@@ -89,6 +95,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
       }
 
       onShowCowork();
+      onDismissSearch?.();
       await coworkService.loadSession(task.id);
     } finally {
       dispatch(clearLoadingSessionId(task.id));
@@ -168,9 +175,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
             <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/30">
               <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
             </div>
-            <h2 className="text-base font-semibold">
-              {i18nService.t('removeProjectDialogTitle')}
-            </h2>
+            <h2 className="text-base font-semibold">{i18nService.t('removeProjectDialogTitle')}</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             {i18nService.t('removeProjectDialogDescription')}
@@ -185,7 +190,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <div className="sticky top-0 z-30 flex h-10 items-center justify-between bg-surface-raised px-1.5">
+      <div className="sticky top-0 z-30 flex h-9 items-center justify-between bg-surface-raised px-1.5">
         <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
           {i18nService.t('workspaces')}
         </h2>
@@ -224,9 +229,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               selectedIds={selectedIds}
               onToggleExpanded={toggleExpanded}
               onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
-              onRemoveWorkspace={selectedWorkspace =>
-                setWorkspacePendingRemoval(selectedWorkspace)
-              }
+              onRemoveWorkspace={selectedWorkspace => setWorkspacePendingRemoval(selectedWorkspace)}
               onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
               onLoadMoreTasks={workspaceId => void loadMoreTasks(workspaceId)}
               onCollapseTasks={collapseTasks}

@@ -34,8 +34,8 @@ const ChatSkillShortcuts: React.FC = () => {
   };
 
   return (
-    <div className="mb-1">
-      <div className="flex h-10 items-center px-1.5">
+    <div className="mb-2">
+      <div className="flex h-9 items-center px-1.5">
         <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
           {i18nService.t('chatQuickSkillsTitle')}
         </h2>
