@@ -68,7 +68,7 @@ const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
  * scripts. Keep this as an explicit allowlist of skills that remain useful as guidance alone.
  * Replace it with capability-based filtering once skills expose that metadata.
  */
-const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx', 'frontend-design']);
+const CHAT_SKILL_IDS = new Set(['docx', 'xlsx', 'pptx', 'frontend-design', 'deep-research']);
 const IMAGE_EXTENSIONS = new Set([
   '.png',
   '.jpg',

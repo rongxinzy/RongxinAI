@@ -29,6 +29,7 @@ import { setWorkMode } from '../store/workMode/workModeSlice';
 import type { CoworkSessionSummary } from '../types/cowork';
 import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
+import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -499,6 +500,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {workMode === WorkMode.Chat && (
               <>
+                <ChatSkillShortcuts />
                 <div className="sticky top-0 z-30 flex h-10 items-center bg-surface-raised px-1.5">
                   <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
                     {i18nService.t('chatRecentTitle')}

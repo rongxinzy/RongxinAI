@@ -1,0 +1,5 @@
+name: 深度研究
+description: 围绕一个研究问题进行多轮网页检索、交叉验证事实，并产出结构清晰、附带来源引用的研究报告。
+author: ComposioHQ
+license: Apache-2.0
+skillmd: ./SKILL.md

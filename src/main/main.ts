@@ -38,7 +38,7 @@ import {
 import {
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
-  type CoworkSessionMode,
+  CoworkSessionMode,
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
@@ -4152,7 +4152,7 @@ if (!gotTheLock) {
           options.activeSkillIds || [],
           options.agentId || 'main',
           options.modelOverride || '',
-          'work',
+          options.mode ?? CoworkSessionMode.Work,
           undefined,
           selectedWorkspace.id,
           expertSnapshots,

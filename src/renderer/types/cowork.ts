@@ -1,4 +1,5 @@
 // Cowork image attachment for vision-capable models
+import type { CoworkSessionMode } from '../../shared/cowork/constants';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
 
 export interface CoworkImageAttachment {
@@ -234,6 +235,7 @@ export interface CoworkStartOptions {
   cwd?: string;
   systemPrompt?: string;
   title?: string;
+  mode?: CoworkSessionMode;
   activeSkillIds?: string[];
   workspaceId?: string;
   agentId?: string;
