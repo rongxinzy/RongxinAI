@@ -49,6 +49,7 @@ import {
   getVisibleProviders,
   isCustomProvider,
 } from '../config';
+import { SettingsToggleRow } from './common/SettingsToggleRow';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -3081,70 +3082,54 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Auto-launch Section */}
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-3">
-                {i18nService.t('autoLaunch')}
-              </h4>
-              <label className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {i18nService.t('autoLaunchDescription')}
-                </span>
-                <Switch
-                  checked={autoLaunch}
-                  onCheckedChange={async next => {
-                    if (isUpdatingAutoLaunch) return;
-                    setIsUpdatingAutoLaunch(true);
-                    try {
-                      const result = await window.electron.autoLaunch.set(next);
-                      if (result.success) {
-                        setAutoLaunchState(next);
-                      } else {
-                        setError(result.error || 'Failed to update auto-launch setting');
-                      }
-                    } catch (err) {
-                      console.error('Failed to set auto-launch:', err);
-                      setError('Failed to update auto-launch setting');
-                    } finally {
-                      setIsUpdatingAutoLaunch(false);
-                    }
-                  }}
-                  disabled={isUpdatingAutoLaunch}
-                />
-              </label>
-            </div>
+            <SettingsToggleRow
+              label={i18nService.t('autoLaunch')}
+              description={i18nService.t('autoLaunchDescription')}
+              checked={autoLaunch}
+              onCheckedChange={async next => {
+                if (isUpdatingAutoLaunch) return;
+                setIsUpdatingAutoLaunch(true);
+                try {
+                  const result = await window.electron.autoLaunch.set(next);
+                  if (result.success) {
+                    setAutoLaunchState(next);
+                  } else {
+                    setError(result.error || 'Failed to update auto-launch setting');
+                  }
+                } catch (err) {
+                  console.error('Failed to set auto-launch:', err);
+                  setError('Failed to update auto-launch setting');
+                } finally {
+                  setIsUpdatingAutoLaunch(false);
+                }
+              }}
+              disabled={isUpdatingAutoLaunch}
+            />
 
             {/* Prevent Sleep Section */}
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-3">
-                {i18nService.t('preventSleep')}
-              </h4>
-              <label className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {i18nService.t('preventSleepDescription')}
-                </span>
-                <Switch
-                  checked={preventSleep}
-                  onCheckedChange={async next => {
-                    if (isUpdatingPreventSleep) return;
-                    setIsUpdatingPreventSleep(true);
-                    try {
-                      const result = await window.electron.preventSleep.set(next);
-                      if (result.success) {
-                        setPreventSleepState(next);
-                      } else {
-                        setError(result.error || 'Failed to update prevent-sleep setting');
-                      }
-                    } catch (err) {
-                      console.error('Failed to set prevent-sleep:', err);
-                      setError('Failed to update prevent-sleep setting');
-                    } finally {
-                      setIsUpdatingPreventSleep(false);
-                    }
-                  }}
-                  disabled={isUpdatingPreventSleep}
-                />
-              </label>
-            </div>
+            <SettingsToggleRow
+              label={i18nService.t('preventSleep')}
+              description={i18nService.t('preventSleepDescription')}
+              checked={preventSleep}
+              onCheckedChange={async next => {
+                if (isUpdatingPreventSleep) return;
+                setIsUpdatingPreventSleep(true);
+                try {
+                  const result = await window.electron.preventSleep.set(next);
+                  if (result.success) {
+                    setPreventSleepState(next);
+                  } else {
+                    setError(result.error || 'Failed to update prevent-sleep setting');
+                  }
+                } catch (err) {
+                  console.error('Failed to set prevent-sleep:', err);
+                  setError('Failed to update prevent-sleep setting');
+                } finally {
+                  setIsUpdatingPreventSleep(false);
+                }
+              }}
+              disabled={isUpdatingPreventSleep}
+            />
 
             {/* System proxy Section */}
             <div>
@@ -5216,7 +5201,7 @@ const Settings: React.FC<SettingsProps> = ({
               <Button type="button" variant="outline" onClick={onClose}>
                 {i18nService.t('cancel')}
               </Button>
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" variant="outline" disabled={isSaving}>
                 {isSaving ? i18nService.t('saving') : i18nService.t('save')}
               </Button>
             </div>
@@ -5466,7 +5451,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <Button type="button" variant="outline" size="sm" onClick={handleCancelModelEdit}>
                   {i18nService.t('cancel')}
                 </Button>
-                <Button type="button" size="sm" onClick={handleSaveNewModel}>
+                <Button type="button" variant="outline" size="sm" onClick={handleSaveNewModel}>
                   {i18nService.t('save')}
                 </Button>
               </div>
@@ -5517,6 +5502,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </Button>
                 <Button
                   type="button"
+                  variant="outline"
                   size="sm"
                   onClick={() => {
                     void handleSaveCoworkMemoryEntry();

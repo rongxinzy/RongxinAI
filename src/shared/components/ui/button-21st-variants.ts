@@ -1,13 +1,9 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
 const button21stSurfaceClassName = [
-  'bg-[linear-gradient(180deg,#f7f7f7_0%,#ffffff_100%)]',
-  'shadow-[0_1px_2px_rgba(15,23,42,0.06),inset_0_1px_0_rgba(255,255,255,0.55)]',
-  "after:absolute after:inset-0 after:rounded-[inherit] after:border-[1.5px] after:border-white/50 after:content-[''] after:pointer-events-none",
-  'after:[-webkit-mask-image:linear-gradient(to_top,transparent_0,black_100%)] after:[mask-image:linear-gradient(to_top,transparent_0,black_100%)]',
-  'after:shadow-[inset_0_1px_2px_rgba(24,24,24,0.045)] after:transition-opacity',
-  'hover:bg-[linear-gradient(180deg,#eeeeee_0%,#ffffff_100%)] hover:shadow-[0_2px_5px_rgba(15,23,42,0.075),inset_0_1px_0_rgba(255,255,255,0.35)] hover:after:opacity-0',
-  'active:brightness-[0.995] active:shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)]',
+  'bg-surface shadow-sm',
+  'hover:bg-surface-tertiary hover:shadow-md',
+  'active:shadow-inset',
 ].join(' ');
 
 const button21stVariants = cva(
@@ -22,28 +18,25 @@ const button21stVariants = cva(
       variant: {
         primary: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-foreground hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
+          'border-border fill-current text-foreground hover:border-border',
         ].join(' '),
         secondary: [
           button21stSurfaceClassName,
-          'border-border/80 fill-current text-secondary-foreground hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_14%,var(--zy-border)_86%)]',
-          'hover:bg-[linear-gradient(180deg,#f6f6f6_0%,#ffffff_100%)]',
+          'border-border fill-current text-secondary-foreground hover:border-border',
         ].join(' '),
         danger: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-[var(--zy-destructive)] hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
+          'border-border fill-current text-destructive hover:border-border',
         ].join(' '),
         loading: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-[color:color-mix(in_srgb,var(--zy-primary)_92%,white)] disabled:opacity-100',
-          'hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
-          'hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--zy-primary)_8%,#ffffff)_0%,#ffffff_100%)]',
+          'border-border bg-primary-muted fill-current text-primary disabled:opacity-100',
+          'hover:border-border',
         ].join(' '),
         closing: [
           button21stSurfaceClassName,
-          'border-border/70 fill-current text-[color:color-mix(in_srgb,var(--zy-destructive)_92%,white)] disabled:opacity-100',
-          'hover:border-[color:color-mix(in_srgb,var(--zy-foreground)_18%,var(--zy-border)_82%)]',
-          'hover:bg-[linear-gradient(180deg,color-mix(in_srgb,var(--zy-destructive)_8%,#ffffff)_0%,#ffffff_100%)]',
+          'border-border bg-destructive/10 fill-current text-destructive disabled:opacity-100',
+          'hover:border-border',
         ].join(' '),
       },
       size: {
