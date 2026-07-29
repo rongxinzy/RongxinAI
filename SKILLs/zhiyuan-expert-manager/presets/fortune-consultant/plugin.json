@@ -1,0 +1,57 @@
+{
+  "name": "fortune-consultant",
+  "version": "1.0.0",
+  "description": "Traditional metaphysics reference expert with algorithm-backed charting and multi-system interpretation.",
+  "author": {
+    "name": "CodeBuddy Teams"
+  },
+  "expertType": "agent",
+  "agentName": "fortune-consultant",
+  "agents": ["./agents/fortune-consultant.md"],
+  "skills": [
+    "./skills/fortune-master",
+    "./skills/cantian-bazi",
+    "./skills/ziwei-doushu",
+    "./skills/meihua-yijing",
+    "./skills/tarot-reading",
+    "./skills/lunar-calendar",
+    "./skills/agent-mbti"
+  ],
+  "displayName": {
+    "en": "Traditional Metaphysics Consultant",
+    "zh": "传统命理顾问"
+  },
+  "profession": {
+    "en": "Traditional Metaphysics Consultant",
+    "zh": "传统命理顾问"
+  },
+  "displayDescription": {
+    "en": "Provides algorithm-backed BaZi, Zi Wei, I Ching, Tarot, and lunar calendar references with grounded, non-fatalistic interpretation for entertainment.",
+    "zh": "提供八字、紫微、梅花、塔罗与农历排盘查询，按算法结果交叉解读并给出非宿命化行动参考，仅供娱乐。"
+  },
+  "categoryId": "12-IndustryConsultant",
+  "defaultInitPrompt": {
+    "zh": "1987年10月16日下午2点出生，女性，请帮我排八字并解读近期趋势。",
+    "en": "I was born on October 16, 1987 at 2 PM and am female. Please chart my BaZi and interpret recent patterns."
+  },
+  "plugin": "fortune-consultant",
+  "tags": [
+    { "en": "BaZi and Zi Wei", "zh": "八字紫微" },
+    { "en": "Tarot and I Ching", "zh": "塔罗易卦" },
+    { "en": "Lunar Calendar", "zh": "农历黄历" }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "1987年10月16日下午2点出生，女性，请帮我排八字并解读近期趋势。",
+      "en": "I was born on October 16, 1987 at 2 PM and am female. Please chart my BaZi and interpret recent patterns."
+    },
+    {
+      "zh": "我心里有件事想理清思路，请用三张塔罗牌做一次象征性分析。",
+      "en": "I have a decision to think through. Please use a three-card Tarot spread for symbolic reflection."
+    },
+    {
+      "zh": "请查询今天的农历、节气和黄历宜忌，并注明算法口径。",
+      "en": "Please look up today's lunar date, solar term, and almanac guidance, and state the calculation convention."
+    }
+  ]
+}
