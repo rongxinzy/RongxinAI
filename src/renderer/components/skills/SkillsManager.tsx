@@ -744,7 +744,6 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
           <SkillsPageToolbar
             activeTab={activeTab}
             installedCount={installedSkills.length}
-            marketplaceCount={marketplaceSkills.length}
             searchQuery={skillSearchQuery}
             isAddMenuOpen={isAddSkillMenuOpen}
             isDownloading={isDownloadingSkill}
@@ -763,7 +762,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         </div>
         <div className="min-h-0 flex-1 overflow-hidden">
           {activeTab === SkillTab.Installed && (
-            <div className="h-full overflow-y-auto">
+            <div className="flex h-full min-h-0 flex-col overflow-y-auto">
               <div
                 className={cn(
                   'mb-4 flex w-full min-h-9 flex-wrap items-center gap-3 px-1 text-sm text-muted-foreground',
@@ -861,17 +860,19 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                   </>
                 )}
               </div>
-              <InstalledSkillGrid
-                skills={paginatedInstalledSkills}
-                readOnly={readOnly}
-                onSelect={setSelectedSkill}
-                onToggle={handleToggleSkill}
-                onTrySkill={onTrySkill}
-                resolveName={resolveSkillName}
-                selectedIds={isBatchMode ? selectedVisibleIds : new Set()}
-                onSelectToggle={toggleInstalledSelection}
-                batchMode={isBatchMode}
-              />
+              <div className="flex-1">
+                <InstalledSkillGrid
+                  skills={paginatedInstalledSkills}
+                  readOnly={readOnly}
+                  onSelect={setSelectedSkill}
+                  onToggle={handleToggleSkill}
+                  onTrySkill={onTrySkill}
+                  resolveName={resolveSkillName}
+                  selectedIds={isBatchMode ? selectedVisibleIds : new Set()}
+                  onSelectToggle={toggleInstalledSelection}
+                  batchMode={isBatchMode}
+                />
+              </div>
               <ListPagination
                 page={installedPageNumber}
                 totalPages={installedPageCount}
@@ -884,7 +885,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
           {activeTab === SkillTab.Marketplace &&
             (isLoadingMarketplace ? (
               <div className="text-center py-12 text-sm text-muted-foreground">
-                {i18nService.t('downloadingSkill')}
+                {i18nService.t('loading')}
               </div>
             ) : (
               <div className="h-full overflow-y-auto pr-2">
@@ -901,7 +902,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 />
                 {isLoadingMoreMarketplace && (
                   <div className="py-4 text-center text-sm text-muted-foreground">
-                    {i18nService.t('downloadingSkill')}
+                    {i18nService.t('loading')}
                   </div>
                 )}
                 <ListPagination

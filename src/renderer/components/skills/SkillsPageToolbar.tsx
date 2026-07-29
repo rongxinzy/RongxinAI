@@ -34,7 +34,6 @@ import { isSkillTab, SkillTab } from './constants';
 interface SkillsPageToolbarProps {
   activeTab: SkillTab;
   installedCount: number;
-  marketplaceCount: number;
   searchQuery: string;
   isAddMenuOpen: boolean;
   isDownloading: boolean;
@@ -52,7 +51,6 @@ interface SkillsPageToolbarProps {
 export function SkillsPageToolbar({
   activeTab,
   installedCount,
-  marketplaceCount,
   searchQuery,
   isAddMenuOpen,
   isDownloading,
@@ -152,7 +150,6 @@ export function SkillsPageToolbar({
             </TabsTrigger>
             <TabsTrigger value={SkillTab.Marketplace} className="after:bottom-[-1px] after:h-1">
               {i18nService.t('skillMarketplace')}
-              {marketplaceCount > 0 ? <Badge variant="secondary">{marketplaceCount}</Badge> : null}
             </TabsTrigger>
           </TabsList>
         </Tabs>
