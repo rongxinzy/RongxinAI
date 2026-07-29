@@ -1179,6 +1179,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workspaces: '项目',
     workspaceAdd: '添加项目',
     workspaceNoWorkspaces: '还没有项目',
+    removeProject: '移除项目',
+    removeProjectDialogTitle: '移除项目',
+    removeProjectDialogDescription:
+      '移除后，项目将从列表中消失，其中的任务记录会一并删除；磁盘上的文件不会被删除。',
     defaultAgentDisplayName: '主项目',
     myAgentSidebarPinned: '置顶',
     myAgentSidebarExpandMore: '展开显示',
@@ -3705,6 +3709,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workspaces: 'Projects',
     workspaceAdd: 'Add project',
     workspaceNoWorkspaces: 'No projects yet',
+    removeProject: 'Remove project',
+    removeProjectDialogTitle: 'Remove project',
+    removeProjectDialogDescription:
+      'After removal, the project will disappear from the list and its task records will be deleted. Files on disk will not be deleted.',
     defaultAgentDisplayName: 'Primary Project',
     myAgentSidebarPinned: 'Pinned',
     myAgentSidebarExpandMore: 'Show more',

@@ -1,5 +1,6 @@
 import { Button } from '@shared/components/ui/button';
-import { FolderPlus } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import { FolderPlus, TriangleAlert } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch } from 'react-redux';
@@ -104,6 +105,15 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   };
 
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [workspacePendingRemoval, setWorkspacePendingRemoval] =
+    useState<WorkspaceSidebarNode | null>(null);
+
+  const handleConfirmRemoveWorkspace = async () => {
+    const workspace = workspacePendingRemoval;
+    setWorkspacePendingRemoval(null);
+    if (!workspace) return;
+    await workspaceService.deleteWorkspace(workspace.id);
+  };
 
   const handleCreateWorkspace = () => {
     // Align with 「进入项目工作 → 新建空白项目」: open the create-project
@@ -147,6 +157,34 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         onOpenChange={setIsCreateProjectOpen}
         onCreated={path => void handleProjectCreated(path)}
       />
+      <Dialog
+        open={workspacePendingRemoval !== null}
+        onOpenChange={open => {
+          if (!open) setWorkspacePendingRemoval(null);
+        }}
+      >
+        <DialogContent className="max-w-sm" showCloseButton={false}>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/30">
+              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
+            </div>
+            <h2 className="text-base font-semibold">
+              {i18nService.t('removeProjectDialogTitle')}
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {i18nService.t('removeProjectDialogDescription')}
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setWorkspacePendingRemoval(null)}>
+              {i18nService.t('cancel')}
+            </Button>
+            <Button variant="destructive" onClick={() => void handleConfirmRemoveWorkspace()}>
+              {i18nService.t('removeProject')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="sticky top-0 z-30 flex h-10 items-center justify-between bg-surface-raised px-1.5">
         <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
           {i18nService.t('workspaces')}
@@ -186,6 +224,9 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               selectedIds={selectedIds}
               onToggleExpanded={toggleExpanded}
               onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
+              onRemoveWorkspace={selectedWorkspace =>
+                setWorkspacePendingRemoval(selectedWorkspace)
+              }
               onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
               onLoadMoreTasks={workspaceId => void loadMoreTasks(workspaceId)}
               onCollapseTasks={collapseTasks}
@@ -223,6 +264,9 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
                   selectedIds={selectedIds}
                   onToggleExpanded={toggleScheduledExpanded}
                   onCreateTask={() => undefined}
+                  onRemoveWorkspace={selectedWorkspace =>
+                    setWorkspacePendingRemoval(selectedWorkspace)
+                  }
                   onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
                   onLoadMoreTasks={workspaceId => void loadMoreScheduledTasks(workspaceId)}
                   onCollapseTasks={collapseScheduledTasks}

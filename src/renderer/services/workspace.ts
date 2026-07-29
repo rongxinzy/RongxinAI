@@ -4,6 +4,7 @@ import { store } from '../store';
 import {
   clearCurrentSession,
   clearCurrentSessionForWorkspaceChange,
+  deleteSessions as deleteSessionsAction,
 } from '../store/slices/coworkSlice';
 import {
   setCurrentWorkspaceId,
@@ -28,6 +29,9 @@ type LegacyCompatibleCoworkApi = {
     id: string,
     name: string,
   ) => Promise<{ success: boolean; workspace?: Workspace }>;
+  deleteWorkspace?: (
+    id: string,
+  ) => Promise<{ success: boolean; deletedSessionIds?: string[]; error?: string }>;
   getConfig?: () => Promise<{ success: boolean; config?: { workingDirectory?: string } }>;
 };
 
@@ -156,6 +160,44 @@ class WorkspaceService {
       ),
     );
     return renamedWorkspace;
+  }
+
+  /**
+   * Removes a workspace from the app together with its session records.
+   * Files on disk are never touched. When the removed workspace was the
+   * current selection, the selection and open session are cleared back to
+   * home (mirroring the mode-switch clear).
+   */
+  async deleteWorkspace(workspaceId: string): Promise<boolean> {
+    const cowork = getCompatibleCoworkApi();
+    if (!this.workspaceApiAvailable || typeof cowork?.deleteWorkspace !== 'function') {
+      return false;
+    }
+    const result = await cowork.deleteWorkspace(workspaceId);
+    if (!result.success) {
+      console.error('Failed to remove workspace:', result.error);
+      return false;
+    }
+
+    const deletedSessionIds = result.deletedSessionIds ?? [];
+    if (deletedSessionIds.length > 0) {
+      store.dispatch(deleteSessionsAction(deletedSessionIds));
+    }
+
+    const wasCurrent = store.getState().workspace.currentWorkspaceId === workspaceId;
+    store.dispatch(
+      setWorkspaces(
+        store.getState().workspace.workspaces.filter(item => item.id !== workspaceId),
+      ),
+    );
+    if (wasCurrent) {
+      // setWorkspaces auto-selects the next workspace when the current one
+      // disappears; override back to no selection (home) instead.
+      store.dispatch(clearCurrentSession());
+      store.dispatch(setCurrentWorkspaceId(null));
+      await localStore.removeItem(CURRENT_WORKSPACE_KEY);
+    }
+    return true;
   }
 }
 

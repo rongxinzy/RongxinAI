@@ -2,6 +2,7 @@ export const WorkspaceIpc = {
   List: 'cowork:workspace:list',
   Ensure: 'cowork:workspace:ensure',
   Rename: 'cowork:workspace:rename',
+  Delete: 'cowork:workspace:delete',
 } as const;
 
 export type WorkspaceIpc = (typeof WorkspaceIpc)[keyof typeof WorkspaceIpc];
