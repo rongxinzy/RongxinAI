@@ -13,7 +13,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Box, Play, Settings2, Square } from 'lucide-react';
+import { Box, Clock3, Play, Settings2, Square } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   type ComponentType,
@@ -33,7 +33,6 @@ import type {
   LlamaCppRunningModel,
 } from '../../../../shared/llamacpp';
 import { ProviderName } from '../../../../shared/providers';
-import clockIconUrl from '../../../assets/localInference/clock.svg';
 import logIconUrl from '../../../assets/localInference/log.svg';
 import { i18nService } from '../../../services/i18n';
 import {
@@ -562,7 +561,7 @@ function ModelCard({
   const contextValue = getPreferredContext(model, runningModel, preference);
   const details = getModelDetails(model, quantization);
   const hasDetailsTag = details.length > 0;
-  const visibleTags = getModelCardTags(model, contextValue, quantization).slice(
+  const visibleTags = getModelCardTags(contextValue).slice(
     0,
     hasDetailsTag ? MODEL_CARD_MAX_VISIBLE_TAGS - 1 : MODEL_CARD_MAX_VISIBLE_TAGS,
   );
@@ -660,8 +659,8 @@ function ModelCard({
 
           <div className="flex items-center gap-2">
             {modifiedDate ? (
-              <div className="flex items-center gap-1 text-xs leading-4 text-muted-foreground">
-                <img src={clockIconUrl} alt="" aria-hidden="true" className="size-3.5 shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
+                <Clock3 aria-hidden="true" className="size-3.5 shrink-0" />
                 <span>{modifiedDate}</span>
               </div>
             ) : null}
@@ -754,13 +753,24 @@ function ModelCard({
 }
 
 function LogButtonIcon() {
+  const maskStyle: CSSProperties = {
+    WebkitMaskImage: `url("${logIconUrl}")`,
+    WebkitMaskPosition: 'center',
+    WebkitMaskRepeat: 'no-repeat',
+    WebkitMaskSize: 'contain',
+    backgroundColor: 'currentColor',
+    maskImage: `url("${logIconUrl}")`,
+    maskPosition: 'center',
+    maskRepeat: 'no-repeat',
+    maskSize: 'contain',
+  };
+
   return (
-    <img
-      src={logIconUrl}
-      alt=""
+    <span
       aria-hidden="true"
       data-icon="inline-start"
-      className="size-3.5 shrink-0"
+      className="inline-block size-3.5 shrink-0 bg-current"
+      style={maskStyle}
     />
   );
 }
@@ -812,34 +822,12 @@ function getModelDetails(
   ].filter((item): item is { label: string; value: string } => Boolean(item));
 }
 
-function getModelCardTags(
-  model: LlamaCppModel,
-  contextValue?: number,
-  quantization?: string,
-): ModelCardTag[] {
-  return dedupeModelTags([
-    createModelCardTag(formatModelFamilyTag(model.details?.family)),
-    createModelCardTag(formatModelTagValue(model.details?.parameter_size)),
-    createModelCardTag(formatModelTagValue(quantization)),
-    createModelCardTag(
-      contextValue
-        ? `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`
-        : null,
-    ),
-  ]);
-}
+function getModelCardTags(contextValue?: number): ModelCardTag[] {
+  if (!contextValue) return [];
 
-function createModelCardTag(label: string | null): ModelCardTag | null {
-  return label ? { label } : null;
-}
-
-function formatModelFamilyTag(value?: string): string | null {
-  const normalized = formatModelTagValue(value);
-  if (!normalized) return null;
-  return normalized
-    .split(/[-_\s]+/)
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
+  return [{
+    label: `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`,
+  }];
 }
 
 function formatModelFormatTag(value?: string): string | null {
@@ -850,17 +838,6 @@ function formatModelFormatTag(value?: string): string | null {
 function formatModelTagValue(value?: string): string | null {
   const normalized = value?.trim();
   return normalized || null;
-}
-
-function dedupeModelTags(values: Array<ModelCardTag | null>): ModelCardTag[] {
-  const seen = new Set<string>();
-  return values.filter((value): value is ModelCardTag => {
-    if (!value) return false;
-    const key = value.label.toLocaleLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 function getModelDisplayName(name: string): string {
