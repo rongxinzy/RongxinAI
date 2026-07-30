@@ -8,7 +8,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 
 const hoisted = vi.hoisted(() => {
@@ -172,11 +172,24 @@ import {
 
 describe('PiRuntimeAdapter', () => {
   let adapter: PiRuntimeAdapter;
+  const temporaryWorkspaceRoots = new Set<string>();
+  const createTemporaryWorkspace = (): string => {
+    const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-runtime-'));
+    temporaryWorkspaceRoots.add(workspaceRoot);
+    return workspaceRoot;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
     adapter = new PiRuntimeAdapter();
+  });
+
+  afterEach(() => {
+    for (const workspaceRoot of temporaryWorkspaceRoots) {
+      fs.rmSync(workspaceRoot, { recursive: true, force: true });
+    }
+    temporaryWorkspaceRoots.clear();
   });
 
   // ── Session lifecycle ──
@@ -252,11 +265,14 @@ describe('PiRuntimeAdapter', () => {
 
     it('asks Work users how an arbitrary skill should execute before prompting Pi', async () => {
       const onPermissionRequest = vi.fn();
+      const onComplete = vi.fn();
       adapter.on('permissionRequest', onPermissionRequest);
+      adapter.on('complete', onComplete);
 
       const start = adapter.startSession('generic-work-skill', 'Analyze this codebase', {
         skillIds: ['code-review'],
         sessionMode: 'work',
+        workspaceRoot: createTemporaryWorkspace(),
       });
       await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(1));
 
@@ -264,7 +280,7 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).not.toHaveBeenCalled();
       adapter.respondToPermission(request.requestId, {
         behavior: 'allow',
-        updatedInput: { answers: { '技能任务执行方式': '持续执行至验收' } },
+        updatedInput: { answers: { 技能任务执行方式: '持续执行至验收' } },
       });
       await start;
 
@@ -272,12 +288,56 @@ describe('PiRuntimeAdapter', () => {
         expect.stringContaining('Loop started. Iteration 1. Goal:'),
       );
 
-      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: { type: string }) => void;
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools: Array<{
+          name: string;
+          execute(
+            toolCallId: string,
+            params: Record<string, unknown>,
+          ): Promise<{ content: Array<{ text: string }> }>;
+        }>;
+      };
+      const loopTool = sessionOptions.customTools.find(tool => tool.name === 'agent_loop');
+      const acceptanceTool = sessionOptions.customTools.find(
+        tool => tool.name === 'work_acceptance',
+      );
+      expect(loopTool).toBeDefined();
+      expect(acceptanceTool).toBeDefined();
+
+      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+        type: string;
+      }) => void;
+      await loopTool!.execute('done-too-early', {
+        action: 'done',
+        reason: 'I think it is complete',
+      });
       listener({ type: 'agent_end' });
       await Promise.resolve();
       expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('protocol omission'),
+        expect.stringContaining('has not received explicit user acceptance'),
       );
+      expect(onComplete).not.toHaveBeenCalled();
+
+      const acceptance = acceptanceTool!.execute('acceptance-call', {
+        summary: 'Implementation and tests are complete.',
+      });
+      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(2));
+      const [, acceptanceRequest] = onPermissionRequest.mock.calls[1] as [
+        string,
+        { requestId: string; toolInput: { questions: Array<{ question: string }> } },
+      ];
+      const acceptanceQuestion = acceptanceRequest.toolInput.questions[0].question;
+      adapter.respondToPermission(acceptanceRequest.requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { [acceptanceQuestion]: '验收通过' } },
+      });
+      await acceptance;
+      await loopTool!.execute('done-after-acceptance', {
+        action: 'done',
+        reason: 'The user accepted the result',
+      });
+      listener({ type: 'agent_end' });
+      expect(onComplete).toHaveBeenCalledOnce();
     });
 
     it('reactivates a completed academic loop when the same session receives a follow-up', async () => {
@@ -529,31 +589,50 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(3);
     });
 
-    it('should reload skill selection without replacing the active session', async () => {
+    it('should recreate the session when skill tool topology changes', async () => {
       await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
-      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+      await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
+
+      expect(mockSession.reload).not.toHaveBeenCalled();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      const replacementLoader = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
         skillsOverride: (base: { skills: Array<{ id: string }>; diagnostics: unknown[] }) => {
           skills: Array<{ id: string }>;
         };
       };
-
       expect(
-        loaderOptions.skillsOverride({
-          skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
-          diagnostics: [],
-        }).skills,
-      ).toEqual([{ id: 'skill-a' }]);
-
-      await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
-
-      expect(mockSession.reload).toHaveBeenCalledOnce();
-      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-      expect(
-        loaderOptions.skillsOverride({
+        replacementLoader.skillsOverride({
           skills: [{ id: 'skill-a' }, { id: 'skill-b' }],
           diagnostics: [],
         }).skills,
       ).toEqual([{ id: 'skill-b' }]);
+    });
+
+    it('asks for execution mode when an arbitrary skill is added to a Work session', async () => {
+      const onPermissionRequest = vi.fn();
+      adapter.on('permissionRequest', onPermissionRequest);
+      const workspaceRoot = createTemporaryWorkspace();
+      await adapter.startSession('dynamic-skill', 'First', { sessionMode: 'work', workspaceRoot });
+
+      const continuation = adapter.continueSession('dynamic-skill', 'Use code review', {
+        skillIds: ['code-review'],
+        sessionMode: 'work',
+        workspaceRoot,
+      });
+      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledOnce());
+      const [, request] = onPermissionRequest.mock.calls[0] as [string, { requestId: string }];
+      adapter.respondToPermission(request.requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { 技能任务执行方式: '完成本轮' } },
+      });
+      await continuation;
+
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockSession.prompt).toHaveBeenLastCalledWith(
+        expect.stringContaining('Use code review'),
+      );
     });
 
     it('should recreate the session when expert tool topology changes', async () => {

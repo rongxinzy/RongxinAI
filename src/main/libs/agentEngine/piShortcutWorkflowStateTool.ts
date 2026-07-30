@@ -48,7 +48,7 @@ export function buildPiShortcutWorkflowStateTool(
         if (role !== 'deliverable' && role !== 'validation' && role !== 'preview') {
           return result('file requires role "deliverable", "validation", or "preview".');
         }
-        return result(controller.recordFile(toText(params.path), role));
+        return result(await controller.recordFile(toText(params.path), role));
       }
       if (action === 'plan') {
         const angles = toList(params.angles);

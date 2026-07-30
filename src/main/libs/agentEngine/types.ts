@@ -75,6 +75,8 @@ export type CoworkStartOptions = {
 export type CoworkContinueOptions = {
   systemPrompt?: string;
   skillIds?: string[];
+  /** UI session mode, preserved when a skill change recreates the Pi session. */
+  sessionMode?: 'work' | 'chat';
   imageAttachments?: CoworkImageAttachment[];
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;

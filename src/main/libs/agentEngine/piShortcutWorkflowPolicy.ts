@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import { isIP } from 'node:net';
+import JSZip from 'jszip';
 
 import { CoreSkillId } from '../../../shared/skills/constants';
 
@@ -66,15 +67,87 @@ export const expectedExtensions = (kind: ShortcutWorkflowKind): string[] =>
     [ShortcutWorkflowKind.DeepResearch]: [],
   })[kind];
 
-export const isOfficeZip = (filePath: string): boolean => {
-  const header = Buffer.alloc(4);
-  const fd = fs.openSync(filePath, 'r');
-  try {
-    fs.readSync(fd, header, 0, header.length, 0);
-  } finally {
-    fs.closeSync(fd);
+const ResearchTrackingParameters = new Set([
+  'dclid',
+  'fbclid',
+  'gclid',
+  'mc_cid',
+  'mc_eid',
+  'msclkid',
+]);
+
+export const normalizeResearchSourceUrl = (source: URL): string => {
+  const normalized = new URL(source);
+  normalized.hash = '';
+  for (const key of [...normalized.searchParams.keys()]) {
+    if (key.toLowerCase().startsWith('utm_') || ResearchTrackingParameters.has(key.toLowerCase())) {
+      normalized.searchParams.delete(key);
+    }
   }
-  return header.subarray(0, 2).toString() === 'PK';
+  normalized.searchParams.sort();
+  return normalized.toString();
+};
+
+export const collectShortcutCompletionFailures = (state: WorkflowState): string[] => {
+  if (state.kind === ShortcutWorkflowKind.DeepResearch) {
+    const failures: string[] = [];
+    if (state.researchAngles.length < 3)
+      failures.push('fewer than three research angles are recorded');
+    if (state.researcherRuns < 3)
+      failures.push('fewer than three researcher delegations completed successfully');
+    if (state.sources.length < 6) failures.push('fewer than six reachable sources are recorded');
+    const sourceHosts = new Set(
+      state.sources.map(source => {
+        try {
+          return new URL(source).hostname;
+        } catch {
+          return '';
+        }
+      }),
+    );
+    sourceHosts.delete('');
+    if (sourceHosts.size < 3) failures.push('sources cover fewer than three distinct hosts');
+    return failures;
+  }
+  const failures: string[] = [];
+  if (!state.files.some(file => file.role === 'deliverable'))
+    failures.push('no verified deliverable file is recorded');
+  if (!state.files.some(file => file.role === 'validation'))
+    failures.push('no verification report is recorded');
+  if (state.kind === ShortcutWorkflowKind.Ppt && !state.files.some(file => file.role === 'preview'))
+    failures.push('no rendered slide preview is recorded');
+  return failures;
+};
+
+const officeRequiredEntries = (kind: ShortcutWorkflowKind): string[] => {
+  if (kind === ShortcutWorkflowKind.Ppt) return ['[Content_Types].xml', 'ppt/presentation.xml'];
+  if (kind === ShortcutWorkflowKind.Docs) return ['[Content_Types].xml', 'word/document.xml'];
+  if (kind === ShortcutWorkflowKind.Sheets) return ['[Content_Types].xml', 'xl/workbook.xml'];
+  return [];
+};
+
+export const isValidOfficePackage = async (
+  filePath: string,
+  kind: ShortcutWorkflowKind,
+): Promise<boolean> => {
+  try {
+    const archive = await JSZip.loadAsync(fs.readFileSync(filePath), { checkCRC32: true });
+    const names = Object.keys(archive.files);
+    if (!officeRequiredEntries(kind).every(entry => archive.file(entry))) return false;
+    if (
+      kind === ShortcutWorkflowKind.Ppt &&
+      !names.some(name => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
+    )
+      return false;
+    if (
+      kind === ShortcutWorkflowKind.Sheets &&
+      !names.some(name => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name))
+    )
+      return false;
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 export const isSafePublicUrl = (rawUrl: string): boolean => {

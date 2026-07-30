@@ -4442,6 +4442,10 @@ if (!gotTheLock) {
           .continueSession(options.sessionId, options.prompt, {
             systemPrompt: runtimeSystemPrompt,
             skillIds: runtimeSkillIds,
+            sessionMode:
+              existingSession?.mode === CoworkSessionMode.Chat
+                ? CoworkSessionMode.Chat
+                : CoworkSessionMode.Work,
             imageAttachments: options.imageAttachments,
             workspaceRoot: existingSession?.cwd,
             agentId: existingSession?.agentId,

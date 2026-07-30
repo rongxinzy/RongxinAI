@@ -2,9 +2,11 @@ import * as fs from 'fs';
 import path from 'path';
 
 import {
+  collectShortcutCompletionFailures,
   expectedExtensions,
-  isOfficeZip,
+  isValidOfficePackage,
   isSafePublicUrl,
+  normalizeResearchSourceUrl,
   ShortcutWorkflowKind,
   type WorkflowFileRole,
   type WorkflowState,
@@ -32,6 +34,7 @@ export class PiShortcutWorkflowController {
   readonly runDirectory: string;
   private readonly statePath: string;
   private state: WorkflowState;
+  private readonly pendingResearcherRuns = new Map<string, number>();
 
   constructor(private readonly options: PiShortcutWorkflowOptions) {
     this.runDirectory = path.join(
@@ -69,6 +72,11 @@ export class PiShortcutWorkflowController {
     this.state.task = task;
     this.state.iteration += 1;
     this.state.staleCount = 0;
+    this.state.files = [];
+    this.state.researchAngles = [];
+    this.state.sources = [];
+    this.state.researcherRuns = 0;
+    this.pendingResearcherRuns.clear();
     delete this.state.completionReason;
     this.writeState();
   }
@@ -81,7 +89,7 @@ export class PiShortcutWorkflowController {
   }
 
   onAgentEnd(): ShortcutWorkflowEndDecision {
-    const failures = this.completionFailures();
+    const failures = collectShortcutCompletionFailures(this.state);
     if (this.state.status === 'completion_requested' && failures.length === 0) {
       this.state.status = 'completed';
       this.writeState();
@@ -104,7 +112,7 @@ export class PiShortcutWorkflowController {
     };
   }
 
-  recordSubagentStart(args: unknown): void {
+  recordSubagentStart(toolCallId: string, args: unknown): void {
     if (
       this.options.kind !== ShortcutWorkflowKind.DeepResearch ||
       !args ||
@@ -115,13 +123,24 @@ export class PiShortcutWorkflowController {
     const count = [raw, ...(Array.isArray(raw.parallel) ? raw.parallel : [])].filter(
       value => (value as Record<string, unknown>).agent === 'researcher',
     ).length;
-    if (count > 0) {
-      this.state.researcherRuns += count;
-      this.writeState();
-    }
+    if (count > 0) this.pendingResearcherRuns.set(toolCallId, count);
   }
 
-  recordFile(rawPath: string, role: WorkflowFileRole): string {
+  recordSubagentResult(toolCallId: string, output: string, isError: boolean): void {
+    const requested = this.pendingResearcherRuns.get(toolCallId) || 0;
+    this.pendingResearcherRuns.delete(toolCallId);
+    if (requested === 0 || isError || !output.trim()) return;
+    const parallelSuccesses = [...output.matchAll(/^## researcher \(ok\)$/gm)].length;
+    const isParallelOutput = /^\d+\/\d+ subagents succeeded\./.test(output.trim());
+    const failed = /^(Error:|\(subagent timed out|Subagent ".*" failed:|Unknown agent)/i.test(
+      output.trim(),
+    );
+    const succeeded = isParallelOutput ? parallelSuccesses : failed ? 0 : 1;
+    this.state.researcherRuns += Math.min(requested, succeeded);
+    this.writeState();
+  }
+
+  async recordFile(rawPath: string, role: WorkflowFileRole): Promise<string> {
     const resolved = this.resolveWorkspacePath(rawPath);
     if (!resolved)
       return 'File was not recorded: use an existing file inside the selected workspace.';
@@ -142,7 +161,7 @@ export class PiShortcutWorkflowController {
           ] as ShortcutWorkflowKind[]
         ).includes(this.options.kind) &&
         ['.pptx', '.docx', '.xlsx', '.xlsm'].includes(path.extname(resolved).toLowerCase()) &&
-        !isOfficeZip(resolved)
+        !(await isValidOfficePackage(resolved, this.options.kind))
       ) {
         return 'File was not recorded: the Office deliverable is not a valid ZIP package.';
       }
@@ -191,9 +210,11 @@ export class PiShortcutWorkflowController {
         }
         await response.body?.cancel();
         if (!response.ok) return `Source was not recorded: URL returned HTTP ${response.status}.`;
-        if (!this.state.sources.includes(rawUrl)) this.state.sources.push(rawUrl);
+        const normalizedSource = normalizeResearchSourceUrl(current);
+        if (!this.state.sources.includes(normalizedSource))
+          this.state.sources.push(normalizedSource);
         this.writeState();
-        return `Verified and recorded source: ${rawUrl}`;
+        return `Verified and recorded source: ${normalizedSource}`;
       }
       return 'Source was not recorded: URL exceeded the redirect limit.';
     } catch (error) {
@@ -204,35 +225,9 @@ export class PiShortcutWorkflowController {
   getSnapshot(): Record<string, unknown> {
     return {
       ...this.state,
-      completionFailures: this.completionFailures(),
+      completionFailures: collectShortcutCompletionFailures(this.state),
       runDirectory: this.runDirectory,
     };
-  }
-
-  private completionFailures(): string[] {
-    if (this.options.kind === ShortcutWorkflowKind.DeepResearch) {
-      const failures: string[] = [];
-      if (this.state.researchAngles.length < 3)
-        failures.push('fewer than three research angles are recorded');
-      if (this.state.researcherRuns < 3)
-        failures.push('fewer than three researcher delegations ran');
-      if (this.state.sources.length < 6)
-        failures.push('fewer than six reachable sources are recorded');
-      return failures;
-    }
-    const failures: string[] = [];
-    const files = this.state.files;
-    if (!files.some(file => file.role === 'deliverable'))
-      failures.push('no verified deliverable file is recorded');
-    if (!files.some(file => file.role === 'validation'))
-      failures.push('no verification report is recorded');
-    if (
-      this.options.kind === ShortcutWorkflowKind.Ppt &&
-      !files.some(file => file.role === 'preview')
-    ) {
-      failures.push('no rendered slide preview is recorded');
-    }
-    return failures;
   }
 
   private kindInstructions(): string[] {
