@@ -30,6 +30,9 @@ jobs:
     if: ${{ inputs.build_macos }}
     runs-on: macos-latest
     environment: release
+    # A release build may download upstream runtimes, but it must never consume
+    # a runner indefinitely when an upstream command stalls.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,6 +67,7 @@ jobs:
     if: ${{ inputs.build_windows }}
     runs-on: windows-latest
     environment: release
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -97,6 +101,7 @@ jobs:
     if: ${{ inputs.build_linux }}
     runs-on: ubuntu-latest
     environment: release
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
