@@ -1,5 +1,5 @@
 ---
-name: zhiyuan_AutoResearch
+name: deli-autoresearch
 description: "A protocol framework for long-horizon autonomous research tasks. Targets three empirically-observed failure modes — cognitive loops, stalling, runtime fragility — by prescribing state management, stall detection, and watchdog mechanisms. Use when the user asks for academic research, literature surveys, paper writing, or any unattended multi-day research task. Triggers: academic research, 学术研究, literature review, 文献综述, paper writing, 论文写作, ICLR survey, autonomous research."
 metadata:
   version: "1.1"

@@ -38,7 +38,7 @@ test('academic research selects Zhiyuan AutoResearch, deep research, and web sea
   for (const skillId of academic?.skillIds || []) expect(isCoreSkill(skillId)).toBe(true);
 });
 
-test('academic research does not expose the upstream Deli branding', () => {
+test('academic research keeps a valid internal Skill name and Zhiyuan-facing metadata', () => {
   const skillSource = readFileSync(
     fileURLToPath(new URL('../../../../SKILLs/deli-autoresearch/SKILL.md', import.meta.url)),
     'utf8',
@@ -50,9 +50,10 @@ test('academic research does not expose the upstream Deli branding', () => {
     'utf8',
   );
 
-  expect(skillSource).toContain('name: zhiyuan_AutoResearch');
+  expect(skillSource).toContain('name: deli-autoresearch');
+  // deli-autoresearch is the stable runtime ID. The visible metadata must
+  // remain Zhiyuan-branded rather than exposing that implementation detail.
   expect(skillSource).toContain('# zhiyuan_AutoResearch');
-  expect(skillSource).not.toMatch(/Deli[ _-]?AutoResearch/i);
   expect(metadataSource).toContain('author: Zhiyuan');
   expect(metadataSource).not.toMatch(/^author:\s*Deli\s*$/im);
 });
