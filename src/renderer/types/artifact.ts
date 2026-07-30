@@ -21,6 +21,13 @@ export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([
 
 export type ArtifactSource = 'codeblock' | 'tool';
 
+export const ArtifactRole = {
+  Intermediate: 'intermediate',
+  Deliverable: 'deliverable',
+} as const;
+
+export type ArtifactRole = (typeof ArtifactRole)[keyof typeof ArtifactRole];
+
 export interface Artifact {
   id: string;
   messageId: string;
@@ -32,6 +39,7 @@ export interface Artifact {
   fileName?: string;
   filePath?: string;
   source: ArtifactSource;
+  role: ArtifactRole;
   createdAt: number;
 }
 

@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { Copy } from 'lucide-react';
+import { Copy, Filter } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -17,8 +17,7 @@ import {
   setActiveTab,
   setPanelWidth,
 } from '@/store/slices/artifactSlice';
-import type { ArtifactType } from '@/types/artifact';
-import type { Artifact } from '@/types/artifact';
+import { ArtifactRole, type Artifact, type ArtifactType } from '@/types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
 import ArtifactRenderer from './ArtifactRenderer';
@@ -69,10 +68,31 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const activeTab = useSelector(selectActiveTab);
   const selectedArtifactId = useSelector((state: RootState) => state.artifact.selectedArtifactId);
   const [showFileList, setShowFileList] = useState(false);
+  const [showIntermediateArtifacts, setShowIntermediateArtifacts] = useState(false);
   const fileListRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
 
-  const previewableArtifacts = artifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
+  const visibleArtifacts = artifacts.filter(
+    artifact => showIntermediateArtifacts || artifact.role === ArtifactRole.Deliverable,
+  );
+  const previewableArtifacts = visibleArtifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
+
+  const intermediateToggle = (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={() => setShowIntermediateArtifacts(value => !value)}
+      className={`h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface ${
+        showIntermediateArtifacts ? 'text-primary bg-primary/10' : ''
+      }`}
+      title={t(showIntermediateArtifacts ? 'artifactHideIntermediate' : 'artifactShowIntermediate')}
+      aria-label={t(
+        showIntermediateArtifacts ? 'artifactHideIntermediate' : 'artifactShowIntermediate',
+      )}
+    >
+      <Filter className="h-3.5 w-3.5" />
+    </Button>
+  );
 
   const isResizing = useRef(false);
   const startX = useRef(0);
@@ -327,6 +347,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <FolderIcon />
                 </Button>
               )}
+              {intermediateToggle}
               <Button
                 ref={toggleBtnRef}
                 variant="ghost"
@@ -386,6 +407,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 {t('artifactFiles')}
               </span>
               <span className="flex-1" />
+              {intermediateToggle}
               <Button
                 variant="ghost"
                 size="icon"
