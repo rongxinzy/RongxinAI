@@ -17,4 +17,8 @@ test('PDF skill exposes an executable visual-QA route through the managed uv run
   assert.match(instructions, /uv run --with pypdfium2 --with pillow/);
   assert.match(instructions, /contact-sheet\.png/);
   assert.match(instructions, /inspection\.json/);
+
+  const pipeline = readFileSync(path.join(skillRoot, 'scripts', 'make.sh'), 'utf8');
+  assert.match(pipeline, /run --quiet --no-project --python/);
+  assert.doesNotMatch(pipeline, /--break-system-packages/);
 });

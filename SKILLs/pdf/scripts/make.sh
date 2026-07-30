@@ -28,8 +28,10 @@
 
 set -euo pipefail
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PY="python3"
+PY="${ZHIYUAN_PYTHON_BIN:-python3}"
 NODE="node"
+UV="${ZHIYUAN_UV_BIN:-$(command -v uv || true)}"
+PYTHON_DEPS=(reportlab pypdf matplotlib pypdfium2 pillow)
 
 # ── Colour helpers ─────────────────────────────────────────────────────────────
 red()    { printf '\033[0;31m%s\033[0m\n' "$*"; }
@@ -37,32 +39,40 @@ green()  { printf '\033[0;32m%s\033[0m\n' "$*"; }
 yellow() { printf '\033[0;33m%s\033[0m\n' "$*"; }
 bold()   { printf '\033[1m%s\033[0m\n' "$*"; }
 
+# Packaged builds provide uv plus an externally-managed CPython. Run all PDF
+# helpers in an isolated uv environment instead of mutating that base runtime.
+run_python() {
+  if [[ -n "$UV" ]]; then
+    # Do not discover a caller's project/.venv: a Skill must use its own
+    # isolated dependency context and never delete or mutate project state.
+    local uv_args=(run --quiet --no-project --python "$PY")
+    for dependency in "${PYTHON_DEPS[@]}"; do
+      uv_args+=(--with "$dependency")
+    done
+    "$UV" "${uv_args[@]}" python "$@"
+  else
+    "$PY" "$@"
+  fi
+}
+
 # ── check ──────────────────────────────────────────────────────────────────────
 cmd_check() {
   local ok=true
   bold "Checking dependencies..."
 
   # Python
-  if command -v python3 &>/dev/null; then
-    green "  ✓ python3 $(python3 --version 2>&1 | awk '{print $2}')"
+  if command -v "$PY" &>/dev/null || [[ -x "$PY" ]]; then
+    green "  ✓ python $("$PY" --version 2>&1 | awk '{print $2}')"
   else
     red   "  ✗ python3 not found"
     ok=false
   fi
 
   # reportlab
-  if python3 -c "import reportlab" 2>/dev/null; then
-    green "  ✓ reportlab"
+  if run_python -c "import reportlab, pypdf, matplotlib, pypdfium2, PIL" 2>/dev/null; then
+    green "  ✓ Python PDF dependencies (${UV:+managed by uv})"
   else
-    yellow "  ⚠ reportlab not installed  (run: make.sh fix)"
-    ok=false
-  fi
-
-  # pypdf
-  if python3 -c "import pypdf" 2>/dev/null; then
-    green "  ✓ pypdf"
-  else
-    yellow "  ⚠ pypdf not installed  (run: make.sh fix)"
+    yellow "  ⚠ Python PDF dependencies unavailable  (run: make.sh fix)"
     ok=false
   fi
 
@@ -83,13 +93,6 @@ cmd_check() {
     ok=false
   fi
 
-  # matplotlib (optional — required for math/chart/flowchart; degrades gracefully)
-  if python3 -c "import matplotlib" 2>/dev/null; then
-    green "  ✓ matplotlib (math, chart, flowchart blocks enabled)"
-  else
-    yellow "  ⚠ matplotlib not installed — math/chart/flowchart blocks degrade to text  (run: make.sh fix)"
-  fi
-
   if $ok; then
     green "\nAll dependencies satisfied."
     exit 0
@@ -104,12 +107,16 @@ cmd_fix() {
   bold "Installing missing dependencies..."
   local rc=0
 
-  # Python packages
-  if command -v python3 &>/dev/null; then
-    python3 -m pip install --break-system-packages -q reportlab pypdf matplotlib 2>/dev/null \
-      || python3 -m pip install -q reportlab pypdf matplotlib 2>/dev/null \
-      || { yellow "  pip install failed — try: pip install reportlab pypdf matplotlib"; rc=3; }
-    green "  ✓ Python packages installed (reportlab, pypdf, matplotlib)"
+  # uv creates an isolated dependency environment and never mutates packaged
+  # CPython. Keep a pip fallback only for standalone legacy installations.
+  if [[ -n "$UV" ]]; then
+    run_python -c "import reportlab, pypdf, matplotlib, pypdfium2, PIL" \
+      || { yellow "  uv dependency setup failed"; rc=3; }
+    green "  ✓ Python dependencies prepared by uv"
+  elif command -v "$PY" &>/dev/null || [[ -x "$PY" ]]; then
+    "$PY" -m pip install -q reportlab pypdf matplotlib pypdfium2 pillow 2>/dev/null \
+      || { yellow "  pip install failed — install reportlab pypdf matplotlib pypdfium2 pillow"; rc=3; }
+    green "  ✓ Python packages installed"
   fi
 
   # Playwright
@@ -173,7 +180,7 @@ cmd_run() {
   local accent_args=()
   [[ -n "$accent"   ]] && accent_args+=(--accent   "$accent")
   [[ -n "$cover_bg" ]] && accent_args+=(--cover-bg "$cover_bg")
-  $PY "$SCRIPTS/palette.py" \
+  run_python "$SCRIPTS/palette.py" \
     --title "$title" --type "$type" \
     --author "$author" --date "$date" \
     --out "$workdir/tokens.json" \
@@ -182,7 +189,7 @@ cmd_run() {
   # Inject optional cover fields into tokens.json
   if [[ -n "$abstract" || -n "$cover_image" ]]; then
     PDF_ABSTRACT="$abstract" PDF_COVER_IMAGE="$cover_image" PDF_TOKENS="$workdir/tokens.json" \
-    $PY - <<'PYEOF'
+    run_python - <<'PYEOF'
 import json, os
 with open(os.environ["PDF_TOKENS"]) as f:
     t = json.load(f)
@@ -197,7 +204,7 @@ with open(os.environ["PDF_TOKENS"], "w") as f:
 PYEOF
   fi
 
-  cat "$workdir/tokens.json" | $PY -c "
+  cat "$workdir/tokens.json" | run_python -c "
 import json,sys
 t=json.load(sys.stdin)
 print(f'  Mood    : {t[\"mood\"]}')
@@ -209,7 +216,7 @@ print(f'  Fonts   : {t[\"font_display\"]} / {t[\"font_body\"]}')"
   bold "Step 2/4  Rendering cover..."
   local subtitle_args=()
   [[ -n "$subtitle" ]] && subtitle_args=(--subtitle "$subtitle")
-  $PY "$SCRIPTS/cover.py" \
+  run_python "$SCRIPTS/cover.py" \
     --tokens "$workdir/tokens.json" \
     --out "$workdir/cover.html" \
     "${subtitle_args[@]+"${subtitle_args[@]}"}"
@@ -235,7 +242,7 @@ JSON
     yellow "  No content file provided — using placeholder body."
   fi
 
-  $PY "$SCRIPTS/render_body.py" \
+  run_python "$SCRIPTS/render_body.py" \
     --tokens  "$workdir/tokens.json" \
     --content "$content_file" \
     --out     "$workdir/body.pdf"
@@ -244,7 +251,7 @@ JSON
   # Step 4: merge
   echo ""
   bold "Step 4/4  Merging and QA..."
-  $PY "$SCRIPTS/merge.py" \
+  run_python "$SCRIPTS/merge.py" \
     --cover "$workdir/cover.pdf" \
     --body  "$workdir/body.pdf" \
     --out   "$out" \
@@ -276,7 +283,7 @@ cmd_fill() {
 
   if $inspect_only || [[ -z "$out" && -z "$values" && -z "$data_file" ]]; then
     bold "Inspecting form fields in: $input"
-    $PY "$SCRIPTS/fill_inspect.py" --input "$input"
+    run_python "$SCRIPTS/fill_inspect.py" --input "$input"
     return
   fi
 
@@ -286,7 +293,7 @@ cmd_fill() {
   if [[ -n "$values" ]];    then val_args="--values $values"; fi
   if [[ -n "$data_file" ]]; then val_args="--data $data_file"; fi
 
-  $PY "$SCRIPTS/fill_write.py" --input "$input" --out "$out" $val_args
+  run_python "$SCRIPTS/fill_write.py" --input "$input" --out "$out" $val_args
 }
 
 # ── reformat ───────────────────────────────────────────────────────────────────
@@ -315,7 +322,7 @@ cmd_reformat() {
   fi
 
   bold "Parsing: $input"
-  $PY "$SCRIPTS/reformat_parse.py" --input "$input" --out "$tmpdir/content.json"
+  run_python "$SCRIPTS/reformat_parse.py" --input "$input" --out "$tmpdir/content.json"
   green "  ✓ Parsed to content.json"
 
   bold "Applying design and building PDF..."
