@@ -82,6 +82,20 @@ describe('PiShortcutWorkflowController', () => {
     );
   });
 
+  it('rejects a ZIP that only impersonates a DOCX package', async () => {
+    const run = createRun(ShortcutWorkflowKind.Docs);
+    const archive = new JSZip();
+    archive.file('[Content_Types].xml', '<Types />');
+    archive.file('word/document.xml', '<w:document />');
+    fs.writeFileSync(
+      path.join(rootFor(run), 'empty.docx'),
+      await archive.generateAsync({ type: 'nodebuffer' }),
+    );
+    await expect(run.recordFile('empty.docx', 'deliverable')).resolves.toContain(
+      'not a valid ZIP package',
+    );
+  });
+
   it('keeps deep research active until a cited report, QA record, plan, researchers, and reachable sources are recorded', async () => {
     vi.stubGlobal(
       'fetch',
@@ -211,7 +225,10 @@ describe('PiShortcutWorkflowController', () => {
     const run = createRun(ShortcutWorkflowKind.Docs);
     const archive = new JSZip();
     archive.file('[Content_Types].xml', '<Types />');
-    archive.file('word/document.xml', '<w:document />');
+    archive.file(
+      'word/document.xml',
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body /></w:document>',
+    );
     fs.writeFileSync(
       path.join(rootFor(run), 'report.docx'),
       await archive.generateAsync({ type: 'nodebuffer' }),

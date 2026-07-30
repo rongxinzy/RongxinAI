@@ -26,11 +26,13 @@ export function buildPiResearchStateTool(
     name: PiResearchStateToolName,
     label: 'Research State',
     description:
-      'Persist and verify academic-research evidence. Use plan, direction, verify_source, claim, and contradictions. Verified sources are fetched by this process before they count toward completion.',
+      'Persist and verify academic-research evidence. Use plan, direction, verify_source, claim, contradictions, and file. Verified sources and workspace artifacts are independently checked before they count toward completion.',
     parameters: {
       type: 'object',
       properties: {
         action: { type: 'string', enum: Object.values(PiResearchStateAction) },
+        path: { type: 'string' },
+        role: { type: 'string', enum: ['deliverable', 'validation'] },
         subquestions: { type: 'array', items: { type: 'string' } },
         direction: { type: 'string' },
         url: { type: 'string' },
@@ -84,6 +86,13 @@ export function buildPiResearchStateTool(
       }
       if (action === PiResearchStateAction.Contradictions) {
         return result(controller.setContradictionCheck(toText(params.summary)));
+      }
+      if (action === PiResearchStateAction.File) {
+        const role = toText(params.role);
+        if (role !== 'deliverable' && role !== 'validation') {
+          return result('file requires role "deliverable" or "validation".');
+        }
+        return result(controller.recordFile(toText(params.path), role));
       }
       return result('Unknown research_state action.');
     },

@@ -175,6 +175,8 @@ export const isValidOfficePackage = async (
     const archive = await JSZip.loadAsync(fs.readFileSync(filePath), { checkCRC32: true });
     const names = Object.keys(archive.files);
     if (!officeRequiredEntries(kind).every(entry => archive.file(entry))) return false;
+    const readXml = async (entry: string): Promise<string> =>
+      (await archive.file(entry)?.async('text')) || '';
     if (
       kind === ShortcutWorkflowKind.Ppt &&
       !names.some(name => /^ppt\/slides\/slide\d+\.xml$/i.test(name))
@@ -185,6 +187,19 @@ export const isValidOfficePackage = async (
       !names.some(name => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name))
     )
       return false;
+    if (kind === ShortcutWorkflowKind.Docs) {
+      const document = await readXml('word/document.xml');
+      if (!/<w:document\b[^>]*xmlns:w=/i.test(document) || !/<w:body\b/i.test(document))
+        return false;
+    }
+    if (kind === ShortcutWorkflowKind.Sheets) {
+      const workbook = await readXml('xl/workbook.xml');
+      const sheets = names.filter(name => /^xl\/worksheets\/sheet\d+\.xml$/i.test(name));
+      if (!/<workbook\b[^>]*xmlns=/i.test(workbook)) return false;
+      for (const sheet of sheets) {
+        if (!/<worksheet\b[^>]*xmlns=/i.test(await readXml(sheet))) return false;
+      }
+    }
     return true;
   } catch {
     return false;

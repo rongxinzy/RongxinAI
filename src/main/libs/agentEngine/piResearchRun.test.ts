@@ -72,6 +72,11 @@ describe('PiResearchRunController', () => {
     run.addClaim('claim-2', 'q2', 'The evidence converges across sources.', urls.slice(2, 4));
     run.addClaim('claim-3', 'q3', 'The limitations are explicitly bounded.', urls.slice(4, 6));
     run.setContradictionCheck('Conflicting results are scoped by population and publication date.');
+    const workspace = path.dirname(path.dirname(path.dirname(run.runDirectory)));
+    fs.writeFileSync(path.join(workspace, 'academic-report.md'), '# Academic research report');
+    fs.writeFileSync(path.join(workspace, 'academic-report-qa.md'), 'Claims and sources checked.');
+    expect(run.recordFile('academic-report.md', 'deliverable')).toContain('Verified');
+    expect(run.recordFile('academic-report-qa.md', 'validation')).toContain('Verified');
     run.recordSubagentStart('research-1', { agent: 'researcher', task: 'retrieve literature' });
 
     let decision = run.onAgentEnd();
@@ -161,6 +166,26 @@ describe('PiResearchRunController', () => {
     expect(decision.nextPrompt).toContain('Completion deferred');
     expect(decision.nextPrompt).toContain('fewer than 3 research iterations');
     expect(run.getSnapshot()).toMatchObject({ status: 'running', iteration: 2 });
+  });
+
+  it('does not accept research evidence without a durable report and QA record', () => {
+    const run = createRun();
+    run.requestCompletion('Evidence is collected.');
+
+    const decision = run.onAgentEnd();
+
+    expect(decision.shouldFinish).toBe(false);
+    expect(decision.nextPrompt).toContain('no verified final research report is recorded');
+    expect(decision.nextPrompt).toContain('no verified research validation report is recorded');
+  });
+
+  it('rejects research artifacts outside the workspace or with the wrong type', () => {
+    const run = createRun();
+    const workspace = path.dirname(path.dirname(path.dirname(run.runDirectory)));
+    fs.writeFileSync(path.join(workspace, 'notes.txt'), 'not the final report');
+
+    expect(run.recordFile('../outside.md', 'deliverable')).toContain('inside the selected workspace');
+    expect(run.recordFile('notes.txt', 'deliverable')).toContain('expects one of');
   });
 
   it('does not fetch local or private source URLs', async () => {
