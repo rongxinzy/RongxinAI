@@ -88,6 +88,7 @@ import ErrorMessage from './ErrorMessage';
 import { GitHubCopilotIcon } from './icons/providers';
 import IMSettings from './im/IMSettings';
 import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
+import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 
@@ -3096,39 +3097,13 @@ const Settings: React.FC<SettingsProps> = ({
         return (
           <div className="space-y-8">
             {/* Language Section */}
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium text-foreground">{i18nService.t('language')}</h4>
-              <div className="w-[140px] shrink-0">
-                <div className="flex items-center space-x-3">
-                  <Select
-                    value={language}
-                    onValueChange={v => {
-                      const nextLanguage = v as LanguageType;
-                      setLanguage(nextLanguage);
-                      i18nService.setLanguage(nextLanguage, { persist: false });
-                    }}
-                  >
-                    <SelectTrigger className="flex-1 rounded-lg bg-surface border-border text-foreground px-4 py-2.5 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-surface border-border">
-                      {[
-                        { value: 'zh', label: i18nService.t('chinese') },
-                        { value: 'en', label: i18nService.t('english') },
-                      ].map(option => (
-                        <SelectItem
-                          key={option.value}
-                          value={option.value}
-                          className="text-sm text-foreground"
-                        >
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
+            <GeneralLanguageField
+              value={language}
+              onValueChange={nextLanguage => {
+                setLanguage(nextLanguage);
+                i18nService.setLanguage(nextLanguage, { persist: false });
+              }}
+            />
 
             {/* Auto-launch Section */}
             <SettingsToggleRow
