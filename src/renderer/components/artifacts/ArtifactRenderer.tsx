@@ -36,7 +36,7 @@ const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact }) => {
       return <CodeRenderer artifact={artifact} />;
     default:
       return (
-        <div className="flex items-center justify-center h-full text-muted text-sm">
+        <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
           Unsupported artifact type
         </div>
       );

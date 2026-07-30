@@ -119,6 +119,7 @@
         "@types/sql.js": "^1.4.9",
         "@types/yazl": "^3.3.0",
         "@vitejs/plugin-react": "^6.0.3",
+        "@xmldom/xmldom": "0.8.13",
         "concurrently": "^8.2.2",
         "cross-env": "^7.0.3",
         "electron": "^40.2.1",

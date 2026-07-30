@@ -22,7 +22,7 @@ const ImageRenderer: React.FC<ImageRendererProps> = ({ artifact }) => {
 
   if (!artifact.content) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         Loading image...
       </div>
     );
@@ -30,7 +30,7 @@ const ImageRenderer: React.FC<ImageRendererProps> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         Failed to load image
       </div>
     );

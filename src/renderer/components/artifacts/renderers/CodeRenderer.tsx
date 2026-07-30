@@ -96,7 +96,9 @@ const CodeRenderer: React.FC<CodeRendererProps> = ({ artifact }) => {
 
   if (!artifact.content) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">No content</div>
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+        No content
+      </div>
     );
   }
 
