@@ -141,7 +141,10 @@ echo "[openclaw-runtime] Skipping release:check (not needed for embedded builds)
 
 echo "[2/7] Packing npm tarball"
 # Skip prepack rebuild — build and ui:build already ran in step [1/7].
-OPENCLAW_PREPACK_PREPARED=1 npm pack --pack-destination "$PACK_DIR"
+# `npm pack` otherwise emits one `npm notice` line for every file in the
+# embedded OpenClaw tree.  That is tens of thousands of CI log writes and can
+# make Windows/macOS packaging appear stalled without adding any signal.
+OPENCLAW_PREPACK_PREPARED=1 npm pack --silent --pack-destination "$PACK_DIR"
 TARBALL="$(ls -1t "$PACK_DIR"/openclaw-*.tgz | head -n 1)"
 if [[ -z "$TARBALL" || ! -f "$TARBALL" ]]; then
   echo "Failed to locate packed tarball in $PACK_DIR" >&2
