@@ -239,7 +239,7 @@ describe('PiRuntimeAdapter', () => {
       try {
         await adapter.startSession('ppt-session', 'Create a deck', {
           workspaceRoot,
-          skillIds: ['pptx'],
+          skillIds: ['presentation-studio'],
         });
         const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools: Array<{ name: string }>;

@@ -1,0 +1,13 @@
+{
+  "title": "Presentation Studio validation fixture",
+  "canvas": { "width": 1280, "height": 720 },
+  "safeMargin": 36,
+  "theme": {
+    "colors": { "background": "#F3F0EA", "text": "#202124", "primary": "#4A3B32" },
+    "textStyles": {
+      "title": { "fontSize": 48, "fontFace": "Aptos Display", "color": "$primary", "bold": true },
+      "body": { "fontSize": 20, "fontFace": "Microsoft YaHei", "color": "$text", "lineHeight": 1.35 }
+    }
+  },
+  "pages": ["pages/01-cover.json"]
+}

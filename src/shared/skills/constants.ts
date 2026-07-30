@@ -7,7 +7,7 @@
  * cannot be removed.
  */
 export const CoreSkillId = {
-  Pptx: 'pptx',
+  PresentationStudio: 'presentation-studio',
   Docx: 'docx',
   Xlsx: 'xlsx',
   DeepResearch: 'deep-research',

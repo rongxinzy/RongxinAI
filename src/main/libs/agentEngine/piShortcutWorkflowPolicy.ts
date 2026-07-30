@@ -41,7 +41,7 @@ export const resolveShortcutWorkflowKind = (
   skillIds: string[] | undefined,
 ): ShortcutWorkflowKind | null => {
   if (!skillIds) return null;
-  if (skillIds.includes(CoreSkillId.Pptx)) return ShortcutWorkflowKind.Ppt;
+  if (skillIds.includes(CoreSkillId.PresentationStudio)) return ShortcutWorkflowKind.Ppt;
   if (skillIds.includes(CoreSkillId.DeepResearch)) return ShortcutWorkflowKind.DeepResearch;
   if (skillIds.includes(CoreSkillId.Docx)) return ShortcutWorkflowKind.Docs;
   if (skillIds.includes(CoreSkillId.FrontendDesign)) return ShortcutWorkflowKind.Website;

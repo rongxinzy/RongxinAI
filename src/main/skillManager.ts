@@ -392,6 +392,8 @@ type SkillsConfig = {
   version: number;
   description?: string;
   defaults: Record<string, SkillDefaultConfig>;
+  /** Bundled skill IDs deliberately removed from the product. */
+  retired?: string[];
 };
 
 const SKILLS_DIR_NAME = 'SKILLs';
@@ -1434,12 +1436,18 @@ export class SkillManager {
       // to user data. Falls back to the legacy "sync everything" behavior
       // if the config is missing or malformed.
       let bundledIds: Set<string> | null = null;
+      let retiredBundledIds: string[] = [];
       try {
         const configPath = path.join(bundledRoot, SKILLS_CONFIG_FILE);
         if (fs.existsSync(configPath)) {
           const parsed = JSON.parse(fs.readFileSync(configPath, 'utf8'));
           if (parsed?.defaults && typeof parsed.defaults === 'object') {
             bundledIds = new Set(Object.keys(parsed.defaults));
+          }
+          if (Array.isArray(parsed?.retired)) {
+            retiredBundledIds = parsed.retired.filter(
+              (id: unknown): id is string => typeof id === 'string',
+            );
           }
         }
       } catch (error) {
@@ -1522,6 +1530,19 @@ export class SkillManager {
         }
       });
 
+      // A retired bundled ID is an explicit product migration, not a generic
+      // cleanup rule: only IDs declared by the bundle are removed from user data.
+      for (const id of retiredBundledIds) {
+        const targetDir = path.join(userRoot, id);
+        if (!fs.existsSync(targetDir)) continue;
+        try {
+          fs.rmSync(targetDir, { recursive: true, force: true });
+          console.log(`[skills] Removed retired bundled skill "${id}" from user data`);
+        } catch (error) {
+          console.warn(`[skills] Failed to remove retired bundled skill "${id}":`, error);
+        }
+      }
+
       const bundledConfig = path.join(bundledRoot, SKILLS_CONFIG_FILE);
       const targetConfig = path.join(userRoot, SKILLS_CONFIG_FILE);
       if (fs.existsSync(bundledConfig)) {
@@ -1586,6 +1607,12 @@ export class SkillManager {
       for (const [id, config] of Object.entries(bundled.defaults)) {
         if (!(id in target.defaults)) {
           target.defaults[id] = config;
+          changed = true;
+        }
+      }
+      for (const id of bundled.retired ?? []) {
+        if (id in target.defaults) {
+          delete target.defaults[id];
           changed = true;
         }
       }

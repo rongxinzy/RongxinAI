@@ -546,7 +546,7 @@ test('G: convertChatCompletionsRequestToResponsesRequest auto-injects missing fu
             type: 'function',
             function: {
               name: 'Skill',
-              arguments: '{"skill":"pptx"}',
+              arguments: '{"skill":"presentation-studio"}',
             },
           },
         ],

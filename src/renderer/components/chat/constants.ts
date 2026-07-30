@@ -22,7 +22,7 @@ export interface ChatSkillShortcut {
 export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
   {
     id: 'ppt',
-    skillId: 'pptx',
+    skillId: CoreSkillId.PresentationStudio,
     icon: Presentation,
     labelKey: 'chatSkillPpt',
     placeholderKey: 'chatSkillPlaceholderPpt',
