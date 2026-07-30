@@ -132,6 +132,13 @@ with `workflow_state` role `deliverable`, the report with role `validation`,
 and the preview with role `preview`. A claimed file path does not complete the
 workflow.
 
+Use the bundled renderer for this visual gate; it isolates LibreOffice's user
+profile and rejects a missing or blank preview:
+
+```bash
+bash SKILL_DIR/scripts/xlsx_render_preview.sh output.xlsx output/sheet-page-1.png
+```
+
 ## Utility Scripts
 
 ```bash
@@ -143,4 +150,5 @@ python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/work/ out.xlsx          # repack aft
 python3 SKILL_DIR/scripts/xlsx_shift_rows.py /tmp/work/ insert 5 1  # shift rows for insertion
 python3 SKILL_DIR/scripts/xlsx_add_column.py /tmp/work/ --col G ... # add column with formulas
 python3 SKILL_DIR/scripts/xlsx_insert_row.py /tmp/work/ --at 6 ...  # insert row with data
+bash SKILL_DIR/scripts/xlsx_render_preview.sh file.xlsx preview.png # real raster preview
 ```

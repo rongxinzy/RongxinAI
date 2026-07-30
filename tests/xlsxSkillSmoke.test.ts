@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -32,4 +32,14 @@ test('XLSX skill packs its template and runs the mandatory formula validator', (
   } finally {
     rmSync(workspace, { recursive: true, force: true });
   }
+});
+
+test('XLSX skill includes a controlled renderer for inspected shortcut previews', () => {
+  const renderer = path.join(skillRoot, 'scripts', 'xlsx_render_preview.sh');
+  assert.equal(existsSync(renderer), true, 'XLSX preview renderer is missing');
+  const usage = spawnSync('bash', [renderer], { encoding: 'utf8', stdio: 'pipe' });
+  // The renderer should require explicit input/output instead of silently
+  // accepting a claimed preview path.
+  assert.equal(usage.status, 2);
+  assert.match(usage.stderr, /Usage:/);
 });
