@@ -156,6 +156,9 @@ vi.mock('../claudeSettings', () => ({
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
+import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
+import type { CoworkStore } from '../../coworkStore';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
@@ -1213,6 +1216,151 @@ describe('PiRuntimeAdapter', () => {
       } finally {
         vi.useRealTimers();
       }
+    });
+  });
+
+  // ── Auto-retry error storm (deferred error surfacing) ──
+
+  describe('auto-retry error storm', () => {
+    let listener: ((event: unknown) => void) | null = null;
+    let mockStore: {
+      updateSession: ReturnType<typeof vi.fn>;
+      updateMessage: ReturnType<typeof vi.fn>;
+      addMessage: ReturnType<typeof vi.fn>;
+      getSession: ReturnType<typeof vi.fn>;
+      getAgent: ReturnType<typeof vi.fn>;
+      listAgents: ReturnType<typeof vi.fn>;
+    };
+    let errors: CoworkError[];
+    let completes: string[];
+
+    const failedAttempt = (errorMessage: string) => {
+      listener!({
+        type: 'message_end',
+        message: { role: 'assistant', content: '', stopReason: 'error', errorMessage },
+      });
+      listener!({ type: 'turn_end' });
+      listener!({ type: 'agent_end' });
+    };
+
+    const successfulTurn = (text: string) => {
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text }] },
+      });
+      listener!({
+        type: 'message_end',
+        message: { role: 'assistant', content: [{ type: 'text', text }], stopReason: 'stop' },
+      });
+      listener!({ type: 'agent_end' });
+    };
+
+    const systemErrorMessages = () =>
+      mockStore.addMessage.mock.calls.filter(
+        ([, message]) => (message as { type: string }).type === 'system',
+      );
+
+    beforeEach(() => {
+      listener = null;
+      mockSession.subscribe.mockImplementation((cb: (event: unknown) => void) => {
+        listener = cb;
+        return () => {};
+      });
+      mockStore = {
+        updateSession: vi.fn(),
+        updateMessage: vi.fn(),
+        addMessage: vi.fn((_sessionId: string, message: Record<string, unknown>) => ({
+          ...message,
+          id: (message.id as string) ?? 'stored-id',
+        })),
+        getSession: vi.fn(() => undefined),
+        getAgent: vi.fn(() => undefined),
+        listAgents: vi.fn(() => []),
+      };
+      adapter.setCoworkStore(mockStore as unknown as CoworkStore);
+      errors = [];
+      completes = [];
+      adapter.on('error', (_sid, error) => errors.push(error as CoworkError));
+      adapter.on('complete', sessionId => completes.push(sessionId));
+    });
+
+    it('surfaces no error when an auto-retry succeeds', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('429 Too Many Requests: overloaded');
+      listener!({ type: 'auto_retry_start' });
+      successfulTurn('Recovered answer');
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(0);
+      expect(systemErrorMessages()).toHaveLength(0);
+      expect(mockStore.updateSession).not.toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({ status: 'error' }),
+      );
+      expect(completes).toEqual(['test']);
+      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'completed' });
+    });
+
+    it('surfaces the error exactly once when auto-retries are exhausted', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        listener!({ type: 'turn_start' });
+        failedAttempt('429 Too Many Requests: overloaded');
+        listener!({ type: attempt < 2 ? 'auto_retry_start' : 'auto_retry_end' });
+      }
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.RateLimited);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'error' });
+      expect(mockStore.updateSession).not.toHaveBeenCalledWith('test', { status: 'completed' });
+      expect(completes).toHaveLength(0);
+    });
+
+    it('surfaces a non-retryable error once on agent_settled', async () => {
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('401 Unauthorized: invalid api key');
+      listener!({ type: 'agent_settled' });
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
+      expect(systemErrorMessages()).toHaveLength(1);
+      expect(completes).toHaveLength(0);
+    });
+
+    it('does not complete or continue the agent loop on a failed turn', async () => {
+      await adapter.startSession('test', 'Hi');
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{
+          name: string;
+          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
+        }>;
+      };
+      const loopTool = sessionOptions.customTools?.find(tool => tool.name === PiAgentLoopToolName);
+      expect(loopTool).toBeDefined();
+      // Arm the loop so agent_end would normally continue with iteration 2.
+      await loopTool!.execute('call-1', {
+        action: PiAgentLoopAction.Start,
+        mode: PiAgentLoopMode.Passes,
+        passes: 3,
+      });
+      await loopTool!.execute('call-2', { action: PiAgentLoopAction.Next, summary: 'iter 1 done' });
+
+      listener!({ type: 'turn_start' });
+      failedAttempt('429 Too Many Requests: overloaded');
+      listener!({ type: 'auto_retry_end' });
+
+      // No continuation prompt beyond the initial startSession prompt.
+      expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+      expect(completes).toHaveLength(0);
+      expect(mockStore.updateSession).not.toHaveBeenCalledWith('test', { status: 'completed' });
     });
   });
 });
