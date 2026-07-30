@@ -12,6 +12,7 @@ export const CoreSkillId = {
   Xlsx: 'xlsx',
   DeepResearch: 'deep-research',
   DeliAutoResearch: 'deli-autoresearch',
+  WebSearch: 'web-search',
   FrontendDesign: 'frontend-design',
 } as const;
 
@@ -19,3 +20,10 @@ export type CoreSkillId = (typeof CoreSkillId)[keyof typeof CoreSkillId];
 
 export const isCoreSkill = (id: string): id is CoreSkillId =>
   (Object.values(CoreSkillId) as string[]).includes(id);
+
+/** Skills that together form the first-class Academic Research workflow. */
+export const AcademicResearchSkillIds = [
+  CoreSkillId.DeliAutoResearch,
+  CoreSkillId.DeepResearch,
+  CoreSkillId.WebSearch,
+] as const;

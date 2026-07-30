@@ -10,6 +10,7 @@ import * as os from 'os';
 import path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CoreSkillId } from '../../../shared/skills/constants';
 
 const hoisted = vi.hoisted(() => ({
   mockCreateAgentSession: vi.fn(),
@@ -206,6 +207,17 @@ describe('buildPiSubagentTool', () => {
         '/tmp/workspace',
         expect.stringContaining('research subagent'),
         4096,
+      );
+    });
+
+    it('gives researcher subagents an explicit web-search capability', async () => {
+      const { tool, deps } = buildTool({ webSearchSkillPath: '/tmp/web-search' });
+      await tool.execute('call-1', { agent: 'researcher', task: 'find primary sources' });
+      expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+        '/tmp/workspace',
+        expect.stringContaining('/tmp/web-search/scripts/search.sh'),
+        4096,
+        [CoreSkillId.WebSearch],
       );
     });
 

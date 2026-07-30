@@ -1,5 +1,6 @@
 import { FileText, Globe, GraduationCap, Presentation, Table, Telescope } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { AcademicResearchSkillIds } from '@shared/skills/constants';
 
 /**
  * Chat quick-skill shortcut entries.
@@ -10,6 +11,8 @@ import type { LucideIcon } from 'lucide-react';
 export interface ChatSkillShortcut {
   id: string;
   skillId: string;
+  /** Additional capabilities selected with the primary shortcut skill. */
+  skillIds?: readonly string[];
   icon: LucideIcon;
   labelKey: string;
   /** Placeholder shown in the chat input while this skill is active. */
@@ -34,6 +37,7 @@ export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
   {
     id: 'academic-research',
     skillId: 'deli-autoresearch',
+    skillIds: AcademicResearchSkillIds,
     icon: GraduationCap,
     labelKey: 'chatSkillAcademicResearch',
     placeholderKey: 'chatSkillPlaceholderAcademicResearch',

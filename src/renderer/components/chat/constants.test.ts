@@ -7,7 +7,7 @@
  * was filtered out of the chat skill list and the shortcut toasted
  * "skill unavailable" even though the skill is core (always enabled).
  */
-import { CoreSkillId, isCoreSkill } from '@shared/skills/constants';
+import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skills/constants';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
@@ -27,6 +27,12 @@ test('every chat quick-skill shortcut points at a core skill', () => {
 test('shortcut skillIds stay unique and match their entry ids where intended', () => {
   const skillIds = CHAT_SKILL_SHORTCUTS.map(entry => entry.skillId);
   expect(new Set(skillIds).size).toBe(skillIds.length);
+});
+
+test('academic research selects Deli, deep research, and explicit web search together', () => {
+  const academic = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'academic-research');
+  expect(academic?.skillIds).toEqual(AcademicResearchSkillIds);
+  for (const skillId of academic?.skillIds || []) expect(isCoreSkill(skillId)).toBe(true);
 });
 
 test('the chat skill allowlist is derived from CoreSkillId, not hardcoded', () => {

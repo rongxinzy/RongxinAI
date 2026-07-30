@@ -4421,7 +4421,11 @@ if (!gotTheLock) {
 
         const runtimeSkillIds = [
           ...new Set([
-            ...(options.activeSkillIds || []),
+            // A continuation normally arrives after the input cleared its
+            // one-shot skill chips. Preserve the session's saved workflow
+            // skills in that case so controlled academic research resumes
+            // with the same state and completion gates.
+            ...(options.activeSkillIds ?? existingSession?.activeSkillIds ?? []),
             ...(existingSession?.experts || []).flatMap(expert => expert.skillIds),
           ]),
         ];

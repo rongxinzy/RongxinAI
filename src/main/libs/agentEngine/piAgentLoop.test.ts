@@ -120,13 +120,15 @@ describe('buildPiAgentLoopTool', () => {
       await callTool(tool, { action: 'start', mode: 'goal', goal: 'write a report' });
       expect(controller.getState().active).toBe(true);
 
-      // Turn ends without a loop signal: no continuation.
-      expect(controller.handleAgentEnd()).toEqual({ shouldContinue: false });
+      // A missing loop signal is a protocol omission, not an implicit completion.
+      const omission = controller.handleAgentEnd();
+      expect(omission.shouldContinue).toBe(true);
+      expect(omission.nextPrompt).toContain('protocol omission');
 
       await callTool(tool, { action: 'next', summary: 'drafted outline' });
       const decision = controller.handleAgentEnd();
       expect(decision.shouldContinue).toBe(true);
-      expect(decision.nextPrompt).toContain('Iteration 2');
+      expect(decision.nextPrompt).toContain('Iteration 3');
       expect(decision.nextPrompt).toContain('write a report');
       expect(decision.nextPrompt).toContain('drafted outline');
       expect(decision.nextPrompt).toContain('agent_loop');
@@ -246,7 +248,12 @@ describe('buildPiAgentLoopTool', () => {
       expect(state.goal).toBe('second goal');
       expect(state.currentStep).toBe(0);
       // The pending "next" from the old loop must not leak into the new one.
-      expect(controller.handleAgentEnd()).toEqual({ shouldContinue: false });
+      // The replacement remains active, so its missing signal triggers the
+      // new protocol-omission continuation rather than the old loop state.
+      const replacementDecision = controller.handleAgentEnd();
+      expect(replacementDecision.shouldContinue).toBe(true);
+      expect(replacementDecision.nextPrompt).toContain('second goal');
+      expect(replacementDecision.nextPrompt).not.toContain('progress');
     });
 
     it('returns no continuation after stop', async () => {
