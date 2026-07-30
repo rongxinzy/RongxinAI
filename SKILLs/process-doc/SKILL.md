@@ -1,7 +1,8 @@
 ---
 name: process-doc
 description: Document a business process — flowcharts, RACI, and SOPs. Use when formalizing a process that lives in someone's head, building a RACI to clarify who owns what, writing an SOP for a handoff or audit, or capturing the exceptions and edge cases of how work actually gets done.
-argument-hint: "<process name or description>"
+metadata:
+  argument-hint: "<process name or description>"
 license: Apache-2.0
 ---
 

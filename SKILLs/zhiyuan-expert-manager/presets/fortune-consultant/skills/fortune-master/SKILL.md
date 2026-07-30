@@ -7,25 +7,26 @@ description: |
   自动识别体系与资料完整度，按 S/A/B/C 四级精度输出解读。
   触发词：算命、八字、紫微、奇门遁甲、六爻、梅花易数、塔罗、星盘、风水、飞星、
   今日运势、占卜、合婚、择吉、数字命理、生命灵数。
-keywords: 算命, 八字, 紫微斗数, 奇门遁甲, 六爻, 梅花易数, 塔罗, 星盘, 风水, 九宫飞星, 今日运势, 占卜, 合婚, 择吉, 数字命理, 生命灵数, fortune telling, BaZi, ZiWei, QiMen, Tarot, astrology, feng shui, I Ching, numerology
-runtime:
-  node: ">=18"
-  python3: true
-network:
-  default: none
-data-retention:
-  location: "local filesystem under data/profiles/"
-  remote-upload: none
-  user-controls:
-    - "view:   node scripts/profile.js show <userId>"
-    - "list:   node scripts/profile.js list"
-    - "edit:   node scripts/profile.js save <userId> <field> <value>"
-    - "delete: node scripts/profile.js delete <userId>"
-notes: |
-  All bundled scripts perform local computation only. User profile data
-  (birth details, optional family members, interaction log) is stored only on
-  the local filesystem and can be viewed, edited, or deleted at any time via
-  scripts/profile.js.
+metadata:
+  keywords: 算命, 八字, 紫微斗数, 奇门遁甲, 六爻, 梅花易数, 塔罗, 星盘, 风水, 九宫飞星, 今日运势, 占卜, 合婚, 择吉, 数字命理, 生命灵数, fortune telling, BaZi, ZiWei, QiMen, Tarot, astrology, feng shui, I Ching, numerology
+  runtime:
+    node: ">=18"
+    python3: true
+  network:
+    default: none
+  data-retention:
+    location: "local filesystem under data/profiles/"
+    remote-upload: none
+    user-controls:
+      - "view:   node scripts/profile.js show <userId>"
+      - "list:   node scripts/profile.js list"
+      - "edit:   node scripts/profile.js save <userId> <field> <value>"
+      - "delete: node scripts/profile.js delete <userId>"
+  notes: |
+    All bundled scripts perform local computation only. User profile data
+    (birth details, optional family members, interaction log) is stored only on
+    the local filesystem and can be viewed, edited, or deleted at any time via
+    scripts/profile.js.
 ---
 
 # ☯️ 命理大师 · Fortune Master Ultimate

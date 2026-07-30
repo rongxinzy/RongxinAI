@@ -105,6 +105,7 @@
     "setup:posix-uv-runtime": "node scripts/setup-mac-uv-runtime.js",
     "setup:posix-python-runtime": "node scripts/setup-mac-python-runtime.js",
     "setup:pandoc-runtime": "node scripts/setup-pandoc-runtime.js",
+    "validate:skills": "node scripts/validate-skill-frontmatter.cjs",
     "openclaw:ensure": "node scripts/ensure-openclaw-version.cjs",
     "openclaw:patch": "node scripts/apply-openclaw-patches.cjs",
     "openclaw:plugins": "node scripts/ensure-openclaw-plugins.cjs",

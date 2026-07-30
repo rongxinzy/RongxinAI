@@ -29,6 +29,8 @@ jobs:
         with:
           bun-version: '1.3.14'
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Validate bundled Skill frontmatter
+        run: bun run validate:skills
       - name: Lint
         run: bun run lint
 

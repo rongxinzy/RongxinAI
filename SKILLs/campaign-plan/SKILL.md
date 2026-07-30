@@ -1,7 +1,8 @@
 ---
 name: campaign-plan
 description: Generate a full campaign brief with objectives, audience, messaging, channel strategy, content calendar, and success metrics. Use when planning a product launch, lead-gen push, or awareness campaign, when you need a week-by-week content calendar with dependencies, or when translating a marketing goal into a structured, executable plan.
-argument-hint: "<campaign objective or product>"
+metadata:
+  argument-hint: "<campaign objective or product>"
 license: Apache-2.0
 ---
 
