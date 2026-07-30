@@ -32,35 +32,22 @@ import io
 import json
 import os
 import sys
-import importlib.util
-
-
-# ── Dependency bootstrap ───────────────────────────────────────────────────────
-def ensure_deps():
-    missing = [p for p in ("reportlab", "pypdf")
-               if importlib.util.find_spec(p) is None]
-    if missing:
-        import subprocess
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install",
-             "--break-system-packages", "-q"] + missing
-        )
-
-
-ensure_deps()
-
-from reportlab.platypus import (
-    BaseDocTemplate, PageTemplate, Frame,
-    Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, PageBreak, Flowable, KeepTogether,
-    Preformatted, Image as RLImage,
-)
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+try:
+    from reportlab.platypus import (
+        BaseDocTemplate, PageTemplate, Frame,
+        Paragraph, Spacer, Table, TableStyle,
+        HRFlowable, PageBreak, Flowable, KeepTogether,
+        Preformatted, Image as RLImage,
+    )
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.colors import HexColor
+    from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+except ImportError:
+    print("Missing reportlab. Run through make.sh or: uv run --with reportlab python render_body.py ...", file=sys.stderr)
+    raise SystemExit(2)
 
 
 # ── Font registration ──────────────────────────────────────────────────────────

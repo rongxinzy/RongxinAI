@@ -10,22 +10,15 @@ Exit codes: 0 success, 1 bad args/missing file, 2 missing dep, 3 merge error
 """
 
 import argparse
-import importlib.util
 import json
 import os
 import sys
 
-def ensure_deps():
-    if importlib.util.find_spec("pypdf") is None:
-        import subprocess
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--break-system-packages", "-q", "pypdf"]
-        )
-
-
-ensure_deps()
-
-from pypdf import PdfWriter, PdfReader
+try:
+    from pypdf import PdfWriter, PdfReader
+except ImportError:
+    print("Missing pypdf. Run this script through make.sh or: uv run --with pypdf python merge.py ...", file=sys.stderr)
+    raise SystemExit(2)
 
 
 def merge(cover_path: str, body_path: str, out_path: str, title: str = "") -> dict:
