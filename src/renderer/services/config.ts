@@ -3,6 +3,8 @@ import { type ApiFormat, type ProviderConfig, ProviderRegistry } from '@shared/p
 import { AppConfig, CONFIG_KEYS, defaultConfig, isCustomProvider } from '../config';
 import { localStore } from './store';
 
+type ProviderModelConfig = NonNullable<ProviderConfig['models']>[number];
+
 const getFixedProviderApiFormat = (providerKey: string): ApiFormat | null => {
   const def = ProviderRegistry.get(providerKey);
   if (def && !def.switchableBaseUrls) {
@@ -127,23 +129,125 @@ const REMOVED_PROVIDER_MODELS: Record<string, string[]> = {
 const ADDED_PROVIDER_MODELS: Record<
   string,
   {
-    models: Array<{ id: string; name: string; supportsImage?: boolean }>;
+    models: Array<{
+      id: string;
+      name: string;
+      supportsImage?: boolean;
+      contextWindow?: number;
+      maxTokens?: number;
+    }>;
     position: 'start' | 'end';
   }
 > = {
   deepseek: {
     models: [
-      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supportsImage: false },
-      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', supportsImage: false },
+      {
+        id: 'deepseek-v4-flash',
+        name: 'DeepSeek V4 Flash',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 384_000,
+      },
+      {
+        id: 'deepseek-v4-pro',
+        name: 'DeepSeek V4 Pro',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 384_000,
+      },
     ],
     position: 'start',
   },
   moonshot: {
-    models: [{ id: 'kimi-k2.6', name: 'Kimi K2.6', supportsImage: true }],
+    models: [
+      {
+        id: 'kimi-k3',
+        name: 'Kimi K3',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'kimi-k2.6',
+        name: 'Kimi K2.6',
+        supportsImage: true,
+        contextWindow: 256_000,
+      },
+    ],
+    position: 'start',
+  },
+  qwen: {
+    models: [
+      {
+        id: 'qwen3.7-max',
+        name: 'Qwen3.7 Max',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 65_536,
+      },
+      {
+        id: 'qwen3.7-plus',
+        name: 'Qwen3.7 Plus',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 64_000,
+      },
+    ],
+    position: 'start',
+  },
+  zhipu: {
+    models: [
+      {
+        id: 'glm-5.2',
+        name: 'GLM 5.2',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 131_072,
+      },
+    ],
     position: 'start',
   },
   minimax: {
-    models: [{ id: 'MiniMax-M2.7', name: 'MiniMax M2.7', supportsImage: false }],
+    models: [
+      {
+        id: 'MiniMax-M3',
+        name: 'MiniMax M3',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'MiniMax-M2.7',
+        name: 'MiniMax M2.7',
+        supportsImage: false,
+        contextWindow: 204_800,
+        maxTokens: 131_072,
+      },
+    ],
+    position: 'start',
+  },
+  stepfun: {
+    models: [
+      {
+        id: 'step-3.7-flash',
+        name: 'Step 3.7 Flash',
+        supportsImage: false,
+        contextWindow: 256_000,
+        maxTokens: 256_000,
+      },
+    ],
+    position: 'start',
+  },
+  xiaomi: {
+    models: [
+      {
+        id: 'mimo-v2.5-pro-ultraspeed',
+        name: 'MiMo V2.5 Pro Ultraspeed',
+        supportsImage: false,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+    ],
     position: 'start',
   },
   openai: {
@@ -189,6 +293,18 @@ class ConfigService {
                 // Inject added models (for existing users who already have saved config)
                 const addedConfig = ADDED_PROVIDER_MODELS[providerKey];
                 if (addedConfig && mergedProvider.models) {
+                  const addedModelsById = new Map(addedConfig.models.map(model => [model.id, model]));
+                  mergedProvider.models = mergedProvider.models.map(
+                    (model: ProviderModelConfig) => {
+                      const addedModel = addedModelsById.get(model.id);
+                      if (!addedModel) return model;
+                      return {
+                        ...model,
+                        contextWindow: model.contextWindow ?? addedModel.contextWindow,
+                        maxTokens: model.maxTokens ?? addedModel.maxTokens,
+                      };
+                    },
+                  );
                   const existingIds = new Set(
                     mergedProvider.models.map((m: { id: string }) => m.id),
                   );

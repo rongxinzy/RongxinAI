@@ -1548,8 +1548,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
  * ZhiYuanAgent stores keys as DEEPSEEK_API_KEY, ANTHROPIC_API_KEY, etc.
  * Pi SDK looks up providers by name (deepseek, anthropic, openai, etc.).
  */
-const DEFAULT_PI_CONTEXT_WINDOW = 32768;
-const DEFAULT_PI_MAX_TOKENS = 4096;
+const DEFAULT_PI_LOCAL_CONTEXT_WINDOW = 32768;
+const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
+const DEFAULT_PI_CLOUD_CONTEXT_WINDOW = 256000;
+const DEFAULT_PI_CLOUD_MAX_TOKENS = 32768;
 const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
 
 const PI_BUILTIN_PROVIDER_ID = {
@@ -1577,6 +1579,12 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
     throw new Error(resolution.error || 'Pi model configuration is unavailable.');
   }
 
+  const isLocalModel = isLocalProviderName(providerMetadata.providerName);
+  const fallbackContextWindow = isLocalModel
+    ? DEFAULT_PI_LOCAL_CONTEXT_WINDOW
+    : DEFAULT_PI_CLOUD_CONTEXT_WINDOW;
+  const fallbackMaxTokens = isLocalModel ? DEFAULT_PI_LOCAL_MAX_TOKENS : DEFAULT_PI_CLOUD_MAX_TOKENS;
+
   return {
     id: config.model,
     name: providerMetadata.modelName || config.model,
@@ -1592,8 +1600,8 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
       cacheWrite: 0,
     },
     contextWindow:
-      providerMetadata.contextWindow || providerMetadata.contextTokens || DEFAULT_PI_CONTEXT_WINDOW,
-    maxTokens: providerMetadata.maxTokens || DEFAULT_PI_MAX_TOKENS,
+      providerMetadata.contextWindow || providerMetadata.contextTokens || fallbackContextWindow,
+    maxTokens: providerMetadata.maxTokens || fallbackMaxTokens,
   };
 }
 

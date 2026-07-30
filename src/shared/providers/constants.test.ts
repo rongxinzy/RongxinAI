@@ -28,6 +28,29 @@ describe('ProviderRegistry', () => {
     expect(def!.region).toBe('global');
   });
 
+  test('stores verified cloud model capacity metadata', () => {
+    const expectations = [
+      [ProviderName.DeepSeek, 'deepseek-v4-flash', 1_000_000, 384_000],
+      [ProviderName.Moonshot, 'kimi-k3', 1_048_576, 131_072],
+      [ProviderName.Qwen, 'qwen3.7-plus', 1_000_000, 64_000],
+      [ProviderName.Zhipu, 'glm-5.2', 1_000_000, 131_072],
+      [ProviderName.Minimax, 'MiniMax-M3', 1_000_000, 128_000],
+      [ProviderName.StepFun, 'step-3.7-flash', 256_000, 256_000],
+      [ProviderName.Xiaomi, 'mimo-v2.5-pro', 1_048_576, 131_072],
+      [ProviderName.OpenAI, 'gpt-5.4', 1_050_000, 128_000],
+      [ProviderName.Gemini, 'gemini-3-pro-preview', 1_048_576, 65_536],
+      [ProviderName.Anthropic, 'claude-opus-4-6', 1_000_000, 128_000],
+      [ProviderName.OpenRouter, 'openai/gpt-5.2-codex', 400_000, 128_000],
+    ] as const;
+
+    for (const [providerName, modelId, contextWindow, maxTokens] of expectations) {
+      const model = ProviderRegistry.get(providerName)?.defaultModels.find(
+        candidate => candidate.id === modelId,
+      );
+      expect(model).toMatchObject({ contextWindow, maxTokens });
+    }
+  });
+
   test('get returns undefined for unknown provider', () => {
     expect(ProviderRegistry.get('nonexistent')).toBeUndefined();
     expect(ProviderRegistry.get(ProviderName.Custom)).toBeUndefined();
