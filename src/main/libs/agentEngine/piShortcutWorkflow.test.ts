@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe('PiShortcutWorkflowController', () => {
   it('creates a controlled workflow for every non-academic sidebar shortcut', () => {
-    expect(resolveShortcutWorkflowKind(['pptx'])).toBe(ShortcutWorkflowKind.Ppt);
+    expect(resolveShortcutWorkflowKind(['presentation-studio'])).toBe(ShortcutWorkflowKind.Ppt);
     expect(resolveShortcutWorkflowKind(['deep-research', 'web-search'])).toBe(
       ShortcutWorkflowKind.DeepResearch,
     );

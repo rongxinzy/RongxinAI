@@ -78,7 +78,7 @@ node "<SKILL_DIR>/scripts/compile-deck.mjs" "<deck-dir>/deck.json" "<deck-dir>/o
 }
 ```
 
-Each page is `{ "pageType": "cover|content|chapter|final", "background": "#...", "elements": [...] }`. Elements require a unique `id`, a `type`, and `bounds: [x, y, width, height]` in canvas pixels. Supported types are `text`, `shape`, and `image`; the compiler intentionally fails closed for unsupported element types.
+Each page is `{ "pageType": "cover|content|chapter|final", "background": "#...", "elements": [...] }`. Elements require a unique `id`, a `type`, and `bounds: [x, y, width, height]` in canvas pixels. Supported types are `text`, `shape`, `image`, `table`, and `chart`; the compiler intentionally fails closed for unsupported element types.
 
 ### Text element
 
@@ -102,10 +102,17 @@ Each page is `{ "pageType": "cover|content|chapter|final", "background": "#...",
 { "id": "hero", "type": "image", "src": "assets/hero.jpg", "bounds": [880, 0, 400, 720], "sizing": "cover" }
 ```
 
+### Table and chart elements
+
+```json
+{ "id": "metrics", "type": "table", "bounds": [96, 420, 520, 180], "rows": [["Metric", "Result"], ["Revenue", "42%"]], "fontSize": 18 }
+{ "id": "trend", "type": "chart", "chartType": "bar", "bounds": [660, 390, 520, 230], "data": [{ "name": "Growth", "labels": ["Q1", "Q2"], "values": [18, 42] }] }
+```
+
 ## Non-negotiable quality gates
 
 - Use 16:9 unless the user requires another format.
-- Minimum body size is 18px; captions may be 12px; no text below 12px.
+- Minimum body size is 18pt; captions may be 12pt; no text below 12pt.
 - Do not use more than three font families or three semantic colors without a design rationale.
 - All non-decorative elements must remain inside the canvas and respect the declared safe margin.
 - Text overflow, text-text occlusion, unsafe margins, unintentional underfill, missing assets, invalid colors, duplicate IDs, and unsupported elements block export.

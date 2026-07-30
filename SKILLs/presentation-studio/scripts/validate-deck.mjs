@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const ALLOWED_TYPES = new Set(['text', 'shape', 'image']);
+const ALLOWED_TYPES = new Set(['text', 'shape', 'image', 'table', 'chart']);
+const ALLOWED_SIZING = new Set(['cover', 'contain']);
+const ALLOWED_CHART_TYPES = new Set(['area', 'bar', 'doughnut', 'line', 'pie', 'radar']);
 
 function fail(message) {
   throw new Error(message);
@@ -32,10 +34,11 @@ function resolveColor(value, colors) {
 }
 
 function textMetrics(text, fontSize, width, lineHeight, wrap) {
+  const fontPixels = fontSize * (96 / 72);
   const chars = [...String(text)];
-  const estimatedWidth = chars.reduce((sum, char) => sum + (/[^\x00-\x7F]/.test(char) ? fontSize : fontSize * 0.55), 0);
+  const estimatedWidth = chars.reduce((sum, char) => sum + (/[^\x00-\x7F]/.test(char) ? fontPixels : fontPixels * 0.55), 0);
   const lines = wrap === false ? 1 : Math.max(1, Math.ceil(estimatedWidth / Math.max(width, 1)));
-  return { width: estimatedWidth, height: lines * fontSize * Math.max(lineHeight ?? 1.3, 1.3), lines };
+  return { width: estimatedWidth, height: lines * fontPixels * Math.max(lineHeight ?? 1.3, 1.3), lines };
 }
 
 function validateDeck(deckPath) {
@@ -63,6 +66,8 @@ function validateDeck(deckPath) {
     if (!fs.existsSync(pagePath)) { add('error', 'page file does not exist', pageLabel); continue; }
     const page = readJson(pagePath);
     if (!Array.isArray(page.elements)) { add('error', 'page.elements must be an array', pageLabel); continue; }
+    const background = resolveColor(page.background ?? '$background', colors);
+    if (!HEX.test(background ?? '')) add('error', 'page background must resolve to #RRGGBB', pageLabel);
     const textElements = [];
     for (const element of page.elements) {
       const label = `${pageLabel}:${element?.id ?? '<missing-id>'}`;
@@ -78,15 +83,17 @@ function validateDeck(deckPath) {
         if (typeof element.src !== 'string' || !element.src) add('error', 'image src is required', label);
         else if (/^https?:\/\//.test(element.src)) add('error', 'remote image URLs are not allowed; download the verified asset into assets/', label);
         else if (!fs.existsSync(path.resolve(baseDir, element.src))) add('error', `image asset not found: ${element.src}`, label);
+        if (element.sizing !== undefined && !ALLOWED_SIZING.has(element.sizing)) add('error', 'image sizing must be cover or contain', label);
       }
-      if (element.type === 'shape' && !resolveColor(element.fill ?? '$background', colors)) add('error', 'shape fill must be a valid theme reference or #RRGGBB color', label);
+      if (element.type === 'shape' && !HEX.test(resolveColor(element.fill ?? '$background', colors) ?? '')) add('error', 'shape fill must resolve to #RRGGBB', label);
       if (element.type === 'text') {
+        if (typeof element.text !== 'string') add('error', 'text content must be a string', label);
         const style = element.style?.startsWith('$') ? styles[element.style.slice(1)] ?? {} : {};
         const fontSize = element.fontSize ?? style.fontSize;
         if (!Number.isFinite(fontSize)) add('error', 'text requires fontSize or a valid text style', label);
         else {
           const minimum = element.role === 'caption' ? 12 : 18;
-          if (fontSize < minimum) add('error', `font size ${fontSize}px is below the ${minimum}px minimum`, label);
+          if (fontSize < minimum) add('error', `font size ${fontSize}pt is below the ${minimum}pt minimum`, label);
           const metrics = textMetrics(element.text, fontSize, width, element.lineHeight ?? style.lineHeight, element.wrap);
           if (element.wrap === false && metrics.width > width) add('error', 'single-line text overflows its width', label);
           if (metrics.height > height) add('error', 'text overflows its height', label);
@@ -95,6 +102,20 @@ function validateDeck(deckPath) {
         const color = resolveColor(element.color ?? style.color ?? '$text', colors);
         if (!HEX.test(color ?? '')) add('error', 'text color must resolve to #RRGGBB', label);
         textElements.push(element);
+      }
+      if (element.type === 'table') {
+        if (!Array.isArray(element.rows) || element.rows.length === 0 || element.rows.some(row => !Array.isArray(row) || row.length === 0)) add('error', 'table rows must be a non-empty matrix', label);
+        else if (element.rows.some(row => row.some(cell => typeof cell !== 'string' && typeof cell !== 'number'))) add('error', 'table cells must be strings or numbers', label);
+        const tableFontSize = element.fontSize ?? 18;
+        if (!Number.isFinite(tableFontSize) || tableFontSize < 12) add('error', 'table font size must be at least 12pt', label);
+      }
+      if (element.type === 'chart') {
+        if (!ALLOWED_CHART_TYPES.has(element.chartType)) add('error', `unsupported chart type ${element.chartType}`, label);
+        if (!Array.isArray(element.data) || element.data.length === 0) add('error', 'chart data must contain at least one series', label);
+        else for (const series of element.data) {
+          if (!series || typeof series.name !== 'string' || !Array.isArray(series.labels) || !Array.isArray(series.values)) add('error', 'chart series requires name, labels, and values', label);
+          else if (series.labels.length === 0 || series.labels.length !== series.values.length || series.values.some(value => !Number.isFinite(value))) add('error', 'chart labels and numeric values must have matching non-zero lengths', label);
+        }
       }
     }
     for (let i = 0; i < textElements.length; i += 1) for (let j = i + 1; j < textElements.length; j += 1) {
