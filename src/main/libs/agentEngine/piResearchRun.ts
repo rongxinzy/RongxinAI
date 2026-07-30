@@ -15,11 +15,13 @@ import {
   verifyResearchSource,
 } from './piResearchEvidence';
 import {
+  buildResearchInitialPrompt,
   buildResearchIterationPrompt,
   buildResearchReviewPrompt,
   collectCompletionFailures,
   collectEvidenceFailures,
   extractSubagentIds,
+  resumeResearchState,
 } from './piResearchPolicy';
 import { PiResearchRunStore } from './piResearchStore';
 import {
@@ -70,19 +72,7 @@ export class PiResearchRunController {
   }
 
   resumeForPrompt(task: string): void {
-    if (
-      this.state.status !== ResearchRunStatus.Completed &&
-      this.state.status !== ResearchRunStatus.NeedsAttention
-    ) {
-      return;
-    }
-    this.state.status = ResearchRunStatus.Running;
-    this.state.task = task;
-    this.state.iteration += 1;
-    this.state.staleCount = 0;
-    this.state.lastFindingCount = this.state.sources.length + this.state.claims.length;
-    this.state.review = { requested: false, passed: false };
-    delete this.state.completionReason;
+    if (!resumeResearchState(this.state, task)) return;
     this.researcherRanThisIteration = false;
     this.reviewerRanThisRequest = false;
     this.reviewerToolCallIds.clear();
@@ -97,19 +87,7 @@ export class PiResearchRunController {
   }
 
   buildInitialPrompt(userPrompt: string): string {
-    return [
-      '## Academic research run initialized',
-      `Durable state directory: ${this.runDirectory}`,
-      'This is a controlled research run. Do not finish after a quick search.',
-      'Complete at least three distinct research iterations, each with an isolated researcher subagent.',
-      'First create at least three subquestions with research_state action "plan", then choose a novel direction with action "direction".',
-      'Every iteration must launch at least one isolated researcher subagent. Researchers have an explicit web-search capability.',
-      'For every source you rely on, call research_state action "verify_source"; this process opens the URL before it is recorded.',
-      'Record each load-bearing claim statement with two or more verified independent source URLs using action "claim".',
-      'Before requesting completion, record a contradiction scan with action "contradictions". Calling agent_loop done only requests review; it cannot complete the run by itself.',
-      '',
-      userPrompt,
-    ].join('\n');
+    return buildResearchInitialPrompt(this.runDirectory, userPrompt);
   }
 
   recordSubagentStart(toolCallId: string, args: unknown): void {
@@ -198,7 +176,7 @@ export class PiResearchRunController {
           deferredFailures.join('; '),
         );
       } else {
-        const failures = this.completionFailures();
+        const failures = collectCompletionFailures(this.state, this.reviewerRanThisRequest);
         if (this.state.review.passed && failures.length === 0) {
           this.state.status = ResearchRunStatus.Completed;
           this.store.writeState(this.state);
@@ -313,11 +291,7 @@ export class PiResearchRunController {
     return {
       ...this.state,
       runDirectory: this.runDirectory,
-      completionFailures: this.completionFailures(),
+      completionFailures: collectCompletionFailures(this.state, this.reviewerRanThisRequest),
     };
-  }
-
-  private completionFailures(): string[] {
-    return collectCompletionFailures(this.state, this.reviewerRanThisRequest);
   }
 }

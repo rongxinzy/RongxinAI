@@ -3,9 +3,43 @@ import {
   MIN_RESEARCH_ITERATIONS,
   MIN_RESEARCH_SUBQUESTIONS,
   MIN_VERIFIED_SOURCES,
+  ResearchRunStatus,
   ResearchSourceType,
   type ResearchRunState,
 } from './piResearchTypes';
+
+export function resumeResearchState(state: ResearchRunState, task: string): boolean {
+  if (
+    state.status !== ResearchRunStatus.Completed &&
+    state.status !== ResearchRunStatus.NeedsAttention
+  ) {
+    return false;
+  }
+  state.status = ResearchRunStatus.Running;
+  state.task = task;
+  state.iteration += 1;
+  state.staleCount = 0;
+  state.lastFindingCount = state.sources.length + state.claims.length;
+  state.review = { requested: false, passed: false };
+  delete state.completionReason;
+  return true;
+}
+
+export function buildResearchInitialPrompt(runDirectory: string, userPrompt: string): string {
+  return [
+    '## Academic research run initialized',
+    `Durable state directory: ${runDirectory}`,
+    'This is a controlled research run. Do not finish after a quick search.',
+    'Complete at least three distinct research iterations, each with an isolated researcher subagent.',
+    'First create at least three subquestions with research_state action "plan", then choose a novel direction with action "direction".',
+    'Every iteration must launch at least one isolated researcher subagent. Researchers have an explicit web-search capability.',
+    'For every source you rely on, call research_state action "verify_source"; this process opens the URL before it is recorded.',
+    'Record each load-bearing claim statement with two or more verified independent source URLs using action "claim".',
+    'Before requesting completion, record a contradiction scan with action "contradictions". Calling agent_loop done only requests review; it cannot complete the run by itself.',
+    '',
+    userPrompt,
+  ].join('\n');
+}
 
 export function collectCompletionFailures(
   state: ResearchRunState,
