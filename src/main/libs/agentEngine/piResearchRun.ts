@@ -18,6 +18,7 @@ import {
   buildResearchIterationPrompt,
   buildResearchReviewPrompt,
   collectCompletionFailures,
+  collectEvidenceFailures,
   extractSubagentIds,
 } from './piResearchPolicy';
 import { PiResearchRunStore } from './piResearchStore';
@@ -33,6 +34,7 @@ import {
 export {
   isAcademicResearchSkillSet,
   MIN_PRIMARY_SOURCE_RATIO,
+  MIN_RESEARCH_ITERATIONS,
   MIN_RESEARCH_SUBQUESTIONS,
   MIN_VERIFIED_SOURCES,
   PiResearchStateAction,
@@ -99,6 +101,7 @@ export class PiResearchRunController {
       '## Academic research run initialized',
       `Durable state directory: ${this.runDirectory}`,
       'This is a controlled research run. Do not finish after a quick search.',
+      'Complete at least three distinct research iterations, each with an isolated researcher subagent.',
       'First create at least three subquestions with research_state action "plan", then choose a novel direction with action "direction".',
       'Every iteration must launch at least one isolated researcher subagent. Researchers have an explicit web-search capability.',
       'For every source you rely on, call research_state action "verify_source"; this process opens the URL before it is recorded.',
@@ -179,34 +182,71 @@ export class PiResearchRunController {
   }
 
   onAgentEnd(): ResearchEndDecision {
+    let deferredFailures: string[] = [];
     if (this.state.status === ResearchRunStatus.CompletionRequested) {
-      const failures = this.completionFailures();
-      if (this.state.review.passed && failures.length === 0) {
-        this.state.status = ResearchRunStatus.Completed;
+      deferredFailures = collectEvidenceFailures(this.state);
+      if (deferredFailures.length > 0) {
+        this.state.status = ResearchRunStatus.Running;
+        this.state.review = { requested: false, passed: false };
+        this.reviewerRanThisRequest = false;
+        this.reviewerToolCallIds.clear();
         this.store.writeState(this.state);
         this.store.log(
           'orchestrator',
-          'info',
-          'completion_approved',
-          this.state.completionReason || 'Approved',
+          'decision',
+          'completion_deferred',
+          deferredFailures.join('; '),
         );
+      } else {
+        const failures = this.completionFailures();
+        if (this.state.review.passed && failures.length === 0) {
+          this.state.status = ResearchRunStatus.Completed;
+          this.store.writeState(this.state);
+          this.store.log(
+            'orchestrator',
+            'info',
+            'completion_approved',
+            this.state.completionReason || 'Approved',
+          );
+          return {
+            shouldFinish: true,
+            reason: this.state.completionReason || 'Academic research gate passed',
+          };
+        }
         return {
-          shouldFinish: true,
-          reason: this.state.completionReason || 'Academic research gate passed',
+          shouldFinish: false,
+          nextPrompt: buildResearchReviewPrompt(failures, this.runDirectory),
         };
       }
-      return {
-        shouldFinish: false,
-        nextPrompt: buildResearchReviewPrompt(failures, this.runDirectory),
-      };
     }
 
     const previousFindingCount = this.state.sources.length + this.state.claims.length;
-    if (!this.researcherRanThisIteration || previousFindingCount <= this.state.lastFindingCount) {
+    if (!this.researcherRanThisIteration) {
       this.state.staleCount += 1;
-    } else {
-      this.state.staleCount = 0;
+      this.store.writeState(this.state);
+      this.store.log(
+        'orchestrator',
+        'warn',
+        'researcher_missing',
+        `Iteration ${this.state.iteration} was not advanced because no researcher subagent ran.`,
+      );
+      return {
+        shouldFinish: false,
+        nextPrompt: [
+          ...(deferredFailures.length > 0
+            ? [
+                '## Completion deferred — evidence gates remain open',
+                ...deferredFailures.map(failure => `- ${failure}`),
+                '',
+              ]
+            : []),
+          `Iteration ${this.state.iteration} was not advanced because no isolated researcher ran.`,
+          buildResearchIterationPrompt(this.state, this.runDirectory),
+        ].join('\n'),
+      };
     }
+    this.state.staleCount =
+      previousFindingCount <= this.state.lastFindingCount ? this.state.staleCount + 1 : 0;
     this.state.lastFindingCount = previousFindingCount;
     this.state.iteration += 1;
     this.researcherRanThisIteration = false;
@@ -236,7 +276,16 @@ export class PiResearchRunController {
 
     return {
       shouldFinish: false,
-      nextPrompt: buildResearchIterationPrompt(this.state, this.runDirectory),
+      nextPrompt: [
+        ...(deferredFailures.length > 0
+          ? [
+              '## Completion deferred — evidence gates remain open',
+              ...deferredFailures.map(failure => `- ${failure}`),
+              '',
+            ]
+          : []),
+        buildResearchIterationPrompt(this.state, this.runDirectory),
+      ].join('\n'),
     };
   }
 

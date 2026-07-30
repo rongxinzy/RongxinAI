@@ -1,5 +1,6 @@
 import {
   MIN_PRIMARY_SOURCE_RATIO,
+  MIN_RESEARCH_ITERATIONS,
   MIN_RESEARCH_SUBQUESTIONS,
   MIN_VERIFIED_SOURCES,
   ResearchSourceType,
@@ -15,6 +16,15 @@ export function collectCompletionFailures(
     failures.push('an isolated reviewer has not completed the request');
   }
   if (!state.review.passed) failures.push('reviewer verdict is not REVIEW_VERDICT: PASS');
+  failures.push(...collectEvidenceFailures(state));
+  return failures;
+}
+
+export function collectEvidenceFailures(state: ResearchRunState): string[] {
+  const failures: string[] = [];
+  if (state.iteration < MIN_RESEARCH_ITERATIONS) {
+    failures.push(`fewer than ${MIN_RESEARCH_ITERATIONS} research iterations are recorded`);
+  }
   if (state.subquestions.length < MIN_RESEARCH_SUBQUESTIONS) {
     failures.push(`fewer than ${MIN_RESEARCH_SUBQUESTIONS} subquestions are recorded`);
   }

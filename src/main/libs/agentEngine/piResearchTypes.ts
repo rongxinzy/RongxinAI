@@ -12,6 +12,7 @@ export type PiResearchStateAction =
   (typeof PiResearchStateAction)[keyof typeof PiResearchStateAction];
 
 export const RESEARCH_MAX_ITERATIONS = 15;
+export const MIN_RESEARCH_ITERATIONS = 3;
 export const MIN_RESEARCH_SUBQUESTIONS = 3;
 export const MIN_VERIFIED_SOURCES = 6;
 export const MIN_PRIMARY_SOURCE_RATIO = 0.3;

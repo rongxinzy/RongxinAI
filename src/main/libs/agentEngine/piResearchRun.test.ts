@@ -74,8 +74,15 @@ describe('PiResearchRunController', () => {
     run.setContradictionCheck('Conflicting results are scoped by population and publication date.');
     run.recordSubagentStart('research-1', { agent: 'researcher', task: 'retrieve literature' });
 
-    run.requestCompletion('All conclusions are documented.');
     let decision = run.onAgentEnd();
+    expect(decision.shouldFinish).toBe(false);
+    run.recordSubagentStart('research-2', { agent: 'researcher', task: 'seek contrary evidence' });
+    decision = run.onAgentEnd();
+    expect(decision.shouldFinish).toBe(false);
+    run.recordSubagentStart('research-3', { agent: 'researcher', task: 'compare methodologies' });
+
+    run.requestCompletion('All conclusions are documented.');
+    decision = run.onAgentEnd();
     expect(decision.shouldFinish).toBe(false);
     expect(decision.nextPrompt).toContain('isolated reviewer');
 
@@ -97,10 +104,10 @@ describe('PiResearchRunController', () => {
     expect(run.getSnapshot()).toMatchObject({
       status: 'running',
       task: 'Investigate a follow-up question.',
-      iteration: 2,
+      iteration: 4,
       review: { requested: false, passed: false },
       completionFailures: expect.arrayContaining([
-        'iteration 2 did not launch an isolated researcher',
+        'iteration 4 did not launch an isolated researcher',
       ]),
     });
   });
@@ -129,13 +136,31 @@ describe('PiResearchRunController', () => {
     expect(run.getSnapshot()).toMatchObject({ claims: [] });
   });
 
-  it('keeps an unfinished run alive and raises stale_count when an iteration launched no researcher', () => {
+  it('keeps an unfinished run on the same iteration when no researcher launched', () => {
     const run = createRun();
     const decision = run.onAgentEnd();
     expect(decision.shouldFinish).toBe(false);
     expect(decision.nextPrompt).toContain('must launch an isolated researcher');
-    expect(run.getSnapshot()).toMatchObject({ iteration: 2, staleCount: 1 });
+    expect(decision.nextPrompt).toContain('was not advanced');
+    expect(run.getSnapshot()).toMatchObject({ iteration: 1, staleCount: 1 });
+
+    run.recordSubagentStart('research-retry', { agent: 'researcher', task: 'retry iteration' });
+    expect(run.onAgentEnd().shouldFinish).toBe(false);
+    expect(run.getSnapshot()).toMatchObject({ iteration: 2 });
     expect(MIN_RESEARCH_SUBQUESTIONS).toBe(3);
+  });
+
+  it('returns an early completion request to research mode instead of deadlocking in review', () => {
+    const run = createRun();
+    run.recordSubagentStart('research-1', { agent: 'researcher', task: 'start discovery' });
+    run.requestCompletion('Finished too early.');
+
+    const decision = run.onAgentEnd();
+
+    expect(decision.shouldFinish).toBe(false);
+    expect(decision.nextPrompt).toContain('Completion deferred');
+    expect(decision.nextPrompt).toContain('fewer than 3 research iterations');
+    expect(run.getSnapshot()).toMatchObject({ status: 'running', iteration: 2 });
   });
 
   it('does not fetch local or private source URLs', async () => {
