@@ -88,6 +88,7 @@ import ErrorMessage from './ErrorMessage';
 import { GitHubCopilotIcon } from './icons/providers';
 import IMSettings from './im/IMSettings';
 import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
+import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 
 type TabType =
@@ -5249,11 +5250,22 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Footer buttons */}
-            <div className="flex flex-wrap justify-end gap-3 p-4 border-border border-t bg-background shrink-0">
-              <Button type="button" variant="outline" onClick={onClose}>
+            <div className="flex flex-wrap items-center justify-end gap-2 border-border border-t bg-background p-4 shrink-0">
+              <Button
+                type="button"
+                variant="outline"
+                className={localInferenceCompactButtonClass}
+                onClick={onClose}
+                disabled={isSaving}
+              >
                 {i18nService.t('cancel')}
               </Button>
-              <Button type="submit" variant="outline" disabled={isSaving}>
+              <Button
+                type="submit"
+                variant="outline"
+                className={localInferenceCompactButtonClass}
+                disabled={isSaving}
+              >
                 {isSaving ? i18nService.t('saving') : i18nService.t('save')}
               </Button>
             </div>
