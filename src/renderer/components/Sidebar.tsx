@@ -1,10 +1,9 @@
 import { AgentId } from '@shared/agent';
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
-import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
-import { Cpu, Settings, TriangleAlert } from 'lucide-react';
-import { MessageCircle, PanelLeft, Search, Trash2, X } from 'lucide-react';
+import { MotionConfig, useReducedMotion } from 'motion/react';
+import { MessageCircle, PanelLeft, Settings, Trash2, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -34,19 +33,21 @@ import type { CoworkSessionSummary } from '../types/cowork';
 import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
-import { NewConversationIcon } from './icons/NewConversationIcon';
-import { ExpertProfileIcon } from './icons/SidebarSemanticIcons';
-import { SidebarAnimatedClockIcon } from './icons/SidebarAnimatedClockIcon';
+import {
+  SidebarAnimatedSearchIcon,
+  type SidebarAnimatedSearchIconHandle,
+} from './icons/SidebarAnimatedSearchIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import Modal from './common/Modal';
 import LoginButton from './LoginButton';
+import { SidebarNavigationControls, type SidebarActiveView } from './SidebarNavigationControls';
 
 interface SidebarProps {
   onShowSettings: () => void;
   onShowLogin?: () => void;
-  activeView: 'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert';
+  activeView: SidebarActiveView;
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowScheduledTasks: () => void;
@@ -64,10 +65,6 @@ const DEFAULT_SIDEBAR_WIDTH = 244;
 const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
-const sidebarNavItemClassName =
-  'sidebar-interactive-surface w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors';
-const activeSidebarNavItemClassName = `${sidebarNavItemClassName} sidebar-interactive-surface-active text-foreground`;
-
 const Sidebar: React.FC<SidebarProps> = ({
   onShowSettings,
   activeView,
@@ -96,6 +93,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchActive, setSearchActive] = useState(false);
   const [searchCorpus, setSearchCorpus] = useState<CoworkSessionSummary[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchIconRef = useRef<SidebarAnimatedSearchIconHandle>(null);
+  const prefersReducedMotion = useReducedMotion();
   const searchControlRef = useRef<HTMLDivElement>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -396,6 +395,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     <div className={cn('shrink-0 bg-surface-raised', !isChatMode && 'px-3')}>
       <div
         ref={searchControlRef}
+        onMouseEnter={() => {
+          if (!prefersReducedMotion) searchIconRef.current?.startAnimation();
+        }}
+        onMouseLeave={() => searchIconRef.current?.stopAnimation()}
         role={searchActive ? undefined : 'button'}
         tabIndex={searchActive ? undefined : 0}
         aria-label={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
@@ -413,13 +416,13 @@ const Sidebar: React.FC<SidebarProps> = ({
           }
         }}
         className={cn(
-          'inline-flex h-8 w-full items-center justify-start gap-2 overflow-hidden rounded-lg px-3 text-left text-[14px] font-normal text-muted-foreground',
+          'inline-flex h-8 w-full items-center justify-start gap-2 overflow-hidden rounded-lg px-3 text-left text-sm font-normal text-muted-foreground',
           searchActive
             ? 'cursor-text bg-background'
-            : 'sidebar-interactive-surface cursor-pointer transition-colors',
+            : 'cursor-pointer transition-colors hover:bg-surface-raised hover:text-foreground',
         )}
       >
-        <Search className="sidebar-animated-search-icon h-4 w-4 shrink-0" />
+        <SidebarAnimatedSearchIcon ref={searchIconRef} />
         {searchActive ? (
           <>
             <input
@@ -435,7 +438,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }
               }}
               placeholder={i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
-              className="h-full min-h-0 min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] font-normal leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="h-full min-h-0 min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-normal leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             {searchQuery && (
               <button
@@ -453,7 +456,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </>
         ) : (
-          <span className="flex-1 truncate text-[14px] leading-none">
+          <span className="flex-1 truncate text-sm leading-none">
             {i18nService.t(workMode === WorkMode.Chat ? 'searchChats' : 'search')}
           </span>
         )}
@@ -462,375 +465,281 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 
   return (
-    <aside
-      className={`relative shrink-0 overflow-hidden bg-surface-raised ${
-        isResizing ? '' : 'sidebar-transition'
-      }`}
-      data-active-view={activeView}
-      style={{ width: isCollapsed ? 0 : sidebarWidth }}
-    >
-      <div
-        className={`flex h-full flex-col transition-opacity ease-out ${
-          isCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+    <MotionConfig reducedMotion="user">
+      <aside
+        className={`relative shrink-0 overflow-hidden bg-surface-raised ${
+          isResizing ? '' : 'sidebar-transition'
         }`}
-        style={{
-          width: sidebarWidth,
-          transitionDuration: `${SIDEBAR_COLLAPSE_TRANSITION_MS}ms`,
-        }}
+        style={{ width: isCollapsed ? 0 : sidebarWidth }}
       >
-        <div className={cn('pt-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
-          <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
-            <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-              <img
-                src="zhiyuan-logo-light.svg"
-                alt="知远"
-                className="logo-light h-5 w-auto select-none"
-              />
-              <img
-                src="zhiyuan-logo-dark.svg"
-                alt="知远"
-                className="logo-dark h-5 w-auto select-none"
-              />
+        <div
+          className={`flex h-full flex-col transition-opacity ease-out ${
+            isCollapsed ? 'pointer-events-none opacity-0' : 'opacity-100'
+          }`}
+          style={{
+            width: sidebarWidth,
+            transitionDuration: `${SIDEBAR_COLLAPSE_TRANSITION_MS}ms`,
+          }}
+        >
+          <div className={cn('pt-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
+            <div className="draggable sidebar-header-drag h-8 flex items-center justify-between px-3">
+              <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
+                <img
+                  src="zhiyuan-logo-light.svg"
+                  alt="知远"
+                  className="logo-light h-5 w-auto select-none"
+                />
+                <img
+                  src="zhiyuan-logo-dark.svg"
+                  alt="知远"
+                  className="logo-dark h-5 w-auto select-none"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onToggleCollapse}
+                className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+                aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
+              >
+                <PanelLeft className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              onClick={onToggleCollapse}
-              className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-              aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
-            >
-              <PanelLeft className="h-4 w-4" />
-            </Button>
+            <SidebarNavigationControls
+              activeView={activeView}
+              onNewChat={onNewChat}
+              onShowExpert={onShowExpert}
+              onShowLocalInference={onShowLocalInference}
+              onShowScheduledTasks={onShowScheduledTasks}
+              onWorkModeChange={handleWorkModeChange}
+              workMode={workMode}
+            />
           </div>
-          <div
-            className={cn(
-              'mt-[5px] space-y-0.5 px-3',
-              workMode === WorkMode.Chat ? 'pb-0' : 'pb-3',
-            )}
-          >
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {workMode !== WorkMode.Chat && renderSearchControl()}
+
             <div
-              className="relative h-7 w-full cursor-pointer"
-              onClick={() => handleWorkModeChange(workMode !== WorkMode.Chat)}
+              ref={agentScrollContainerRef}
+              className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-3 pb-10"
+              onScroll={handleAgentScroll}
             >
-              <Switch
-                checked={workMode === WorkMode.Chat}
-                onCheckedChange={handleWorkModeChange}
-                data-mode="work-chat"
-              />
-              <span
-                className={cn(
-                  'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
-                  workMode === WorkMode.Work
-                    ? 'font-semibold text-foreground'
-                    : 'font-normal text-muted-foreground opacity-50',
-                )}
-                style={{ left: '25%', transform: 'translate(-50%, -50%)' }}
-              >
-                <span className="text-sm">{i18nService.t('workMode')}</span>
-              </span>
-              <span
-                className={cn(
-                  'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
-                  workMode === WorkMode.Chat
-                    ? 'font-semibold text-foreground'
-                    : 'font-normal text-muted-foreground opacity-50',
-                )}
-                style={{ left: '75%', transform: 'translate(-50%, -50%)' }}
-              >
-                <span className="text-sm">{i18nService.t('chatMode')}</span>
-              </span>
+              <div className={cn(workMode === WorkMode.Chat && 'hidden')}>
+                <MyAgentSidebarTree
+                  isBatchMode={isBatchMode}
+                  selectedIds={selectedIds}
+                  recentlyDeletedSessionIds={recentlyDeletedSessionIds}
+                  onShowCowork={onShowCowork}
+                  onToggleSelection={handleToggleSelection}
+                  onEnterBatchMode={handleEnterBatchMode}
+                  onVisibleSessionsChange={
+                    workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
+                  }
+                  onDismissSearch={() => {
+                    setSearchActive(false);
+                    setSearchQuery('');
+                  }}
+                  workMode={WorkMode.Work}
+                  searchQuery={searchQuery}
+                  searchCorpus={searchCorpus}
+                />
+              </div>
+              {workMode === WorkMode.Chat && (
+                <>
+                  <div>
+                    <ChatSkillShortcuts />
+                  </div>
+                  {renderSearchControl(true)}
+                  <div className="sticky top-0 z-30 flex h-9 items-center bg-surface-raised px-1.5">
+                    <h2 className="min-w-0 truncate text-sm font-normal text-muted-foreground">
+                      {i18nService.t('chatRecentTitle')}
+                    </h2>
+                  </div>
+                  {!chatSessionsLoaded ? (
+                    <div className="flex items-center justify-center py-10 px-4 text-sm text-muted-foreground">
+                      {i18nService.t('loading')}
+                    </div>
+                  ) : chatTaskNodes.length === 0 && !searchQuery.trim() ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-4">
+                      <MessageCircle className="size-10 text-muted-foreground mb-3" />
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
+                        {i18nService.t('chatNoSessions')}
+                      </p>
+                      <p className="text-xs text-muted-foreground text-center">
+                        {i18nService.t('chatNoSessionsHint')}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {chatTaskNodes.map(task => (
+                        <AgentTaskRow
+                          key={task.id}
+                          task={task}
+                          isBatchMode={isBatchMode}
+                          isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
+                          isNested={false}
+                          onSelect={() => {
+                            const session =
+                              searchSessionById.get(task.id) ??
+                              sessions.find(s => s.id === task.id);
+                            if (session) {
+                              setSearchActive(false);
+                              setSearchQuery('');
+                              void handleSelectSession(session);
+                            }
+                          }}
+                          onDelete={() => handleDeleteSession(task.id)}
+                          onShare={async () => {
+                            const session =
+                              searchSessionById.get(task.id) ??
+                              sessions.find(s => s.id === task.id);
+                            if (session) {
+                              setSearchActive(false);
+                              setSearchQuery('');
+                              await handleSelectSession(session);
+                              window.setTimeout(() => {
+                                window.dispatchEvent(
+                                  new CustomEvent('cowork:open-share-options', {
+                                    detail: { sessionId: task.id },
+                                  }),
+                                );
+                              }, 0);
+                            }
+                          }}
+                          onTogglePin={pinned => handleToggleSessionPin(task.id, pinned)}
+                          onRename={title => handleRenameSession(task.id, title)}
+                          onToggleSelection={() => handleToggleSelection(task.id)}
+                          onEnterBatchMode={() => handleEnterBatchMode(task.id)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <div className="mt-2!">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onNewChat}
-                className={sidebarNavItemClassName}
-              >
-                <NewConversationIcon />
-                {workMode === WorkMode.Chat ? i18nService.t('newChat') : i18nService.t('newTask')}
-              </Button>
+            <div
+              className={cn(
+                'pointer-events-none absolute inset-x-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150',
+                workMode === WorkMode.Chat ? 'top-0' : 'top-8',
+                agentScrollEdges.top ? 'opacity-100' : 'opacity-0',
+              )}
+            />
+            <div
+              className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
+                agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
+          </div>
+          {!isCollapsed && (
+            <div
+              className="non-draggable absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
+              onMouseDown={handleResizeStart}
+            />
+          )}
+          {isBatchMode ? (
+            <div className="px-3 pb-3 pt-1 flex items-center justify-between">
+              <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
+                <Checkbox
+                  checked={
+                    selectedIds.size === allVisibleSessionIdsRef.current.length &&
+                    allVisibleSessionIdsRef.current.length > 0
+                  }
+                  onCheckedChange={handleSelectAll}
+                  className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
+                />
+                {i18nService.t('batchSelectAll')}
+              </label>
+              <div className="flex items-center justify-start gap-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBatchDeleteClick}
+                  disabled={selectedIds.size === 0}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExitBatchMode}
+                  className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+                >
+                  {i18nService.t('batchCancel')}
+                </Button>
+              </div>
             </div>
-            {workMode !== WorkMode.Chat && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  onShowLocalInference();
-                }}
-                className={
-                  activeView === 'localInference'
-                    ? activeSidebarNavItemClassName
-                    : sidebarNavItemClassName
-                }
-                aria-current={activeView === 'localInference' ? 'page' : undefined}
-              >
-                <Cpu className="h-4 w-4 shrink-0" />
-                {i18nService.t('localInferenceSidebarTitle')}
-              </Button>
-            )}
-            {workMode !== WorkMode.Chat && (
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  onShowScheduledTasks();
-                }}
-                className={
-                  activeView === 'scheduledTasks'
-                    ? activeSidebarNavItemClassName
-                    : sidebarNavItemClassName
-                }
-                aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
-              >
-                <SidebarAnimatedClockIcon />
-                {i18nService.t('scheduledTasks')}
-              </Button>
-            )}
-            {workMode !== WorkMode.Chat && (
-              <>
+          ) : (
+            <div className="space-y-1 px-3 pb-3 pt-1">
+              {updateEntry}
+              <div className="flex items-center gap-1">
+                {!hideLogin && (
+                  <div className="flex-1 min-w-0">
+                    <LoginButton />
+                  </div>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => {
-                    onShowExpert();
-                  }}
-                  className={
-                    activeView === 'expert'
-                      ? activeSidebarNavItemClassName
-                      : sidebarNavItemClassName
-                  }
-                  aria-current={activeView === 'expert' ? 'page' : undefined}
+                  onClick={() => onShowSettings()}
+                  className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-sm font-normal text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground ${hideLogin ? 'w-full' : 'shrink-0'}`}
+                  aria-label={i18nService.t('settings')}
                 >
-                  <ExpertProfileIcon />
-                  {i18nService.t('expert')}
+                  <Settings className="h-4 w-4 shrink-0" />
+                  {i18nService.t('settings')}
                 </Button>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="relative flex min-h-0 flex-1 flex-col">
-          {workMode !== WorkMode.Chat && renderSearchControl()}
-
-          <div
-            ref={agentScrollContainerRef}
-            className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-3 pb-10"
-            onScroll={handleAgentScroll}
-          >
-            <div className={cn(workMode === WorkMode.Chat && 'hidden')}>
-              <MyAgentSidebarTree
-                isBatchMode={isBatchMode}
-                selectedIds={selectedIds}
-                recentlyDeletedSessionIds={recentlyDeletedSessionIds}
-                onShowCowork={onShowCowork}
-                onToggleSelection={handleToggleSelection}
-                onEnterBatchMode={handleEnterBatchMode}
-                onVisibleSessionsChange={
-                  workMode === WorkMode.Work ? handleVisibleSessionsChange : undefined
-                }
-                onDismissSearch={() => {
-                  setSearchActive(false);
-                  setSearchQuery('');
-                }}
-                workMode={WorkMode.Work}
-                searchQuery={searchQuery}
-                searchCorpus={searchCorpus}
-              />
-            </div>
-            {workMode === WorkMode.Chat && (
-              <>
-                <div>
-                  <ChatSkillShortcuts />
-                </div>
-                {renderSearchControl(true)}
-                <div className="sticky top-0 z-30 flex h-9 items-center bg-surface-raised px-1.5">
-                  <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
-                    {i18nService.t('chatRecentTitle')}
-                  </h2>
-                </div>
-                {!chatSessionsLoaded ? (
-                  <div className="flex items-center justify-center py-10 px-4 text-sm text-muted-foreground">
-                    {i18nService.t('loading')}
-                  </div>
-                ) : chatTaskNodes.length === 0 && !searchQuery.trim() ? (
-                  <div className="flex flex-col items-center justify-center py-10 px-4">
-                    <MessageCircle className="size-10 text-muted-foreground mb-3" />
-                    <p className="text-sm font-medium text-muted-foreground mb-1">
-                      {i18nService.t('chatNoSessions')}
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center">
-                      {i18nService.t('chatNoSessionsHint')}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-0.5">
-                    {chatTaskNodes.map(task => (
-                      <AgentTaskRow
-                        key={task.id}
-                        task={task}
-                        isBatchMode={isBatchMode}
-                        isSelected={isBatchMode ? selectedIds.has(task.id) : task.isSelected}
-                        isNested={false}
-                        onSelect={() => {
-                          const session =
-                            searchSessionById.get(task.id) ?? sessions.find(s => s.id === task.id);
-                          if (session) {
-                            setSearchActive(false);
-                            setSearchQuery('');
-                            void handleSelectSession(session);
-                          }
-                        }}
-                        onDelete={() => handleDeleteSession(task.id)}
-                        onShare={async () => {
-                          const session =
-                            searchSessionById.get(task.id) ?? sessions.find(s => s.id === task.id);
-                          if (session) {
-                            setSearchActive(false);
-                            setSearchQuery('');
-                            await handleSelectSession(session);
-                            window.setTimeout(() => {
-                              window.dispatchEvent(
-                                new CustomEvent('cowork:open-share-options', {
-                                  detail: { sessionId: task.id },
-                                }),
-                              );
-                            }, 0);
-                          }
-                        }}
-                        onTogglePin={pinned => handleToggleSessionPin(task.id, pinned)}
-                        onRename={title => handleRenameSession(task.id, title)}
-                        onToggleSelection={() => handleToggleSelection(task.id)}
-                        onEnterBatchMode={() => handleEnterBatchMode(task.id)}
-                      />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-          <div
-            className={cn(
-              'pointer-events-none absolute inset-x-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150',
-              workMode === WorkMode.Chat ? 'top-0' : 'top-8',
-              agentScrollEdges.top ? 'opacity-100' : 'opacity-0',
-            )}
-          />
-          <div
-            className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
-              agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-        </div>
-        {!isCollapsed && (
-          <div
-            className="non-draggable absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
-            onMouseDown={handleResizeStart}
-          />
-        )}
-        {isBatchMode ? (
-          <div className="px-3 pb-3 pt-1 flex items-center justify-between">
-            <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
-              <Checkbox
-                checked={
-                  selectedIds.size === allVisibleSessionIdsRef.current.length &&
-                  allVisibleSessionIdsRef.current.length > 0
-                }
-                onCheckedChange={handleSelectAll}
-                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 accent-primary cursor-pointer"
-              />
-              {i18nService.t('batchSelectAll')}
-            </label>
-            <div className="flex items-center justify-start gap-2">
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleBatchDeleteClick}
-                disabled={selectedIds.size === 0}
-                className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleExitBatchMode}
-                className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-              >
-                {i18nService.t('batchCancel')}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1 px-3 pb-3 pt-1">
-            {updateEntry}
-            <div className="flex items-center gap-1">
-              {!hideLogin && (
-                <div className="flex-1 min-w-0">
-                  <LoginButton />
-                </div>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onShowSettings()}
-                className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
-                aria-label={i18nService.t('settings')}
-              >
-                <Settings className="h-4 w-4 shrink-0" />
-                {i18nService.t('settings')}
-              </Button>
-            </div>
-          </div>
-        )}
-        {/* Batch Delete Confirmation Modal */}
-        {showBatchDeleteConfirm && (
-          <Modal
-            onClose={() => setShowBatchDeleteConfirm(false)}
-            className="w-full max-w-sm mx-4 bg-surface rounded-2xl shadow-xl overflow-hidden"
-          >
-            <div className="flex items-center gap-3 px-5 py-4">
-              <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-                <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
               </div>
-              <h2 className="text-base font-semibold text-foreground">
-                {i18nService.t('batchDeleteConfirmTitle')}
-              </h2>
             </div>
-            <div className="px-5 pb-4">
-              <p className="text-sm text-muted-foreground">
-                {i18nService
-                  .t('batchDeleteConfirmMessage')
-                  .replace('{count}', String(selectedIds.size))}
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBatchDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
-              >
-                {i18nService.t('cancel')}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleBatchDelete}
-                className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
-              >
-                {i18nService.t('batchDelete')} ({selectedIds.size})
-              </Button>
-            </div>
-          </Modal>
-        )}
-      </div>
-    </aside>
+          )}
+          {/* Batch Delete Confirmation Modal */}
+          {showBatchDeleteConfirm && (
+            <Modal
+              onClose={() => setShowBatchDeleteConfirm(false)}
+              className="w-full max-w-sm mx-4 bg-surface rounded-2xl shadow-xl overflow-hidden"
+            >
+              <div className="flex items-center gap-3 px-5 py-4">
+                <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
+                  <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
+                </div>
+                <h2 className="text-base font-semibold text-foreground">
+                  {i18nService.t('batchDeleteConfirmTitle')}
+                </h2>
+              </div>
+              <div className="px-5 pb-4">
+                <p className="text-sm text-muted-foreground">
+                  {i18nService
+                    .t('batchDeleteConfirmMessage')
+                    .replace('{count}', String(selectedIds.size))}
+                </p>
+              </div>
+              <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBatchDeleteConfirm(false)}
+                  className="px-4 py-2 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+                >
+                  {i18nService.t('cancel')}
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBatchDelete}
+                  className="px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+                >
+                  {i18nService.t('batchDelete')} ({selectedIds.size})
+                </Button>
+              </div>
+            </Modal>
+          )}
+        </div>
+      </aside>
+    </MotionConfig>
   );
 };
 
