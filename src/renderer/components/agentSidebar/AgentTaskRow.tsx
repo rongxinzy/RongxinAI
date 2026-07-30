@@ -107,14 +107,14 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
 
   return (
     <div
-      className={`group relative ${
+      className={`sidebar-session-row group relative ${
         isNested ? 'ml-[-6px] w-[calc(100%+12px)]' : 'ml-0 w-full'
       } flex h-[30px] cursor-pointer items-center gap-2 rounded-md ${
         isBatchMode ? 'pl-4' : isNested ? 'pl-[38px]' : 'pl-3'
       } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} text-[14px] font-normal transition-colors ${
         isSelected
-          ? 'bg-black/3 text-foreground dark:bg-white/4'
-          : 'text-muted-foreground hover:bg-black/3 hover:text-foreground dark:hover:bg-white/4'
+          ? 'sidebar-interactive-surface-active text-foreground'
+          : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground'
       }`}
       onClick={handleRowClick}
       role="treeitem"

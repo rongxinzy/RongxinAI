@@ -62,8 +62,8 @@ const MIN_SIDEBAR_WIDTH = 220;
 const MAX_SIDEBAR_WIDTH = 420;
 const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
-  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4';
-const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-black/3 dark:bg-white/4`;
+  'sidebar-interactive-surface w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors';
+const activeSidebarNavItemClassName = `${sidebarNavItemClassName} sidebar-interactive-surface-active text-foreground`;
 const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -414,7 +414,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           'inline-flex h-8 w-full items-center justify-start gap-2 overflow-hidden rounded-lg px-3 text-left text-[14px] font-normal text-muted-foreground',
           searchActive
             ? 'cursor-text bg-background'
-            : 'cursor-pointer transition-colors hover:bg-black/3 dark:hover:bg-white/4',
+            : 'sidebar-interactive-surface cursor-pointer transition-colors',
         )}
       >
         <Search className="h-4 w-4 shrink-0" />
@@ -464,6 +464,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       className={`relative shrink-0 overflow-hidden bg-surface-raised ${
         isResizing ? '' : 'sidebar-transition'
       }`}
+      data-active-view={activeView}
       style={{ width: isCollapsed ? 0 : sidebarWidth }}
     >
       <div

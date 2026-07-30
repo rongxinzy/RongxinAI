@@ -518,6 +518,17 @@ select::-ms-expand {
   background-color: var(--zy-surface-raised);
 }
 
+/* Sidebar interactive surfaces follow the active application theme. */
+.sidebar-interactive-surface:hover,
+.sidebar-interactive-surface-active {
+  background-color: color-mix(in srgb, var(--zy-text-primary) 4%, transparent);
+}
+
+[data-active-view]:not([data-active-view='cowork']) .sidebar-session-row.sidebar-interactive-surface-active {
+  background-color: transparent;
+  color: var(--zy-text-secondary);
+}
+
 /* Sidebar width transition */
 .sidebar-transition {
   transition: width 200ms ease-out;

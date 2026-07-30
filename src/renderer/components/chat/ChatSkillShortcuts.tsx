@@ -57,8 +57,8 @@ const ChatSkillShortcuts: React.FC = () => {
               className={cn(
                 'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] transition-colors',
                 isActive
-                  ? 'bg-black/3 font-medium text-foreground dark:bg-white/4'
-                  : 'text-muted-foreground hover:bg-black/3 hover:text-foreground dark:hover:bg-white/4',
+                  ? 'sidebar-interactive-surface-active font-medium text-foreground'
+                  : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground',
                 isStreaming && 'pointer-events-none opacity-50',
               )}
             >
