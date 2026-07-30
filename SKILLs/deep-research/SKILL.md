@@ -120,3 +120,9 @@ Before delivering, check:
 - [ ] Every citation maps to a real, retrieved URL
 - [ ] Conflicts and uncertainty are surfaced, not hidden
 - [ ] No fabricated quotes, numbers, or links
+- [ ] In the controlled shortcut, save the completed report as a `.md` file
+  inside the selected workspace and record it with `workflow_state` role
+  `deliverable`.
+- [ ] Save a readable `.md`, `.txt`, or `.json` validation report that audits
+  citations, source conflicts, scope, and remaining uncertainty; record it with
+  role `validation`. Research evidence alone never completes the shortcut.

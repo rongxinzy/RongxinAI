@@ -28,7 +28,7 @@ export function buildPiShortcutWorkflowStateTool(
     label: 'Workflow State',
     description:
       'Record workflow evidence that the main process independently checks. ' +
-      'Use file for deliverables, validation reports, and PPT previews; use plan and source for deep research.',
+      'Use file for deliverables, readable validation reports, and inspected rendered previews; use plan and source for deep research.',
     parameters: {
       type: 'object',
       properties: {

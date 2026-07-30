@@ -64,8 +64,49 @@ export const expectedExtensions = (kind: ShortcutWorkflowKind): string[] =>
     [ShortcutWorkflowKind.Docs]: ['.docx'],
     [ShortcutWorkflowKind.Website]: ['.html', '.htm'],
     [ShortcutWorkflowKind.Sheets]: ['.xlsx', '.xlsm', '.csv', '.tsv'],
-    [ShortcutWorkflowKind.DeepResearch]: [],
+    // Evidence collection alone is not a user-facing result. Deep research
+    // must leave a durable, reviewable report in the selected workspace.
+    [ShortcutWorkflowKind.DeepResearch]: ['.md'],
   })[kind];
+
+export const validationExtensions = ['.md', '.txt', '.json'];
+export const previewExtensions = ['.png', '.jpg', '.jpeg'];
+
+export const requiresRenderedPreview = (kind: ShortcutWorkflowKind): boolean =>
+  kind !== ShortcutWorkflowKind.DeepResearch;
+
+/** Reject renamed text files before treating a claimed screenshot as visual QA evidence. */
+export const isValidRasterPreview = (filePath: string): boolean => {
+  try {
+    const bytes = fs.readFileSync(filePath);
+    if (bytes.length < 24) return false;
+    const isPng =
+      bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) &&
+      bytes.subarray(12, 16).toString('ascii') === 'IHDR';
+    if (isPng) return bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0;
+
+    if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return false;
+    for (let offset = 2; offset + 8 < bytes.length; ) {
+      if (bytes[offset] !== 0xff) return false;
+      while (bytes[offset] === 0xff) offset += 1;
+      const marker = bytes[offset++];
+      if (marker === 0xd9 || marker === 0xda) return false;
+      const segmentLength = bytes.readUInt16BE(offset);
+      if (segmentLength < 2 || offset + segmentLength > bytes.length) return false;
+      const isStartOfFrame =
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf);
+      if (isStartOfFrame)
+        return bytes.readUInt16BE(offset + 3) > 0 && bytes.readUInt16BE(offset + 5) > 0;
+      offset += segmentLength;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
 
 const ResearchTrackingParameters = new Set([
   'dclid',
@@ -89,8 +130,15 @@ export const normalizeResearchSourceUrl = (source: URL): string => {
 };
 
 export const collectShortcutCompletionFailures = (state: WorkflowState): string[] => {
+  const failures: string[] = [];
+  if (!state.files.some(file => file.role === 'deliverable'))
+    failures.push('no verified deliverable file is recorded');
+  if (!state.files.some(file => file.role === 'validation'))
+    failures.push('no verification report is recorded');
+  if (requiresRenderedPreview(state.kind) && !state.files.some(file => file.role === 'preview'))
+    failures.push('no inspected rendered preview is recorded');
+
   if (state.kind === ShortcutWorkflowKind.DeepResearch) {
-    const failures: string[] = [];
     if (state.researchAngles.length < 3)
       failures.push('fewer than three research angles are recorded');
     if (state.researcherRuns < 3)
@@ -109,13 +157,6 @@ export const collectShortcutCompletionFailures = (state: WorkflowState): string[
     if (sourceHosts.size < 3) failures.push('sources cover fewer than three distinct hosts');
     return failures;
   }
-  const failures: string[] = [];
-  if (!state.files.some(file => file.role === 'deliverable'))
-    failures.push('no verified deliverable file is recorded');
-  if (!state.files.some(file => file.role === 'validation'))
-    failures.push('no verification report is recorded');
-  if (state.kind === ShortcutWorkflowKind.Ppt && !state.files.some(file => file.role === 'preview'))
-    failures.push('no rendered slide preview is recorded');
   return failures;
 };
 

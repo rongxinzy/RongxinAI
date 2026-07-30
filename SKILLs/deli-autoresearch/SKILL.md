@@ -26,6 +26,15 @@ The protocol's abstract mechanisms map onto concrete tools here:
 
 State files and logs below are tool-agnostic: they are what makes every iteration resumable.
 
+## Controlled Shortcut Completion
+
+When this skill is selected through the Academic Research sidebar shortcut, the
+runtime applies the Deep Research evidence gate in addition to this protocol.
+Before requesting completion, save the final cited research report as a `.md`
+deliverable and a readable `.md`, `.txt`, or `.json` validation report in the
+selected workspace. Record both with `workflow_state`; plans, delegates, and
+source URLs are necessary evidence but never substitute for the final report.
+
 ## 1. Motivation
 
 Long-running code agents exhibit three recurring failure modes:

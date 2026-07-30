@@ -4,10 +4,14 @@ import path from 'path';
 import {
   collectShortcutCompletionFailures,
   expectedExtensions,
+  isValidRasterPreview,
   isValidOfficePackage,
   isSafePublicUrl,
   normalizeResearchSourceUrl,
+  previewExtensions,
+  requiresRenderedPreview,
   ShortcutWorkflowKind,
+  validationExtensions,
   type WorkflowFileRole,
   type WorkflowState,
   workflowLabel,
@@ -147,11 +151,22 @@ export class PiShortcutWorkflowController {
     const stat = fs.statSync(resolved);
     if (!stat.isFile() || stat.size === 0)
       return 'File was not recorded: it is missing, not a file, or empty.';
+    const extension = path.extname(resolved).toLowerCase();
+    const allowedExtensions =
+      role === 'deliverable'
+        ? expectedExtensions(this.options.kind)
+        : role === 'validation'
+          ? validationExtensions
+          : requiresRenderedPreview(this.options.kind)
+            ? previewExtensions
+            : [];
+    if (!allowedExtensions.includes(extension)) {
+      return `File was not recorded: role "${role}" expects one of ${allowedExtensions.join(', ')}.`;
+    }
+    if (role === 'preview' && !isValidRasterPreview(resolved)) {
+      return 'File was not recorded: preview is not a valid raster image.';
+    }
     if (role === 'deliverable') {
-      const extensions = expectedExtensions(this.options.kind);
-      if (!extensions.includes(path.extname(resolved).toLowerCase())) {
-        return `File was not recorded: expected one of ${extensions.join(', ')}.`;
-      }
       if (
         (
           [
@@ -233,7 +248,7 @@ export class PiShortcutWorkflowController {
   private kindInstructions(): string[] {
     if (this.options.kind === ShortcutWorkflowKind.DeepResearch) {
       return [
-        'Create at least three distinct research angles, launch researchers for them, and record six reachable sources with workflow_state before requesting completion.',
+        'Create at least three distinct research angles, launch researchers for them, record six reachable sources, save the final cited report as a Markdown file, and save a readable validation report before requesting completion.',
       ];
     }
     const output = expectedExtensions(this.options.kind).join(' or ');
@@ -241,9 +256,9 @@ export class PiShortcutWorkflowController {
       `Create the requested ${output} deliverable, then call workflow_state with role "deliverable" to verify it exists and is nonempty.`,
       'Write a nonempty validation report inside the workspace and call workflow_state with role "validation" after the check succeeds.',
     ];
-    if (this.options.kind === ShortcutWorkflowKind.Ppt) {
+    if (requiresRenderedPreview(this.options.kind)) {
       instructions.push(
-        'Render at least one slide preview image, inspect it, and record it with role "preview".',
+        'Render the deliverable to at least one preview image, inspect it, and record that image with role "preview".',
       );
     }
     return instructions;

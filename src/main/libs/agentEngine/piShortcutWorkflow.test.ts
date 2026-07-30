@@ -12,6 +12,10 @@ import {
 } from './piShortcutWorkflow';
 
 const roots: string[] = [];
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAF/gL+ONo+9QAAAABJRU5ErkJggg==',
+  'base64',
+);
 
 const createRun = (kind: ShortcutWorkflowKind): PiShortcutWorkflowController => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shortcut-workflow-'));
@@ -61,7 +65,7 @@ describe('PiShortcutWorkflowController', () => {
       await archive.generateAsync({ type: 'nodebuffer' }),
     );
     fs.writeFileSync(path.join(root, 'qa.md'), 'Checked text and fixed the title overflow.');
-    fs.writeFileSync(path.join(root, 'slide-1.png'), 'preview');
+    fs.writeFileSync(path.join(root, 'slide-1.png'), onePixelPng);
     await expect(run.recordFile('deck.pptx', 'deliverable')).resolves.toContain('Verified');
     await expect(run.recordFile('qa.md', 'validation')).resolves.toContain('Verified');
     await expect(run.recordFile('slide-1.png', 'preview')).resolves.toContain('Verified');
@@ -78,7 +82,7 @@ describe('PiShortcutWorkflowController', () => {
     );
   });
 
-  it('keeps deep research active until plan, researchers, and reachable sources are recorded', async () => {
+  it('keeps deep research active until a cited report, QA record, plan, researchers, and reachable sources are recorded', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -110,8 +114,50 @@ describe('PiShortcutWorkflowController', () => {
     for (let index = 0; index < 6; index += 1) {
       await run.verifySource(`https://source-${index}.example.test/report`);
     }
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'report.md'), '# Report\n\n[1] https://source-0.example.test/report');
+    fs.writeFileSync(path.join(root, 'research-qa.md'), 'Checked citations, scope, and unresolved gaps.');
+    await run.recordFile('report.md', 'deliverable');
+    await run.recordFile('research-qa.md', 'validation');
     run.requestCompletion('report is supported');
     expect(run.onAgentEnd()).toMatchObject({ shouldFinish: true });
+  });
+
+  it('rejects deep-research completion when evidence exists but no durable report is recorded', () => {
+    const run = createRun(ShortcutWorkflowKind.DeepResearch);
+    run.requestCompletion('sources are enough');
+    expect(run.onAgentEnd()).toMatchObject({
+      shouldFinish: false,
+      nextPrompt: expect.stringContaining('no verified deliverable file is recorded'),
+    });
+  });
+
+  it('requires a rendered preview for Docs, Website, and Sheets workflows', () => {
+    for (const kind of [
+      ShortcutWorkflowKind.Docs,
+      ShortcutWorkflowKind.Website,
+      ShortcutWorkflowKind.Sheets,
+    ]) {
+      const run = createRun(kind);
+      run.requestCompletion('looks done');
+      expect(run.onAgentEnd()).toMatchObject({
+        shouldFinish: false,
+        nextPrompt: expect.stringContaining('no inspected rendered preview is recorded'),
+      });
+    }
+  });
+
+  it('rejects arbitrary files used as validation reports or rendered previews', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'qa.sh'), '#!/bin/sh\ntrue');
+    fs.writeFileSync(path.join(root, 'preview.txt'), 'not an image');
+    fs.writeFileSync(path.join(root, 'renamed-text.png'), 'not an image');
+    await expect(run.recordFile('qa.sh', 'validation')).resolves.toContain('expects one of');
+    await expect(run.recordFile('preview.txt', 'preview')).resolves.toContain('expects one of');
+    await expect(run.recordFile('renamed-text.png', 'preview')).resolves.toContain(
+      'not a valid raster image',
+    );
   });
 
   it('does not count failed researcher starts as completed research', () => {
@@ -171,8 +217,10 @@ describe('PiShortcutWorkflowController', () => {
       await archive.generateAsync({ type: 'nodebuffer' }),
     );
     fs.writeFileSync(path.join(rootFor(run), 'qa.md'), 'validated');
+    fs.writeFileSync(path.join(rootFor(run), 'report-preview.png'), onePixelPng);
     await run.recordFile('report.docx', 'deliverable');
     await run.recordFile('qa.md', 'validation');
+    await run.recordFile('report-preview.png', 'preview');
     run.requestCompletion('done');
     expect(run.onAgentEnd().shouldFinish).toBe(true);
 

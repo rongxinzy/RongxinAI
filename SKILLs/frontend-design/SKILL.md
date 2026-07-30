@@ -50,7 +50,9 @@ Remember: you are capable of extraordinary creative work. Don't hold back, show 
 ## Delivery Gate
 
 Build or otherwise run the finished interface, inspect the rendered result,
-and save a nonempty validation report in the workspace. The controlled Website
-shortcut completes only after `workflow_state` records an existing HTML
-deliverable (role `deliverable`) and that validation report (role
-`validation`); never end after a design explanation or code sketch.
+and save a nonempty `.md`, `.txt`, or `.json` validation report in the
+workspace. Capture at least one inspected `.png`, `.jpg`, or `.jpeg`
+rendered preview. The controlled Website shortcut completes only after
+`workflow_state` records an existing HTML deliverable (role `deliverable`),
+that validation report (role `validation`), and the preview (role `preview`);
+never end after a design explanation or code sketch.

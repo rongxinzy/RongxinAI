@@ -185,10 +185,12 @@ scripts/docx_preview.sh doc.docx
 
 Final preview: `scripts/docx_preview.sh doc.docx`
 
-For the controlled Docs shortcut, save a nonempty validation report in the
-workspace after this pipeline, then record the DOCX with `workflow_state` role
-`deliverable` and the report with role `validation`. Do not finish from a
-claimed output path alone.
+For the controlled Docs shortcut, save a nonempty `.md`, `.txt`, or `.json`
+validation report in the workspace after this pipeline. Render at least one
+page to a `.png`, `.jpg`, or `.jpeg` preview and inspect it for layout
+defects. Record the DOCX with `workflow_state` role `deliverable`, the report
+with role `validation`, and the inspected image with role `preview`. Do not
+finish from a claimed output path alone.
 
 ## Critical rules
 
