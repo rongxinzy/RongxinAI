@@ -185,6 +185,11 @@ scripts/docx_preview.sh doc.docx
 
 Final preview: `scripts/docx_preview.sh doc.docx`
 
+For the controlled Docs shortcut, save a nonempty validation report in the
+workspace after this pipeline, then record the DOCX with `workflow_state` role
+`deliverable` and the report with role `validation`. Do not finish from a
+claimed output path alone.
+
 ## Critical rules
 
 These prevent file corruption — OpenXML is strict about element ordering.

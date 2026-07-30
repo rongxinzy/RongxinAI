@@ -35,6 +35,11 @@ test('academic research selects Deli, deep research, and explicit web search tog
   for (const skillId of academic?.skillIds || []) expect(isCoreSkill(skillId)).toBe(true);
 });
 
+test('deep research selects explicit web search with its research protocol', () => {
+  const deepResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'deep-research');
+  expect(deepResearch?.skillIds).toEqual(['deep-research', 'web-search']);
+});
+
 test('the chat skill allowlist is derived from CoreSkillId, not hardcoded', () => {
   const source = readFileSync(
     fileURLToPath(new URL('../cowork/CoworkPromptInput.tsx', import.meta.url)),

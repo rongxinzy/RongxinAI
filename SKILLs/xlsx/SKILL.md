@@ -124,6 +124,11 @@ Run `formula_check.py` for static validation. Use `libreoffice_recalc.py` for dy
 4. **Always produce the output file** — this is the #1 priority
 5. **Validate before delivery**: `formula_check.py` exit code 0 = safe
 
+For the controlled Sheets shortcut, save the validation output as a nonempty
+workspace report, then record the spreadsheet with `workflow_state` role
+`deliverable` and the report with role `validation`. A claimed file path does
+not complete the task.
+
 ## Utility Scripts
 
 ```bash

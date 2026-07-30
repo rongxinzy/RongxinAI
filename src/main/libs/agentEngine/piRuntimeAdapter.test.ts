@@ -221,6 +221,35 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('keeps a sidebar PPT workflow alive when the model ends without a completion signal', async () => {
+      const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-ppt-runtime-'));
+      try {
+        await adapter.startSession('ppt-session', 'Create a deck', {
+          workspaceRoot,
+          skillIds: ['pptx'],
+        });
+        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools: Array<{ name: string }>;
+        };
+        expect(sessionOptions.customTools.map(tool => tool.name)).toContain('workflow_state');
+        expect(mockSession.prompt).toHaveBeenCalledWith(
+          expect.stringContaining('Controlled PPT presentation workflow'),
+        );
+
+        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+          type: string;
+        }) => void;
+        listener({ type: 'agent_end' });
+        await Promise.resolve();
+
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('workflow continuation'),
+        );
+      } finally {
+        fs.rmSync(workspaceRoot, { recursive: true, force: true });
+      }
+    });
+
     it('reactivates a completed academic loop when the same session receives a follow-up', async () => {
       const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-follow-up-'));
       try {

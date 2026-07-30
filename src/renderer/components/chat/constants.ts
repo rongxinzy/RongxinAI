@@ -1,6 +1,6 @@
 import { FileText, Globe, GraduationCap, Presentation, Table, Telescope } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { AcademicResearchSkillIds } from '@shared/skills/constants';
+import { AcademicResearchSkillIds, CoreSkillId } from '@shared/skills/constants';
 
 /**
  * Chat quick-skill shortcut entries.
@@ -30,6 +30,9 @@ export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
   {
     id: 'deep-research',
     skillId: 'deep-research',
+    // Deep research is a retrieval workflow. Selecting only its protocol
+    // leaves researchers without the bundled search capability.
+    skillIds: [CoreSkillId.DeepResearch, CoreSkillId.WebSearch],
     icon: Telescope,
     labelKey: 'chatSkillDeepResearch',
     placeholderKey: 'chatSkillPlaceholderDeepResearch',

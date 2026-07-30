@@ -54,6 +54,10 @@ Decompose the question into 3–5 **meaningfully different** angles (definitions
 
 Each delegation task must be self-contained: the angle, the core question for context, the time range, the languages to search in, and the required output — a list of findings where each finding carries a source URL, publisher, date, and a one-line takeaway.
 
+When the controlled Deep Research shortcut is active, persist the 3–5 angles
+with `workflow_state` action `plan`, and record each source with action
+`source`. Those URLs are fetched by the runtime before they count.
+
 ### 3. Cross-Validate the Returns
 
 When the parallel researchers return:
@@ -66,7 +70,7 @@ When the parallel researchers return:
 
 ### 4. Loop on the Gaps
 
-Draft the report outline and audit it for gaps: unsupported claims, missing sub-questions, contradictions left unresolved. If material gaps remain, start an `agent_loop` (goal mode, goal = "all load-bearing claims in the outline are supported by 2+ independent sources") and use each iteration to attack the remaining gaps — with fresh `subagent` delegations where the gap needs new retrieval. Declare `done` only when the goal holds or the iterations stop changing the picture. Respect the loop's iteration cap; if it trips, deliver the report with the gaps explicitly listed.
+Draft the report outline and audit it for gaps: unsupported claims, missing sub-questions, contradictions left unresolved. If material gaps remain, start an `agent_loop` (goal mode, goal = "all load-bearing claims in the outline are supported by 2+ independent sources") and use each iteration to attack the remaining gaps — with fresh `subagent` delegations where the gap needs new retrieval. Declare `done` only when the goal holds or the iterations stop changing the picture. Respect the loop's iteration cap; if it trips, deliver the report with the gaps explicitly listed. In the controlled shortcut, `done` is only a completion request: it remains active until the recorded angles, researcher delegations, and reachable sources clear the runtime gate.
 
 ### 5. Synthesize the Report
 
