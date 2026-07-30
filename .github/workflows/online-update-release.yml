@@ -138,18 +138,12 @@ jobs:
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Verify the packaged renderer in a virtual Ubuntu desktop
-        shell: bash
-        run: |
-          mapfile -t executables < <(find release/linux-unpacked -maxdepth 1 -type f -perm -111)
-          if [[ ${#executables[@]} -ne 1 ]]; then
-            echo 'Expected exactly one packaged Linux executable' >&2
-            printf '%s\n' "${executables[@]}" >&2
-            exit 1
-          fi
-          node scripts/verify-linux-renderer.mjs \
-            "${executables[0]}" \
-            release/linux-render-smoke.png
+        run: >-
+          node scripts/verify-linux-renderer.mjs
+          release/linux-unpacked
+          release/linux-render-smoke.png
       - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
           name: linux-x64-default
           path: |

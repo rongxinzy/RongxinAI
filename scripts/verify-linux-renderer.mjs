@@ -3,14 +3,38 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 
-const [executablePath, screenshotPath = 'release/linux-render-smoke.png'] =
+const [executableInput, screenshotPath = 'release/linux-render-smoke.png'] =
   process.argv.slice(2);
-if (!executablePath) {
+if (!executableInput) {
   throw new Error(
-    'usage: verify-linux-renderer.mjs <linux-unpacked-executable> [screenshot-output]',
+    'usage: verify-linux-renderer.mjs <linux-unpacked-directory-or-executable> [screenshot-output]',
   );
 }
 
+async function resolveExecutable(inputPath) {
+  const inputStat = await fs.stat(inputPath);
+  if (inputStat.isFile()) return inputPath;
+  if (!inputStat.isDirectory()) {
+    throw new Error(`Linux renderer input is not a file or directory: ${inputPath}`);
+  }
+
+  const builderConfig = JSON.parse(
+    await fs.readFile(new URL('../electron-builder.json', import.meta.url), 'utf8'),
+  );
+  const executableName = builderConfig.executableName ?? builderConfig.productName;
+  if (!executableName) {
+    throw new Error('electron-builder.json does not define executableName or productName');
+  }
+
+  const resolvedPath = path.join(inputPath, executableName);
+  const resolvedStat = await fs.stat(resolvedPath);
+  if (!resolvedStat.isFile() || (resolvedStat.mode & 0o111) === 0) {
+    throw new Error(`Packaged Linux executable is missing or not executable: ${resolvedPath}`);
+  }
+  return resolvedPath;
+}
+
+const executablePath = await resolveExecutable(executableInput);
 const remoteDebuggingPort = 9222;
 let applicationOutput = '';
 
@@ -239,17 +263,38 @@ async function stopApplication() {
   }
 }
 
-let devTools;
-try {
-  const page = await waitForPageTarget();
-  devTools = await connectToDevTools(page.webSocketDebuggerUrl);
-  await devTools.send('Page.enable');
-  const renderedState = await waitForRenderedContent(devTools);
+async function captureScreenshot(devTools) {
   const screenshot = await devTools.send('Page.captureScreenshot', {
     format: 'png',
     captureBeyondViewport: false,
   });
   const screenshotBytes = Buffer.from(screenshot.data, 'base64');
+  await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
+  await fs.writeFile(screenshotPath, screenshotBytes);
+  return screenshotBytes;
+}
+
+let devTools;
+try {
+  const page = await waitForPageTarget();
+  devTools = await connectToDevTools(page.webSocketDebuggerUrl);
+  await devTools.send('Page.enable');
+  let renderedState;
+  try {
+    renderedState = await waitForRenderedContent(devTools);
+  } catch (error) {
+    try {
+      await captureScreenshot(devTools);
+      console.error(`[LinuxRendererSmoke] saved failure screenshot to ${screenshotPath}`);
+    } catch (screenshotError) {
+      console.error(
+        `[LinuxRendererSmoke] could not capture failure screenshot: ${screenshotError.message}`,
+      );
+    }
+    throw error;
+  }
+
+  const screenshotBytes = await captureScreenshot(devTools);
   const screenshotAnalysis = analyzeScreenshot(screenshotBytes);
   if (screenshotAnalysis.distinctColors < 8 || screenshotAnalysis.nonWhiteRatio < 0.01) {
     throw new Error(
@@ -257,8 +302,6 @@ try {
     );
   }
 
-  await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
-  await fs.writeFile(screenshotPath, screenshotBytes);
   console.log(
     `[LinuxRendererSmoke] rendered ${renderedState.rootChildren} root element(s) with visible text; screenshot ${screenshotAnalysis.width}x${screenshotAnalysis.height}, ${screenshotAnalysis.distinctColors} sampled colors`,
   );
