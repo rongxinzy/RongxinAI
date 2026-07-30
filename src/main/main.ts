@@ -4291,6 +4291,7 @@ if (!gotTheLock) {
             skillIds: runtimeSkillIds,
             workspaceRoot: taskWorkingDirectory,
             confirmationMode: 'modal',
+            sessionMode: options.mode ?? CoworkSessionMode.Work,
             autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
             agentId: options.agentId,

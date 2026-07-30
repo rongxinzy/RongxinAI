@@ -251,6 +251,40 @@ const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined
     ? undefined
     : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
 
+const WorkExecutionQuestion = '技能任务执行方式';
+const WorkExecutionOption = {
+  SingleTurn: '完成本轮',
+  Persistent: '持续执行至验收',
+} as const;
+
+const buildWorkExecutionQuestion = (): PiAskUserQuestionInput => ({
+  questions: [
+    {
+      header: '执行方式',
+      question: WorkExecutionQuestion,
+      options: [
+        {
+          label: WorkExecutionOption.SingleTurn,
+          description: '让技能完成当前一轮任务；模型结束后会结束会话。',
+        },
+        {
+          label: WorkExecutionOption.Persistent,
+          description: '持续推进复杂任务；遗漏循环协议时会自动继续，直到模型明确完成。',
+        },
+      ],
+    },
+  ],
+});
+
+const chosePersistentWorkExecution = (response: PiAskUserQuestionResponse): boolean => {
+  if (response.behavior !== 'allow') return false;
+  const answers = response.updatedInput?.answers;
+  if (!answers || typeof answers !== 'object') return false;
+  return (
+    (answers as Record<string, unknown>)[WorkExecutionQuestion] === WorkExecutionOption.Persistent
+  );
+};
+
 const normalizeExpertIds = (expertIds: string[] | undefined): string[] =>
   expertIds === undefined
     ? []
@@ -536,13 +570,45 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       this.activeSessions.set(sessionId, active);
 
       // Send the prompt (may include conversation history for restart restores)
-      await session.prompt(
+      let initialPrompt =
         researchRun
           ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
           : shortcutWorkflow
             ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
-            : options._piPromptOverride || prompt,
-      );
+            : options._piPromptOverride || prompt;
+
+      // Work sessions with an arbitrary selected skill need an explicit choice:
+      // direct one-turn execution, or a managed multi-turn loop. First-class
+      // workflows already own their completion policy, and agent-backed chat
+      // intentionally stays conversational.
+      const shouldAskWorkExecutionMode =
+        options.sessionMode === 'work' &&
+        Boolean(resourceState.skillIds?.length) &&
+        !researchRun &&
+        !shortcutWorkflow;
+      if (shouldAskWorkExecutionMode) {
+        const response = await this.requestAskUserQuestion(
+          sessionId,
+          `work-execution-mode-${sessionId}`,
+          buildWorkExecutionQuestion(),
+          abortController.signal,
+        );
+        if (chosePersistentWorkExecution(response)) {
+          const loopPrompt = agentLoop.start({
+            mode: PiAgentLoopMode.Goal,
+            goal: `Complete and verify the user's skill-assisted task: ${prompt}`,
+            passes: 0,
+            stages: [],
+          });
+          initialPrompt = `${loopPrompt}\n\n${initialPrompt}`;
+        }
+      }
+
+      // The user may stop the session while the execution-mode question is
+      // open. Do not revive an aborted Pi turn when that question resolves.
+      if (abortController.signal.aborted) return;
+
+      await session.prompt(initialPrompt);
     } catch (error) {
       this.activeSessions.delete(sessionId);
       if (abortController.signal.aborted) {

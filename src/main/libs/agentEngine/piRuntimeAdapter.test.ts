@@ -250,6 +250,36 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('asks Work users how an arbitrary skill should execute before prompting Pi', async () => {
+      const onPermissionRequest = vi.fn();
+      adapter.on('permissionRequest', onPermissionRequest);
+
+      const start = adapter.startSession('generic-work-skill', 'Analyze this codebase', {
+        skillIds: ['code-review'],
+        sessionMode: 'work',
+      });
+      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(1));
+
+      const [, request] = onPermissionRequest.mock.calls[0] as [string, { requestId: string }];
+      expect(mockSession.prompt).not.toHaveBeenCalled();
+      adapter.respondToPermission(request.requestId, {
+        behavior: 'allow',
+        updatedInput: { answers: { '技能任务执行方式': '持续执行至验收' } },
+      });
+      await start;
+
+      expect(mockSession.prompt).toHaveBeenCalledWith(
+        expect.stringContaining('Loop started. Iteration 1. Goal:'),
+      );
+
+      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: { type: string }) => void;
+      listener({ type: 'agent_end' });
+      await Promise.resolve();
+      expect(mockSession.prompt).toHaveBeenLastCalledWith(
+        expect.stringContaining('protocol omission'),
+      );
+    });
+
     it('reactivates a completed academic loop when the same session receives a follow-up', async () => {
       const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-follow-up-'));
       try {

@@ -60,6 +60,8 @@ export type CoworkStartOptions = {
   autoApprove?: boolean;
   workspaceRoot?: string;
   confirmationMode?: 'modal' | 'text';
+  /** UI session mode, used to apply Work-only execution controls. */
+  sessionMode?: 'work' | 'chat';
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
   expertIds?: string[];
