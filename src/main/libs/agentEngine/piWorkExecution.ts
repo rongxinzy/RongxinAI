@@ -2,26 +2,15 @@ import * as fs from 'fs';
 import path from 'path';
 
 import type {
-  PiAskUserQuestionInput,
   PiAskUserQuestionRequester,
-  PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
 
-export const WorkExecutionQuestion = '技能任务执行方式';
-export const WorkExecutionOption = {
-  SingleTurn: '完成本轮',
-  Persistent: '持续执行至验收',
-} as const;
-
 export const PiWorkAcceptanceToolName = 'work_acceptance';
-
-type WorkExecutionMode = 'pending' | 'single' | 'persistent';
 
 interface WorkExecutionState {
   version: 1;
   sessionId: string;
   task: string;
-  mode: WorkExecutionMode;
   status: 'running' | 'completion_requested' | 'completed';
   accepted: boolean;
   iteration: number;
@@ -29,34 +18,6 @@ interface WorkExecutionState {
   acceptanceFeedback?: string;
   updatedAt: string;
 }
-
-export const buildWorkExecutionQuestion = (): PiAskUserQuestionInput => ({
-  questions: [
-    {
-      header: '执行方式',
-      question: WorkExecutionQuestion,
-      options: [
-        {
-          label: WorkExecutionOption.SingleTurn,
-          description: '让技能完成当前一轮任务；模型结束后会结束会话。',
-        },
-        {
-          label: WorkExecutionOption.Persistent,
-          description: '持续推进复杂任务，并在模型申请完成时由你最终验收。',
-        },
-      ],
-    },
-  ],
-});
-
-export const chosePersistentWorkExecution = (response: PiAskUserQuestionResponse): boolean => {
-  if (response.behavior !== 'allow') return false;
-  const answers = response.updatedInput?.answers;
-  if (!answers || typeof answers !== 'object') return false;
-  return (
-    (answers as Record<string, unknown>)[WorkExecutionQuestion] === WorkExecutionOption.Persistent
-  );
-};
 
 const now = (): string => new Date().toISOString();
 
@@ -84,12 +45,7 @@ export class PiWorkExecutionController {
     return `Complete and obtain user acceptance for: ${this.state.task}`;
   }
 
-  isPersistent(): boolean {
-    return this.state.mode === 'persistent';
-  }
-
-  selectMode(persistent: boolean, task: string): void {
-    this.state.mode = persistent ? 'persistent' : 'single';
+  start(task: string): void {
     this.state.task = task;
     this.state.status = 'running';
     this.state.accepted = false;
@@ -137,9 +93,6 @@ export class PiWorkExecutionController {
   }
 
   onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
-    if (this.state.mode !== 'persistent') {
-      return { shouldFinish: true, reason: 'Single-turn Work execution selected' };
-    }
     if (this.state.status === 'completion_requested' && this.state.accepted) {
       this.state.status = 'completed';
       this.writeState();
@@ -180,7 +133,6 @@ export class PiWorkExecutionController {
       version: 1,
       sessionId: this.options.sessionId,
       task: this.options.task,
-      mode: 'pending',
       status: 'running',
       accepted: false,
       iteration: 1,

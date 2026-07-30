@@ -454,7 +454,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         ? new PiWorkExecutionController({ sessionId, workspaceRoot, task: prompt })
         : null;
       if (workExecution) {
-        workExecution.selectMode(true, prompt);
+        workExecution.start(prompt);
         customTools.push(
           buildPiWorkAcceptanceTool(workExecution, (toolCallId, input, signal) =>
             this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
@@ -505,13 +505,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       // loops; the controller continues the session on agent_end.
       const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
       const agentLoop = new PiAgentLoopController(completionWorkflow || undefined);
+      let workLoopPrompt = '';
       if (researchRun || shortcutWorkflow || workExecution) {
-        agentLoop.start({
+        const loopPrompt = agentLoop.start({
           mode: PiAgentLoopMode.Goal,
           goal: (researchRun || shortcutWorkflow || workExecution)!.goal,
           passes: 0,
           stages: [],
         });
+        if (workExecution) workLoopPrompt = loopPrompt;
       }
       customTools.push(buildPiAgentLoopTool(agentLoop));
 
@@ -572,8 +574,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             ? workExecution.buildInitialPrompt(options._piPromptOverride || prompt)
           : options._piPromptOverride || prompt;
       if (workExecution) {
-        const loopPrompt = `Loop started. Iteration 1. Goal: ${workExecution.goal}`;
-        initialPrompt = `${loopPrompt}\n\n${initialPrompt}`;
+        initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
       }
 
       // The user may stop the session while the execution-mode question is
@@ -703,7 +704,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const completionWorkflow =
       active.researchRun ||
       active.shortcutWorkflow ||
-      (active.workExecution?.isPersistent() ? active.workExecution : null);
+      active.workExecution;
     if (completionWorkflow && !active.agentLoop.getState().active) {
       completionWorkflow.resumeForPrompt(prompt);
       active.agentLoop.start({
