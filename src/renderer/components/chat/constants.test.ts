@@ -2,7 +2,7 @@
  * Guards the wiring between the sidebar quick-skill shortcuts and the core
  * skill registry.
  *
- * Regression covered: a new shortcut was added for `deli-autoresearch` but
+ * Regression covered: a new academic-research shortcut was added but
  * CoworkPromptInput's hardcoded chat allowlist was not updated, so the skill
  * was filtered out of the chat skill list and the shortcut toasted
  * "skill unavailable" even though the skill is core (always enabled).
@@ -29,10 +29,34 @@ test('shortcut skillIds stay unique and match their entry ids where intended', (
   expect(new Set(skillIds).size).toBe(skillIds.length);
 });
 
-test('academic research selects Deli, deep research, and explicit web search together', () => {
+test('academic research selects Zhiyuan AutoResearch, deep research, and web search', () => {
   const academic = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'academic-research');
   expect(academic?.skillIds).toEqual(AcademicResearchSkillIds);
   for (const skillId of academic?.skillIds || []) expect(isCoreSkill(skillId)).toBe(true);
+});
+
+test('academic research does not expose the upstream Deli branding', () => {
+  const skillSource = readFileSync(
+    fileURLToPath(new URL('../../../../SKILLs/deli-autoresearch/SKILL.md', import.meta.url)),
+    'utf8',
+  );
+  const metadataSource = readFileSync(
+    fileURLToPath(
+      new URL('../../../../SKILLs/deli-autoresearch/zhiyuan/metadata.yaml', import.meta.url),
+    ),
+    'utf8',
+  );
+
+  expect(skillSource).toContain('name: zhiyuan_AutoResearch');
+  expect(skillSource).toContain('# zhiyuan_AutoResearch');
+  expect(skillSource).not.toMatch(/Deli[ _-]?AutoResearch/i);
+  expect(metadataSource).toContain('author: Zhiyuan');
+  expect(metadataSource).not.toMatch(/^author:\s*Deli\s*$/im);
+});
+
+test('deep research selects explicit web search with its research protocol', () => {
+  const deepResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'deep-research');
+  expect(deepResearch?.skillIds).toEqual(['deep-research', 'web-search']);
 });
 
 test('the chat skill allowlist is derived from CoreSkillId, not hardcoded', () => {

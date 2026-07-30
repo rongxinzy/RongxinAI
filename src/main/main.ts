@@ -4291,6 +4291,7 @@ if (!gotTheLock) {
             skillIds: runtimeSkillIds,
             workspaceRoot: taskWorkingDirectory,
             confirmationMode: 'modal',
+            sessionMode: options.mode ?? CoworkSessionMode.Work,
             autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
             agentId: options.agentId,
@@ -4441,6 +4442,10 @@ if (!gotTheLock) {
           .continueSession(options.sessionId, options.prompt, {
             systemPrompt: runtimeSystemPrompt,
             skillIds: runtimeSkillIds,
+            sessionMode:
+              existingSession?.mode === CoworkSessionMode.Chat
+                ? CoworkSessionMode.Chat
+                : CoworkSessionMode.Work,
             imageAttachments: options.imageAttachments,
             workspaceRoot: existingSession?.cwd,
             agentId: existingSession?.agentId,

@@ -60,6 +60,8 @@ export type CoworkStartOptions = {
   autoApprove?: boolean;
   workspaceRoot?: string;
   confirmationMode?: 'modal' | 'text';
+  /** UI session mode, used to apply Work-only execution controls. */
+  sessionMode?: 'work' | 'chat';
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
   expertIds?: string[];
@@ -73,6 +75,8 @@ export type CoworkStartOptions = {
 export type CoworkContinueOptions = {
   systemPrompt?: string;
   skillIds?: string[];
+  /** UI session mode, preserved when a skill change recreates the Pi session. */
+  sessionMode?: 'work' | 'chat';
   imageAttachments?: CoworkImageAttachment[];
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;

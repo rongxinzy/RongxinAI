@@ -123,6 +123,11 @@ Run with: `cd slides && node compile.js`
 
 See [QA Process](references/pitfalls.md#qa-process).
 
+After QA, write a concise nonempty QA report inside the workspace and render at
+least one slide preview image. In the controlled PPT shortcut, record the PPTX
+as `workflow_state` role `deliverable`, the report as `validation`, and the
+rendered image as `preview`. A file path in the answer is not completion.
+
 ### Output Structure
 
 ```

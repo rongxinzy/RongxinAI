@@ -46,8 +46,20 @@ import { buildPiAgentLoopTool, PiAgentLoopController, PiAgentLoopMode } from './
 import { buildPiConversationPrompt } from './piConversationContext';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
 import { buildPiResearchStateTool } from './piResearchStateTool';
+import {
+  PiShortcutWorkflowController,
+  resolveShortcutWorkflowKind,
+  ShortcutWorkflowKind,
+} from './piShortcutWorkflow';
+import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
+import {
+  buildPiWorkAcceptanceTool,
+  buildWorkExecutionQuestion,
+  chosePersistentWorkExecution,
+  PiWorkExecutionController,
+} from './piWorkExecution';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import type {
   CoworkContinueOptions,
@@ -139,6 +151,10 @@ interface ActivePiSession {
   agentLoop: PiAgentLoopController;
   /** Present only for the controlled academic-research workflow. */
   researchRun: PiResearchRunController | null;
+  /** Present for every other first-class sidebar shortcut workflow. */
+  shortcutWorkflow: PiShortcutWorkflowController | null;
+  /** Present for arbitrary skills loaded in Work mode. */
+  workExecution: PiWorkExecutionController | null;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
   /**
    * Error from the latest failed attempt (message_end with stopReason=error).
@@ -414,6 +430,34 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         researchRun.resumeForPrompt(prompt);
         customTools.push(buildPiResearchStateTool(researchRun));
       }
+      const shortcutKind = researchRun ? null : resolveShortcutWorkflowKind(resourceState.skillIds);
+      const shortcutWorkflow = shortcutKind
+        ? new PiShortcutWorkflowController({
+            sessionId,
+            workspaceRoot,
+            task: prompt,
+            kind: shortcutKind,
+          })
+        : null;
+      if (shortcutWorkflow) {
+        shortcutWorkflow.resumeForPrompt(prompt);
+        customTools.push(buildPiShortcutWorkflowStateTool(shortcutWorkflow));
+      }
+      const shouldAskWorkExecutionMode =
+        options.sessionMode === 'work' &&
+        Boolean(resourceState.skillIds?.length) &&
+        !researchRun &&
+        !shortcutWorkflow;
+      const workExecution = shouldAskWorkExecutionMode
+        ? new PiWorkExecutionController({ sessionId, workspaceRoot, task: prompt })
+        : null;
+      if (workExecution) {
+        customTools.push(
+          buildPiWorkAcceptanceTool(workExecution, (toolCallId, input, signal) =>
+            this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
+          ),
+        );
+      }
 
       // Subagent tool: registered for every cowork session. When the session
       // agent is a Team Lead from a package, its presetId additionally exposes
@@ -438,7 +482,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         presetId: subagentPresetId,
         resolvedModel,
         workspaceRoot,
-        webSearchSkillPath: researchRun ? path.join(getSkillsRoot(), 'web-search') : undefined,
+        webSearchSkillPath:
+          researchRun || shortcutKind === ShortcutWorkflowKind.DeepResearch
+            ? path.join(getSkillsRoot(), 'web-search')
+            : undefined,
         createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens, skillIds) =>
           this.createPiResourceLoader(pi, cwd, {
             systemPrompt,
@@ -453,11 +500,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
       // Agent loop tool: lets the LLM drive multi-iteration long-horizon
       // loops; the controller continues the session on agent_end.
-      const agentLoop = new PiAgentLoopController(researchRun || undefined);
-      if (researchRun) {
+      const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
+      const agentLoop = new PiAgentLoopController(completionWorkflow || undefined);
+      if (researchRun || shortcutWorkflow) {
         agentLoop.start({
           mode: PiAgentLoopMode.Goal,
-          goal: researchRun.goal,
+          goal: (researchRun || shortcutWorkflow)!.goal,
           passes: 0,
           stages: [],
         });
@@ -498,6 +546,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         toolResultMessageIdByCallId: new Map(),
         agentLoop,
         researchRun,
+        shortcutWorkflow,
+        workExecution,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
         pendingError: null,
       };
@@ -511,11 +561,41 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       this.activeSessions.set(sessionId, active);
 
       // Send the prompt (may include conversation history for restart restores)
-      await session.prompt(
-        researchRun
-          ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
-          : options._piPromptOverride || prompt,
-      );
+      let initialPrompt = researchRun
+        ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
+        : shortcutWorkflow
+          ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
+          : options._piPromptOverride || prompt;
+
+      // Work sessions with an arbitrary selected skill need an explicit choice:
+      // direct one-turn execution, or a managed multi-turn loop. First-class
+      // workflows already own their completion policy, and agent-backed chat
+      // intentionally stays conversational.
+      if (shouldAskWorkExecutionMode) {
+        const response = await this.requestAskUserQuestion(
+          sessionId,
+          `work-execution-mode-${sessionId}`,
+          buildWorkExecutionQuestion(),
+          abortController.signal,
+        );
+        const persistent = chosePersistentWorkExecution(response);
+        workExecution!.selectMode(persistent, prompt);
+        if (persistent) {
+          const loopPrompt = agentLoop.start({
+            mode: PiAgentLoopMode.Goal,
+            goal: workExecution!.goal,
+            passes: 0,
+            stages: [],
+          });
+          initialPrompt = `${loopPrompt}\n\n${workExecution!.buildInitialPrompt(initialPrompt)}`;
+        }
+      }
+
+      // The user may stop the session while the execution-mode question is
+      // open. Do not revive an aborted Pi turn when that question resolves.
+      if (abortController.signal.aborted) return;
+
+      await session.prompt(initialPrompt);
     } catch (error) {
       this.activeSessions.delete(sessionId);
       if (abortController.signal.aborted) {
@@ -566,6 +646,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         : normalizeExpertIds(options.expertIds);
     if (!haveSameStringList(requestedExpertIds, active.requestedExpertIds)) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
+      this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
         systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
@@ -578,7 +659,18 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
     const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
     const skillsChanged = !haveSameStringList(requestedSkillIds, active.requestedSkillIds);
-    if (promptChanged || skillsChanged) {
+    if (skillsChanged) {
+      const history = this.store?.getSession(sessionId)?.messages ?? [];
+      this.disposeSessionForRecreation(sessionId, active);
+      return this.startSession(sessionId, prompt, {
+        ...options,
+        systemPrompt: nextSystemPrompt,
+        skillIds: requestedSkillIds,
+        expertIds: requestedExpertIds,
+        _piPromptOverride: buildPiConversationPrompt(history, prompt),
+      });
+    }
+    if (promptChanged) {
       const previousSystemPrompt = active.resourceState.systemPrompt;
       const previousSkillIds = active.resourceState.skillIds;
       active.resourceState.systemPrompt = nextSystemPrompt;
@@ -589,9 +681,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         await active.piSession.reload();
         active.requestedSystemPrompt = nextSystemPrompt;
         active.requestedSkillIds = requestedSkillIds;
-        console.debug(
-          `[PiRuntime] reloaded session resources after ${promptChanged ? 'prompt' : 'skill'} change`,
-        );
+        console.debug('[PiRuntime] reloaded session resources after prompt change');
       } catch (error) {
         active.resourceState.systemPrompt = previousSystemPrompt;
         active.resourceState.skillIds = previousSkillIds;
@@ -625,15 +715,23 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     this.emit('message', sessionId, persisted);
 
     let nextPrompt = prompt;
-    if (active.researchRun && !active.agentLoop.getState().active) {
-      active.researchRun.resumeForPrompt(prompt);
+    const completionWorkflow =
+      active.researchRun ||
+      active.shortcutWorkflow ||
+      (active.workExecution?.isPersistent() ? active.workExecution : null);
+    if (completionWorkflow && !active.agentLoop.getState().active) {
+      completionWorkflow.resumeForPrompt(prompt);
       active.agentLoop.start({
         mode: PiAgentLoopMode.Goal,
-        goal: active.researchRun.goal,
+        goal: completionWorkflow.goal,
         passes: 0,
         stages: [],
       });
-      nextPrompt = active.researchRun.buildInitialPrompt(prompt);
+      nextPrompt = active.researchRun
+        ? active.researchRun.buildInitialPrompt(prompt)
+        : active.shortcutWorkflow
+          ? active.shortcutWorkflow.buildInitialPrompt(prompt)
+          : active.workExecution!.buildInitialPrompt(prompt);
     }
 
     try {
@@ -668,6 +766,17 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     } catch (err) {
       console.warn('[PiRuntime] Failed to update model via patchSession:', err);
     }
+  }
+
+  private disposeSessionForRecreation(sessionId: string, active: ActivePiSession): void {
+    this.dismissAskUserQuestionsBySession(sessionId);
+    active.agentLoop.stop();
+    active.pendingError = null;
+    active.piSession.abortBash();
+    active.abortController.abort();
+    active.unsubscribe();
+    void active.piSession.abort();
+    this.activeSessions.delete(sessionId);
   }
 
   stopSession(sessionId: string): void {
@@ -945,6 +1054,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         if (!event.toolCallId || !event.toolName) break;
         if (event.toolName === PiSubagentToolName) {
           active.researchRun?.recordSubagentStart(event.toolCallId, event.args);
+          active.shortcutWorkflow?.recordSubagentStart(event.toolCallId, event.args);
         }
         const toolUseMsg: CoworkMessage = {
           id: randomUUID(),
@@ -974,6 +1084,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         const resultText = extractToolResultText(event.result);
         if (event.toolName === PiSubagentToolName) {
           active.researchRun?.recordSubagentResult(
+            event.toolCallId,
+            resultText,
+            Boolean(event.isError),
+          );
+          active.shortcutWorkflow?.recordSubagentResult(
             event.toolCallId,
             resultText,
             Boolean(event.isError),

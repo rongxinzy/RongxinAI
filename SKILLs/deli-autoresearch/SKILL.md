@@ -1,14 +1,14 @@
 ---
-name: deli-autoresearch
+name: zhiyuan_AutoResearch
 description: "A protocol framework for long-horizon autonomous research tasks. Targets three empirically-observed failure modes — cognitive loops, stalling, runtime fragility — by prescribing state management, stall detection, and watchdog mechanisms. Use when the user asks for academic research, literature surveys, paper writing, or any unattended multi-day research task. Triggers: academic research, 学术研究, literature review, 文献综述, paper writing, 论文写作, ICLR survey, autonomous research."
 metadata:
   version: "1.1"
   category: research
 ---
 
-<!-- Deli_AutoResearch: protocol framework for long-horizon autonomous tasks. Ships no executable code; prescribes conventions for state persistence, stall detection, and layered guardians. -->
+<!-- zhiyuan_AutoResearch: protocol framework for long-horizon autonomous tasks. Ships no executable code; prescribes conventions for state persistence, stall detection, and layered guardians. -->
 
-# Deli_AutoResearch
+# zhiyuan_AutoResearch
 
 This skill is a protocol framework for long-horizon autonomous tasks (days to weeks). It ships no executable code; instead it prescribes a set of battle-tested conventions: how state is persisted, how stalls are detected, how guardians are layered, and what constraints bind agent behavior. Implementation details are left to the adopter's environment.
 
