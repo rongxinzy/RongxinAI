@@ -45,7 +45,7 @@ const ArtifactBadge: React.FC<ArtifactBadgeProps> = ({ artifact }) => {
     >
       <span>{TYPE_ICONS[artifact.type] || '📄'}</span>
       <span className="truncate max-w-[200px]">{artifact.title}</span>
-      <span className="text-xs text-muted">{t('artifactView')}</span>
+      <span className="text-xs text-muted-foreground">{t('artifactView')}</span>
     </Button>
   );
 };

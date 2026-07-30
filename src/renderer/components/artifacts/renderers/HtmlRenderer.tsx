@@ -78,7 +78,9 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
 
   if (!artifact.content && !artifact.filePath) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">Loading...</div>
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+        Loading...
+      </div>
     );
   }
 
@@ -101,7 +103,9 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   // Loading state: filePath exists but content not yet processed
   if (!processedHtml && !artifact.content) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">Loading...</div>
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+        Loading...
+      </div>
     );
   }
 

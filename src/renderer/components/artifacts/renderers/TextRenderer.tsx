@@ -56,7 +56,9 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
 
   if (!artifact.content) {
     return (
-      <div className="flex items-center justify-center h-full text-muted text-sm">No content</div>
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+        No content
+      </div>
     );
   }
 
@@ -120,7 +122,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
             {lines.map((line, i) => (
               <span key={i} className="flex">
                 <span
-                  className="select-none text-muted/50 pr-4 text-right inline-block"
+                  className="select-none text-muted-foreground/50 pr-4 text-right inline-block"
                   style={{ minWidth: `${lineNumWidth + 1}ch` }}
                 >
                   {i + 1}
