@@ -358,7 +358,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       const resourceState: PiResourceState = {
         systemPrompt: basePrompt,
         skillIds: normalizeSkillIds(options.skillIds),
-        maxOutputTokens: DEFAULT_PI_MAX_TOKENS,
+        maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
         fileToolsEnabled: options.confirmationMode !== 'text',
       };
 
@@ -1706,7 +1706,7 @@ async function resolvePiModel(
         ? (registeredModel as Record<string, unknown>)
         : customModel),
     modelRuntime,
-    maxOutputTokens: resolution.providerMetadata.maxTokens || DEFAULT_PI_MAX_TOKENS,
+    maxOutputTokens: resolution.providerMetadata.maxTokens || DEFAULT_PI_LOCAL_MAX_TOKENS,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
 }
