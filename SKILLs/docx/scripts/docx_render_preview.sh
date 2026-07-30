@@ -36,7 +36,12 @@ fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
-"$soffice_bin" --headless --convert-to pdf --outdir "$tmpdir" "$input" >/dev/null
+# LibreOffice otherwise initializes its profile below the caller's home
+# directory. That is both shared mutable state and unavailable in sandboxed
+# execution, so give every render an isolated, disposable profile.
+profile_dir="$tmpdir/libreoffice-profile"
+mkdir -p "$profile_dir"
+"$soffice_bin" "-env:UserInstallation=file://$profile_dir" --headless --convert-to pdf --outdir "$tmpdir" "$input" >/dev/null
 pdf="$tmpdir/$(basename "${input%.*}").pdf"
 if [ ! -s "$pdf" ]; then
   echo "LibreOffice did not produce a PDF preview." >&2
