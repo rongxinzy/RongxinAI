@@ -4,8 +4,10 @@ import { ModelCapabilityStatus } from '../../shared/providers';
 import { store } from '../store';
 import { setAvailableModels, setDefaultSelectedModel } from '../store/slices/modelSlice';
 import { apiService } from './api';
+import { i18nService } from './i18n';
 
 afterEach(() => {
+  i18nService.setLanguage('zh', { persist: false });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -55,6 +57,67 @@ test('explicit supported capability keeps the native tool loop enabled', async (
   });
 
   expect(loop).toHaveBeenCalledOnce();
+});
+
+test('OpenRouter model metadata enables the tool loop only when tools are declared', async () => {
+  const model = {
+    id: 'vendor/tool-model',
+    name: 'OpenRouter Tool Model',
+    providerKey: 'openrouter',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({
+    apiKey: 'openrouter-key',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiFormat: 'openai',
+  });
+  const fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      data: [{ id: model.id, supported_parameters: ['tools'] }],
+    },
+  });
+  vi.stubGlobal('window', { electron: { api: { fetch } } });
+  const loop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockResolvedValue({ content: 'searched answer' });
+
+  await expect(apiService.chatWithWebSearch('latest news')).resolves.toEqual({
+    content: 'searched answer',
+  });
+
+  expect(fetch).toHaveBeenCalledWith({
+    url: 'https://openrouter.ai/api/v1/models',
+    method: 'GET',
+    headers: { Authorization: 'Bearer openrouter-key' },
+  });
+  expect(loop).toHaveBeenCalledOnce();
+});
+
+test('web-search fallback message follows the selected UI language', async () => {
+  i18nService.setLanguage('en', { persist: false });
+  const model = {
+    id: 'custom-unknown-en',
+    name: 'Custom Unknown',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+  const progress = vi.fn();
+
+  await apiService.chatWithWebSearch('latest news', progress);
+
+  expect(progress).toHaveBeenCalledWith(
+    'Tool-calling support for this model is unknown. Switched to regular chat without web search.\n\n',
+  );
 });
 
 test('OpenAI Responses returns an output for every parallel tool call', async () => {

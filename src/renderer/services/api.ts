@@ -8,6 +8,7 @@ import {
 import { store } from '../store';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
+import { i18nService } from './i18n';
 import {
   buildLocalThinkingRequestParams,
   type DirectChatRequestOptions,
@@ -17,6 +18,7 @@ import {
   shouldRetryLocalInferenceSlot,
   waitForLocalInferenceSlot,
 } from './localInferenceSlotRetry';
+import { probeRuntimeModelCapabilities } from './modelCapabilityProbe';
 import { StreamRequestRegistry } from './streamRequestRegistry';
 
 export interface ApiConfig {
@@ -548,17 +550,28 @@ class ApiService {
       );
     }
     const apiFormat = this.normalizeApiFormat(config.apiFormat);
-    const capabilities = ProviderRegistry.resolveModelCapabilities(
+    let capabilities = ProviderRegistry.resolveModelCapabilities(
       provider,
       selectedModel.id,
       apiFormat,
       selectedModel,
     );
+    if (capabilities.toolCalling === ModelCapabilityStatus.Unknown) {
+      const detectedCapabilities = await probeRuntimeModelCapabilities(
+        provider,
+        selectedModel.id,
+        config,
+      );
+      capabilities = {
+        ...capabilities,
+        toolCalling: detectedCapabilities.toolCalling ?? capabilities.toolCalling,
+      };
+    }
     if (capabilities.toolCalling !== ModelCapabilityStatus.Supported) {
       const capabilityMessage =
         capabilities.toolCalling === ModelCapabilityStatus.Unsupported
-          ? '当前模型不支持工具调用，已改用普通对话，未执行联网搜索。\n\n'
-          : '当前模型的工具调用能力尚未确认，已改用普通对话，未执行联网搜索。\n\n';
+          ? `${i18nService.t('toolCapabilityUnsupportedFallback')}\n\n`
+          : `${i18nService.t('toolCapabilityUnknownFallback')}\n\n`;
       // Keep the request valid for custom, aggregated, and local endpoints. The
       // regular chat path deliberately contains no `tools` or `tool_choice`.
       onProgress?.(capabilityMessage);

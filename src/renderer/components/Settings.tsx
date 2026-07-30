@@ -180,14 +180,14 @@ const resolveModelSupportsImageForProvider = (
   ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage);
 
 const CUSTOM_MODEL_CAPABILITY_FIELDS = [
-  { key: 'toolCalling', label: '工具调用' },
-  { key: 'videoInput', label: '视频输入' },
-  { key: 'audioInput', label: '音频输入' },
-  { key: 'documentInput', label: '文档输入' },
-  { key: 'reasoning', label: '推理' },
+  { key: 'toolCalling', labelKey: 'capabilityToolCalling' },
+  { key: 'videoInput', labelKey: 'capabilityVideoInput' },
+  { key: 'audioInput', labelKey: 'capabilityAudioInput' },
+  { key: 'documentInput', labelKey: 'capabilityDocumentInput' },
+  { key: 'reasoning', labelKey: 'capabilityReasoning' },
 ] as const satisfies ReadonlyArray<{
   key: Exclude<keyof ModelCapabilities, 'imageInput'>;
-  label: string;
+  labelKey: string;
 }>;
 
 const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
@@ -5486,9 +5486,11 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
                 {isCustomProvider(activeProvider) && (
                   <div className="rounded-lg border border-border bg-surface-raised p-3">
-                    <p className="mb-2 text-xs font-medium text-foreground">模型能力</p>
+                    <p className="mb-2 text-xs font-medium text-foreground">
+                      {i18nService.t('modelCapabilities')}
+                    </p>
                     <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
-                      未知能力不会启用对应功能；工具调用未知时，联网搜索会自动使用普通对话。
+                      {i18nService.t('modelCapabilitiesHint')}
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
@@ -5496,7 +5498,7 @@ const Settings: React.FC<SettingsProps> = ({
                           key={field.key}
                           className="space-y-1 text-[11px] text-muted-foreground"
                         >
-                          <span>{field.label}</span>
+                          <span>{i18nService.t(field.labelKey)}</span>
                           <Select
                             value={newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown}
                             onValueChange={value =>
@@ -5510,11 +5512,15 @@ const Settings: React.FC<SettingsProps> = ({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={ModelCapabilityStatus.Supported}>支持</SelectItem>
-                              <SelectItem value={ModelCapabilityStatus.Unsupported}>
-                                不支持
+                              <SelectItem value={ModelCapabilityStatus.Supported}>
+                                {i18nService.t('capabilitySupported')}
                               </SelectItem>
-                              <SelectItem value={ModelCapabilityStatus.Unknown}>未知</SelectItem>
+                              <SelectItem value={ModelCapabilityStatus.Unsupported}>
+                                {i18nService.t('capabilityUnsupported')}
+                              </SelectItem>
+                              <SelectItem value={ModelCapabilityStatus.Unknown}>
+                                {i18nService.t('capabilityUnknown')}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </label>

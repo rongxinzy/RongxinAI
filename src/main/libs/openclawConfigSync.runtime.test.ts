@@ -416,7 +416,7 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(selection.providerConfig).not.toHaveProperty('apiKey');
   });
 
-  test('repairs stale image capability for known Qwen models before writing OpenClaw input', async () => {
+  test('repairs built-in image metadata while honoring custom provider overrides', async () => {
     const { ProviderName } = await import('../../shared/providers');
     const { buildProviderSelection } = await import('./openclawConfigSync');
 
@@ -443,7 +443,7 @@ describe('OpenClawConfigSync runtime config output', () => {
     });
     expect(customSelection.providerId).toBe('custom_0');
     expect(customSelection.primaryModel).toBe('custom_0/qwen3.6-plus');
-    expect(customSelection.providerConfig.models[0].input).toEqual(['text', 'image']);
+    expect(customSelection.providerConfig.models[0].input).toEqual(['text']);
   });
 
   test('adds missing array items in MCP bridge tool schemas for OpenAI compatibility', async () => {

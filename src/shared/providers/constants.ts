@@ -456,7 +456,6 @@ const PROVIDER_DEFINITIONS = [
         maxTokens: 131_072,
       },
     ],
-    codingPlanModels: [{ id: 'ark-code-latest', name: 'Ark Coding', supportsImage: false }],
   },
   {
     id: ProviderName.Volcengine,
@@ -501,11 +500,7 @@ const PROVIDER_DEFINITIONS = [
         maxTokens: 32_000,
       },
     ],
-    codingPlanModels: [
-      { id: 'qianfan-code-latest', name: 'Qianfan Coding', supportsImage: false },
-      { id: 'glm-5.1', name: 'GLM 5.1', supportsImage: false },
-      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supportsImage: false },
-    ],
+    codingPlanModels: [{ id: 'ark-code-latest', name: 'Ark Coding', supportsImage: false }],
   },
   {
     id: ProviderName.Qianfan,
@@ -540,8 +535,9 @@ const PROVIDER_DEFINITIONS = [
       },
     ],
     codingPlanModels: [
-      { id: 'mimo-v2.5-pro', name: 'MiMo V2.5 Pro', supportsImage: false },
-      { id: 'mimo-v2.5', name: 'MiMo V2.5', supportsImage: true },
+      { id: 'qianfan-code-latest', name: 'Qianfan Coding', supportsImage: false },
+      { id: 'glm-5.1', name: 'GLM 5.1', supportsImage: false },
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supportsImage: false },
     ],
   },
   {
@@ -627,6 +623,10 @@ const PROVIDER_DEFINITIONS = [
         contextWindow: 262_144,
         maxTokens: 65_536,
       },
+    ],
+    codingPlanModels: [
+      { id: 'mimo-v2.5-pro', name: 'MiMo V2.5 Pro', supportsImage: false },
+      { id: 'mimo-v2.5', name: 'MiMo V2.5', supportsImage: true },
     ],
   },
   {
@@ -939,7 +939,10 @@ const PROVIDER_TOOL_CAPABILITIES: Readonly<
     [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
     [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
   },
-  [ProviderName.Zhipu]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+  [ProviderName.Zhipu]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
+  },
   [ProviderName.Minimax]: {
     [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
     [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
@@ -950,7 +953,10 @@ const PROVIDER_TOOL_CAPABILITIES: Readonly<
     [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
   },
   [ProviderName.StepFun]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
-  [ProviderName.Volcengine]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+  [ProviderName.Volcengine]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
+  },
 };
 
 class ProviderRegistryImpl {
@@ -1069,6 +1075,13 @@ class ProviderRegistryImpl {
     modelId: string,
     configuredSupportsImage?: boolean,
   ): boolean {
+    if (
+      (providerName === ProviderName.Custom ||
+        providerName.startsWith(`${ProviderName.Custom}_`)) &&
+      configuredSupportsImage !== undefined
+    ) {
+      return configuredSupportsImage;
+    }
     const providerModels = [
       ...(this.get(providerName)?.defaultModels ?? []),
       ...(this.get(providerName)?.codingPlanModels ?? []),
