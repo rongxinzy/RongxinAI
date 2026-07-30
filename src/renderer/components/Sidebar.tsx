@@ -441,18 +441,20 @@ const Sidebar: React.FC<SidebarProps> = ({
               className="h-full min-h-0 min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] font-normal leading-none text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
             {searchQuery && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon-xs"
                 aria-label={i18nService.t('clearSearch')}
                 onClick={event => {
                   event.stopPropagation();
                   setSearchQuery('');
                   searchInputRef.current?.focus();
                 }}
-                className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                className="size-4 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground active:translate-y-0 dark:hover:bg-transparent [&_svg]:size-3.5"
               >
-                <X className="h-3.5 w-3.5" />
-              </button>
+                <X />
+              </Button>
             )}
           </>
         ) : (

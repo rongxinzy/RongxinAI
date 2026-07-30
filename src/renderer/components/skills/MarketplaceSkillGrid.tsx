@@ -74,10 +74,12 @@ export function MarketplaceSkillGrid({
               isInstallingSkillId && !isInstalling && 'pointer-events-none opacity-50',
             )}
           >
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="lg"
               disabled={Boolean(isInstallingSkillId && !isInstalling)}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="h-auto min-w-0 flex-1 shrink justify-start gap-2 border-0 px-0 py-1 text-left whitespace-normal hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
               onClick={() => onSelect(skill)}
             >
               <Avatar className="size-10 shrink-0 rounded-xl bg-muted">
@@ -98,7 +100,7 @@ export function MarketplaceSkillGrid({
                   {resolveLocalizedText(skill.description)}
                 </p>
               </div>
-            </button>
+            </Button>
 
             <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
               {isInstalled ? (

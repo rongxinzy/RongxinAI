@@ -1,5 +1,6 @@
 import { Button } from '@shared/components/ui/button';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { cn } from '@shared/lib/utils';
+import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import React, { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -305,33 +306,25 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
                     );
 
                     return (
-                      <button
+                      <Button
                         key={index}
                         type="button"
+                        variant={isActive ? 'default' : isAnswered ? 'outline' : 'secondary'}
+                        size="icon-sm"
+                        aria-current={isActive ? 'step' : undefined}
+                        aria-label={`${index + 1}. ${question.question}`}
                         onClick={() => setCurrentStep(index)}
-                        className={`relative flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-all ${
-                          isActive
-                            ? 'bg-primary text-white shadow-md'
-                            : isAnswered
-                              ? 'bg-green-500/20 dark:bg-green-600/20 text-green-700 dark:text-green-400 border border-green-500 dark:border-green-600 hover:scale-105'
-                              : 'bg-surface-raised text-muted-foreground hover:bg-primary/20 dark:hover:bg-primary/20 hover:scale-105'
-                        }`}
+                        className={cn(
+                          'rounded-full [&_svg]:size-3.5',
+                          isActive && 'shadow-md',
+                          isAnswered &&
+                            !isActive &&
+                            'border-success bg-success/10 text-success hover:bg-success/20',
+                        )}
                         title={question.question}
                       >
-                        {isAnswered && !isActive ? (
-                          <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
-                            <path
-                              d="M13 4L6 11L3 8"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        ) : (
-                          index + 1
-                        )}
-                      </button>
+                        {isAnswered && !isActive ? <Check /> : index + 1}
+                      </Button>
                     );
                   })}
                 </div>

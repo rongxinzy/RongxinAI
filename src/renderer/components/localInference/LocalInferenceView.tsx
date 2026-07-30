@@ -45,9 +45,7 @@ import type {
 } from './types';
 import { LocalInferenceToastKind } from './types';
 import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
-import {
-  buildMarketplaceSearchParams,
-} from './utils/marketplace';
+import { buildMarketplaceSearchParams } from './utils/marketplace';
 import {
   isInstallTerminalPhase,
   isPullInProgress,
@@ -639,8 +637,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     if (nextTab === activeTab) return;
     launchLogs.closePanel();
     setTabDirection(
-      LOCAL_INFERENCE_TAB_ORDER.indexOf(nextTab) >=
-        LOCAL_INFERENCE_TAB_ORDER.indexOf(activeTab)
+      LOCAL_INFERENCE_TAB_ORDER.indexOf(nextTab) >= LOCAL_INFERENCE_TAB_ORDER.indexOf(activeTab)
         ? 1
         : -1,
     );
@@ -654,80 +651,88 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onValueChange={handleTabChange}
         className="flex h-full min-h-0 flex-1 flex-col gap-0"
       >
-      <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
-        <div className="flex items-center space-x-3 h-8">
-          {isSidebarCollapsed && (
-            <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <button
-                type="button"
-                onClick={onToggleSidebar}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-surface-raised hover:text-foreground"
-              >
-                <PanelLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onNewChat}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground/70 transition-colors hover:bg-surface-raised hover:text-foreground"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-              {updateBadge}
-            </div>
-          )}
-          <h1 className="text-lg font-semibold text-foreground">
-            {i18nService.t('localInferenceTitle')}
-          </h1>
-        </div>
-        <WindowTitleBar inline />
-      </div>
-      <LocalInferenceTabSelector activeTab={activeTab} isVisible={isVisible} />
-      {toast && (
-        <div className="pointer-events-none absolute right-4 top-16 z-30 flex w-[min(24rem,calc(100%-2rem))] justify-end">
-          <LocalInferenceToastView toast={toast} onClose={dismissToast} />
-        </div>
-      )}
-        <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        <div
-          ref={contentViewportRef}
-          className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]"
-        >
-          <div className="w-full space-y-4 px-6 py-4">
-            {activeTab === 'models' ? (
-              <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
+          <div className="flex items-center space-x-3 h-8">
+            {isSidebarCollapsed && (
+              <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
                 <Button
                   type="button"
-                  variant="outline"
-                  className={localInferenceCompactButtonClass}
-                  size="sm"
-                  onClick={openAccessSettings}
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleSidebar}
+                  aria-label={i18nService.t('collapse')}
+                  title={i18nService.t('collapse')}
+                  className="text-foreground/70 hover:text-foreground"
                 >
-                  <Globe data-icon="inline-start" />
-                  {i18nService.t('localInferenceAccessSettings')}
+                  <PanelLeft />
                 </Button>
                 <Button
                   type="button"
-                  variant="outline"
-                  className={localInferenceCompactButtonClass}
-                  size="sm"
-                  onClick={() => {
-                    setDraftModelsDir(modelsDir);
-                    setLibrarySettingsOpen(true);
-                  }}
+                  variant="ghost"
+                  size="icon"
+                  onClick={onNewChat}
+                  aria-label={i18nService.t('newChat')}
+                  title={i18nService.t('newChat')}
+                  className="text-foreground/70 hover:text-foreground"
                 >
-                  <Settings2 data-icon="inline-start" />
-                  {i18nService.t('localInferenceLibrarySettings')}
+                  <Pencil />
                 </Button>
+                {updateBadge}
               </div>
-            ) : null}
+            )}
+            <h1 className="text-lg font-semibold text-foreground">
+              {i18nService.t('localInferenceTitle')}
+            </h1>
+          </div>
+          <WindowTitleBar inline />
+        </div>
+        <LocalInferenceTabSelector activeTab={activeTab} isVisible={isVisible} />
+        {toast && (
+          <div className="pointer-events-none absolute right-4 top-16 z-30 flex w-[min(24rem,calc(100%-2rem))] justify-end">
+            <LocalInferenceToastView toast={toast} onClose={dismissToast} />
+          </div>
+        )}
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          <div
+            ref={contentViewportRef}
+            className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]"
+          >
+            <div className="w-full space-y-4 px-6 py-4">
+              {activeTab === 'models' ? (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={localInferenceCompactButtonClass}
+                    size="sm"
+                    onClick={openAccessSettings}
+                  >
+                    <Globe data-icon="inline-start" />
+                    {i18nService.t('localInferenceAccessSettings')}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={localInferenceCompactButtonClass}
+                    size="sm"
+                    onClick={() => {
+                      setDraftModelsDir(modelsDir);
+                      setLibrarySettingsOpen(true);
+                    }}
+                  >
+                    <Settings2 data-icon="inline-start" />
+                    {i18nService.t('localInferenceLibrarySettings')}
+                  </Button>
+                </div>
+              ) : null}
 
-            <LayeredTabsContent
-              value="models"
-              activeValue={activeTab}
-              direction={tabDirection}
-              className="min-h-0"
-              contentClassName="min-h-0"
-            >
+              <LayeredTabsContent
+                value="models"
+                activeValue={activeTab}
+                direction={tabDirection}
+                className="min-h-0"
+                contentClassName="min-h-0"
+              >
                 <ModelsPanel
                   loading={loading}
                   loadingModelName={loadingModelName}
@@ -748,39 +753,39 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   logPanelVisible={launchLogs.state.visible && !launchLogFullscreen}
                   logPanelModelName={launchLogFullscreen ? null : launchLogs.state.modelName}
                 />
-            </LayeredTabsContent>
-            <LayeredTabsContent
-              value="marketplace"
-              activeValue={activeTab}
-              direction={tabDirection}
-              className="min-h-0"
-              contentClassName="min-h-0"
-            >
-              <MarketplacePanel
-                loading={loading}
-                models={marketplaceModels}
-                hasSearched={marketplaceHasSearched}
-                marketplaceLoading={marketplaceLoading}
-                marketplaceError={marketplaceError}
-                query={marketplaceQuery}
-                installedModelPathMap={installedModelPathMap}
-                installProgress={pullProgress}
-                savedToken={marketplaceToken}
-                onTokenSaved={setMarketplaceToken}
-                onQueryChange={setMarketplaceQuery}
-                onSearch={handleMarketplaceSearch}
-                onInstall={handleMarketplaceInstall}
-                contentViewportRef={contentViewportRef}
-              />
-            </LayeredTabsContent>
+              </LayeredTabsContent>
+              <LayeredTabsContent
+                value="marketplace"
+                activeValue={activeTab}
+                direction={tabDirection}
+                className="min-h-0"
+                contentClassName="min-h-0"
+              >
+                <MarketplacePanel
+                  loading={loading}
+                  models={marketplaceModels}
+                  hasSearched={marketplaceHasSearched}
+                  marketplaceLoading={marketplaceLoading}
+                  marketplaceError={marketplaceError}
+                  query={marketplaceQuery}
+                  installedModelPathMap={installedModelPathMap}
+                  installProgress={pullProgress}
+                  savedToken={marketplaceToken}
+                  onTokenSaved={setMarketplaceToken}
+                  onQueryChange={setMarketplaceQuery}
+                  onSearch={handleMarketplaceSearch}
+                  onInstall={handleMarketplaceInstall}
+                  contentViewportRef={contentViewportRef}
+                />
+              </LayeredTabsContent>
+            </div>
           </div>
-        </div>
-        <ModelLaunchLogSidebar
-          state={launchLogs.state}
-          isFullscreen={launchLogFullscreen}
-          onFullscreenChange={setLaunchLogFullscreen}
-          onClose={launchLogs.closePanel}
-        />
+          <ModelLaunchLogSidebar
+            state={launchLogs.state}
+            isFullscreen={launchLogFullscreen}
+            onFullscreenChange={setLaunchLogFullscreen}
+            onClose={launchLogs.closePanel}
+          />
         </div>
       </Tabs>
 
