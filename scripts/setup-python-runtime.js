@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * Prepare bundled Windows Python runtime under resources/python-win.
+ * Prepare the uv-managed Windows Python runtime (3.14.6) under resources/python-win.
  *
  * This script mirrors setup-mingit.js behavior:
- * - Supports local offline archive via ZHIYUAN_PORTABLE_PYTHON_ARCHIVE
- * - Supports optional mirror URL via ZHIYUAN_PORTABLE_PYTHON_URL
+ * - Uses the application's bundled uv executable to install the interpreter
  * - Can run cross-platform for Windows packaging
- * - Bundles interpreter runtime only (no preinstalled skill dependencies)
+ * - Bundles interpreter runtime only (uv creates Skill environments on demand)
  */
 
 'use strict';
@@ -17,12 +16,13 @@ const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 const { spawnSync } = require('child_process');
 const extractZip = require('extract-zip');
+const { ensurePortableUvRuntime, findPortableUvExecutables } = require('./setup-uv-runtime.js');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'python-win');
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'python-win-runtime.zip');
 const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION =
-  process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_VERSION || '3.11.9';
+  process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_VERSION || '3.14.6';
 const DEFAULT_WINDOWS_EMBED_PYTHON_ZIP = `python-${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}-embed-amd64.zip`;
 const DEFAULT_WINDOWS_EMBED_PYTHON_URL =
   process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_URL ||
@@ -522,34 +522,42 @@ async function bootstrapRuntimeOnWindows() {
   }
 
   console.log(
-    '[setup-python-runtime] No prebuilt archive provided, bootstrapping runtime from python.org on Windows host...',
+    `[setup-python-runtime] Installing uv-managed Python ${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION} for the application...`,
   );
-  const tempRoot = fs.mkdtempSync(path.join(PROJECT_ROOT, 'tmp-python-bootstrap-'));
-  try {
-    const embedZipPath = path.join(tempRoot, DEFAULT_WINDOWS_EMBED_PYTHON_ZIP);
-    await downloadArchive(DEFAULT_WINDOWS_EMBED_PYTHON_URL, embedZipPath);
-    await extractArchiveToRuntime(embedZipPath);
+  await ensurePortableUvRuntime({ required: true });
+  const uv = findPortableUvExecutables().uv;
+  if (!uv) throw new Error('Bundled uv.exe is unavailable for managed Python installation.');
 
-    enableSitePackages(OUTPUT_DIR);
+  const tempRoot = fs.mkdtempSync(path.join(PROJECT_ROOT, 'tmp-uv-python-runtime-'));
+  try {
+    const installDir = path.join(tempRoot, 'install');
+    runCommand(
+      uv,
+      [
+        'python',
+        'install',
+        DEFAULT_WINDOWS_EMBED_PYTHON_VERSION,
+        '--install-dir',
+        installDir,
+        '--no-registry',
+      ],
+      {
+        env: {
+          ...process.env,
+          UV_NO_MODIFY_PATH: '1',
+          UV_CACHE_DIR: path.join(tempRoot, 'cache'),
+          UV_NO_PROGRESS: '1',
+        },
+      },
+    );
+    const runtimeRoot = findRuntimeRoot(installDir);
+    if (!runtimeRoot) throw new Error('uv did not produce a usable Python runtime.');
+    copyRuntimeTree(runtimeRoot, OUTPUT_DIR);
     ensurePython3Alias(OUTPUT_DIR);
 
     const pythonExe = path.join(OUTPUT_DIR, 'python.exe');
     if (!fs.existsSync(pythonExe)) {
       throw new Error('python.exe not found after extraction.');
-    }
-
-    const pipExe = path.join(OUTPUT_DIR, 'Scripts', 'pip.exe');
-    if (!fs.existsSync(pipExe)) {
-      try {
-        const getPipPath = path.join(tempRoot, 'get-pip.py');
-        await downloadArchive(DEFAULT_GET_PIP_URL, getPipPath);
-        runCommand(pythonExe, [getPipPath], { timeout: 3 * 60 * 1000 });
-      } catch (error) {
-        console.warn(
-          '[setup-python-runtime] Failed to bootstrap pip during Windows-host preparation. ' +
-            `Python runtime remains usable. Reason: ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
     }
 
     await ensurePipPayload(OUTPUT_DIR, { required: true });
@@ -560,7 +568,16 @@ async function bootstrapRuntimeOnWindows() {
       );
     }
 
-    console.log('[setup-python-runtime] Windows bootstrap completed successfully');
+    fs.writeFileSync(
+      path.join(OUTPUT_DIR, 'runtime.json'),
+      `${JSON.stringify({
+        version: 1,
+        manager: 'uv',
+        python: DEFAULT_WINDOWS_EMBED_PYTHON_VERSION,
+      }, null, 2)}\n`,
+      'utf8',
+    );
+    console.log('[setup-python-runtime] uv-managed Windows runtime completed successfully');
   } finally {
     try {
       fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -610,6 +627,20 @@ function findPortablePythonExecutable(baseDir = OUTPUT_DIR) {
   return null;
 }
 
+function isExpectedUvManagedRuntime(baseDir = OUTPUT_DIR) {
+  const python = findPortablePythonExecutable(baseDir);
+  if (!python) return false;
+  const result = spawnSync(python, ['--version'], { encoding: 'utf-8', windowsHide: true });
+  const version = `${result.stdout || ''}${result.stderr || ''}`.trim();
+  if (!version.startsWith(`Python ${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}`)) return false;
+  try {
+    const state = JSON.parse(fs.readFileSync(path.join(baseDir, 'runtime.json'), 'utf-8'));
+    return state?.manager === 'uv' && state?.python === DEFAULT_WINDOWS_EMBED_PYTHON_VERSION;
+  } catch {
+    return false;
+  }
+}
+
 async function ensurePortablePythonRuntime(options = {}) {
   const required = Boolean(options.required);
   const shouldRun =
@@ -625,7 +656,7 @@ async function ensurePortablePythonRuntime(options = {}) {
   }
 
   const existingBaseHealth = checkRuntimeHealth(OUTPUT_DIR, { requirePip: false });
-  if (existingBaseHealth.ok) {
+  if (existingBaseHealth.ok && (process.platform !== 'win32' || isExpectedUvManagedRuntime())) {
     await ensurePipPayload(OUTPUT_DIR, { required: true });
     const existingFullHealth = checkRuntimeHealth(OUTPUT_DIR, { requirePip: true });
     if (existingFullHealth.ok) {
@@ -637,33 +668,28 @@ async function ensurePortablePythonRuntime(options = {}) {
       '[setup-python-runtime] Existing runtime found but pip support is incomplete; ' +
         `missing: ${existingFullHealth.missing.join(', ')}. Re-extracting runtime...`,
     );
+  } else if (existingBaseHealth.ok && process.platform === 'win32') {
+    console.warn(
+      `[setup-python-runtime] Existing runtime is not uv-managed Python ${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}; replacing it.`,
+    );
   }
 
-  const archive = await resolveArchive(required && process.platform !== 'win32');
-  if (archive) {
-    console.log(`[setup-python-runtime] Extracting runtime archive (${archive.source})...`);
-    try {
-      await extractArchiveToRuntime(archive.archivePath);
-    } catch (error) {
-      if (process.platform !== 'win32') {
-        throw error;
-      }
-      console.warn(
-        '[setup-python-runtime] Archive extraction or pip payload setup failed; ' +
-          `falling back to Windows bootstrap. Reason: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      await bootstrapRuntimeOnWindows();
-    }
-  } else if (process.platform === 'win32') {
+  if (process.platform === 'win32') {
     await bootstrapRuntimeOnWindows();
-  } else if (required) {
-    throw new Error(
-      'Portable Python archive is not available for non-Windows host. ' +
-        'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or ' +
-        'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.',
-    );
   } else {
-    return { ok: true, skipped: true, pythonPath: null };
+    const archive = await resolveArchive(required);
+    if (archive) {
+      console.log(`[setup-python-runtime] Extracting runtime archive (${archive.source})...`);
+      await extractArchiveToRuntime(archive.archivePath);
+    } else if (required) {
+      throw new Error(
+        'Portable Python archive is not available for non-Windows host. ' +
+          'Set ZHIYUAN_PORTABLE_PYTHON_ARCHIVE to a local package or ' +
+          'ZHIYUAN_PORTABLE_PYTHON_URL to a downloadable runtime archive URL.',
+      );
+    } else {
+      return { ok: true, skipped: true, pythonPath: null };
+    }
   }
 
   const pythonPath = findPortablePythonExecutable(OUTPUT_DIR);
@@ -672,6 +698,11 @@ async function ensurePortablePythonRuntime(options = {}) {
     throw new Error(
       'Portable Python runtime is missing required pip components after preparation: ' +
         finalHealth.missing.join(', '),
+    );
+  }
+  if (process.platform === 'win32' && !isExpectedUvManagedRuntime()) {
+    throw new Error(
+      `Portable Python runtime is not uv-managed Python ${DEFAULT_WINDOWS_EMBED_PYTHON_VERSION}.`,
     );
   }
   const finalSize = getDirSize(OUTPUT_DIR);

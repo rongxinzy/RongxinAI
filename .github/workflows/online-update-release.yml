@@ -70,9 +70,8 @@ jobs:
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run setup:uv-runtime
       - run: bun run setup:python-runtime
-        env:
-          ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
       - run: bun run dist:win:lite
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}

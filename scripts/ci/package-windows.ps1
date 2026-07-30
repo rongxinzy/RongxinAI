@@ -82,80 +82,22 @@ Write-Host "NODE_OPTIONS set to $env:NODE_OPTIONS"
 
 pnpm config set registry https://registry.npmmirror.com
 
-$preinstalledPython = 'C:\ci-cache\python-embed'
-$pythonDir = 'resources\python-win'
-New-Item -ItemType Directory -Path $pythonDir -Force | Out-Null
-# 打包应用需要内置 Python 运行时。优先使用 Runner 本地缓存，
-# 缓存缺失时才下载嵌入式 Python。
-if (-not (Test-Path "$pythonDir\python.exe")) {
-  if (Test-Path "$preinstalledPython\python.exe") {
-    Write-Host "Copying Python from pre-installed $preinstalledPython ..."
-    Copy-Item "$preinstalledPython\*" "$pythonDir\" -Recurse -Force
-  } else {
-    Write-Host "Pre-installed Python not found at $preinstalledPython, downloading..."
-    $pythonVersion = '3.11.9'
-    $pythonZip = Join-Path $env:TEMP "python-$pythonVersion-embed-amd64.zip"
-    $pythonMirror = if ($env:PYTHON_MIRROR) { $env:PYTHON_MIRROR } else { "https://www.python.org/ftp/python/$pythonVersion" }
-    Invoke-WebRequest -Uri "$pythonMirror/python-$pythonVersion-embed-amd64.zip" -OutFile $pythonZip
-    Expand-Archive -Path $pythonZip -DestinationPath $pythonDir -Force
-    Remove-Item $pythonZip -Force
-
-    $pth = Get-ChildItem "$pythonDir\*._pth" | Select-Object -First 1
-    if ($pth) {
-      $content = (Get-Content $pth.FullName -Raw) -replace '(?m)^#import site', 'import site'
-      if ($content -notmatch '(?m)^import site$') {
-        $content += "`r`nimport site"
-      }
-      Set-Content $pth.FullName $content -NoNewline
-    }
-
-    Copy-Item "$pythonDir\python.exe" "$pythonDir\python3.exe" -Force
-    $getPip = Join-Path $env:TEMP 'get-pip.py'
-    Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile $getPip
-    & "$pythonDir\python.exe" $getPip --no-warn-script-location
-    Remove-Item $getPip -Force
-  }
-  Write-Host 'Python runtime ready'
-} else {
-  Write-Host 'Python runtime already present (cached)'
-}
-
-if (-not (Test-Path "$pythonDir\python.exe")) {
-  Write-Error 'FATAL: Python runtime setup failed'
-  if (Test-Path 'resources') {
-    Get-ChildItem resources -Directory | ForEach-Object { Write-Host "resources dir: $($_.Name)" }
-  }
-  exit 1
-}
-& "$pythonDir\python.exe" --version
-& "$pythonDir\python.exe" -m pip --version
-
-# electron-builder beforePack 钩子需要 portable uv 运行时。
-# GitHub 在 CI 环境不可达，因此优先使用 Runner 本地缓存。
-$uvArchive = 'C:\ci-cache\uv-x86_64-pc-windows-msvc-0.8.4.zip'
-$uvRuntimeDir = 'resources\uv-win'
+# 使用应用内置 uv 管理应用内置 Python 3.14.6；不依赖 Runner 或最终用户的 Python。
+$uvArchive = 'C:\ci-cache\uv-x86_64-pc-windows-msvc-0.11.32.zip'
 if (Test-Path $uvArchive) {
   $env:ZHIYUAN_PORTABLE_UV_ARCHIVE = $uvArchive
   Write-Host "Using cached uv runtime archive: $uvArchive"
-  # setup-uv-runtime.js 在 CI 解压 zip 时容易静默崩溃，因此改用 PowerShell 直接复制。
-  # 只要 resources/uv-win 里已有健康的 uv.exe/uvx.exe，beforePack 钩子就会跳过解压。
-  New-Item -ItemType Directory -Path $uvRuntimeDir -Force | Out-Null
-  $uvSource = 'C:\Users\Administrator\.local\bin'
-  if ((Test-Path "$uvSource\uv.exe") -and (Test-Path "$uvSource\uvx.exe")) {
-    Copy-Item "$uvSource\uv.exe" "$uvRuntimeDir\uv.exe" -Force
-    Copy-Item "$uvSource\uvx.exe" "$uvRuntimeDir\uvx.exe" -Force
-    Write-Host "Copied uv.exe and uvx.exe from $uvSource to $uvRuntimeDir"
-  } else {
-    Write-Warning "Local uv executables not found at $uvSource; falling back to setup-uv-runtime.js"
-    & node scripts/setup-uv-runtime.js --required
-    if ($LASTEXITCODE -ne 0) {
-      Write-Error 'FATAL: setup-uv-runtime.js failed'
-      exit $LASTEXITCODE
-    }
-  }
 } else {
-  Write-Warning "Cached uv archive not found at $uvArchive; build will try to download from GitHub"
+  Write-Warning "Cached uv archive not found at $uvArchive; setup will download the pinned release"
 }
+
+& node scripts/setup-uv-runtime.js --required
+if ($LASTEXITCODE -ne 0) { Write-Error 'FATAL: bundled uv setup failed'; exit $LASTEXITCODE }
+& node scripts/setup-python-runtime.js --required
+if ($LASTEXITCODE -ne 0) { Write-Error 'FATAL: uv-managed Python setup failed'; exit $LASTEXITCODE }
+$pythonDir = 'resources\python-win'
+& "$pythonDir\python.exe" --version
+& "$pythonDir\python.exe" -m pip --version
 
 # CI 中跳过了 Electron postinstall 下载，因此在 electron-builder 运行前
 # 需要手动确保 Windows Electron 二进制文件存在。

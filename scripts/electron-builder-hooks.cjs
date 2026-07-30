@@ -20,6 +20,10 @@ const {
   ensurePortableUvRuntime,
   checkRuntimeHealth: checkUvRuntimeHealth,
 } = require('./setup-uv-runtime.js');
+const {
+  ensurePortablePandocRuntime,
+  checkRuntimeHealth: checkPandocRuntimeHealth,
+} = require('./setup-pandoc-runtime.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const {
@@ -898,7 +902,20 @@ async function beforePack(context) {
 
   if (isWindowsTarget(context)) {
     console.log(
-      '[electron-builder-hooks] Windows target detected, ensuring portable Python runtime is prepared...',
+      '[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...',
+    );
+    await ensurePortableUvRuntime({ required: true });
+    const uvRuntimeRoot = path.join(__dirname, '..', 'resources', 'uv-win');
+    const uvRuntimeHealth = checkUvRuntimeHealth(uvRuntimeRoot);
+    if (!uvRuntimeHealth.ok) {
+      throw new Error(
+        'Portable uv runtime health check failed before pack. Missing files: ' +
+          uvRuntimeHealth.missing.join(', '),
+      );
+    }
+
+    console.log(
+      '[electron-builder-hooks] Windows target detected, ensuring uv-managed Python 3.14.6 runtime is prepared...',
     );
     await ensurePortablePythonRuntime({ required: true });
     const pythonRuntimeRoot = path.join(__dirname, '..', 'resources', 'python-win');
@@ -909,17 +926,19 @@ async function beforePack(context) {
           pythonRuntimeHealth.missing.join(', '),
       );
     }
+  }
 
-    console.log(
-      '[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...',
-    );
-    await ensurePortableUvRuntime({ required: true });
-    const uvRuntimeRoot = path.join(__dirname, '..', 'resources', 'uv-win');
-    const uvRuntimeHealth = checkUvRuntimeHealth(uvRuntimeRoot);
-    if (!uvRuntimeHealth.ok) {
+  if (isWindowsTarget(context) || isMacTarget(context)) {
+    console.log('[electron-builder-hooks] Ensuring bundled Pandoc runtime is prepared...');
+    const targetPlatform = context.electronPlatformName;
+    const targetArch = resolveTargetArch(context);
+    await ensurePortablePandocRuntime({ required: true, platform: targetPlatform, arch: targetArch });
+    const pandocRuntimeRoot = path.join(__dirname, '..', 'resources', 'pandoc');
+    const pandocRuntimeHealth = checkPandocRuntimeHealth(pandocRuntimeRoot, targetPlatform, targetArch);
+    if (!pandocRuntimeHealth.ok) {
       throw new Error(
-        'Portable uv runtime health check failed before pack. Missing files: ' +
-          uvRuntimeHealth.missing.join(', '),
+        'Bundled Pandoc runtime health check failed before pack. Missing files: ' +
+          pandocRuntimeHealth.missing.join(', '),
       );
     }
   }
@@ -968,6 +987,11 @@ async function beforePack(context) {
         label: 'uv runtime',
         dir: path.join(__dirname, '..', 'resources', 'uv-win'),
         prefix: 'uv-win',
+      },
+      {
+        label: 'Pandoc runtime',
+        dir: path.join(__dirname, '..', 'resources', 'pandoc'),
+        prefix: 'pandoc',
       },
     ].concat(
       llamaCppBackendResources ? [llamaCppBackendResources] : [],

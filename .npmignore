@@ -25,6 +25,10 @@ resources/MinGit-*.zip
 resources/PortableGit-*.7z.exe
 resources/python-win/
 resources/python-*.zip
+resources/uv-win/
+resources/uv-win-runtime.zip
+resources/pandoc/
+resources/pandoc-archives/
 SKILLs/**/.connection
 SKILLs/**/.server.log
 SKILLs/**/.server.pid

@@ -24,7 +24,8 @@ import {
   serializeToolContentForLog,
   truncateForLog,
 } from './mcpLog';
-import { getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
+import { appendPythonRuntimeToEnv, getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
+import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
 
 export interface McpToolManifestEntry {
@@ -334,6 +335,10 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
   if (process.platform === 'win32' && app.isPackaged && effectiveCommand) {
+    const managedRuntimeEnv = configureUvForManagedPython(
+      appendUvRuntimeToEnv(appendPythonRuntimeToEnv({ ...(stdioEnv || {}) })),
+    );
+    stdioEnv = { ...(stdioEnv || {}), ...managedRuntimeEnv };
     const normalized = effectiveCommand.trim().toLowerCase();
     const nodeCommandType = isNodeCommand(normalized);
     const uvCommandType = isUvCommand(normalized);

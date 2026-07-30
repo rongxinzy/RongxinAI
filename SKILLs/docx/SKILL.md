@@ -29,7 +29,7 @@ Create, edit, and format DOCX documents via CLI tools or direct C# scripts built
 
 **First time:** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps).
 
-**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. `LIMITED` means Pandoc can create a simple DOCX from Markdown, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
+**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. Packaged Windows and macOS builds provide a private Pandoc binary through `PANDOC_BIN`; never ask an end user to install it. `LIMITED` means that bundled Pandoc can create a simple DOCX from Markdown, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
 
 ## Capability routing
 

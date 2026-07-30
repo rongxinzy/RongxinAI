@@ -67,8 +67,10 @@ describe('PiShortcutWorkflowController', () => {
     fs.writeFileSync(path.join(root, 'qa.md'), 'Checked text and fixed the title overflow.');
     fs.writeFileSync(path.join(root, 'slide-1.png'), onePixelPng);
     await expect(run.recordFile('deck.pptx', 'deliverable')).resolves.toContain('Verified');
-    await expect(run.recordFile('qa.md', 'validation')).resolves.toContain('Verified');
-    await expect(run.recordFile('slide-1.png', 'preview')).resolves.toContain('Verified');
+    await expect(run.recordFile('qa.md', 'validation', 'deck.pptx')).resolves.toContain('Verified');
+    await expect(run.recordFile('slide-1.png', 'preview', 'deck.pptx')).resolves.toContain(
+      'Verified',
+    );
 
     run.requestCompletion('all checks passed');
     expect(run.onAgentEnd()).toMatchObject({ shouldFinish: true });
@@ -132,7 +134,7 @@ describe('PiShortcutWorkflowController', () => {
     fs.writeFileSync(path.join(root, 'report.md'), '# Report\n\n[1] https://source-0.example.test/report');
     fs.writeFileSync(path.join(root, 'research-qa.md'), 'Checked citations, scope, and unresolved gaps.');
     await run.recordFile('report.md', 'deliverable');
-    await run.recordFile('research-qa.md', 'validation');
+    await run.recordFile('research-qa.md', 'validation', 'report.md');
     run.requestCompletion('report is supported');
     expect(run.onAgentEnd()).toMatchObject({ shouldFinish: true });
   });
@@ -171,6 +173,30 @@ describe('PiShortcutWorkflowController', () => {
     await expect(run.recordFile('preview.txt', 'preview')).resolves.toContain('expects one of');
     await expect(run.recordFile('renamed-text.png', 'preview')).resolves.toContain(
       'not a valid raster image',
+    );
+  });
+
+  it('binds validation and preview evidence to an already registered deliverable', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'site.html'), '<main>Website</main>');
+    fs.writeFileSync(path.join(root, 'qa.md'), 'Checked desktop layout.');
+    fs.writeFileSync(path.join(root, 'site.png'), onePixelPng);
+
+    await expect(run.recordFile('qa.md', 'validation', 'site.html')).resolves.toContain(
+      'record the referenced deliverable',
+    );
+    await run.recordFile('site.html', 'deliverable');
+    await expect(run.recordFile('qa.md', 'validation', 'missing.html')).resolves.toContain(
+      'must name an existing workspace deliverable',
+    );
+    await expect(run.recordFile('qa.md', 'validation', 'site.html')).resolves.toContain('Verified');
+    await expect(run.recordFile('site.png', 'preview', 'site.html')).resolves.toContain('Verified');
+    expect(run.getSnapshot().files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'qa.md', role: 'validation', deliverablePath: 'site.html' }),
+        expect.objectContaining({ path: 'site.png', role: 'preview', deliverablePath: 'site.html' }),
+      ]),
     );
   });
 
@@ -236,8 +262,8 @@ describe('PiShortcutWorkflowController', () => {
     fs.writeFileSync(path.join(rootFor(run), 'qa.md'), 'validated');
     fs.writeFileSync(path.join(rootFor(run), 'report-preview.png'), onePixelPng);
     await run.recordFile('report.docx', 'deliverable');
-    await run.recordFile('qa.md', 'validation');
-    await run.recordFile('report-preview.png', 'preview');
+    await run.recordFile('qa.md', 'validation', 'report.docx');
+    await run.recordFile('report-preview.png', 'preview', 'report.docx');
     run.requestCompletion('done');
     expect(run.onAgentEnd().shouldFinish).toBe(true);
 

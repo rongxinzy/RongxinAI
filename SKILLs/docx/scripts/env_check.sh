@@ -97,12 +97,13 @@ else
 fi
 
 # --- Optional: pandoc ---
-if command -v pandoc &>/dev/null; then
-    pandoc_ver=$(pandoc --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "?")
-    printf "[OK]      %-14s %s (content preview)\n" "pandoc" "$pandoc_ver"
+PANDOC_BIN="${PANDOC_BIN:-$(command -v pandoc || true)}"
+if [ -n "$PANDOC_BIN" ] && [ -x "$PANDOC_BIN" ]; then
+    pandoc_ver=$("$PANDOC_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "?")
+    printf "[OK]      %-14s %s (content preview; %s)\n" "pandoc" "$pandoc_ver" "$PANDOC_BIN"
     PANDOC_AVAILABLE=true
 else
-    printf "[WARN]    %-14s not found — docx_preview.sh will use fallback\n" "pandoc"
+    printf "[WARN]    %-14s not found — bundled desktop builds should provide PANDOC_BIN\n" "pandoc"
     WARNINGS=$((WARNINGS + 1))
     if ! $DOTNET_AVAILABLE; then
         STATUS="NOT READY"

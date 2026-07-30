@@ -144,7 +144,11 @@ export class PiShortcutWorkflowController {
     this.writeState();
   }
 
-  async recordFile(rawPath: string, role: WorkflowFileRole): Promise<string> {
+  async recordFile(
+    rawPath: string,
+    role: WorkflowFileRole,
+    rawDeliverablePath?: string,
+  ): Promise<string> {
     const resolved = this.resolveWorkspacePath(rawPath);
     if (!resolved)
       return 'File was not recorded: use an existing file inside the selected workspace.';
@@ -182,10 +186,23 @@ export class PiShortcutWorkflowController {
       }
     }
     const normalized = path.relative(this.options.workspaceRoot, resolved);
+    let deliverablePath: string | undefined;
+    if (role !== 'deliverable') {
+      const deliverable = this.resolveWorkspacePath(rawDeliverablePath || '');
+      if (!deliverable)
+        return 'File was not recorded: validation and preview files must name an existing workspace deliverable.';
+      deliverablePath = path.relative(this.options.workspaceRoot, deliverable);
+      if (
+        !this.state.files.some(
+          file => file.role === 'deliverable' && file.path === deliverablePath,
+        )
+      )
+        return 'File was not recorded: record the referenced deliverable before its validation or preview.';
+    }
     const index = this.state.files.findIndex(
       file => file.path === normalized && file.role === role,
     );
-    const value = { path: normalized, role, verifiedAt: now() };
+    const value = { path: normalized, role, deliverablePath, verifiedAt: now() };
     if (index >= 0) this.state.files[index] = value;
     else this.state.files.push(value);
     this.writeState();
@@ -254,11 +271,11 @@ export class PiShortcutWorkflowController {
     const output = expectedExtensions(this.options.kind).join(' or ');
     const instructions = [
       `Create the requested ${output} deliverable, then call workflow_state with role "deliverable" to verify it exists and is nonempty.`,
-      'Write a nonempty validation report inside the workspace and call workflow_state with role "validation" after the check succeeds.',
+      'Write a nonempty validation report inside the workspace and record it with role "validation" and deliverablePath set to the deliverable it checked.',
     ];
     if (requiresRenderedPreview(this.options.kind)) {
       instructions.push(
-        'Render the deliverable to at least one preview image, inspect it, and record that image with role "preview".',
+        'Render the deliverable to at least one preview image, inspect it, and record that image with role "preview" and deliverablePath set to that deliverable.',
       );
     }
     return instructions;

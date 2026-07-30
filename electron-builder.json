@@ -122,6 +122,11 @@
         ]
       },
       {
+        "from": "resources/pandoc",
+        "to": "pandoc",
+        "filter": ["**/*"]
+      },
+      {
         "from": "vendor/openclaw-runtime/current",
         "to": "cfmind",
         "filter": [

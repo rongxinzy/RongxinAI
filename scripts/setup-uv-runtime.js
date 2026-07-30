@@ -19,7 +19,7 @@ const extractZip = require('extract-zip');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'uv-win');
-const UV_VERSION = process.env.ZHIYUAN_WINDOWS_UV_VERSION || '0.8.4';
+const UV_VERSION = process.env.ZHIYUAN_WINDOWS_UV_VERSION || '0.11.32';
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'uv-win-runtime.zip');
 
 function parseArgs(argv) {

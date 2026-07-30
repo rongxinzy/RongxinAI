@@ -42,6 +42,16 @@ function findPythonExecutable(rootDir: string): string | null {
   return null;
 }
 
+/** Resolve the app-private interpreter that Skills and uv must use on Windows. */
+export function getManagedPythonExecutable(): string | null {
+  for (const root of [getUserPythonRoot(), getBundledPythonRoot()]) {
+    if (!root) continue;
+    const executable = findPythonExecutable(root);
+    if (executable) return executable;
+  }
+  return null;
+}
+
 function readEmbedPthFiles(rootDir: string): string[] {
   try {
     return fs.readdirSync(rootDir).filter(name => name.endsWith('._pth'));

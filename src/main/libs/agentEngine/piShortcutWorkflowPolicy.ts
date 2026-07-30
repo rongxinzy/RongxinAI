@@ -18,6 +18,8 @@ export type WorkflowFileRole = 'deliverable' | 'validation' | 'preview';
 export interface WorkflowFile {
   path: string;
   role: WorkflowFileRole;
+  /** The deliverable a QA record or rendered preview attests to. */
+  deliverablePath?: string;
   verifiedAt: string;
 }
 

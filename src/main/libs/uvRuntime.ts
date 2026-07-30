@@ -2,6 +2,8 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
+import { getManagedPythonExecutable } from './pythonRuntime';
+
 const UV_RUNTIME_DIR_NAME = 'uv-win';
 
 function resolveBundledCandidates(): string[] {
@@ -108,5 +110,25 @@ export function appendUvRuntimeToEnv(
     env.PATH = [runtimeDir, ...parts.filter(Boolean)].join(';');
   }
   env.ZHIYUAN_UV_ROOT = runtimeDir;
+  return env;
+}
+
+/**
+ * Bind uv to the application-private CPython runtime and user-data cache.
+ * This prevents a Skill from silently selecting or downloading a system Python
+ * while leaving uv responsible for isolated environments and dependencies.
+ */
+export function configureUvForManagedPython(
+  env: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  if (process.platform !== 'win32') return env;
+  const uv = findBundledUvExecutable('uv.exe');
+  const python = getManagedPythonExecutable();
+  if (!uv || !python) return env;
+  env.UV_PYTHON = python;
+  env.UV_NO_MANAGED_PYTHON = '1';
+  env.UV_CACHE_DIR = path.join(app.getPath('userData'), 'runtimes', 'uv-cache');
+  env.UV_TOOL_DIR = path.join(app.getPath('userData'), 'runtimes', 'uv-tools');
+  env.ZHIYUAN_PYTHON_BIN = python;
   return env;
 }
