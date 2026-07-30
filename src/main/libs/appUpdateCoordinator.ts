@@ -18,6 +18,8 @@ import type { SqliteStore } from '../sqliteStore';
 const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
 const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
 const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
+const SUPPORTED_UPDATE_PLATFORMS = new Set(['win32', 'darwin', 'linux']);
+const SUPPORTED_UPDATE_ARCHITECTURES = new Set(['x64', 'arm64']);
 
 type ManifestReleaseNotes = {
   zh?: { title?: unknown; items?: unknown };
@@ -161,7 +163,9 @@ export class AppUpdateCoordinator {
     const platform = process.platform;
     const arch = process.arch;
     const variant = this.resolveBuildVariant();
-    if (!['win32', 'darwin'].includes(platform) || !['x64', 'arm64'].includes(arch)) return null;
+    if (!SUPPORTED_UPDATE_PLATFORMS.has(platform) || !SUPPORTED_UPDATE_ARCHITECTURES.has(arch)) {
+      return null;
+    }
 
     const cacheKey = `${MANIFEST_CACHE_KEY_PREFIX}:${platform}:${arch}:${variant}`;
     const cachedManifest = this.readCachedManifest(cacheKey);
@@ -277,7 +281,14 @@ export class AppUpdateCoordinator {
     }
 
     const downloadUrl = new URL(artifact.url);
-    const expectedExtension = target.platform === 'darwin' ? '.dmg' : '.exe';
+    const expectedExtension =
+      target.platform === 'darwin'
+        ? '.dmg'
+        : target.platform === 'linux'
+          ? target.variant === 'appimage'
+            ? '.appimage'
+            : '.deb'
+          : '.exe';
     if (
       downloadUrl.protocol !== 'https:' ||
       downloadUrl.hostname !== DOWNLOAD_HOST ||
@@ -308,6 +319,9 @@ export class AppUpdateCoordinator {
   }
 
   private resolveBuildVariant(): string {
+    if (process.platform === 'linux') {
+      return process.env.APPIMAGE ? 'appimage' : 'deb';
+    }
     if (process.platform !== 'win32') return 'default';
     try {
       const packageJson = JSON.parse(
