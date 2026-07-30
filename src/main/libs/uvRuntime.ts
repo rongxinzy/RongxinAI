@@ -4,7 +4,14 @@ import path from 'path';
 
 import { getManagedPythonExecutable } from './pythonRuntime';
 
-const UV_RUNTIME_DIR_NAME = 'uv-win';
+const UV_RUNTIME_DIR_NAME =
+  process.platform === 'darwin' ? 'uv-mac' : process.platform === 'linux' ? 'uv-linux' : 'uv-win';
+const IS_WINDOWS = process.platform === 'win32';
+type UvExecutableName = 'uv.exe' | 'uvx.exe' | 'uv' | 'uvx';
+
+function executableName(name: 'uv' | 'uvx'): UvExecutableName {
+  return IS_WINDOWS ? `${name}.exe` : name;
+}
 
 function resolveBundledCandidates(): string[] {
   if (app.isPackaged) {
@@ -68,7 +75,7 @@ export function getUserUvRoot(): string {
   return path.join(app.getPath('userData'), 'runtimes', UV_RUNTIME_DIR_NAME);
 }
 
-export function findBundledUvExecutable(name: 'uv.exe' | 'uvx.exe'): string | null {
+export function findBundledUvExecutable(name: UvExecutableName): string | null {
   const candidates = [getUserUvRoot(), getBundledUvRoot()].filter((value): value is string =>
     Boolean(value),
   );
@@ -85,18 +92,19 @@ export function findBundledUvExecutable(name: 'uv.exe' | 'uvx.exe'): string | nu
 export function appendUvRuntimeToEnv(
   env: Record<string, string | undefined>,
 ): Record<string, string | undefined> {
-  if (process.platform !== 'win32') {
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     return env;
   }
 
-  const uvExe = findBundledUvExecutable('uv.exe');
+  const uvExe = findBundledUvExecutable(executableName('uv'));
   if (!uvExe) {
     return env;
   }
 
   const runtimeDir = path.dirname(uvExe);
   const current = env.PATH || '';
-  const parts = current ? current.split(';') : [];
+  const separator = IS_WINDOWS ? ';' : ':';
+  const parts = current ? current.split(separator) : [];
   const normalizedDir = runtimeDir.toLowerCase().replace(/[\\/]+$/, '');
   if (
     !parts.some(
@@ -107,7 +115,7 @@ export function appendUvRuntimeToEnv(
           .replace(/[\\/]+$/, '') === normalizedDir,
     )
   ) {
-    env.PATH = [runtimeDir, ...parts.filter(Boolean)].join(';');
+    env.PATH = [runtimeDir, ...parts.filter(Boolean)].join(separator);
   }
   env.ZHIYUAN_UV_ROOT = runtimeDir;
   return env;
@@ -121,8 +129,8 @@ export function appendUvRuntimeToEnv(
 export function configureUvForManagedPython(
   env: Record<string, string | undefined>,
 ): Record<string, string | undefined> {
-  if (process.platform !== 'win32') return env;
-  const uv = findBundledUvExecutable('uv.exe');
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) return env;
+  const uv = findBundledUvExecutable(executableName('uv'));
   const python = getManagedPythonExecutable();
   if (!uv || !python) return env;
   env.UV_PYTHON = python;

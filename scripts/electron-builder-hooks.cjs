@@ -21,6 +21,14 @@ const {
   checkRuntimeHealth: checkUvRuntimeHealth,
 } = require('./setup-uv-runtime.js');
 const {
+  ensurePosixUvRuntime,
+  checkRuntimeHealth: checkMacUvRuntimeHealth,
+} = require('./setup-mac-uv-runtime.js');
+const {
+  ensurePosixPythonRuntime,
+  checkRuntimeHealth: checkMacPythonRuntimeHealth,
+} = require('./setup-mac-python-runtime.js');
+const {
   ensurePortablePandocRuntime,
   checkRuntimeHealth: checkPandocRuntimeHealth,
 } = require('./setup-pandoc-runtime.js');
@@ -79,6 +87,10 @@ function isWindowsTarget(context) {
 
 function isMacTarget(context) {
   return context?.electronPlatformName === 'darwin';
+}
+
+function isLinuxTarget(context) {
+  return context?.electronPlatformName === 'linux';
 }
 
 function collectLatestMtimeMs(dir) {
@@ -928,7 +940,20 @@ async function beforePack(context) {
     }
   }
 
-  if (isWindowsTarget(context) || isMacTarget(context)) {
+  if (isMacTarget(context) || isLinuxTarget(context)) {
+    const targetArch = resolveTargetArch(context);
+    const targetPlatform = context.electronPlatformName;
+    const resourceSuffix = targetPlatform === 'darwin' ? 'mac' : 'linux';
+    console.log(`[electron-builder-hooks] ${targetPlatform} target detected, ensuring bundled uv and uv-managed Python 3.14.6...`);
+    await ensurePosixUvRuntime({ required: true, platform: targetPlatform, arch: targetArch });
+    const uvHealth = checkMacUvRuntimeHealth(path.join(__dirname, '..', 'resources', `uv-${resourceSuffix}`), targetArch, targetPlatform);
+    if (!uvHealth.ok) throw new Error(`Bundled ${targetPlatform} uv health check failed: ${uvHealth.missing.join(', ')}`);
+    await ensurePosixPythonRuntime({ required: true, platform: targetPlatform, arch: targetArch });
+    const pythonHealth = checkMacPythonRuntimeHealth(path.join(__dirname, '..', 'resources', `python-${resourceSuffix}`), targetArch, targetPlatform);
+    if (!pythonHealth.ok) throw new Error(`Bundled ${targetPlatform} Python health check failed: ${pythonHealth.missing.join(', ')}`);
+  }
+
+  if (isWindowsTarget(context) || isMacTarget(context) || isLinuxTarget(context)) {
     console.log('[electron-builder-hooks] Ensuring bundled Pandoc runtime is prepared...');
     const targetPlatform = context.electronPlatformName;
     const targetArch = resolveTargetArch(context);

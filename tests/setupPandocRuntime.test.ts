@@ -9,6 +9,6 @@ describe('bundled Pandoc runtime', () => {
     expect(targetAsset('win32', 'x64')).toBe('pandoc-3.9.0.2-windows-x86_64.zip');
     expect(targetAsset('darwin', 'arm64')).toBe('pandoc-3.9.0.2-arm64-macOS.zip');
     expect(targetAsset('darwin', 'x64')).toBe('pandoc-3.9.0.2-x86_64-macOS.zip');
-    expect(targetAsset('linux', 'x64')).toBeNull();
+    expect(targetAsset('linux', 'x64')).toBe('pandoc-3.9.0.2-linux-amd64.tar.gz');
   });
 });

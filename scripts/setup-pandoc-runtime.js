@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
+const { spawnSync } = require('child_process');
 const extractZip = require('extract-zip');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
@@ -30,6 +31,7 @@ function targetAsset(platform = process.platform, arch = process.arch) {
   if (platform === 'win32' && arch === 'x64') return `pandoc-${PANDOC_VERSION}-windows-x86_64.zip`;
   if (platform === 'darwin' && arch === 'arm64') return `pandoc-${PANDOC_VERSION}-arm64-macOS.zip`;
   if (platform === 'darwin' && arch === 'x64') return `pandoc-${PANDOC_VERSION}-x86_64-macOS.zip`;
+  if (platform === 'linux' && arch === 'x64') return `pandoc-${PANDOC_VERSION}-linux-amd64.tar.gz`;
   return null;
 }
 
@@ -116,14 +118,19 @@ async function ensurePortablePandocRuntime(options = {}) {
   const required = Boolean(options.required);
   const platform = options.platform || process.platform;
   const arch = options.arch || process.arch;
-  if (!['win32', 'darwin'].includes(platform)) return { ok: true, skipped: true, executable: null };
+  if (!['win32', 'darwin', 'linux'].includes(platform)) return { ok: true, skipped: true, executable: null };
   const existing = checkRuntimeHealth(OUTPUT_DIR, platform, arch);
   if (existing.ok) return { ok: true, skipped: false, executable: existing.executable };
   const archive = await resolveArchive(required, platform, arch);
   if (!archive) return { ok: true, skipped: true, executable: null };
   const temporary = fs.mkdtempSync(path.join(PROJECT_ROOT, 'tmp-pandoc-runtime-'));
   try {
-    await extractZip(archive, { dir: temporary });
+    if (archive.endsWith('.tar.gz')) {
+      const extracted = spawnSync('tar', ['-xzf', archive, '-C', temporary], { encoding: 'utf8' });
+      if (extracted.status !== 0) throw new Error(`Unable to extract Pandoc archive: ${(extracted.stderr || extracted.stdout || '').trim()}`);
+    } else {
+      await extractZip(archive, { dir: temporary });
+    }
     const executable = findExecutable(temporary, expectedExecutable(platform));
     if (!executable) throw new Error(`Pandoc archive does not contain ${expectedExecutable(platform)}.`);
     fs.rmSync(OUTPUT_DIR, { recursive: true, force: true });

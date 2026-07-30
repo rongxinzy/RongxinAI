@@ -97,6 +97,11 @@ jobs:
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up bundled macOS runtimes
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+          bun run setup:pandoc-runtime
       - run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
@@ -129,6 +134,11 @@ jobs:
             libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up bundled Ubuntu runtimes
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+          bun run setup:pandoc-runtime
       - name: Build Ubuntu deb and Linux AppImage
         run: bun run dist:linux
         env:

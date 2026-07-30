@@ -37,6 +37,11 @@ resources/uv-win/
 resources/uv-win-runtime.zip
 resources/pandoc/
 resources/pandoc-archives/
+resources/uv-archives/
+resources/uv-mac/
+resources/python-mac/
+resources/uv-linux/
+resources/python-linux/
 resources/modelscope.tokens.local.json
 
 # SKILLs runtime files
