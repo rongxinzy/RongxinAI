@@ -210,13 +210,6 @@ export function MarketplacePanel({
     setTokenModalOpen(false);
   };
 
-  const handleClearToken = async () => {
-    setTokenInput('');
-    await window.electron.marketplace.setToken('');
-    onTokenSaved(null);
-    setTokenModalOpen(false);
-  };
-
   const handleInstall = async (model: MarketplaceModel) => {
     setInstallingModelIds(prev => new Set(prev).add(model.id));
     try {
@@ -458,17 +451,7 @@ export function MarketplacePanel({
               </InputGroupAddon>
             </InputGroup>
           </div>
-          <div className="flex items-center justify-between pt-1">
-            <Button
-              type="button"
-              onClick={handleClearToken}
-              disabled={!savedToken}
-              className={localInferenceCompactButtonClass}
-              size="sm"
-              variant="destructive"
-            >
-              {i18nService.t('marketplaceTokenClear')}
-            </Button>
+          <div className="flex items-center justify-end pt-1">
             <div className="flex items-center gap-2">
               <Button
                 type="button"
