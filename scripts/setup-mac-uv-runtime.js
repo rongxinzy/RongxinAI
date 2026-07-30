@@ -11,6 +11,7 @@ const { pipeline } = require('stream/promises');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const CACHE_DIR = path.join(PROJECT_ROOT, 'resources', 'uv-archives');
 const UV_VERSION = process.env.ZHIYUAN_UV_VERSION || '0.11.32';
+const DOWNLOAD_TIMEOUT_MS = Number.parseInt(process.env.ZHIYUAN_RUNTIME_DOWNLOAD_TIMEOUT_MS || '600000', 10);
 
 function outputDir(platform) { return path.join(PROJECT_ROOT, 'resources', platform === 'darwin' ? 'uv-mac' : 'uv-linux'); }
 function targetAsset(platform = process.platform, arch = process.arch) {
@@ -49,7 +50,9 @@ function checkRuntimeHealth(root, arch = process.arch, platform = process.platfo
 }
 
 async function download(url, destination) {
-  const response = await fetch(url, { redirect: 'follow' });
+  let response;
+  try { response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) }); }
+  catch (error) { throw new Error(`uv download failed for ${url}: ${error.message}`); }
   if (!response.ok || !response.body) throw new Error(`Download failed (${response.status}) for ${url}`);
   fs.mkdirSync(path.dirname(destination), { recursive: true });
   const partial = `${destination}.download`;

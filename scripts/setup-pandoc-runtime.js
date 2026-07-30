@@ -14,6 +14,7 @@ const extractZip = require('extract-zip');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const PANDOC_VERSION = process.env.ZHIYUAN_PANDOC_VERSION || '3.9.0.2';
+const DOWNLOAD_TIMEOUT_MS = Number.parseInt(process.env.ZHIYUAN_RUNTIME_DOWNLOAD_TIMEOUT_MS || '600000', 10);
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'pandoc');
 const CACHE_DIR = path.join(PROJECT_ROOT, 'resources', 'pandoc-archives');
 const STATE_FILE = 'runtime.json';
@@ -72,7 +73,9 @@ function checkRuntimeHealth(rootDir = OUTPUT_DIR, platform = process.platform, a
 }
 
 async function download(url, destination) {
-  const response = await fetch(url, { redirect: 'follow' });
+  let response;
+  try { response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) }); }
+  catch (error) { throw new Error(`Pandoc download failed for ${url}: ${error.message}`); }
   if (!response.ok || !response.body)
     throw new Error(`Download failed (${response.status} ${response.statusText}) for ${url}`);
   fs.mkdirSync(path.dirname(destination), { recursive: true });

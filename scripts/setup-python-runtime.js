@@ -20,6 +20,7 @@ const { ensurePortableUvRuntime, findPortableUvExecutables } = require('./setup-
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const OUTPUT_DIR = path.join(PROJECT_ROOT, 'resources', 'python-win');
+const DOWNLOAD_TIMEOUT_MS = Number.parseInt(process.env.ZHIYUAN_RUNTIME_DOWNLOAD_TIMEOUT_MS || '600000', 10);
 const DEFAULT_ARCHIVE_PATH = path.join(PROJECT_ROOT, 'resources', 'python-win-runtime.zip');
 const DEFAULT_WINDOWS_EMBED_PYTHON_VERSION =
   process.env.ZHIYUAN_WINDOWS_EMBED_PYTHON_VERSION || '3.14.6';
@@ -359,7 +360,9 @@ function findRuntimeRoot(baseDir) {
 }
 
 async function downloadArchive(url, destination) {
-  const response = await fetch(url, { redirect: 'follow' });
+  let response;
+  try { response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) }); }
+  catch (error) { throw new Error(`Python runtime download failed for ${url}: ${error.message}`); }
   if (!response.ok || !response.body) {
     throw new Error(`Download failed (${response.status} ${response.statusText}) for ${url}`);
   }
