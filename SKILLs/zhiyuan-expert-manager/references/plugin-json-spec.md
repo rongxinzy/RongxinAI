@@ -25,10 +25,11 @@
 
 ## 资源声明
 
-| 字段     | 类型     | 说明                                               |
-| -------- | -------- | -------------------------------------------------- |
-| `agents` | string[] | Agent 定义文件路径列表                             |
-| `skills` | string[] | Skill 目录路径列表（会被复制到 ZhiYuan Agent SKILLs/） |
+| 字段       | 类型     | 说明                                                   |
+| ---------- | -------- | ------------------------------------------------------ |
+| `agents`   | string[] | Agent 定义文件路径列表                                 |
+| `skills`   | string[] | Skill 目录路径列表（会被复制到 ZhiYuan Agent SKILLs/） |
+| `skillIds` | string[] | 复用应用内已有 Skill 的 ID（不复制文件）               |
 
 ## 展示字段（必填）
 
@@ -69,6 +70,8 @@
   "agentName": "{agent-name}",
 
   "agents": ["./agents/{agent-name}.md"],
+
+  "skillIds": ["web-search", "docx"],
 
   "displayName": {
     "en": "{English display name}",

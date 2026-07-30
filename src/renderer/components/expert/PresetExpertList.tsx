@@ -14,6 +14,7 @@ import { useSelector } from 'react-redux';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
+import { shouldShowPresetExpertProfession } from './presetExpertLabels';
 
 interface PresetExpertSummary {
   name: string;
@@ -89,18 +90,18 @@ const PresetExpertList: React.FC = () => {
         const isInstalled = installedPresetIds.has(expert.name);
         const isCurrent = installing === expert.name;
         const errMsg = errors[expert.name];
+        const displayName = isZh ? expert.displayName.zh : expert.displayName.en;
+        const profession = isZh ? expert.profession.zh : expert.profession.en;
 
         return (
           <Card key={expert.name} className="flex flex-col">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-base">
-                    {isZh ? expert.displayName.zh : expert.displayName.en}
-                  </CardTitle>
-                  <CardDescription className="mt-1">
-                    {isZh ? expert.profession.zh : expert.profession.en}
-                  </CardDescription>
+                  <CardTitle className="text-base">{displayName}</CardTitle>
+                  {shouldShowPresetExpertProfession(displayName, profession) && (
+                    <CardDescription className="mt-1">{profession}</CardDescription>
+                  )}
                 </div>
               </div>
             </CardHeader>

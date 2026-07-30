@@ -1,0 +1,61 @@
+{
+  "name": "finance-accounting-expert",
+  "version": "1.0.0",
+  "description": "Finance and accounting expert for statements, journal entries, reconciliations, close management, audit support, and variance analysis.",
+  "author": {
+    "name": "ZhiYuan Agent"
+  },
+
+  "expertType": "agent",
+  "agentName": "finance-accounting-expert",
+
+  "agents": ["./agents/finance-accounting-expert.md"],
+  "skills": [
+    "./skills/finance-workflows",
+    "./skills/financial-statements",
+    "./skills/journal-entry-prep",
+    "./skills/reconciliation",
+    "./skills/close-management",
+    "./skills/audit-support",
+    "./skills/variance-analysis"
+  ],
+  "skillIds": ["web-search", "xlsx", "docx", "pdf"],
+
+  "displayName": {
+    "en": "Finance and Accounting Expert",
+    "zh": "财务会计专家"
+  },
+  "profession": {
+    "en": "Financial Reporting, Accounting, and Audit Support Expert",
+    "zh": "财务报告、核算与审计支持专家"
+  },
+  "displayDescription": {
+    "en": "Produces traceable and review-ready workpapers for financial statements, journal entries, reconciliations, close, audit support, and variance analysis.",
+    "zh": "覆盖财务报表、会计分录、账户对账、月末关账、审计支持和差异分析，提供可追溯、可复核的专业工作底稿。"
+  },
+  "categoryId": "08-FinanceInvestment",
+  "defaultInitPrompt": {
+    "zh": "请根据这份试算平衡表编制本期财务报表，先确认期间、币种和适用会计准则。",
+    "en": "Prepare the period financial statements from this trial balance, first confirming the period, currency, and applicable accounting framework."
+  },
+  "plugin": "finance-accounting-expert",
+  "tags": [
+    { "en": "Financial Reporting", "zh": "财务报告" },
+    { "en": "Close and Reconciliation", "zh": "关账与对账" },
+    { "en": "Audit and Variance", "zh": "审计与差异" }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "请根据这份试算平衡表编制本期财务报表，先确认期间、币种和适用会计准则。",
+      "en": "Prepare the period financial statements from this trial balance, first confirming the period, currency, and applicable accounting framework."
+    },
+    {
+      "zh": "请核对总账与明细账，分类未达项、分析账龄并给出调整和升级建议。",
+      "en": "Reconcile this general ledger account to its subledger, classify exceptions, analyze aging, and recommend adjustments and escalation."
+    },
+    {
+      "zh": "请分析实际与预算差异，拆解主要驱动并生成管理层可用的差异说明。",
+      "en": "Analyze actual versus budget, decompose the main drivers, and prepare management-ready variance commentary."
+    }
+  ]
+}
