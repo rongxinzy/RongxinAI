@@ -1,25 +1,136 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { ModelCapabilityStatus } from '../../shared/providers';
+import { store } from '../store';
+import { setAvailableModels, setDefaultSelectedModel } from '../store/slices/modelSlice';
 import { apiService } from './api';
+import { i18nService } from './i18n';
 
 afterEach(() => {
+  i18nService.setLanguage('zh', { persist: false });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+test('unknown tool capability falls back to regular chat without a tool payload', async () => {
+  const model = {
+    id: 'custom-unknown',
+    name: 'Custom Unknown',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  const regularChat = vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+  const stream = vi.spyOn(apiService as any, 'streamOpenAIChatResponse');
+  const progress = vi.fn();
+
+  await expect(apiService.chatWithWebSearch('latest news', progress)).resolves.toEqual({
+    content: 'plain answer',
+  });
+
+  expect(regularChat).toHaveBeenCalledOnce();
+  expect(stream).not.toHaveBeenCalled();
+  expect(progress).toHaveBeenCalledWith(
+    '当前模型的工具调用能力尚未确认，已改用普通对话，未执行联网搜索。\n\n',
+  );
+});
+
+test('explicit supported capability keeps the native tool loop enabled', async () => {
+  const model = {
+    id: 'custom-tools',
+    name: 'Custom Tools',
+    providerKey: 'custom_0',
+    supportsImage: false,
+    capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  const loop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockResolvedValue({ content: 'searched answer' });
+
+  await expect(apiService.chatWithWebSearch('latest news')).resolves.toEqual({
+    content: 'searched answer',
+  });
+
+  expect(loop).toHaveBeenCalledOnce();
+});
+
+test('OpenRouter model metadata enables the tool loop only when tools are declared', async () => {
+  const model = {
+    id: 'vendor/tool-model',
+    name: 'OpenRouter Tool Model',
+    providerKey: 'openrouter',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({
+    apiKey: 'openrouter-key',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiFormat: 'openai',
+  });
+  const fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      data: [{ id: model.id, supported_parameters: ['tools'] }],
+    },
+  });
+  vi.stubGlobal('window', { electron: { api: { fetch } } });
+  const loop = vi
+    .spyOn(apiService as any, 'runOpenAIWebSearchLoop')
+    .mockResolvedValue({ content: 'searched answer' });
+
+  await expect(apiService.chatWithWebSearch('latest news')).resolves.toEqual({
+    content: 'searched answer',
+  });
+
+  expect(fetch).toHaveBeenCalledWith({
+    url: 'https://openrouter.ai/api/v1/models',
+    method: 'GET',
+    headers: { Authorization: 'Bearer openrouter-key' },
+  });
+  expect(loop).toHaveBeenCalledOnce();
+});
+
+test('web-search fallback message follows the selected UI language', async () => {
+  i18nService.setLanguage('en', { persist: false });
+  const model = {
+    id: 'custom-unknown-en',
+    name: 'Custom Unknown',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({ apiKey: 'key', baseUrl: 'https://example.test/v1', apiFormat: 'openai' });
+  vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+  const progress = vi.fn();
+
+  await apiService.chatWithWebSearch('latest news', progress);
+
+  expect(progress).toHaveBeenCalledWith(
+    'Tool-calling support for this model is unknown. Switched to regular chat without web search.\n\n',
+  );
 });
 
 test('OpenAI Responses returns an output for every parallel tool call', async () => {
   const streamResponse = vi
     .spyOn(apiService as any, 'streamOpenAIResponsesResponse')
-    .mockResolvedValueOnce(
-      {
-        output: Array.from({ length: 4 }, (_, index) => ({
-          type: 'function_call',
-          call_id: `call-${index}`,
-          name: 'web_search',
-          arguments: JSON.stringify({ query: `query ${index}` }),
-        })),
-      },
-    )
+    .mockResolvedValueOnce({
+      output: Array.from({ length: 4 }, (_, index) => ({
+        type: 'function_call',
+        call_id: `call-${index}`,
+        name: 'web_search',
+        arguments: JSON.stringify({ query: `query ${index}` }),
+      })),
+    })
     .mockResolvedValueOnce({ output_text: 'final answer' });
   const webSearch = vi.fn().mockResolvedValue({
     ok: true,
@@ -50,13 +161,9 @@ test('OpenAI Responses returns an output for every parallel tool call', async ()
 });
 
 test('OpenAI-compatible Copilot requests retain required headers', async () => {
-  const streamResponse = vi
-    .spyOn(apiService as any, 'streamOpenAIChatResponse')
-    .mockResolvedValue(
-      {
-      choices: [{ message: { role: 'assistant', content: 'answer' } }],
-      },
-    );
+  const streamResponse = vi.spyOn(apiService as any, 'streamOpenAIChatResponse').mockResolvedValue({
+    choices: [{ message: { role: 'assistant', content: 'answer' } }],
+  });
   vi.stubGlobal('window', {
     electron: { api: { webSearch: vi.fn() } },
   });

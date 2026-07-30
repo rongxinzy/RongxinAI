@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { ApiFormat, ProviderName, ProviderRegistry } from './constants';
+import { ApiFormat, ModelCapabilityStatus, ProviderName, ProviderRegistry } from './constants';
 
 describe('ProviderName constants', () => {
   test('contains expected provider keys', () => {
@@ -51,6 +51,51 @@ describe('ProviderRegistry', () => {
     }
   });
 
+  test('registers complete capability metadata and gates tools by endpoint', () => {
+    for (const provider of ProviderRegistry.providerIds) {
+      const def = ProviderRegistry.get(provider)!;
+      for (const model of [...def.defaultModels, ...(def.codingPlanModels ?? [])]) {
+        const capabilities = ProviderRegistry.resolveModelCapabilities(
+          provider,
+          model.id,
+          def.defaultApiFormat,
+          model,
+        );
+        expect(capabilities.imageInput).toBe(
+          model.supportsImage ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported,
+        );
+        expect(capabilities).toHaveProperty('toolCalling');
+        expect(capabilities).toHaveProperty('videoInput');
+        expect(capabilities).toHaveProperty('audioInput');
+        expect(capabilities).toHaveProperty('documentInput');
+        expect(capabilities).toHaveProperty('reasoning');
+      }
+    }
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Moonshot,
+        'kimi-k3',
+        ApiFormat.Anthropic,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unsupported);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.OpenRouter,
+        'unknown',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    for (const provider of [ProviderName.Zhipu, ProviderName.Volcengine]) {
+      expect(
+        ProviderRegistry.resolveModelCapabilities(
+          provider,
+          ProviderRegistry.get(provider)!.defaultModels[0].id,
+          ApiFormat.Anthropic,
+        ).toolCalling,
+      ).toBe(ModelCapabilityStatus.Supported);
+    }
+  });
+
   test('get returns undefined for unknown provider', () => {
     expect(ProviderRegistry.get('nonexistent')).toBeUndefined();
     expect(ProviderRegistry.get(ProviderName.Custom)).toBeUndefined();
@@ -65,8 +110,11 @@ describe('ProviderRegistry', () => {
     ).toBe(false);
   });
 
-  test('resolveModelSupportsImage upgrades custom providers for globally known vision models', () => {
+  test('resolveModelSupportsImage honors explicit custom-provider image settings', () => {
     expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'qwen3.6-plus', false)).toBe(
+      false,
+    );
+    expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'qwen3-coder-plus', true)).toBe(
       true,
     );
     expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'unknown-model', false)).toBe(
@@ -84,6 +132,24 @@ describe('ProviderRegistry', () => {
     expect(ProviderRegistry.supportsCodingPlan(ProviderName.Volcengine)).toBe(true);
     expect(ProviderRegistry.supportsCodingPlan(ProviderName.Qianfan)).toBe(true);
     expect(ProviderRegistry.supportsCodingPlan(ProviderName.Xiaomi)).toBe(true);
+  });
+
+  test('keeps each coding-plan model catalog assigned to its provider', () => {
+    const expectedModelIds = new Map([
+      [ProviderName.Moonshot, ['kimi-for-coding']],
+      [ProviderName.Qwen, ['qwen3.7-plus', 'qwen3.6-plus', 'qwen3-coder-next', 'qwen3-coder-plus']],
+      [ProviderName.Zhipu, ['glm-5.2', 'glm-5-turbo', 'glm-4.7']],
+      [ProviderName.Volcengine, ['ark-code-latest']],
+      [ProviderName.Qianfan, ['qianfan-code-latest', 'glm-5.1', 'deepseek-v4-flash']],
+      [ProviderName.Xiaomi, ['mimo-v2.5-pro', 'mimo-v2.5']],
+    ]);
+
+    for (const [provider, modelIds] of expectedModelIds) {
+      expect(ProviderRegistry.get(provider)?.codingPlanModels?.map(model => model.id)).toEqual(
+        modelIds,
+      );
+    }
+    expect(ProviderRegistry.get(ProviderName.Minimax)?.codingPlanModels).toBeUndefined();
   });
 
   test('supportsCodingPlan is false for others', () => {

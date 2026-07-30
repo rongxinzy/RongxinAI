@@ -37,6 +37,8 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import {
   isProviderEnabled,
+  ModelCapabilityStatus,
+  type ModelCapabilities,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -176,6 +178,25 @@ const resolveModelSupportsImageForProvider = (
   model: { id: string; supportsImage?: boolean },
 ): boolean =>
   ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage);
+
+const CUSTOM_MODEL_CAPABILITY_FIELDS = [
+  { key: 'toolCalling', labelKey: 'capabilityToolCalling' },
+  { key: 'videoInput', labelKey: 'capabilityVideoInput' },
+  { key: 'audioInput', labelKey: 'capabilityAudioInput' },
+  { key: 'documentInput', labelKey: 'capabilityDocumentInput' },
+  { key: 'reasoning', labelKey: 'capabilityReasoning' },
+] as const satisfies ReadonlyArray<{
+  key: Exclude<keyof ModelCapabilities, 'imageInput'>;
+  labelKey: string;
+}>;
+
+const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
+  toolCalling: ModelCapabilityStatus.Unknown,
+  videoInput: ModelCapabilityStatus.Unknown,
+  audioInput: ModelCapabilityStatus.Unknown,
+  documentInput: ModelCapabilityStatus.Unknown,
+  reasoning: ModelCapabilityStatus.Unknown,
+};
 
 interface ProviderExportEntry {
   enabled: boolean;
@@ -758,6 +779,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
   const [newModelSupportsImage, setNewModelSupportsImage] = useState(false);
+  const [newModelCapabilities, setNewModelCapabilities] = useState<Partial<ModelCapabilities>>(
+    DEFAULT_CUSTOM_MODEL_CAPABILITIES,
+  );
   const [modelFormError, setModelFormError] = useState<string | null>(null);
 
   // About tab
@@ -2144,16 +2168,23 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setModelFormError(null);
   };
 
-  const handleEditModel = (modelId: string, modelName: string, supportsImage?: boolean) => {
+  const handleEditModel = (
+    modelId: string,
+    modelName: string,
+    supportsImage?: boolean,
+    capabilities?: Partial<ModelCapabilities>,
+  ) => {
     setIsAddingModel(false);
     setIsEditingModel(true);
     setEditingModelId(modelId);
     setNewModelName(modelName);
     setNewModelId(modelId);
     setNewModelSupportsImage(!!supportsImage);
+    setNewModelCapabilities({ ...DEFAULT_CUSTOM_MODEL_CAPABILITIES, ...capabilities });
     setModelFormError(null);
   };
 
@@ -2213,6 +2244,7 @@ const Settings: React.FC<SettingsProps> = ({
         modelId,
         newModelSupportsImage,
       ),
+      ...(isCustomProvider(activeProvider) ? { capabilities: newModelCapabilities } : {}),
     };
     const updatedModels =
       isEditingModel && editingModelId
@@ -2233,6 +2265,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setModelFormError(null);
   };
 
@@ -2243,6 +2276,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setModelFormError(null);
   };
 
@@ -4760,7 +4794,12 @@ const Settings: React.FC<SettingsProps> = ({
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    handleEditModel(model.id, model.name, model.supportsImage)
+                                    handleEditModel(
+                                      model.id,
+                                      model.name,
+                                      model.supportsImage,
+                                      model.capabilities,
+                                    )
                                   }
                                   className="p-0.5 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
                                 >
@@ -5445,6 +5484,50 @@ const Settings: React.FC<SettingsProps> = ({
                     {i18nService.t('supportsImageInput')}
                   </label>
                 </div>
+                {isCustomProvider(activeProvider) && (
+                  <div className="rounded-lg border border-border bg-surface-raised p-3">
+                    <p className="mb-2 text-xs font-medium text-foreground">
+                      {i18nService.t('modelCapabilities')}
+                    </p>
+                    <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
+                      {i18nService.t('modelCapabilitiesHint')}
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
+                        <label
+                          key={field.key}
+                          className="space-y-1 text-[11px] text-muted-foreground"
+                        >
+                          <span>{i18nService.t(field.labelKey)}</span>
+                          <Select
+                            value={newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown}
+                            onValueChange={value =>
+                              setNewModelCapabilities(current => ({
+                                ...current,
+                                [field.key]: value as ModelCapabilityStatus,
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={ModelCapabilityStatus.Supported}>
+                                {i18nService.t('capabilitySupported')}
+                              </SelectItem>
+                              <SelectItem value={ModelCapabilityStatus.Unsupported}>
+                                {i18nService.t('capabilityUnsupported')}
+                              </SelectItem>
+                              <SelectItem value={ModelCapabilityStatus.Unknown}>
+                                {i18nService.t('capabilityUnknown')}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end space-x-2 mt-4">

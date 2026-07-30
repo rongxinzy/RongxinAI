@@ -1,6 +1,7 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { LlamaCppOpenClawEligibility } from '../../../shared/llamacpp';
+import { type ModelCapabilities, ProviderRegistry } from '../../../shared/providers';
 import { defaultConfig, getProviderDisplayName } from '../../config';
 import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
 
@@ -11,6 +12,7 @@ export interface Model {
   providerKey?: string;
   openClawProviderId?: string;
   supportsImage?: boolean;
+  capabilities?: Partial<ModelCapabilities>;
   supportsThinkingToggle?: boolean;
   isServerModel?: boolean;
   serverApiFormat?: string;
@@ -48,6 +50,12 @@ function buildInitialModels(): Model[] {
             provider: getProviderDisplayName(providerName, config),
             providerKey: providerName,
             supportsImage: model.supportsImage ?? false,
+            capabilities: ProviderRegistry.resolveModelCapabilities(
+              providerName,
+              model.id,
+              config.apiFormat ?? 'anthropic',
+              model,
+            ),
           });
         });
       }
