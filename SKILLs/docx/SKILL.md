@@ -183,7 +183,14 @@ scripts/docx_preview.sh doc.docx
 # Verify: font contamination=0, table count correct, drawing count correct, sectPr count correct
 ```
 
-Final preview: `scripts/docx_preview.sh doc.docx`
+Final text inspection: `scripts/docx_preview.sh doc.docx`
+
+For the controlled shortcut, render a real visual preview (not text/XML) before
+recording `workflow_state` role `preview`:
+
+```bash
+bash "<SKILL_DIR>/scripts/docx_render_preview.sh" doc.docx output/doc-page-1.png
+```
 
 For the controlled Docs shortcut, save a nonempty `.md`, `.txt`, or `.json`
 validation report in the workspace after this pipeline. Render at least one
