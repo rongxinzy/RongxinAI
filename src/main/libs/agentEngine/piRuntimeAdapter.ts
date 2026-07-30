@@ -56,8 +56,6 @@ import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import {
   buildPiWorkAcceptanceTool,
-  buildWorkExecutionQuestion,
-  chosePersistentWorkExecution,
   PiWorkExecutionController,
 } from './piWorkExecution';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
@@ -443,15 +441,20 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         shortcutWorkflow.resumeForPrompt(prompt);
         customTools.push(buildPiShortcutWorkflowStateTool(shortcutWorkflow));
       }
-      const shouldAskWorkExecutionMode =
+      // A selected skill in Work mode is an execution request, not a one-turn
+      // chat hint. Run it through Pi's durable loop by default; completion
+      // still requires explicit user acceptance because arbitrary skills do
+      // not share a safe universal semantic validator.
+      const shouldManageSkillExecution =
         options.sessionMode === 'work' &&
         Boolean(resourceState.skillIds?.length) &&
         !researchRun &&
         !shortcutWorkflow;
-      const workExecution = shouldAskWorkExecutionMode
+      const workExecution = shouldManageSkillExecution
         ? new PiWorkExecutionController({ sessionId, workspaceRoot, task: prompt })
         : null;
       if (workExecution) {
+        workExecution.selectMode(true, prompt);
         customTools.push(
           buildPiWorkAcceptanceTool(workExecution, (toolCallId, input, signal) =>
             this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
@@ -502,10 +505,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       // loops; the controller continues the session on agent_end.
       const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
       const agentLoop = new PiAgentLoopController(completionWorkflow || undefined);
-      if (researchRun || shortcutWorkflow) {
+      if (researchRun || shortcutWorkflow || workExecution) {
         agentLoop.start({
           mode: PiAgentLoopMode.Goal,
-          goal: (researchRun || shortcutWorkflow)!.goal,
+          goal: (researchRun || shortcutWorkflow || workExecution)!.goal,
           passes: 0,
           stages: [],
         });
@@ -565,30 +568,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
         : shortcutWorkflow
           ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
+          : workExecution
+            ? workExecution.buildInitialPrompt(options._piPromptOverride || prompt)
           : options._piPromptOverride || prompt;
-
-      // Work sessions with an arbitrary selected skill need an explicit choice:
-      // direct one-turn execution, or a managed multi-turn loop. First-class
-      // workflows already own their completion policy, and agent-backed chat
-      // intentionally stays conversational.
-      if (shouldAskWorkExecutionMode) {
-        const response = await this.requestAskUserQuestion(
-          sessionId,
-          `work-execution-mode-${sessionId}`,
-          buildWorkExecutionQuestion(),
-          abortController.signal,
-        );
-        const persistent = chosePersistentWorkExecution(response);
-        workExecution!.selectMode(persistent, prompt);
-        if (persistent) {
-          const loopPrompt = agentLoop.start({
-            mode: PiAgentLoopMode.Goal,
-            goal: workExecution!.goal,
-            passes: 0,
-            stages: [],
-          });
-          initialPrompt = `${loopPrompt}\n\n${workExecution!.buildInitialPrompt(initialPrompt)}`;
-        }
+      if (workExecution) {
+        const loopPrompt = `Loop started. Iteration 1. Goal: ${workExecution.goal}`;
+        initialPrompt = `${loopPrompt}\n\n${initialPrompt}`;
       }
 
       // The user may stop the session while the execution-mode question is
