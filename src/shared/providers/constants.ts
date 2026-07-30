@@ -96,6 +96,32 @@ export const AuthType = {
 } as const;
 export type AuthType = (typeof AuthType)[keyof typeof AuthType];
 
+export const ModelCapabilityStatus = {
+  Supported: 'supported',
+  Unsupported: 'unsupported',
+  Unknown: 'unknown',
+} as const;
+export type ModelCapabilityStatus =
+  (typeof ModelCapabilityStatus)[keyof typeof ModelCapabilityStatus];
+
+export interface ModelCapabilities {
+  readonly toolCalling: ModelCapabilityStatus;
+  readonly imageInput: ModelCapabilityStatus;
+  readonly videoInput: ModelCapabilityStatus;
+  readonly audioInput: ModelCapabilityStatus;
+  readonly documentInput: ModelCapabilityStatus;
+  readonly reasoning: ModelCapabilityStatus;
+}
+
+const UNKNOWN_MODEL_CAPABILITIES: ModelCapabilities = {
+  toolCalling: ModelCapabilityStatus.Unknown,
+  imageInput: ModelCapabilityStatus.Unknown,
+  videoInput: ModelCapabilityStatus.Unknown,
+  audioInput: ModelCapabilityStatus.Unknown,
+  documentInput: ModelCapabilityStatus.Unknown,
+  reasoning: ModelCapabilityStatus.Unknown,
+};
+
 // ═══════════════════════════════════════════════════════
 // 2. Provider Definition Shape
 // ═══════════════════════════════════════════════════════
@@ -149,6 +175,7 @@ interface ProviderDefInput {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly capabilities?: Partial<ModelCapabilities>;
     readonly contextWindow?: number;
     readonly maxTokens?: number;
   }[];
@@ -161,6 +188,7 @@ interface ProviderDefInput {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly capabilities?: Partial<ModelCapabilities>;
     readonly contextWindow?: number;
     readonly maxTokens?: number;
   }[];
@@ -334,6 +362,12 @@ const PROVIDER_DEFINITIONS = [
         maxTokens: 65_536,
       },
     ],
+    codingPlanModels: [
+      { id: 'qwen3.7-plus', name: 'Qwen3.7 Plus', supportsImage: true },
+      { id: 'qwen3.6-plus', name: 'Qwen3.6 Plus', supportsImage: true },
+      { id: 'qwen3-coder-next', name: 'Qwen3 Coder Next', supportsImage: false },
+      { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', supportsImage: false },
+    ],
   },
   {
     id: ProviderName.Zhipu,
@@ -378,6 +412,11 @@ const PROVIDER_DEFINITIONS = [
         maxTokens: 131_072,
       },
     ],
+    codingPlanModels: [
+      { id: 'glm-5.2', name: 'GLM 5.2', supportsImage: false },
+      { id: 'glm-5-turbo', name: 'GLM 5 Turbo', supportsImage: false },
+      { id: 'glm-4.7', name: 'GLM 4.7', supportsImage: false },
+    ],
   },
   {
     id: ProviderName.Minimax,
@@ -417,6 +456,7 @@ const PROVIDER_DEFINITIONS = [
         maxTokens: 131_072,
       },
     ],
+    codingPlanModels: [{ id: 'ark-code-latest', name: 'Ark Coding', supportsImage: false }],
   },
   {
     id: ProviderName.Volcengine,
@@ -461,6 +501,11 @@ const PROVIDER_DEFINITIONS = [
         maxTokens: 32_000,
       },
     ],
+    codingPlanModels: [
+      { id: 'qianfan-code-latest', name: 'Qianfan Coding', supportsImage: false },
+      { id: 'glm-5.1', name: 'GLM 5.1', supportsImage: false },
+      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supportsImage: false },
+    ],
   },
   {
     id: ProviderName.Qianfan,
@@ -493,6 +538,10 @@ const PROVIDER_DEFINITIONS = [
         contextWindow: 8_192,
         maxTokens: 8_192,
       },
+    ],
+    codingPlanModels: [
+      { id: 'mimo-v2.5-pro', name: 'MiMo V2.5 Pro', supportsImage: false },
+      { id: 'mimo-v2.5', name: 'MiMo V2.5', supportsImage: true },
     ],
   },
   {
@@ -853,6 +902,7 @@ export interface ProviderDef {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly capabilities?: Partial<ModelCapabilities>;
     readonly contextWindow?: number;
     readonly maxTokens?: number;
   }[];
@@ -860,6 +910,7 @@ export interface ProviderDef {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly capabilities?: Partial<ModelCapabilities>;
     readonly contextWindow?: number;
     readonly maxTokens?: number;
   }[];
@@ -869,6 +920,38 @@ export interface ProviderDef {
 // ═══════════════════════════════════════════════════════
 // 5. Registry Implementation
 // ═══════════════════════════════════════════════════════
+
+const PROVIDER_TOOL_CAPABILITIES: Readonly<
+  Record<string, Partial<Record<ApiFormat, ModelCapabilityStatus>>>
+> = {
+  [ProviderName.OpenAI]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+  [ProviderName.Gemini]: { [ApiFormat.Gemini]: ModelCapabilityStatus.Supported },
+  [ProviderName.Anthropic]: { [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported },
+  [ProviderName.DeepSeek]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
+  },
+  [ProviderName.Moonshot]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Unsupported,
+  },
+  [ProviderName.Qwen]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
+  },
+  [ProviderName.Zhipu]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+  [ProviderName.Minimax]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
+  },
+  [ProviderName.Qianfan]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+  [ProviderName.Xiaomi]: {
+    [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported,
+    [ApiFormat.Anthropic]: ModelCapabilityStatus.Supported,
+  },
+  [ProviderName.StepFun]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+  [ProviderName.Volcengine]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
+};
 
 class ProviderRegistryImpl {
   private readonly defs: readonly ProviderDef[];
@@ -941,11 +1024,62 @@ class ProviderRegistryImpl {
     return this.modelCapabilityIndex.get(modelId);
   }
 
+  resolveModelCapabilities(
+    providerName: string,
+    modelId: string,
+    apiFormat: ApiFormat,
+    configured?: {
+      readonly supportsImage?: boolean;
+      readonly capabilities?: Partial<ModelCapabilities>;
+    },
+  ): ModelCapabilities {
+    const providerModels = [
+      ...(this.get(providerName)?.defaultModels ?? []),
+      ...(this.get(providerName)?.codingPlanModels ?? []),
+    ];
+    const providerModel =
+      providerModels.find(
+        candidate =>
+          candidate.id === modelId &&
+          configured?.supportsImage !== undefined &&
+          candidate.supportsImage === configured.supportsImage,
+      ) ?? providerModels.find(candidate => candidate.id === modelId);
+    const imageSupport = this.resolveModelSupportsImage(
+      providerName,
+      modelId,
+      configured?.supportsImage,
+    );
+    return {
+      ...UNKNOWN_MODEL_CAPABILITIES,
+      ...providerModel?.capabilities,
+      ...configured?.capabilities,
+      imageInput: imageSupport
+        ? ModelCapabilityStatus.Supported
+        : ModelCapabilityStatus.Unsupported,
+      toolCalling:
+        providerModel?.capabilities?.toolCalling ??
+        PROVIDER_TOOL_CAPABILITIES[providerName]?.[apiFormat] ??
+        configured?.capabilities?.toolCalling ??
+        ModelCapabilityStatus.Unknown,
+    };
+  }
+
   resolveModelSupportsImage(
     providerName: string,
     modelId: string,
     configuredSupportsImage?: boolean,
   ): boolean {
+    const providerModels = [
+      ...(this.get(providerName)?.defaultModels ?? []),
+      ...(this.get(providerName)?.codingPlanModels ?? []),
+    ].filter(candidate => candidate.id === modelId);
+    if (
+      providerModels.length > 1 &&
+      new Set(providerModels.map(candidate => candidate.supportsImage)).size > 1 &&
+      configuredSupportsImage !== undefined
+    ) {
+      return configuredSupportsImage;
+    }
     const providerModelSupportsImage = this.getProviderModelSupportsImage(providerName, modelId);
     if (providerModelSupportsImage !== undefined) {
       return providerModelSupportsImage;

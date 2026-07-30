@@ -1,4 +1,4 @@
-import { type ProviderConfig, ProviderRegistry } from '@shared/providers';
+import { type ModelCapabilities, type ProviderConfig, ProviderRegistry } from '@shared/providers';
 
 import { WorkMode, type WorkMode as WorkModeValue } from './store/workMode/constants';
 
@@ -15,6 +15,7 @@ export interface AppConfig {
       id: string;
       name: string;
       supportsImage?: boolean;
+      capabilities?: Partial<ModelCapabilities>;
     }>;
     defaultModel: string;
     defaultModelProvider?: string;
@@ -58,7 +59,10 @@ const buildDefaultProviders = (): AppConfig['providers'] => {
       baseUrl: def.defaultBaseUrl,
       apiFormat: def.defaultApiFormat,
       ...(def.codingPlanSupported ? { codingPlanEnabled: false } : {}),
-      models: def.defaultModels.map(m => ({ ...m })),
+      models: def.defaultModels.map(m => ({
+        ...m,
+        capabilities: ProviderRegistry.resolveModelCapabilities(id, m.id, def.defaultApiFormat, m),
+      })),
     };
   }
 

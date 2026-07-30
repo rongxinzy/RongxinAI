@@ -1,8 +1,9 @@
 export { resolveCodingPlanBaseUrl } from './codingPlan';
-export type { ProviderDef } from './constants';
+export type { ModelCapabilities, ProviderDef } from './constants';
 export {
   ApiFormat,
   AuthType,
+  ModelCapabilityStatus,
   OpenClawApi,
   OpenClawProviderId,
   ProviderName,

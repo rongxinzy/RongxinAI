@@ -1,4 +1,10 @@
-import { isProviderEnabled, ProviderName, resolveCodingPlanBaseUrl } from '../../shared/providers';
+import {
+  isProviderEnabled,
+  ModelCapabilityStatus,
+  ProviderName,
+  ProviderRegistry,
+  resolveCodingPlanBaseUrl,
+} from '../../shared/providers';
 import { store } from '../store';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
@@ -541,6 +547,23 @@ class ApiService {
         'API key is not configured. Please set your API key in the settings menu.',
       );
     }
+    const apiFormat = this.normalizeApiFormat(config.apiFormat);
+    const capabilities = ProviderRegistry.resolveModelCapabilities(
+      provider,
+      selectedModel.id,
+      apiFormat,
+      selectedModel,
+    );
+    if (capabilities.toolCalling !== ModelCapabilityStatus.Supported) {
+      const capabilityMessage =
+        capabilities.toolCalling === ModelCapabilityStatus.Unsupported
+          ? '当前模型不支持工具调用，已改用普通对话，未执行联网搜索。\n\n'
+          : '当前模型的工具调用能力尚未确认，已改用普通对话，未执行联网搜索。\n\n';
+      // Keep the request valid for custom, aggregated, and local endpoints. The
+      // regular chat path deliberately contains no `tools` or `tool_choice`.
+      onProgress?.(capabilityMessage);
+      return this.chat(message, onProgress, history, options, requestId);
+    }
     const prompt =
       'Use the web_search tool when current, factual, or external information would improve the answer. Cite result URLs when you use search.';
     const system = [
@@ -549,7 +572,6 @@ class ApiService {
     ]
       .filter(Boolean)
       .join('\n');
-    const apiFormat = this.normalizeApiFormat(config.apiFormat);
     const userMessage: ChatMessagePayload = { role: 'user', content: message };
 
     if (apiFormat === 'anthropic') {
@@ -567,10 +589,12 @@ class ApiService {
       );
     }
     if (apiFormat === 'gemini') {
-      const contents = [...history.filter(item => item.role !== 'system'), userMessage].map(item => ({
-        role: item.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: item.content }],
-      }));
+      const contents = [...history.filter(item => item.role !== 'system'), userMessage].map(
+        item => ({
+          role: item.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: item.content }],
+        }),
+      );
       return this.runGeminiWebSearchLoop(
         contents,
         system,
@@ -673,8 +697,7 @@ class ApiService {
         settle(new DOMException('The request was aborted.', 'AbortError'));
       };
       abortSignal?.addEventListener('abort', handleSignalAbort, { once: true });
-      const removeSignalAbort = () =>
-        abortSignal?.removeEventListener('abort', handleSignalAbort);
+      const removeSignalAbort = () => abortSignal?.removeEventListener('abort', handleSignalAbort);
       this.streamRequests.register(requestId, [
         removeData,
         removeDone,
@@ -821,7 +844,8 @@ class ApiService {
     );
     return {
       output_text: content,
-      output: completedOutput || [...output.entries()].sort(([a], [b]) => a - b).map(([, item]) => item),
+      output:
+        completedOutput || [...output.entries()].sort(([a], [b]) => a - b).map(([, item]) => item),
     };
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { ApiFormat, ProviderName, ProviderRegistry } from './constants';
+import { ApiFormat, ModelCapabilityStatus, ProviderName, ProviderRegistry } from './constants';
 
 describe('ProviderName constants', () => {
   test('contains expected provider keys', () => {
@@ -49,6 +49,42 @@ describe('ProviderRegistry', () => {
       );
       expect(model).toMatchObject({ contextWindow, maxTokens });
     }
+  });
+
+  test('registers complete capability metadata and gates tools by endpoint', () => {
+    for (const provider of ProviderRegistry.providerIds) {
+      const def = ProviderRegistry.get(provider)!;
+      for (const model of [...def.defaultModels, ...(def.codingPlanModels ?? [])]) {
+        const capabilities = ProviderRegistry.resolveModelCapabilities(
+          provider,
+          model.id,
+          def.defaultApiFormat,
+          model,
+        );
+        expect(capabilities.imageInput).toBe(
+          model.supportsImage ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported,
+        );
+        expect(capabilities).toHaveProperty('toolCalling');
+        expect(capabilities).toHaveProperty('videoInput');
+        expect(capabilities).toHaveProperty('audioInput');
+        expect(capabilities).toHaveProperty('documentInput');
+        expect(capabilities).toHaveProperty('reasoning');
+      }
+    }
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Moonshot,
+        'kimi-k3',
+        ApiFormat.Anthropic,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unsupported);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.OpenRouter,
+        'unknown',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
   });
 
   test('get returns undefined for unknown provider', () => {

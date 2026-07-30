@@ -1,4 +1,4 @@
-import type { ApiFormat } from './constants';
+import type { ApiFormat, ModelCapabilities } from './constants';
 import { ProviderName } from './constants';
 
 export interface ProviderConfig {
@@ -11,6 +11,8 @@ export interface ProviderConfig {
     id: string;
     name: string;
     supportsImage?: boolean;
+    /** Explicit model capability metadata. Unknown values must not enable a feature. */
+    capabilities?: Partial<ModelCapabilities>;
     contextWindow?: number;
     contextTokens?: number;
     maxTokens?: number;

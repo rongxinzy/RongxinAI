@@ -61,6 +61,7 @@ const normalizeProviderApiFormat = (
 const normalizeProviderModels = (
   providerKey: string,
   models: ProviderConfig['models'],
+  apiFormat: ApiFormat,
 ): ProviderConfig['models'] =>
   models?.map(model => ({
     ...model,
@@ -68,6 +69,12 @@ const normalizeProviderModels = (
       providerKey,
       model.id,
       model.supportsImage,
+    ),
+    capabilities: ProviderRegistry.resolveModelCapabilities(
+      providerKey,
+      model.id,
+      apiFormat,
+      model,
     ),
   }));
 
@@ -83,7 +90,11 @@ const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig[
         ...providerConfig,
         baseUrl: normalizeProviderBaseUrl(providerKey, providerConfig.baseUrl),
         apiFormat: normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
-        models: normalizeProviderModels(providerKey, providerConfig.models),
+        models: normalizeProviderModels(
+          providerKey,
+          providerConfig.models,
+          normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
+        ),
       },
     ]),
   ) as AppConfig['providers'];
@@ -293,7 +304,9 @@ class ConfigService {
                 // Inject added models (for existing users who already have saved config)
                 const addedConfig = ADDED_PROVIDER_MODELS[providerKey];
                 if (addedConfig && mergedProvider.models) {
-                  const addedModelsById = new Map(addedConfig.models.map(model => [model.id, model]));
+                  const addedModelsById = new Map(
+                    addedConfig.models.map(model => [model.id, model]),
+                  );
                   mergedProvider.models = mergedProvider.models.map(
                     (model: ProviderModelConfig) => {
                       const addedModel = addedModelsById.get(model.id);
@@ -316,6 +329,13 @@ class ConfigService {
                         : [...mergedProvider.models, ...newModels];
                   }
                 }
+                const codingPlanModels = ProviderRegistry.get(providerKey)?.codingPlanModels;
+                if (
+                  (mergedProvider as { codingPlanEnabled?: boolean }).codingPlanEnabled &&
+                  codingPlanModels
+                ) {
+                  mergedProvider.models = codingPlanModels.map(model => ({ ...model }));
+                }
                 return {
                   ...mergedProvider,
                   baseUrl: normalizeProviderBaseUrl(providerKey, mergedProvider.baseUrl),
@@ -323,6 +343,7 @@ class ConfigService {
                   models: normalizeProviderModels(
                     providerKey,
                     mergedProvider.models as ProviderConfig['models'],
+                    normalizeProviderApiFormat(providerKey, mergedProvider.apiFormat),
                   ),
                 };
               })(),

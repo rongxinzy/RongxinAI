@@ -38,6 +38,12 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
         providerKey: providerName,
         openClawProviderId: ProviderRegistry.getOpenClawProviderId(providerName),
         supportsImage: model.supportsImage ?? false,
+        capabilities: ProviderRegistry.resolveModelCapabilities(
+          providerName,
+          model.id,
+          providerConfig.apiFormat ?? 'anthropic',
+          model,
+        ),
       });
     });
   });
