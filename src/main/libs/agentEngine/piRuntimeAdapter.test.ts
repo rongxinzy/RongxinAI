@@ -132,6 +132,7 @@ const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
 const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
+const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
@@ -310,6 +311,33 @@ describe('PiRuntimeAdapter', () => {
       expect(adapter.isSessionActive('test')).toBe(false);
       await adapter.startSession('test', 'Hello');
       expect(adapter.isSessionActive('test')).toBe(true);
+    });
+
+    it('uses the cloud fallback when provider metadata has no capacity limits', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-cloud',
+          baseURL: 'https://example.com/v1',
+          model: 'unknown-cloud-model',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'custom_0',
+          codingPlanEnabled: false,
+          supportsImage: false,
+        },
+      });
+
+      await adapter.startSession('cloud-fallback', 'Hello Pi');
+
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            contextWindow: 256000,
+            maxTokens: 32768,
+          }),
+        }),
+      );
     });
 
     it('should throw on empty prompt with no images', async () => {

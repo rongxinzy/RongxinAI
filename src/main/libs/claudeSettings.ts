@@ -217,26 +217,35 @@ function normalizeProviderModels(
 ): ProviderModelConfig[] {
   return (models ?? [])
     .filter(model => model.id?.trim())
-    .map(model => ({
-      ...model,
-      name: model.name || model.id,
-      supportsImage: ProviderRegistry.resolveModelSupportsImage(
-        providerName,
-        model.id,
-        model.supportsImage,
-      ),
-      contextWindow:
-        typeof model.contextWindow === 'number' && model.contextWindow > 0
-          ? model.contextWindow
-          : undefined,
-      contextTokens:
-        typeof model.contextTokens === 'number' && model.contextTokens > 0
-          ? model.contextTokens
-          : undefined,
-      maxTokens:
-        typeof model.maxTokens === 'number' && model.maxTokens > 0 ? model.maxTokens : undefined,
-      openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
-    }));
+    .map(model => {
+      const providerDefinition = ProviderRegistry.get(providerName);
+      const registeredModel = [
+        ...(providerDefinition?.defaultModels ?? []),
+        ...(providerDefinition?.codingPlanModels ?? []),
+      ].find(candidate => candidate.id === model.id);
+      return {
+        ...model,
+        name: model.name || model.id,
+        supportsImage: ProviderRegistry.resolveModelSupportsImage(
+          providerName,
+          model.id,
+          model.supportsImage,
+        ),
+        contextWindow:
+          typeof model.contextWindow === 'number' && model.contextWindow > 0
+            ? model.contextWindow
+            : registeredModel?.contextWindow,
+        contextTokens:
+          typeof model.contextTokens === 'number' && model.contextTokens > 0
+            ? model.contextTokens
+            : undefined,
+        maxTokens:
+          typeof model.maxTokens === 'number' && model.maxTokens > 0
+            ? model.maxTokens
+            : registeredModel?.maxTokens,
+        openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
+      };
+    });
 }
 
 const getStore = (): SqliteStore | null => {

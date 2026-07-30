@@ -149,6 +149,8 @@ interface ProviderDefInput {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly contextWindow?: number;
+    readonly maxTokens?: number;
   }[];
   /**
    * Coding Plan dedicated model list (only meaningful when codingPlanSupported=true).
@@ -159,6 +161,8 @@ interface ProviderDefInput {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly contextWindow?: number;
+    readonly maxTokens?: number;
   }[];
   /**
    * The OpenClaw gateway provider ID used when building model refs (e.g. "provider/modelId").
@@ -194,9 +198,27 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash', supportsImage: false },
-      { id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro', supportsImage: false },
-      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', supportsImage: false },
+      {
+        id: 'deepseek-v4-flash',
+        name: 'DeepSeek V4 Flash',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 384_000,
+      },
+      {
+        id: 'deepseek-v4-pro',
+        name: 'DeepSeek V4 Pro',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 384_000,
+      },
+      {
+        id: 'deepseek-reasoner',
+        name: 'DeepSeek Reasoner',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 384_000,
+      },
     ],
   },
   {
@@ -223,10 +245,37 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'kimi-k2.6', name: 'Kimi K2.6', supportsImage: true },
-      { id: 'kimi-k2.5', name: 'Kimi K2.5', supportsImage: true },
+      {
+        id: 'kimi-k3',
+        name: 'Kimi K3',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'kimi-k2.6',
+        name: 'Kimi K2.6',
+        supportsImage: true,
+        contextWindow: 262_144,
+        maxTokens: 262_144,
+      },
+      {
+        id: 'kimi-k2.5',
+        name: 'Kimi K2.5',
+        supportsImage: true,
+        contextWindow: 262_144,
+        maxTokens: 262_144,
+      },
     ],
-    codingPlanModels: [{ id: 'kimi-for-coding', name: 'Kimi K2.5', supportsImage: true }],
+    codingPlanModels: [
+      {
+        id: 'kimi-for-coding',
+        name: 'Kimi for Coding',
+        supportsImage: true,
+        contextWindow: 262_144,
+        maxTokens: 32_768,
+      },
+    ],
   },
   {
     id: ProviderName.Qwen,
@@ -249,9 +298,41 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'qwen3.6-plus', name: 'Qwen3.6 Plus', supportsImage: true },
-      { id: 'qwen3.5-plus', name: 'Qwen3.5 Plus', supportsImage: true },
-      { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', supportsImage: false },
+      {
+        id: 'qwen3.7-max',
+        name: 'Qwen3.7 Max',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 65_536,
+      },
+      {
+        id: 'qwen3.7-plus',
+        name: 'Qwen3.7 Plus',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 64_000,
+      },
+      {
+        id: 'qwen3.6-plus',
+        name: 'Qwen3.6 Plus',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 65_536,
+      },
+      {
+        id: 'qwen3.5-plus',
+        name: 'Qwen3.5 Plus',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 65_536,
+      },
+      {
+        id: 'qwen3-coder-plus',
+        name: 'Qwen3 Coder Plus',
+        supportsImage: false,
+        contextWindow: 1_048_576,
+        maxTokens: 65_536,
+      },
     ],
   },
   {
@@ -275,8 +356,27 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'glm-5', name: 'GLM 5', supportsImage: false },
-      { id: 'glm-4.7', name: 'GLM 4.7', supportsImage: false },
+      {
+        id: 'glm-5.2',
+        name: 'GLM 5.2',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'glm-5',
+        name: 'GLM 5',
+        supportsImage: false,
+        contextWindow: 204_800,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'glm-4.7',
+        name: 'GLM 4.7',
+        supportsImage: false,
+        contextWindow: 204_800,
+        maxTokens: 131_072,
+      },
     ],
   },
   {
@@ -295,8 +395,27 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'MiniMax-M2.7', name: 'MiniMax M2.7', supportsImage: false },
-      { id: 'MiniMax-M2.5', name: 'MiniMax M2.5', supportsImage: false },
+      {
+        id: 'MiniMax-M3',
+        name: 'MiniMax M3',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'MiniMax-M2.7',
+        name: 'MiniMax M2.7',
+        supportsImage: false,
+        contextWindow: 204_800,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'MiniMax-M2.5',
+        name: 'MiniMax M2.5',
+        supportsImage: false,
+        contextWindow: 204_800,
+        maxTokens: 131_072,
+      },
     ],
   },
   {
@@ -319,10 +438,28 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'doubao-seed-2-0-pro-260215', name: 'Doubao-Seed-2.0-pro', supportsImage: true },
+      {
+        id: 'doubao-seed-2-0-pro-260215',
+        name: 'Doubao-Seed-2.0-pro',
+        supportsImage: true,
+        contextWindow: 256_000,
+        maxTokens: 128_000,
+      },
       { id: 'ark-code-latest', name: 'Auto', supportsImage: true },
-      { id: 'doubao-seed-2-0-lite-260215', name: 'Doubao-Seed-2.0-lite', supportsImage: true },
-      { id: 'doubao-seed-2-0-mini-260215', name: 'Doubao-Seed-2.0-mini', supportsImage: true },
+      {
+        id: 'doubao-seed-2-0-lite-260215',
+        name: 'Doubao-Seed-2.0-lite',
+        supportsImage: true,
+        contextWindow: 256_000,
+        maxTokens: 32_000,
+      },
+      {
+        id: 'doubao-seed-2-0-mini-260215',
+        name: 'Doubao-Seed-2.0-mini',
+        supportsImage: true,
+        contextWindow: 256_000,
+        maxTokens: 32_000,
+      },
     ],
   },
   {
@@ -342,8 +479,20 @@ const PROVIDER_DEFINITIONS = [
     defaultModels: [
       { id: 'deepseek-v3.2', name: 'DeepSeek V3.2', supportsImage: false },
       { id: 'deepseek-r1', name: 'DeepSeek R1', supportsImage: false },
-      { id: 'ernie-4.5-8k', name: 'ERNIE 4.5 8K', supportsImage: false },
-      { id: 'ernie-4.5-turbo-8k', name: 'ERNIE 4.5 Turbo', supportsImage: false },
+      {
+        id: 'ernie-4.5-8k',
+        name: 'ERNIE 4.5 8K',
+        supportsImage: false,
+        contextWindow: 8_192,
+        maxTokens: 8_192,
+      },
+      {
+        id: 'ernie-4.5-turbo-8k',
+        name: 'ERNIE 4.5 Turbo',
+        supportsImage: false,
+        contextWindow: 8_192,
+        maxTokens: 8_192,
+      },
     ],
   },
   {
@@ -357,7 +506,22 @@ const PROVIDER_DEFINITIONS = [
     codingPlanSupported: false,
     region: 'china',
     enPriority: 0,
-    defaultModels: [{ id: 'step-3.5-flash', name: 'Step 3.5 Flash', supportsImage: false }],
+    defaultModels: [
+      {
+        id: 'step-3.7-flash',
+        name: 'Step 3.7 Flash',
+        supportsImage: false,
+        contextWindow: 256_000,
+        maxTokens: 256_000,
+      },
+      {
+        id: 'step-3.5-flash',
+        name: 'Step 3.5 Flash',
+        supportsImage: false,
+        contextWindow: 256_000,
+        maxTokens: 256_000,
+      },
+    ],
   },
   {
     id: ProviderName.Xiaomi,
@@ -379,10 +543,41 @@ const PROVIDER_DEFINITIONS = [
     region: 'china',
     enPriority: 0,
     defaultModels: [
-      { id: 'mimo-v2.5-pro', name: 'MiMo V2.5 Pro', supportsImage: false },
-      { id: 'mimo-v2.5', name: 'MiMo V2.5', supportsImage: true },
-      { id: 'mimo-v2-pro', name: 'MiMo V2 Pro', supportsImage: false },
-      { id: 'mimo-v2-flash', name: 'MiMo V2 Flash', supportsImage: false },
+      {
+        id: 'mimo-v2.5-pro-ultraspeed',
+        name: 'MiMo V2.5 Pro Ultraspeed',
+        supportsImage: false,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'mimo-v2.5-pro',
+        name: 'MiMo V2.5 Pro',
+        supportsImage: false,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'mimo-v2.5',
+        name: 'MiMo V2.5',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'mimo-v2-pro',
+        name: 'MiMo V2 Pro',
+        supportsImage: false,
+        contextWindow: 1_048_576,
+        maxTokens: 131_072,
+      },
+      {
+        id: 'mimo-v2-flash',
+        name: 'MiMo V2 Flash',
+        supportsImage: false,
+        contextWindow: 262_144,
+        maxTokens: 65_536,
+      },
     ],
   },
   {
@@ -428,10 +623,34 @@ const PROVIDER_DEFINITIONS = [
     region: 'global',
     enPriority: 0,
     defaultModels: [
-      { id: 'gpt-5-mini', name: 'GPT-5 mini', supportsImage: true },
-      { id: 'claude-haiku-4.5', name: 'Claude Haiku 4.5', supportsImage: true },
-      { id: 'gpt-4.1', name: 'GPT-4.1', supportsImage: true },
-      { id: 'gpt-4o', name: 'GPT-4o', supportsImage: true },
+      {
+        id: 'gpt-5-mini',
+        name: 'GPT-5 mini',
+        supportsImage: true,
+        contextWindow: 264_000,
+        maxTokens: 64_000,
+      },
+      {
+        id: 'claude-haiku-4.5',
+        name: 'Claude Haiku 4.5',
+        supportsImage: true,
+        contextWindow: 200_000,
+        maxTokens: 64_000,
+      },
+      {
+        id: 'gpt-4.1',
+        name: 'GPT-4.1',
+        supportsImage: true,
+        contextWindow: 128_000,
+        maxTokens: 16_384,
+      },
+      {
+        id: 'gpt-5.4',
+        name: 'GPT-5.4',
+        supportsImage: true,
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+      },
     ],
   },
   {
@@ -446,10 +665,34 @@ const PROVIDER_DEFINITIONS = [
     region: 'global',
     enPriority: 1,
     defaultModels: [
-      { id: 'gpt-5.4', name: 'GPT-5.4', supportsImage: true },
-      { id: 'gpt-5.2', name: 'GPT-5.2', supportsImage: true },
-      { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex', supportsImage: true },
-      { id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex', supportsImage: true },
+      {
+        id: 'gpt-5.4',
+        name: 'GPT-5.4',
+        supportsImage: true,
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'gpt-5.2',
+        name: 'GPT-5.2',
+        supportsImage: true,
+        contextWindow: 400_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'gpt-5.3-codex',
+        name: 'GPT-5.3 Codex',
+        supportsImage: true,
+        contextWindow: 400_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'gpt-5.2-codex',
+        name: 'GPT-5.2 Codex',
+        supportsImage: true,
+        contextWindow: 400_000,
+        maxTokens: 128_000,
+      },
     ],
   },
   {
@@ -464,9 +707,27 @@ const PROVIDER_DEFINITIONS = [
     region: 'global',
     enPriority: 3,
     defaultModels: [
-      { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', supportsImage: true },
-      { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', supportsImage: true },
-      { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', supportsImage: true },
+      {
+        id: 'gemini-3-pro-preview',
+        name: 'Gemini 3 Pro',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 65_536,
+      },
+      {
+        id: 'gemini-3.1-pro-preview',
+        name: 'Gemini 3.1 Pro',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 65_536,
+      },
+      {
+        id: 'gemini-3-flash-preview',
+        name: 'Gemini 3 Flash',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 65_536,
+      },
     ],
   },
   {
@@ -481,9 +742,27 @@ const PROVIDER_DEFINITIONS = [
     region: 'global',
     enPriority: 2,
     defaultModels: [
-      { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', supportsImage: true },
-      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', supportsImage: true },
-      { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', supportsImage: true },
+      {
+        id: 'claude-sonnet-4-5-20250929',
+        name: 'Claude Sonnet 4.5',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 64_000,
+      },
+      {
+        id: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'claude-opus-4-6',
+        name: 'Claude Opus 4.6',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+      },
     ],
   },
   {
@@ -502,10 +781,34 @@ const PROVIDER_DEFINITIONS = [
     region: 'global',
     enPriority: 0,
     defaultModels: [
-      { id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5', supportsImage: true },
-      { id: 'anthropic/claude-opus-4.6', name: 'Claude Opus 4.6', supportsImage: true },
-      { id: 'openai/gpt-5.2-codex', name: 'GPT 5.2 Codex', supportsImage: true },
-      { id: 'google/gemini-3-pro-preview', name: 'Gemini 3 Pro', supportsImage: true },
+      {
+        id: 'anthropic/claude-sonnet-4.5',
+        name: 'Claude Sonnet 4.5',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 64_000,
+      },
+      {
+        id: 'anthropic/claude-opus-4.6',
+        name: 'Claude Opus 4.6',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'openai/gpt-5.2-codex',
+        name: 'GPT 5.2 Codex',
+        supportsImage: true,
+        contextWindow: 400_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'google/gemini-3-pro-preview',
+        name: 'Gemini 3 Pro',
+        supportsImage: true,
+        contextWindow: 1_048_576,
+        maxTokens: 65_536,
+      },
     ],
   },
 ] as const satisfies readonly ProviderDefInput[];
@@ -550,11 +853,15 @@ export interface ProviderDef {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly contextWindow?: number;
+    readonly maxTokens?: number;
   }[];
   readonly codingPlanModels?: readonly {
     readonly id: string;
     readonly name: string;
     readonly supportsImage: boolean;
+    readonly contextWindow?: number;
+    readonly maxTokens?: number;
   }[];
   readonly openClawProviderId: OpenClawProviderId;
 }
