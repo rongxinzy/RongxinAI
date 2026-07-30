@@ -1,6 +1,7 @@
 // Cowork image attachment for vision-capable models
 import type { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
+import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
 export interface CoworkImageAttachment {
   name: string;
@@ -157,14 +158,7 @@ export interface CoworkApiConfig {
   apiType?: 'anthropic' | 'openai';
 }
 
-export type OpenClawEnginePhase =
-  | 'not_installed'
-  | 'installing'
-  | 'ready'
-  | 'starting'
-  | 'compiling'
-  | 'running'
-  | 'error';
+export type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
 export interface OpenClawEngineStatus {
   phase: OpenClawEnginePhase;

@@ -8,6 +8,10 @@ import net from 'net';
 import os from 'os';
 import path from 'path';
 
+import {
+  OpenClawEnginePhase,
+  type OpenClawEnginePhase as OpenClawEnginePhaseValue,
+} from '../../shared/openclaw/constants';
 import { t } from '../i18n';
 import { ensureElectronNodeShim, getElectronNodeRuntimePath, getSkillsRoot } from './coworkUtil';
 import {
@@ -48,17 +52,10 @@ const GATEWAY_BOOT_TIMEOUT_MS_WARM = 300 * 1000; // 5 min — warm start, but fi
 const GATEWAY_MAX_RESTART_ATTEMPTS = 5;
 const GATEWAY_RESTART_DELAYS = [3_000, 5_000, 10_000, 20_000, 30_000];
 
-export type OpenClawEnginePhase =
-  | 'not_installed'
-  | 'installing'
-  | 'ready'
-  | 'starting'
-  | 'compiling'
-  | 'running'
-  | 'error';
+export type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
 export interface OpenClawEngineStatus {
-  phase: OpenClawEnginePhase;
+  phase: OpenClawEnginePhaseValue;
   version: string | null;
   progressPercent?: number;
   message?: string;
@@ -781,7 +778,10 @@ export class OpenClawEngineManager extends EventEmitter {
       // Best-effort cleanup; don't block startup.
     }
 
-    if (this.status.phase === 'running') {
+    if (
+      this.status.phase === OpenClawEnginePhase.Running ||
+      this.status.phase === OpenClawEnginePhase.Restarting
+    ) {
       return this.getStatus();
     }
 
@@ -821,7 +821,11 @@ export class OpenClawEngineManager extends EventEmitter {
 
     const ensured = await this.ensureReady();
     console.log(`[OpenClaw] startGateway: ensureReady done (${elapsed()}), phase=${ensured.phase}`);
-    if (ensured.phase !== 'ready' && ensured.phase !== 'running') {
+    if (
+      ensured.phase !== OpenClawEnginePhase.Ready &&
+      ensured.phase !== OpenClawEnginePhase.Running &&
+      ensured.phase !== OpenClawEnginePhase.Restarting
+    ) {
       return ensured;
     }
 
@@ -1151,7 +1155,7 @@ export class OpenClawEngineManager extends EventEmitter {
     return this.getStatus();
   }
 
-  async stopGateway(): Promise<void> {
+  async stopGateway(options: { preserveStatus?: boolean } = {}): Promise<void> {
     this.shutdownRequested = true;
 
     if (this.gatewayRestartTimer) {
@@ -1183,15 +1187,17 @@ export class OpenClawEngineManager extends EventEmitter {
       this.gatewayProcess = null;
     }
 
-    const runtime = this.resolveRuntimeMetadata();
-    this.setStatus({
-      phase: runtime.root ? 'ready' : 'not_installed',
-      version: runtime.version,
-      message: runtime.root
-        ? 'OpenClaw runtime is ready. Gateway is stopped.'
-        : `Bundled OpenClaw runtime is missing. Expected: ${runtime.expectedPathHint}`,
-      canRetry: !runtime.root,
-    });
+    if (!options.preserveStatus) {
+      const runtime = this.resolveRuntimeMetadata();
+      this.setStatus({
+        phase: runtime.root ? OpenClawEnginePhase.Ready : OpenClawEnginePhase.NotInstalled,
+        version: runtime.version,
+        message: runtime.root
+          ? 'OpenClaw runtime is ready. Gateway is stopped.'
+          : `Bundled OpenClaw runtime is missing. Expected: ${runtime.expectedPathHint}`,
+        canRetry: !runtime.root,
+      });
+    }
   }
 
   async restartGateway(reason = 'unknown'): Promise<OpenClawEngineStatus> {
@@ -1200,8 +1206,15 @@ export class OpenClawEngineManager extends EventEmitter {
     console.log(
       `${gwDiagTs()} restartGateway: reason=${reason}, pid=${pid}, port=${this.gatewayPort ?? 'none'}`,
     );
+    this.setStatus({
+      phase: OpenClawEnginePhase.Restarting,
+      version: this.status.version,
+      progressPercent: 0,
+      message: t('coworkErrorServiceRestart'),
+      canRetry: false,
+    });
     console.log(`${gwDiagTs()} restartGateway: stopping existing gateway...`);
-    await this.stopGateway();
+    await this.stopGateway({ preserveStatus: true });
     // Reset restart counter on manual restart so user can always retry
     this.gatewayRestartAttempt = 0;
     console.log(`${gwDiagTs()} restartGateway: starting gateway with new env...`);

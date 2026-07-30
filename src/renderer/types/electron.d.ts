@@ -3,6 +3,7 @@ import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
+import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
   LlamaCppCancelInstallResult,
   LlamaCppImportModelFilesResult,
@@ -184,15 +185,6 @@ interface CoworkApiConfig {
   model: string;
   apiType?: 'anthropic' | 'openai';
 }
-
-type OpenClawEnginePhase =
-  | 'not_installed'
-  | 'installing'
-  | 'ready'
-  | 'starting'
-  | 'compiling'
-  | 'running'
-  | 'error';
 
 interface OpenClawEngineStatus {
   phase: OpenClawEnginePhase;

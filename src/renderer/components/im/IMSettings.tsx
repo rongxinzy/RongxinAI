@@ -3,20 +3,27 @@
  * Configuration UI for DingTalk, Feishu and Telegram IM bots
  */
 
+import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import { DialogTitle } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
-import { Spinner } from '@shared/components/ui/spinner';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
+import { Skeleton } from '@shared/components/ui/skeleton';
+import { Switch } from '@shared/components/ui/switch';
+import { cn } from '@shared/lib/utils';
 import type { Platform } from '@shared/platform';
 import { PlatformRegistry } from '@shared/platform';
 import WecomAIBotSDK from '@wecom/wecom-aibot-sdk';
-import { CheckCircle, RefreshCw, Signal, TriangleAlert, X, XCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  Signal,
+  TriangleAlert,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -54,6 +61,7 @@ import { useGatewayReady } from '../cowork/useGatewayReady';
 import DingTalkInstanceSettings from './DingTalkInstanceSettings';
 import DiscordInstanceSettings from './DiscordInstanceSettings';
 import FeishuInstanceSettings from './FeishuInstanceSettings';
+import { IMField, IMSelectField, IMStatusAlert } from './IMFormControls';
 import QQInstanceSettings from './QQInstanceSettings';
 import TelegramInstanceSettings from './TelegramInstanceSettings';
 import WecomInstanceSettings from './WecomInstanceSettings';
@@ -67,7 +75,7 @@ const PlatformGuide: React.FC<{
 }> = ({ title, steps, guideUrl, guideLabel }) => (
   <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
     {title && <p className="text-xs text-foreground leading-relaxed mb-1.5 font-medium">{title}</p>}
-    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+    <ol className="text-xs text-muted-foreground flex flex-col gap-1 list-decimal list-inside">
       {steps.map((step, i) => (
         <li key={i}>{step}</li>
       ))}
@@ -89,19 +97,6 @@ const PlatformGuide: React.FC<{
     )}
   </div>
 );
-
-const verdictColorClass: Record<IMConnectivityTestResult['verdict'], string> = {
-  pass: 'bg-green-500/15 text-green-600 dark:text-green-400',
-  warn: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300',
-  fail: 'bg-red-500/15 text-red-600 dark:text-red-400',
-};
-
-const checkLevelColorClass: Record<IMConnectivityCheck['level'], string> = {
-  pass: 'text-green-600 dark:text-green-400',
-  info: 'text-sky-600 dark:text-sky-400',
-  warn: 'text-yellow-700 dark:text-yellow-300',
-  fail: 'text-red-600 dark:text-red-400',
-};
 
 const IMSettings: React.FC = () => {
   const dispatch = useDispatch();
@@ -300,7 +295,7 @@ const IMSettings: React.FC = () => {
     } catch (err: any) {
       if (!isMountedRef.current) return;
       setFeishuQrStatus('error');
-      setFeishuQrError(err?.message || '获取二维码失败');
+      setFeishuQrError(err?.message || i18nService.t('imQrGenerationFailed'));
     }
   };
 
@@ -327,11 +322,6 @@ const IMSettings: React.FC = () => {
 
   // Initialize IM service and subscribe status updates
   useEffect(() => {
-    if (!gatewayReady) {
-      setConfigLoaded(false);
-      return;
-    }
-
     let cancelled = false;
     void imService.init().then(() => {
       if (!cancelled) {
@@ -343,7 +333,7 @@ const IMSettings: React.FC = () => {
       setConfigLoaded(false);
       imService.destroy();
     };
-  }, [gatewayReady]);
+  }, []);
   // Handle DingTalk multi-instance config
   const dingtalkMultiConfig = config.dingtalk;
 
@@ -843,7 +833,7 @@ const IMSettings: React.FC = () => {
     const isEnabled = isPlatformEnabled(platform);
     // Can toggle ON if credentials are present, can always toggle OFF
     const canToggle = isEnabled || canStart(platform);
-    if (canToggle && !isLoading) {
+    if (canToggle && !isLoading && gatewayReady) {
       setActivePlatform(platform);
       toggleGateway(platform);
     }
@@ -856,9 +846,9 @@ const IMSettings: React.FC = () => {
       variant="outline"
       size="sm"
       onClick={() => handleConnectivityTest(platform)}
-      disabled={isLoading || testingPlatform === platform}
+      disabled={!gatewayReady || isLoading || testingPlatform === platform}
     >
-      <Signal className="h-3.5 w-3.5 mr-1.5" />
+      <Signal data-icon="inline-start" />
       {testingPlatform === platform
         ? i18nService.t('imConnectivityTesting')
         : connectivityResults[platform]
@@ -881,12 +871,10 @@ const IMSettings: React.FC = () => {
   }, [connectivityModalPlatform]);
 
   const renderPairingSection = (platform: string) => (
-    <div className="space-y-2">
-      <label className="block text-xs font-medium text-muted-foreground">
-        {i18nService.t('imPairingApproval')}
-      </label>
+    <IMField id={`${platform}-pairing-code`} label={i18nService.t('imPairingApproval')}>
       <div className="flex gap-2">
         <Input
+          id={`${platform}-pairing-code`}
           type="text"
           value={pairingCodeInput[platform] || ''}
           onChange={e => {
@@ -920,28 +908,38 @@ const IMSettings: React.FC = () => {
               });
             }
           }}
-          className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
         >
           {i18nService.t('imPairingApprove')}
         </Button>
       </div>
       {pairingStatus[platform] && (
-        <p
-          className={`text-xs ${pairingStatus[platform]!.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-        >
-          {pairingStatus[platform]!.type === 'success' ? '\u2713' : '\u2717'}{' '}
+        <IMStatusAlert error={pairingStatus[platform]!.type === 'error'}>
           {pairingStatus[platform]!.message}
-        </p>
+        </IMStatusAlert>
       )}
-    </div>
+    </IMField>
   );
 
-  if (!gatewayReady || !configLoaded) {
+  if (!configLoaded) {
     return (
-      <div className="flex h-full min-h-0 items-center justify-center">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Spinner />
-          <span>{i18nService.t('imLoadingBots')}</span>
+      <div
+        className="flex h-full min-h-0 gap-4"
+        aria-label={i18nService.t('imLoadingBots')}
+        aria-busy="true"
+      >
+        <div className="flex w-48 shrink-0 flex-col gap-2 border-r border-border pr-3">
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+        </div>
+        <div className="flex flex-1 flex-col gap-4 px-4">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-full" />
+          <Skeleton className="h-8 w-32" />
         </div>
       </div>
     );
@@ -950,50 +948,52 @@ const IMSettings: React.FC = () => {
   return (
     <div className="flex h-full gap-4">
       {/* Platform List - Left Side */}
-      <div className="w-48 shrink-0 border-r border-border pr-3 space-y-2 overflow-y-auto">
+      <div className="w-48 shrink-0 border-r border-border pr-3 flex flex-col gap-2 overflow-y-auto">
         {platforms.map(platform => {
           const logo = PlatformRegistry.logo(platform);
           const isEnabled = isPlatformEnabled(platform);
-          const isConnected = getPlatformConnected(platform) || getPlatformStarting(platform);
           const canToggle = isEnabled || canStart(platform);
 
           if (platform === 'dingtalk') {
             return (
               <div key="dingtalk">
                 {/* DingTalk Platform Header - clickable to expand/collapse */}
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActivePlatform('dingtalk');
                     setActiveDingTalkInstanceId(null);
                     setDingtalkExpanded(!dingtalkExpanded);
                   }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                  className={cn(
+                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
                     activePlatform === 'dingtalk'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
+                      ? 'border-primary bg-primary-muted shadow-subtle'
+                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                  )}
                 >
                   <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
+                    <div className="mr-2 flex size-7 items-center justify-center">
                       <img
                         src={PlatformRegistry.logo('dingtalk')}
                         alt="DingTalk"
-                        className="w-6 h-6 object-contain rounded-md"
+                        className="size-6 object-contain rounded-md"
                       />
                     </div>
-                    <span
-                      className={`text-sm font-medium truncate ${activePlatform === 'dingtalk' ? 'text-primary' : 'text-foreground'}`}
-                    >
+                    <span className="truncate text-sm font-medium">
                       {i18nService.t('dingtalk')}
                     </span>
                   </div>
-                  <span className="text-xs opacity-50">
-                    {dingtalkExpanded ? '\u25BC' : '\u25B6'}
-                  </span>
-                </div>
+                  {dingtalkExpanded ? (
+                    <ChevronDown data-icon="inline-end" />
+                  ) : (
+                    <ChevronRight data-icon="inline-end" />
+                  )}
+                </Button>
                 {/* DingTalk Instance Sub-items */}
                 {dingtalkExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
+                  <div className="ml-5 mt-1 flex flex-col gap-1">
                     {config.dingtalk.instances.map(inst => {
                       const instStatus = status.dingtalk?.instances?.find(
                         s => s.instanceId === inst.instanceId,
@@ -1002,30 +1002,27 @@ const IMSettings: React.FC = () => {
                         activePlatform === 'dingtalk' &&
                         activeDingTalkInstanceId === inst.instanceId;
                       const dotColor = !inst.enabled
-                        ? 'bg-gray-400'
+                        ? 'bg-muted-foreground'
                         : instStatus?.connected
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500';
+                          ? 'bg-success'
+                          : 'bg-warning';
                       return (
-                        <div
+                        <Button
+                          type="button"
+                          variant="ghost"
                           key={inst.instanceId}
                           onClick={() => {
                             setActivePlatform('dingtalk');
                             setActiveDingTalkInstanceId(inst.instanceId);
                           }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
+                          className={cn(
+                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                          )}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
-                          <span
-                            className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}
-                          >
-                            {inst.instanceName}
-                          </span>
-                        </div>
+                          <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
+                          <span className="flex-1 truncate">{inst.instanceName}</span>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1038,37 +1035,40 @@ const IMSettings: React.FC = () => {
             return (
               <div key="feishu">
                 {/* Feishu Platform Header - clickable to expand/collapse */}
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActivePlatform('feishu');
                     setActiveFeishuInstanceId(null);
                     setFeishuExpanded(!feishuExpanded);
                   }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                  className={cn(
+                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
                     activePlatform === 'feishu'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
+                      ? 'border-primary bg-primary-muted shadow-subtle'
+                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                  )}
                 >
                   <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
+                    <div className="mr-2 flex size-7 items-center justify-center">
                       <img
                         src={PlatformRegistry.logo('feishu')}
                         alt="Feishu"
-                        className="w-6 h-6 object-contain rounded-md"
+                        className="size-6 object-contain rounded-md"
                       />
                     </div>
-                    <span
-                      className={`text-sm font-medium truncate ${activePlatform === 'feishu' ? 'text-primary' : 'text-foreground'}`}
-                    >
-                      {i18nService.t('feishu')}
-                    </span>
+                    <span className="truncate text-sm font-medium">{i18nService.t('feishu')}</span>
                   </div>
-                  <span className="text-xs opacity-50">{feishuExpanded ? '\u25BC' : '\u25B6'}</span>
-                </div>
+                  {feishuExpanded ? (
+                    <ChevronDown data-icon="inline-end" />
+                  ) : (
+                    <ChevronRight data-icon="inline-end" />
+                  )}
+                </Button>
                 {/* Feishu Instance Sub-items */}
                 {feishuExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
+                  <div className="ml-5 mt-1 flex flex-col gap-1">
                     {config.feishu.instances.map(inst => {
                       const instStatus = status.feishu?.instances?.find(
                         s => s.instanceId === inst.instanceId,
@@ -1076,30 +1076,27 @@ const IMSettings: React.FC = () => {
                       const isSelected =
                         activePlatform === 'feishu' && activeFeishuInstanceId === inst.instanceId;
                       const dotColor = !inst.enabled
-                        ? 'bg-gray-400'
+                        ? 'bg-muted-foreground'
                         : instStatus?.connected
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500';
+                          ? 'bg-success'
+                          : 'bg-warning';
                       return (
-                        <div
+                        <Button
+                          type="button"
+                          variant="ghost"
                           key={inst.instanceId}
                           onClick={() => {
                             setActivePlatform('feishu');
                             setActiveFeishuInstanceId(inst.instanceId);
                           }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
+                          className={cn(
+                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                          )}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
-                          <span
-                            className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}
-                          >
-                            {inst.instanceName}
-                          </span>
-                        </div>
+                          <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
+                          <span className="flex-1 truncate">{inst.instanceName}</span>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1112,37 +1109,40 @@ const IMSettings: React.FC = () => {
             return (
               <div key="qq">
                 {/* QQ Platform Header - clickable to expand/collapse */}
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActivePlatform('qq');
                     setActiveQQInstanceId(null);
                     setQqExpanded(!qqExpanded);
                   }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                  className={cn(
+                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
                     activePlatform === 'qq'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
+                      ? 'border-primary bg-primary-muted shadow-subtle'
+                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                  )}
                 >
                   <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
+                    <div className="mr-2 flex size-7 items-center justify-center">
                       <img
                         src={PlatformRegistry.logo('qq')}
                         alt="QQ"
-                        className="w-6 h-6 object-contain rounded-md"
+                        className="size-6 object-contain rounded-md"
                       />
                     </div>
-                    <span
-                      className={`text-sm font-medium truncate ${activePlatform === 'qq' ? 'text-primary' : 'text-foreground'}`}
-                    >
-                      {i18nService.t('qq')}
-                    </span>
+                    <span className="truncate text-sm font-medium">{i18nService.t('qq')}</span>
                   </div>
-                  <span className="text-xs opacity-50">{qqExpanded ? '\u25BC' : '\u25B6'}</span>
-                </div>
+                  {qqExpanded ? (
+                    <ChevronDown data-icon="inline-end" />
+                  ) : (
+                    <ChevronRight data-icon="inline-end" />
+                  )}
+                </Button>
                 {/* QQ Instance Sub-items */}
                 {qqExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
+                  <div className="ml-5 mt-1 flex flex-col gap-1">
                     {config.qq.instances.map(inst => {
                       const instStatus = status.qq?.instances?.find(
                         s => s.instanceId === inst.instanceId,
@@ -1150,30 +1150,27 @@ const IMSettings: React.FC = () => {
                       const isSelected =
                         activePlatform === 'qq' && activeQQInstanceId === inst.instanceId;
                       const dotColor = !inst.enabled
-                        ? 'bg-gray-400'
+                        ? 'bg-muted-foreground'
                         : instStatus?.connected
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500';
+                          ? 'bg-success'
+                          : 'bg-warning';
                       return (
-                        <div
+                        <Button
+                          type="button"
+                          variant="ghost"
                           key={inst.instanceId}
                           onClick={() => {
                             setActivePlatform('qq');
                             setActiveQQInstanceId(inst.instanceId);
                           }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
+                          className={cn(
+                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                          )}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
-                          <span
-                            className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}
-                          >
-                            {inst.instanceName}
-                          </span>
-                        </div>
+                          <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
+                          <span className="flex-1 truncate">{inst.instanceName}</span>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1186,37 +1183,40 @@ const IMSettings: React.FC = () => {
             return (
               <div key="wecom">
                 {/* WeCom Platform Header - clickable to expand/collapse */}
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActivePlatform('wecom');
                     setActiveWecomInstanceId(null);
                     setWecomExpanded(!wecomExpanded);
                   }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                  className={cn(
+                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
                     activePlatform === 'wecom'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
+                      ? 'border-primary bg-primary-muted shadow-subtle'
+                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                  )}
                 >
                   <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
+                    <div className="mr-2 flex size-7 items-center justify-center">
                       <img
                         src={PlatformRegistry.logo('wecom')}
                         alt="WeCom"
-                        className="w-6 h-6 object-contain rounded-md"
+                        className="size-6 object-contain rounded-md"
                       />
                     </div>
-                    <span
-                      className={`text-sm font-medium truncate ${activePlatform === 'wecom' ? 'text-primary' : 'text-foreground'}`}
-                    >
-                      {i18nService.t('wecom')}
-                    </span>
+                    <span className="truncate text-sm font-medium">{i18nService.t('wecom')}</span>
                   </div>
-                  <span className="text-xs opacity-50">{wecomExpanded ? '\u25BC' : '\u25B6'}</span>
-                </div>
+                  {wecomExpanded ? (
+                    <ChevronDown data-icon="inline-end" />
+                  ) : (
+                    <ChevronRight data-icon="inline-end" />
+                  )}
+                </Button>
                 {/* WeCom Instance Sub-items */}
                 {wecomExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
+                  <div className="ml-5 mt-1 flex flex-col gap-1">
                     {config.wecom.instances.map(inst => {
                       const instStatus = status.wecom?.instances?.find(
                         s => s.instanceId === inst.instanceId,
@@ -1224,30 +1224,27 @@ const IMSettings: React.FC = () => {
                       const isSelected =
                         activePlatform === 'wecom' && activeWecomInstanceId === inst.instanceId;
                       const dotColor = !inst.enabled
-                        ? 'bg-gray-400'
+                        ? 'bg-muted-foreground'
                         : instStatus?.connected
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500';
+                          ? 'bg-success'
+                          : 'bg-warning';
                       return (
-                        <div
+                        <Button
+                          type="button"
+                          variant="ghost"
                           key={inst.instanceId}
                           onClick={() => {
                             setActivePlatform('wecom');
                             setActiveWecomInstanceId(inst.instanceId);
                           }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
+                          className={cn(
+                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                          )}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
-                          <span
-                            className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}
-                          >
-                            {inst.instanceName}
-                          </span>
-                        </div>
+                          <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
+                          <span className="flex-1 truncate">{inst.instanceName}</span>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1260,37 +1257,42 @@ const IMSettings: React.FC = () => {
             return (
               <div key="telegram">
                 {/* Telegram Platform Header - clickable to expand/collapse */}
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActivePlatform('telegram');
                     setActiveTelegramInstanceId(null);
                     setTelegramExpanded(!telegramExpanded);
                   }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                  className={cn(
+                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
                     activePlatform === 'telegram'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
+                      ? 'border-primary bg-primary-muted shadow-subtle'
+                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                  )}
                 >
                   <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
+                    <div className="mr-2 flex size-7 items-center justify-center">
                       <img
                         src={PlatformRegistry.logo('telegram')}
                         alt="Telegram"
-                        className="w-6 h-6 object-contain rounded-md"
+                        className="size-6 object-contain rounded-md"
                       />
                     </div>
-                    <span
-                      className={`text-sm font-medium truncate ${activePlatform === 'telegram' ? 'text-primary' : 'text-foreground'}`}
-                    >
+                    <span className="truncate text-sm font-medium">
                       {i18nService.t('telegram')}
                     </span>
                   </div>
-                  <span className="text-xs opacity-50">{telegramExpanded ? '▼' : '▶'}</span>
-                </div>
+                  {telegramExpanded ? (
+                    <ChevronDown data-icon="inline-end" />
+                  ) : (
+                    <ChevronRight data-icon="inline-end" />
+                  )}
+                </Button>
                 {/* Telegram Instance Sub-items */}
                 {telegramExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
+                  <div className="ml-5 mt-1 flex flex-col gap-1">
                     {config.telegram.instances.map(inst => {
                       const instStatus = status.telegram?.instances?.find(
                         s => s.instanceId === inst.instanceId,
@@ -1299,30 +1301,27 @@ const IMSettings: React.FC = () => {
                         activePlatform === 'telegram' &&
                         activeTelegramInstanceId === inst.instanceId;
                       const dotColor = !inst.enabled
-                        ? 'bg-gray-400'
+                        ? 'bg-muted-foreground'
                         : instStatus?.connected
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500';
+                          ? 'bg-success'
+                          : 'bg-warning';
                       return (
-                        <div
+                        <Button
+                          type="button"
+                          variant="ghost"
                           key={inst.instanceId}
                           onClick={() => {
                             setActivePlatform('telegram');
                             setActiveTelegramInstanceId(inst.instanceId);
                           }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
+                          className={cn(
+                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                          )}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
-                          <span
-                            className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}
-                          >
-                            {inst.instanceName}
-                          </span>
-                        </div>
+                          <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
+                          <span className="flex-1 truncate">{inst.instanceName}</span>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1335,37 +1334,40 @@ const IMSettings: React.FC = () => {
             return (
               <div key="discord">
                 {/* Discord Platform Header - clickable to expand/collapse */}
-                <div
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setActivePlatform('discord');
                     setActiveDiscordInstanceId(null);
                     setDiscordExpanded(!discordExpanded);
                   }}
-                  className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+                  className={cn(
+                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
                     activePlatform === 'discord'
-                      ? 'bg-primary-muted border border-primary shadow-subtle'
-                      : 'bg-surface hover:bg-surface-raised border border-transparent'
-                  }`}
+                      ? 'border-primary bg-primary-muted shadow-subtle'
+                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                  )}
                 >
                   <div className="flex flex-1 items-center">
-                    <div className="mr-2 flex h-7 w-7 items-center justify-center">
+                    <div className="mr-2 flex size-7 items-center justify-center">
                       <img
                         src={PlatformRegistry.logo('discord')}
                         alt="Discord"
-                        className="w-6 h-6 object-contain rounded-md"
+                        className="size-6 object-contain rounded-md"
                       />
                     </div>
-                    <span
-                      className={`text-sm font-medium truncate ${activePlatform === 'discord' ? 'text-primary' : 'text-foreground'}`}
-                    >
-                      {i18nService.t('discord')}
-                    </span>
+                    <span className="truncate text-sm font-medium">{i18nService.t('discord')}</span>
                   </div>
-                  <span className="text-xs opacity-50">{discordExpanded ? '▼' : '▶'}</span>
-                </div>
+                  {discordExpanded ? (
+                    <ChevronDown data-icon="inline-end" />
+                  ) : (
+                    <ChevronRight data-icon="inline-end" />
+                  )}
+                </Button>
                 {/* Discord Instance Sub-items */}
                 {discordExpanded && (
-                  <div className="ml-5 mt-1 space-y-1">
+                  <div className="ml-5 mt-1 flex flex-col gap-1">
                     {config.discord.instances.map(inst => {
                       const instStatus = status.discord?.instances?.find(
                         s => s.instanceId === inst.instanceId,
@@ -1373,30 +1375,27 @@ const IMSettings: React.FC = () => {
                       const isSelected =
                         activePlatform === 'discord' && activeDiscordInstanceId === inst.instanceId;
                       const dotColor = !inst.enabled
-                        ? 'bg-gray-400'
+                        ? 'bg-muted-foreground'
                         : instStatus?.connected
-                          ? 'bg-green-500'
-                          : 'bg-yellow-500';
+                          ? 'bg-success'
+                          : 'bg-warning';
                       return (
-                        <div
+                        <Button
+                          type="button"
+                          variant="ghost"
                           key={inst.instanceId}
                           onClick={() => {
                             setActivePlatform('discord');
                             setActiveDiscordInstanceId(inst.instanceId);
                           }}
-                          className={`flex items-center p-1.5 pl-2 rounded-lg cursor-pointer transition-colors text-sm ${
-                            isSelected
-                              ? 'bg-primary/10 dark:bg-primary/20'
-                              : 'hover:bg-surface-raised'
-                          }`}
+                          className={cn(
+                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
+                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                          )}
                         >
-                          <span className={`w-2 h-2 rounded-full ${dotColor} mr-2 shrink-0`} />
-                          <span
-                            className={`truncate flex-1 ${isSelected ? 'text-primary font-medium' : 'text-foreground'}`}
-                          >
-                            {inst.instanceName}
-                          </span>
-                        </div>
+                          <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
+                          <span className="flex-1 truncate">{inst.instanceName}</span>
+                        </Button>
                       );
                     })}
                   </div>
@@ -1408,85 +1407,73 @@ const IMSettings: React.FC = () => {
           return (
             <div
               key={platform}
-              onClick={() => setActivePlatform(platform)}
-              className={`flex items-center p-2 rounded-xl cursor-pointer transition-colors ${
+              className={cn(
+                'flex items-center rounded-lg border transition-colors',
                 activePlatform === platform
-                  ? 'bg-primary-muted border border-primary shadow-subtle'
-                  : 'bg-surface hover:bg-surface-raised border border-transparent'
-              }`}
+                  ? 'border-primary bg-primary-muted shadow-subtle'
+                  : 'border-transparent bg-surface hover:bg-surface-raised',
+              )}
             >
-              <div className="flex flex-1 items-center">
-                <div className="mr-2 flex h-7 w-7 items-center justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setActivePlatform(platform)}
+                aria-current={activePlatform === platform ? 'page' : undefined}
+                className="h-auto min-w-0 flex-1 justify-start p-2"
+              >
+                <span className="mr-2 flex size-7 items-center justify-center">
                   <img
                     src={logo}
                     alt={i18nService.t(platform)}
-                    className="w-6 h-6 object-contain rounded-md"
+                    className="size-6 rounded-md object-contain"
                   />
-                </div>
-                <span
-                  className={`text-sm font-medium truncate ${
-                    activePlatform === platform ? 'text-primary' : 'text-foreground'
-                  }`}
-                >
-                  {i18nService.t(platform)}
                 </span>
-              </div>
-              <div className="flex items-center ml-2">
-                <div
-                  className={`w-7 h-4 rounded-full flex items-center transition-colors ${
-                    isEnabled
-                      ? isConnected
-                        ? 'bg-green-500'
-                        : 'bg-yellow-500'
-                      : 'bg-gray-400 dark:bg-gray-600'
-                  } ${!canToggle || togglingPlatform === platform ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                  onClick={e => {
-                    e.stopPropagation();
-                    handlePlatformToggle(platform);
-                  }}
-                >
-                  <div
-                    className={`w-3 h-3 rounded-full bg-white shadow-md transform transition-transform ${
-                      isEnabled ? 'translate-x-3.5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </div>
-              </div>
+                <span className="truncate text-sm font-medium">{i18nService.t(platform)}</span>
+              </Button>
+              <Switch
+                className="mr-2"
+                checked={isEnabled}
+                disabled={!gatewayReady || !canToggle || togglingPlatform === platform}
+                aria-label={`${i18nService.t(platform)} ${i18nService.t('enabled')}`}
+                onCheckedChange={() => handlePlatformToggle(platform)}
+              />
             </div>
           );
         })}
       </div>
 
       {/* Platform Settings - Right Side */}
-      <div className="flex-1 min-w-0 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable">
+      <div className="flex-1 min-w-0 pl-4 pr-2 flex flex-col gap-4 overflow-y-auto scrollbar-gutter-stable">
         {/* Header with status (only for single-instance platforms without per-instance headers) */}
         {activePlatform === 'weixin' && (
           <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
             <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
+              <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
                 <img
                   src={PlatformRegistry.logo(activePlatform)}
                   alt={i18nService.t(activePlatform)}
-                  className="w-4 h-4 object-contain rounded"
+                  className="size-4 object-contain rounded"
                 />
               </div>
               <h3 className="text-sm font-medium text-foreground">
                 {`${i18nService.t(activePlatform)}${i18nService.t('settings')}`}
               </h3>
             </div>
-            <div
-              className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                getPlatformConnected(activePlatform) || getPlatformStarting(activePlatform)
-                  ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-                  : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
-              }`}
+            <Badge
+              variant={
+                getPlatformConnected(activePlatform)
+                  ? 'default'
+                  : getPlatformStarting(activePlatform)
+                    ? 'outline'
+                    : 'secondary'
+              }
             >
               {getPlatformConnected(activePlatform)
                 ? i18nService.t('connected')
                 : getPlatformStarting(activePlatform)
-                  ? i18nService.t('starting') || '启动中'
+                  ? i18nService.t('starting')
                   : i18nService.t('disconnected')}
-            </div>
+            </Badge>
           </div>
         )}
 
@@ -1496,16 +1483,14 @@ const IMSettings: React.FC = () => {
             <img
               src={PlatformRegistry.logo('dingtalk')}
               alt="DingTalk"
-              className="w-12 h-12 object-contain rounded-md mb-4 opacity-50"
+              className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
             <p className="text-sm text-muted-foreground mb-4">
               {config.dingtalk.instances.length === 0
-                ? language === 'zh'
-                  ? '尚未添加钉钉实例，点击下方按钮添加'
-                  : 'No DingTalk instances yet. Click below to add one.'
-                : language === 'zh'
-                  ? '请在左侧选择一个钉钉实例'
-                  : 'Select a DingTalk instance from the sidebar.'}
+                ? i18nService.t('imNoInstances').replace('{platform}', i18nService.t('dingtalk'))
+                : i18nService
+                    .t('imSelectInstance')
+                    .replace('{platform}', i18nService.t('dingtalk'))}
             </p>
             {config.dingtalk.instances.length < MAX_DINGTALK_INSTANCES && (
               <Button
@@ -1608,7 +1593,6 @@ const IMSettings: React.FC = () => {
                 }}
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
-                language={language}
               />
             );
           })()}
@@ -1619,16 +1603,12 @@ const IMSettings: React.FC = () => {
             <img
               src={PlatformRegistry.logo('feishu')}
               alt="Feishu"
-              className="w-12 h-12 object-contain rounded-md mb-4 opacity-50"
+              className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
             <p className="text-sm text-muted-foreground mb-4">
               {config.feishu.instances.length === 0
-                ? language === 'zh'
-                  ? '尚未添加飞书实例，点击下方按钮添加'
-                  : 'No Feishu instances yet. Click below to add one.'
-                : language === 'zh'
-                  ? '请在左侧选择一个飞书实例'
-                  : 'Select a Feishu instance from the sidebar.'}
+                ? i18nService.t('imNoInstances').replace('{platform}', i18nService.t('feishu'))
+                : i18nService.t('imSelectInstance').replace('{platform}', i18nService.t('feishu'))}
             </p>
             {config.feishu.instances.length < MAX_FEISHU_INSTANCES && (
               <Button
@@ -1725,7 +1705,6 @@ const IMSettings: React.FC = () => {
                 }}
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
-                language={language}
               />
             );
           })()}
@@ -1736,16 +1715,12 @@ const IMSettings: React.FC = () => {
             <img
               src={PlatformRegistry.logo('qq')}
               alt="QQ"
-              className="w-12 h-12 object-contain rounded-md mb-4 opacity-50"
+              className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
             <p className="text-sm text-muted-foreground mb-4">
               {config.qq.instances.length === 0
-                ? language === 'zh'
-                  ? '尚未添加 QQ 实例，点击下方按钮添加'
-                  : 'No QQ instances yet. Click below to add one.'
-                : language === 'zh'
-                  ? '请在左侧选择一个 QQ 实例'
-                  : 'Select a QQ instance from the sidebar.'}
+                ? i18nService.t('imNoInstances').replace('{platform}', i18nService.t('qq'))
+                : i18nService.t('imSelectInstance').replace('{platform}', i18nService.t('qq'))}
             </p>
             {config.qq.instances.length < MAX_QQ_INSTANCES && (
               <Button
@@ -1833,7 +1808,6 @@ const IMSettings: React.FC = () => {
                 }}
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
-                language={language}
               />
             );
           })()}
@@ -1844,16 +1818,14 @@ const IMSettings: React.FC = () => {
             <img
               src={PlatformRegistry.logo('telegram')}
               alt="Telegram"
-              className="w-12 h-12 object-contain rounded-md mb-4 opacity-50"
+              className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
             <p className="text-sm text-muted-foreground mb-4">
               {config.telegram.instances.length === 0
-                ? language === 'zh'
-                  ? '尚未添加 Telegram 实例，点击下方按钮添加'
-                  : 'No Telegram instances yet. Click below to add one.'
-                : language === 'zh'
-                  ? '请在左侧选择一个 Telegram 实例'
-                  : 'Select a Telegram instance from the sidebar.'}
+                ? i18nService.t('imNoInstances').replace('{platform}', i18nService.t('telegram'))
+                : i18nService
+                    .t('imSelectInstance')
+                    .replace('{platform}', i18nService.t('telegram'))}
             </p>
             {config.telegram.instances.length < MAX_TELEGRAM_INSTANCES && (
               <Button
@@ -1955,7 +1927,6 @@ const IMSettings: React.FC = () => {
                 }}
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
-                language={language}
               />
             );
           })()}
@@ -1966,16 +1937,12 @@ const IMSettings: React.FC = () => {
             <img
               src={PlatformRegistry.logo('discord')}
               alt="Discord"
-              className="w-12 h-12 object-contain rounded-md mb-4 opacity-50"
+              className="size-12 object-contain rounded-md mb-4 opacity-50"
             />
             <p className="text-sm text-muted-foreground mb-4">
               {config.discord.instances.length === 0
-                ? language === 'zh'
-                  ? '尚未添加 Discord 实例，点击下方按钮添加'
-                  : 'No Discord instances yet. Click below to add one.'
-                : language === 'zh'
-                  ? '请在左侧选择一个 Discord 实例'
-                  : 'Select a Discord instance from the sidebar.'}
+                ? i18nService.t('imNoInstances').replace('{platform}', i18nService.t('discord'))
+                : i18nService.t('imSelectInstance').replace('{platform}', i18nService.t('discord'))}
             </p>
             {config.discord.instances.length < MAX_DISCORD_INSTANCES && (
               <Button
@@ -1992,7 +1959,7 @@ const IMSettings: React.FC = () => {
                   }
                 }}
               >
-                + {language === 'zh' ? '添加 Discord 实例' : 'Add Discord Instance'}
+                + {i18nService.t('imAddInstance').replace('{platform}', i18nService.t('discord'))}
               </Button>
             )}
           </div>
@@ -2075,42 +2042,40 @@ const IMSettings: React.FC = () => {
                 }}
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
-                language={language}
               />
             );
           })()}
 
         {/* Weixin (微信) Settings */}
         {activePlatform === 'weixin' && (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-3">
             {/* Scan QR code section */}
-            <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center space-y-3">
+            <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center flex flex-col gap-3">
               {weixinQrStatus === 'idle' && (
-                <>
-                  <Button type="button" onClick={() => void handleWeixinQrLogin()}>
+                <div className="flex w-fit max-w-full flex-col gap-3 self-center">
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => void handleWeixinQrLogin()}
+                  >
                     {i18nService.t('imWeixinScanBtn')}
                   </Button>
                   <p className="text-xs text-muted-foreground">
                     {i18nService.t('imWeixinScanHint')}
                   </p>
-                </>
+                </div>
               )}
               {weixinQrStatus === 'error' && (
                 <>
                   <Button type="button" onClick={() => void handleWeixinQrLogin()}>
                     {i18nService.t('imWeixinScanBtn')}
                   </Button>
-                  {weixinQrError && (
-                    <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                      <XCircle className="h-4 w-4 shrink-0" />
-                      {weixinQrError}
-                    </div>
-                  )}
+                  {weixinQrError && <IMStatusAlert error>{weixinQrError}</IMStatusAlert>}
                 </>
               )}
               {weixinQrStatus === 'loading' && (
                 <div className="flex items-center justify-center gap-2 py-4">
-                  <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                  <RefreshCw className="size-5 animate-spin text-primary" />
                   <span className="text-sm text-muted-foreground">
                     {i18nService.t('imWeixinQrLoading')}
                   </span>
@@ -2120,26 +2085,25 @@ const IMSettings: React.FC = () => {
                 weixinQrStatus === 'waiting' ||
                 weixinQrStatus === 'expired') &&
                 weixinQrUrl && (
-                  <div className="space-y-3">
+                  <div className="flex flex-col items-center gap-3">
                     <p className="text-sm font-medium text-foreground">
                       {weixinQrStatus === 'expired'
                         ? i18nService.t('imWeixinQrExpired')
                         : i18nService.t('imWeixinQrScanPrompt')}
                     </p>
-                    <div className="relative inline-block">
+                    <div className="relative w-fit">
                       <div
-                        className={`p-3 bg-white rounded-lg border border-border-subtle ${weixinQrStatus === 'expired' ? 'opacity-30' : ''}`}
+                        className={cn(
+                          'rounded-lg border border-border-subtle bg-white p-3',
+                          weixinQrStatus === 'expired' && 'opacity-30',
+                        )}
                       >
                         <QRCodeSVG value={weixinQrUrl} size={192} />
                       </div>
                       {weixinQrStatus === 'expired' && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <Button
-                            type="button"
-                            onClick={() => void handleWeixinQrLogin()}
-                            className="shadow-lg"
-                          >
-                            <RefreshCw className="h-4 w-4 mr-1.5" />
+                          <Button type="button" onClick={() => void handleWeixinQrLogin()}>
+                            <RefreshCw data-icon="inline-start" />
                             {i18nService.t('imWeixinQrRefresh')}
                           </Button>
                         </div>
@@ -2147,17 +2111,14 @@ const IMSettings: React.FC = () => {
                     </div>
                     {weixinQrStatus === 'waiting' && (
                       <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        {i18nService.t('imWeixinQrWaiting') || 'Waiting for scan...'}
+                        <RefreshCw className="size-3.5 animate-spin" />
+                        {i18nService.t('imWeixinQrWaiting')}
                       </div>
                     )}
                   </div>
                 )}
               {weixinQrStatus === 'success' && (
-                <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-                  <CheckCircle className="h-4 w-4 shrink-0" />
-                  {i18nService.t('imWeixinQrSuccess')}
-                </div>
+                <IMStatusAlert>{i18nService.t('imWeixinQrSuccess')}</IMStatusAlert>
               )}
             </div>
 
@@ -2176,16 +2137,14 @@ const IMSettings: React.FC = () => {
 
             {/* Account ID display */}
             {weixinOpenClawConfig.accountId && (
-              <div className="text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-                Account ID: {weixinOpenClawConfig.accountId}
-              </div>
+              <IMStatusAlert>
+                {i18nService.t('imAccountId')}: {weixinOpenClawConfig.accountId}
+              </IMStatusAlert>
             )}
 
             {/* Error display */}
             {status.weixin?.lastError && (
-              <div className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                {status.weixin.lastError}
-              </div>
+              <IMStatusAlert error>{status.weixin.lastError}</IMStatusAlert>
             )}
 
             {/* Advanced Settings (collapsible) */}
@@ -2193,44 +2152,31 @@ const IMSettings: React.FC = () => {
               <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
                 {i18nService.t('imAdvancedSettings')}
               </summary>
-              <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
+              <div className="mt-2 flex flex-col gap-3 pl-2 border-l-2 border-border-subtle">
                 {/* DM Policy */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">
-                    DM Policy
-                  </label>
-                  <Select
-                    value={weixinOpenClawConfig.dmPolicy}
-                    onValueChange={value => {
-                      const update = { dmPolicy: value as WeixinOpenClawConfig['dmPolicy'] };
-                      void imService.updateConfig({
-                        weixin: { ...weixinOpenClawConfig, ...update },
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="open">{i18nService.t('imDmPolicyOpen')}</SelectItem>
-                      <SelectItem value="pairing">{i18nService.t('imDmPolicyPairing')}</SelectItem>
-                      <SelectItem value="allowlist">
-                        {i18nService.t('imDmPolicyAllowlist')}
-                      </SelectItem>
-                      <SelectItem value="disabled">
-                        {i18nService.t('imDmPolicyDisabled')}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <IMSelectField
+                  id="weixin-dm-policy"
+                  label={i18nService.t('imDmPolicy')}
+                  value={weixinOpenClawConfig.dmPolicy}
+                  options={[
+                    { value: 'open', label: i18nService.t('imDmPolicyOpen') },
+                    { value: 'pairing', label: i18nService.t('imDmPolicyPairing') },
+                    { value: 'allowlist', label: i18nService.t('imDmPolicyAllowlist') },
+                    { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
+                  ]}
+                  onValueChange={value => {
+                    const update = { dmPolicy: value as WeixinOpenClawConfig['dmPolicy'] };
+                    void imService.updateConfig({
+                      weixin: { ...weixinOpenClawConfig, ...update },
+                    });
+                  }}
+                />
 
                 {/* Allow From */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-medium text-muted-foreground">
-                    Allow From (User IDs)
-                  </label>
+                <IMField id="weixin-allow-user" label={i18nService.t('imAllowFromUserIds')}>
                   <div className="flex gap-2">
                     <Input
+                      id="weixin-allow-user"
                       type="text"
                       value={weixinAllowFromInput}
                       onChange={e => setWeixinAllowFromInput(e.target.value)}
@@ -2265,7 +2211,7 @@ const IMSettings: React.FC = () => {
                         }
                       }}
                     >
-                      {i18nService.t('add') || '添加'}
+                      {i18nService.t('add')}
                     </Button>
                   </div>
                   {weixinOpenClawConfig.allowFrom.length > 0 && (
@@ -2279,8 +2225,8 @@ const IMSettings: React.FC = () => {
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                            size="icon-xs"
+                            aria-label={i18nService.t('delete')}
                             onClick={() => {
                               const newIds = weixinOpenClawConfig.allowFrom.filter(
                                 uid => uid !== id,
@@ -2290,13 +2236,13 @@ const IMSettings: React.FC = () => {
                               });
                             }}
                           >
-                            <X className="w-3 h-3" />
+                            <X data-icon="inline-start" />
                           </Button>
                         </span>
                       ))}
                     </div>
                   )}
-                </div>
+                </IMField>
               </div>
             </details>
           </div>
@@ -2392,7 +2338,9 @@ const IMSettings: React.FC = () => {
                       if (!isMountedRef.current) return;
                       setWecomQuickSetupStatus('error');
                       const err = error as { message?: string; code?: string };
-                      setWecomQuickSetupError(err.message || err.code || 'Unknown error');
+                      setWecomQuickSetupError(
+                        err.message || err.code || i18nService.t('unknownError'),
+                      );
                     }
                   }}
                   quickSetupStatus={wecomQuickSetupStatus}
@@ -2401,7 +2349,6 @@ const IMSettings: React.FC = () => {
                   connectivityResults={
                     connectivityResults as Record<string, IMConnectivityTestResult>
                   }
-                  language={language}
                   renderPairingSection={renderPairingSection}
                 />
               );
@@ -2413,16 +2360,14 @@ const IMSettings: React.FC = () => {
                 <img
                   src={PlatformRegistry.logo('wecom')}
                   alt="WeCom"
-                  className="w-12 h-12 object-contain rounded-md mb-4 opacity-50"
+                  className="size-12 object-contain rounded-md mb-4 opacity-50"
                 />
                 <p className="text-sm text-muted-foreground mb-4">
                   {wecomMultiConfig.instances.length === 0
-                    ? language === 'zh'
-                      ? '尚未添加企业微信实例，点击下方按钮添加'
-                      : 'No WeCom instances yet. Click below to add one.'
-                    : language === 'zh'
-                      ? '请在左侧选择一个企业微信实例'
-                      : 'Select a WeCom instance from the sidebar.'}
+                    ? i18nService.t('imNoInstances').replace('{platform}', i18nService.t('wecom'))
+                    : i18nService
+                        .t('imSelectInstance')
+                        .replace('{platform}', i18nService.t('wecom'))}
                 </p>
                 {wecomMultiConfig.instances.length < MAX_WECOM_INSTANCES && (
                   <Button
@@ -2448,22 +2393,20 @@ const IMSettings: React.FC = () => {
         {connectivityModalPlatform && (
           <Modal
             onClose={() => setConnectivityModalPlatform(null)}
-            overlayClassName="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
-            className="w-full max-w-2xl bg-surface rounded-2xl shadow-modal border border-border overflow-hidden"
+            className="w-full max-w-2xl overflow-hidden"
           >
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-              <div className="text-sm font-semibold text-foreground">
+              <DialogTitle>
                 {`${i18nService.t(connectivityModalPlatform)} ${i18nService.t('imConnectivitySectionTitle')}`}
-              </div>
+              </DialogTitle>
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
                 aria-label={i18nService.t('close')}
                 onClick={() => setConnectivityModalPlatform(null)}
-                className="text-muted-foreground"
               >
-                <X className="h-4 w-4" />
+                <X data-icon="inline-start" />
               </Button>
             </div>
 
@@ -2473,43 +2416,54 @@ const IMSettings: React.FC = () => {
                   {i18nService.t('imConnectivityTesting')}
                 </div>
               ) : connectivityResults[connectivityModalPlatform] ? (
-                <div className="space-y-3">
+                <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
-                    <div
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${verdictColorClass[connectivityResults[connectivityModalPlatform]!.verdict]}`}
+                    <Badge
+                      variant={
+                        connectivityResults[connectivityModalPlatform]!.verdict === 'fail'
+                          ? 'destructive'
+                          : connectivityResults[connectivityModalPlatform]!.verdict === 'warn'
+                            ? 'outline'
+                            : 'default'
+                      }
                     >
                       {connectivityResults[connectivityModalPlatform]!.verdict === 'pass' ? (
-                        <CheckCircle className="h-3.5 w-3.5" />
+                        <CheckCircle data-icon="inline-start" />
                       ) : connectivityResults[connectivityModalPlatform]!.verdict === 'warn' ? (
-                        <TriangleAlert className="h-3.5 w-3.5" />
+                        <TriangleAlert data-icon="inline-start" />
                       ) : (
-                        <XCircle className="h-3.5 w-3.5" />
+                        <XCircle data-icon="inline-start" />
                       )}
                       {i18nService.t(
                         `imConnectivityVerdict_${connectivityResults[connectivityModalPlatform]!.verdict}`,
                       )}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
+                    </Badge>
+                    <div className="text-xs text-muted-foreground">
                       {`${i18nService.t('imConnectivityLastChecked')}: ${formatTestTime(connectivityResults[connectivityModalPlatform]!.testedAt)}`}
                     </div>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="flex flex-col gap-2">
                     {connectivityResults[connectivityModalPlatform]!.checks.map((check, index) => (
-                      <div
+                      <Alert
                         key={`${check.code}-${index}`}
-                        className="rounded-lg border border-border-subtle px-2.5 py-2 bg-surface"
+                        variant={check.level === 'fail' ? 'destructive' : 'default'}
                       >
-                        <div className={`text-xs font-medium ${checkLevelColorClass[check.level]}`}>
-                          {getCheckTitle(check.code)}
-                        </div>
-                        <div className="mt-1 text-xs text-muted-foreground">{check.message}</div>
-                        {getCheckSuggestion(check) && (
-                          <div className="mt-1 text-[11px] text-muted-foreground">
-                            {`${i18nService.t('imConnectivitySuggestion')}: ${getCheckSuggestion(check)}`}
-                          </div>
+                        {check.level === 'fail' ? (
+                          <XCircle />
+                        ) : check.level === 'warn' ? (
+                          <TriangleAlert />
+                        ) : (
+                          <CheckCircle />
                         )}
-                      </div>
+                        <AlertTitle>{getCheckTitle(check.code)}</AlertTitle>
+                        <AlertDescription>
+                          <p>{check.message}</p>
+                          {getCheckSuggestion(check) ? (
+                            <p>{`${i18nService.t('imConnectivitySuggestion')}: ${getCheckSuggestion(check)}`}</p>
+                          ) : null}
+                        </AlertDescription>
+                      </Alert>
                     ))}
                   </div>
                 </div>

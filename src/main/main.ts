@@ -53,6 +53,7 @@ import {
   ProjectCreateDirectorySchema,
 } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
+import { OpenClawEnginePhase } from '../shared/openclaw/constants';
 import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc } from '../shared/workspace';
 import { AgentManager } from './agentManager';
@@ -1699,9 +1700,8 @@ const doSyncOpenClawConfig = async (options: {
     openClawRuntimeAdapter.disconnectGatewayClient();
   }
 
-  await manager.stopGateway();
-  const restarted = await manager.startGateway(`config-sync:${options.reason}`);
-  if (restarted.phase !== 'running') {
+  const restarted = await manager.restartGateway(`config-sync:${options.reason}`);
+  if (restarted.phase !== OpenClawEnginePhase.Running) {
     return {
       success: false,
       changed: true,

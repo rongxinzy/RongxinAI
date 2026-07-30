@@ -7,6 +7,11 @@ import { useDispatch, useSelector } from 'react-redux';
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import { OpenClawEnginePhase } from '../../../shared/openclaw/constants';
+import {
+  isOpenClawEngineTransitioning,
+  isOpenClawGatewayRunning,
+} from '../../../shared/openclaw/status';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
 import {
@@ -56,6 +61,7 @@ import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
+import { useDelayedVisibility } from './useDelayedVisibility';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 
 export interface CoworkViewProps {
@@ -96,6 +102,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const [isInitialized, setIsInitialized] = useState(false);
   const [openClawStatus, setOpenClawStatus] = useState<OpenClawEngineStatus | null>(null);
   const [isRestartingGateway, setIsRestartingGateway] = useState(false);
+  const shouldShowEngineStatus = useDelayedVisibility(
+    Boolean(
+      openClawStatus &&
+      !isOpenClawGatewayRunning(openClawStatus.phase) &&
+      !isOpenClawEngineTransitioning(openClawStatus.phase) &&
+      openClawStatus.phase !== OpenClawEnginePhase.Error,
+    ),
+  );
   // Track in-flight direct-chat operations per session so switching to another
   // chat window does not block submission on a global boolean ref.
   const startingSessionIdsRef = useRef(new Set<string>());
@@ -180,18 +194,19 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const resolveEngineStatusText = (status: OpenClawEngineStatus): string => {
     switch (status.phase) {
-      case 'not_installed':
+      case OpenClawEnginePhase.NotInstalled:
         return i18nService.t('coworkOpenClawNotInstalledNotice');
-      case 'installing':
+      case OpenClawEnginePhase.Installing:
         return i18nService.t('coworkOpenClawInstalling');
-      case 'ready':
+      case OpenClawEnginePhase.Ready:
         return i18nService.t('coworkOpenClawReadyNotice');
-      case 'starting':
-      case 'compiling':
+      case OpenClawEnginePhase.Starting:
+      case OpenClawEnginePhase.Compiling:
+      case OpenClawEnginePhase.Restarting:
         return status.message || i18nService.t('coworkOpenClawStarting');
-      case 'error':
+      case OpenClawEnginePhase.Error:
         return i18nService.t('coworkOpenClawError');
-      case 'running':
+      case OpenClawEnginePhase.Running:
       default:
         return i18nService.t('coworkOpenClawRunning');
     }
@@ -1264,8 +1279,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     );
   }
 
-  const shouldShowEngineStatus = Boolean(openClawStatus && openClawStatus.phase !== 'running');
-  const isEngineError = openClawStatus?.phase === 'error';
+  const isEngineError = openClawStatus?.phase === OpenClawEnginePhase.Error;
 
   const homeHeader = (
     <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
@@ -1291,11 +1305,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   // Engine status banner for error/non-running states (starting overlay is now global in App.tsx)
   const engineStatusBanner =
-    shouldShowEngineStatus &&
-    openClawStatus &&
-    openClawStatus.phase !== 'starting' &&
-    openClawStatus.phase !== 'compiling' &&
-    openClawStatus.phase !== 'error' ? (
+    shouldShowEngineStatus && openClawStatus ? (
       <div
         className={`shrink-0 flex items-center justify-between px-4 py-2 text-xs ${
           isEngineError
