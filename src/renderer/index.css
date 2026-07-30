@@ -701,32 +701,6 @@ select::-ms-expand {
 [data-slot='button'][data-local-inference-launch-close-button='true']:hover:not(:disabled) svg {
   color: var(--lobster-destructive-foreground);
 }
-[data-slot='button'][data-local-inference-toolbar-button='true'] {
-  height: 32px;
-  border-color: var(--zy-border);
-  border-radius: 9999px;
-  background-color: var(--zy-surface);
-  color: var(--zy-text-secondary);
-  box-shadow: none;
-  font-weight: 500;
-  transition:
-    background-color 200ms ease,
-    border-color 200ms ease,
-    color 200ms ease,
-    transform 120ms ease;
-}
-[data-slot='button'][data-local-inference-toolbar-button='true']:hover:not(:disabled) {
-  border-color: var(--zy-border);
-  background-color: var(--zy-surface-raised);
-  color: var(--zy-text-secondary);
-  box-shadow: none;
-}
-[data-slot='button'][data-local-inference-toolbar-button='true'] svg {
-  color: var(--zy-text-secondary);
-}
-[data-slot='button'][data-local-inference-toolbar-button='true']:hover:not(:disabled) svg {
-  color: var(--zy-text-secondary);
-}
 [data-local-inference-secondary-action-button='true'],
 [data-local-inference-secondary-action-button='true']:hover:not(:disabled),
 [data-local-inference-secondary-action-button='true'] svg,

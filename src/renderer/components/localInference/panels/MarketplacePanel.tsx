@@ -23,7 +23,11 @@ import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
 import { EmptyState } from '../components/Common';
 import { MarketplaceModelCard } from '../components/MarketplaceModelCard';
-import { localInferenceMutedTextClass, MARKETPLACE_PAGE_SIZE } from '../constants';
+import {
+  localInferenceCompactButtonClass,
+  localInferenceMutedTextClass,
+  MARKETPLACE_PAGE_SIZE,
+} from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
@@ -305,7 +309,8 @@ export function MarketplacePanel({
               <Button
                 type="submit"
                 disabled={marketplaceLoading}
-                className={hasSearched ? 'h-9 text-xs' : 'h-16 rounded-2xl px-8 text-lg'}
+                className={`${localInferenceCompactButtonClass} self-center`}
+                variant="outline"
               >
                 {marketplaceLoading && (
                   <RefreshCw data-icon="inline-start" className="animate-spin" />
@@ -458,6 +463,7 @@ export function MarketplacePanel({
               type="button"
               onClick={handleClearToken}
               disabled={!savedToken}
+              className={localInferenceCompactButtonClass}
               size="sm"
               variant="destructive"
             >
@@ -469,10 +475,17 @@ export function MarketplacePanel({
                 onClick={() => setTokenModalOpen(false)}
                 size="sm"
                 variant="outline"
+                className={localInferenceCompactButtonClass}
               >
                 {i18nService.t('cancel')}
               </Button>
-              <Button type="button" onClick={() => void handleSaveToken()} size="sm">
+              <Button
+                type="button"
+                className={localInferenceCompactButtonClass}
+                onClick={() => void handleSaveToken()}
+                size="sm"
+                variant="outline"
+              >
                 {i18nService.t('marketplaceTokenSave')}
               </Button>
             </div>

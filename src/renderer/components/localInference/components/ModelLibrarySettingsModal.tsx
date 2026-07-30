@@ -10,6 +10,7 @@ import { Input } from '@shared/components/ui/input';
 import { FolderOpen, FolderUp, Settings2 } from 'lucide-react';
 
 import { i18nService } from '../../../services/i18n';
+import { localInferenceCompactButtonClass } from '../constants';
 
 type ModelLibrarySettingsModalProps = {
   isOpen: boolean;
@@ -67,6 +68,7 @@ export function ModelLibrarySettingsModal({
               <Button
                 type="button"
                 variant="outline"
+                className={localInferenceCompactButtonClass}
                 onClick={onPickDirectory}
                 disabled={saving}
               >
@@ -76,6 +78,7 @@ export function ModelLibrarySettingsModal({
               <Button
                 type="button"
                 variant="outline"
+                className={localInferenceCompactButtonClass}
                 onClick={onOpenDirectory}
                 disabled={saving}
               >
