@@ -92,7 +92,7 @@ export interface ResearchToolResult {
 }
 
 export const isAcademicResearchSkillSet = (skillIds: string[] | undefined): boolean =>
-  Boolean(skillIds?.includes(CoreSkillId.DeliAutoResearch));
+  Boolean(skillIds?.includes(CoreSkillId.ZhiyuanAutoResearch));
 
 export const isResearchSourceType = (value: unknown): value is ResearchSourceType =>
   value === ResearchSourceType.Primary || value === ResearchSourceType.Secondary;

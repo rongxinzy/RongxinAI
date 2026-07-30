@@ -11,7 +11,7 @@ export const CoreSkillId = {
   Docx: 'docx',
   Xlsx: 'xlsx',
   DeepResearch: 'deep-research',
-  DeliAutoResearch: 'deli-autoresearch',
+  ZhiyuanAutoResearch: 'deli-autoresearch',
   WebSearch: 'web-search',
   FrontendDesign: 'frontend-design',
 } as const;
@@ -23,7 +23,7 @@ export const isCoreSkill = (id: string): id is CoreSkillId =>
 
 /** Skills that together form the first-class Academic Research workflow. */
 export const AcademicResearchSkillIds = [
-  CoreSkillId.DeliAutoResearch,
+  CoreSkillId.ZhiyuanAutoResearch,
   CoreSkillId.DeepResearch,
   CoreSkillId.WebSearch,
 ] as const;
