@@ -11,6 +11,9 @@ import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skil
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { isAcademicResearchSkillSet } from '../../../main/libs/agentEngine/piResearchRun';
+import { resolveShortcutWorkflowKind } from '../../../main/libs/agentEngine/piShortcutWorkflow';
+
 import { expect, test } from 'vitest';
 
 import { CHAT_SKILL_SHORTCUTS } from './constants';
@@ -57,6 +60,18 @@ test('academic research does not expose the upstream Deli branding', () => {
 test('deep research selects explicit web search with its research protocol', () => {
   const deepResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'deep-research');
   expect(deepResearch?.skillIds).toEqual(['deep-research', 'web-search']);
+});
+
+test('every sidebar shortcut is protected by a Pi completion controller', () => {
+  for (const shortcut of CHAT_SKILL_SHORTCUTS) {
+    const selectedIds = [...(shortcut.skillIds || [shortcut.skillId])];
+    const protectedByAcademicHarness = isAcademicResearchSkillSet(selectedIds);
+    const protectedByShortcutHarness = resolveShortcutWorkflowKind(selectedIds) !== null;
+    expect(
+      protectedByAcademicHarness || protectedByShortcutHarness,
+      `shortcut ${shortcut.id} has no completion controller`,
+    ).toBe(true);
+  }
 });
 
 test('the chat skill allowlist is derived from CoreSkillId, not hardcoded', () => {
