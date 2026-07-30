@@ -3,19 +3,13 @@
  * Renders form fields dynamically from JSON Schema + uiHints
  */
 
-import { Button } from '@shared/components/ui/button';
-import { Input } from '@shared/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
+import { Field, FieldLabel } from '@shared/components/ui/field';
 import { Switch } from '@shared/components/ui/switch';
-import { Textarea } from '@shared/components/ui/textarea';
-import { ChevronRight, Eye, EyeOff, XCircle } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import React from 'react';
+
+import { i18nService } from '../../services/i18n';
+import { IMFormGroup, IMInputField, IMSelectField, IMTextareaField } from './IMFormControls';
 
 /** A single uiHint entry from the gateway */
 export interface UiHint {
@@ -132,38 +126,33 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     // Boolean toggle
     if (isBoolean) {
       const boolValue = Boolean(fieldValue);
+      const fieldId = `im-schema-${path.replaceAll('.', '-')}`;
       return (
-        <div key={path} className="flex items-center justify-between py-1">
-          <label className="text-xs font-medium text-muted-foreground">{hint.label}</label>
-          <Switch checked={boolValue} onCheckedChange={checked => handleChange(checked)} />
-        </div>
+        <Field key={path} orientation="horizontal">
+          <FieldLabel htmlFor={fieldId}>{hint.label}</FieldLabel>
+          <Switch
+            id={fieldId}
+            checked={boolValue}
+            onCheckedChange={checked => handleChange(checked)}
+          />
+        </Field>
       );
     }
 
     // String with enum → select
     if (type === 'string' && enumValues) {
       return (
-        <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
-          <Select
-            value={String(fieldValue || '')}
-            onValueChange={value => handleChange(value)}
-            onOpenChange={open => {
-              if (!open) onBlur?.();
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {enumValues.map(v => (
-                <SelectItem key={v} value={v}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <IMSelectField
+          key={path}
+          id={`im-schema-${path.replaceAll('.', '-')}`}
+          label={hint.label}
+          value={String(fieldValue || '')}
+          options={enumValues.map(option => ({ label: option, value: option }))}
+          onValueChange={handleChange}
+          onOpenChange={open => {
+            if (!open) onBlur?.();
+          }}
+        />
       );
     }
 
@@ -172,42 +161,22 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
       const shown = showSecrets[path] || false;
       const strValue = String(fieldValue || '');
       return (
-        <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
-          <div className="relative">
-            <Input
-              type={shown ? 'text' : 'password'}
-              value={strValue}
-              onChange={e => handleChange(e.target.value)}
-              onBlur={onBlur}
-              className="pr-16"
-              placeholder="••••••••••••"
-            />
-            <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-              {strValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => handleChange('')}
-                  title="Clear"
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => onToggleSecret?.(path)}
-              >
-                {shown ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <IMInputField
+          key={path}
+          id={`im-schema-${path.replaceAll('.', '-')}`}
+          label={hint.label}
+          type={shown ? 'text' : 'password'}
+          value={strValue}
+          onChange={e => handleChange(e.target.value)}
+          onBlur={onBlur}
+          placeholder="••••••••••••"
+          clearLabel={i18nService.t('clear')}
+          onClear={() => handleChange('')}
+          revealLabel={i18nService.t('imShowSecret')}
+          concealLabel={i18nService.t('imHideSecret')}
+          revealed={shown}
+          onRevealChange={() => onToggleSecret?.(path)}
+        />
       );
     }
 
@@ -215,32 +184,17 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     if (type === 'string') {
       const strValue = String(fieldValue || '');
       return (
-        <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
-          <div className="relative">
-            <Input
-              type="text"
-              value={strValue}
-              onChange={e => handleChange(e.target.value)}
-              onBlur={onBlur}
-              className="pr-8"
-            />
-            {strValue && (
-              <div className="absolute right-2 inset-y-0 flex items-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => handleChange('')}
-                  title="Clear"
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
+        <IMInputField
+          key={path}
+          id={`im-schema-${path.replaceAll('.', '-')}`}
+          label={hint.label}
+          type="text"
+          value={strValue}
+          onChange={e => handleChange(e.target.value)}
+          onBlur={onBlur}
+          clearLabel={i18nService.t('clear')}
+          onClear={() => handleChange('')}
+        />
       );
     }
 
@@ -248,21 +202,21 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     if (type === 'array') {
       const arrValue = Array.isArray(fieldValue) ? fieldValue.map(String).join('\n') : '';
       return (
-        <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
-          <Textarea
-            value={arrValue}
-            onChange={e => {
-              const lines = e.target.value
-                .split('\n')
-                .map(s => s.trim())
-                .filter(Boolean);
-              handleChange(lines);
-            }}
-            onBlur={onBlur}
-            className="min-h-[60px] resize-y"
-          />
-        </div>
+        <IMTextareaField
+          key={path}
+          id={`im-schema-${path.replaceAll('.', '-')}`}
+          label={hint.label}
+          value={arrValue}
+          onChange={e => {
+            const lines = e.target.value
+              .split('\n')
+              .map(s => s.trim())
+              .filter(Boolean);
+            handleChange(lines);
+          }}
+          onBlur={onBlur}
+          className="min-h-16 resize-y"
+        />
       );
     }
 
@@ -270,15 +224,15 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     if (type === 'number' || type === 'integer') {
       const numValue = typeof fieldValue === 'number' ? fieldValue : '';
       return (
-        <div key={path} className="space-y-1.5">
-          <label className="block text-xs font-medium text-muted-foreground">{hint.label}</label>
-          <Input
-            type="number"
-            value={numValue}
-            onChange={e => handleChange(e.target.value ? Number(e.target.value) : undefined)}
-            onBlur={onBlur}
-          />
-        </div>
+        <IMInputField
+          key={path}
+          id={`im-schema-${path.replaceAll('.', '-')}`}
+          label={hint.label}
+          type="number"
+          value={numValue}
+          onChange={e => handleChange(e.target.value ? Number(e.target.value) : undefined)}
+          onBlur={onBlur}
+        />
       );
     }
 
@@ -298,23 +252,23 @@ export const SchemaForm: React.FC<SchemaFormProps> = ({
     return (
       <details key={groupKey} className="group">
         <summary className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-muted-foreground select-none py-1">
-          <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+          <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
           {groupHint.label}
         </summary>
-        <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
-          {childFields.map(field => renderField(field, hints[field]))}
+        <div className="mt-2 border-l-2 border-border-subtle pl-2">
+          <IMFormGroup>{childFields.map(field => renderField(field, hints[field]))}</IMFormGroup>
         </div>
       </details>
     );
   };
 
   return (
-    <div className="space-y-3">
+    <IMFormGroup>
       {/* Top-level fields */}
       {topLevelFields.map(field => renderField(field, hints[field]))}
 
       {/* Groups */}
       {groups.map(group => renderGroup(group))}
-    </div>
+    </IMFormGroup>
   );
 };

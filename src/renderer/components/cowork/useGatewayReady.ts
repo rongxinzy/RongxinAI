@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react';
 
+import { isOpenClawGatewayRunning } from '../../../shared/openclaw/status';
 import { coworkService } from '../../services/cowork';
 import type { OpenClawEngineStatus } from '../../types/cowork';
 
-const OpenClawEnginePhase = {
-  Running: 'running',
-} as const;
-
 function isGatewayRunning(status: OpenClawEngineStatus | null): boolean {
-  return status?.phase === OpenClawEnginePhase.Running;
+  return isOpenClawGatewayRunning(status?.phase);
 }
 
 export function useGatewayReady(): boolean {

@@ -5,16 +5,11 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
+import { Separator } from '@shared/components/ui/separator';
 import { Switch } from '@shared/components/ui/switch';
 import { PlatformRegistry } from '@shared/platform';
-import { CheckCircle, Eye, EyeOff, RefreshCw, Signal, Trash2, X, XCircle } from 'lucide-react';
+import { cn } from '@shared/lib/utils';
+import { RefreshCw, Signal, Trash2, X } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -25,6 +20,14 @@ import type {
   FeishuOpenClawConfig,
   IMConnectivityTestResult,
 } from '../../types/im';
+import {
+  IMConnectionBadge,
+  IMField,
+  IMInputField,
+  IMSelectField,
+  IMStatusAlert,
+  IMSwitchField,
+} from './IMFormControls';
 
 interface FeishuInstanceSettingsProps {
   instance: FeishuInstanceConfig;
@@ -37,7 +40,6 @@ interface FeishuInstanceSettingsProps {
   onTestConnectivity: () => void;
   testingPlatform: string | null;
   connectivityResults: Record<string, IMConnectivityTestResult>;
-  language: 'zh' | 'en';
 }
 
 // Reusable guide card component for platform setup instructions
@@ -46,7 +48,7 @@ const PlatformGuide: React.FC<{
   guideUrl?: string;
 }> = ({ steps, guideUrl }) => (
   <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-    <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+    <ol className="text-xs text-muted-foreground flex flex-col gap-1 list-decimal list-inside">
       {steps.map((step, i) => (
         <li key={i}>{step}</li>
       ))}
@@ -100,12 +102,10 @@ const PairingSection: React.FC<{
   };
 
   return (
-    <div className="space-y-2">
-      <label className="block text-xs font-medium text-muted-foreground">
-        {i18nService.t('imPairingApproval')}
-      </label>
+    <IMField id={`${platform}-pairing-code`} label={i18nService.t('imPairingApproval')}>
       <div className="flex gap-2">
         <Input
+          id={`${platform}-pairing-code`}
           type="text"
           value={pairingCodeInput}
           onChange={e => {
@@ -139,19 +139,16 @@ const PairingSection: React.FC<{
               });
             }
           }}
-          className="bg-green-600 text-white hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700"
         >
           {i18nService.t('imPairingApprove')}
         </Button>
       </div>
       {pairingStatus && (
-        <p
-          className={`text-xs ${pairingStatus.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-        >
-          {pairingStatus.type === 'success' ? '\u2713' : '\u2717'} {pairingStatus.message}
-        </p>
+        <IMStatusAlert error={pairingStatus.type === 'error'}>
+          {pairingStatus.message}
+        </IMStatusAlert>
       )}
-    </div>
+    </IMField>
   );
 };
 
@@ -166,7 +163,6 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
   onTestConnectivity,
   testingPlatform,
   connectivityResults,
-  language,
 }) => {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [allowedUserIdInput, setAllowedUserIdInput] = useState('');
@@ -265,7 +261,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
     } catch (err: any) {
       if (!isMountedRef.current) return;
       setQrStatus('error');
-      setQrError(err?.message || '获取二维码失败');
+      setQrError(err?.message || i18nService.t('imQrGenerationFailed'));
     }
   };
 
@@ -286,15 +282,15 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {/* Instance Header: Name, Status, Enable Toggle, Delete */}
       <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
+          <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
             <img
               src={PlatformRegistry.logo('feishu')}
               alt="Feishu"
-              className="w-4 h-4 object-contain rounded"
+              className="size-4 object-contain rounded"
             />
           </div>
           {editingName ? (
@@ -314,42 +310,37 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
               className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent"
             />
           ) : (
-            <span
-              className="text-sm font-medium text-foreground cursor-pointer hover:text-primary transition-colors truncate border-b border-dashed border-gray-400 dark:border-secondary/50 hover:border-primary pb-px"
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto min-w-0 justify-start truncate p-0"
               onClick={() => setEditingName(true)}
-              title={language === 'zh' ? '点击重命名' : 'Click to rename'}
+              title={i18nService.t('imClickToRename')}
             >
               {instance.instanceName}
-            </span>
+            </Button>
           )}
         </div>
 
         {/* Status badge */}
-        <div
-          className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-            instanceStatus?.connected
-              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-              : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
-          }`}
-        >
-          {instanceStatus?.connected ? i18nService.t('connected') : i18nService.t('disconnected')}
-        </div>
+        <IMConnectionBadge
+          connected={Boolean(instanceStatus?.connected)}
+          connectedLabel={i18nService.t('connected')}
+          disconnectedLabel={i18nService.t('disconnected')}
+        />
 
         {/* Enable toggle */}
         <Switch
+          aria-label={i18nService.t('enabled')}
           checked={instance.enabled}
           onCheckedChange={onToggleEnabled}
           disabled={!instance.enabled && !(instance.appId && instance.appSecret)}
           title={
             instance.enabled
-              ? language === 'zh'
-                ? '禁用此实例'
-                : 'Disable this instance'
+              ? i18nService.t('imDisableInstance')
               : !(instance.appId && instance.appSecret)
                 ? i18nService.t('imInstanceFillCredentials')
-                : language === 'zh'
-                  ? '启用此实例'
-                  : 'Enable this instance'
+                : i18nService.t('imEnableInstance')
           }
         />
 
@@ -359,15 +350,15 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
           variant="destructive"
           size="sm"
           onClick={onDelete}
-          title={language === 'zh' ? '删除此实例' : 'Delete this instance'}
+          title={i18nService.t('imDeleteInstance')}
         >
-          <Trash2 className="h-4 w-4" />
-          {language === 'zh' ? '删除' : 'Delete'}
+          <Trash2 data-icon="inline-start" />
+          {i18nService.t('delete')}
         </Button>
       </div>
 
       {/* Scan QR code section */}
-      <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center space-y-3">
+      <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center flex flex-col gap-3">
         {qrStatus === 'idle' && (
           <>
             <Button type="button" onClick={() => void handleStartQr()} disabled={false}>
@@ -383,19 +374,14 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
             <Button type="button" onClick={() => void handleStartQr()} disabled={false}>
               {i18nService.t('feishuBotCreateWizardScanBtn')}
             </Button>
-            {qrError && (
-              <div className="flex items-center justify-center gap-1.5 text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-                <XCircle className="h-4 w-4 shrink-0" />
-                {qrError}
-              </div>
-            )}
+            {qrError && <IMStatusAlert error>{qrError}</IMStatusAlert>}
           </>
         )}
         {qrStatus === 'loading' && (
           <div className="flex flex-col items-center gap-2 py-2">
-            <RefreshCw className="h-7 w-7 text-primary animate-spin" />
+            <RefreshCw className="size-7 text-primary animate-spin" />
             <span className="text-xs text-muted-foreground">
-              {i18nService.t('feishuBotCreateWizardGenerating') || '正在生成二维码…'}
+              {i18nService.t('feishuBotCreateWizardGenerating')}
             </span>
           </div>
         )}
@@ -403,14 +389,14 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
           <div className="flex flex-col items-center gap-2">
             <div className="relative inline-block">
               <div
-                className={`p-2 bg-white rounded-lg ${qrStatus === 'expired' ? 'opacity-30' : ''}`}
+                className={cn('rounded-lg bg-white p-2', qrStatus === 'expired' && 'opacity-30')}
               >
                 <QRCodeSVG value={qrUrl} size={160} />
               </div>
               {qrStatus === 'expired' && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Button type="button" onClick={() => void handleStartQr()} className="shadow-lg">
-                    <RefreshCw className="h-4 w-4 mr-1.5" />
+                  <Button type="button" onClick={() => void handleStartQr()}>
+                    <RefreshCw data-icon="inline-start" />
                     {i18nService.t('feishuBotCreateWizardQrcodeRefresh')}
                   </Button>
                 </div>
@@ -427,20 +413,17 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
           </div>
         )}
         {qrStatus === 'success' && (
-          <div className="flex items-center justify-center gap-1.5 text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-            <CheckCircle className="h-4 w-4 shrink-0" />
-            {i18nService.t('feishuBotCreateWizardSuccessTitle')}
-          </div>
+          <IMStatusAlert>{i18nService.t('feishuBotCreateWizardSuccessTitle')}</IMStatusAlert>
         )}
       </div>
 
       {/* Divider */}
-      <div className="relative flex items-center">
-        <div className="flex-1 border-t border-border-subtle" />
-        <span className="px-3 text-xs text-muted-foreground whitespace-nowrap">
-          {i18nService.t('feishuBotCreateWizardOrManual') || i18nService.t('or') || '或'}
+      <div className="flex items-center gap-3">
+        <Separator className="flex-1" />
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {i18nService.t('feishuBotCreateWizardOrManual')}
         </span>
-        <div className="flex-1 border-t border-border-subtle" />
+        <Separator className="flex-1" />
       </div>
 
       {/* Guide */}
@@ -450,151 +433,94 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
       />
 
       {/* App ID */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-muted-foreground">
-          App ID<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-        </label>
-        <div className="relative">
-          <Input
-            type="text"
-            value={instance.appId}
-            onChange={e => onConfigChange({ appId: e.target.value })}
-            onBlur={() => void onSave()}
-            className="pr-8"
-            placeholder="cli_xxxxx"
-          />
-          {instance.appId && (
-            <div className="absolute right-2 inset-y-0 flex items-center">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => {
-                  onConfigChange({ appId: '' });
-                  void onSave({ appId: '' });
-                }}
-                title={i18nService.t('clear') || 'Clear'}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
+      <IMInputField
+        id={`feishu-${instance.instanceId}-app-id`}
+        label={i18nService.t('imAppId')}
+        required
+        type="text"
+        value={instance.appId}
+        onChange={e => onConfigChange({ appId: e.target.value })}
+        onBlur={() => void onSave()}
+        placeholder="cli_xxxxx"
+        clearLabel={i18nService.t('clear')}
+        onClear={() => {
+          onConfigChange({ appId: '' });
+          void onSave({ appId: '' });
+        }}
+      />
 
       {/* App Secret */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-muted-foreground">
-          App Secret<span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-        </label>
-        <div className="relative">
-          <Input
-            type={showSecrets['appSecret'] ? 'text' : 'password'}
-            value={instance.appSecret}
-            onChange={e => onConfigChange({ appSecret: e.target.value })}
-            onBlur={() => void onSave()}
-            className="pr-16"
-            placeholder="••••••••••••"
-          />
-          <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-            {instance.appSecret && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => {
-                  onConfigChange({ appSecret: '' });
-                  void onSave({ appSecret: '' });
-                }}
-                title={i18nService.t('clear') || 'Clear'}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setShowSecrets(prev => ({ ...prev, appSecret: !prev['appSecret'] }))}
-              title={
-                showSecrets['appSecret']
-                  ? i18nService.t('hide') || 'Hide'
-                  : i18nService.t('show') || 'Show'
-              }
-            >
-              {showSecrets['appSecret'] ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-      </div>
+      <IMInputField
+        id={`feishu-${instance.instanceId}-app-secret`}
+        label={i18nService.t('imAppSecret')}
+        required
+        type={showSecrets['appSecret'] ? 'text' : 'password'}
+        value={instance.appSecret}
+        onChange={e => onConfigChange({ appSecret: e.target.value })}
+        onBlur={() => void onSave()}
+        placeholder="••••••••••••"
+        clearLabel={i18nService.t('clear')}
+        onClear={() => {
+          onConfigChange({ appSecret: '' });
+          void onSave({ appSecret: '' });
+        }}
+        revealLabel={i18nService.t('imShowSecret')}
+        concealLabel={i18nService.t('imHideSecret')}
+        revealed={showSecrets['appSecret']}
+        onRevealChange={revealed => setShowSecrets(prev => ({ ...prev, appSecret: revealed }))}
+      />
 
       {/* Domain */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-muted-foreground">Domain</label>
-        <Select
-          value={instance.domain}
-          onValueChange={value => {
-            const update = { domain: value as string };
-            onConfigChange(update);
-            void onSave(update);
-          }}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="feishu">{i18nService.t('imFeishuDomainFeishu')}</SelectItem>
-            <SelectItem value="lark">{i18nService.t('imFeishuDomainLark')}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <IMSelectField
+        id={`feishu-${instance.instanceId}-domain`}
+        label={i18nService.t('imFeishuDomain')}
+        value={instance.domain}
+        options={[
+          { value: 'feishu', label: i18nService.t('imFeishuDomainFeishu') },
+          { value: 'lark', label: i18nService.t('imFeishuDomainLark') },
+        ]}
+        onValueChange={value => {
+          const update = { domain: value };
+          onConfigChange(update);
+          void onSave(update);
+        }}
+      />
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
         <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
-        <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
+        <div className="mt-2 flex flex-col gap-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">DM Policy</label>
-            <Select
-              value={instance.dmPolicy}
-              onValueChange={value => {
-                const update = { dmPolicy: value as FeishuOpenClawConfig['dmPolicy'] };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pairing">{i18nService.t('imDmPolicyPairing')}</SelectItem>
-                <SelectItem value="allowlist">{i18nService.t('imDmPolicyAllowlist')}</SelectItem>
-                <SelectItem value="open">{i18nService.t('imDmPolicyOpen')}</SelectItem>
-                <SelectItem value="disabled">{i18nService.t('imDmPolicyDisabled')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <IMSelectField
+            id={`feishu-${instance.instanceId}-dm-policy`}
+            label={i18nService.t('imDmPolicy')}
+            value={instance.dmPolicy}
+            options={[
+              { value: 'pairing', label: i18nService.t('imDmPolicyPairing') },
+              { value: 'allowlist', label: i18nService.t('imDmPolicyAllowlist') },
+              { value: 'open', label: i18nService.t('imDmPolicyOpen') },
+              { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
+            ]}
+            onValueChange={value => {
+              const update = { dmPolicy: value as FeishuOpenClawConfig['dmPolicy'] };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
 
           {/* Pairing Requests (shown when dmPolicy is 'pairing') */}
           {instance.dmPolicy === 'pairing' && <PairingSection platform="feishu" />}
 
           {/* Allow From (User IDs) */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Allow From (User IDs)
-            </label>
+          <IMField
+            id={`feishu-${instance.instanceId}-allow-user`}
+            label={i18nService.t('imAllowFromUserIds')}
+          >
             <div className="flex gap-2">
               <Input
+                id={`feishu-${instance.instanceId}-allow-user`}
                 type="text"
                 value={allowedUserIdInput}
                 onChange={e => setAllowedUserIdInput(e.target.value)}
@@ -627,7 +553,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                   }
                 }}
               >
-                {i18nService.t('add') || '添加'}
+                {i18nService.t('add')}
               </Button>
             </div>
             {instance.allowFrom.length > 0 && (
@@ -641,51 +567,47 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                      size="icon-xs"
+                      aria-label={i18nService.t('delete')}
                       onClick={() => {
                         const newIds = instance.allowFrom.filter(uid => uid !== id);
                         onConfigChange({ allowFrom: newIds });
                         void onSave({ allowFrom: newIds });
                       }}
                     >
-                      <X className="w-3 h-3" />
+                      <X data-icon="inline-start" />
                     </Button>
                   </span>
                 ))}
               </div>
             )}
-          </div>
+          </IMField>
 
           {/* Group Policy */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">Group Policy</label>
-            <Select
-              value={instance.groupPolicy}
-              onValueChange={value => {
-                const update = { groupPolicy: value as FeishuOpenClawConfig['groupPolicy'] };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="allowlist">Allowlist</SelectItem>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="disabled">Disabled</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <IMSelectField
+            id={`feishu-${instance.instanceId}-group-policy`}
+            label={i18nService.t('imGroupPolicy')}
+            value={instance.groupPolicy}
+            options={[
+              { value: 'allowlist', label: i18nService.t('imGroupPolicyAllowlist') },
+              { value: 'open', label: i18nService.t('imGroupPolicyOpen') },
+              { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
+            ]}
+            onValueChange={value => {
+              const update = { groupPolicy: value as FeishuOpenClawConfig['groupPolicy'] };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
 
           {/* Group Allow From */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Group Allow From (Chat IDs)
-            </label>
+          <IMField
+            id={`feishu-${instance.instanceId}-allow-chat`}
+            label={i18nService.t('imGroupAllowFromChatIds')}
+          >
             <div className="flex gap-2">
               <Input
+                id={`feishu-${instance.instanceId}-allow-chat`}
                 type="text"
                 value={groupAllowIdInput}
                 onChange={e => setGroupAllowIdInput(e.target.value)}
@@ -718,7 +640,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                   }
                 }}
               >
-                {i18nService.t('add') || '添加'}
+                {i18nService.t('add')}
               </Button>
             </div>
             {instance.groupAllowFrom.length > 0 && (
@@ -732,153 +654,120 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                      size="icon-xs"
+                      aria-label={i18nService.t('delete')}
                       onClick={() => {
                         const newIds = instance.groupAllowFrom.filter(gid => gid !== id);
                         onConfigChange({ groupAllowFrom: newIds });
                         void onSave({ groupAllowFrom: newIds });
                       }}
                     >
-                      <X className="w-3 h-3" />
+                      <X data-icon="inline-start" />
                     </Button>
                   </span>
                 ))}
               </div>
             )}
-          </div>
+          </IMField>
 
           {/* Streaming Output Toggle */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {i18nService.t('imFeishuStreaming')}
-                </label>
-                <p className="text-[11px] text-tertiary mt-0.5">
-                  {i18nService.t('imFeishuStreamingDesc')}
-                </p>
-              </div>
-              <Switch
-                checked={instance.streaming}
+          <IMSwitchField
+            id={`feishu-${instance.instanceId}-streaming`}
+            label={i18nService.t('imFeishuStreaming')}
+            description={i18nService.t('imFeishuStreamingDesc')}
+            checked={instance.streaming}
+            onCheckedChange={checked => {
+              const update = { streaming: Boolean(checked) };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
+
+          {/* Footer Options (visible when streaming is enabled) */}
+          {instance.streaming && (
+            <div className="flex flex-col gap-2 pl-3 border-l-2 border-primary/20">
+              <IMSwitchField
+                id={`feishu-${instance.instanceId}-footer-status`}
+                label={i18nService.t('imFeishuFooterStatus')}
+                size="sm"
+                checked={instance.footer?.status ?? false}
                 onCheckedChange={checked => {
-                  const update = { streaming: Boolean(checked) };
+                  const newFooter = { ...instance.footer, status: Boolean(checked) };
+                  const update = { footer: newFooter };
+                  onConfigChange(update);
+                  void onSave(update);
+                }}
+              />
+              <IMSwitchField
+                id={`feishu-${instance.instanceId}-footer-elapsed`}
+                label={i18nService.t('imFeishuFooterElapsed')}
+                size="sm"
+                checked={instance.footer?.elapsed ?? false}
+                onCheckedChange={checked => {
+                  const newFooter = { ...instance.footer, elapsed: Boolean(checked) };
+                  const update = { footer: newFooter };
                   onConfigChange(update);
                   void onSave(update);
                 }}
               />
             </div>
-          </div>
-
-          {/* Footer Options (visible when streaming is enabled) */}
-          {instance.streaming && (
-            <div className="space-y-2 pl-3 border-l-2 border-primary/20">
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-muted-foreground">
-                  {i18nService.t('imFeishuFooterStatus')}
-                </label>
-                <Switch
-                  size="sm"
-                  checked={instance.footer?.status ?? false}
-                  onCheckedChange={checked => {
-                    const newFooter = { ...instance.footer, status: Boolean(checked) };
-                    const update = { footer: newFooter };
-                    onConfigChange(update);
-                    void onSave(update);
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <label className="text-xs text-muted-foreground">
-                  {i18nService.t('imFeishuFooterElapsed')}
-                </label>
-                <Switch
-                  size="sm"
-                  checked={instance.footer?.elapsed ?? false}
-                  onCheckedChange={checked => {
-                    const newFooter = { ...instance.footer, elapsed: Boolean(checked) };
-                    const update = { footer: newFooter };
-                    onConfigChange(update);
-                    void onSave(update);
-                  }}
-                />
-              </div>
-            </div>
           )}
 
           {/* Reply Mode */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">Reply Mode</label>
-            <Select
-              value={instance.replyMode}
-              onValueChange={value => {
-                const update = { replyMode: value as FeishuOpenClawConfig['replyMode'] };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">{i18nService.t('imReplyModeAuto')}</SelectItem>
-                <SelectItem value="static">{i18nService.t('imReplyModeStatic')}</SelectItem>
-                <SelectItem value="streaming">{i18nService.t('imReplyModeStreaming')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <IMSelectField
+            id={`feishu-${instance.instanceId}-reply-mode`}
+            label={i18nService.t('imReplyMode')}
+            value={instance.replyMode}
+            options={[
+              { value: 'auto', label: i18nService.t('imReplyModeAuto') },
+              { value: 'static', label: i18nService.t('imReplyModeStatic') },
+              { value: 'streaming', label: i18nService.t('imReplyModeStreaming') },
+            ]}
+            onValueChange={value => {
+              const update = { replyMode: value as FeishuOpenClawConfig['replyMode'] };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
 
           {/* Block Streaming */}
           {instance.replyMode !== 'streaming' && (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="block text-xs font-medium text-muted-foreground">
-                    {i18nService.t('imFeishuBlockStreaming')}
-                  </label>
-                  <p className="text-[11px] text-tertiary mt-0.5">
-                    {i18nService.t('imFeishuBlockStreamingDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={instance.blockStreaming}
-                  onCheckedChange={checked => {
-                    const update = { blockStreaming: Boolean(checked) };
-                    onConfigChange(update);
-                    void onSave(update);
-                  }}
-                />
-              </div>
-            </div>
+            <IMSwitchField
+              id={`feishu-${instance.instanceId}-block-streaming`}
+              label={i18nService.t('imFeishuBlockStreaming')}
+              description={i18nService.t('imFeishuBlockStreamingDesc')}
+              checked={instance.blockStreaming}
+              onCheckedChange={checked => {
+                const update = { blockStreaming: Boolean(checked) };
+                onConfigChange(update);
+                void onSave(update);
+              }}
+            />
           )}
 
           {/* History Limit */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">History Limit</label>
-            <Input
-              type="number"
-              value={instance.historyLimit}
-              onChange={e => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
-              onBlur={() => void onSave()}
-              min={1}
-              max={200}
-            />
-          </div>
+          <IMInputField
+            id={`feishu-${instance.instanceId}-history-limit`}
+            label={i18nService.t('imHistoryLimit')}
+            type="number"
+            value={instance.historyLimit}
+            onChange={e => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
+            onBlur={() => void onSave()}
+            min={1}
+            max={200}
+          />
 
           {/* Media Max MB */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Media Max (MB)
-            </label>
-            <Input
-              type="number"
-              value={instance.mediaMaxMb}
-              onChange={e => onConfigChange({ mediaMaxMb: parseInt(e.target.value) || 30 })}
-              onBlur={() => void onSave()}
-              min={1}
-              max={50}
-            />
-          </div>
+          <IMInputField
+            id={`feishu-${instance.instanceId}-media-max-mb`}
+            label={i18nService.t('imMediaMaxMb')}
+            type="number"
+            value={instance.mediaMaxMb}
+            onChange={e => onConfigChange({ mediaMaxMb: parseInt(e.target.value) || 30 })}
+            onBlur={() => void onSave()}
+            min={1}
+            max={50}
+          />
         </div>
       </details>
 
@@ -891,7 +780,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
           onClick={onTestConnectivity}
           disabled={testingPlatform === 'feishu'}
         >
-          <Signal className="h-3.5 w-3.5 mr-1.5" />
+          <Signal data-icon="inline-start" />
           {testingPlatform === 'feishu'
             ? i18nService.t('imConnectivityTesting')
             : connectivityResults['feishu' as keyof typeof connectivityResults]
@@ -901,11 +790,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
       </div>
 
       {/* Error display */}
-      {instanceStatus?.error && (
-        <div className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-          {instanceStatus.error}
-        </div>
-      )}
+      {instanceStatus?.error && <IMStatusAlert error>{instanceStatus.error}</IMStatusAlert>}
     </div>
   );
 };

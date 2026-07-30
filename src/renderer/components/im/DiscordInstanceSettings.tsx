@@ -5,17 +5,9 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
-import { Textarea } from '@shared/components/ui/textarea';
 import { PlatformRegistry } from '@shared/platform';
-import { Eye, EyeOff, Signal, Trash2, X, XCircle } from 'lucide-react';
+import { Signal, Trash2, X } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -26,6 +18,15 @@ import type {
   DiscordOpenClawGuildConfig,
   IMConnectivityTestResult,
 } from '../../types/im';
+import {
+  IMConnectionBadge,
+  IMField,
+  IMInputField,
+  IMSelectField,
+  IMStatusAlert,
+  IMSwitchField,
+  IMTextareaField,
+} from './IMFormControls';
 
 interface DiscordInstanceSettingsProps {
   instance: DiscordInstanceConfig;
@@ -38,7 +39,6 @@ interface DiscordInstanceSettingsProps {
   onTestConnectivity: () => void;
   testingPlatform: string | null;
   connectivityResults: Record<string, IMConnectivityTestResult>;
-  language: 'zh' | 'en';
 }
 
 const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
@@ -52,7 +52,6 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
   onTestConnectivity,
   testingPlatform,
   connectivityResults,
-  language,
 }) => {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [allowedUserIdInput, setAllowedUserIdInput] = useState('');
@@ -97,15 +96,15 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {/* Instance Header: Name, Status, Enable Toggle, Delete */}
       <div className="flex items-center gap-3 pb-3 border-b border-border-subtle">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
+          <div className="flex size-7 items-center justify-center rounded-md bg-surface border border-border-subtle p-1">
             <img
               src={PlatformRegistry.logo('discord')}
               alt="Discord"
-              className="w-4 h-4 object-contain rounded"
+              className="size-4 object-contain rounded"
             />
           </div>
           {editingName ? (
@@ -125,29 +124,28 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent"
             />
           ) : (
-            <span
-              className="text-sm font-medium text-foreground cursor-pointer hover:text-primary transition-colors truncate border-b border-dashed border-gray-400 dark:border-secondary/50 hover:border-primary pb-px"
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto min-w-0 justify-start truncate p-0"
               onClick={() => setEditingName(true)}
               title={i18nService.t('imDiscordClickToRename')}
             >
               {instance.instanceName}
-            </span>
+            </Button>
           )}
         </div>
 
         {/* Status badge */}
-        <div
-          className={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
-            instanceStatus?.connected
-              ? 'bg-green-500/15 text-green-600 dark:text-green-400'
-              : 'bg-gray-500/15 text-gray-500 dark:text-gray-400'
-          }`}
-        >
-          {instanceStatus?.connected ? i18nService.t('connected') : i18nService.t('disconnected')}
-        </div>
+        <IMConnectionBadge
+          connected={Boolean(instanceStatus?.connected)}
+          connectedLabel={i18nService.t('connected')}
+          disconnectedLabel={i18nService.t('disconnected')}
+        />
 
         {/* Enable toggle */}
         <Switch
+          aria-label={i18nService.t('enabled')}
           checked={instance.enabled}
           onCheckedChange={onToggleEnabled}
           disabled={!instance.enabled && !instance.botToken}
@@ -168,14 +166,14 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
           onClick={onDelete}
           title={i18nService.t('imDiscordDeleteInstance')}
         >
-          <Trash2 className="h-4 w-4" />
-          {language === 'zh' ? '删除' : 'Delete'}
+          <Trash2 data-icon="inline-start" />
+          {i18nService.t('delete')}
         </Button>
       </div>
 
       {/* Guide */}
       <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
-        <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+        <ol className="text-xs text-muted-foreground flex flex-col gap-1 list-decimal list-inside">
           <li>{i18nService.t('imDiscordGuideStep1')}</li>
           <li>{i18nService.t('imDiscordGuideStep2')}</li>
           <li>{i18nService.t('imDiscordGuideStep3')}</li>
@@ -203,92 +201,58 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
       </div>
 
       {/* Bot Token */}
-      <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-muted-foreground">Bot Token</label>
-        <div className="relative">
-          <Input
-            type={showSecrets['botToken'] ? 'text' : 'password'}
-            value={instance.botToken}
-            onChange={e => onConfigChange({ botToken: e.target.value })}
-            onBlur={() => void onSave()}
-            className="pr-16"
-            placeholder="MTIzNDU2Nzg5MDEyMzQ1Njc4OQ..."
-          />
-          <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-            {instance.botToken && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => {
-                  onConfigChange({ botToken: '' });
-                  void onSave({ botToken: '' });
-                }}
-                title={i18nService.t('clear') || 'Clear'}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => setShowSecrets(prev => ({ ...prev, botToken: !prev['botToken'] }))}
-              title={
-                showSecrets['botToken']
-                  ? i18nService.t('hide') || 'Hide'
-                  : i18nService.t('show') || 'Show'
-              }
-            >
-              {showSecrets['botToken'] ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">{i18nService.t('imDiscordTokenHint')}</p>
-      </div>
+      <IMInputField
+        id={`discord-${instance.instanceId}-bot-token`}
+        label="Bot Token"
+        type={showSecrets['botToken'] ? 'text' : 'password'}
+        value={instance.botToken}
+        onChange={e => onConfigChange({ botToken: e.target.value })}
+        onBlur={() => void onSave()}
+        placeholder="MTIzNDU2Nzg5MDEyMzQ1Njc4OQ..."
+        description={i18nService.t('imDiscordTokenHint')}
+        clearLabel={i18nService.t('clear')}
+        onClear={() => {
+          onConfigChange({ botToken: '' });
+          void onSave({ botToken: '' });
+        }}
+        revealLabel={i18nService.t('imShowSecret')}
+        concealLabel={i18nService.t('imHideSecret')}
+        revealed={showSecrets['botToken']}
+        onRevealChange={revealed => setShowSecrets(prev => ({ ...prev, botToken: revealed }))}
+      />
 
       {/* Advanced Settings (collapsible) */}
       <details className="group">
         <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary transition-colors">
           {i18nService.t('imAdvancedSettings')}
         </summary>
-        <div className="mt-2 space-y-3 pl-2 border-l-2 border-border-subtle">
+        <div className="mt-2 flex flex-col gap-3 pl-2 border-l-2 border-border-subtle">
           {/* DM Policy */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">DM Policy</label>
-            <Select
-              value={instance.dmPolicy}
-              onValueChange={value => {
-                const update = { dmPolicy: value as DiscordOpenClawConfig['dmPolicy'] };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pairing">{i18nService.t('imDmPolicyPairing')}</SelectItem>
-                <SelectItem value="allowlist">{i18nService.t('imDmPolicyAllowlist')}</SelectItem>
-                <SelectItem value="open">{i18nService.t('imDmPolicyOpen')}</SelectItem>
-                <SelectItem value="disabled">{i18nService.t('imDmPolicyDisabled')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <IMSelectField
+            id={`discord-${instance.instanceId}-dm-policy`}
+            label={i18nService.t('imDmPolicy')}
+            value={instance.dmPolicy}
+            options={[
+              { value: 'pairing', label: i18nService.t('imDmPolicyPairing') },
+              { value: 'allowlist', label: i18nService.t('imDmPolicyAllowlist') },
+              { value: 'open', label: i18nService.t('imDmPolicyOpen') },
+              { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
+            ]}
+            onValueChange={value => {
+              const update = { dmPolicy: value as DiscordOpenClawConfig['dmPolicy'] };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
 
           {/* Allow From (User IDs) */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              Allow From (User IDs)
-            </label>
+          <IMField
+            id={`discord-${instance.instanceId}-allow-user`}
+            label={i18nService.t('imAllowFromUserIds')}
+          >
             <div className="flex gap-2">
               <Input
+                id={`discord-${instance.instanceId}-allow-user`}
                 type="text"
                 value={allowedUserIdInput}
                 onChange={e => setAllowedUserIdInput(e.target.value)}
@@ -321,7 +285,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                   }
                 }}
               >
-                {i18nService.t('add') || '添加'}
+                {i18nService.t('add')}
               </Button>
             </div>
             {instance.allowFrom.length > 0 && (
@@ -335,52 +299,48 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                      size="icon-xs"
+                      aria-label={i18nService.t('delete')}
                       onClick={() => {
                         const newIds = instance.allowFrom.filter(uid => uid !== id);
                         onConfigChange({ allowFrom: newIds });
                         void onSave({ allowFrom: newIds });
                       }}
                     >
-                      <X className="w-3 h-3" />
+                      <X data-icon="inline-start" />
                     </Button>
                   </span>
                 ))}
               </div>
             )}
-          </div>
+          </IMField>
 
           {/* Group Policy */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">Group Policy</label>
-            <Select
-              value={instance.groupPolicy}
-              onValueChange={value => {
-                const update = { groupPolicy: value as DiscordOpenClawConfig['groupPolicy'] };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="allowlist">{i18nService.t('imGroupPolicyAllowlist')}</SelectItem>
-                <SelectItem value="open">{i18nService.t('imGroupPolicyOpen')}</SelectItem>
-                <SelectItem value="disabled">{i18nService.t('imGroupPolicyDisabled')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <IMSelectField
+            id={`discord-${instance.instanceId}-group-policy`}
+            label={i18nService.t('imGroupPolicy')}
+            value={instance.groupPolicy}
+            options={[
+              { value: 'allowlist', label: i18nService.t('imGroupPolicyAllowlist') },
+              { value: 'open', label: i18nService.t('imGroupPolicyOpen') },
+              { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
+            ]}
+            onValueChange={value => {
+              const update = { groupPolicy: value as DiscordOpenClawConfig['groupPolicy'] };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
 
           {/* Group Allow From (Server IDs) */}
           {instance.groupPolicy === 'allowlist' && (
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-muted-foreground">
-                Group Allow From (Server IDs)
-              </label>
+            <IMField
+              id={`discord-${instance.instanceId}-allow-server`}
+              label={i18nService.t('imGroupAllowFromServerIds')}
+            >
               <div className="flex gap-2">
                 <Input
+                  id={`discord-${instance.instanceId}-allow-server`}
                   type="text"
                   value={groupAllowFromInput}
                   onChange={e => setGroupAllowFromInput(e.target.value)}
@@ -413,7 +373,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                     }
                   }}
                 >
-                  {i18nService.t('add') || '添加'}
+                  {i18nService.t('add')}
                 </Button>
               </div>
               {instance.groupAllowFrom.length > 0 && (
@@ -427,30 +387,31 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                        size="icon-xs"
+                        aria-label={i18nService.t('delete')}
                         onClick={() => {
                           const newIds = instance.groupAllowFrom.filter(gid => gid !== id);
                           onConfigChange({ groupAllowFrom: newIds });
                           void onSave({ groupAllowFrom: newIds });
                         }}
                       >
-                        <X className="w-3 h-3" />
+                        <X data-icon="inline-start" />
                       </Button>
                     </span>
                   ))}
                 </div>
               )}
-            </div>
+            </IMField>
           )}
 
           {/* Per-Guild Settings */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">
-              {language === 'zh' ? 'Guild 独立配置' : 'Per-Guild Settings'}
-            </label>
+          <IMField
+            id={`discord-${instance.instanceId}-guild-id`}
+            label={i18nService.t('imDiscordGuildSettings')}
+          >
             <div className="flex gap-2">
               <Input
+                id={`discord-${instance.instanceId}-guild-id`}
                 type="text"
                 value={guildIdInput}
                 onChange={e => setGuildIdInput(e.target.value)}
@@ -483,141 +444,124 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
                   }
                 }}
               >
-                {i18nService.t('add') || '添加'}
+                {i18nService.t('add')}
               </Button>
             </div>
             {Object.keys(instance.guilds).length > 0 && (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 flex flex-col gap-2">
                 {Object.entries(instance.guilds).map(([guildId, guildCfg]) => (
                   <div
                     key={guildId}
-                    className="p-2 rounded-lg bg-surface border border-border-subtle space-y-2"
+                    className="p-2 rounded-lg bg-surface border border-border-subtle flex flex-col gap-2"
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-mono text-foreground">{guildId}</span>
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
-                        className="h-5 w-5 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                        size="icon-xs"
+                        aria-label={i18nService.t('delete')}
                         onClick={() => handleRemoveGuild(guildId)}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X data-icon="inline-start" />
                       </Button>
                     </div>
                     {/* requireMention toggle */}
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs text-muted-foreground">Require @mention</label>
-                      <Switch
-                        checked={guildCfg.requireMention}
-                        onCheckedChange={checked =>
-                          handleGuildConfigChange(guildId, { requireMention: Boolean(checked) })
-                        }
-                      />
-                    </div>
+                    <IMSwitchField
+                      id={`discord-${instance.instanceId}-${guildId}-require-mention`}
+                      label={i18nService.t('imRequireMention')}
+                      checked={Boolean(guildCfg.requireMention)}
+                      onCheckedChange={checked =>
+                        handleGuildConfigChange(guildId, { requireMention: Boolean(checked) })
+                      }
+                    />
                     {/* Guild-level systemPrompt */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">
-                        {language === 'zh' ? '系统提示词' : 'System Prompt'}
-                      </label>
-                      <Textarea
-                        value={guildCfg.systemPrompt ?? ''}
-                        onChange={e => {
-                          const currentGuild = instance.guilds[guildId] ?? {};
-                          const newGuilds = {
-                            ...instance.guilds,
-                            [guildId]: { ...currentGuild, systemPrompt: e.target.value },
-                          };
-                          onConfigChange({ guilds: newGuilds });
-                        }}
-                        onBlur={() => void onSave()}
-                        className="min-h-[60px] resize-y text-xs"
-                        placeholder={
-                          language === 'zh'
-                            ? '该 Guild 专属系统提示词（可选）'
-                            : 'Custom system prompt for this guild (optional)'
-                        }
-                      />
-                    </div>
+                    <IMTextareaField
+                      id={`discord-${instance.instanceId}-${guildId}-system-prompt`}
+                      label={i18nService.t('systemPrompt')}
+                      value={guildCfg.systemPrompt ?? ''}
+                      onChange={e => {
+                        const currentGuild = instance.guilds[guildId] ?? {};
+                        const newGuilds = {
+                          ...instance.guilds,
+                          [guildId]: { ...currentGuild, systemPrompt: e.target.value },
+                        };
+                        onConfigChange({ guilds: newGuilds });
+                      }}
+                      onBlur={() => void onSave()}
+                      className="min-h-[60px] resize-y text-xs"
+                      placeholder={i18nService.t('imDiscordGuildSystemPromptPlaceholder')}
+                    />
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </IMField>
 
           {/* Streaming */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">Streaming</label>
-            <Select
-              value={instance.streaming}
-              onValueChange={value => {
-                const update = { streaming: value as DiscordOpenClawConfig['streaming'] };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="off">Off</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
-                <SelectItem value="block">Block</SelectItem>
-                <SelectItem value="progress">Progress</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <IMSelectField
+            id={`discord-${instance.instanceId}-streaming`}
+            label={i18nService.t('imStreaming')}
+            value={instance.streaming}
+            options={[
+              { value: 'off', label: i18nService.t('imStreamingOff') },
+              { value: 'partial', label: i18nService.t('imStreamingPartial') },
+              { value: 'block', label: i18nService.t('imStreamingBlock') },
+              { value: 'progress', label: i18nService.t('imStreamingProgress') },
+            ]}
+            onValueChange={value => {
+              const update = { streaming: value as DiscordOpenClawConfig['streaming'] };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
 
           {/* Proxy */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">Proxy</label>
-            <Input
-              type="text"
-              value={instance.proxy}
-              onChange={e => onConfigChange({ proxy: e.target.value })}
-              onBlur={() => void onSave()}
-              placeholder="http://proxy:port"
-            />
-          </div>
+          <IMInputField
+            id={`discord-${instance.instanceId}-proxy`}
+            label={i18nService.t('imProxy')}
+            type="text"
+            value={instance.proxy}
+            onChange={e => onConfigChange({ proxy: e.target.value })}
+            onBlur={() => void onSave()}
+            placeholder="http://proxy:port"
+          />
 
           {/* History Limit */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">History Limit</label>
-            <Input
-              type="number"
-              value={instance.historyLimit}
-              onChange={e => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
-              onBlur={() => void onSave()}
-              min={1}
-              max={200}
-            />
-          </div>
+          <IMInputField
+            id={`discord-${instance.instanceId}-history-limit`}
+            label={i18nService.t('imHistoryLimit')}
+            type="number"
+            value={instance.historyLimit}
+            onChange={e => onConfigChange({ historyLimit: parseInt(e.target.value) || 50 })}
+            onBlur={() => void onSave()}
+            min={1}
+            max={200}
+          />
 
           {/* Media Max MB */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-muted-foreground">Media Max MB</label>
-            <Input
-              type="number"
-              value={instance.mediaMaxMb}
-              onChange={e => onConfigChange({ mediaMaxMb: parseInt(e.target.value) || 25 })}
-              onBlur={() => void onSave()}
-              min={1}
-              max={100}
-            />
-          </div>
+          <IMInputField
+            id={`discord-${instance.instanceId}-media-max-mb`}
+            label={i18nService.t('imMediaMaxMb')}
+            type="number"
+            value={instance.mediaMaxMb}
+            onChange={e => onConfigChange({ mediaMaxMb: parseInt(e.target.value) || 25 })}
+            onBlur={() => void onSave()}
+            min={1}
+            max={100}
+          />
 
           {/* Debug */}
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-medium text-muted-foreground">Debug</label>
-            <Switch
-              checked={instance.debug}
-              onCheckedChange={checked => {
-                const update = { debug: Boolean(checked) };
-                onConfigChange(update);
-                void onSave(update);
-              }}
-            />
-          </div>
+          <IMSwitchField
+            id={`discord-${instance.instanceId}-debug`}
+            label={i18nService.t('imDebugMode')}
+            checked={instance.debug}
+            onCheckedChange={checked => {
+              const update = { debug: Boolean(checked) };
+              onConfigChange(update);
+              void onSave(update);
+            }}
+          />
         </div>
       </details>
 
@@ -630,7 +574,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
           onClick={onTestConnectivity}
           disabled={testingPlatform === 'discord'}
         >
-          <Signal className="h-3.5 w-3.5 mr-1.5" />
+          <Signal data-icon="inline-start" />
           {testingPlatform === 'discord'
             ? i18nService.t('imConnectivityTesting')
             : connectivityResults['discord' as keyof typeof connectivityResults]
@@ -641,17 +585,13 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
       {/* Bot username display */}
       {instanceStatus?.botUsername && (
-        <div className="text-xs text-green-600 dark:text-green-400 bg-green-500/10 px-3 py-2 rounded-lg">
-          Bot: {instanceStatus.botUsername}
-        </div>
+        <IMStatusAlert>
+          {i18nService.t('imBot')}: {instanceStatus.botUsername}
+        </IMStatusAlert>
       )}
 
       {/* Error display */}
-      {instanceStatus?.lastError && (
-        <div className="text-xs text-red-500 bg-red-500/10 px-3 py-2 rounded-lg">
-          {instanceStatus.lastError}
-        </div>
-      )}
+      {instanceStatus?.lastError && <IMStatusAlert error>{instanceStatus.lastError}</IMStatusAlert>}
     </div>
   );
 };

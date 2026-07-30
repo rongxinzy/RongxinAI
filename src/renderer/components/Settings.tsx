@@ -43,6 +43,7 @@ import {
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
 } from '../../shared/providers';
+import { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import {
   type AppConfig,
   defaultConfig,
@@ -1726,18 +1727,19 @@ const Settings: React.FC<SettingsProps> = ({
       return status.message.trim();
     }
     switch (status.phase) {
-      case 'not_installed':
+      case OpenClawEnginePhase.NotInstalled:
         return i18nService.t('coworkOpenClawNotInstalledNotice');
-      case 'installing':
+      case OpenClawEnginePhase.Installing:
         return i18nService.t('coworkOpenClawInstalling');
-      case 'ready':
+      case OpenClawEnginePhase.Ready:
         return i18nService.t('coworkOpenClawReadyNotice');
-      case 'starting':
-      case 'compiling':
+      case OpenClawEnginePhase.Starting:
+      case OpenClawEnginePhase.Compiling:
+      case OpenClawEnginePhase.Restarting:
         return i18nService.t('coworkOpenClawStarting');
-      case 'error':
+      case OpenClawEnginePhase.Error:
         return i18nService.t('coworkOpenClawError');
-      case 'running':
+      case OpenClawEnginePhase.Running:
       default:
         return i18nService.t('coworkOpenClawRunning');
     }
