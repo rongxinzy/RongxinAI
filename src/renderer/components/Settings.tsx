@@ -86,7 +86,8 @@ import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
 import ErrorMessage from './ErrorMessage';
 import { GitHubCopilotIcon } from './icons/providers';
 import IMSettings from './im/IMSettings';
-import EmailSkillConfig from './skills/EmailSkillConfig';
+import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
+import type { EmailSettingsHandle } from './settings/email/types';
 
 type TabType =
   | 'general'
@@ -711,6 +712,7 @@ const Settings: React.FC<SettingsProps> = ({
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
   const didSaveRef = useRef(false);
+  const emailSettingsRef = useRef<EmailSettingsHandle>(null);
 
   // Add state for active provider
   const [activeProvider, setActiveProvider] = useState<ProviderType>(getDefaultActiveProvider());
@@ -1974,6 +1976,12 @@ const Settings: React.FC<SettingsProps> = ({
     setError(null);
 
     try {
+      const emailSaved = (await emailSettingsRef.current?.saveIfDirty()) ?? true;
+      if (!emailSaved) {
+        setActiveTab('email');
+        return;
+      }
+
       const normalizedProviders = Object.fromEntries(
         Object.entries(providers).map(([providerKey, providerConfig]) => {
           const apiFormat = getEffectiveApiFormat(providerKey, providerConfig.apiFormat);
@@ -3218,7 +3226,7 @@ const Settings: React.FC<SettingsProps> = ({
         return renderAppearanceSettings();
 
       case 'email':
-        return <EmailSkillConfig />;
+        return null;
 
       case 'coworkAgentEngine':
         return (
@@ -5232,7 +5240,10 @@ const Settings: React.FC<SettingsProps> = ({
               className="px-4 sm:px-6 py-4 flex-1 overflow-y-auto"
               style={{ scrollbarGutter: 'stable' }}
             >
-              {renderTabContent()}
+              <div className={activeTab === 'email' ? 'block' : 'hidden'}>
+                <EmailSettingsPage ref={emailSettingsRef} />
+              </div>
+              {activeTab !== 'email' && renderTabContent()}
             </div>
 
             {/* Footer buttons */}
