@@ -40,7 +40,7 @@ let applicationOutput = '';
 
 const application = spawn(
   'xvfb-run',
-  ['-a', executablePath, `--remote-debugging-port=${remoteDebuggingPort}`],
+  ['-a', executablePath, '--no-sandbox', `--remote-debugging-port=${remoteDebuggingPort}`],
   {
     detached: true,
     env: {
