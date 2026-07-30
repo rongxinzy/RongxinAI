@@ -47,7 +47,7 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
           </PromptInputButton>
         }
       />
-      <DropdownMenuContent side="top" align="start" sideOffset={4} className="w-56">
+      <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56">
         <DropdownMenuRadioGroup
           value={value}
           onValueChange={nextValue => onChange(nextValue as CoworkPermissionMode)}
@@ -62,7 +62,7 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
               ],
             ] as const
           ).map(([mode, labelKey, descriptionKey]) => (
-            <DropdownMenuRadioItem key={mode} value={mode} className="items-start py-1.5">
+            <DropdownMenuRadioItem key={mode} value={mode} className="items-center py-1.5">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm">{i18nService.t(labelKey)}</span>
                 <span className="text-xs text-muted-foreground">

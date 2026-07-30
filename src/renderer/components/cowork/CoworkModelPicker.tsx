@@ -80,7 +80,7 @@ export function CoworkModelPicker({
       />
       <PopoverContent
         className="w-72 rounded-md! border! border-border! bg-surface! p-0 shadow-md ring-0! outline-none!"
-        side="top"
+        side="bottom"
         align="start"
         sideOffset={4}
       >
