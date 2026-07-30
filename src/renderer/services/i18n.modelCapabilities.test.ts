@@ -22,4 +22,12 @@ describe('model capability translations', () => {
     expect(i18nService.t('capabilityUnknown')).toBe('Unknown');
     expect(i18nService.t('toolCapabilityUnknownFallback')).toContain('regular chat');
   });
+
+  test('uses the edge-inference label for the sidebar entry', () => {
+    i18nService.setLanguage('zh', { persist: false });
+    expect(i18nService.t('localInferenceSidebarTitle')).toBe('端侧推理');
+
+    i18nService.setLanguage('en', { persist: false });
+    expect(i18nService.t('localInferenceSidebarTitle')).toBe('Edge Inference');
+  });
 });
