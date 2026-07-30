@@ -24,6 +24,8 @@ IMPORTANT: Run on an UNPACKED directory (from xlsx_unpack.py).
 After running, repack with xlsx_pack.py.
 """
 
+from __future__ import annotations
+
 import argparse
 import copy
 import os
