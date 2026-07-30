@@ -1,9 +1,5 @@
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
-import {
-  LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
-  LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS,
-} from '../constants';
 
 export function isPullInProgress(progress?: Record<string, unknown>): boolean {
   if (!progress) return false;
@@ -85,14 +81,6 @@ export function normalizeInstallProgress(
 
 export function isInstallTerminalPhase(phase: LlamaCppInstallProgress['phase']): boolean {
   return ['done', 'failed', 'cancelled', 'needs-manual'].includes(phase);
-}
-
-export function getLocalInferenceToastAutoDismissMs(): number {
-  return LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS;
-}
-
-export function getLocalInferenceProgressDismissMs(): number {
-  return LOCAL_INFERENCE_PROGRESS_DISMISS_MS;
 }
 
 export function humanizeInstallPhase(phase: string): string {

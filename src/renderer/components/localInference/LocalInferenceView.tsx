@@ -47,12 +47,8 @@ import { LocalInferenceToastKind } from './types';
 import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
 import {
   buildMarketplaceSearchParams,
-  getInstallableMarketplaceModels,
 } from './utils/marketplace';
 import {
-  formatInstallProgressSummary,
-  getLocalInferenceProgressDismissMs,
-  getLocalInferenceToastAutoDismissMs,
   isInstallTerminalPhase,
   isPullInProgress,
   normalizeInstallProgress,
@@ -69,15 +65,6 @@ interface LocalInferenceViewProps {
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
 }
-
-const LlamaCppServiceAction = {
-  Ready: 'ready',
-  Install: 'install',
-  Start: 'start',
-  Refresh: 'refresh',
-} as const;
-
-type LlamaCppServiceAction = (typeof LlamaCppServiceAction)[keyof typeof LlamaCppServiceAction];
 
 const LOCAL_INFERENCE_TAB_ORDER: LocalInferenceTab[] = ['models', 'marketplace'];
 
@@ -840,24 +827,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 };
 
-function getModelCardBusyState(input: {
-  modelName: string;
-  loadingModelName: string | null;
-  unloadingModelName: string | null;
-  globalLoading: boolean;
-}): { cardBusy: boolean; buttonsDisabled: boolean } {
-  const cardBusy = Boolean(
-    input.loadingModelName === input.modelName || input.unloadingModelName === input.modelName,
-  );
-  const anotherModelLoading = Boolean(
-    input.loadingModelName && input.loadingModelName !== input.modelName,
-  );
-  return {
-    cardBusy,
-    buttonsDisabled: input.globalLoading || cardBusy || anotherModelLoading,
-  };
-}
-
 function shouldBlockModelAction(input: {
   modelName: string;
   unloadingModelName: string | null;
@@ -873,35 +842,6 @@ function getRemainingBusyMs(input: {
   return Math.max(0, input.minimumBusyMs - Math.max(0, input.nowMs - input.startedAtMs));
 }
 
-function resolveLlamaCppServiceAction(
-  snapshot: Pick<OllamaStatusSnapshot, 'status'> | null | undefined,
-): LlamaCppServiceAction {
-  switch (snapshot?.status) {
-    case 'running':
-      return LlamaCppServiceAction.Ready;
-    case 'not-installed':
-      return LlamaCppServiceAction.Install;
-    case 'installed':
-    case 'stopped':
-      return LlamaCppServiceAction.Start;
-    default:
-      return LlamaCppServiceAction.Refresh;
-  }
-}
-
-export const __test__buildMarketplaceSearchParams = (
-  input: Parameters<typeof buildMarketplaceSearchParams>[0],
-) => buildMarketplaceSearchParams(input);
-export const __test__getInstallableMarketplaceModels = (
-  models: MarketplaceModel[],
-  installedModelPathMap: Map<string, string>,
-) => getInstallableMarketplaceModels(models, installedModelPathMap);
-export const __test__getModelCardBusyState = (input: {
-  modelName: string;
-  loadingModelName: string | null;
-  unloadingModelName: string | null;
-  globalLoading: boolean;
-}) => getModelCardBusyState(input);
 export const __test__shouldBlockModelAction = (input: {
   modelName: string;
   unloadingModelName: string | null;
@@ -911,17 +851,5 @@ export const __test__getRemainingBusyMs = (input: {
   nowMs: number;
   minimumBusyMs: number;
 }) => getRemainingBusyMs(input);
-export const __test__resolveLlamaCppServiceAction = (
-  snapshot: Pick<OllamaStatusSnapshot, 'status'> | null | undefined,
-) => resolveLlamaCppServiceAction(snapshot);
-export const __test__isInstallTerminalPhase = (phase: LlamaCppInstallProgress['phase']) =>
-  isInstallTerminalPhase(phase);
-export const __test__getLocalInferenceToastAutoDismissMs = () =>
-  getLocalInferenceToastAutoDismissMs();
-export const __test__getLocalInferenceProgressDismissMs = () =>
-  getLocalInferenceProgressDismissMs();
-export const __test__formatInstallProgressSummary = (
-  progress: Parameters<typeof formatInstallProgressSummary>[0],
-) => formatInstallProgressSummary(progress);
 
 export default LocalInferenceView;
