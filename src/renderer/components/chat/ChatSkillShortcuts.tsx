@@ -7,6 +7,7 @@ import { RootState } from '../../store';
 import { selectIsStreaming } from '../../store/selectors/coworkSelectors';
 import { clearCurrentSession } from '../../store/slices/coworkSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
+import { DocumentWritingIcon } from '../icons/DocumentWritingIcon';
 import { CHAT_SKILL_SHORTCUTS, ChatSkillShortcut } from './constants';
 
 const ChatSkillShortcuts: React.FC = () => {
@@ -52,17 +53,22 @@ const ChatSkillShortcuts: React.FC = () => {
             <button
               key={entry.id}
               type="button"
+              data-chat-skill-shortcut={entry.id}
               disabled={isStreaming}
               onClick={() => handleSelect(entry)}
               className={cn(
-                'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] transition-colors',
+                'chat-skill-shortcut flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] transition-colors',
                 isActive
                   ? 'sidebar-interactive-surface-active font-medium text-foreground'
                   : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground',
                 isStreaming && 'pointer-events-none opacity-50',
               )}
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              {entry.id === 'docs' ? (
+                <DocumentWritingIcon />
+              ) : (
+                <Icon aria-hidden="true" className="chat-skill-shortcut-icon size-4 shrink-0" />
+              )}
               <span className="min-w-0 truncate">{i18nService.t(entry.labelKey)}</span>
             </button>
           );

@@ -4,7 +4,7 @@ import { Checkbox } from '@shared/components/ui/checkbox';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { Cpu, Settings, TriangleAlert } from 'lucide-react';
-import { Clock, MessageCircle, PanelLeft, Pencil, Puzzle, Search, Trash2, X } from 'lucide-react';
+import { MessageCircle, PanelLeft, Puzzle, Search, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -34,6 +34,8 @@ import type { CoworkSessionSummary } from '../types/cowork';
 import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
+import { NewConversationIcon } from './icons/NewConversationIcon';
+import { SidebarAnimatedClockIcon } from './icons/SidebarAnimatedClockIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -64,7 +66,6 @@ const SIDEBAR_COLLAPSE_TRANSITION_MS = 200;
 const sidebarNavItemClassName =
   'sidebar-interactive-surface w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-[14px] font-normal text-muted-foreground transition-colors';
 const activeSidebarNavItemClassName = `${sidebarNavItemClassName} sidebar-interactive-surface-active text-foreground`;
-const sidebarCreateIconClassName = 'h-4 w-4 shrink-0';
 
 const Sidebar: React.FC<SidebarProps> = ({
   onShowSettings,
@@ -417,7 +418,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             : 'sidebar-interactive-surface cursor-pointer transition-colors',
         )}
       >
-        <Search className="h-4 w-4 shrink-0" />
+        <Search className="sidebar-animated-search-icon h-4 w-4 shrink-0" />
         {searchActive ? (
           <>
             <input
@@ -546,7 +547,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 onClick={onNewChat}
                 className={sidebarNavItemClassName}
               >
-                <Pencil className={sidebarCreateIconClassName} />
+                <NewConversationIcon />
                 {workMode === WorkMode.Chat ? i18nService.t('newChat') : i18nService.t('newTask')}
               </Button>
             </div>
@@ -582,7 +583,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }
                 aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
               >
-                <Clock className="h-4 w-4 shrink-0" />
+                <SidebarAnimatedClockIcon />
                 {i18nService.t('scheduledTasks')}
               </Button>
             )}
