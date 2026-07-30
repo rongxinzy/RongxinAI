@@ -1,13 +1,14 @@
 {
   "version": 1,
   "description": "Default skill configuration for RongxinAI",
+  "retired": ["pptx"],
   "defaults": {
     "docx": { "order": 10, "enabled": true },
     "web-search": { "order": 15, "enabled": true },
     "deep-research": { "order": 16, "enabled": true },
     "deli-autoresearch": { "order": 17, "enabled": true },
     "xlsx": { "order": 20, "enabled": true },
-    "pptx": { "order": 30, "enabled": true },
+    "presentation-studio": { "order": 30, "enabled": true },
     "pdf": { "order": 40, "enabled": true },
     "remotion": { "order": 50, "enabled": true },
     "develop-web-game": { "order": 60, "enabled": true },

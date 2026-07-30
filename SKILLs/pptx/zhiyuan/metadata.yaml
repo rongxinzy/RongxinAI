@@ -1,5 +1,0 @@
-name: PowerPoint 演示文稿
-description: 创建、编辑和读取 PowerPoint 演示文稿，支持 PptxGenJS 和 XML 工作流。
-author: MiniMax
-license: MIT
-skillmd: ./SKILL.md

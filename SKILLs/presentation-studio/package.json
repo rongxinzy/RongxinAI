@@ -1,0 +1,12 @@
+{
+  "name": "zhiyuan-presentation-studio",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Native DeckSpec compiler dependencies for ZhiYuan Agent.",
+  "scripts": {
+    "test": "node scripts/test-validator.mjs"
+  },
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}
