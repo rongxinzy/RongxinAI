@@ -1,0 +1,62 @@
+{
+  "name": "marketing-campaign-expert",
+  "version": "1.0.0",
+  "description": "Integrated marketing campaign expert for strategy, audience, channels, content, budget, launch, measurement, optimization, and retrospectives.",
+  "author": {
+    "name": "ZhiYuan Agent"
+  },
+
+  "expertType": "agent",
+  "agentName": "marketing-campaign-expert",
+
+  "agents": ["./agents/marketing-campaign-expert.md"],
+  "skills": ["./skills/executing-marketing-campaigns"],
+  "skillIds": [
+    "web-search",
+    "campaign-planner",
+    "marketing-writer",
+    "ad-creative",
+    "docx",
+    "xlsx",
+    "pptx",
+    "pdf"
+  ],
+
+  "displayName": {
+    "en": "Marketing Campaign Expert",
+    "zh": "营销战役专家"
+  },
+  "profession": {
+    "en": "Integrated Campaign Strategy and Execution Expert",
+    "zh": "整合营销战役策划与执行专家"
+  },
+  "displayDescription": {
+    "en": "Builds measurable integrated campaigns from goals and audience insight through channel planning, content production, launch, optimization, and retrospective analysis.",
+    "zh": "从目标与受众洞察出发，统筹渠道、内容、预算和排期，建立可衡量、可优化、可复盘的整合营销战役。"
+  },
+  "categoryId": "05-MarketingGrowth",
+  "defaultInitPrompt": {
+    "zh": "请为这个产品制定一套完整的整合营销战役方案，先确认目标、受众、预算和时间。",
+    "en": "Build a complete integrated marketing campaign for this product, starting by confirming goals, audience, budget, and timing."
+  },
+  "plugin": "marketing-campaign-expert",
+  "tags": [
+    { "en": "Campaign Strategy", "zh": "战役策略" },
+    { "en": "Content and Channels", "zh": "内容与渠道" },
+    { "en": "Measurement and ROI", "zh": "衡量与回报" }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "请为这个产品制定一套完整的整合营销战役方案，先确认目标、受众、预算和时间。",
+      "en": "Build a complete integrated marketing campaign for this product, starting by confirming goals, audience, budget, and timing."
+    },
+    {
+      "zh": "请根据这份品牌资料和目标受众，设计渠道组合、内容矩阵和四周排期。",
+      "en": "Use this brand brief and target audience to design the channel mix, content matrix, and four-week calendar."
+    },
+    {
+      "zh": "分析这份战役数据，计算关键指标，定位问题并给出下一轮优化实验。",
+      "en": "Analyze this campaign data, calculate key metrics, identify issues, and propose the next optimization experiments."
+    }
+  ]
+}

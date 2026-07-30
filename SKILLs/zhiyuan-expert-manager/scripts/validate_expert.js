@@ -219,6 +219,22 @@ function validatePluginJson(pluginJson, expertDir, result) {
     }
   }
 
+  if (pluginJson.skillIds !== undefined) {
+    if (!Array.isArray(pluginJson.skillIds)) {
+      result.error("plugin.json: 'skillIds' must be an array when provided");
+    } else {
+      const invalidSkillIds = pluginJson.skillIds.filter(
+        skillId => typeof skillId !== 'string' || skillId.trim().length === 0,
+      );
+      if (invalidSkillIds.length > 0) {
+        result.error("plugin.json: 'skillIds' must contain only non-empty strings");
+      }
+      if (new Set(pluginJson.skillIds).size !== pluginJson.skillIds.length) {
+        result.error("plugin.json: 'skillIds' must not contain duplicates");
+      }
+    }
+  }
+
   if (expertType === 'team') {
     const teamInfo = pluginJson.teamInfo;
     if (typeof teamInfo !== 'object' || teamInfo === null || Array.isArray(teamInfo)) {

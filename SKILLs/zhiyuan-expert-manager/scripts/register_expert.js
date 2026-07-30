@@ -184,8 +184,8 @@ function resolvePackagePath(expertDir, packagePath, kind) {
 }
 
 function resolveSkillIds(pluginJson, expertDir) {
-  const skillIds = [];
-  if (!pluginJson.skills || !Array.isArray(pluginJson.skills)) return skillIds;
+  const skillIds = Array.isArray(pluginJson.skillIds) ? [...pluginJson.skillIds] : [];
+  if (!pluginJson.skills || !Array.isArray(pluginJson.skills)) return [...new Set(skillIds)];
 
   for (const skillPath of pluginJson.skills) {
     const fullPath = resolvePackagePath(expertDir, skillPath, 'skill');
@@ -204,7 +204,7 @@ function resolveSkillIds(pluginJson, expertDir) {
     }
     skillIds.push(skillName);
   }
-  return skillIds;
+  return [...new Set(skillIds)];
 }
 
 function validatePackagePaths(pluginJson, expertDir) {
@@ -731,6 +731,7 @@ if (require.main === module) {
 module.exports = {
   registerExpert,
   parseExpertPackage,
+  resolveSkillIds,
   getDefaultDbPath,
   getDefaultExpertPackagesDir,
   getPiAgentsDir,
