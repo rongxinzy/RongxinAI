@@ -4,7 +4,7 @@ import { Checkbox } from '@shared/components/ui/checkbox';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { Cpu, Settings, TriangleAlert } from 'lucide-react';
-import { MessageCircle, PanelLeft, Puzzle, Search, Trash2, X } from 'lucide-react';
+import { MessageCircle, PanelLeft, Search, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -35,6 +35,7 @@ import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import { NewConversationIcon } from './icons/NewConversationIcon';
+import { ExpertProfileIcon } from './icons/SidebarSemanticIcons';
 import { SidebarAnimatedClockIcon } from './icons/SidebarAnimatedClockIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
@@ -602,7 +603,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   }
                   aria-current={activeView === 'expert' ? 'page' : undefined}
                 >
-                  <Puzzle className="h-4 w-4 shrink-0" />
+                  <ExpertProfileIcon />
                   {i18nService.t('expert')}
                 </Button>
               </>
