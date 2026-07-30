@@ -47,3 +47,7 @@ jobs:
         run: bun run compile:electron
       - name: Run tests
         run: bun run test
+      - name: Verify Presentation Studio compiler and validator
+        run: |
+          npm ci --prefix SKILLs/presentation-studio --ignore-scripts
+          npm test --prefix SKILLs/presentation-studio
