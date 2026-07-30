@@ -27,11 +27,48 @@ export type ArtifactDetectionResult = {
   needsFileLoad: boolean;
 };
 
+type ProcessedMessageSnapshot = {
+  type: CoworkMessage['type'];
+  content: string;
+  metadata: string;
+};
+
+function createMessageSnapshot(message: CoworkMessage): ProcessedMessageSnapshot {
+  const metadata = message.metadata;
+  return {
+    type: message.type,
+    content: message.content,
+    metadata: JSON.stringify({
+      toolName: metadata?.toolName,
+      toolInput: metadata?.toolInput,
+      toolUseId: metadata?.toolUseId,
+      isError: metadata?.isError,
+      error: metadata?.error,
+      isStreaming: metadata?.isStreaming,
+      isFinal: metadata?.isFinal,
+      isFinalAnswer: metadata?.isFinalAnswer,
+      isThinking: metadata?.isThinking,
+    }),
+  };
+}
+
+function hasMessageChanged(
+  previous: ProcessedMessageSnapshot | undefined,
+  current: ProcessedMessageSnapshot,
+): boolean {
+  return (
+    !previous ||
+    previous.type !== current.type ||
+    previous.content !== current.content ||
+    previous.metadata !== current.metadata
+  );
+}
+
 export class ArtifactDetectionService {
   private worker: Worker | null = null;
   private pending = new Map<number, (result: ArtifactDetectionResult[]) => void>();
   private seq = 0;
-  private processedMessageIds = new Set<string>();
+  private processedMessages = new Map<string, ProcessedMessageSnapshot>();
   private loadedFileIds = new Set<string>();
 
   constructor(
@@ -72,24 +109,29 @@ export class ArtifactDetectionService {
   }
 
   /**
-   * Process only messages that have not been processed yet.
+   * Process when messages are added or their artifact-relevant state changes.
    *
    * For incremental detection we send the full message list because tool_use
    * messages need to be paired with their tool_result, and the result may
-   * arrive later. The worker deduplicates via message ids naturally; we just
-   * avoid redundant work on the caller side by remembering the last message
-   * count and re-sending from the start only when new messages appear.
+   * arrive later. Assistant messages also update in place while streaming, so
+   * message ids alone cannot determine whether a snapshot was processed.
    */
   async processMessages(
     messages: CoworkMessage[],
     sessionId: string,
     cwd?: string | null,
   ): Promise<void> {
-    const unprocessed = messages.filter(m => !this.processedMessageIds.has(m.id));
-    if (unprocessed.length === 0) return;
+    const snapshots = messages.map(message => ({
+      id: message.id,
+      snapshot: createMessageSnapshot(message),
+    }));
+    const hasChanges = snapshots.some(({ id, snapshot }) =>
+      hasMessageChanged(this.processedMessages.get(id), snapshot),
+    );
+    if (!hasChanges) return;
 
-    for (const m of messages) {
-      this.processedMessageIds.add(m.id);
+    for (const { id, snapshot } of snapshots) {
+      this.processedMessages.set(id, snapshot);
     }
 
     const detected = await this.detect(messages, sessionId);
@@ -100,7 +142,7 @@ export class ArtifactDetectionService {
   }
 
   reset(): void {
-    this.processedMessageIds.clear();
+    this.processedMessages.clear();
     this.loadedFileIds.clear();
   }
 
