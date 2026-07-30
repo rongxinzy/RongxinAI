@@ -108,8 +108,51 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: darwin-arm64-default, path: "release/*.dmg" }
 
+  build-linux-x64:
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-release.outputs.commit }}
+      - uses: actions/setup-node@v4
+        with: { node-version: "24.x" }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: "1.3.14" }
+      # OpenClaw is built with pnpm upstream; Bun remains this repository's installer.
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - name: Install Electron and virtual desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
+            libxss1 libxtst6 libuuid1 xdg-utils xvfb
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build Ubuntu deb and Linux AppImage
+        run: bun run dist:linux
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify the packaged renderer in a virtual Ubuntu desktop
+        run: >-
+          node scripts/verify-linux-renderer.mjs
+          release/linux-unpacked
+          release/linux-render-smoke.png
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
+        with:
+          name: linux-x64-default
+          path: |
+            release/*.deb
+            release/*.AppImage
+            release/linux-render-smoke.png
+
   publish:
-    needs: [prepare-release, build-windows-lite, build-macos-arm64]
+    needs: [prepare-release, build-windows-lite, build-macos-arm64, build-linux-x64]
     runs-on: ubuntu-latest
     environment: release
     steps:
@@ -129,12 +172,19 @@ jobs:
         run: |
           mapfile -t windows_artifacts < <(find artifacts/win32-x64-lite -type f -name '*.exe')
           mapfile -t macos_artifacts < <(find artifacts/darwin-arm64-default -type f -name '*.dmg')
-          if [[ ${#windows_artifacts[@]} -ne 1 || ${#macos_artifacts[@]} -ne 1 ]]; then
-            echo 'Expected exactly one Windows installer and one macOS installer' >&2
+          mapfile -t linux_deb_artifacts < <(find artifacts/linux-x64-default -type f -name '*.deb')
+          mapfile -t linux_appimage_artifacts < <(find artifacts/linux-x64-default -type f -name '*.AppImage')
+          if [[ ${#windows_artifacts[@]} -ne 1 ||
+                ${#macos_artifacts[@]} -ne 1 ||
+                ${#linux_deb_artifacts[@]} -ne 1 ||
+                ${#linux_appimage_artifacts[@]} -ne 1 ]]; then
+            echo 'Expected exactly one Windows, macOS, Ubuntu deb, and AppImage installer' >&2
             exit 1
           fi
           echo "windows=${windows_artifacts[0]}" >> "$GITHUB_OUTPUT"
           echo "macos=${macos_artifacts[0]}" >> "$GITHUB_OUTPUT"
+          echo "linux_deb=${linux_deb_artifacts[0]}" >> "$GITHUB_OUTPUT"
+          echo "linux_appimage=${linux_appimage_artifacts[0]}" >> "$GITHUB_OUTPUT"
       - name: Create and verify signed manifest
         run: |
           node scripts/release/publish-update-manifest.mjs \
@@ -142,7 +192,9 @@ jobs:
             '${{ needs.prepare-release.outputs.version }}' \
             '${{ needs.prepare-release.outputs.commit }}' \
             '${{ steps.artifacts.outputs.windows }}:win32:x64:lite' \
-            '${{ steps.artifacts.outputs.macos }}:darwin:arm64:default'
+            '${{ steps.artifacts.outputs.macos }}:darwin:arm64:default' \
+            '${{ steps.artifacts.outputs.linux_deb }}:linux:x64:deb' \
+            '${{ steps.artifacts.outputs.linux_appimage }}:linux:x64:appimage'
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
@@ -194,18 +246,30 @@ jobs:
           version='${{ needs.prepare-release.outputs.version }}'
           windows_path='${{ steps.artifacts.outputs.windows }}'
           macos_path='${{ steps.artifacts.outputs.macos }}'
+          linux_deb_path='${{ steps.artifacts.outputs.linux_deb }}'
+          linux_appimage_path='${{ steps.artifacts.outputs.linux_appimage }}'
           windows_key="releases/$version/win32-x64-lite/$(basename "$windows_path")"
           macos_key="releases/$version/darwin-arm64-default/$(basename "$macos_path")"
+          linux_deb_key="releases/$version/linux-x64-deb/$(basename "$linux_deb_path")"
+          linux_appimage_key="releases/$version/linux-x64-appimage/$(basename "$linux_appimage_path")"
 
           aws s3 cp "$windows_path" "s3://$R2_BUCKET/$windows_key" \
             --cache-control 'public, max-age=31536000, immutable'
           aws s3 cp "$macos_path" "s3://$R2_BUCKET/$macos_key" \
             --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp "$linux_deb_path" "s3://$R2_BUCKET/$linux_deb_key" \
+            --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp "$linux_appimage_path" "s3://$R2_BUCKET/$linux_appimage_key" \
+            --cache-control 'public, max-age=31536000, immutable'
 
           windows_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$windows_key" --query ContentLength --output text)
           macos_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$macos_key" --query ContentLength --output text)
+          linux_deb_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$linux_deb_key" --query ContentLength --output text)
+          linux_appimage_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$linux_appimage_key" --query ContentLength --output text)
           [[ "$windows_remote_size" == "$(stat --format='%s' "$windows_path")" ]]
           [[ "$macos_remote_size" == "$(stat --format='%s' "$macos_path")" ]]
+          [[ "$linux_deb_remote_size" == "$(stat --format='%s' "$linux_deb_path")" ]]
+          [[ "$linux_appimage_remote_size" == "$(stat --format='%s' "$linux_appimage_path")" ]]
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -254,7 +318,9 @@ jobs:
           node scripts/release/verify-published-update.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             win32:x64:lite \
-            darwin:arm64:default
+            darwin:arm64:default \
+            linux:x64:deb \
+            linux:x64:appimage
           smoke_status=$?
           set -e
 

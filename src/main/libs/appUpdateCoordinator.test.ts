@@ -32,7 +32,22 @@ class MemoryStore {
   }
 }
 
-function signedManifest(privateKey: crypto.KeyObject) {
+type ManifestTarget = {
+  platform: 'darwin' | 'linux';
+  arch: 'arm64' | 'x64';
+  variant: 'appimage' | 'deb' | 'default';
+  filename: string;
+};
+
+function signedManifest(
+  privateKey: crypto.KeyObject,
+  target: ManifestTarget = {
+    platform: 'darwin',
+    arch: 'arm64',
+    variant: 'default',
+    filename: 'ZhiYuan.dmg',
+  },
+) {
   const payload = {
     channel: 'stable',
     version: '2026.7.2',
@@ -44,10 +59,10 @@ function signedManifest(privateKey: crypto.KeyObject) {
       en: { title: 'Test release', items: ['Bug fixes'] },
     },
     artifact: {
-      platform: 'darwin',
-      arch: 'arm64',
-      variant: 'default',
-      url: 'https://downloads.rongxzyai.com/releases/2026.7.2/darwin-arm64-default/ZhiYuan.dmg',
+      platform: target.platform,
+      arch: target.arch,
+      variant: target.variant,
+      url: `https://downloads.rongxzyai.com/releases/2026.7.2/${target.platform}-${target.arch}-${target.variant}/${target.filename}`,
       size: 1024,
       sha256: 'a'.repeat(64),
     },
@@ -65,6 +80,7 @@ function signedManifest(privateKey: crypto.KeyObject) {
 describe('AppUpdateCoordinator manifest cache', () => {
   const originalPlatform = process.platform;
   const originalArch = process.arch;
+  const originalAppImage = process.env.APPIMAGE;
   let privateKey: crypto.KeyObject;
   let publicKeyBase64: string;
 
@@ -81,6 +97,11 @@ describe('AppUpdateCoordinator manifest cache', () => {
     delete (APP_UPDATE_TRUSTED_KEYS as Record<string, string>)['test-release-key'];
     Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
     Object.defineProperty(process, 'arch', { configurable: true, value: originalArch });
+    if (originalAppImage === undefined) {
+      delete process.env.APPIMAGE;
+    } else {
+      process.env.APPIMAGE = originalAppImage;
+    }
     vi.unstubAllGlobals();
   });
 
@@ -132,5 +153,52 @@ describe('AppUpdateCoordinator manifest cache', () => {
 
     expect(restartedResult.updateFound).toBe(true);
     expect(restartedResult.state.status).toBe(AppUpdateStatus.Available);
+  });
+
+  test.each([
+    {
+      name: 'AppImage',
+      appImage: '/opt/zhiyuan/zhiyuan.AppImage',
+      variant: 'appimage' as const,
+      filename: 'ZhiYuan.AppImage',
+    },
+    {
+      name: 'Ubuntu deb',
+      appImage: undefined,
+      variant: 'deb' as const,
+      filename: 'zhiyuan_amd64.deb',
+    },
+  ])('selects the matching Linux $name update artifact', async target => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' });
+    Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
+    if (target.appImage) {
+      process.env.APPIMAGE = target.appImage;
+    } else {
+      delete process.env.APPIMAGE;
+    }
+
+    const envelope = signedManifest(privateKey, {
+      platform: 'linux',
+      arch: 'x64',
+      variant: target.variant,
+      filename: target.filename,
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(envelope), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new AppUpdateCoordinator(
+      new MemoryStore() as unknown as SqliteStore,
+    ).checkNow();
+    const requestedUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
+
+    expect(result.updateFound).toBe(true);
+    expect(result.state.info?.url).toContain(target.filename);
+    expect(requestedUrl.searchParams.get('platform')).toBe('linux');
+    expect(requestedUrl.searchParams.get('variant')).toBe(target.variant);
   });
 });

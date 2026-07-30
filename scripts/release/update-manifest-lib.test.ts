@@ -39,9 +39,13 @@ describe('online update release tools', () => {
   function createManifest(version: string, filename = 'installer') {
     const windowsArtifact = path.join(temporaryDirectory, `${filename}.exe`);
     const macosArtifact = path.join(temporaryDirectory, `${filename}.dmg`);
+    const linuxDebArtifact = path.join(temporaryDirectory, `${filename}.deb`);
+    const linuxAppImageArtifact = path.join(temporaryDirectory, `${filename}.AppImage`);
     const manifestPath = path.join(temporaryDirectory, `${version}-${filename}.json`);
     fs.writeFileSync(windowsArtifact, 'windows artifact');
     fs.writeFileSync(macosArtifact, 'macos artifact');
+    fs.writeFileSync(linuxDebArtifact, 'linux deb artifact');
+    fs.writeFileSync(linuxAppImageArtifact, 'linux appimage artifact');
 
     const result = runScript(
       'publish-update-manifest.mjs',
@@ -51,6 +55,8 @@ describe('online update release tools', () => {
         'a'.repeat(40),
         `${windowsArtifact}:win32:x64:lite`,
         `${macosArtifact}:darwin:arm64:default`,
+        `${linuxDebArtifact}:linux:x64:deb`,
+        `${linuxAppImageArtifact}:linux:x64:appimage`,
       ],
       releaseEnvironment,
     );
@@ -58,6 +64,34 @@ describe('online update release tools', () => {
     expect(result.status).toBe(0);
     return manifestPath;
   }
+
+  test('publishes signed Ubuntu deb and AppImage targets with their content types', () => {
+    const manifestPath = createManifest('2026.7.4', 'linux');
+    const collection = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      manifests: Array<{ payload: string }>;
+    };
+    const payloads = collection.manifests.map(envelope =>
+      JSON.parse(Buffer.from(envelope.payload, 'base64url').toString('utf8')),
+    );
+
+    expect(
+      payloads.map(payload => ({
+        target: `${payload.artifact.platform}:${payload.artifact.arch}:${payload.artifact.variant}`,
+        contentType: payload.artifact.contentType,
+      })),
+    ).toEqual(
+      expect.arrayContaining([
+        {
+          target: 'linux:x64:deb',
+          contentType: 'application/vnd.debian.binary-package',
+        },
+        {
+          target: 'linux:x64:appimage',
+          contentType: 'application/vnd.appimage',
+        },
+      ]),
+    );
+  });
 
   test('enforces monotonic versions and same-version artifact idempotency', () => {
     const currentManifest = createManifest('2026.7.3', 'current');

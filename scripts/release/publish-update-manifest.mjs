@@ -19,6 +19,25 @@ const privateKey = crypto.createPrivateKey({
   type: 'pkcs8',
 });
 
+function resolveArtifactFormat(platform, variant) {
+  if (platform === 'win32' && (variant === 'lite' || variant === 'full')) {
+    return {
+      extension: '.exe',
+      contentType: 'application/vnd.microsoft.portable-executable',
+    };
+  }
+  if (platform === 'darwin' && variant === 'default') {
+    return { extension: '.dmg', contentType: 'application/x-apple-diskimage' };
+  }
+  if (platform === 'linux' && variant === 'deb') {
+    return { extension: '.deb', contentType: 'application/vnd.debian.binary-package' };
+  }
+  if (platform === 'linux' && variant === 'appimage') {
+    return { extension: '.appimage', contentType: 'application/vnd.appimage' };
+  }
+  throw new Error(`Unsupported release target: ${platform}:${variant}`);
+}
+
 const artifacts = await Promise.all(
   specs.map(async spec => {
     const [file, platform, arch, variant] = spec.split(':');
@@ -28,8 +47,8 @@ const artifacts = await Promise.all(
 
     const content = await fs.readFile(file);
     const extension = path.extname(file).toLowerCase();
-    const expectedExtension = platform === 'darwin' ? '.dmg' : '.exe';
-    if (extension !== expectedExtension || content.length === 0) {
+    const format = resolveArtifactFormat(platform, variant);
+    if (extension !== format.extension || content.length === 0) {
       throw new Error(`Invalid ${platform} artifact: ${file}`);
     }
 
@@ -51,10 +70,7 @@ const artifacts = await Promise.all(
         url: `https://downloads.rongxzyai.com/releases/${releaseVersion}/${platform}-${arch}-${variant}/${filename}`,
         size: content.length,
         sha256: crypto.createHash('sha256').update(content).digest('hex'),
-        contentType:
-          extension === '.dmg'
-            ? 'application/x-apple-diskimage'
-            : 'application/vnd.microsoft.portable-executable',
+        contentType: format.contentType,
       },
       source: {
         commitSha,

@@ -204,6 +204,7 @@ import {
   loadOpenClawSessionPolicyConfig,
   saveOpenClawSessionPolicyConfig,
 } from './openclawSessionPolicy/store';
+import { configureRendererStartup } from './rendererStartup';
 import { SkillManager } from './skillManager';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
@@ -718,11 +719,6 @@ const isWindows = process.platform === 'win32';
 const DEV_SERVER_URL = process.env.ELECTRON_START_URL || 'http://localhost:5175';
 const enableVerboseLogging =
   process.env.ELECTRON_ENABLE_LOGGING === '1' || process.env.ELECTRON_ENABLE_LOGGING === 'true';
-const disableGpu =
-  process.env.ZHIYUAN_DISABLE_GPU === '1' ||
-  process.env.ZHIYUAN_DISABLE_GPU === 'true' ||
-  process.env.ELECTRON_DISABLE_GPU === '1' ||
-  process.env.ELECTRON_DISABLE_GPU === 'true';
 const reloadOnChildProcessGone =
   process.env.ELECTRON_RELOAD_ON_CHILD_PROCESS_GONE === '1' ||
   process.env.ELECTRON_RELOAD_ON_CHILD_PROCESS_GONE === 'true';
@@ -877,20 +873,18 @@ const requestCalendarPermission = async (): Promise<boolean> => {
   return false;
 };
 
-// 配置应用
-// Linux/Windows 禁用 Chromium 沙箱：桌面应用渲染自有代码，风险可控；
-// Windows 下以管理员运行时沙箱无法降权会导致 GPU 进程启动失败 (error_code=18)
-if (isLinux || isWindows) {
-  app.commandLine.appendSwitch('no-sandbox');
-}
-if (isLinux) {
-  app.commandLine.appendSwitch('disable-dev-shm-usage');
-}
-if (disableGpu) {
-  app.commandLine.appendSwitch('disable-gpu');
-  app.commandLine.appendSwitch('disable-software-rasterizer');
-  // 禁用硬件加速
-  app.disableHardwareAcceleration();
+// Configure Chromium switches before app readiness. Linux defaults to software rendering to avoid
+// blank windows on incompatible Ubuntu GPU/Wayland combinations. This does not affect llama.cpp.
+const rendererStartup = configureRendererStartup({
+  platform: process.platform,
+  env: process.env,
+  commandLine: app.commandLine,
+  disableHardwareAcceleration: () => app.disableHardwareAcceleration(),
+});
+if (isLinux && rendererStartup.softwareRenderingEnabled) {
+  console.log(
+    '[RendererStartup] software rendering is enabled; set ZHIYUAN_ENABLE_GPU=1 to opt in to GPU acceleration',
+  );
 }
 if (enableVerboseLogging) {
   app.commandLine.appendSwitch('enable-logging');

@@ -107,17 +107,26 @@ jobs:
       - name: Install Electron system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0
+          sudo apt-get install -y \
+            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
+            libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
       - name: Build Linux
         run: bun run dist:linux
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify the packaged renderer in a virtual Ubuntu desktop
+        run: >-
+          node scripts/verify-linux-renderer.mjs
+          release/linux-unpacked
+          release/linux-render-smoke.png
       - uses: actions/upload-artifact@v4
+        if: ${{ always() }}
         with:
           name: linux-build
           path: |
             release/*.AppImage
             release/*.deb
+            release/linux-render-smoke.png
           retention-days: 7
