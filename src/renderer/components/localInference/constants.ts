@@ -35,3 +35,6 @@ export const smallDangerButtonClass =
 export const localInferenceMutedTextClass = 'text-muted-foreground';
 export const localInferenceSoftTextClass = 'text-foreground/75';
 export const localInferencePlaceholderTextClass = 'text-foreground/45';
+
+export const localInferenceCompactButtonClass =
+  'h-8 min-w-16 cursor-pointer px-3 shadow-none transition-[background-color,border-color,box-shadow] duration-200 ease-out hover:shadow-lg hover:shadow-foreground/10 active:shadow-inset';

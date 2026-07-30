@@ -25,7 +25,10 @@ import {
   XiaomiIcon,
   ZhipuIcon,
 } from '../../icons/providers';
-import { localInferenceMutedTextClass } from '../constants';
+import {
+  localInferenceCompactButtonClass,
+  localInferenceMutedTextClass,
+} from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   capabilityLabel,
@@ -45,7 +48,6 @@ const marketplaceCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-n
 const marketplaceCardActionClassName =
   'relative z-20 transition-[opacity,transform] duration-200 ease-out group-hover/card:translate-x-0 group-hover/card:opacity-100 group-hover/card:pointer-events-auto';
 const marketplaceCardHiddenActionClassName = 'pointer-events-none translate-x-1 opacity-0';
-
 const marketplaceModelIcons = {
   [ProviderName.Anthropic]: AnthropicIcon,
   [ProviderName.DeepSeek]: DeepSeekIcon,
@@ -134,6 +136,7 @@ export function MarketplaceModelCard({
             >
               <Button
                 type="button"
+                className={localInferenceCompactButtonClass}
                 onClick={() => void openExternalUrl(model.detailUrl!)}
                 size="sm"
                 variant="outline"
@@ -214,6 +217,7 @@ export function MarketplaceModelCard({
             {installing ? (
               <Button
                 type="button"
+                className={localInferenceCompactButtonClass}
                 onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}
                 size="sm"
                 variant="outline"
@@ -227,6 +231,7 @@ export function MarketplaceModelCard({
                 disabled={loading}
                 size="sm"
                 variant="outline"
+                className={localInferenceCompactButtonClass}
                 onClick={() => void onInstall(model)}
               >
                 <Download data-icon="inline-start" />

@@ -12,6 +12,7 @@ import { Switch } from '@shared/components/ui/switch';
 import { Globe, Lock, RefreshCw } from 'lucide-react';
 
 import { i18nService } from '../../../services/i18n';
+import { localInferenceCompactButtonClass } from '../constants';
 import { isValidLlamaCppPort } from '../hooks/useLocalInferenceAccessSettings';
 
 type LocalInferenceAccessSettingsDialogProps = {
@@ -138,10 +139,22 @@ model: "${modelName}"`}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+            <Button
+              type="button"
+              variant="outline"
+              className={localInferenceCompactButtonClass}
+              onClick={onClose}
+              disabled={saving}
+            >
               {i18nService.t('cancel')}
             </Button>
-            <Button type="button" disabled={saving || !portValid} onClick={onSave}>
+            <Button
+              type="button"
+              variant="outline"
+              className={localInferenceCompactButtonClass}
+              disabled={saving || !portValid}
+              onClick={onSave}
+            >
               {i18nService.t('save')}
             </Button>
           </div>

@@ -28,6 +28,7 @@ import {
   LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_TIMEOUT_MS,
+  localInferenceCompactButtonClass,
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
@@ -709,9 +710,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
+                  className={localInferenceCompactButtonClass}
                   size="sm"
-                  data-local-inference-toolbar-button="true"
                   onClick={openAccessSettings}
                 >
                   <Globe data-icon="inline-start" />
@@ -719,9 +720,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 </Button>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
+                  className={localInferenceCompactButtonClass}
                   size="sm"
-                  data-local-inference-toolbar-button="true"
                   onClick={() => {
                     setDraftModelsDir(modelsDir);
                     setLibrarySettingsOpen(true);
