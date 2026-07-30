@@ -4,7 +4,15 @@ import {
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
 import { Button } from '@shared/components/ui/button';
-import { Download, Folder, Image as ImageIcon, MessageCirclePlus, PanelLeft } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Folder,
+  Image as ImageIcon,
+  MessageCirclePlus,
+  PanelLeft,
+} from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -1213,8 +1221,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 }}
               >
                 {/* Up Arrow */}
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={i18nService.t('coworkQuestionWizardPrevious')}
+                  disabled={
+                    (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
+                  }
                   onClick={() => {
                     const resolvedRail =
                       currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex;
@@ -1224,30 +1238,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`shrink-0 flex items-center justify-center w-5 h-5 mb-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
+                  className={`mb-2 mr-[-5px] size-5 rounded-full text-muted-foreground active:translate-y-0 [&_svg]:size-3.5
                 ${
                   !isRailHovered
-                    ? 'opacity-0 pointer-events-none'
+                    ? 'pointer-events-none opacity-0'
                     : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
                       ? 'opacity-30 cursor-default'
-                      : 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60'
+                      : 'cursor-pointer hover:text-foreground'
                 }`}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2.5}
-                    stroke="currentColor"
-                    className="w-3.5 h-3.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M4.5 15.75l7.5-7.5 7.5 7.5"
-                    />
-                  </svg>
-                </button>
+                  <ChevronUp />
+                </Button>
 
                 {/* Message Lines */}
                 <div
@@ -1337,9 +1338,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                       const ratio = msg.contentLen / maxLen;
                       const lineW = Math.round(MIN_W + ratio * (MAX_W - MIN_W));
                       return (
-                        <button
+                        <Button
                           key={msg.key}
                           type="button"
+                          variant="ghost"
+                          aria-label={msg.label}
+                          aria-current={isActive ? 'true' : undefined}
                           onClick={() => {
                             navigateToRailItem(idx);
                           }}
@@ -1358,25 +1362,30 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                             });
                           }}
                           onMouseLeave={() => setRailTooltip(null)}
-                          className="flex items-center justify-end cursor-pointer w-5 py-[5px]"
+                          className="h-auto w-5 cursor-pointer justify-end rounded-none px-0 py-[5px] hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
                         >
                           <div
                             className={`h-[2px] rounded-full transition-all ${
-                              isActive || isHovered
-                                ? 'bg-neutral-800 dark:bg-neutral-200'
-                                : 'bg-neutral-300 dark:bg-neutral-600'
+                              isActive || isHovered ? 'bg-foreground' : 'bg-border'
                             }`}
                             style={{ width: isActive || isHovered ? MAX_W : lineW }}
                           />
-                        </button>
+                        </Button>
                       );
                     });
                   })()}
                 </div>
 
                 {/* Down Arrow */}
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={i18nService.t('coworkQuestionWizardNext')}
+                  disabled={
+                    (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
+                    railItemCountRef.current - 1
+                  }
                   onClick={() => {
                     const maxRail = railItemCountRef.current - 1;
                     const resolvedRail = currentRailIndex < 0 ? maxRail : currentRailIndex;
@@ -1386,31 +1395,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`shrink-0 flex items-center justify-center w-5 h-5 mt-2 mr-[-5px] rounded-full transition-all text-neutral-600 dark:text-neutral-400
+                  className={`mt-2 mr-[-5px] size-5 rounded-full text-muted-foreground active:translate-y-0 [&_svg]:size-3.5
                 ${
                   !isRailHovered
-                    ? 'opacity-0 pointer-events-none'
+                    ? 'pointer-events-none opacity-0'
                     : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
                         railItemCountRef.current - 1
                       ? 'opacity-30 cursor-default'
-                      : 'cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-200/60 dark:hover:bg-neutral-700/60'
+                      : 'cursor-pointer hover:text-foreground'
                 }`}
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth={2.5}
-                    stroke="currentColor"
-                    className="w-3.5 h-3.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </button>
+                  <ChevronDown />
+                </Button>
               </div>
             )}
 

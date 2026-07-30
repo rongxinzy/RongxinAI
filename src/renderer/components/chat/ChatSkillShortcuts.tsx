@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig, useReducedMotion } from 'motion/react';
 import React from 'react';
@@ -104,9 +105,10 @@ const ChatSkillShortcuts: React.FC = () => {
             const selectedSkillIds = entry.skillIds || [entry.skillId];
             const isActive = selectedSkillIds.every(skillId => activeSkillIds.includes(skillId));
             return (
-              <button
+              <Button
                 key={entry.id}
                 type="button"
+                variant="ghost"
                 data-chat-skill-shortcut={entry.id}
                 disabled={isStreaming}
                 onMouseEnter={() => {
@@ -117,18 +119,17 @@ const ChatSkillShortcuts: React.FC = () => {
                 }}
                 onClick={() => handleSelect(entry)}
                 className={cn(
-                  'chat-skill-shortcut flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors',
+                  'chat-skill-shortcut w-full justify-start gap-2 px-3 text-left',
                   isActive
                     ? 'bg-surface-raised font-medium text-foreground'
                     : 'text-muted-foreground hover:bg-surface-raised hover:text-foreground',
-                  isStreaming && 'pointer-events-none opacity-50',
                 )}
               >
                 {animatedIcon?.icon ?? (
                   <Icon aria-hidden="true" className="chat-skill-shortcut-icon size-4 shrink-0" />
                 )}
                 <span className="min-w-0 truncate">{i18nService.t(entry.labelKey)}</span>
-              </button>
+              </Button>
             );
           })}
         </div>

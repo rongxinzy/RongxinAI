@@ -288,7 +288,7 @@ const getProviderStatusBadge = (
       }
     : {
         labelKey: 'providerStatusOff',
-                className: 'bg-destructive/20 text-destructive',
+        className: 'bg-destructive/20 text-destructive',
       };
 };
 const normalizeBaseUrl = (baseUrl: string): string =>
@@ -2973,71 +2973,30 @@ const Settings: React.FC<SettingsProps> = ({
           {(['light', 'dark', 'system'] as const).map(mode => {
             const isSelected = theme === mode;
             return (
-              <button
+              <Button
                 key={mode}
                 type="button"
+                variant="outline"
+                size="lg"
+                aria-pressed={isSelected}
                 onClick={() => {
                   setTheme(mode);
                   themeService.setTheme(mode);
                 }}
-                className="flex flex-col items-center rounded-xl border-2 p-3 transition-colors cursor-pointer"
+                className="h-auto w-full flex-col items-center rounded-xl border-2 p-3"
                 style={{
                   borderColor: isSelected ? 'var(--zy-primary)' : 'var(--zy-border)',
-                  backgroundColor: isSelected ? 'var(--zy-primary-muted)' : undefined,
+                  backgroundColor: isSelected ? 'var(--zy-primary-muted)' : 'transparent',
                 }}
               >
-                <svg
-                  viewBox="0 0 120 80"
-                  className="w-full h-auto rounded-md mb-2 overflow-hidden"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  {mode === 'light' && (
-                    <>
-                      <rect width="120" height="80" fill="#ffffff" />
-                      <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
-                      <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
-                      <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#d4d4d8" />
-                      <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#d4d4d8" />
-                      <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#d4d4d8" />
-                      <rect x="36" y="8" width="78" height="64" rx="4" fill="#ffffff" />
-                      <rect x="42" y="16" width="50" height="4" rx="2" fill="#d4d4d8" />
-                      <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                      <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#e5e5e5" />
-                      <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
-                      <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
-                      <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                      <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#e5e5e5" />
-                    </>
-                  )}
-                  {mode === 'dark' && (
-                    <>
-                      <rect width="120" height="80" fill="#1a1d23" />
-                      <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
-                      <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
-                      <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="36" y="8" width="78" height="64" rx="4" fill="#2d2d2d" />
-                      <rect x="42" y="16" width="50" height="4" rx="2" fill="#52525b" />
-                      <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
-                      <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                      <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#3f3f46" />
-                    </>
-                  )}
-                  {mode === 'system' && (
-                    <>
-                      <defs>
-                        <clipPath id="left-half">
-                          <rect x="0" y="0" width="60" height="80" />
-                        </clipPath>
-                        <clipPath id="right-half">
-                          <rect x="60" y="0" width="60" height="80" />
-                        </clipPath>
-                      </defs>
-                      <g clipPath="url(#left-half)">
+                <span className="mb-2 block aspect-[3/2] w-full overflow-hidden rounded-md">
+                  <svg
+                    viewBox="0 0 120 80"
+                    className="size-full"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    {mode === 'light' && (
+                      <>
                         <rect width="120" height="80" fill="#ffffff" />
                         <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
                         <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
@@ -3051,8 +3010,11 @@ const Settings: React.FC<SettingsProps> = ({
                         <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
                         <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
                         <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                      </g>
-                      <g clipPath="url(#right-half)">
+                        <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#e5e5e5" />
+                      </>
+                    )}
+                    {mode === 'dark' && (
+                      <>
                         <rect width="120" height="80" fill="#1a1d23" />
                         <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
                         <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
@@ -3066,22 +3028,64 @@ const Settings: React.FC<SettingsProps> = ({
                         <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
                         <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
                         <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                      </g>
-                      <line x1="60" y1="0" x2="60" y2="80" stroke="#71717a" strokeWidth="0.5" />
-                    </>
-                  )}
-                </svg>
+                        <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#3f3f46" />
+                      </>
+                    )}
+                    {mode === 'system' && (
+                      <>
+                        <defs>
+                          <clipPath id="left-half">
+                            <rect x="0" y="0" width="60" height="80" />
+                          </clipPath>
+                          <clipPath id="right-half">
+                            <rect x="60" y="0" width="60" height="80" />
+                          </clipPath>
+                        </defs>
+                        <g clipPath="url(#left-half)">
+                          <rect width="120" height="80" fill="#ffffff" />
+                          <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
+                          <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
+                          <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#d4d4d8" />
+                          <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#d4d4d8" />
+                          <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#d4d4d8" />
+                          <rect x="36" y="8" width="78" height="64" rx="4" fill="#ffffff" />
+                          <rect x="42" y="16" width="50" height="4" rx="2" fill="#d4d4d8" />
+                          <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#e5e5e5" />
+                          <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#e5e5e5" />
+                          <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
+                          <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
+                          <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
+                        </g>
+                        <g clipPath="url(#right-half)">
+                          <rect width="120" height="80" fill="#1a1d23" />
+                          <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
+                          <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
+                          <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#3f3f46" />
+                          <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#3f3f46" />
+                          <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#3f3f46" />
+                          <rect x="36" y="8" width="78" height="64" rx="4" fill="#2d2d2d" />
+                          <rect x="42" y="16" width="50" height="4" rx="2" fill="#52525b" />
+                          <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#3f3f46" />
+                          <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#3f3f46" />
+                          <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
+                          <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
+                          <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
+                        </g>
+                        <line x1="60" y1="0" x2="60" y2="80" stroke="#71717a" strokeWidth="0.5" />
+                      </>
+                    )}
+                  </svg>
+                </span>
                 <span
                   className="text-xs font-medium"
                   style={{ color: isSelected ? 'var(--zy-primary)' : 'var(--zy-text-primary)' }}
                 >
                   {i18nService.t(mode)}
                 </span>
-              </button>
+              </Button>
             );
           })}
         </div>
-
       </div>
     </div>
   );
@@ -4765,14 +4769,16 @@ const Settings: React.FC<SettingsProps> = ({
                       {i18nService.t('availableModels')}
                     </h3>
                     {activeProvider !== ProviderName.LlamaCpp && (
-                      <button
+                      <Button
                         type="button"
+                        variant="link"
+                        size="xs"
                         onClick={handleAddModel}
-                        className="inline-flex items-center text-xs text-primary hover:text-primary-hover"
+                        className="h-auto px-0 py-0 [&_svg]:size-3.5"
                       >
-                        <PlusCircle className="h-3.5 w-3.5 mr-1" />
+                        <PlusCircle data-icon="inline-start" />
                         {i18nService.t('addModel')}
-                      </button>
+                      </Button>
                     )}
                   </div>
 
@@ -4802,8 +4808,10 @@ const Settings: React.FC<SettingsProps> = ({
                             )}
                             {activeProvider !== ProviderName.LlamaCpp && (
                               <>
-                                <button
+                                <Button
                                   type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
                                   onClick={() =>
                                     handleEditModel(
                                       model.id,
@@ -4812,17 +4820,23 @@ const Settings: React.FC<SettingsProps> = ({
                                       model.capabilities,
                                     )
                                   }
-                                  className="p-0.5 text-muted-foreground hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                  aria-label={`${i18nService.t('editModel')} ${model.name}`}
+                                  title={i18nService.t('editModel')}
+                                  className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground [&_svg]:size-3.5"
                                 >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                                <button
+                                  <Pencil />
+                                </Button>
+                                <Button
                                   type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
                                   onClick={() => handleDeleteModel(model.id)}
-                                  className="p-0.5 text-muted-foreground hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  aria-label={`${i18nService.t('delete')} ${model.name}`}
+                                  title={i18nService.t('delete')}
+                                  className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive [&_svg]:size-3.5"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                  <Trash2 />
+                                </Button>
                               </>
                             )}
                           </div>
@@ -4837,14 +4851,16 @@ const Settings: React.FC<SettingsProps> = ({
                           {i18nService.t('noModelsAvailable')}
                         </p>
                         {activeProvider !== ProviderName.LlamaCpp && (
-                          <button
+                          <Button
                             type="button"
+                            variant="link"
+                            size="xs"
                             onClick={handleAddModel}
-                            className="mt-1.5 inline-flex items-center text-[11px] font-medium text-primary hover:text-primary-hover"
+                            className="mt-1.5 h-auto px-0 py-0"
                           >
-                            <PlusCircle className="h-3 w-3 mr-1" />
+                            <PlusCircle data-icon="inline-start" />
                             {i18nService.t('addFirstModel')}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     )}
@@ -5095,8 +5111,16 @@ const Settings: React.FC<SettingsProps> = ({
         return (
           <div className="flex min-h-full flex-col items-center pt-6 pb-3">
             {/* Logo & App Name */}
-            <img src="zhiyuan-logo-light.svg" alt="知远" className="logo-light h-16 w-auto mb-3 select-none" />
-            <img src="zhiyuan-logo-dark.svg" alt="知远" className="logo-dark h-16 w-auto mb-3 select-none" />
+            <img
+              src="zhiyuan-logo-light.svg"
+              alt="知远"
+              className="logo-light h-16 w-auto mb-3 select-none"
+            />
+            <img
+              src="zhiyuan-logo-dark.svg"
+              alt="知远"
+              className="logo-dark h-16 w-auto mb-3 select-none"
+            />
             <span className="text-xs text-muted-foreground mt-1">v{appVersion}</span>
             <span className="text-xs text-muted-foreground mt-0.5">开放源码，汇聚智慧</span>
 
@@ -5402,9 +5426,7 @@ const Settings: React.FC<SettingsProps> = ({
                 </Button>
               </div>
 
-              {modelFormError && (
-                <p className="mb-3 text-xs text-destructive">{modelFormError}</p>
-              )}
+              {modelFormError && <p className="mb-3 text-xs text-destructive">{modelFormError}</p>}
 
               <div className="space-y-3">
                 {activeProvider === 'ollama' ? (

@@ -34,7 +34,7 @@ import {
   rectangularSelection,
 } from '@codemirror/view';
 import { indentationMarkers } from '@replit/codemirror-indentation-markers';
-import { Button } from '@shared/components/ui/button';
+import { Button, buttonVariants } from '@shared/components/ui/button';
 // CopyIcon removed — using Copy from lucide-react instead
 import {
   Tooltip,
@@ -389,14 +389,22 @@ function buildSearchPanel(view: EditorView): Panel {
   // Prev / Next buttons
   const prevBtn = document.createElement('button');
   prevBtn.type = 'button';
-  prevBtn.className = 'cm-search-nav-btn';
+  prevBtn.className = buttonVariants({
+    variant: 'outline',
+    size: 'icon-sm',
+    className: 'cm-search-nav-btn [&_svg]:size-3.5',
+  });
   prevBtn.title = t('codeSearchPrev');
   prevBtn.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>';
 
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
-  nextBtn.className = 'cm-search-nav-btn';
+  nextBtn.className = buttonVariants({
+    variant: 'outline',
+    size: 'icon-sm',
+    className: 'cm-search-nav-btn [&_svg]:size-3.5',
+  });
   nextBtn.title = t('codeSearchNext');
   nextBtn.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
@@ -424,7 +432,11 @@ function buildSearchPanel(view: EditorView): Panel {
   // Close button
   const closeBtn = document.createElement('button');
   closeBtn.type = 'button';
-  closeBtn.className = 'cm-search-close-btn';
+  closeBtn.className = buttonVariants({
+    variant: 'ghost',
+    size: 'icon-sm',
+    className: 'cm-search-close-btn [&_svg]:size-3.5',
+  });
   closeBtn.title = t('codeSearchClose');
   closeBtn.setAttribute('aria-label', t('codeSearchClose'));
   closeBtn.innerHTML =

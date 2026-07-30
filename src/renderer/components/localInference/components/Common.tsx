@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import { Progress } from '@shared/components/ui/progress';
 import { CheckCircle, Info, Server, TriangleAlert, X } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -50,14 +51,16 @@ export function LocalInferenceToastView({
         <div className={`min-w-0 flex-1 text-sm leading-6 ${tone.messageClass}`}>
           {toast.message}
         </div>
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onClose}
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-foreground/70 transition-colors hover:bg-surface-raised hover:text-foreground"
+          className="shrink-0 rounded-full text-foreground/70 hover:text-foreground"
           aria-label={i18nService.t('close')}
         >
-          <X className="h-4 w-4" />
-        </button>
+          <X />
+        </Button>
       </div>
     </div>
   );

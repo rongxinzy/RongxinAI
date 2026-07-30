@@ -34,25 +34,24 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
   return (
     <span className="inline-flex h-6 items-center gap-1.5 rounded-full pl-1.5 pr-1 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)">
       {skill?.iconUrl ? (
-        <img
-          src={resolveSkillIconUrl(skill.iconUrl)}
-          alt=""
-          className="size-3.5 object-contain"
-        />
+        <img src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="size-3.5 object-contain" />
       ) : ShortcutIcon ? (
         <ShortcutIcon className="size-3.5" />
       ) : (
         <PlusMenuSkillsIcon className="size-3.5" />
       )}
       <span className="max-w-24 truncate">{label}</span>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon-xs"
         onClick={onRemove}
+        aria-label={`${i18nService.t('clearSkill')} ${label}`}
         title={i18nService.t('clearSkill')}
-        className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-(--zy-skill-blue-foreground)/10"
+        className="ml-0.5 size-4 rounded-full hover:bg-(--zy-skill-blue-foreground)/10 aria-expanded:bg-(--zy-skill-blue-foreground)/10 dark:hover:bg-(--zy-skill-blue-foreground)/10"
       >
-        <X className="size-3" />
-      </button>
+        <X />
+      </Button>
     </span>
   );
 };

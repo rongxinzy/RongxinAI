@@ -51,10 +51,11 @@ export function InstalledSkillGrid({
             className="group relative min-h-20 flex-row items-center gap-3 border border-border bg-card p-4 ring-0 transition-colors hover:bg-muted"
           >
             {!batchMode && (
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 aria-label={name}
-                className="absolute inset-0 z-0 rounded-[inherit] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                className="absolute inset-0 z-0 h-auto w-auto rounded-[inherit] border-0 p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
                 onClick={() => onSelect(skill)}
               />
             )}

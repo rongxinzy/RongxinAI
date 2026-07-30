@@ -80,7 +80,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   // measurement may read 0 — poll with rAF until the button has a real width (with a safety
   // timeout) so the bar never stays invisible. A ResizeObserver covers later width changes
   // (e.g. the count badge appearing/disappearing).
-  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const tabRefs = useRef<Record<string, HTMLElement | null>>({});
   const tabRowRef = useRef<HTMLDivElement>(null);
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
   useLayoutEffect(() => {
@@ -266,15 +266,18 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           {/* ── Tab list on the divider line, with a sliding underline ── */}
           <div className="relative border-b border-border">
             <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
-              {([
-                { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
-                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
-                { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
-              ] as const).map(tab => {
+              {(
+                [
+                  { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
+                  { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
+                  { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
+                ] as const
+              ).map(tab => {
                 const active = activeTab === tab.value;
                 return (
-                  <button
+                  <Button
                     key={tab.value}
+                    variant="ghost"
                     ref={el => {
                       tabRefs.current[tab.value] = el;
                     }}
@@ -285,17 +288,15 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                     onClick={() => setActiveTab(tab.value)}
                     onKeyDown={e => handleTabKeyDown(e, tab.value)}
                     className={cn(
-                      'relative -mb-px flex items-center gap-2 border-b-2 border-transparent pb-2.5 text-sm font-medium outline-none transition-colors focus-visible:text-foreground',
-                      active
-                        ? 'text-foreground'
-                        : 'text-muted-foreground hover:text-foreground',
+                      'relative -mb-px h-auto gap-2 rounded-none border-b-2 border-transparent px-0 pb-2.5 hover:bg-transparent focus-visible:text-foreground active:translate-y-0 dark:hover:bg-transparent',
+                      active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {tab.label}
                     {tab.value === AUTO_TAB.Tasks && tasks.length > 0 && (
                       <Badge variant="secondary">{tasks.length}</Badge>
                     )}
-                  </button>
+                  </Button>
                 );
               })}
             </div>
