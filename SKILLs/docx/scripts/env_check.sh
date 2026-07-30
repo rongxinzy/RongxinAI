@@ -16,6 +16,8 @@ echo ""
 
 STATUS="READY"
 WARNINGS=0
+DOTNET_AVAILABLE=true
+PANDOC_AVAILABLE=false
 
 # --- Detect platform ---
 OS="unknown"
@@ -28,9 +30,9 @@ case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) OS="windows-shell" ;;
 esac
 
-# --- Critical: .NET SDK ---
+# --- Full pipeline: .NET SDK ---
 if ! command -v dotnet &>/dev/null; then
-    printf "[FAIL]    %-14s not found\n" "dotnet"
+    printf "[WARN]    %-14s not found (Pandoc fallback may still create simple DOCX files)\n" "dotnet"
     echo ""
     echo "  .NET SDK is REQUIRED. Install it:"
     case "$OS" in
@@ -47,7 +49,8 @@ if ! command -v dotnet &>/dev/null; then
     echo ""
     echo "  Or run the full setup: bash scripts/setup.sh"
     echo ""
-    STATUS="NOT READY"
+    DOTNET_AVAILABLE=false
+    STATUS="LIMITED"
 else
     local_ver=$(dotnet --version 2>/dev/null || echo "0.0.0")
     local_major="${local_ver%%.*}"
@@ -55,13 +58,16 @@ else
         printf "[OK]      %-14s %s (>= 8.0)\n" "dotnet" "$local_ver"
     else
         printf "[FAIL]    %-14s %s (requires >= 8.0)\n" "dotnet" "$local_ver"
-        STATUS="NOT READY"
+        DOTNET_AVAILABLE=false
+        STATUS="LIMITED"
     fi
 fi
 
 # --- Critical: NuGet packages ---
 if [ -d "$DOTNET_DIR" ]; then
-    if [ -f "$DOTNET_DIR/MiniMaxAIDocx.Cli/bin/Debug/net10.0/MiniMaxAIDocx.Cli.dll" ] || \
+    if ! $DOTNET_AVAILABLE; then
+        printf "[SKIP]    %-14s requires .NET 8+ (Pandoc fallback remains available)\n" "OpenXML project"
+    elif [ -f "$DOTNET_DIR/MiniMaxAIDocx.Cli/bin/Debug/net10.0/MiniMaxAIDocx.Cli.dll" ] || \
        [ -f "$DOTNET_DIR/MiniMaxAIDocx.Cli/bin/Debug/net8.0/MiniMaxAIDocx.Cli.dll" ]; then
         printf "[OK]      %-14s built\n" "project"
     else
@@ -94,9 +100,13 @@ fi
 if command -v pandoc &>/dev/null; then
     pandoc_ver=$(pandoc --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "?")
     printf "[OK]      %-14s %s (content preview)\n" "pandoc" "$pandoc_ver"
+    PANDOC_AVAILABLE=true
 else
     printf "[WARN]    %-14s not found — docx_preview.sh will use fallback\n" "pandoc"
     WARNINGS=$((WARNINGS + 1))
+    if ! $DOTNET_AVAILABLE; then
+        STATUS="NOT READY"
+    fi
     case "$OS" in
         macos)        echo "           Install: brew install pandoc" ;;
         linux|wsl)    echo "           Install: sudo apt-get install pandoc  # or dnf/pacman" ;;
@@ -186,6 +196,8 @@ if [ "$STATUS" = "READY" ]; then
     else
         echo "Status: READY"
     fi
+elif [ "$STATUS" = "LIMITED" ] && $PANDOC_AVAILABLE; then
+    echo "Status: LIMITED (Pandoc fallback is available for simple document creation; OpenXML editing/template validation requires .NET 8+)"
 else
     echo "Status: NOT READY"
     echo ""
