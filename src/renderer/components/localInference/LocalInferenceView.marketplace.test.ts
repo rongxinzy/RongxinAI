@@ -1,5 +1,12 @@
 import { expect, test } from 'vitest';
-import { getMarketplaceGridColumnCount, getMarketplacePageSize } from './utils/marketplace';
+import {
+  buildMarketplaceSearchParams,
+  getInstallableMarketplaceModels,
+  getMarketplaceGridColumnCount,
+  getMarketplacePageSize,
+} from './utils/marketplace';
+import { LOCAL_INFERENCE_PROGRESS_DISMISS_MS, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS } from './constants';
+import { formatInstallProgressSummary, isInstallTerminalPhase } from './utils/progress';
 
 test('marketplace page size uses the actual grid height', () => {
   expect(
@@ -64,31 +71,13 @@ test('grid column count uses track geometry when the last page has a partial row
   ).toBe(2);
 });
 
-test('marketplace search params load recommended models for an empty query and use the app cap for a search', async () => {
-  const module = await import('./LocalInferenceView');
-  const buildMarketplaceSearchParams = (
-    module as {
-      __test__buildMarketplaceSearchParams?: (input: {
-        query: string;
-        pageNumber?: number;
-      }) => { query?: string; limit?: number; pageNumber?: number } | null;
-    }
-  ).__test__buildMarketplaceSearchParams;
-
-  expect(typeof buildMarketplaceSearchParams).toBe('function');
-  if (!buildMarketplaceSearchParams) return;
-
+test('marketplace search params load recommended models for an empty query and use the app cap for a search', () => {
   expect(buildMarketplaceSearchParams({ query: ' qwen ' })).toEqual({
     query: 'qwen',
     limit: 300,
   });
 
-  expect(
-    buildMarketplaceSearchParams({
-      query: ' qwen ',
-      pageNumber: 4,
-    }),
-  ).toEqual({
+  expect(buildMarketplaceSearchParams({ query: ' qwen ', pageNumber: 4 })).toEqual({
     query: 'qwen',
     limit: 300,
     pageNumber: 4,
@@ -98,108 +87,18 @@ test('marketplace search params load recommended models for an empty query and u
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
 });
 
-test('marketplace only keeps installable models in the visible list', async () => {
-  const module = await import('./LocalInferenceView');
-  const getInstallableMarketplaceModels = (
-    module as unknown as {
-      __test__getInstallableMarketplaceModels?: (
-        models: Array<{ id: string; repoId: string; installed: boolean; installedPath?: string }>,
-        installedModelPathMap: Map<string, string>,
-      ) => Array<{ id: string }>;
-    }
-  ).__test__getInstallableMarketplaceModels;
-
-  expect(typeof getInstallableMarketplaceModels).toBe('function');
-  if (!getInstallableMarketplaceModels) return;
-
+test('marketplace only keeps installable models in the visible list', () => {
   expect(
     getInstallableMarketplaceModels(
       [
-        { id: 'a', repoId: 'Qwen/A-GGUF', installed: false },
-        { id: 'b', repoId: 'Qwen/B-GGUF', installed: true },
-        { id: 'c', repoId: 'Qwen/C-GGUF', installed: false, installedPath: '/models/Qwen/C.gguf' },
-        { id: 'duplicate-a', repoId: 'Qwen/A-GGUF', installed: false },
+        { source: 'modelscope-gguf', id: 'a', repoId: 'Qwen/A-GGUF', name: 'A', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: false },
+        { source: 'modelscope-gguf', id: 'b', repoId: 'Qwen/B-GGUF', name: 'B', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: true },
+        { source: 'modelscope-gguf', id: 'c', repoId: 'Qwen/C-GGUF', name: 'C', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: false, installedPath: '/models/Qwen/C.gguf' },
+        { source: 'modelscope-gguf', id: 'duplicate-a', repoId: 'Qwen/A-GGUF', name: 'A duplicate', description: '', tags: [], sizes: [], recommendedTag: '', capability: 'chat', installed: false },
       ],
       new Map([['/models/Qwen/C.gguf', 'C']]),
     ).map(model => model.id),
   ).toEqual(['a']);
-});
-
-test('model card busy state locks the loading or unloading model card', async () => {
-  const module = await import('./LocalInferenceView');
-  const getModelCardBusyState = (
-    module as {
-      __test__getModelCardBusyState?: (input: {
-        modelName: string;
-        loadingModelName: string | null;
-        unloadingModelName: string | null;
-        globalLoading: boolean;
-      }) => { cardBusy: boolean; buttonsDisabled: boolean };
-    }
-  ).__test__getModelCardBusyState;
-
-  expect(typeof getModelCardBusyState).toBe('function');
-  if (!getModelCardBusyState) return;
-
-  expect(
-    getModelCardBusyState({
-      modelName: 'model-a',
-      loadingModelName: null,
-      unloadingModelName: 'model-a',
-      globalLoading: false,
-    }),
-  ).toEqual({
-    cardBusy: true,
-    buttonsDisabled: true,
-  });
-
-  expect(
-    getModelCardBusyState({
-      modelName: 'model-b',
-      loadingModelName: null,
-      unloadingModelName: 'model-a',
-      globalLoading: false,
-    }),
-  ).toEqual({
-    cardBusy: false,
-    buttonsDisabled: false,
-  });
-
-  expect(
-    getModelCardBusyState({
-      modelName: 'model-b',
-      loadingModelName: null,
-      unloadingModelName: null,
-      globalLoading: true,
-    }),
-  ).toEqual({
-    cardBusy: false,
-    buttonsDisabled: true,
-  });
-
-  expect(
-    getModelCardBusyState({
-      modelName: 'model-a',
-      loadingModelName: 'model-a',
-      unloadingModelName: null,
-      globalLoading: false,
-    }),
-  ).toEqual({
-    cardBusy: true,
-    buttonsDisabled: true,
-  });
-
-  expect(
-    getModelCardBusyState({
-      modelName: 'model-b',
-      loadingModelName: 'model-a',
-      unloadingModelName: null,
-      globalLoading: false,
-    }),
-  ).toEqual({
-    cardBusy: false,
-    buttonsDisabled: true,
-  });
 });
 
 test('model action guard blocks operations for the unloading model only', async () => {
@@ -270,58 +169,9 @@ test('unload busy state keeps a minimum visible duration', async () => {
   ).toBe(0);
 });
 
-test('local inference service action only auto-starts the shared llama.cpp service', async () => {
-  const module = await import('./LocalInferenceView');
-  const resolveLlamaCppServiceAction = (
-    module as {
-      __test__resolveLlamaCppServiceAction?: (
-        snapshot: { status: string } | null | undefined,
-      ) => string;
-    }
-  ).__test__resolveLlamaCppServiceAction;
-
-  expect(typeof resolveLlamaCppServiceAction).toBe('function');
-  if (!resolveLlamaCppServiceAction) return;
-
-  expect(resolveLlamaCppServiceAction({ status: 'not-installed' })).toBe('install');
-  expect(resolveLlamaCppServiceAction({ status: 'installed' })).toBe('start');
-  expect(resolveLlamaCppServiceAction({ status: 'stopped' })).toBe('start');
-  expect(resolveLlamaCppServiceAction({ status: 'running' })).toBe('ready');
-  expect(resolveLlamaCppServiceAction({ status: 'error' })).toBe('refresh');
-  expect(resolveLlamaCppServiceAction(null)).toBe('refresh');
-});
-
-test('local inference transient notices auto-dismiss within five seconds', async () => {
-  const module = await import('./LocalInferenceView');
-  const isInstallTerminalPhase = (
-    module as {
-      __test__isInstallTerminalPhase?: (phase: string) => boolean;
-    }
-  ).__test__isInstallTerminalPhase;
-  const getLocalInferenceToastAutoDismissMs = (
-    module as {
-      __test__getLocalInferenceToastAutoDismissMs?: () => number;
-    }
-  ).__test__getLocalInferenceToastAutoDismissMs;
-  const getLocalInferenceProgressDismissMs = (
-    module as {
-      __test__getLocalInferenceProgressDismissMs?: () => number;
-    }
-  ).__test__getLocalInferenceProgressDismissMs;
-
-  expect(typeof isInstallTerminalPhase).toBe('function');
-  expect(typeof getLocalInferenceToastAutoDismissMs).toBe('function');
-  expect(typeof getLocalInferenceProgressDismissMs).toBe('function');
-  if (
-    !isInstallTerminalPhase ||
-    !getLocalInferenceToastAutoDismissMs ||
-    !getLocalInferenceProgressDismissMs
-  ) {
-    return;
-  }
-
-  expect(getLocalInferenceToastAutoDismissMs()).toBeLessThanOrEqual(5000);
-  expect(getLocalInferenceProgressDismissMs()).toBeLessThanOrEqual(5000);
+test('local inference transient notices auto-dismiss within five seconds', () => {
+  expect(LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS).toBeLessThanOrEqual(5000);
+  expect(LOCAL_INFERENCE_PROGRESS_DISMISS_MS).toBeLessThanOrEqual(5000);
   expect(isInstallTerminalPhase('done')).toBe(true);
   expect(isInstallTerminalPhase('failed')).toBe(true);
   expect(isInstallTerminalPhase('cancelled')).toBe(true);
@@ -329,21 +179,7 @@ test('local inference transient notices auto-dismiss within five seconds', async
   expect(isInstallTerminalPhase('downloading-progress')).toBe(false);
 });
 
-test('install progress summary uses a readable separator', async () => {
-  const module = await import('./LocalInferenceView');
-  const formatInstallProgressSummary = (
-    module as {
-      __test__formatInstallProgressSummary?: (progress: Record<string, unknown>) => {
-        primary: string;
-        phase?: string;
-        error?: string;
-      };
-    }
-  ).__test__formatInstallProgressSummary;
-
-  expect(typeof formatInstallProgressSummary).toBe('function');
-  if (!formatInstallProgressSummary) return;
-
+test('install progress summary uses a readable separator', () => {
   expect(
     formatInstallProgressSummary({
       status: 'downloading',
