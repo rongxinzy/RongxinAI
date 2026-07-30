@@ -564,7 +564,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 aria-current={activeView === 'localInference' ? 'page' : undefined}
               >
                 <Cpu className="h-4 w-4 shrink-0" />
-                {i18nService.t('localInferenceTitle')}
+                {i18nService.t('localInferenceSidebarTitle')}
               </Button>
             )}
             {workMode !== WorkMode.Chat && (
