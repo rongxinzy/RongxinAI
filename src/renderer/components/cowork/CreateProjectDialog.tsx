@@ -12,6 +12,7 @@ import { FolderOpen, LoaderCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { localInferenceCompactButtonClass } from '../localInference/constants';
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -141,6 +142,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
               <Button
                 type="button"
                 variant="outline"
+                className={localInferenceCompactButtonClass}
                 onClick={() => void handleBrowse()}
                 disabled={isSaving}
               >
@@ -154,12 +156,19 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
           <Button
             type="button"
             variant="outline"
+            className={localInferenceCompactButtonClass}
             onClick={() => onOpenChange(false)}
             disabled={isSaving}
           >
             {i18nService.t('cancel')}
           </Button>
-          <Button type="button" onClick={() => void handleSave()} disabled={isSaving}>
+          <Button
+            type="button"
+            variant="outline"
+            className={localInferenceCompactButtonClass}
+            onClick={() => void handleSave()}
+            disabled={isSaving}
+          >
             {isSaving && <LoaderCircle className="size-4 animate-spin" />}
             {i18nService.t('save')}
           </Button>

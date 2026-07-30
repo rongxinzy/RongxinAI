@@ -3,6 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
@@ -18,6 +19,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
+import { skillService } from '../../services/skill';
 import { resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
@@ -193,7 +195,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
           </PromptInputButton>
         }
       />
-      <DropdownMenuContent side="top" align="start" sideOffset={4} className="w-56">
+      <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56">
         <DropdownMenuItem
           onClick={() => {
             onAddFile();
@@ -208,34 +210,58 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             <PlusMenuSkillsIcon className="size-4" />
             <span className="truncate">{i18nService.t('skills')}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent align="center" className="w-56">
-            {enabledSkills.length === 0 ? (
-              <DropdownMenuItem disabled>{i18nService.t('noSkillsAvailable')}</DropdownMenuItem>
-            ) : (
-              enabledSkills.map(skill => (
-                <DropdownMenuCheckboxItem
-                  key={skill.id}
-                  checked={activeSkillIds.includes(skill.id)}
-                  onCheckedChange={() => {
-                    dispatch(toggleActiveSkill(skill.id));
-                    setOpen(false);
-                  }}
-                >
-                  {skill.iconUrl ? (
-                    <img
-                      src={resolveSkillIconUrl(skill.iconUrl)}
-                      alt=""
-                      className="size-4 object-contain"
-                    />
-                  ) : (
-                    <PlusMenuSkillGlyphIcon className="size-4" />
-                  )}
-                  <span className="truncate">{skill.displayName || skill.name}</span>
-                </DropdownMenuCheckboxItem>
-              ))
-            )}
+          <DropdownMenuSubContent
+            align="center"
+            sideOffset={8}
+            className="w-[360px] max-w-[calc(100vw-16px)]"
+          >
+            <DropdownMenuGroup className="max-h-[360px] overflow-y-auto overscroll-contain">
+              {enabledSkills.length === 0 ? (
+                <DropdownMenuItem disabled>
+                  {i18nService.t('noSkillsAvailable')}
+                </DropdownMenuItem>
+              ) : (
+                enabledSkills.map(skill => {
+                  const description = skillService.getLocalizedSkillDescription(
+                    skill.id,
+                    skill.name,
+                    skill.description,
+                  );
+
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={skill.id}
+                      checked={activeSkillIds.includes(skill.id)}
+                      onCheckedChange={() => {
+                        dispatch(toggleActiveSkill(skill.id));
+                        setOpen(false);
+                      }}
+                      className="items-start gap-3 py-2.5 pr-8 pl-2"
+                    >
+                      {skill.iconUrl ? (
+                        <img
+                          src={resolveSkillIconUrl(skill.iconUrl)}
+                          alt=""
+                          className="size-10 shrink-0 rounded-md object-contain"
+                        />
+                      ) : (
+                        <PlusMenuSkillGlyphIcon className="size-10 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">
+                          {skill.displayName || skill.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {description}
+                        </span>
+                      </span>
+                    </DropdownMenuCheckboxItem>
+                  );
+                })
+              )}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onManageSkills}>
+            <DropdownMenuItem onClick={onManageSkills} className="py-2.5">
               <PlusMenuManageIcon className="size-4" />
               <span className="truncate">{i18nService.t('manageSkills')}</span>
             </DropdownMenuItem>
@@ -284,7 +310,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
             <Cable className="size-4" />
             <span className="truncate">{i18nService.t('connectors')}</span>
           </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent align="center" className="w-56">
+          <DropdownMenuSubContent align="center" sideOffset={8} className="w-56">
             {mcpLoading ? (
               <DropdownMenuItem disabled>{i18nService.t('loading')}</DropdownMenuItem>
             ) : mcpServers.length === 0 ? (

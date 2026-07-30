@@ -163,7 +163,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span>{i18nService.t('recentFolders')}</span>
             </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-28 overflow-y-auto">
+            <DropdownMenuSubContent sideOffset={8} className="max-h-28 overflow-y-auto">
               {isLoading ? (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
                   {i18nService.t('loading')}
