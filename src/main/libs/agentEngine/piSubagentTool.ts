@@ -20,6 +20,7 @@
 import * as fs from 'fs';
 import path from 'path';
 
+import { CoreSkillId } from '../../../shared/skills/constants';
 import { runPiSubagent, type PiSubagentSession } from './piSubagentExecution';
 
 // ── Constants ──
@@ -74,11 +75,14 @@ export interface PiSubagentToolDeps {
   presetId?: string | null;
   resolvedModel: PiSubagentResolvedModel;
   workspaceRoot?: string;
+  /** Absolute bundled web-search skill directory for researcher subagents. */
+  webSearchSkillPath?: string;
   /** Builds the per-session Pi resource loader for a subagent system prompt. */
   createPiResourceLoader(
     cwd: string,
     systemPrompt: string,
     maxOutputTokens: number,
+    skillIds?: string[],
   ): Promise<unknown>;
 }
 
@@ -245,11 +249,17 @@ async function runSubagent(
       // No customTools: subagents must not recursively spawn sub-subagents,
       // and AskUserQuestion is reserved for the parent session.
     };
-    subOptions.resourceLoader = await deps.createPiResourceLoader(
-      cwd,
-      profile.systemPrompt,
-      deps.resolvedModel.maxOutputTokens,
-    );
+    const researcherUsesWebSearch = profile.id === 'researcher' && Boolean(deps.webSearchSkillPath);
+    const systemPrompt = researcherUsesWebSearch
+      ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill with Bash:\n` +
+        `bash "${path.join(deps.webSearchSkillPath || '', 'scripts/search.sh')}" "<query>" 10\n` +
+        'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
+      : profile.systemPrompt;
+    subOptions.resourceLoader = researcherUsesWebSearch
+      ? await deps.createPiResourceLoader(cwd, systemPrompt, deps.resolvedModel.maxOutputTokens, [
+          CoreSkillId.WebSearch,
+        ])
+      : await deps.createPiResourceLoader(cwd, systemPrompt, deps.resolvedModel.maxOutputTokens);
     if (deps.resolvedModel.modelRuntime) {
       subOptions.modelRuntime = deps.resolvedModel.modelRuntime;
     }

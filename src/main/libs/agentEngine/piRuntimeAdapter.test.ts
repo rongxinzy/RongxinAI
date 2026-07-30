@@ -4,7 +4,12 @@
  * Tests CoworkRuntime contract compliance using mocked Pi SDK modules.
  */
 
+import * as fs from 'fs';
+import * as os from 'os';
+import path from 'path';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -181,6 +186,39 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello Pi');
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
+    });
+
+    it('initializes a controlled persistent run for academic research', async () => {
+      const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-runtime-'));
+      try {
+        await adapter.startSession('academic-session', 'Research reliable agents', {
+          workspaceRoot,
+          skillIds: [...AcademicResearchSkillIds],
+        });
+        expect(mockSession.prompt).toHaveBeenCalledWith(
+          expect.stringContaining('Academic research run initialized'),
+        );
+        expect(
+          fs.existsSync(
+            path.join(
+              workspaceRoot,
+              '.zhiyuan',
+              'research',
+              'academic-session',
+              'state',
+              'progress.json',
+            ),
+          ),
+        ).toBe(true);
+        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools: Array<{ name: string }>;
+        };
+        expect(sessionOptions.customTools.map(tool => tool.name)).toEqual(
+          expect.arrayContaining(['agent_loop', 'research_state', 'subagent']),
+        );
+      } finally {
+        fs.rmSync(workspaceRoot, { recursive: true, force: true });
+      }
     });
 
     it('should inject the session system prompt through Pi resource loading', async () => {

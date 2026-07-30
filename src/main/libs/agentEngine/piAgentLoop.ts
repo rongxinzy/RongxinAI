@@ -21,9 +21,9 @@
  *      the previous iteration ended with "next", it prompts the Pi session
  *      with the next-iteration prompt instead of completing the session.
  *
- * State is held in memory only — no persistence. A safety cap
- * (AGENT_LOOP_MAX_ITERATIONS) forces a wrap-up iteration and then closes the
- * loop even if the LLM keeps signaling "next".
+ * Generic loops are memory-only. Academic-research loops additionally attach
+ * a persistent PiResearchRunController, which owns the evidence and review
+ * gates before a model may finish.
  */
 
 // ── Constants ──
@@ -110,6 +110,13 @@ export class PiAgentLoopController {
    */
   private wrapUpPending = false;
 
+  constructor(
+    private readonly researchRun?: {
+      onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
+      requestCompletion(reason: string): string;
+    },
+  ) {}
+
   /** Read-only snapshot of the current loop state. */
   getState(): PiAgentLoopState {
     return { ...this.state, stages: [...this.state.stages] };
@@ -171,6 +178,10 @@ export class PiAgentLoopController {
     if (!this.state.active) {
       return 'No active loop. Start one with agent_loop action "start".';
     }
+    if (this.researchRun) {
+      this.state.lastSummary = reason;
+      return this.researchRun.requestCompletion(reason);
+    }
     this.finish(reason);
     return `Loop complete after ${this.state.currentStep + 1} iteration(s). Reason: ${reason}`;
   }
@@ -181,8 +192,53 @@ export class PiAgentLoopController {
    * session is allowed to complete.
    */
   handleAgentEnd(): PiAgentLoopContinueDecision {
-    if (!this.state.active || !this.pendingNext) {
+    if (!this.state.active) {
       return { shouldContinue: false };
+    }
+
+    if (this.researchRun) {
+      const researchDecision = this.researchRun.onAgentEnd();
+      if (researchDecision.shouldFinish) {
+        this.finish(researchDecision.reason || 'Academic research completion gate passed');
+        return { shouldContinue: false };
+      }
+      this.state.currentStep += 1;
+      this.pendingNext = false;
+      return {
+        shouldContinue: true,
+        nextPrompt:
+          researchDecision.nextPrompt ||
+          'Continue the academic research run and follow its persisted evidence protocol.',
+      };
+    }
+
+    // The dedicated wrap-up turn is the only generic-loop exception: it is
+    // intentionally terminal after the safety cap, even if the model omits a
+    // final tool call.
+    if (this.wrapUpPending) {
+      this.finish(
+        `Iteration limit of ${AGENT_LOOP_MAX_ITERATIONS} reached; loop closed after the wrap-up iteration`,
+      );
+      return { shouldContinue: false };
+    }
+
+    // A loop is a protocol, not a suggestion. If a model ends its turn without
+    // next/done, keep the loop alive and make the omission visible in the next
+    // prompt instead of silently emitting a completed session.
+    if (!this.pendingNext) {
+      const nextStep = this.state.currentStep + 1;
+      this.state.currentStep = nextStep;
+      if (nextStep >= AGENT_LOOP_MAX_ITERATIONS - 1) {
+        this.wrapUpPending = true;
+        return { shouldContinue: true, nextPrompt: this.buildWrapUpPrompt() };
+      }
+      return {
+        shouldContinue: true,
+        nextPrompt:
+          `## Agent Loop — protocol omission\nYou ended iteration ${nextStep} without calling agent_loop next or done. ` +
+          'The loop remains active. Continue the work now, then call next or done explicitly.\n\n' +
+          this.buildIterationPrompt(nextStep),
+      };
     }
 
     // The wrap-up iteration just ended — close the loop unconditionally.

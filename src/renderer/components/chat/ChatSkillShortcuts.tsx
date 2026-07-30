@@ -17,16 +17,19 @@ const ChatSkillShortcuts: React.FC = () => {
 
   const handleSelect = (entry: ChatSkillShortcut) => {
     if (isStreaming) return;
+    const selectedSkillIds = entry.skillIds || [entry.skillId];
     // Require the skill to be enabled — disabled skills must not be
     // re-activated through the shortcut (matches SkillsPopover filtering).
-    const skill = skills.find(s => s.id === entry.skillId && s.enabled);
-    if (!skill) {
+    const allSkillsAvailable = selectedSkillIds.every(skillId =>
+      skills.some(skill => skill.id === skillId && skill.enabled),
+    );
+    if (!allSkillsAvailable) {
       window.dispatchEvent(
         new CustomEvent('app:showToast', { detail: i18nService.t('chatSkillUnavailable') }),
       );
       return;
     }
-    dispatch(setActiveSkillIds([skill.id]));
+    dispatch(setActiveSkillIds([...selectedSkillIds]));
     dispatch(clearCurrentSession());
     window.setTimeout(() => {
       window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
@@ -43,7 +46,8 @@ const ChatSkillShortcuts: React.FC = () => {
       <div className="space-y-0.5">
         {CHAT_SKILL_SHORTCUTS.map(entry => {
           const Icon = entry.icon;
-          const isActive = activeSkillIds.includes(entry.skillId);
+          const selectedSkillIds = entry.skillIds || [entry.skillId];
+          const isActive = selectedSkillIds.every(skillId => activeSkillIds.includes(skillId));
           return (
             <button
               key={entry.id}

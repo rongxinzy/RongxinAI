@@ -42,9 +42,11 @@ import {
   type PiAskUserQuestionInput,
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
-import { buildPiAgentLoopTool, PiAgentLoopController } from './piAgentLoop';
+import { buildPiAgentLoopTool, PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
 import { buildPiConversationPrompt } from './piConversationContext';
-import { buildPiSubagentTool } from './piSubagentTool';
+import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
+import { buildPiResearchStateTool } from './piResearchStateTool';
+import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import type {
@@ -135,6 +137,8 @@ interface ActivePiSession {
   toolResultMessageIdByCallId: Map<string, string>;
   /** Long-horizon agent loop controller for this session (agent_loop tool). */
   agentLoop: PiAgentLoopController;
+  /** Present only for the controlled academic-research workflow. */
+  researchRun: PiResearchRunController | null;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
   /**
    * Error from the latest failed attempt (message_end with stopReason=error).
@@ -400,6 +404,16 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         customTools.push(mcpProxyTool);
       }
 
+      // Academic research is a controlled workflow, not a prompt-only label.
+      // It owns durable state and completion gates for the lifetime of this
+      // session (and reloads the same state directory after a session restart).
+      const researchRun = isAcademicResearchSkillSet(resourceState.skillIds)
+        ? new PiResearchRunController({ sessionId, workspaceRoot, task: prompt })
+        : null;
+      if (researchRun) {
+        customTools.push(buildPiResearchStateTool(researchRun));
+      }
+
       // Subagent tool: registered for every cowork session. When the session
       // agent is a Team Lead from a package, its presetId additionally exposes
       // the team member agents alongside the built-in profiles.
@@ -423,10 +437,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         presetId: subagentPresetId,
         resolvedModel,
         workspaceRoot,
-        createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens) =>
+        webSearchSkillPath: researchRun ? path.join(getSkillsRoot(), 'web-search') : undefined,
+        createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens, skillIds) =>
           this.createPiResourceLoader(pi, cwd, {
             systemPrompt,
-            skillIds: undefined,
+            skillIds,
             maxOutputTokens,
             fileToolsEnabled: true,
           }),
@@ -437,7 +452,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
       // Agent loop tool: lets the LLM drive multi-iteration long-horizon
       // loops; the controller continues the session on agent_end.
-      const agentLoop = new PiAgentLoopController();
+      const agentLoop = new PiAgentLoopController(researchRun || undefined);
+      if (researchRun) {
+        agentLoop.start({
+          mode: PiAgentLoopMode.Goal,
+          goal: researchRun.goal,
+          passes: 0,
+          stages: [],
+        });
+      }
       customTools.push(buildPiAgentLoopTool(agentLoop));
 
       if (customTools.length > 0) {
@@ -473,6 +496,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
         agentLoop,
+        researchRun,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
         pendingError: null,
       };
@@ -486,7 +510,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       this.activeSessions.set(sessionId, active);
 
       // Send the prompt (may include conversation history for restart restores)
-      await session.prompt(options._piPromptOverride || prompt);
+      await session.prompt(
+        researchRun
+          ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
+          : options._piPromptOverride || prompt,
+      );
     } catch (error) {
       this.activeSessions.delete(sessionId);
       if (abortController.signal.aborted) {
@@ -902,6 +930,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
         // Mirrors OpenClaw adapter's tool_use construction.
         if (!event.toolCallId || !event.toolName) break;
+        if (event.toolName === PiSubagentToolName) {
+          active.researchRun?.recordSubagentStart(event.toolCallId, event.args);
+        }
         const toolUseMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_use',
@@ -928,6 +959,13 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
         const resultText = extractToolResultText(event.result);
+        if (event.toolName === PiSubagentToolName) {
+          active.researchRun?.recordSubagentResult(
+            event.toolCallId,
+            resultText,
+            Boolean(event.isError),
+          );
+        }
         const toolResultMsg: CoworkMessage = {
           id: randomUUID(),
           type: 'tool_result',
