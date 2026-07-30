@@ -221,6 +221,44 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('reactivates a completed academic loop when the same session receives a follow-up', async () => {
+      const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-follow-up-'));
+      try {
+        await adapter.startSession('academic-follow-up', 'Research reliable agents', {
+          workspaceRoot,
+          skillIds: [...AcademicResearchSkillIds],
+        });
+        const activeSessions = (
+          adapter as unknown as {
+            activeSessions: Map<
+              string,
+              {
+                agentLoop: {
+                  stop(): void;
+                  getState(): { active: boolean };
+                };
+              }
+            >;
+          }
+        ).activeSessions;
+        const active = activeSessions.get('academic-follow-up');
+        expect(active).toBeDefined();
+        active?.agentLoop.stop();
+        mockSession.prompt.mockClear();
+
+        await adapter.continueSession('academic-follow-up', 'Investigate a follow-up.', {
+          skillIds: [...AcademicResearchSkillIds],
+        });
+
+        expect(active?.agentLoop.getState().active).toBe(true);
+        expect(mockSession.prompt).toHaveBeenCalledWith(
+          expect.stringContaining('Academic research run initialized'),
+        );
+      } finally {
+        fs.rmSync(workspaceRoot, { recursive: true, force: true });
+      }
+    });
+
     it('should inject the session system prompt through Pi resource loading', async () => {
       await adapter.startSession('test', 'Hello Pi', {
         systemPrompt: 'You are the selected expert.',

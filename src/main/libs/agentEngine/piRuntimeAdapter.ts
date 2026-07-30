@@ -411,6 +411,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         ? new PiResearchRunController({ sessionId, workspaceRoot, task: prompt })
         : null;
       if (researchRun) {
+        researchRun.resumeForPrompt(prompt);
         customTools.push(buildPiResearchStateTool(researchRun));
       }
 
@@ -623,8 +624,20 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
     this.emit('message', sessionId, persisted);
 
+    let nextPrompt = prompt;
+    if (active.researchRun && !active.agentLoop.getState().active) {
+      active.researchRun.resumeForPrompt(prompt);
+      active.agentLoop.start({
+        mode: PiAgentLoopMode.Goal,
+        goal: active.researchRun.goal,
+        passes: 0,
+        stages: [],
+      });
+      nextPrompt = active.researchRun.buildInitialPrompt(prompt);
+    }
+
     try {
-      await active.piSession.prompt(prompt);
+      await active.piSession.prompt(nextPrompt);
     } catch (error) {
       if (active.abortController.signal.aborted) {
         this.emit('sessionStopped', sessionId);

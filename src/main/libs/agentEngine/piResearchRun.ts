@@ -67,6 +67,33 @@ export class PiResearchRunController {
     return `Produce a verified academic research result for: ${this.state.task}`;
   }
 
+  resumeForPrompt(task: string): void {
+    if (
+      this.state.status !== ResearchRunStatus.Completed &&
+      this.state.status !== ResearchRunStatus.NeedsAttention
+    ) {
+      return;
+    }
+    this.state.status = ResearchRunStatus.Running;
+    this.state.task = task;
+    this.state.iteration += 1;
+    this.state.staleCount = 0;
+    this.state.lastFindingCount = this.state.sources.length + this.state.claims.length;
+    this.state.review = { requested: false, passed: false };
+    delete this.state.completionReason;
+    this.researcherRanThisIteration = false;
+    this.reviewerRanThisRequest = false;
+    this.reviewerToolCallIds.clear();
+    this.store.appendFollowUpTask(task);
+    this.store.writeState(this.state);
+    this.store.log(
+      'orchestrator',
+      'decision',
+      'run_resumed_for_follow_up',
+      `Academic research resumed at iteration ${this.state.iteration}.`,
+    );
+  }
+
   buildInitialPrompt(userPrompt: string): string {
     return [
       '## Academic research run initialized',

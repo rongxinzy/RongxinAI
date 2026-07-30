@@ -106,6 +106,13 @@ export class PiResearchRunStore {
     );
   }
 
+  appendFollowUpTask(task: string): void {
+    fs.appendFileSync(
+      path.join(this.stateDirectory, 'task_spec.md'),
+      `\n## Follow-up ${now()}\n\n${task}\n`,
+    );
+  }
+
   log(source: string, level: string, event: string, detail: string): void {
     this.appendJsonl(path.join(this.logsDirectory, 'orchestrator.jsonl'), {
       ts: now(),

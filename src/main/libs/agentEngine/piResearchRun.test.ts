@@ -92,6 +92,17 @@ describe('PiResearchRunController', () => {
     run.recordSubagentResult('review-2', 'REVIEW_VERDICT: PASS', false);
     decision = run.onAgentEnd();
     expect(decision).toMatchObject({ shouldFinish: true });
+
+    run.resumeForPrompt('Investigate a follow-up question.');
+    expect(run.getSnapshot()).toMatchObject({
+      status: 'running',
+      task: 'Investigate a follow-up question.',
+      iteration: 2,
+      review: { requested: false, passed: false },
+      completionFailures: expect.arrayContaining([
+        'iteration 2 did not launch an isolated researcher',
+      ]),
+    });
   });
 
   it('clears claims when the research plan changes and requires auditable claim text', async () => {
