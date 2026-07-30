@@ -21,7 +21,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
-import { classifyCoworkError } from '../../../common/coworkError';
+import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { isLocalProviderName, ProviderName } from '../../../shared/providers';
@@ -136,6 +136,13 @@ interface ActivePiSession {
   /** Long-horizon agent loop controller for this session (agent_loop tool). */
   agentLoop: PiAgentLoopController;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
+  /**
+   * Error from the latest failed attempt (message_end with stopReason=error).
+   * Deferred — not persisted/emitted — because Pi may auto-retry the turn;
+   * flushPendingError surfaces it once the run settles (auto_retry_end /
+   * agent_settled). Cleared when a retry succeeds or the turn is reset.
+   */
+  pendingError: { message: string; classified: CoworkError } | null;
 }
 
 // ── Dynamic imports ──
@@ -467,6 +474,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         toolResultMessageIdByCallId: new Map(),
         agentLoop,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
+        pendingError: null,
       };
 
       // Subscribe to Pi events before sending the prompt
@@ -574,6 +582,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     active.lastCompletedAnswerText = '';
     active.toolResultMessageIdByCallId.clear();
     active.writeTokenLimitRecovery.reset();
+    active.pendingError = null;
 
     // Emit user message (persisted to SQLite, same as startSession).
     const userMsg: CoworkMessage = {
@@ -631,6 +640,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     // session object, which may be in an inconsistent state after abort.
     active.aborted = true;
     active.agentLoop.stop();
+    // Drop any deferred error without surfacing it — the user stopped the turn.
+    active.pendingError = null;
 
     // Only abort the current turn — keep the session entry in activeSessions
     // so isSessionActive still reports true for IM routing, but do not reuse
@@ -843,23 +854,17 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
                 : JSON.stringify(event.message.content)
               : '(no content)';
             console.error('[PiRuntime] Assistant error:', errMsg, 'detail:', errDetail);
-            // Persist a system error message so the error survives session
-            // switching and is visible in the message list.
-            // Store the classified error kind so the renderer can translate it
-            // into a user-friendly message via i18n (e.g. "任务执行出错，请重试…").
-            // Raw errMsg is kept for console diagnostics only.
-            const classified = classifyCoworkError(errMsg);
-            if (this.store) {
-              this.store.updateSession(sessionId, { status: 'error' });
-              this.store.addMessage(sessionId, {
-                type: 'system',
-                content: '',
-                metadata: { error: errMsg, errorKind: classified.kind },
-              });
-            }
-            this.emit('error', sessionId, classified);
+            // Defer surfacing: Pi may auto-retry this turn (auto_retry_start).
+            // Persisting/emitting here would produce one error bubble per failed
+            // attempt — flushPendingError surfaces the error exactly once when
+            // the run settles (auto_retry_end / agent_settled).
+            active.pendingError = { message: errMsg, classified: classifyCoworkError(errMsg) };
             return;
           }
+
+          // A successful assistant message after failed attempts means the retry
+          // recovered — drop the deferred error so it is never surfaced.
+          active.pendingError = null;
 
           const { text, thinking } = extractStreamingSnapshot(event.message);
           const finalThinking = thinking || active.thinkingText;
@@ -952,6 +957,10 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
         this.markFinalAnswer(sessionId, active);
+        // Failed attempt (deferred error pending): do not continue the agent
+        // loop, mark completed, or emit complete. flushPendingError surfaces
+        // the error when the run settles (auto_retry_end / agent_settled).
+        if (active.pendingError) break;
         // Agent loop: when the finished iteration signaled "next", continue
         // the session with the next iteration prompt instead of completing.
         const loopDecision = active.agentLoop.handleAgentEnd();
@@ -984,12 +993,51 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         // Pi is retrying after an error — silently wait
         break;
 
+      case 'auto_retry_end':
+        // Retries exhausted — surface the deferred error, if any.
+        this.flushPendingError(sessionId, active);
+        break;
+
+      case 'agent_settled':
+        // Run settled (covers non-retryable errors with no auto-retry) —
+        // surface the deferred error, if any. Idempotent after auto_retry_end.
+        this.flushPendingError(sessionId, active);
+        break;
+
       default:
         // Silently ignore unknown/internal events
         if (event.type && !event.type.startsWith('_')) {
           console.log('[PiRuntime] Unhandled event type:', event.type);
         }
     }
+  }
+
+  // ── Private: deferred error handling ──
+
+  /**
+   * Persist and emit a deferred turn error exactly once.
+   *
+   * message_end(stopReason=error) only records the error on the session because
+   * Pi may auto-retry the turn; this flush runs on auto_retry_end / agent_settled,
+   * when the run has genuinely failed. Idempotent — a second call is a no-op.
+   */
+  private flushPendingError(sessionId: string, active: ActivePiSession): void {
+    const pending = active.pendingError;
+    if (!pending) return;
+    active.pendingError = null;
+    // Persist a system error message so the error survives session switching
+    // and is visible in the message list. The classified kind lets the renderer
+    // translate it into a user-friendly i18n message; the raw message is kept
+    // for console diagnostics only.
+    if (this.store) {
+      this.store.updateSession(sessionId, { status: 'error' });
+      this.store.addMessage(sessionId, {
+        type: 'system',
+        content: '',
+        metadata: { error: pending.message, errorKind: pending.classified.kind },
+      });
+    }
+    this.emit('error', sessionId, pending.classified);
   }
 
   // ── Private: assistant message lifecycle ──
@@ -1583,7 +1631,9 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
   const fallbackContextWindow = isLocalModel
     ? DEFAULT_PI_LOCAL_CONTEXT_WINDOW
     : DEFAULT_PI_CLOUD_CONTEXT_WINDOW;
-  const fallbackMaxTokens = isLocalModel ? DEFAULT_PI_LOCAL_MAX_TOKENS : DEFAULT_PI_CLOUD_MAX_TOKENS;
+  const fallbackMaxTokens = isLocalModel
+    ? DEFAULT_PI_LOCAL_MAX_TOKENS
+    : DEFAULT_PI_CLOUD_MAX_TOKENS;
 
   return {
     id: config.model,
