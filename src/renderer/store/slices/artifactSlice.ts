@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import { normalizeFilePathForDedup } from '../../services/artifactParser';
-import type { Artifact } from '../../types/artifact';
+import { ArtifactRole, type Artifact } from '../../types/artifact';
 import type { RootState } from '../index';
 
 const DEFAULT_PANEL_WIDTH = 560;
@@ -29,6 +29,18 @@ const initialState: ArtifactState = {
   panelWidth: DEFAULT_PANEL_WIDTH,
 };
 
+function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
+  return {
+    ...existing,
+    ...incoming,
+    content: incoming.content || existing.content,
+    role:
+      existing.role === ArtifactRole.Deliverable || incoming.role === ArtifactRole.Deliverable
+        ? ArtifactRole.Deliverable
+        : ArtifactRole.Intermediate,
+  };
+}
+
 const artifactSlice = createSlice({
   name: 'artifact',
   initialState,
@@ -48,9 +60,7 @@ const artifactSlice = createSlice({
       const existing = state.artifactsBySession[sessionId].findIndex(a => a.id === artifact.id);
       if (existing >= 0) {
         const old = state.artifactsBySession[sessionId][existing];
-        if (artifact.content || !old.content) {
-          state.artifactsBySession[sessionId][existing] = artifact;
-        }
+        state.artifactsBySession[sessionId][existing] = mergeArtifact(old, artifact);
       } else {
         // Deduplicate by filePath: if another artifact with same filePath already exists, update it
         if (artifact.filePath) {
@@ -60,9 +70,7 @@ const artifactSlice = createSlice({
           );
           if (dupIndex >= 0) {
             const old = state.artifactsBySession[sessionId][dupIndex];
-            if (artifact.content || !old.content) {
-              state.artifactsBySession[sessionId][dupIndex] = artifact;
-            }
+            state.artifactsBySession[sessionId][dupIndex] = mergeArtifact(old, artifact);
             return;
           }
         }

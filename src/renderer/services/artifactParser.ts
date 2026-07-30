@@ -1,4 +1,4 @@
-import type { Artifact, ArtifactType } from '../types/artifact';
+import { ArtifactRole, type Artifact, type ArtifactType } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
 
 /**
@@ -122,6 +122,7 @@ export function parseCodeBlockArtifacts(
       content,
       language: type === 'code' ? language : undefined,
       source: 'codeblock',
+      role: ArtifactRole.Deliverable,
       createdAt: Date.now(),
     });
 
@@ -145,6 +146,7 @@ export function parseFilePathsFromText(
   messageId: string,
   sessionId: string,
   idPrefix = 'artifact-path',
+  role: Artifact['role'] = ArtifactRole.Deliverable,
 ): Artifact[] {
   if (!messageContent) return [];
 
@@ -185,6 +187,7 @@ export function parseFilePathsFromText(
       fileName,
       filePath,
       source: 'tool',
+      role,
       createdAt: Date.now(),
     });
 
@@ -198,6 +201,7 @@ export function parseFileLinksFromMessage(
   messageContent: string,
   messageId: string,
   sessionId: string,
+  role: Artifact['role'] = ArtifactRole.Deliverable,
 ): Artifact[] {
   if (!messageContent) return [];
 
@@ -234,6 +238,7 @@ export function parseFileLinksFromMessage(
       fileName,
       filePath,
       source: 'tool',
+      role,
       createdAt: Date.now(),
     });
 
@@ -333,6 +338,7 @@ export function parseToolArtifact(
     fileName,
     filePath,
     source: 'tool',
+    role: ArtifactRole.Intermediate,
     createdAt: toolUseMsg.timestamp || Date.now(),
   };
 }
@@ -355,7 +361,31 @@ export function detectArtifactsFromMessages(
   sessionId: string,
 ): DetectedArtifact[] {
   const detected: DetectedArtifact[] = [];
-  const seenFilePaths = new Set<string>();
+  const detectedFilePathIndexes = new Map<string, number>();
+  const finalAnswerMessageId = findFinalAnswerMessageId(messages);
+
+  const addPathArtifact = (artifact: Artifact, needsFileLoad: boolean) => {
+    if (!artifact.filePath) return;
+
+    const normalized = normalizeFilePathForDedup(artifact.filePath);
+    const existingIndex = detectedFilePathIndexes.get(normalized);
+    if (existingIndex === undefined) {
+      detectedFilePathIndexes.set(normalized, detected.length);
+      detected.push({ artifact, needsFileLoad });
+      return;
+    }
+
+    const existing = detected[existingIndex];
+    if (
+      existing.artifact.role !== ArtifactRole.Deliverable &&
+      artifact.role === ArtifactRole.Deliverable
+    ) {
+      detected[existingIndex] = {
+        artifact,
+        needsFileLoad: existing.needsFileLoad || needsFileLoad,
+      };
+    }
+  };
 
   for (const msg of messages) {
     if (msg.type === 'assistant' && !msg.metadata?.isThinking && msg.content) {
@@ -364,22 +394,22 @@ export function detectArtifactsFromMessages(
         detected.push({ artifact, needsFileLoad: false });
       }
 
-      const fileLinks = parseFileLinksFromMessage(msg.content, msg.id, sessionId);
+      const fileRole =
+        msg.id === finalAnswerMessageId ? ArtifactRole.Deliverable : ArtifactRole.Intermediate;
+      const fileLinks = parseFileLinksFromMessage(msg.content, msg.id, sessionId, fileRole);
       for (const fl of fileLinks) {
-        const normalized = fl.filePath ? normalizeFilePathForDedup(fl.filePath) : '';
-        if (fl.filePath && !seenFilePaths.has(normalized)) {
-          seenFilePaths.add(normalized);
-          detected.push({ artifact: fl, needsFileLoad: true });
-        }
+        addPathArtifact(fl, true);
       }
 
-      const filePaths = parseFilePathsFromText(msg.content, msg.id, sessionId);
+      const filePaths = parseFilePathsFromText(
+        msg.content,
+        msg.id,
+        sessionId,
+        'artifact-path',
+        fileRole,
+      );
       for (const artifact of filePaths) {
-        const normalized = artifact.filePath ? normalizeFilePathForDedup(artifact.filePath) : '';
-        if (artifact.filePath && !seenFilePaths.has(normalized)) {
-          seenFilePaths.add(normalized);
-          detected.push({ artifact, needsFileLoad: true });
-        }
+        addPathArtifact(artifact, true);
       }
     }
   }
@@ -395,11 +425,7 @@ export function detectArtifactsFromMessages(
           : undefined;
       const toolArtifact = parseToolArtifact(msg, toolResult, sessionId);
       if (toolArtifact && toolArtifact.filePath) {
-        const normalized = normalizeFilePathForDedup(toolArtifact.filePath);
-        if (!seenFilePaths.has(normalized)) {
-          seenFilePaths.add(normalized);
-          detected.push({ artifact: toolArtifact, needsFileLoad: true });
-        }
+        addPathArtifact(toolArtifact, true);
       } else if (toolArtifact && !toolArtifact.filePath) {
         detected.push({ artifact: toolArtifact, needsFileLoad: false });
       }
@@ -407,4 +433,32 @@ export function detectArtifactsFromMessages(
   }
 
   return detected;
+}
+
+function findFinalAnswerMessageId(messages: CoworkMessage[]): string | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      message.type === 'assistant' &&
+      !message.metadata?.isThinking &&
+      message.metadata?.isFinalAnswer === true &&
+      message.content.trim()
+    ) {
+      return message.id;
+    }
+  }
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (
+      message.type === 'assistant' &&
+      !message.metadata?.isThinking &&
+      message.metadata?.isStreaming !== true &&
+      message.content.trim()
+    ) {
+      return message.id;
+    }
+  }
+
+  return null;
 }

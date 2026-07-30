@@ -38,7 +38,7 @@ import {
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
-import type { Artifact } from '../../types/artifact';
+import { ArtifactRole, type Artifact } from '../../types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
@@ -402,6 +402,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           fileName,
           filePath,
           source: 'tool',
+          role: ArtifactRole.Deliverable,
           createdAt: Date.now(),
         };
         dispatch(addArtifact({ sessionId, artifact: newArtifact }));

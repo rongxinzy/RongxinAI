@@ -7,6 +7,7 @@ import {
   parseFilePathsFromText,
   parseToolArtifact,
 } from './artifactParser';
+import { ArtifactRole } from '../types/artifact';
 
 describe('normalizeFilePathForDedup', () => {
   test('strips leading / before Windows drive letter', () => {
@@ -133,6 +134,7 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.type).toBe('code');
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
     expect(artifacts[0].needsFileLoad).toBe(false);
   });
 
@@ -236,6 +238,59 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.filePath).toBe('D:/workspace/output.ts');
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Intermediate);
     expect(artifacts[0].needsFileLoad).toBe(true);
+  });
+
+  test('marks only the final answer file path as a deliverable', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-progress',
+          type: 'assistant',
+          content: 'Working file: D:/workspace/slides/slide-01.js',
+          timestamp: Date.now(),
+          metadata: { isFinal: true, isStreaming: false },
+        },
+        {
+          id: 'assistant-final',
+          type: 'assistant',
+          content: 'Final file: D:/workspace/output/presentation.pptx',
+          timestamp: Date.now(),
+          metadata: { isFinal: true, isStreaming: false, isFinalAnswer: true },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(2);
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Intermediate);
+    expect(artifacts[1].artifact.role).toBe(ArtifactRole.Deliverable);
+  });
+
+  test('promotes a repeated intermediate path when the final answer references it', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-progress',
+          type: 'assistant',
+          content: 'Generated script: D:/workspace/output/build.js',
+          timestamp: Date.now(),
+          metadata: { isStreaming: false },
+        },
+        {
+          id: 'assistant-final',
+          type: 'assistant',
+          content: 'Final file: D:/workspace/output/build.js',
+          timestamp: Date.now(),
+          metadata: { isStreaming: false, isFinalAnswer: true },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
+    expect(artifacts[0].artifact.messageId).toBe('assistant-final');
   });
 });

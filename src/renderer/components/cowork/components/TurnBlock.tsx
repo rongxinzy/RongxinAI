@@ -16,7 +16,7 @@ import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
 import { i18nService } from '../../../services/i18n';
-import type { Artifact } from '../../../types/artifact';
+import { ArtifactRole, type Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import { ArtifactPreviewCard } from '../../artifacts';
 import {
@@ -357,11 +357,13 @@ export const TurnBlock: React.FC<{
                   ),
                 )}
             {showTypingIndicator && <TypingDots />}
-            {artifacts && artifacts.length > 0 && (
+            {artifacts?.some(artifact => artifact.role === ArtifactRole.Deliverable) && (
               <div className="flex flex-wrap gap-2 pt-1">
-                {artifacts.map(artifact => (
-                  <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
-                ))}
+                {artifacts
+                  .filter(artifact => artifact.role === ArtifactRole.Deliverable)
+                  .map(artifact => (
+                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                  ))}
               </div>
             )}
           </div>
