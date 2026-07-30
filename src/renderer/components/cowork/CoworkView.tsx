@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { PanelLeft, Pencil } from 'lucide-react';
+import { MessageCirclePlus, PanelLeft } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -1285,12 +1285,22 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
       <div className="non-draggable h-8 flex items-center">
         {isSidebarCollapsed && (
-          <div className={`flex items-center gap-1 mr-2 ${isMac ? 'pl-[68px]' : ''}`}>
-            <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
-              <PanelLeft className="h-4 w-4" />
+          <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleSidebar}
+              className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
+            >
+              <PanelLeft className="size-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={onNewChat}>
-              <Pencil className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onNewChat}
+              className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
+            >
+              <MessageCirclePlus className="size-4" />
             </Button>
             {updateBadge}
           </div>

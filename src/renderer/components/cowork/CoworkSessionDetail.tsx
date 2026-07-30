@@ -4,7 +4,7 @@ import {
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
 import { Button } from '@shared/components/ui/button';
-import { Download, Folder, Image as ImageIcon, PanelLeft, Pencil } from 'lucide-react';
+import { Download, Folder, Image as ImageIcon, MessageCirclePlus, PanelLeft } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -1036,12 +1036,22 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         {/* Left side: Toggle buttons (when collapsed) + Title */}
         <div className="flex h-full items-center gap-2 min-w-0">
           {isSidebarCollapsed && (
-            <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <Button variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeft className="h-4 w-4" />
+            <div className={`non-draggable flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onToggleSidebar}
+                className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
+              >
+                <PanelLeft className="size-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={onNewChat}>
-                <Pencil className="h-4 w-4" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onNewChat}
+                className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
+              >
+                <MessageCirclePlus className="size-4" />
               </Button>
               {updateBadge}
             </div>

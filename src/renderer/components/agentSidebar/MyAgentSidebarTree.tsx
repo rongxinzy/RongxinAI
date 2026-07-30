@@ -1,7 +1,8 @@
 import { Button } from '@shared/components/ui/button';
 import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
-import { FolderPlus, TriangleAlert } from 'lucide-react';
-import React, { useEffect, useState } from 'react';
+import { useReducedMotion } from 'motion/react';
+import { TriangleAlert } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch } from 'react-redux';
 
@@ -17,6 +18,10 @@ import {
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from '../cowork/constants';
 import CreateProjectDialog from '../cowork/CreateProjectDialog';
+import {
+  AnimatedFolderPlusIcon,
+  type AnimatedFolderPlusIconHandle,
+} from '../icons/AnimatedFolderPlusIcon';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 import { useWorkspaceSidebarState } from './useWorkspaceSidebarState';
 import WorkspaceTreeNode from './WorkspaceTreeNode';
@@ -112,6 +117,8 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   };
 
   const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const folderPlusIconRef = useRef<AnimatedFolderPlusIconHandle>(null);
+  const prefersReducedMotion = useReducedMotion();
   const [workspacePendingRemoval, setWorkspacePendingRemoval] =
     useState<WorkspaceSidebarNode | null>(null);
 
@@ -191,7 +198,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         </DialogContent>
       </Dialog>
       <div className="sticky top-0 z-30 flex h-9 items-center justify-between bg-surface-raised px-1.5">
-        <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+        <h2 className="min-w-0 truncate text-sm font-normal text-muted-foreground">
           {i18nService.t('workspaces')}
         </h2>
         <Button
@@ -199,10 +206,14 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           variant="ghost"
           size="icon-sm"
           onClick={() => void handleCreateWorkspace()}
-          className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
+          onMouseEnter={() => {
+            if (!prefersReducedMotion) folderPlusIconRef.current?.startAnimation();
+          }}
+          onMouseLeave={() => folderPlusIconRef.current?.stopAnimation()}
+          className="text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
           aria-label={i18nService.t('workspaceAdd')}
         >
-          <FolderPlus className="size-4" />
+          <AnimatedFolderPlusIcon ref={folderPlusIconRef} />
         </Button>
       </div>
 
@@ -248,7 +259,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
       {workMode === 'work' && (
         <div className="mt-3 flex flex-col gap-0.5">
           <div className="flex h-10 items-center bg-surface-raised px-1.5">
-            <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
+            <h2 className="min-w-0 truncate text-sm font-normal text-muted-foreground">
               {i18nService.t('scheduledTasks')}
             </h2>
           </div>

@@ -1,11 +1,16 @@
 import { Button } from '@shared/components/ui/button';
-import { Folder, Pencil, Trash2 } from 'lucide-react';
+import { useReducedMotion } from 'motion/react';
+import { MessageCirclePlus, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { isScratchWorkspacePath } from '../../utils/path';
 import AgentTaskRow from './AgentTaskRow';
 import ExpandAgentTasksRow from './ExpandAgentTasksRow';
+import {
+  AnimatedFolderOpenIcon,
+  type AnimatedFolderOpenIconHandle,
+} from '../icons/AnimatedFolderOpenIcon';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 
 interface WorkspaceTreeNodeProps {
@@ -51,9 +56,12 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
 }) => {
   const [shouldRenderTasks, setShouldRenderTasks] = useState(workspace.isExpanded);
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
+  const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
+  const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(workspace.isExpanded);
   // The scratch workspace (「无项目」) is not removable — it always exists.
-  const canRemove = typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
+  const canRemove =
+    typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
 
   useEffect(() => {
     let frame = 0;
@@ -82,16 +90,20 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
       <div className="group sticky top-0 z-20 ml-[-6px] h-7 w-[calc(100%+12px)] bg-surface-raised">
         <Button
           variant="ghost"
-          className="flex h-full w-full items-center justify-start gap-2 rounded-md py-0 pl-3 pr-12 text-left text-[14px] font-normal text-foreground"
+          className="flex h-full w-full items-center justify-start gap-2 rounded-md py-0 pl-3 pr-12 text-left text-sm font-normal text-foreground"
           onClick={() => onToggleExpanded(workspace.id)}
+          onMouseEnter={() => {
+            if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
+          }}
+          onMouseLeave={() => folderIconRef.current?.stopAnimation()}
           role="treeitem"
           aria-level={1}
           aria-expanded={workspace.isExpanded}
         >
           <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
-            <Folder className="size-4" />
+            <AnimatedFolderOpenIcon ref={folderIconRef} />
           </span>
-          <span className="min-w-0 flex-1 truncate opacity-[0.76]" title={workspace.path}>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground" title={workspace.path}>
             {workspace.name}
           </span>
         </Button>
@@ -100,10 +112,10 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             variant="ghost"
             size="icon-xs"
             onClick={() => onCreateTask(workspace)}
-            className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-[0.3] hover:opacity-[0.46] ${canRemove ? 'right-7' : 'right-1.5'}`}
+            className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground ${canRemove ? 'right-7' : 'right-1.5'}`}
             aria-label={i18nService.t('myAgentSidebarNewTask')}
           >
-            <Pencil className="size-3.5" />
+            <MessageCirclePlus className="size-3.5" />
           </Button>
         )}
         {canRemove && (
@@ -111,7 +123,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             variant="ghost"
             size="icon-xs"
             onClick={() => onRemoveWorkspace?.(workspace)}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-[0.3] hover:text-destructive hover:opacity-[0.46]"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 transition-colors group-hover:opacity-100 hover:bg-surface-raised hover:text-destructive"
             aria-label={i18nService.t('removeProject')}
           >
             <Trash2 className="size-3.5" />

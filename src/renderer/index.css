@@ -634,7 +634,6 @@ select::-ms-expand {
   background-color: var(--zy-primary);
 }
 
-
 /* Dialog shadow — provides elevated depth for all dialogs.
    Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
    via the Tailwind plugin which uses var(--zy-*) directly. */
