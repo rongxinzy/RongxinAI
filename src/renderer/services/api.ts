@@ -1344,6 +1344,8 @@ class ApiService {
     let fullContent = '';
     let fullReasoning = '';
     let usage: { inputTokens: number; outputTokens: number } | undefined;
+    let inputTokens: number | undefined;
+    let outputTokens: number | undefined;
 
     try {
       const requestId = streamRequestId ?? generateRequestId();
@@ -1419,9 +1421,13 @@ class ApiService {
                 const parsed = JSON.parse(data);
                 const responseUsage = parsed.usage ?? parsed.message?.usage;
                 if (responseUsage && typeof responseUsage === 'object') {
-                  const inputTokens = responseUsage.input_tokens;
-                  const outputTokens = responseUsage.output_tokens;
-                  if (typeof inputTokens === 'number' && typeof outputTokens === 'number') {
+                  if (typeof responseUsage.input_tokens === 'number') {
+                    inputTokens = responseUsage.input_tokens;
+                  }
+                  if (typeof responseUsage.output_tokens === 'number') {
+                    outputTokens = responseUsage.output_tokens;
+                  }
+                  if (inputTokens !== undefined && outputTokens !== undefined) {
                     usage = { inputTokens, outputTokens };
                   }
                 }
