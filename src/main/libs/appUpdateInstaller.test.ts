@@ -14,7 +14,7 @@ vi.mock('electron', () => ({
   session: { defaultSession: { fetch: fetchMock } },
 }));
 
-import { downloadUpdate } from './appUpdateInstaller';
+import { buildMacReplacementScript, downloadUpdate } from './appUpdateInstaller';
 
 describe('downloadUpdate', () => {
   let userDataDir: string;
@@ -33,7 +33,9 @@ describe('downloadUpdate', () => {
     const body = Buffer.from('verified installer bytes');
     const sha256 = crypto.createHash('sha256').update(body).digest('hex');
     fetchMock.mockResolvedValue(
-      new Response(body, { headers: { 'content-length': String(body.length) } }),
+      new Response(body, {
+        headers: { 'content-length': String(body.length) },
+      }),
     );
 
     const result = await downloadUpdate(
@@ -53,7 +55,9 @@ describe('downloadUpdate', () => {
   test('removes the partial file and rejects when the manifest hash does not match', async () => {
     const body = Buffer.from('tampered installer bytes');
     fetchMock.mockResolvedValue(
-      new Response(body, { headers: { 'content-length': String(body.length) } }),
+      new Response(body, {
+        headers: { 'content-length': String(body.length) },
+      }),
     );
 
     await expect(
@@ -66,5 +70,40 @@ describe('downloadUpdate', () => {
     ).rejects.toThrow('checksum verification failed');
 
     await expect(fs.promises.readdir(path.join(userDataDir, 'updates'))).resolves.toEqual([]);
+  });
+});
+
+describe('unattended installation handoff', () => {
+  test('macOS waits for exit, atomically swaps the staged bundle, and keeps a rollback path', () => {
+    const script = buildMacReplacementScript({
+      appPid: 1234,
+      backupApp: '/Applications/.ZhiYuan.app.backup',
+      failedApp: '/Applications/.ZhiYuan.app.failed',
+      stagedApp: '/Applications/.ZhiYuan.app.update',
+      targetApp: '/Applications/ZhiYuan.app',
+    });
+
+    expect(script.indexOf('while kill -0 1234')).toBeLessThan(
+      script.indexOf('mv "$TARGET" "$BACKUP"'),
+    );
+    expect(script).toContain('if mv "$STAGED" "$TARGET"; then');
+    expect(script).toContain('mv "$BACKUP" "$TARGET" || true');
+    expect(script).not.toContain('rm -rf "$TARGET"');
+  });
+
+  test('NSIS silent mode bypasses the local-signing confirmation dialog', async () => {
+    const nsisSource = await fs.promises.readFile(
+      path.resolve(process.cwd(), 'scripts/nsis-installer.nsh'),
+      'utf8',
+    );
+    const confirmationBlock = nsisSource.slice(
+      nsisSource.indexOf('LlamaCppBackendLocalSigningConfirmationRequired:'),
+      nsisSource.indexOf('LlamaCppBackendLocalSigningConfirmed:'),
+    );
+
+    expect(confirmationBlock).toContain('IfSilent LlamaCppBackendLocalSigningConfirmed 0');
+    expect(confirmationBlock.indexOf('IfSilent')).toBeLessThan(
+      confirmationBlock.indexOf('    MessageBox'),
+    );
   });
 });

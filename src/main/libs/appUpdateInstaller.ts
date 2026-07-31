@@ -49,6 +49,65 @@ function execAsync(command: string, timeoutMs = 120_000): Promise<string> {
   });
 }
 
+function spawnDetachedAndConfirm(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+  });
+}
+
+export function buildMacReplacementScript(options: {
+  appPid: number;
+  backupApp: string;
+  failedApp: string;
+  stagedApp: string;
+  targetApp: string;
+}): string {
+  const { appPid, backupApp, failedApp, stagedApp, targetApp } = options;
+  return [
+    '#!/bin/sh',
+    'set -u',
+    `TARGET=${shellEscape(targetApp)}`,
+    `STAGED=${shellEscape(stagedApp)}`,
+    `BACKUP=${shellEscape(backupApp)}`,
+    `FAILED=${shellEscape(failedApp)}`,
+    'waited=0',
+    `while kill -0 ${appPid} 2>/dev/null; do`,
+    '  if [ "$waited" -ge 120 ]; then exit 1; fi',
+    '  sleep 1',
+    '  waited=$((waited + 1))',
+    'done',
+    'if [ ! -f "$STAGED/Contents/Info.plist" ]; then exit 1; fi',
+    'had_target=0',
+    'if [ -e "$TARGET" ]; then',
+    '  if ! mv "$TARGET" "$BACKUP"; then exit 1; fi',
+    '  had_target=1',
+    'fi',
+    'if mv "$STAGED" "$TARGET"; then',
+    '  rm -rf "$BACKUP"',
+    '  /usr/bin/open "$TARGET"',
+    '  exit 0',
+    'fi',
+    '# Preserve any unexpected partial target before restoring the previous app.',
+    'if [ -e "$TARGET" ]; then mv "$TARGET" "$FAILED" || true; fi',
+    'if [ "$had_target" -eq 1 ] && [ -e "$BACKUP" ] && [ ! -e "$TARGET" ]; then',
+    '  mv "$BACKUP" "$TARGET" || true',
+    'fi',
+    'if [ -e "$TARGET" ]; then',
+    '  rm -rf "$FAILED"',
+    '  /usr/bin/open "$TARGET"',
+    'elif [ -e "$BACKUP" ]; then',
+    '  /usr/bin/open "$BACKUP"',
+    'fi',
+    'exit 1',
+    '',
+  ].join('\n');
+}
+
 /** Minimum interval between progress IPC events (ms). */
 const PROGRESS_THROTTLE_MS = 200;
 
@@ -189,7 +248,9 @@ export async function downloadUpdate(
       throw new Error(`Download incomplete: expected ${total} bytes but got ${stat.size}`);
     }
     if (stat.size !== expected.size) {
-      throw new Error(`Downloaded size mismatch: expected ${expected.size} bytes but got ${stat.size}`);
+      throw new Error(
+        `Downloaded size mismatch: expected ${expected.size} bytes but got ${stat.size}`,
+      );
     }
 
     const sha256 = hash.digest('hex');
@@ -298,7 +359,10 @@ async function installLinuxPackage(packagePath: string): Promise<void> {
   }
 
   await fs.promises.writeFile(scriptPath, script, { mode: 0o700 });
-  const launcher = spawn('/bin/sh', [scriptPath], { detached: true, stdio: 'ignore' });
+  const launcher = spawn('/bin/sh', [scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+  });
   launcher.unref();
   console.log(`[AppUpdate] Linux installer scheduled via ${scriptPath}`);
   app.quit();
@@ -306,6 +370,8 @@ async function installLinuxPackage(packagePath: string): Promise<void> {
 
 async function installMacDmg(dmgPath: string): Promise<void> {
   let mountPoint: string | null = null;
+  let stagedApp: string | null = null;
+  let installScheduled = false;
 
   try {
     // Mount the DMG (timeout 60s)
@@ -335,49 +401,47 @@ async function installMacDmg(dmgPath: string): Promise<void> {
     const sourceApp = path.join(mountPoint, appBundle);
     console.log(`[AppUpdate] Source app: ${sourceApp}`);
 
-    // Determine target path: current running app location
-    // process.resourcesPath is .app/Contents/Resources, go up 3 levels
-    const currentAppPath = path.resolve(process.resourcesPath, '..', '..', '..');
+    // process.resourcesPath is <bundle>.app/Contents/Resources, so two parent
+    // traversals resolve the bundle itself.
+    const currentAppPath = path.resolve(process.resourcesPath, '..', '..');
     let targetApp: string;
 
-    if (currentAppPath.endsWith('.app')) {
+    if (currentAppPath.endsWith('.app') && !currentAppPath.startsWith('/Volumes/')) {
       targetApp = currentAppPath;
     } else {
-      // Fallback to /Applications
       targetApp = `/Applications/${appBundle}`;
     }
     console.log(`[AppUpdate] Target app: ${targetApp}`);
 
-    // Try to copy the .app bundle (use shellEscape to prevent injection)
+    // Fully stage the new bundle beside the target. Keeping both directories on
+    // the same filesystem makes the post-exit mv operations atomic.
+    const timestamp = Date.now();
+    const targetDir = path.dirname(targetApp);
+    stagedApp = path.join(targetDir, `.${appBundle}.update-${timestamp}`);
+    const backupApp = path.join(targetDir, `.${appBundle}.backup-${timestamp}`);
+    const failedApp = path.join(targetDir, `.${appBundle}.failed-${timestamp}`);
+    let needsElevation = false;
+    const dittoCommand = `/usr/bin/ditto ${shellEscape(sourceApp)} ${shellEscape(stagedApp)}`;
+
     try {
-      console.log('[AppUpdate] Copying app bundle...');
-      await execAsync(
-        `rm -rf ${shellEscape(targetApp)} && cp -R ${shellEscape(sourceApp)} ${shellEscape(targetApp)}`,
-        300_000,
-      );
-      console.log('[AppUpdate] Copy succeeded');
+      console.log('[AppUpdate] Staging app bundle...');
+      await execAsync(dittoCommand, 300_000);
     } catch {
-      // Permission denied: try with admin privileges via osascript
-      console.log('[AppUpdate] Normal copy failed, requesting admin privileges...');
+      console.log('[AppUpdate] Staging requires administrator privileges...');
+      needsElevation = true;
       try {
-        // For osascript, escape backslashes and double quotes for the inner shell
-        const escapeForInnerShell = (s: string) =>
-          s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-        const escapedTarget = escapeForInnerShell(targetApp);
-        const escapedSource = escapeForInnerShell(sourceApp);
-        await execAsync(
-          `osascript -e 'do shell script "rm -rf \\"${escapedTarget}\\" && cp -R \\"${escapedSource}\\" \\"${escapedTarget}\\"" with administrator privileges'`,
-          300_000,
-        );
-        console.log('[AppUpdate] Admin copy succeeded');
+        const privilegedStageCommand = `/bin/rm -rf ${shellEscape(stagedApp)} && ${dittoCommand}`;
+        const appleScript = `do shell script ${JSON.stringify(privilegedStageCommand)} with administrator privileges`;
+        await execAsync(`/usr/bin/osascript -e ${shellEscape(appleScript)}`, 300_000);
       } catch (adminError) {
         throw new Error(
-          `Installation failed: insufficient permissions. ${adminError instanceof Error ? adminError.message : ''}`,
+          `Installation staging failed: insufficient permissions. ${adminError instanceof Error ? adminError.message : ''}`,
         );
       }
     }
+    await fs.promises.access(path.join(stagedApp, 'Contents', 'Info.plist'), fs.constants.R_OK);
+    console.log(`[AppUpdate] Staged app verified: ${stagedApp}`);
 
-    // Detach DMG (timeout 30s)
     try {
       await execAsync(`hdiutil detach ${shellEscape(mountPoint)} -force`, 30_000);
     } catch {
@@ -385,25 +449,34 @@ async function installMacDmg(dmgPath: string): Promise<void> {
     }
     mountPoint = null;
 
-    // Clean up downloaded DMG
     try {
       await fs.promises.unlink(dmgPath);
     } catch {
       // Best effort
     }
 
-    // Relaunch from the new app location
-    const executablePath = path.join(targetApp, 'Contents', 'MacOS');
-    const execEntries = await fs.promises.readdir(executablePath);
-    const executable = execEntries[0]; // Should be the app executable
+    // The running bundle is never modified. A detached helper waits for this
+    // process to exit, then swaps the staged bundle into place and rolls back
+    // to the backup if the replacement cannot be completed.
+    const scriptPath = path.join(app.getPath('temp'), `zhiyuan-mac-update-${timestamp}.sh`);
+    const script = buildMacReplacementScript({
+      appPid: process.pid,
+      backupApp,
+      failedApp,
+      stagedApp,
+      targetApp,
+    });
+    await fs.promises.writeFile(scriptPath, script, { mode: 0o700 });
 
-    if (executable) {
-      console.log(`[AppUpdate] Relaunching: ${path.join(executablePath, executable)}`);
-      app.relaunch({ execPath: path.join(executablePath, executable) });
+    if (needsElevation) {
+      const helperCommand = `/bin/sh ${shellEscape(scriptPath)}`;
+      const appleScript = `do shell script ${JSON.stringify(helperCommand)} with administrator privileges`;
+      await spawnDetachedAndConfirm('/usr/bin/osascript', ['-e', appleScript]);
     } else {
-      console.log('[AppUpdate] Relaunching (default)');
-      app.relaunch();
+      await spawnDetachedAndConfirm('/bin/sh', [scriptPath]);
     }
+    installScheduled = true;
+    console.log(`[AppUpdate] macOS replacement scheduled via ${scriptPath}`);
     app.quit();
   } catch (error) {
     console.error('[AppUpdate] macOS install error:', error);
@@ -414,6 +487,9 @@ async function installMacDmg(dmgPath: string): Promise<void> {
       } catch {
         // Best effort
       }
+    }
+    if (stagedApp && !installScheduled) {
+      await fs.promises.rm(stagedApp, { recursive: true, force: true }).catch(() => {});
     }
     throw error;
   }

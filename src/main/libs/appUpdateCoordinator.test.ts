@@ -10,9 +10,14 @@ import type { SqliteStore } from '../sqliteStore';
 import { downloadUpdate, installUpdate } from './appUpdateInstaller';
 import { AppUpdateCoordinator } from './appUpdateCoordinator';
 
+const electronMocks = vi.hoisted(() => ({
+  getPath: vi.fn(() => os.tmpdir()),
+}));
+
 vi.mock('electron', () => ({
   app: {
     getAppPath: () => process.cwd(),
+    getPath: electronMocks.getPath,
     getVersion: () => '2026.7.1',
   },
   BrowserWindow: {
@@ -57,11 +62,16 @@ function signedManifest(
     variant: 'default',
     filename: 'ZhiYuan.dmg',
   },
-  artifactOverrides: Partial<{ size: number; sha256: string }> = {},
+  artifactOverrides: Partial<{
+    version: string;
+    size: number;
+    sha256: string;
+  }> = {},
 ) {
+  const version = artifactOverrides.version ?? '2026.7.2';
   const payload = {
     channel: 'stable',
-    version: '2026.7.2',
+    version,
     publishedAt: '2026-07-28T00:00:00.000Z',
     minimumSupportedVersion: '2026.7.1',
     mandatory: false,
@@ -73,7 +83,7 @@ function signedManifest(
       platform: target.platform,
       arch: target.arch,
       variant: target.variant,
-      url: `https://downloads.rongxzyai.com/releases/2026.7.2/${target.platform}-${target.arch}-${target.variant}/${target.filename}`,
+      url: `https://downloads.rongxzyai.com/releases/${version}/${target.platform}-${target.arch}-${target.variant}/${target.filename}`,
       size: artifactOverrides.size ?? 1024,
       sha256: artifactOverrides.sha256 ?? 'a'.repeat(64),
     },
@@ -96,12 +106,19 @@ describe('AppUpdateCoordinator manifest cache', () => {
   let publicKeyBase64: string;
 
   beforeEach(() => {
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
-    Object.defineProperty(process, 'arch', { configurable: true, value: 'arm64' });
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'darwin',
+    });
+    Object.defineProperty(process, 'arch', {
+      configurable: true,
+      value: 'arm64',
+    });
     const keyPair = crypto.generateKeyPairSync('ed25519');
     privateKey = keyPair.privateKey;
     publicKeyBase64 = keyPair.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
     (APP_UPDATE_TRUSTED_KEYS as Record<string, string>)['test-release-key'] = publicKeyBase64;
+    electronMocks.getPath.mockReturnValue(os.tmpdir());
     vi.mocked(downloadUpdate).mockResolvedValue({
       filePath: '/tmp/zhiyuan-update.dmg',
       sha256: 'a'.repeat(64),
@@ -111,8 +128,14 @@ describe('AppUpdateCoordinator manifest cache', () => {
 
   afterEach(() => {
     delete (APP_UPDATE_TRUSTED_KEYS as Record<string, string>)['test-release-key'];
-    Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
-    Object.defineProperty(process, 'arch', { configurable: true, value: originalArch });
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: originalPlatform,
+    });
+    Object.defineProperty(process, 'arch', {
+      configurable: true,
+      value: originalArch,
+    });
     if (originalAppImage === undefined) {
       delete process.env.APPIMAGE;
     } else {
@@ -122,7 +145,7 @@ describe('AppUpdateCoordinator manifest cache', () => {
     vi.clearAllMocks();
   });
 
-  test('keeps a verified downloaded update ready without downloading it again', async () => {
+  test('refreshes the signed manifest while reusing a ready installer', async () => {
     const store = new MemoryStore();
     const envelope = signedManifest(privateKey);
     const fetchMock = vi
@@ -130,7 +153,10 @@ describe('AppUpdateCoordinator manifest cache', () => {
       .mockResolvedValueOnce(
         new Response(JSON.stringify(envelope), {
           status: 200,
-          headers: { 'content-type': 'application/json', etag: '"manifest-v1"' },
+          headers: {
+            'content-type': 'application/json',
+            etag: '"manifest-v1"',
+          },
         }),
       )
       .mockResolvedValueOnce(new Response(null, { status: 304 }));
@@ -138,13 +164,130 @@ describe('AppUpdateCoordinator manifest cache', () => {
 
     const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
     const firstResult = await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
     const secondResult = await coordinator.checkNow();
 
     expect(firstResult.updateFound).toBe(true);
     expect(secondResult.updateFound).toBe(true);
     expect(secondResult.state.status).toBe(AppUpdateStatus.Ready);
     expect(secondResult.state.info?.latestVersion).toBe('2026.7.2');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(downloadUpdate).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[1]?.[1]).toEqual(
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'if-none-match': '"manifest-v1"' }),
+      }),
+    );
+  });
+
+  test('replaces a ready installer when the signed manifest advances again', async () => {
+    const store = new MemoryStore();
+    const firstEnvelope = signedManifest(privateKey);
+    const nextSha256 = 'b'.repeat(64);
+    const nextEnvelope = signedManifest(privateKey, undefined, {
+      version: '2026.7.3',
+      sha256: nextSha256,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(firstEnvelope), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(nextEnvelope), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        ),
+    );
+    vi.mocked(downloadUpdate)
+      .mockResolvedValueOnce({
+        filePath: '/tmp/zhiyuan-update-2026.7.2.dmg',
+        sha256: 'a'.repeat(64),
+      })
+      .mockResolvedValueOnce({
+        filePath: '/tmp/zhiyuan-update-2026.7.3.dmg',
+        sha256: nextSha256,
+      });
+
+    const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+    await coordinator.checkNow();
+    await vi.waitFor(() =>
+      expect(coordinator.getState()).toEqual(
+        expect.objectContaining({
+          status: AppUpdateStatus.Ready,
+          readyFileHash: nextSha256,
+          readyFilePath: '/tmp/zhiyuan-update-2026.7.3.dmg',
+        }),
+      ),
+    );
+
+    expect(coordinator.getState().info?.latestVersion).toBe('2026.7.3');
+    expect(downloadUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  test('restores ready metadata only when its signed envelope and update path are valid', async () => {
+    const userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-user-data-'));
+    const updateDir = path.join(userDataDir, 'updates');
+    const installerContents = Buffer.from('signed cached installer');
+    const sha256 = crypto.createHash('sha256').update(installerContents).digest('hex');
+    const installerPath = path.join(updateDir, 'zhiyuan.dmg');
+    await fs.promises.mkdir(updateDir, { recursive: true });
+    await fs.promises.writeFile(installerPath, installerContents);
+    electronMocks.getPath.mockReturnValue(userDataDir);
+
+    try {
+      const store = new MemoryStore();
+      const envelope = signedManifest(privateKey, undefined, {
+        size: installerContents.length,
+        sha256,
+      });
+      store.set('app_update_ready', {
+        envelope,
+        filePath: installerPath,
+        sha256,
+      });
+
+      const restored = new AppUpdateCoordinator(store as unknown as SqliteStore);
+      expect(restored.getState()).toEqual(
+        expect.objectContaining({
+          status: AppUpdateStatus.Ready,
+          readyFilePath: installerPath,
+          readyFileHash: sha256,
+        }),
+      );
+
+      const tamperedStore = new MemoryStore();
+      tamperedStore.set('app_update_ready', {
+        envelope: { ...envelope, signature: 'A'.repeat(86) },
+        filePath: installerPath,
+        sha256,
+      });
+      const rejected = new AppUpdateCoordinator(tamperedStore as unknown as SqliteStore);
+      expect(rejected.getState().status).toBe(AppUpdateStatus.Idle);
+      expect(tamperedStore.get('app_update_ready')).toBeUndefined();
+
+      const outsidePath = path.join(userDataDir, 'do-not-delete.dmg');
+      await fs.promises.writeFile(outsidePath, installerContents);
+      const outsideStore = new MemoryStore();
+      outsideStore.set('app_update_ready', {
+        envelope,
+        filePath: outsidePath,
+        sha256,
+      });
+      const outsideRejected = new AppUpdateCoordinator(outsideStore as unknown as SqliteStore);
+      expect(outsideRejected.getState().status).toBe(AppUpdateStatus.Idle);
+      await expect(fs.promises.readFile(outsidePath)).resolves.toEqual(installerContents);
+    } finally {
+      await fs.promises.rm(userDataDir, { recursive: true, force: true });
+    }
   });
 
   test('restores a verified downloaded update after an application restart', async () => {
@@ -155,7 +298,10 @@ describe('AppUpdateCoordinator manifest cache', () => {
       .mockResolvedValueOnce(
         new Response(JSON.stringify(envelope), {
           status: 200,
-          headers: { 'content-type': 'application/json', etag: '"manifest-v1"' },
+          headers: {
+            'content-type': 'application/json',
+            etag: '"manifest-v1"',
+          },
         }),
       )
       .mockResolvedValueOnce(new Response(null, { status: 304 }));
@@ -185,8 +331,14 @@ describe('AppUpdateCoordinator manifest cache', () => {
       filename: 'zhiyuan_amd64.deb',
     },
   ])('selects the matching Linux $name update artifact', async target => {
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' });
-    Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'linux',
+    });
+    Object.defineProperty(process, 'arch', {
+      configurable: true,
+      value: 'x64',
+    });
     if (target.appImage) {
       process.env.APPIMAGE = target.appImage;
     } else {
@@ -249,7 +401,10 @@ describe('AppUpdateCoordinator manifest cache', () => {
       expect.any(Function),
     );
 
-    resolveDownload?.({ filePath: '/tmp/zhiyuan-update.dmg', sha256: 'a'.repeat(64) });
+    resolveDownload?.({
+      filePath: '/tmp/zhiyuan-update.dmg',
+      sha256: 'a'.repeat(64),
+    });
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
     expect(coordinator.getState().readyFilePath).toBe('/tmp/zhiyuan-update.dmg');
   });
@@ -281,7 +436,10 @@ describe('AppUpdateCoordinator manifest cache', () => {
     const updateDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-update-test-'));
     const installerPath = path.join(updateDir, 'zhiyuan.dmg');
     await fs.promises.writeFile(installerPath, installerContents);
-    vi.mocked(downloadUpdate).mockResolvedValue({ filePath: installerPath, sha256 });
+    vi.mocked(downloadUpdate).mockResolvedValue({
+      filePath: installerPath,
+      sha256,
+    });
     const envelope = signedManifest(privateKey, undefined, {
       size: installerContents.length,
       sha256,

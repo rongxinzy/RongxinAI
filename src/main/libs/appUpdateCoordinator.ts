@@ -53,9 +53,14 @@ type CachedSignedManifest = {
 };
 
 type ReadyUpdateCache = {
-  info: AppUpdateInfo;
+  envelope: unknown;
   filePath: string;
   sha256: string;
+};
+
+type VerifiedUpdate = {
+  envelope: unknown;
+  info: AppUpdateInfo;
 };
 
 const initialState = (): AppUpdateRuntimeState => ({
@@ -78,6 +83,7 @@ export class AppUpdateCoordinator {
   private readonly store: SqliteStore;
   private checkPromise: Promise<AppUpdateCheckResult> | null = null;
   private downloadPromise: Promise<void> | null = null;
+  private currentSignedEnvelope: unknown | null = null;
 
   constructor(store: SqliteStore) {
     this.store = store;
@@ -90,17 +96,14 @@ export class AppUpdateCoordinator {
 
   async checkNow(options: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
     if (this.isUpdateDisabled()) {
-      return { success: true, state: this.setState(initialState()), updateFound: false };
+      this.currentSignedEnvelope = null;
+      return {
+        success: true,
+        state: this.setState(initialState()),
+        updateFound: false,
+      };
     }
     if (this.checkPromise) return this.checkPromise;
-
-    if (
-      this.state.status === AppUpdateStatus.Ready &&
-      this.state.info &&
-      this.isNewerVersion(this.state.info.latestVersion, this.resolveCurrentVersion())
-    ) {
-      return { success: true, state: this.getState(), updateFound: true };
-    }
 
     const source = options.manual ? AppUpdateSource.Manual : AppUpdateSource.Auto;
     this.checkPromise = this.checkForUpdate(source).finally(() => {
@@ -114,7 +117,14 @@ export class AppUpdateCoordinator {
     if (!info || this.downloadPromise || this.state.status === AppUpdateStatus.Installing) {
       return this.getState();
     }
-    this.startBackgroundDownload(info, this.state.source ?? AppUpdateSource.Manual);
+    if (!this.currentSignedEnvelope) {
+      void this.checkNow({ manual: true });
+      return this.getState();
+    }
+    this.startBackgroundDownload(
+      { info, envelope: this.currentSignedEnvelope },
+      this.state.source ?? AppUpdateSource.Manual,
+    );
     return this.getState();
   }
 
@@ -138,12 +148,17 @@ export class AppUpdateCoordinator {
   }> {
     const { readyFilePath, readyFileHash, info, source } = this.state;
     if (!readyFilePath || !readyFileHash || !info) {
-      return { success: false, state: this.getState(), error: 'No verified update is ready' };
+      return {
+        success: false,
+        state: this.getState(),
+        error: 'No verified update is ready',
+      };
     }
 
     try {
       const stat = await fs.promises.stat(readyFilePath);
-      if (stat.size !== info.expectedSize) throw new Error('Downloaded update file is no longer valid');
+      if (stat.size !== info.expectedSize)
+        throw new Error('Downloaded update file is no longer valid');
       const actualHash = await this.sha256File(readyFilePath);
       if (actualHash !== readyFileHash || actualHash !== info.expectedSha256) {
         throw new Error('Downloaded update checksum verification failed');
@@ -172,34 +187,57 @@ export class AppUpdateCoordinator {
   }
 
   private async checkForUpdate(source: AppUpdateSource): Promise<AppUpdateCheckResult> {
-    this.setState({ ...initialState(), status: AppUpdateStatus.Checking, source });
+    const previousReady = this.state.status === AppUpdateStatus.Ready ? this.getState() : null;
+    const previousEnvelope = this.currentSignedEnvelope;
+    this.setState({
+      ...initialState(),
+      status: AppUpdateStatus.Checking,
+      source,
+    });
     try {
       const currentVersion = this.resolveCurrentVersion();
-      const info = await this.fetchUpdateInfo(currentVersion);
-      if (!info) {
+      const update = await this.fetchUpdateInfo(currentVersion);
+      if (!update) {
+        this.currentSignedEnvelope = null;
+        if (previousReady?.readyFilePath) this.discardReadyUpdate(previousReady.readyFilePath);
         const state = this.setState(initialState());
         return { success: true, state, updateFound: false };
       }
       if (
-        this.state.status === AppUpdateStatus.Ready &&
-        this.state.info?.latestVersion === info.latestVersion
+        previousReady?.info?.latestVersion === update.info.latestVersion &&
+        previousReady.readyFilePath &&
+        previousReady.readyFileHash === update.info.expectedSha256
       ) {
-        return { success: true, state: this.getState(), updateFound: true };
+        this.currentSignedEnvelope = update.envelope;
+        this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, {
+          envelope: update.envelope,
+          filePath: previousReady.readyFilePath,
+          sha256: previousReady.readyFileHash,
+        });
+        return {
+          success: true,
+          state: this.setState(previousReady),
+          updateFound: true,
+        };
       }
+      this.currentSignedEnvelope = update.envelope;
       const state = this.setState({
         ...initialState(),
         status: AppUpdateStatus.Available,
         source,
-        info,
+        info: update.info,
       });
-      this.startBackgroundDownload(info, source);
+      this.startBackgroundDownload(update, source, previousReady?.readyFilePath ?? undefined);
       return { success: true, state, updateFound: true };
     } catch (error) {
       console.warn(
         '[AppUpdate] update check failed:',
         error instanceof Error ? error.message : 'unknown',
       );
-      const state = this.setState(initialState());
+      if (previousReady) {
+        this.currentSignedEnvelope = previousEnvelope;
+      }
+      const state = this.setState(previousReady ?? initialState());
       return {
         success: false,
         state,
@@ -209,8 +247,13 @@ export class AppUpdateCoordinator {
     }
   }
 
-  private startBackgroundDownload(info: AppUpdateInfo, source: AppUpdateSource): void {
+  private startBackgroundDownload(
+    update: VerifiedUpdate,
+    source: AppUpdateSource,
+    supersededFilePath?: string,
+  ): void {
     if (this.downloadPromise) return;
+    const { envelope, info } = update;
     this.setState({
       ...initialState(),
       status: AppUpdateStatus.Downloading,
@@ -226,8 +269,9 @@ export class AppUpdateCoordinator {
       },
     )
       .then(({ filePath, sha256 }) => {
-        const readyUpdate: ReadyUpdateCache = { info, filePath, sha256 };
+        const readyUpdate: ReadyUpdateCache = { envelope, filePath, sha256 };
         this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, readyUpdate);
+        this.currentSignedEnvelope = envelope;
         this.setState({
           ...initialState(),
           status: AppUpdateStatus.Ready,
@@ -236,6 +280,9 @@ export class AppUpdateCoordinator {
           readyFilePath: filePath,
           readyFileHash: sha256,
         });
+        if (supersededFilePath && supersededFilePath !== filePath) {
+          void fs.promises.unlink(supersededFilePath).catch(() => {});
+        }
       })
       .catch(error => {
         if (
@@ -261,19 +308,33 @@ export class AppUpdateCoordinator {
 
   private restoreReadyUpdate(): void {
     const cached = this.store.get<unknown>(READY_UPDATE_CACHE_KEY);
-    if (!this.isReadyUpdateCache(cached)) return;
+    if (!this.isReadyUpdateCache(cached)) {
+      if (cached !== undefined) this.store.delete(READY_UPDATE_CACHE_KEY);
+      return;
+    }
     try {
-      const stat = fs.statSync(cached.filePath);
-      if (stat.size !== cached.info.expectedSize) throw new Error('size mismatch');
-      if (!this.isNewerVersion(cached.info.latestVersion, this.resolveCurrentVersion())) {
+      const payload = this.verifyAndDecodeManifest(cached.envelope);
+      const target = this.resolveUpdateTarget();
+      if (!target) throw new Error('unsupported update target');
+      const info = this.toUpdateInfo(payload, target);
+      if (!info || info.expectedSha256 !== cached.sha256) throw new Error('manifest mismatch');
+      const updateDir = path.resolve(app.getPath('userData'), 'updates');
+      const resolvedFilePath = path.resolve(cached.filePath);
+      if (!resolvedFilePath.startsWith(`${updateDir}${path.sep}`)) {
+        throw new Error('installer path is outside the update directory');
+      }
+      const stat = fs.statSync(resolvedFilePath);
+      if (stat.size !== info.expectedSize) throw new Error('size mismatch');
+      if (!this.isNewerVersion(info.latestVersion, this.resolveCurrentVersion())) {
         throw new Error('not newer than the running app');
       }
+      this.currentSignedEnvelope = cached.envelope;
       this.state = {
         ...initialState(),
         status: AppUpdateStatus.Ready,
         source: AppUpdateSource.Auto,
-        info: cached.info,
-        readyFilePath: cached.filePath,
+        info,
+        readyFilePath: resolvedFilePath,
         readyFileHash: cached.sha256,
       };
     } catch {
@@ -287,11 +348,18 @@ export class AppUpdateCoordinator {
     return (
       typeof cached.filePath === 'string' &&
       /^[a-f0-9]{64}$/.test(cached.sha256) &&
-      Boolean(cached.info) &&
-      typeof cached.info.latestVersion === 'string' &&
-      typeof cached.info.expectedSize === 'number' &&
-      typeof cached.info.expectedSha256 === 'string'
+      Boolean(cached.envelope) &&
+      typeof cached.envelope === 'object'
     );
+  }
+
+  private discardReadyUpdate(filePath: string): void {
+    this.store.delete(READY_UPDATE_CACHE_KEY);
+    const updateDir = path.resolve(app.getPath('userData'), 'updates');
+    const resolvedFilePath = path.resolve(filePath);
+    if (resolvedFilePath.startsWith(`${updateDir}${path.sep}`)) {
+      void fs.promises.unlink(resolvedFilePath).catch(() => {});
+    }
   }
 
   private async sha256File(filePath: string): Promise<string> {
@@ -302,13 +370,10 @@ export class AppUpdateCoordinator {
     return hash.digest('hex');
   }
 
-  private async fetchUpdateInfo(currentVersion: string): Promise<AppUpdateInfo | null> {
-    const platform = process.platform;
-    const arch = process.arch;
-    const variant = this.resolveBuildVariant();
-    if (!SUPPORTED_UPDATE_PLATFORMS.has(platform) || !SUPPORTED_UPDATE_ARCHITECTURES.has(arch)) {
-      return null;
-    }
+  private async fetchUpdateInfo(currentVersion: string): Promise<VerifiedUpdate | null> {
+    const target = this.resolveUpdateTarget();
+    if (!target) return null;
+    const { platform, arch, variant } = target;
 
     const cacheKey = `${MANIFEST_CACHE_KEY_PREFIX}:${platform}:${arch}:${variant}`;
     const cachedManifest = this.readCachedManifest(cacheKey);
@@ -339,18 +404,34 @@ export class AppUpdateCoordinator {
     const envelope: unknown =
       response.status === 304 ? cachedManifest?.envelope : await response.json();
     const payload = this.verifyAndDecodeManifest(envelope);
-    const info = this.toUpdateInfo(payload, { platform, arch, variant });
+    const info = this.toUpdateInfo(payload, target);
 
     if (response.status !== 304) {
       const receivedEtag = response.headers.get('etag');
       if (receivedEtag) {
-        this.store.set<CachedSignedManifest>(cacheKey, { etag: receivedEtag, envelope });
+        this.store.set<CachedSignedManifest>(cacheKey, {
+          etag: receivedEtag,
+          envelope,
+        });
       } else {
         this.store.delete(cacheKey);
       }
     }
     if (!info || !this.isNewerVersion(info.latestVersion, currentVersion)) return null;
-    return info;
+    return { envelope, info };
+  }
+
+  private resolveUpdateTarget(): {
+    platform: string;
+    arch: string;
+    variant: string;
+  } | null {
+    const platform = process.platform;
+    const arch = process.arch;
+    if (!SUPPORTED_UPDATE_PLATFORMS.has(platform) || !SUPPORTED_UPDATE_ARCHITECTURES.has(arch)) {
+      return null;
+    }
+    return { platform, arch, variant: this.resolveBuildVariant() };
   }
 
   private readCachedManifest(key: string): CachedSignedManifest | null {
