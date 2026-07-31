@@ -62,11 +62,21 @@ export interface CoworkMessageMetadata {
     outputTokens?: number;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    reasoningTokens?: number;
+    totalTokens?: number;
   };
   contextPercent?: number;
+  /** Current context measured by the agent runtime after this response. */
+  contextUsage?: CoworkContextUsage;
   model?: string;
   agentName?: string;
   [key: string]: unknown;
+}
+
+export interface CoworkContextUsage {
+  usedTokens: number;
+  contextWindowTokens: number;
+  updatedAt: number;
 }
 
 // Cowork message

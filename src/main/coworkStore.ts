@@ -397,6 +397,8 @@ export interface CoworkMessageMetadata {
     outputTokens?: number;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    reasoningTokens?: number;
+    totalTokens?: number;
   };
   contextPercent?: number;
   model?: string;

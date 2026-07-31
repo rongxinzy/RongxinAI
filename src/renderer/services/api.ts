@@ -364,7 +364,11 @@ class ApiService {
     history: ChatMessagePayload[] = [],
     options: DirectChatRequestOptions = {},
     streamRequestId?: string,
-  ): Promise<{ content: string; reasoning?: string }> {
+  ): Promise<{
+    content: string;
+    reasoning?: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
     if (!this.config) {
       throw new ApiError(
         'API configuration not set. Please configure your API settings in the settings menu.',
@@ -525,7 +529,11 @@ class ApiService {
     options: DirectChatRequestOptions = {},
     requestId: string = generateRequestId(),
     abortSignal?: AbortSignal,
-  ): Promise<{ content: string; reasoning?: string }> {
+  ): Promise<{
+    content: string;
+    reasoning?: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
     if (!this.config) {
       throw new ApiError(
         'API configuration not set. Please configure your API settings in the settings menu.',
@@ -1019,7 +1027,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
-  ): Promise<{ content: string }> {
+  ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const headers = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${config.apiKey}`,
@@ -1046,7 +1054,14 @@ class ApiService {
       if (!functionCalls.length) {
         const content = this.extractResponsesOutputText(data);
         onProgress?.(content);
-        return { content };
+        const inputTokens = data?.usage?.input_tokens;
+        const outputTokens = data?.usage?.output_tokens;
+        return {
+          content,
+          ...(typeof inputTokens === 'number' && typeof outputTokens === 'number'
+            ? { usage: { inputTokens, outputTokens } }
+            : {}),
+        };
       }
       input.push(...output);
       const parsedCalls = functionCalls.map((call: any) => {
@@ -1078,7 +1093,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
-  ): Promise<{ content: string }> {
+  ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
@@ -1134,7 +1149,14 @@ class ApiService {
       if (!calls.length) {
         const content = typeof assistant.content === 'string' ? assistant.content : '';
         onProgress?.(content);
-        return { content };
+        const inputTokens = data?.usage?.prompt_tokens ?? data?.usage?.input_tokens;
+        const outputTokens = data?.usage?.completion_tokens ?? data?.usage?.output_tokens;
+        return {
+          content,
+          ...(typeof inputTokens === 'number' && typeof outputTokens === 'number'
+            ? { usage: { inputTokens, outputTokens } }
+            : {}),
+        };
       }
       const parsedCalls = calls.map((call: any) => {
         let args = {};
@@ -1165,7 +1187,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
-  ): Promise<{ content: string }> {
+  ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const headers = {
       'Content-Type': 'application/json',
       'x-api-key': config.apiKey,
@@ -1203,7 +1225,14 @@ class ApiService {
           .map((block: any) => block.text)
           .join('');
         onProgress?.(text);
-        return { content: text };
+        const inputTokens = data?.usage?.input_tokens;
+        const outputTokens = data?.usage?.output_tokens;
+        return {
+          content: text,
+          ...(typeof inputTokens === 'number' && typeof outputTokens === 'number'
+            ? { usage: { inputTokens, outputTokens } }
+            : {}),
+        };
       }
       messages.push({ role: 'assistant', content });
       const results = await this.executeSearchCalls(
@@ -1231,7 +1260,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
-  ): Promise<{ content: string }> {
+  ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const baseUrl =
       config.baseUrl.trim().replace(/\/+$/, '') ||
       'https://generativelanguage.googleapis.com/v1beta';
@@ -1273,7 +1302,14 @@ class ApiService {
           .map((part: any) => part.text)
           .join('');
         onProgress?.(text);
-        return { content: text };
+        const inputTokens = data?.usageMetadata?.promptTokenCount;
+        const outputTokens = data?.usageMetadata?.candidatesTokenCount;
+        return {
+          content: text,
+          ...(typeof inputTokens === 'number' && typeof outputTokens === 'number'
+            ? { usage: { inputTokens, outputTokens } }
+            : {}),
+        };
       }
       contents.push(content);
       const results = await this.executeSearchCalls(
@@ -1300,9 +1336,14 @@ class ApiService {
     config: ApiConfig = this.config!,
     supportsImages: boolean = false,
     streamRequestId?: string,
-  ): Promise<{ content: string; reasoning?: string }> {
+  ): Promise<{
+    content: string;
+    reasoning?: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
     let fullContent = '';
     let fullReasoning = '';
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
 
     try {
       const requestId = streamRequestId ?? generateRequestId();
@@ -1376,6 +1417,14 @@ class ApiService {
 
               try {
                 const parsed = JSON.parse(data);
+                const responseUsage = parsed.usage ?? parsed.message?.usage;
+                if (responseUsage && typeof responseUsage === 'object') {
+                  const inputTokens = responseUsage.input_tokens;
+                  const outputTokens = responseUsage.output_tokens;
+                  if (typeof inputTokens === 'number' && typeof outputTokens === 'number') {
+                    usage = { inputTokens, outputTokens };
+                  }
+                }
 
                 // Anthropic SSE 事件处理
                 if (parsed.type === 'content_block_delta') {
@@ -1400,7 +1449,7 @@ class ApiService {
           if (!fullContent && !fullReasoning) {
             reject(new ApiError('No content received from the API. Please try again.'));
           } else {
-            resolve({ content: fullContent, reasoning: fullReasoning || undefined });
+            resolve({ content: fullContent, reasoning: fullReasoning || undefined, usage });
           }
         });
 
@@ -1482,9 +1531,14 @@ class ApiService {
     config: ApiConfig = this.config!,
     supportsImages: boolean = false,
     streamRequestId?: string,
-  ): Promise<{ content: string; reasoning?: string }> {
+  ): Promise<{
+    content: string;
+    reasoning?: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
     let fullContent = '';
     let fullReasoning = '';
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
 
     try {
       const requestId = streamRequestId ?? generateRequestId();
@@ -1562,6 +1616,14 @@ class ApiService {
 
               try {
                 const parsed = JSON.parse(data);
+                const usageMetadata = parsed.usageMetadata;
+                if (usageMetadata && typeof usageMetadata === 'object') {
+                  const inputTokens = usageMetadata.promptTokenCount;
+                  const outputTokens = usageMetadata.candidatesTokenCount;
+                  if (typeof inputTokens === 'number' && typeof outputTokens === 'number') {
+                    usage = { inputTokens, outputTokens };
+                  }
+                }
                 const candidate = parsed.candidates?.[0];
                 if (!candidate?.content?.parts) continue;
 
@@ -1585,7 +1647,7 @@ class ApiService {
           if (!fullContent && !fullReasoning) {
             reject(new ApiError('No content received from the API. Please try again.'));
           } else {
-            resolve({ content: fullContent, reasoning: fullReasoning || undefined });
+            resolve({ content: fullContent, reasoning: fullReasoning || undefined, usage });
           }
         });
 
@@ -1667,9 +1729,14 @@ class ApiService {
     provider: string = 'openai',
     options: DirectChatRequestOptions = {},
     streamRequestId?: string,
-  ): Promise<{ content: string; reasoning?: string }> {
+  ): Promise<{
+    content: string;
+    reasoning?: string;
+    usage?: { inputTokens: number; outputTokens: number };
+  }> {
     let fullContent = '';
     let fullReasoning = '';
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
 
     try {
       const requestId = streamRequestId ?? generateRequestId();
@@ -1726,6 +1793,14 @@ class ApiService {
               const parsed = JSON.parse(data);
 
               if (useResponsesApi) {
+                const responseUsage = parsed.usage ?? parsed.response?.usage;
+                if (responseUsage && typeof responseUsage === 'object') {
+                  const inputTokens = responseUsage.input_tokens;
+                  const outputTokens = responseUsage.output_tokens;
+                  if (typeof inputTokens === 'number' && typeof outputTokens === 'number') {
+                    usage = { inputTokens, outputTokens };
+                  }
+                }
                 const eventType = currentEvent || String(parsed.type || '');
                 const content =
                   (eventType === 'response.output_text.delta' ||
@@ -1759,6 +1834,24 @@ class ApiService {
               }
 
               const delta = parsed.choices?.[0]?.delta || {};
+              const responseUsage = parsed.usage;
+              if (responseUsage && typeof responseUsage === 'object') {
+                const inputTokens =
+                  typeof responseUsage.prompt_tokens === 'number'
+                    ? responseUsage.prompt_tokens
+                    : typeof responseUsage.input_tokens === 'number'
+                      ? responseUsage.input_tokens
+                      : undefined;
+                const outputTokens =
+                  typeof responseUsage.completion_tokens === 'number'
+                    ? responseUsage.completion_tokens
+                    : typeof responseUsage.output_tokens === 'number'
+                      ? responseUsage.output_tokens
+                      : undefined;
+                if (inputTokens !== undefined && outputTokens !== undefined) {
+                  usage = { inputTokens, outputTokens };
+                }
+              }
               const content = typeof delta.content === 'string' ? delta.content : '';
               const reasoning =
                 typeof delta.reasoning_content === 'string'
@@ -1789,7 +1882,7 @@ class ApiService {
           if (!fullContent && !fullReasoning) {
             reject(new ApiError('No content received from the API. Please try again.'));
           } else {
-            resolve({ content: fullContent, reasoning: fullReasoning || undefined });
+            resolve({ content: fullContent, reasoning: fullReasoning || undefined, usage });
           }
         });
 
@@ -1804,6 +1897,7 @@ class ApiService {
           resolve({
             content: fullContent || 'Response was stopped.',
             reasoning: fullReasoning || undefined,
+            usage,
           });
         });
 
@@ -1856,6 +1950,9 @@ class ApiService {
           requestBody,
           buildLocalThinkingRequestParams(provider, options.localThinkingEnabled),
         );
+        if (provider === ProviderName.LlamaCpp && !useResponsesApi) {
+          requestBody.stream_options = { include_usage: true };
+        }
 
         window.electron.api
           .stream({

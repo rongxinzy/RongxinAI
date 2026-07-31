@@ -82,6 +82,11 @@ interface PiSession {
   abortBash(): void;
   reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
+  getContextUsage?(): {
+    tokens: number | null;
+    contextWindow: number;
+    percent: number | null;
+  } | undefined;
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
 
@@ -94,6 +99,16 @@ interface PiContentBlock {
   arguments?: Record<string, unknown>;
 }
 
+interface PiUsage {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  reasoning?: number;
+  totalTokens: number;
+  cost: { input: number; output: number; cacheRead: number; cacheWrite: number; total: number };
+}
+
 interface PiEvent {
   type: string;
   message?: {
@@ -102,6 +117,8 @@ interface PiEvent {
     // For message_update / message_end this is the FULL accumulating snapshot
     // (blocks: {type:'text',text} / {type:'thinking',thinking}), NOT a delta.
     content: string | PiContentBlock[];
+    model?: string;
+    usage?: PiUsage;
     stopReason?: string;
     errorMessage?: string;
   };
@@ -1025,6 +1042,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
             active.lastCompletedAnswerMessageId = active.assistantMessageId;
             active.lastCompletedAnswerText = finalAnswer;
+            this.scheduleContextUsageSync(sessionId, active.assistantMessageId, event.message.usage, event.message.model);
           }
 
           // Turn's segments are done; next turn starts fresh messages.
@@ -1314,6 +1332,62 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       });
     }
     this.emit('messageUpdate', sessionId, messageId, content, metadata);
+  }
+
+  /**
+   * Pi commits usage after emitting the terminal assistant event. Deferring one
+   * task ensures the snapshot corresponds to the response just persisted.
+   */
+  private scheduleContextUsageSync(
+    sessionId: string,
+    messageId: string | null,
+    piUsage: PiUsage | undefined,
+    model: string | undefined,
+  ): void {
+    if (!messageId) return;
+    setTimeout(() => {
+      const active = this.activeSessions.get(sessionId);
+      const contextUsage = active?.piSession.getContextUsage?.();
+      if (
+        !contextUsage ||
+        contextUsage.tokens == null ||
+        !Number.isFinite(contextUsage.tokens) ||
+        !Number.isFinite(contextUsage.contextWindow) ||
+        contextUsage.tokens < 0 ||
+        contextUsage.contextWindow <= 0
+      ) {
+        return;
+      }
+
+      const usage = {
+        usedTokens: Math.round(contextUsage.tokens),
+        contextWindowTokens: Math.round(contextUsage.contextWindow),
+        updatedAt: Date.now(),
+      };
+      const message = this.store
+        ?.getSession(sessionId)
+        ?.messages.find(item => item.id === messageId);
+      if (!message) return;
+      const metadata = {
+        ...message?.metadata,
+        contextUsage: usage,
+        ...(model ? { model } : {}),
+        ...(piUsage
+          ? {
+              usage: {
+                inputTokens: piUsage.input,
+                outputTokens: piUsage.output,
+                cacheReadTokens: piUsage.cacheRead,
+                cacheWriteTokens: piUsage.cacheWrite,
+                reasoningTokens: piUsage.reasoning,
+                totalTokens: piUsage.totalTokens,
+              },
+            }
+          : {}),
+      };
+      this.store?.updateMessage(sessionId, messageId, { metadata });
+      this.emit('messageUpdate', sessionId, messageId, message.content, metadata);
+    }, 0);
   }
 
   // ── Private: throttling ──

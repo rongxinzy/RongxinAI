@@ -3,6 +3,7 @@ import { ProviderName } from '../../shared/providers';
 export type DirectChatRequestOptions = {
   modelId?: string;
   localThinkingEnabled?: boolean;
+  contextWindowTokens?: number;
 };
 
 export function buildLocalThinkingRequestParams(

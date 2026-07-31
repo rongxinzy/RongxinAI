@@ -44,6 +44,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
           providerConfig.apiFormat ?? 'anthropic',
           model,
         ),
+        contextWindow: model.contextWindow,
       });
     });
   });
