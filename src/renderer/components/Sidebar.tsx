@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig, useReducedMotion } from 'motion/react';
-import { MessageCircle, PanelLeft, Settings, Trash2, TriangleAlert, X } from 'lucide-react';
+import { MessageCircle, PanelLeft, Trash2, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -37,6 +37,10 @@ import {
   SidebarAnimatedSearchIcon,
   type SidebarAnimatedSearchIconHandle,
 } from './icons/SidebarAnimatedSearchIcon';
+import {
+  SidebarAnimatedSettingsIcon,
+  type SidebarAnimatedSettingsIconHandle,
+} from './icons/SidebarAnimatedSettingsIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -94,6 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchCorpus, setSearchCorpus] = useState<CoworkSessionSummary[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchIconRef = useRef<SidebarAnimatedSearchIconHandle>(null);
+  const settingsIconRef = useRef<SidebarAnimatedSettingsIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const searchControlRef = useRef<HTMLDivElement>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -689,10 +694,14 @@ const Sidebar: React.FC<SidebarProps> = ({
                   type="button"
                   variant="ghost"
                   onClick={() => onShowSettings()}
+                  onMouseEnter={() => {
+                    if (!prefersReducedMotion) settingsIconRef.current?.startAnimation();
+                  }}
+                  onMouseLeave={() => settingsIconRef.current?.stopAnimation()}
                   className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
                   aria-label={i18nService.t('settings')}
                 >
-                  <Settings className="h-4 w-4 shrink-0" />
+                  <SidebarAnimatedSettingsIcon ref={settingsIconRef} />
                   {i18nService.t('settings')}
                 </Button>
               </div>

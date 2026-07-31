@@ -1,4 +1,4 @@
-import { motion, useAnimation, type Variants } from 'motion/react';
+import { motion, useAnimation, useReducedMotion, type Variants } from 'motion/react';
 import type { HTMLAttributes, MouseEvent } from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 
@@ -14,8 +14,21 @@ interface SidebarAnimatedMessageCirclePlusIconProps extends HTMLAttributes<HTMLD
 }
 
 const PLUS_VARIANTS: Variants = {
-  normal: { pathLength: 1, opacity: 1 },
-  animate: { pathLength: [0, 1], opacity: [0, 1] },
+  normal: { opacity: 1, scaleY: 1 },
+  animate: {
+    opacity: [0, 1],
+    scaleY: [0.25, 1],
+    transition: { duration: 0.4, ease: 'easeOut' },
+  },
+};
+
+const HORIZONTAL_PLUS_VARIANTS: Variants = {
+  normal: { opacity: 1, scaleX: 1 },
+  animate: {
+    opacity: [0, 1],
+    scaleX: [0.25, 1],
+    transition: { delay: 0.16, duration: 0.4, ease: 'easeOut' },
+  },
 };
 
 export const SidebarAnimatedMessageCirclePlusIcon = forwardRef<
@@ -23,12 +36,15 @@ export const SidebarAnimatedMessageCirclePlusIcon = forwardRef<
   SidebarAnimatedMessageCirclePlusIconProps
 >(({ onMouseEnter, onMouseLeave, className, size = 16, ...props }, ref) => {
   const controls = useAnimation();
+  const prefersReducedMotion = useReducedMotion();
   const isControlledRef = useRef(false);
 
   useImperativeHandle(ref, () => {
     isControlledRef.current = true;
     return {
-      startAnimation: () => void controls.start('animate'),
+      startAnimation: () => {
+        if (!prefersReducedMotion) void controls.start('animate');
+      },
       stopAnimation: () => void controls.start('normal'),
     };
   });
@@ -36,9 +52,9 @@ export const SidebarAnimatedMessageCirclePlusIcon = forwardRef<
   const handleMouseEnter = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
       if (isControlledRef.current) onMouseEnter?.(event);
-      else void controls.start('animate');
+      else if (!prefersReducedMotion) void controls.start('animate');
     },
-    [controls, onMouseEnter],
+    [controls, onMouseEnter, prefersReducedMotion],
   );
 
   const handleMouseLeave = useCallback(
@@ -73,15 +89,15 @@ export const SidebarAnimatedMessageCirclePlusIcon = forwardRef<
           animate={controls}
           d="M12 8v8"
           initial="normal"
-          transition={{ duration: 0.15, ease: 'easeOut' }}
+          style={{ transformOrigin: 'center' }}
           variants={PLUS_VARIANTS}
         />
         <motion.path
           animate={controls}
           d="M8 12h8"
           initial="normal"
-          transition={{ delay: 0.1, duration: 0.15, ease: 'easeOut' }}
-          variants={PLUS_VARIANTS}
+          style={{ transformOrigin: 'center' }}
+          variants={HORIZONTAL_PLUS_VARIANTS}
         />
       </svg>
     </div>

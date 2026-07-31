@@ -1,6 +1,5 @@
 import { Button } from '@shared/components/ui/button';
 import { useReducedMotion } from 'motion/react';
-import { MessageCirclePlus, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -11,6 +10,11 @@ import {
   AnimatedFolderOpenIcon,
   type AnimatedFolderOpenIconHandle,
 } from '../icons/AnimatedFolderOpenIcon';
+import { AnimatedDeleteIcon, type AnimatedDeleteIconHandle } from '../icons/AnimatedDeleteIcon';
+import {
+  SidebarAnimatedMessageCirclePlusIcon,
+  type SidebarAnimatedMessageCirclePlusIconHandle,
+} from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import type { AgentSidebarTaskNode, WorkspaceSidebarNode } from './types';
 
 interface WorkspaceTreeNodeProps {
@@ -57,6 +61,8 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const [shouldRenderTasks, setShouldRenderTasks] = useState(workspace.isExpanded);
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
   const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
+  const createTaskIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
+  const deleteIconRef = useRef<AnimatedDeleteIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(workspace.isExpanded);
   // The scratch workspace (「无项目」) is not removable — it always exists.
@@ -112,10 +118,18 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             variant="ghost"
             size="icon-xs"
             onClick={() => onCreateTask(workspace)}
+            onMouseEnter={() => {
+              if (!prefersReducedMotion) createTaskIconRef.current?.startAnimation();
+            }}
+            onMouseLeave={() => createTaskIconRef.current?.stopAnimation()}
             className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground ${canRemove ? 'right-7' : 'right-1.5'}`}
             aria-label={i18nService.t('myAgentSidebarNewTask')}
           >
-            <MessageCirclePlus className="size-3.5" />
+            <SidebarAnimatedMessageCirclePlusIcon
+              ref={createTaskIconRef}
+              size={14}
+              className="size-3.5"
+            />
           </Button>
         )}
         {canRemove && (
@@ -123,10 +137,14 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             variant="ghost"
             size="icon-xs"
             onClick={() => onRemoveWorkspace?.(workspace)}
+            onMouseEnter={() => {
+              if (!prefersReducedMotion) deleteIconRef.current?.startAnimation();
+            }}
+            onMouseLeave={() => deleteIconRef.current?.stopAnimation()}
             className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 transition-colors group-hover:opacity-100 hover:bg-surface-raised hover:text-destructive"
             aria-label={i18nService.t('removeProject')}
           >
-            <Trash2 className="size-3.5" />
+            <AnimatedDeleteIcon ref={deleteIconRef} />
           </Button>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { MessageCirclePlus, PanelLeft } from 'lucide-react';
+import { PanelLeft } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -20,6 +20,7 @@ import {
   resolveChatExecution,
 } from '../../services/chatExecutionRouter';
 import { resolveSkillPlaceholderKey } from '../chat/constants';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
@@ -1300,7 +1301,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               onClick={onNewChat}
               className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
             >
-              <MessageCirclePlus className="size-4" />
+              <SidebarAnimatedMessageCirclePlusIcon />
             </Button>
             {updateBadge}
           </div>

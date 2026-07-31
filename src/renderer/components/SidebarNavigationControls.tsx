@@ -11,9 +11,9 @@ import {
   type SidebarAnimatedAlarmClockIconHandle,
 } from './icons/SidebarAnimatedAlarmClockIcon';
 import {
-  SidebarAnimatedCpuIcon,
-  type SidebarAnimatedCpuIconHandle,
-} from './icons/SidebarAnimatedCpuIcon';
+  SidebarAnimatedBotIcon,
+  type SidebarAnimatedBotIconHandle,
+} from './icons/SidebarAnimatedBotIcon';
 import {
   SidebarAnimatedMessageCirclePlusIcon,
   type SidebarAnimatedMessageCirclePlusIconHandle,
@@ -56,7 +56,7 @@ export const SidebarNavigationControls = ({
 }: SidebarNavigationControlsProps) => {
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
-  const localInferenceIconRef = useRef<SidebarAnimatedCpuIconHandle>(null);
+  const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
   const expertIconRef = useRef<SidebarAnimatedUsersIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
 
@@ -125,7 +125,7 @@ export const SidebarNavigationControls = ({
           }
           aria-current={activeView === 'localInference' ? 'page' : undefined}
         >
-          <SidebarAnimatedCpuIcon ref={localInferenceIconRef} />
+          <SidebarAnimatedBotIcon ref={localInferenceIconRef} />
           {i18nService.t('localInferenceTitle')}
         </Button>
       )}
