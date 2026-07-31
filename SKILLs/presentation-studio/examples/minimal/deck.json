@@ -3,7 +3,11 @@
   "canvas": { "width": 1280, "height": 720 },
   "safeMargin": 36,
   "theme": {
-    "colors": { "background": "#F3F0EA", "text": "#202124", "primary": "#4A3B32" },
+    "colors": {
+      "background": "#F2EFE8", "surface": "#E5E0D6", "text": "#202124", "muted": "#8B8376",
+      "primary": "#4A3B32", "secondary": "#6D7D6A", "accent": "#C96A3D",
+      "series1": "#4A3B32", "series2": "#6D7D6A", "series3": "#C96A3D"
+    },
     "textStyles": {
       "title": { "fontSize": 48, "fontFace": "Aptos Display", "color": "$primary", "bold": true },
       "body": { "fontSize": 20, "fontFace": "Microsoft YaHei", "color": "$text", "lineHeight": 1.35 }

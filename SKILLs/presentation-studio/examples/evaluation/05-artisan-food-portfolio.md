@@ -1,0 +1,1 @@
+Present an artisan food studio's seasonal work to prospective collaborators. Include origin story, three product stories, a materials/process page, and partnership offer. Aim for tactile editorial character without copying a known brand.

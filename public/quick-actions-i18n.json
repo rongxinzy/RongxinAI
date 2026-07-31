@@ -81,22 +81,22 @@
         "web-resume": {
           "label": "个人简历",
           "description": "在线简历与作品集页面",
-          "prompt": "帮我制作一个精美的在线个人简历页面。\n\n基本信息:\n- 姓名:张小明;\n- 职位:产品经理(5年经验);\n- 联系方式:邮箱、手机、微信二维码占位区。\n\n页面内容:\n- 个人简介:一段简短的自我介绍,突出核心优势;\n- 工作经历:3段工作经历,含公司名、职位、时间、主要成果;\n- 专业技能:以进度条形式展示产品设计、数据分析、项目管理等技能;\n- 项目案例:展示3个代表项目的卡片,含项目名称和简短描述;\n- 教育背景与证书。\n\n设计风格:\n简洁专业、左右分栏布局、深色侧边栏搭配白色主内容区。适合直接分享给面试官或合作伙伴。"
+          "prompt": "帮我制作一个精美的在线个人简历页面。\n\n基本信息:\n- 姓名:张小明;\n- 职位:产品经理(5年经验);\n- 联系方式:邮箱、手机、微信二维码占位区。\n\n页面内容:\n- 个人简介:一段简短的自我介绍,突出核心优势;\n- 工作经历:3段工作经历,含公司名、职位、时间、主要成果;\n- 专业技能:以进度条形式展示产品设计、数据分析、项目管理等技能;\n- 项目案例:展示3个代表项目的卡片,含项目名称和简短描述;\n- 教育背景与证书。\n\n设计目标:\n面向面试官或合作伙伴，传达可信、清晰且有个人辨识度的专业感。请从内容和受众推导视觉方向、配色、字体和版式；不要默认套用侧栏或固定颜色。"
         },
         "web-store": {
           "label": "店铺主页",
           "description": "小型商铺或工作室展示页",
-          "prompt": "帮我做一个烘焙工作室的展示网页,工作室名叫「麦田烘焙」。\n\n页面内容:\n- 首屏大图:工作室名称、一句口号「用心烘焙,温暖每一天」、\"查看菜单\"按钮;\n- 招牌产品:展示6款人气产品卡片(含图片占位、名称、价格、简短描述);\n- 关于我们:工作室的故事,创始人理念,配一张店内环境图占位;\n- 顾客好评:3条用户评价,带头像和星级评分;\n- 联系与地址:营业时间、地址、电话,嵌入地图占位区域;\n\n设计风格:\n温馨文艺、奶油色和棕色为主色调、圆角卡片、手写风格标题字体。整体氛围温暖亲切。"
+          "prompt": "帮我做一个烘焙工作室的展示网页,工作室名叫「麦田烘焙」。\n\n页面内容:\n- 首屏大图:工作室名称、一句口号「用心烘焙,温暖每一天」、\"查看菜单\"按钮;\n- 招牌产品:展示6款人气产品卡片(含图片占位、名称、价格、简短描述);\n- 关于我们:工作室的故事,创始人理念,配一张店内环境图占位;\n- 顾客好评:3条用户评价,带头像和星级评分;\n- 联系与地址:营业时间、地址、电话,嵌入地图占位区域;\n\n设计目标:\n传达食物、手作与社区感，但请根据品牌故事选择有辨识度的材质、色温、字体和构图；不要默认使用奶油棕、圆角卡片或手写字体。"
         },
         "web-event": {
           "label": "活动邀请函",
           "description": "聚会、婚礼或活动的在线邀请页",
-          "prompt": "帮我制作一个生日派对的在线邀请函网页。\n\n活动信息:\n- 主题:「Leo的30岁生日派对」;\n- 时间:2025年8月15日 周六 晚上7:00;\n- 地点:星光花园餐厅 三楼露台;\n\n页面内容:\n- 开场动画:标题渐入,彩色纸屑飘落效果;\n- 邀请语:一段温馨的邀请文字;\n- 活动安排:时间轴展示派对流程(签到、晚宴、游戏、蛋糕、自由交流);\n- 着装建议:休闲正装,配色参考图占位;\n- 交通指引:地址信息和停车提示;\n- RSVP确认:\"我会参加\"和\"很遗憾不能到\"两个按钮;\n\n设计风格:\n浪漫活泼、深蓝色星空背景、金色点缀文字、充满庆祝氛围。页面要适合手机浏览。"
+          "prompt": "帮我制作一个生日派对的在线邀请函网页。\n\n活动信息:\n- 主题:「Leo的30岁生日派对」;\n- 时间:2025年8月15日 周六 晚上7:00;\n- 地点:星光花园餐厅 三楼露台;\n\n页面内容:\n- 开场动画:标题渐入,彩色纸屑飘落效果;\n- 邀请语:一段温馨的邀请文字;\n- 活动安排:时间轴展示派对流程(签到、晚宴、游戏、蛋糕、自由交流);\n- 着装建议:休闲正装,配色参考图占位;\n- 交通指引:地址信息和停车提示;\n- RSVP确认:\"我会参加\"和\"很遗憾不能到\"两个按钮;\n\n设计目标:\n营造成年生日庆典的记忆点与仪式感，并优先适配手机。请独立选择色温、字体、动效和空间节奏；不要默认使用星空、深蓝金色或固定庆典模板。"
         },
         "web-survey": {
           "label": "调查问卷",
           "description": "在线表单与问卷收集页",
-          "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填);\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意);\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块);\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障);\n- 单选题:使用频率(每天/每周/每月/偶尔);\n- 文本题:您的建议或意见(大文本框);\n- 提交按钮,提交后显示感谢页面。\n\n设计风格:\n清爽简洁、白色背景、蓝绿色主色调、每道题之间有足够间距、带进度条显示填写进度。适合手机端操作。"
+          "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填);\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意);\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块);\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障);\n- 单选题:使用频率(每天/每周/每月/偶尔);\n- 文本题:您的建议或意见(大文本框);\n- 提交按钮,提交后显示感谢页面。\n\n设计目标:\n让填写过程轻松、可信且适合手机操作，清晰呈现进度和反馈状态。请根据这一任务选择克制而有辨识度的设计系统；不要默认使用白底蓝绿色问卷模板。"
         }
       }
     }
@@ -183,25 +183,24 @@
         "web-resume": {
           "label": "Personal Resume",
           "description": "Online resume and portfolio page",
-          "prompt": "Help me create a beautiful online personal resume page.\n\nBasic information:\n- Name: John Smith\n- Position: Product Manager (5 years experience)\n- Contact: Email, phone, WeChat QR code placeholder\n\nPage content:\n- Personal introduction: A brief self-introduction highlighting core strengths\n- Work experience: 3 work experiences, including company name, position, time, main achievements\n- Professional skills: Display product design, data analysis, project management and other skills in progress bar format\n- Project cases: Display 3 representative project cards with project name and brief description\n- Educational background and certificates\n\nDesign style:\nClean and professional, left-right column layout, dark sidebar with white main content area. Suitable for sharing directly with interviewers or partners."
+          "prompt": "Help me create a beautiful online personal resume page.\n\nBasic information:\n- Name: John Smith\n- Position: Product Manager (5 years experience)\n- Contact: Email, phone, WeChat QR code placeholder\n\nPage content:\n- Personal introduction: A brief self-introduction highlighting core strengths\n- Work experience: 3 work experiences, including company name, position, time, main achievements\n- Professional skills: Display product design, data analysis, project management and other skills in progress bar format\n- Project cases: Display 3 representative project cards with project name and brief description\n- Educational background and certificates\n\nDesign goal:\nCommunicate credibility, clarity, and a personal point of view to interviewers or partners. Derive the visual direction, palette, typography, and composition from the content and audience; do not default to a sidebar or fixed colors."
         },
         "web-store": {
           "label": "Store Homepage",
           "description": "Small shop or studio showcase page",
-          "prompt": "Help me create a showcase webpage for a bakery studio called \"Wheat Field Bakery\".\n\nPage content:\n- Hero image: Studio name, a slogan \"Baking with heart, warming every day\", \"View Menu\" button\n- Signature products: Display 6 popular product cards (including image placeholder, name, price, brief description)\n- About us: Studio story, founder philosophy, with a store environment image placeholder\n- Customer reviews: 3 user reviews with avatars and star ratings\n- Contact and address: Business hours, address, phone, embedded map placeholder area\n\nDesign style:\nWarm and artistic, cream and brown as main colors, rounded cards, handwritten style title fonts. Overall atmosphere warm and friendly."
+          "prompt": "Help me create a showcase webpage for a bakery studio called \"Wheat Field Bakery\".\n\nPage content:\n- Hero image: Studio name, a slogan \"Baking with heart, warming every day\", \"View Menu\" button\n- Signature products: Display 6 popular product cards (including image placeholder, name, price, brief description)\n- About us: Studio story, founder philosophy, with a store environment image placeholder\n- Customer reviews: 3 user reviews with avatars and star ratings\n- Contact and address: Business hours, address, phone, embedded map placeholder area\n\nDesign goal:\nCommunicate food, craft, and community. Select distinctive material, temperature, typography, and composition from the brand story; do not default to cream-brown, rounded cards, or handwritten type."
         },
         "web-event": {
           "label": "Event Invitation",
           "description": "Online invitation page for parties, weddings or events",
-          "prompt": "Help me create an online invitation webpage for a birthday party.\n\nEvent information:\n- Theme: \"Leo's 30th Birthday Party\"\n- Time: Saturday, August 15, 2025, 7:00 PM\n- Location: Starlight Garden Restaurant, 3rd Floor Terrace\n\nPage content:\n- Opening animation: Title fade-in, colorful confetti falling effect\n- Invitation message: A warm invitation text\n- Event schedule: Timeline showing party flow (check-in, dinner, games, cake, free socializing)\n- Dress code: Business casual, color reference image placeholder\n- Transportation guide: Address information and parking tips\n- RSVP confirmation: \"I will attend\" and \"Regrettably cannot attend\" two buttons\n\nDesign style:\nRomantic and lively, dark blue starry background, gold accent text, full of celebration atmosphere. Page should be mobile-friendly."
+          "prompt": "Help me create an online invitation webpage for a birthday party.\n\nEvent information:\n- Theme: \"Leo's 30th Birthday Party\"\n- Time: Saturday, August 15, 2025, 7:00 PM\n- Location: Starlight Garden Restaurant, 3rd Floor Terrace\n\nPage content:\n- Opening animation: Title fade-in, colorful confetti falling effect\n- Invitation message: A warm invitation text\n- Event schedule: Timeline showing party flow (check-in, dinner, games, cake, free socializing)\n- Dress code: Business casual, color reference image placeholder\n- Transportation guide: Address information and parking tips\n- RSVP confirmation: \"I will attend\" and \"Regrettably cannot attend\" two buttons\n\nDesign goal:\nCreate a memorable, ceremonial adult birthday experience with mobile-first RSVP. Independently select temperature, typography, motion, and spatial rhythm; do not default to stars, navy-and-gold, or a fixed celebration template."
         },
         "web-survey": {
           "label": "Survey Questionnaire",
           "description": "Online form and questionnaire collection page",
-          "prompt": "Help me create a customer satisfaction survey questionnaire webpage.\n\nQuestionnaire title: \"Your Feedback is Important to Us\"\n\nQuestionnaire content:\n- Basic information: Name (optional), Contact (optional)\n- Single choice: Overall satisfaction (Very satisfied/Satisfied/Neutral/Dissatisfied/Very dissatisfied)\n- Single choice: Would you recommend to friends (1-10 rating slider)\n- Multiple choice: What aspects do you value most (Product quality/Service attitude/Response speed/Value for money/After-sales support)\n- Single choice: Usage frequency (Daily/Weekly/Monthly/Occasionally)\n- Text question: Your suggestions or opinions (large text box)\n- Submit button, show thank you page after submission\n\nDesign style:\nFresh and simple, white background, blue-green main color, sufficient spacing between questions, with progress bar showing completion. Suitable for mobile operation."
+          "prompt": "Help me create a customer satisfaction survey questionnaire webpage.\n\nQuestionnaire title: \"Your Feedback is Important to Us\"\n\nQuestionnaire content:\n- Basic information: Name (optional), Contact (optional)\n- Single choice: Overall satisfaction (Very satisfied/Satisfied/Neutral/Dissatisfied/Very dissatisfied)\n- Single choice: Would you recommend to friends (1-10 rating slider)\n- Multiple choice: What aspects do you value most (Product quality/Service attitude/Response speed/Value for money/After-sales support)\n- Single choice: Usage frequency (Daily/Weekly/Monthly/Occasionally)\n- Text question: Your suggestions or opinions (large text box)\n- Submit button, show thank you page after submission\n\nDesign goal:\nMake completion easy, trustworthy, and mobile-friendly with clear progress and feedback states. Choose a restrained but distinctive system for this task; do not default to a white-and-teal survey template."
         }
       }
     }
   }
 }
-

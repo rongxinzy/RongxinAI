@@ -3,6 +3,6 @@
   "background": "$background",
   "elements": [
     { "id": "cover-title", "type": "text", "bounds": [96, 244, 860, 130], "style": "$title", "text": "A decisive action title", "wrap": true, "allowUnderfill": true },
-    { "id": "cover-rule", "type": "shape", "shape": "rect", "bounds": [96, 400, 160, 8], "fill": "$primary", "decorative": true }
+    { "id": "cover-rule", "type": "shape", "shape": "rect", "bounds": [96, 400, 160, 8], "fill": "$accent", "decorative": true }
   ]
 }

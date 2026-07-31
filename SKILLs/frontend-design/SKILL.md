@@ -9,9 +9,17 @@ metadata:
     - https://github.com/anthropics/skills
 ---
 
-This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
+This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices. Do not begin from a remembered palette, component library, or hero layout.
 
 The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.
+
+## Visual direction workflow
+
+1. Read [the design brief](references/design-brief.md). Extract audience, brand cues, content density, platform, accessibility needs, and one memorable interaction or composition.
+2. Select three materially different directions from [design archetypes](references/design-archetypes.md). A direction changes composition, typography, color temperature, and motion—not only the accent color.
+3. Record the chosen direction in `design.md` before implementation: the discarded alternatives, anchor, palette roles, typography, spacing scale, component treatment, image strategy, responsive changes, motion budget, and context-specific prohibitions.
+4. When screenshots or an approved site are supplied, use [reference mode](references/reference-mode.md) before selecting a direction. Extract a design system; never copy protected logos, artwork, or a page screenshot.
+5. Build the hero and one representative dense section first. Render desktop and mobile, review with [the visual rubric](references/visual-review.md), revise the contract, then complete the site.
 
 ## Design Thinking
 
@@ -45,6 +53,10 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
 Remember: you are capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+
+## Evaluation suite
+
+Before changing this skill, run the eight prompts in [the evaluation suite](examples/evaluation/README.md). For each, retain the brief, direction cards, desktop/mobile previews, build result, and rubric score. A build passing is a delivery prerequisite, not visual evidence.
 
 ## Delivery Gate
 
