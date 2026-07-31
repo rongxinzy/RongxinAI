@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { Copy, Filter } from 'lucide-react';
+import { Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -11,10 +11,12 @@ import {
   MAX_PANEL_WIDTH,
   MIN_PANEL_WIDTH,
   selectActiveTab,
+  selectArtifactLayoutMode,
   selectArtifact,
   selectPanelWidth,
   selectSelectedArtifact,
   setActiveTab,
+  setArtifactLayoutMode,
   setPanelWidth,
 } from '@/store/slices/artifactSlice';
 import { ArtifactRole, type Artifact, type ArtifactType } from '@/types/artifact';
@@ -66,11 +68,14 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const selectedArtifact = useSelector(selectSelectedArtifact);
   const panelWidth = useSelector(selectPanelWidth);
   const activeTab = useSelector(selectActiveTab);
+  const layoutMode = useSelector(selectArtifactLayoutMode);
   const selectedArtifactId = useSelector((state: RootState) => state.artifact.selectedArtifactId);
   const [showFileList, setShowFileList] = useState(false);
   const [showIntermediateArtifacts, setShowIntermediateArtifacts] = useState(false);
   const fileListRef = useRef<HTMLDivElement>(null);
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const visibleArtifacts = artifacts.filter(
     artifact => showIntermediateArtifacts || artifact.role === ArtifactRole.Deliverable,
@@ -152,6 +157,25 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   }, []);
 
   useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsFullscreen(document.fullscreenElement === panelRef.current);
+    };
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreenState);
+  }, []);
+
+  useEffect(() => {
+    if (layoutMode !== 'workspace' || isFullscreen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        dispatch(setArtifactLayoutMode('split'));
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [dispatch, isFullscreen, layoutMode]);
+
+  useEffect(() => {
     if (!showFileList) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -167,7 +191,35 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showFileList]);
 
-  const handleClose = useCallback(() => dispatch(closePanel()), [dispatch]);
+  const handleClose = useCallback(() => {
+    if (document.fullscreenElement === panelRef.current) {
+      void document.exitFullscreen();
+    }
+    dispatch(closePanel());
+  }, [dispatch]);
+
+  const handleToggleWorkspace = useCallback(async () => {
+    if (document.fullscreenElement === panelRef.current) {
+      await document.exitFullscreen();
+    }
+    dispatch(setArtifactLayoutMode(layoutMode === 'workspace' ? 'split' : 'workspace'));
+  }, [dispatch, layoutMode]);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    if (document.fullscreenElement === panelRef.current) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    dispatch(setArtifactLayoutMode('workspace'));
+    try {
+      await panelRef.current?.requestFullscreen();
+    } catch {
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', { detail: t('artifactFullscreenUnavailable') }),
+      );
+    }
+  }, [dispatch]);
   const handleSelectArtifact = useCallback(
     (id: string) => {
       dispatch(selectArtifact(id));
@@ -257,12 +309,23 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     <>
       {/* Drag handle */}
       <div
-        className="w-1 shrink-0 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
+        className={`w-1 shrink-0 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors ${
+          layoutMode === 'workspace' ? 'hidden' : ''
+        }`}
         onMouseDown={handleResizeStart}
       />
       <aside
-        style={{ width: constrainedPanelWidth, maxWidth: constrainedMaxPanelWidth }}
-        className="shrink border-l border-border bg-background flex flex-col h-full overflow-hidden relative"
+        ref={panelRef}
+        style={{
+          width: layoutMode === 'workspace' || isFullscreen ? '100%' : constrainedPanelWidth,
+          height: layoutMode === 'workspace' || isFullscreen ? '100vh' : undefined,
+          maxWidth: layoutMode === 'workspace' || isFullscreen ? 'none' : constrainedMaxPanelWidth,
+        }}
+        className={`bg-background flex flex-col h-full overflow-hidden ${
+          layoutMode === 'workspace' || isFullscreen
+            ? 'fixed inset-0 z-200 w-screen border-0'
+            : 'relative shrink border-l border-border'
+        }`}
       >
         {/* Floating file list overlay */}
         {showFileList && (
@@ -347,6 +410,42 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <FolderIcon />
                 </Button>
               )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => void handleToggleWorkspace()}
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                title={t(
+                  layoutMode === 'workspace' ? 'artifactExitFullWindow' : 'artifactEnterFullWindow',
+                )}
+                aria-label={t(
+                  layoutMode === 'workspace' ? 'artifactExitFullWindow' : 'artifactEnterFullWindow',
+                )}
+              >
+                {layoutMode === 'workspace' ? (
+                  <Shrink className="h-3.5 w-3.5" />
+                ) : (
+                  <Expand className="h-3.5 w-3.5" />
+                )}
+              </Button>
+              {document.fullscreenEnabled && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void handleToggleFullscreen()}
+                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  title={t(isFullscreen ? 'artifactExitFullscreen' : 'artifactEnterFullscreen')}
+                  aria-label={t(
+                    isFullscreen ? 'artifactExitFullscreen' : 'artifactEnterFullscreen',
+                  )}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 className="h-3.5 w-3.5" />
+                  ) : (
+                    <Maximize2 className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              )}
               {intermediateToggle}
               <Button
                 ref={toggleBtnRef}
@@ -361,6 +460,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 title={t('artifactFileList')}
               >
                 <FileListIcon />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleClose}
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                title={t('close')}
+                aria-label={t('close')}
+              >
+                <CloseIcon />
               </Button>
             </div>
 

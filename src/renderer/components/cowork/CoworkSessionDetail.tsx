@@ -40,6 +40,7 @@ import {
   MIN_PANEL_WIDTH,
   EMPTY_ARTIFACTS,
   selectArtifact,
+  selectArtifactLayoutMode,
   selectIsPanelOpen,
   selectPanelWidth,
   selectSessionArtifacts,
@@ -227,6 +228,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // ─── Artifact detection ─────────────────────────────────────────────
   const isPanelOpen = useSelector(selectIsPanelOpen);
   const panelWidth = useSelector(selectPanelWidth);
+  const artifactLayoutMode = useSelector(selectArtifactLayoutMode);
+  const isArtifactWorkspace = artifactLayoutMode === 'workspace';
   const [shouldRenderArtifactPanel, setShouldRenderArtifactPanel] = useState(isPanelOpen);
   const [isArtifactPanelVisible, setIsArtifactPanelVisible] = useState(isPanelOpen);
   const [isArtifactPanelTransitioning, setIsArtifactPanelTransitioning] = useState(false);
@@ -1181,8 +1184,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
         <div
           ref={detailRootRef}
-          className="flex-1 flex flex-col bg-background h-full"
-          style={{ minWidth: COWORK_DETAIL_MIN_WIDTH }}
+          className={`flex-1 flex flex-col bg-background h-full ${
+            isArtifactWorkspace ? 'hidden' : ''
+          }`}
+          style={{ minWidth: isArtifactWorkspace ? 0 : COWORK_DETAIL_MIN_WIDTH }}
+          aria-hidden={isArtifactWorkspace}
         >
           <div className="relative flex-1 min-h-0">
             <Conversation className="h-full" initial="instant">
@@ -1490,18 +1496,23 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         </div>
         {shouldRenderArtifactPanel && (
           <div
-            className={`h-full shrink-0 overflow-hidden ${
+            className={`h-full overflow-hidden ${isArtifactWorkspace ? 'flex-1' : 'shrink-0'} ${
               isArtifactPanelTransitioning
                 ? 'transition-[width,opacity] duration-200 ease-out motion-reduce:transition-none'
                 : ''
             } ${isArtifactPanelVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
             style={{
-              width: artifactPanelFrameWidth,
-              maxWidth: artifactPanelMaxWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
+              width: isArtifactWorkspace ? '100%' : artifactPanelFrameWidth,
+              maxWidth: isArtifactWorkspace
+                ? 'none'
+                : artifactPanelMaxWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
             }}
             aria-hidden={!isPanelOpen}
           >
-            <div className="flex h-full" style={{ width: artifactPanelFrameWidth }}>
+            <div
+              className="flex h-full"
+              style={{ width: isArtifactWorkspace ? '100%' : artifactPanelFrameWidth }}
+            >
               <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
                 <ArtifactPanel
                   artifacts={sessionArtifacts}
