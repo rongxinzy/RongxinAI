@@ -881,12 +881,23 @@ class ApiService {
     const blocks = new Map<number, any>();
     let text = '';
     let reasoning = '';
+    let inputTokens: number | undefined;
+    let outputTokens: number | undefined;
     await this.consumeSse(
       url,
       headers,
       { ...body, stream: true },
       requestId,
       event => {
+        const eventUsage = event?.usage ?? event?.message?.usage;
+        if (eventUsage && typeof eventUsage === 'object') {
+          if (typeof eventUsage.input_tokens === 'number') {
+            inputTokens = eventUsage.input_tokens;
+          }
+          if (typeof eventUsage.output_tokens === 'number') {
+            outputTokens = eventUsage.output_tokens;
+          }
+        }
         const index = typeof event?.index === 'number' ? event.index : 0;
         if (event?.type === 'content_block_start' && event.content_block) {
           blocks.set(index, { ...event.content_block });
@@ -926,7 +937,12 @@ class ApiService {
         }
         return { ...block, input };
       });
-    return { content };
+    return {
+      content,
+      ...(inputTokens !== undefined && outputTokens !== undefined
+        ? { usage: { input_tokens: inputTokens, output_tokens: outputTokens } }
+        : {}),
+    };
   }
 
   private async streamGeminiResponse(
