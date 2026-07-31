@@ -601,16 +601,24 @@ select::-ms-expand {
   background-color: var(--zy-surface-raised);
   box-shadow: var(--shadow-inset);
 }
-[data-slot='switch'][data-checked] {
-  background-color: var(--zy-primary);
+[data-fluid-switch][data-slot='switch'][data-unchecked]:hover {
+  background-color: color-mix(in oklab, var(--zy-surface-raised), var(--zy-text-primary) 8%);
 }
-[data-slot='switch-thumb'] {
-  background-color: var(--zy-primary-foreground) !important;
+[data-slot='switch'][data-checked] {
+  background-color: var(--zy-switch-track-checked);
+}
+[data-fluid-switch][data-slot='switch'][data-checked]:hover {
+  background-color: var(--zy-switch-track-checked-hover);
+}
+[data-fluid-switch] [data-slot='switch-thumb'] {
+  background-color: var(--color-white) !important;
   transition: translate 200ms ease !important;
 }
-/* v4 component classes handle thumb positioning via translate-x-* utilities.
-   Do not override here — let items-center on the track handle vertical
-   centering, and component translate-x handle horizontal positioning. */
+[data-mode='work-chat'] [data-slot='switch-thumb'] {
+  background-color: var(--zy-primary-foreground) !important;
+}
+/* Normal thumbs are positioned by Motion; the Work/Chat variant below keeps
+   its existing translate utility classes and dedicated left-position rules. */
 
 /* Slider: zhiyuan theme tokens are hex values, so shadcn's hsl() utility colors are invalid. */
 [data-slot='slider-track'] {

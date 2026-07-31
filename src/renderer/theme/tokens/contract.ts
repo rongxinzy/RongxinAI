@@ -12,6 +12,8 @@ export const TOKEN_CONTRACT = {
   'primary-foreground': '--zy-primary-foreground',
   'primary-hover': '--zy-primary-hover',
   'primary-muted': '--zy-primary-muted',
+  'switch-track-checked': '--zy-switch-track-checked',
+  'switch-track-checked-hover': '--zy-switch-track-checked-hover',
 
   // ── Accent ──
   accent: '--zy-accent',
