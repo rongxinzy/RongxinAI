@@ -1,5 +1,5 @@
 ---
-name: zhiyuan_AutoResearch
+name: deli-autoresearch
 description: "A protocol framework for long-horizon autonomous research tasks. Targets three empirically-observed failure modes — cognitive loops, stalling, runtime fragility — by prescribing state management, stall detection, and watchdog mechanisms. Use when the user asks for academic research, literature surveys, paper writing, or any unattended multi-day research task. Triggers: academic research, 学术研究, literature review, 文献综述, paper writing, 论文写作, ICLR survey, autonomous research."
 metadata:
   version: "1.1"
@@ -25,6 +25,15 @@ The protocol's abstract mechanisms map onto concrete tools here:
 | Nudge / direction injection | the parent session steers between loop iterations by editing state files |
 
 State files and logs below are tool-agnostic: they are what makes every iteration resumable.
+
+## Controlled Shortcut Completion
+
+When this skill is selected through the Academic Research sidebar shortcut, the
+runtime applies the Deep Research evidence gate in addition to this protocol.
+Before requesting completion, save the final cited research report as a `.md`
+deliverable and a readable `.md`, `.txt`, or `.json` validation report in the
+selected workspace. Record both with `workflow_state`; plans, delegates, and
+source URLs are necessary evidence but never substitute for the final report.
 
 ## 1. Motivation
 

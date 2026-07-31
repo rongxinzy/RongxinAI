@@ -129,6 +129,12 @@ export default defineConfig(async () => ({
     emptyOutDir: true,
     sourcemap: true,
     minify: false,
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        officePreview: path.resolve(__dirname, 'office-preview.html'),
+      },
+    },
     // CI 中指定 chrome130（Electron 40 运行时）跳过降级转译省内存
     ...(process.env.CI && { target: 'chrome130' }),
   },

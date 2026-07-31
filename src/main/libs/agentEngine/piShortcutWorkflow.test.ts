@@ -6,14 +6,22 @@ import JSZip from 'jszip';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  type PiShortcutWorkflowOptions,
   PiShortcutWorkflowController,
   resolveShortcutWorkflowKind,
   ShortcutWorkflowKind,
 } from './piShortcutWorkflow';
 
 const roots: string[] = [];
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
 
-const createRun = (kind: ShortcutWorkflowKind): PiShortcutWorkflowController => {
+const createRun = (
+  kind: ShortcutWorkflowKind,
+  overrides: Partial<PiShortcutWorkflowOptions> = {},
+): PiShortcutWorkflowController => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shortcut-workflow-'));
   roots.push(root);
   return new PiShortcutWorkflowController({
@@ -21,6 +29,7 @@ const createRun = (kind: ShortcutWorkflowKind): PiShortcutWorkflowController => 
     workspaceRoot: root,
     task: 'Create deliverable',
     kind,
+    ...overrides,
   });
 };
 
@@ -61,10 +70,12 @@ describe('PiShortcutWorkflowController', () => {
       await archive.generateAsync({ type: 'nodebuffer' }),
     );
     fs.writeFileSync(path.join(root, 'qa.md'), 'Checked text and fixed the title overflow.');
-    fs.writeFileSync(path.join(root, 'slide-1.png'), 'preview');
+    fs.writeFileSync(path.join(root, 'slide-1.png'), onePixelPng);
     await expect(run.recordFile('deck.pptx', 'deliverable')).resolves.toContain('Verified');
-    await expect(run.recordFile('qa.md', 'validation')).resolves.toContain('Verified');
-    await expect(run.recordFile('slide-1.png', 'preview')).resolves.toContain('Verified');
+    await expect(run.recordFile('qa.md', 'validation', 'deck.pptx')).resolves.toContain('Verified');
+    await expect(run.recordFile('slide-1.png', 'preview', 'deck.pptx')).resolves.toContain(
+      'Verified',
+    );
 
     run.requestCompletion('all checks passed');
     expect(run.onAgentEnd()).toMatchObject({ shouldFinish: true });
@@ -78,7 +89,21 @@ describe('PiShortcutWorkflowController', () => {
     );
   });
 
-  it('keeps deep research active until plan, researchers, and reachable sources are recorded', async () => {
+  it('rejects a ZIP that only impersonates a DOCX package', async () => {
+    const run = createRun(ShortcutWorkflowKind.Docs);
+    const archive = new JSZip();
+    archive.file('[Content_Types].xml', '<Types />');
+    archive.file('word/document.xml', '<w:document />');
+    fs.writeFileSync(
+      path.join(rootFor(run), 'empty.docx'),
+      await archive.generateAsync({ type: 'nodebuffer' }),
+    );
+    await expect(run.recordFile('empty.docx', 'deliverable')).resolves.toContain(
+      'not a valid ZIP package',
+    );
+  });
+
+  it('keeps deep research active until a cited report, QA record, plan, researchers, and reachable sources are recorded', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -110,8 +135,159 @@ describe('PiShortcutWorkflowController', () => {
     for (let index = 0; index < 6; index += 1) {
       await run.verifySource(`https://source-${index}.example.test/report`);
     }
+    const root = rootFor(run);
+    fs.writeFileSync(
+      path.join(root, 'report.md'),
+      '# Report\n\n[1] https://source-0.example.test/report',
+    );
+    fs.writeFileSync(
+      path.join(root, 'research-qa.md'),
+      'Checked citations, scope, and unresolved gaps.',
+    );
+    await run.recordFile('report.md', 'deliverable');
+    await run.recordFile('research-qa.md', 'validation', 'report.md');
     run.requestCompletion('report is supported');
     expect(run.onAgentEnd()).toMatchObject({ shouldFinish: true });
+  });
+
+  it('rejects deep-research completion when evidence exists but no durable report is recorded', () => {
+    const run = createRun(ShortcutWorkflowKind.DeepResearch);
+    run.requestCompletion('sources are enough');
+    expect(run.onAgentEnd()).toMatchObject({
+      shouldFinish: false,
+      nextPrompt: expect.stringContaining('no verified deliverable file is recorded'),
+    });
+  });
+
+  it('requires a rendered preview for Docs, Website, and Sheets workflows', () => {
+    for (const kind of [
+      ShortcutWorkflowKind.Docs,
+      ShortcutWorkflowKind.Website,
+      ShortcutWorkflowKind.Sheets,
+    ]) {
+      const run = createRun(kind);
+      run.requestCompletion('looks done');
+      expect(run.onAgentEnd()).toMatchObject({
+        shouldFinish: false,
+        nextPrompt: expect.stringContaining('no inspected rendered preview is recorded'),
+      });
+    }
+  });
+
+  it('rejects arbitrary files used as validation reports or rendered previews', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'qa.sh'), '#!/bin/sh\ntrue');
+    fs.writeFileSync(path.join(root, 'preview.txt'), 'not an image');
+    fs.writeFileSync(path.join(root, 'renamed-text.png'), 'not an image');
+    await expect(run.recordFile('qa.sh', 'validation')).resolves.toContain('expects one of');
+    await expect(run.recordFile('preview.txt', 'preview')).resolves.toContain('expects one of');
+    await expect(run.recordFile('renamed-text.png', 'preview')).resolves.toContain(
+      'not a valid raster image',
+    );
+  });
+
+  it('rejects a truncated PNG that only contains a signature and IHDR dimensions', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    const truncated = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(truncated);
+    Buffer.from('IHDR').copy(truncated, 12);
+    truncated.writeUInt32BE(1, 16);
+    truncated.writeUInt32BE(1, 20);
+    fs.writeFileSync(path.join(root, 'fake.png'), truncated);
+    await expect(run.recordFile('fake.png', 'preview')).resolves.toContain(
+      'not a valid raster image',
+    );
+  });
+
+  it('binds validation and preview evidence to an already registered deliverable', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'site.html'), '<main>Website</main>');
+    fs.writeFileSync(path.join(root, 'qa.md'), 'Checked desktop layout.');
+    fs.writeFileSync(path.join(root, 'site.png'), onePixelPng);
+
+    await expect(run.recordFile('qa.md', 'validation', 'site.html')).resolves.toContain(
+      'record the referenced deliverable',
+    );
+    await run.recordFile('site.html', 'deliverable');
+    await expect(run.recordFile('qa.md', 'validation', 'missing.html')).resolves.toContain(
+      'must name an existing workspace deliverable',
+    );
+    await expect(run.recordFile('qa.md', 'validation', 'site.html')).resolves.toContain('Verified');
+    await expect(run.recordFile('site.png', 'preview', 'site.html')).resolves.toContain('Verified');
+    expect(run.getSnapshot().files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'qa.md',
+          role: 'validation',
+          deliverablePath: 'site.html',
+        }),
+        expect.objectContaining({
+          path: 'site.png',
+          role: 'preview',
+          deliverablePath: 'site.html',
+        }),
+      ]),
+    );
+  });
+
+  it('renders Docs previews with the application-owned renderer and records them', async () => {
+    const renderOfficePreview = vi.fn(
+      async (_deliverablePath: string, outputPath: string): Promise<void> => {
+        fs.writeFileSync(outputPath, onePixelPng);
+      },
+    );
+    const run = createRun(ShortcutWorkflowKind.Docs, { renderOfficePreview });
+    const root = rootFor(run);
+    const archive = new JSZip();
+    archive.file('[Content_Types].xml', '<Types />');
+    archive.file(
+      'word/document.xml',
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Report</w:t></w:r></w:p></w:body></w:document>',
+    );
+    fs.writeFileSync(
+      path.join(root, 'report.docx'),
+      await archive.generateAsync({ type: 'nodebuffer' }),
+    );
+    await run.recordFile('report.docx', 'deliverable');
+    await expect(run.renderPreview('report.docx', 'previews/report.png')).resolves.toContain(
+      'Verified preview',
+    );
+    expect(renderOfficePreview).toHaveBeenCalledWith(
+      path.join(root, 'report.docx'),
+      path.join(root, 'previews', 'report.png'),
+      ShortcutWorkflowKind.Docs,
+    );
+    expect(run.getSnapshot().files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: path.join('previews', 'report.png'),
+          role: 'preview',
+          deliverablePath: 'report.docx',
+        }),
+      ]),
+    );
+  });
+
+  it('fails completion when verified artifacts are deleted or changed', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'site.html'), '<main>Version one</main>');
+    fs.writeFileSync(path.join(root, 'qa.md'), 'Checked version one.');
+    fs.writeFileSync(path.join(root, 'site.png'), onePixelPng);
+    await run.recordFile('site.html', 'deliverable');
+    await run.recordFile('qa.md', 'validation', 'site.html');
+    await run.recordFile('site.png', 'preview', 'site.html');
+
+    fs.writeFileSync(path.join(root, 'site.html'), '<main>Unverified replacement</main>');
+    fs.rmSync(path.join(root, 'site.png'));
+    run.requestCompletion('done');
+    const decision = run.onAgentEnd();
+    expect(decision).toMatchObject({ shouldFinish: false });
+    expect(decision.nextPrompt).toContain('deliverable artifact changed after verification');
+    expect(decision.nextPrompt).toContain('preview artifact is missing');
   });
 
   it('does not count failed researcher starts as completed research', () => {
@@ -165,14 +341,19 @@ describe('PiShortcutWorkflowController', () => {
     const run = createRun(ShortcutWorkflowKind.Docs);
     const archive = new JSZip();
     archive.file('[Content_Types].xml', '<Types />');
-    archive.file('word/document.xml', '<w:document />');
+    archive.file(
+      'word/document.xml',
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body /></w:document>',
+    );
     fs.writeFileSync(
       path.join(rootFor(run), 'report.docx'),
       await archive.generateAsync({ type: 'nodebuffer' }),
     );
     fs.writeFileSync(path.join(rootFor(run), 'qa.md'), 'validated');
+    fs.writeFileSync(path.join(rootFor(run), 'report-preview.png'), onePixelPng);
     await run.recordFile('report.docx', 'deliverable');
-    await run.recordFile('qa.md', 'validation');
+    await run.recordFile('qa.md', 'validation', 'report.docx');
+    await run.recordFile('report-preview.png', 'preview', 'report.docx');
     run.requestCompletion('done');
     expect(run.onAgentEnd().shouldFinish).toBe(true);
 

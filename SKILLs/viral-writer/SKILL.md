@@ -1,5 +1,5 @@
 ---
-name: Viral Writer
+name: viral-writer
 description: >
   自媒体内容创作工具，帮助创作者写出高质量的文章、标题，并提供配图和封面图的生成指导。
   支持微信公众号、小红书、抖音文案三种平台风格。

@@ -21,6 +21,8 @@ Exit codes:
     1 — LibreOffice found but recalculation failed (timeout, crash, bad file)
 """
 
+from __future__ import annotations
+
 import subprocess
 import sys
 import shutil

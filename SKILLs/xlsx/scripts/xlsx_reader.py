@@ -17,6 +17,8 @@ Exit codes:
     1 — file not found / unsupported format / encoding failure
 """
 
+from __future__ import annotations
+
 import sys
 import json
 import argparse

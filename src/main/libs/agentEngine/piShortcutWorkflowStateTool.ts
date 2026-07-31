@@ -28,13 +28,19 @@ export function buildPiShortcutWorkflowStateTool(
     label: 'Workflow State',
     description:
       'Record workflow evidence that the main process independently checks. ' +
-      'Use file for deliverables, validation reports, and PPT previews; use plan and source for deep research.',
+      'Use file for deliverables, readable validation reports, and inspected rendered previews. ' +
+      'Use render_preview to generate Docs and Sheets previews with the bundled application renderer. ' +
+      'Validation and preview records must name the registered deliverable they checked; use plan and source for deep research.',
     parameters: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ['file', 'plan', 'source', 'status'] },
+        action: {
+          type: 'string',
+          enum: ['file', 'render_preview', 'plan', 'source', 'status'],
+        },
         path: { type: 'string' },
         role: { type: 'string', enum: ['deliverable', 'validation', 'preview'] },
+        deliverablePath: { type: 'string' },
         angles: { type: 'array', items: { type: 'string' } },
         url: { type: 'string' },
       },
@@ -48,7 +54,14 @@ export function buildPiShortcutWorkflowStateTool(
         if (role !== 'deliverable' && role !== 'validation' && role !== 'preview') {
           return result('file requires role "deliverable", "validation", or "preview".');
         }
-        return result(await controller.recordFile(toText(params.path), role));
+        return result(
+          await controller.recordFile(toText(params.path), role, toText(params.deliverablePath)),
+        );
+      }
+      if (action === 'render_preview') {
+        return result(
+          await controller.renderPreview(toText(params.deliverablePath), toText(params.path)),
+        );
       }
       if (action === 'plan') {
         const angles = toList(params.angles);

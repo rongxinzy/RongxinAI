@@ -229,6 +229,7 @@
   CreateDirectory "$INSTDIR\resources\cfmind"
   CreateDirectory "$INSTDIR\resources\python-win"
   CreateDirectory "$INSTDIR\resources\uv-win"
+  CreateDirectory "$INSTDIR\resources\pandoc"
   CreateDirectory "$INSTDIR\resources\SKILLs"
   DetailPrint "[Installer] Preparing resource directories"
   DetailPrint "[Installer] Adding Windows Defender exclusions before extraction"
@@ -237,7 +238,7 @@
   FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\pandoc$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
@@ -528,7 +529,7 @@
 !macro customUnInstall
   ; ─── Remove Windows Defender Exclusion on uninstall ───
   ; Clean up the exclusions we added during installation.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\pandoc$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
   Pop $0
   Pop $1
 !macroend

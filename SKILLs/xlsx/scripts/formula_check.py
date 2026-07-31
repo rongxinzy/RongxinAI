@@ -27,6 +27,8 @@ Exit code:
     1 — errors detected (or file cannot be opened)
 """
 
+from __future__ import annotations
+
 import sys
 import zipfile
 import xml.etree.ElementTree as ET

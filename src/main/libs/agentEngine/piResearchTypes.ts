@@ -7,6 +7,7 @@ export const PiResearchStateAction = {
   VerifySource: 'verify_source',
   Claim: 'claim',
   Contradictions: 'contradictions',
+  File: 'file',
 } as const;
 export type PiResearchStateAction =
   (typeof PiResearchStateAction)[keyof typeof PiResearchStateAction];
@@ -61,6 +62,14 @@ export interface ResearchReview {
   output?: string;
 }
 
+export type ResearchArtifactRole = 'deliverable' | 'validation';
+
+export interface ResearchArtifact {
+  path: string;
+  role: ResearchArtifactRole;
+  verifiedAt: string;
+}
+
 export interface ResearchRunState {
   version: 1;
   sessionId: string;
@@ -73,6 +82,7 @@ export interface ResearchRunState {
   subquestions: ResearchQuestion[];
   sources: ResearchSource[];
   claims: ResearchClaim[];
+  artifacts: ResearchArtifact[];
   directionsTried: string[];
   contradictionCheck?: string;
   review: ResearchReview;

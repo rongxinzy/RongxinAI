@@ -30,6 +30,9 @@ jobs:
     if: ${{ inputs.build_macos }}
     runs-on: macos-latest
     environment: release
+    # A release build may download upstream runtimes, but it must never consume
+    # a runner indefinitely when an upstream command stalls.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,6 +46,11 @@ jobs:
         with:
           version: 10
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up bundled macOS runtimes
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+          bun run setup:pandoc-runtime
       - name: Build macOS
         run: bun run dist:mac
         env:
@@ -59,6 +67,7 @@ jobs:
     if: ${{ inputs.build_windows }}
     runs-on: windows-latest
     environment: release
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,10 +81,10 @@ jobs:
         with:
           version: 10
       - run: bun install --frozen-lockfile --ignore-scripts
-      - name: Set up the portable Python runtime
+      - name: Set up bundled uv
+        run: bun run setup:uv-runtime
+      - name: Set up uv-managed Python 3.14.6 runtime
         run: bun run setup:python-runtime
-        env:
-          ZHIYUAN_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
       - name: Build Windows
         run: bun run dist:win
         env:
@@ -92,6 +101,7 @@ jobs:
     if: ${{ inputs.build_linux }}
     runs-on: ubuntu-latest
     environment: release
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -111,6 +121,11 @@ jobs:
             libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up bundled Ubuntu runtimes
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+          bun run setup:pandoc-runtime
       - name: Build Linux
         run: bun run dist:linux
         env:

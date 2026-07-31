@@ -20,6 +20,7 @@ export function resumeResearchState(state: ResearchRunState, task: string): bool
   state.iteration += 1;
   state.staleCount = 0;
   state.lastFindingCount = state.sources.length + state.claims.length;
+  state.artifacts = [];
   state.review = { requested: false, passed: false };
   delete state.completionReason;
   return true;
@@ -35,6 +36,7 @@ export function buildResearchInitialPrompt(runDirectory: string, userPrompt: str
     'Every iteration must launch at least one isolated researcher subagent. Researchers have an explicit web-search capability.',
     'For every source you rely on, call research_state action "verify_source"; this process opens the URL before it is recorded.',
     'Record each load-bearing claim statement with two or more verified independent source URLs using action "claim".',
+    'Save the final cited report as a Markdown file and a readable validation report in the selected workspace, then register them with research_state action "file".',
     'Before requesting completion, record a contradiction scan with action "contradictions". Calling agent_loop done only requests review; it cannot complete the run by itself.',
     '',
     userPrompt,
@@ -56,6 +58,12 @@ export function collectCompletionFailures(
 
 export function collectEvidenceFailures(state: ResearchRunState): string[] {
   const failures: string[] = [];
+  if (!state.artifacts.some(artifact => artifact.role === 'deliverable')) {
+    failures.push('no verified final research report is recorded');
+  }
+  if (!state.artifacts.some(artifact => artifact.role === 'validation')) {
+    failures.push('no verified research validation report is recorded');
+  }
   if (state.iteration < MIN_RESEARCH_ITERATIONS) {
     failures.push(`fewer than ${MIN_RESEARCH_ITERATIONS} research iterations are recorded`);
   }

@@ -11,6 +11,9 @@ import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skil
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { isAcademicResearchSkillSet } from '../../../main/libs/agentEngine/piResearchRun';
+import { resolveShortcutWorkflowKind } from '../../../main/libs/agentEngine/piShortcutWorkflow';
+
 import { expect, test } from 'vitest';
 
 import { CHAT_SKILL_SHORTCUTS } from './constants';
@@ -35,7 +38,7 @@ test('academic research selects Zhiyuan AutoResearch, deep research, and web sea
   for (const skillId of academic?.skillIds || []) expect(isCoreSkill(skillId)).toBe(true);
 });
 
-test('academic research does not expose the upstream Deli branding', () => {
+test('academic research keeps a valid internal Skill name and Zhiyuan-facing metadata', () => {
   const skillSource = readFileSync(
     fileURLToPath(new URL('../../../../SKILLs/deli-autoresearch/SKILL.md', import.meta.url)),
     'utf8',
@@ -47,9 +50,10 @@ test('academic research does not expose the upstream Deli branding', () => {
     'utf8',
   );
 
-  expect(skillSource).toContain('name: zhiyuan_AutoResearch');
+  expect(skillSource).toContain('name: deli-autoresearch');
+  // deli-autoresearch is the stable runtime ID. The visible metadata must
+  // remain Zhiyuan-branded rather than exposing that implementation detail.
   expect(skillSource).toContain('# zhiyuan_AutoResearch');
-  expect(skillSource).not.toMatch(/Deli[ _-]?AutoResearch/i);
   expect(metadataSource).toContain('author: Zhiyuan');
   expect(metadataSource).not.toMatch(/^author:\s*Deli\s*$/im);
 });
@@ -57,6 +61,18 @@ test('academic research does not expose the upstream Deli branding', () => {
 test('deep research selects explicit web search with its research protocol', () => {
   const deepResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'deep-research');
   expect(deepResearch?.skillIds).toEqual(['deep-research', 'web-search']);
+});
+
+test('every sidebar shortcut is protected by a Pi completion controller', () => {
+  for (const shortcut of CHAT_SKILL_SHORTCUTS) {
+    const selectedIds = [...(shortcut.skillIds || [shortcut.skillId])];
+    const protectedByAcademicHarness = isAcademicResearchSkillSet(selectedIds);
+    const protectedByShortcutHarness = resolveShortcutWorkflowKind(selectedIds) !== null;
+    expect(
+      protectedByAcademicHarness || protectedByShortcutHarness,
+      `shortcut ${shortcut.id} has no completion controller`,
+    ).toBe(true);
+  }
 });
 
 test('the chat skill allowlist is derived from CoreSkillId, not hardcoded', () => {

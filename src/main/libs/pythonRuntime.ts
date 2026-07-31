@@ -5,10 +5,12 @@ import path from 'path';
 
 import { cpRecursiveSync } from '../fsCompat';
 
-const PYTHON_RUNTIME_DIR_NAME = 'python-win';
+const PYTHON_RUNTIME_DIR_NAME =
+  process.platform === 'darwin' ? 'python-mac' : process.platform === 'linux' ? 'python-linux' : 'python-win';
 const PYTHON_RUNTIME_STATE_FILE = 'runtime.json';
+const IS_WINDOWS = process.platform === 'win32';
 
-const REQUIRED_FILES = ['python.exe', 'python3.exe'];
+const REQUIRED_FILES = IS_WINDOWS ? ['python.exe', 'python3.exe'] : [path.join('bin', 'python3')];
 const PIP_EXECUTABLE_CANDIDATES = [
   path.join('Scripts', 'pip.exe'),
   path.join('Scripts', 'pip3.exe'),
@@ -33,11 +35,23 @@ function hasPipSupport(rootDir: string): boolean {
 }
 
 function findPythonExecutable(rootDir: string): string | null {
-  const candidates = [path.join(rootDir, 'python.exe'), path.join(rootDir, 'python3.exe')];
+  const candidates = IS_WINDOWS
+    ? [path.join(rootDir, 'python.exe'), path.join(rootDir, 'python3.exe')]
+    : [path.join(rootDir, 'bin', 'python3'), path.join(rootDir, 'bin', 'python')];
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       return candidate;
     }
+  }
+  return null;
+}
+
+/** Resolve the app-private interpreter that Skills and uv must use on Windows. */
+export function getManagedPythonExecutable(): string | null {
+  for (const root of [getUserPythonRoot(), getBundledPythonRoot()]) {
+    if (!root) continue;
+    const executable = findPythonExecutable(root);
+    if (executable) return executable;
   }
   return null;
 }
@@ -224,7 +238,7 @@ export function getUserPythonRoot(): string {
 export function appendPythonRuntimeToEnv(
   env: Record<string, string | undefined>,
 ): Record<string, string | undefined> {
-  if (process.platform !== 'win32') {
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     return env;
   }
 
@@ -238,7 +252,12 @@ export function appendPythonRuntimeToEnv(
   }
 
   if (pathEntries.length > 0) {
-    env.PATH = appendWindowsPath(env.PATH, pathEntries);
+    if (IS_WINDOWS) {
+      env.PATH = appendWindowsPath(env.PATH, pathEntries);
+    } else {
+      const posixEntries = candidates.flatMap(root => [path.join(root, 'bin')]);
+      env.PATH = [...posixEntries, ...(env.PATH || '').split(':').filter(Boolean)].join(':');
+    }
     env.ZHIYUAN_PYTHON_ROOT = pathEntries[0];
   }
 
@@ -246,23 +265,23 @@ export function appendPythonRuntimeToEnv(
 }
 
 export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; error?: string }> {
-  if (process.platform !== 'win32') {
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) {
     return { success: true };
   }
 
   try {
     const userRoot = getUserPythonRoot();
-    if (fs.existsSync(userRoot)) {
+    if (IS_WINDOWS && fs.existsSync(userRoot)) {
       try {
         ensureEmbedSitePackages(userRoot);
       } catch (error) {
         console.warn('[python-runtime] Failed to normalize user runtime _pth:', error);
       }
     }
-    const userHealth = runtimeHealth(userRoot);
+    const userHealth = runtimeHealth(userRoot, { requireEmbedSiteConfig: IS_WINDOWS });
     if (userHealth.ok) {
       ensureRuntimeStateFile(userRoot, 'existing-user-runtime');
-      if (!hasPipSupport(userRoot)) {
+      if (IS_WINDOWS && !hasPipSupport(userRoot)) {
         console.warn(
           '[python-runtime] User runtime is ready without full pip support; pip commands may fail.',
         );
@@ -291,9 +310,9 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
     }
     fs.mkdirSync(path.dirname(userRoot), { recursive: true });
     cpRecursiveSync(bundledRoot, userRoot, { force: true, dereference: true });
-    ensureEmbedSitePackages(userRoot);
+    if (IS_WINDOWS) ensureEmbedSitePackages(userRoot);
 
-    const syncedHealth = runtimeHealth(userRoot);
+    const syncedHealth = runtimeHealth(userRoot, { requireEmbedSiteConfig: IS_WINDOWS });
     if (!syncedHealth.ok) {
       const message = `Synced python runtime is unhealthy (missing: ${syncedHealth.missing.join(', ')})`;
       console.error(`[python-runtime] ${message}`);
@@ -301,7 +320,7 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
     }
 
     ensureRuntimeStateFile(userRoot, bundledRoot);
-    if (!hasPipSupport(userRoot)) {
+    if (IS_WINDOWS && !hasPipSupport(userRoot)) {
       console.warn(
         '[python-runtime] Synced runtime does not include full pip support; pip commands may fail.',
       );
@@ -359,14 +378,14 @@ function tryBootstrapPip(rootDir: string): { ok: boolean; detail?: string } {
 }
 
 export async function ensurePythonPipReady(): Promise<{ success: boolean; error?: string }> {
-  if (process.platform !== 'win32') {
-    return { success: true };
-  }
-
   const runtimeReady = await ensurePythonRuntimeReady();
   if (!runtimeReady.success) {
     return runtimeReady;
   }
+
+  // uv is the dependency manager on macOS/Linux; its managed runtime is enough
+  // for Skill execution and avoids mutating the bundled interpreter with pip.
+  if (!IS_WINDOWS) return { success: true };
 
   try {
     const userRoot = getUserPythonRoot();

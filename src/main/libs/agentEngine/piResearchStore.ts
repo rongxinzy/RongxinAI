@@ -36,6 +36,7 @@ export class PiResearchRunStore {
           return {
             ...parsed,
             researcherIterations: parsed.researcherIterations || [],
+            artifacts: parsed.artifacts || [],
             claims: (parsed.claims || []).map(claim => ({
               ...claim,
               statement: claim.statement || '',
@@ -63,6 +64,7 @@ export class PiResearchRunStore {
       subquestions: [],
       sources: [],
       claims: [],
+      artifacts: [],
       directionsTried: [],
       review: { requested: false, passed: false },
       updatedAt: now(),

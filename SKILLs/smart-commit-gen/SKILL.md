@@ -1,13 +1,10 @@
 ---
 name: smart-commit-gen
 description: "Conventional Commits 规范化工具：分析 git diff 自动生成符合规范的提交信息，支持自动检测作用域（scope）并智能推断提交类型（如 feat, fix, refactor）。当用户提及 commit message、提交信息、conventional commits、git commit、规范化提交、scope 检测，或提出“帮我写个 commit message”、“这些改动应该怎么提交”、“分析一下 diff 生成提交信息”等请求时触发。"
-type: tool
 license: MIT
-tags:
-  - git
-  - conventional-commits
-  - devops
-  - productivity
+metadata:
+  type: tool
+  tags: [git, conventional-commits, devops, productivity]
 ---
 
 # Git Commit Helper

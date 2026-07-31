@@ -122,6 +122,21 @@
         ]
       },
       {
+        "from": "resources/pandoc",
+        "to": "pandoc",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/uv-mac",
+        "to": "uv-mac",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/python-mac",
+        "to": "python-mac",
+        "filter": ["**/*"]
+      },
+      {
         "from": "vendor/openclaw-runtime/current",
         "to": "cfmind",
         "filter": [
@@ -176,6 +191,21 @@
     "category": "Utility",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "extraResources": [
+      {
+        "from": "resources/pandoc",
+        "to": "pandoc",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/uv-linux",
+        "to": "uv-linux",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/python-linux",
+        "to": "python-linux",
+        "filter": ["**/*"]
+      },
       {
         "from": "SKILLs",
         "to": "SKILLs",

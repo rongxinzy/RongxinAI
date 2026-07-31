@@ -24,7 +24,8 @@ import {
   serializeToolContentForLog,
   truncateForLog,
 } from './mcpLog';
-import { getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
+import { appendPythonRuntimeToEnv, getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
+import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
 
 export interface McpToolManifestEntry {
@@ -333,7 +334,11 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
 
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
-  if (process.platform === 'win32' && app.isPackaged && effectiveCommand) {
+  if (['win32', 'darwin', 'linux'].includes(process.platform) && app.isPackaged && effectiveCommand) {
+    const managedRuntimeEnv = configureUvForManagedPython(
+      appendUvRuntimeToEnv(appendPythonRuntimeToEnv({ ...(stdioEnv || {}) })),
+    );
+    stdioEnv = { ...(stdioEnv || {}), ...managedRuntimeEnv };
     const normalized = effectiveCommand.trim().toLowerCase();
     const nodeCommandType = isNodeCommand(normalized);
     const uvCommandType = isUvCommand(normalized);
@@ -343,7 +348,11 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
         (value): value is string => Boolean(value),
       );
       const bundledPythonPath = pythonRoots
-        .map(root => path.join(root, 'python.exe'))
+        .map(root =>
+          process.platform === 'win32'
+            ? path.join(root, 'python.exe')
+            : path.join(root, 'bin', 'python3'),
+        )
         .find(candidate => fs.existsSync(candidate));
       if (bundledPythonPath) {
         effectiveCommand = bundledPythonPath;
@@ -352,7 +361,11 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
     }
 
     if (uvCommandType) {
-      const bundledUvPath = findBundledUvExecutable(uvCommandType === 'uv' ? 'uv.exe' : 'uvx.exe');
+      const bundledUvPath = findBundledUvExecutable(
+        process.platform === 'win32'
+          ? uvCommandType === 'uv' ? 'uv.exe' : 'uvx.exe'
+          : uvCommandType === 'uv' ? 'uv' : 'uvx',
+      );
       if (bundledUvPath) {
         effectiveCommand = bundledUvPath;
         log('INFO', `"${server.name}": using bundled ${uvCommandType} runtime "${bundledUvPath}"`);

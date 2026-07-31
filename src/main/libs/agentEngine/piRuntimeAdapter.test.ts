@@ -263,26 +263,17 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('asks Work users how an arbitrary skill should execute before prompting Pi', async () => {
+    it('runs an arbitrary selected Work skill through a durable acceptance loop by default', async () => {
       const onPermissionRequest = vi.fn();
       const onComplete = vi.fn();
       adapter.on('permissionRequest', onPermissionRequest);
       adapter.on('complete', onComplete);
 
-      const start = adapter.startSession('generic-work-skill', 'Analyze this codebase', {
+      await adapter.startSession('generic-work-skill', 'Analyze this codebase', {
         skillIds: ['code-review'],
         sessionMode: 'work',
         workspaceRoot: createTemporaryWorkspace(),
       });
-      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(1));
-
-      const [, request] = onPermissionRequest.mock.calls[0] as [string, { requestId: string }];
-      expect(mockSession.prompt).not.toHaveBeenCalled();
-      adapter.respondToPermission(request.requestId, {
-        behavior: 'allow',
-        updatedInput: { answers: { 技能任务执行方式: '持续执行至验收' } },
-      });
-      await start;
 
       expect(mockSession.prompt).toHaveBeenCalledWith(
         expect.stringContaining('Loop started. Iteration 1. Goal:'),
@@ -321,8 +312,8 @@ describe('PiRuntimeAdapter', () => {
       const acceptance = acceptanceTool!.execute('acceptance-call', {
         summary: 'Implementation and tests are complete.',
       });
-      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(2));
-      const [, acceptanceRequest] = onPermissionRequest.mock.calls[1] as [
+      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(1));
+      const [, acceptanceRequest] = onPermissionRequest.mock.calls[0] as [
         string,
         { requestId: string; toolInput: { questions: Array<{ question: string }> } },
       ];
@@ -609,29 +600,19 @@ describe('PiRuntimeAdapter', () => {
       ).toEqual([{ id: 'skill-b' }]);
     });
 
-    it('asks for execution mode when an arbitrary skill is added to a Work session', async () => {
-      const onPermissionRequest = vi.fn();
-      adapter.on('permissionRequest', onPermissionRequest);
+    it('uses the durable acceptance loop when an arbitrary skill is added to a Work session', async () => {
       const workspaceRoot = createTemporaryWorkspace();
       await adapter.startSession('dynamic-skill', 'First', { sessionMode: 'work', workspaceRoot });
 
-      const continuation = adapter.continueSession('dynamic-skill', 'Use code review', {
+      await adapter.continueSession('dynamic-skill', 'Use code review', {
         skillIds: ['code-review'],
         sessionMode: 'work',
         workspaceRoot,
       });
-      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledOnce());
-      const [, request] = onPermissionRequest.mock.calls[0] as [string, { requestId: string }];
-      adapter.respondToPermission(request.requestId, {
-        behavior: 'allow',
-        updatedInput: { answers: { 技能任务执行方式: '完成本轮' } },
-      });
-      await continuation;
-
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
       expect(mockSession.abort).toHaveBeenCalledOnce();
       expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('Use code review'),
+        expect.stringContaining('Persistent Work execution'),
       );
     });
 

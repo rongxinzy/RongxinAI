@@ -27,8 +27,9 @@ import {
 } from './coworkModelApi';
 import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
+import { appendPandocRuntimeToEnv } from './pandocRuntime';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
-import { appendUvRuntimeToEnv } from './uvRuntime';
+import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 
 const DOMESTIC_PYPI_INDEX_URL = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
 const DOMESTIC_NPM_REGISTRY_URL = 'https://registry.npmmirror.com';
@@ -1220,7 +1221,9 @@ function applyPackagedEnvOverrides(
     }
 
     appendPythonRuntimeToEnv(env);
+    appendPandocRuntimeToEnv(env);
     appendUvRuntimeToEnv(env);
+    configureUvForManagedPython(env);
 
     // Tell git-bash to inherit the PATH from the parent process instead of
     // rebuilding it from scratch. Without this, git-bash's /etc/profile (login
@@ -1401,6 +1404,8 @@ function applyPackagedEnvOverrides(
   }
 
   appendUvRuntimeToEnv(env);
+  appendPandocRuntimeToEnv(env);
+  configureUvForManagedPython(env);
 
   // Verify node/npx resolution in the constructed environment
   verifyNodeEnvironment(env);

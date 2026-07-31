@@ -19,17 +19,6 @@ description: >
   "fill in this form", "reformat to match this template", or any task whose final output
   is a .docx file. Even if the user doesn't mention "docx" explicitly, if the task
   implies a printable/formal document, use this skill.
-triggers:
-  - Word
-  - docx
-  - document
-  - 文档
-  - Word文档
-  - 报告
-  - 合同
-  - 公文
-  - 排版
-  - 套模板
 ---
 
 # minimax-docx
@@ -40,7 +29,12 @@ Create, edit, and format DOCX documents via CLI tools or direct C# scripts built
 
 **First time:** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps).
 
-**First operation in session:** `scripts/env_check.sh` — do not proceed if `NOT READY`. (Skip on subsequent operations within the same session.)
+**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. Packaged Windows and macOS builds provide a private Pandoc binary through `PANDOC_BIN`; never ask an end user to install it. `LIMITED` means that bundled Pandoc can create a simple DOCX from Markdown, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
+
+## Capability routing
+
+- **Full OpenXML path:** use the pipelines below when .NET 8+ is available; it supports structural editing, templates, and XSD/business-rule validation.
+- **Pandoc fallback:** when the environment check reports `LIMITED`, use only for a new, simple document. Write the content to Markdown, then run `bash scripts/markdown_to_docx.sh content.md output.docx`. Do not use it for preserving an existing document's formatting, filling templates, tracked changes, or template validation. Render and inspect the result before delivery.
 
 ## Quick Start: Direct C# Path
 
@@ -100,9 +94,9 @@ If the request spans multiple pipelines, run them sequentially (e.g., Create the
 
 ## Pre-processing
 
-Convert `.doc` → `.docx` if needed: `scripts/doc_to_docx.sh input.doc output_dir/`
+Convert `.doc` → `.docx` if needed: `bash scripts/doc_to_docx.sh input.doc output_dir/`
 
-Preview before editing (avoids reading raw XML): `scripts/docx_preview.sh document.docx`
+Preview before editing (avoids reading raw XML): `bash scripts/docx_preview.sh document.docx`
 
 Analyze structure for editing scenarios: `$CLI analyze --input document.docx`
 
@@ -117,6 +111,14 @@ Read `references/scenario_a_create.md`, `references/typography_guide.md`, and `r
 CLI options: `--type` (report|letter|memo|academic), `--title`, `--author`, `--page-size` (letter|a4|legal|a3), `--margins` (standard|narrow|wide), `--header`, `--footer`, `--page-numbers`, `--toc`, `--content-json`.
 
 Then run the **validation pipeline** (below).
+
+If only the Pandoc fallback is available, create the content as Markdown and run:
+
+```bash
+bash scripts/markdown_to_docx.sh content.md out.docx
+```
+
+Then run the rendered-preview and controlled-shortcut delivery gate below. Record in the validation report that the fallback was used and that OpenXML XSD/business-rule validation was unavailable.
 
 ## Scenario B: Edit / Fill
 
@@ -179,16 +181,31 @@ $CLI validate --input doc.docx --xsd assets/xsd/wml-subset.xsd
 If XSD still fails, fall back to business rules + preview:
 ```bash
 $CLI validate --input doc.docx --business
-scripts/docx_preview.sh doc.docx
+bash scripts/docx_preview.sh doc.docx
 # Verify: font contamination=0, table count correct, drawing count correct, sectPr count correct
 ```
 
-Final preview: `scripts/docx_preview.sh doc.docx`
+Final text inspection: `bash scripts/docx_preview.sh doc.docx`
 
-For the controlled Docs shortcut, save a nonempty validation report in the
-workspace after this pipeline, then record the DOCX with `workflow_state` role
-`deliverable` and the report with role `validation`. Do not finish from a
-claimed output path alone.
+For the controlled shortcut, render a real visual preview (not text/XML) before
+finishing. First record the DOCX as the deliverable, then ask the application
+to render and record the preview with its bundled cross-platform renderer:
+
+```json
+{
+  "action": "render_preview",
+  "deliverablePath": "doc.docx",
+  "path": "output/doc-page-1.png"
+}
+```
+
+For the controlled Docs shortcut, save a nonempty `.md`, `.txt`, or `.json`
+validation report in the workspace after this pipeline. Render at least one
+page to a `.png` preview and inspect it for layout defects. Record the DOCX
+with `workflow_state` role `deliverable`, the report with role `validation`,
+then use `workflow_state` action `render_preview`. The application records
+the generated image as role `preview`; inspect it before completion. Do not
+finish from a claimed output path alone.
 
 ## Critical rules
 

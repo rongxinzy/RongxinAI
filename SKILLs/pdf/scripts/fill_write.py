@@ -25,21 +25,15 @@ import argparse
 import json
 import os
 import sys
-import importlib.util
 
 
 
 
-def ensure_deps():
-    if importlib.util.find_spec("pypdf") is None:
-        import subprocess
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--break-system-packages", "-q", "pypdf"]
-        )
-
-
-ensure_deps()
-from pypdf import PdfReader, PdfWriter
+try:
+    from pypdf import PdfReader, PdfWriter
+except ImportError:
+    print("Missing pypdf. Run this script through make.sh or: uv run --with pypdf python fill_write.py ...", file=sys.stderr)
+    raise SystemExit(2)
 from pypdf.generic import NameObject, TextStringObject, BooleanObject
 
 

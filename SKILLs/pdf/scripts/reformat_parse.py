@@ -27,24 +27,10 @@ import json
 import os
 import re
 import sys
-import importlib.util
 from pathlib import Path
 
 
 
-
-def ensure_deps():
-    missing = []
-    if importlib.util.find_spec("pypdf") is None:
-        missing.append("pypdf")
-    if missing:
-        import subprocess
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "--break-system-packages", "-q"] + missing
-        )
-
-
-ensure_deps()
 
 
 # ── Markdown / plain text parser ───────────────────────────────────────────────
@@ -213,7 +199,12 @@ def parse_pdf(pdf_path: str) -> list:
     Best-effort: detects headings by font size heuristics if available,
     otherwise falls back to paragraph splitting.
     """
-    from pypdf import PdfReader
+    try:
+        from pypdf import PdfReader
+    except ImportError as error:
+        raise RuntimeError(
+            "Missing pypdf. Run through make.sh or: uv run --with pypdf python reformat_parse.py ..."
+        ) from error
 
     reader = PdfReader(pdf_path)
     all_text = []

@@ -2,7 +2,6 @@
 name: frontend-design
 description: Create distinctive, production-grade frontend interfaces with high design quality. Use this skill when the user asks to build web components, pages, artifacts, posters, or applications (examples include websites, landing pages, dashboards, React components, HTML/CSS layouts, or when styling/beautifying any web UI). Generates creative, polished code and UI design that avoids generic AI aesthetics.
 license: Complete terms in LICENSE.txt
-official: true
 metadata:
   version: "1.0"
   category: design
@@ -50,7 +49,10 @@ Remember: you are capable of extraordinary creative work. Don't hold back, show 
 ## Delivery Gate
 
 Build or otherwise run the finished interface, inspect the rendered result,
-and save a nonempty validation report in the workspace. The controlled Website
-shortcut completes only after `workflow_state` records an existing HTML
-deliverable (role `deliverable`) and that validation report (role
-`validation`); never end after a design explanation or code sketch.
+and save a nonempty `.md`, `.txt`, or `.json` validation report in the
+workspace. Capture at least one inspected `.png`, `.jpg`, or `.jpeg`
+rendered preview. The controlled Website shortcut completes only after
+`workflow_state` records an existing HTML deliverable (role `deliverable`),
+then that validation report (role `validation`, with `deliverablePath` set to
+the HTML file), and the preview (role `preview`, with the same
+`deliverablePath`). Never end after a design explanation or code sketch.

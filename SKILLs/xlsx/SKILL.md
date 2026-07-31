@@ -125,9 +125,24 @@ Run `formula_check.py` for static validation. Use `libreoffice_recalc.py` for dy
 5. **Validate before delivery**: `formula_check.py` exit code 0 = safe
 
 For the controlled Sheets shortcut, save the validation output as a nonempty
-workspace report, then record the spreadsheet with `workflow_state` role
-`deliverable` and the report with role `validation`. A claimed file path does
-not complete the task.
+`.md`, `.txt`, or `.json` workspace report. Render at least one inspected
+`.png` preview of the finished sheet, including
+the formulas, charts, or formatting the user asked for. Record the spreadsheet
+with `workflow_state` role `deliverable`, the report with role `validation`,
+and the preview with role `preview`. A claimed file path does not complete the
+workflow.
+
+After recording the spreadsheet as the deliverable, use the application's
+bundled cross-platform renderer for this visual gate. It does not require
+LibreOffice, Poppler, Python, or other user-installed software:
+
+```json
+{
+  "action": "render_preview",
+  "deliverablePath": "output.xlsx",
+  "path": "output/sheet-page-1.png"
+}
+```
 
 ## Utility Scripts
 

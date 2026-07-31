@@ -7,6 +7,9 @@
  * deterministic completion gate.
  */
 
+import * as fs from 'fs';
+import path from 'path';
+
 import {
   addResearchClaim,
   addResearchDirection,
@@ -28,6 +31,7 @@ import {
   RESEARCH_MAX_ITERATIONS,
   ResearchRunStatus,
   type PiResearchRunOptions,
+  type ResearchArtifactRole,
   type ResearchEndDecision,
   type ResearchRunState,
   type ResearchSourceType,
@@ -53,8 +57,10 @@ export class PiResearchRunController {
   private researcherRanThisIteration = false;
   private reviewerRanThisRequest = false;
   private readonly reviewerToolCallIds = new Set<string>();
+  private readonly workspaceRoot: string;
 
   constructor(options: PiResearchRunOptions) {
+    this.workspaceRoot = path.resolve(options.workspaceRoot);
     this.store = new PiResearchRunStore(options);
     this.runDirectory = this.store.runDirectory;
     this.state = this.store.loadOrCreate();
@@ -285,6 +291,34 @@ export class PiResearchRunController {
 
   setContradictionCheck(summary: string): string {
     return setResearchContradictionCheck(this.state, this.store, summary);
+  }
+
+  recordFile(rawPath: string, role: ResearchArtifactRole): string {
+    const resolved = path.resolve(this.workspaceRoot, rawPath.trim());
+    const relative = path.relative(this.workspaceRoot, resolved);
+    if (
+      !rawPath.trim() ||
+      relative.startsWith('..') ||
+      path.isAbsolute(relative) ||
+      !fs.existsSync(resolved)
+    ) {
+      return 'File was not recorded: use an existing file inside the selected workspace.';
+    }
+    const stat = fs.statSync(resolved);
+    if (!stat.isFile() || stat.size === 0)
+      return 'File was not recorded: it is missing, not a file, or empty.';
+    const extension = path.extname(resolved).toLowerCase();
+    const allowed = role === 'deliverable' ? ['.md'] : ['.md', '.txt', '.json'];
+    if (!allowed.includes(extension)) {
+      return `File was not recorded: role "${role}" expects one of ${allowed.join(', ')}.`;
+    }
+    const artifact = { path: relative, role, verifiedAt: new Date().toISOString() };
+    const index = this.state.artifacts.findIndex(existing => existing.role === role);
+    if (index >= 0) this.state.artifacts[index] = artifact;
+    else this.state.artifacts.push(artifact);
+    this.store.writeState(this.state);
+    this.store.log('orchestrator', 'info', 'artifact_verified', `${role}: ${relative}`);
+    return `Verified ${role} file: ${relative}`;
   }
 
   getSnapshot(): Record<string, unknown> {

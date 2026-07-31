@@ -348,6 +348,8 @@ function main() {
       { dir: path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current'), prefix: 'cfmind' },
       { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs' },
       { dir: path.join(projectRoot, 'resources', 'python-win'), prefix: 'python-win' },
+      { dir: path.join(projectRoot, 'resources', 'uv-win'), prefix: 'uv-win' },
+      { dir: path.join(projectRoot, 'resources', 'pandoc'), prefix: 'pandoc' },
     ];
 
     console.log(`[pack-openclaw-tar] Packing combined Windows tar: ${outputTar}`);

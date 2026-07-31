@@ -29,6 +29,8 @@ jobs:
         with:
           bun-version: '1.3.14'
       - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Validate bundled Skill frontmatter
+        run: bun run validate:skills
       - name: Lint
         run: bun run lint
 
@@ -47,3 +49,7 @@ jobs:
         run: bun run compile:electron
       - name: Run tests
         run: bun run test
+      - name: Verify Presentation Studio compiler and validator
+        run: |
+          npm ci --prefix SKILLs/presentation-studio --ignore-scripts
+          npm test --prefix SKILLs/presentation-studio
