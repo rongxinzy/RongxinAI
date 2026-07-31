@@ -10,6 +10,11 @@ import {
   type CoworkSessionSummary,
 } from '../../types/cowork';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import {
+  type CoworkToolActivity,
+  type CoworkToolActivityEvent,
+  CoworkToolActivityEventType,
+} from '../../../shared/cowork/toolActivity';
 import { removeSessionFromState, removeSessionsFromState } from './coworkDeleteState';
 
 export interface DraftAttachment {
@@ -36,6 +41,8 @@ interface CoworkState {
   streamingSessionIds: string[];
   /** Live message snapshots for active streams, including sessions not currently open. */
   streamingSessions: Record<string, CoworkSession>;
+  /** Non-persistent tool preparation state, isolated by session and tool call. */
+  toolActivitiesBySession: Record<string, Record<string, CoworkToolActivity>>;
   isCoworkActive: boolean;
   remoteManaged: boolean;
   pendingPermissions: CoworkPermissionRequest[];
@@ -55,6 +62,7 @@ const initialState: CoworkState = {
   unreadSessionIds: [],
   streamingSessionIds: [],
   streamingSessions: {},
+  toolActivitiesBySession: {},
   isCoworkActive: false,
   remoteManaged: false,
   pendingPermissions: [],
@@ -103,6 +111,7 @@ const setSessionStreaming = (state: CoworkState, sessionId: string, streaming: b
   }
   if (!streaming) {
     delete state.streamingSessions[sessionId];
+    delete state.toolActivitiesBySession[sessionId];
   }
 };
 
@@ -348,6 +357,16 @@ const coworkSlice = createSlice({
     addMessage(state, action: PayloadAction<{ sessionId: string; message: CoworkMessage }>) {
       const { sessionId, message } = action.payload;
 
+      if (message.type === 'tool_use') {
+        const toolUseId = message.metadata?.toolUseId;
+        if (typeof toolUseId === 'string') {
+          delete state.toolActivitiesBySession[sessionId]?.[toolUseId];
+          if (Object.keys(state.toolActivitiesBySession[sessionId] ?? {}).length === 0) {
+            delete state.toolActivitiesBySession[sessionId];
+          }
+        }
+      }
+
       const streamingSession = state.streamingSessions[sessionId];
       if (streamingSession) {
         const exists = streamingSession.messages.some(item => item.id === message.id);
@@ -440,6 +459,27 @@ const coworkSlice = createSlice({
       });
 
       markSessionUnread(state, sessionId);
+    },
+
+    updateToolActivity(
+      state,
+      action: PayloadAction<{ sessionId: string; event: CoworkToolActivityEvent }>,
+    ) {
+      const { sessionId, event } = action.payload;
+      if (event.type === CoworkToolActivityEventType.Clear) {
+        delete state.toolActivitiesBySession[sessionId];
+        return;
+      }
+      if (event.type === CoworkToolActivityEventType.Remove) {
+        delete state.toolActivitiesBySession[sessionId]?.[event.toolCallId];
+        if (Object.keys(state.toolActivitiesBySession[sessionId] ?? {}).length === 0) {
+          delete state.toolActivitiesBySession[sessionId];
+        }
+        return;
+      }
+      const sessionActivities = state.toolActivitiesBySession[sessionId] ?? {};
+      sessionActivities[event.activity.toolCallId] = event.activity;
+      state.toolActivitiesBySession[sessionId] = sessionActivities;
     },
 
     setRemoteManaged(state, action: PayloadAction<boolean>) {
@@ -584,6 +624,7 @@ export const {
   addMessage,
   prependMessages,
   updateMessageContent,
+  updateToolActivity,
   setRemoteManaged,
   updateSessionPinned,
   updateSessionTitle,

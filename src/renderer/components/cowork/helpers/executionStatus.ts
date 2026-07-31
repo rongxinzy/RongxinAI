@@ -1,4 +1,5 @@
 import { i18nService } from '../../../services/i18n';
+import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 
 import type { AssistantTurnItem } from './messageGrouping';
 import { getToolInputSummary, hasText, normalizeToolName, truncatePreview } from './toolUtils';
@@ -61,6 +62,12 @@ export const getCurrentExecutionStatus = (
   return null;
 };
 
+export const getToolActivityExecutionStatus = (activity: CoworkToolActivity): ExecutionStatus => ({
+  kind: ExecutionStatusKind.Tool,
+  toolName: activity.toolName,
+  target: getToolTarget(activity.toolName, activity.toolInput),
+});
+
 export const getFinalAnswerIndex = (
   items: AssistantTurnItem[],
   allowCompletedFallback = false,
@@ -112,15 +119,32 @@ const getToolActionTranslationKey = (toolName: string | undefined): string => {
     case 'edit':
     case 'editfile':
     case 'multiedit':
+    case 'applypatch':
+    case 'notebookedit':
       return 'coworkExecutionEdit';
     case 'grep':
     case 'glob':
     case 'find':
+    case 'websearch':
       return 'coworkExecutionSearch';
     case 'ls':
       return 'coworkExecutionList';
     case 'mcp':
       return 'coworkExecutionTool';
+    case 'webfetch':
+      return 'coworkExecutionFetch';
+    case 'task':
+    case 'subagent':
+      return 'coworkExecutionDelegate';
+    case 'todowrite':
+      return 'coworkExecutionTodo';
+    case 'process':
+      return 'coworkExecutionProcess';
+    case 'cron':
+      return 'coworkExecutionSchedule';
+    case 'workflowstate':
+    case 'researchstate':
+      return 'coworkExecutionWorkflow';
     default:
       return 'coworkExecutionRunning';
   }

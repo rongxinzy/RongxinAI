@@ -7,6 +7,7 @@ import type {
   CoworkPermissionOrigin,
   CoworkSessionMode,
 } from '../../shared/cowork/constants';
+import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
   LlamaCppCancelInstallResult,
@@ -869,6 +870,9 @@ interface IElectronAPI {
         content: string;
         metadata?: Record<string, unknown>;
       }) => void,
+    ) => () => void;
+    onStreamToolActivity: (
+      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
     ) => () => void;
     onStreamPermission: (
       callback: (data: {

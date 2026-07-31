@@ -229,9 +229,15 @@ export const getToolInputSummary = (
     case 'grep':
       return getToolInputString(input, ['pattern', 'query']);
     case 'task':
+    case 'subagent':
       return getToolInputString(input, ['description', 'task']);
     case 'webfetch':
       return getToolInputString(input, ['url']);
+    case 'websearch':
+      return getToolInputString(input, ['query']);
+    case 'workflowstate':
+    case 'researchstate':
+      return getToolInputString(input, ['action', 'deliverablePath', 'path']);
     case 'process': {
       const action = getToolInputString(input, ['action']);
       const sessionId = getToolInputString(input, ['sessionId', 'session_id']);

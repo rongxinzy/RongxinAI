@@ -1,12 +1,14 @@
 import { expect, test } from 'vitest';
 
 import type { AssistantTurnItem } from './messageGrouping';
+import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
 import {
   ExecutionStatusKind,
   getCompletedExecutionSummaryText,
   getCurrentExecutionStatus,
   getExecutionSummary,
   getFinalAnswerIndex,
+  getToolActivityExecutionStatus,
 } from './executionStatus';
 
 const toolGroup = (
@@ -56,13 +58,27 @@ test('prefers the latest active thinking status over prior tool calls', () => {
 });
 
 test('includes a concise target for an active tool call', () => {
-  const status = getCurrentExecutionStatus([
-    toolGroup('read-1', 'read', { path: 'src/app.ts' }),
-  ]);
+  const status = getCurrentExecutionStatus([toolGroup('read-1', 'read', { path: 'src/app.ts' })]);
 
   expect(status).toEqual({
     kind: ExecutionStatusKind.Tool,
     toolName: 'read',
+    target: 'src/app.ts',
+  });
+});
+
+test('formats a transient Write activity before tool execution starts', () => {
+  expect(
+    getToolActivityExecutionStatus({
+      toolCallId: 'write-1',
+      phase: CoworkToolActivityPhase.Preparing,
+      toolName: 'Write',
+      toolInput: { path: 'src/app.ts' },
+      updatedAt: 1,
+    }),
+  ).toEqual({
+    kind: ExecutionStatusKind.Tool,
+    toolName: 'Write',
     target: 'src/app.ts',
   });
 });
@@ -113,7 +129,7 @@ test('omits zero-valued execution counts from the static summary', () => {
       incompleteTools: 0,
     }),
   ).toBe('已完成 3 次工具调用');
-  expect(getCompletedExecutionSummaryText(null)).toBe('任务完成');
+  expect(getCompletedExecutionSummaryText(null)).toBe('正在工作');
 });
 
 test('recognizes only an explicitly marked final answer', () => {
