@@ -15,5 +15,14 @@ export {
   isLocalProviderName,
   LocalProviderName,
 } from './local';
+export {
+  normalizeProviderModelPiRuntimeConfig,
+  ProviderModelPiApi,
+  ProviderModelPiCacheControlFormat,
+  ProviderModelPiMaxTokensField,
+  ProviderModelPiThinkingFormat,
+  resolveProviderModelPiReasoning,
+} from './piRuntime';
+export type { ProviderModelPiRuntimeCompat, ProviderModelPiRuntimeConfig } from './piRuntime';
 export type { ProviderConfig } from './types';
 export { isProviderEnabled } from './types';

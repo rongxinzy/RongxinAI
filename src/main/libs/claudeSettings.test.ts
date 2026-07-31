@@ -6,7 +6,12 @@ vi.mock('./coworkOpenAICompatProxy', () => ({
   getCoworkOpenAICompatProxyStatus: () => ({ running: true }),
 }));
 
-import { ProviderName } from '../../shared/providers';
+import {
+  ModelCapabilityStatus,
+  ProviderModelPiApi,
+  ProviderModelPiMaxTokensField,
+  ProviderName,
+} from '../../shared/providers';
 import {
   resolveAllEnabledProviderConfigs,
   resolveCurrentApiConfig,
@@ -267,4 +272,79 @@ test('resolveRawApiConfigForModelRef resolves an explicit llama.cpp model ref', 
     contextTokens: 32768,
     maxTokens: 4096,
   });
+});
+
+test('resolveRawApiConfigForModelRef forwards custom model Pi runtime metadata', () => {
+  const CustomProviderKey = {
+    Primary: 'custom_0',
+  } as const;
+
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config'
+            ? {
+                model: {
+                  defaultModel: 'agent-model',
+                  defaultModelProvider: CustomProviderKey.Primary,
+                },
+                providers: {
+                  [CustomProviderKey.Primary]: {
+                    enabled: true,
+                    apiKey: 'sk-custom',
+                    baseUrl: 'https://custom.example/v1',
+                    apiFormat: 'openai' as const,
+                    models: [
+                      {
+                        id: 'agent-model',
+                        name: 'Agent Model',
+                        supportsImage: true,
+                        capabilities: {
+                          toolCalling: ModelCapabilityStatus.Supported,
+                          reasoning: ModelCapabilityStatus.Supported,
+                        },
+                        piRuntime: {
+                          api: ProviderModelPiApi.OpenAIResponses,
+                          reasoning: true,
+                          compat: {
+                            supportsDeveloperRole: false,
+                            maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  const result = resolveRawApiConfigForModelRef('custom_0/agent-model');
+  expect(result.config).toEqual({
+    apiKey: 'sk-custom',
+    baseURL: 'https://custom.example/v1',
+    model: 'agent-model',
+    apiType: 'openai',
+  });
+  expect(result.providerMetadata).toEqual(
+    expect.objectContaining({
+      providerName: CustomProviderKey.Primary,
+      supportsImage: true,
+      modelName: 'Agent Model',
+      capabilities: expect.objectContaining({
+        toolCalling: ModelCapabilityStatus.Supported,
+        reasoning: ModelCapabilityStatus.Supported,
+      }),
+      piRuntime: {
+        api: ProviderModelPiApi.OpenAIResponses,
+        reasoning: true,
+        compat: {
+          supportsDeveloperRole: false,
+          maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
+        },
+      },
+    }),
+  );
 });

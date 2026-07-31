@@ -9,6 +9,11 @@ import * as os from 'os';
 import path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  ModelCapabilityStatus,
+  ProviderModelPiApi,
+  ProviderModelPiMaxTokensField,
+} from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 
 const hoisted = vi.hoisted(() => {
@@ -46,6 +51,9 @@ const hoisted = vi.hoisted(() => {
       getModel: vi.fn(),
     },
     mockModelRuntimeCreate: vi.fn(),
+    mockRegisterPiOpenAICompatUpstream: vi.fn(
+      async (providerId: string) => `http://127.0.0.1:19191/__pi_openai_compat/${providerId}/v1`,
+    ),
     mockResolveRawApiConfig: vi.fn(() => ({
       config: {
         apiKey: 'sk-test',
@@ -139,6 +147,7 @@ const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
+const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
@@ -157,6 +166,10 @@ vi.mock('@earendil-works/pi-ai/compat', () => ({
 vi.mock('../claudeSettings', () => ({
   resolveRawApiConfig: hoisted.mockResolveRawApiConfig,
   resolveRawApiConfigForModelRef: hoisted.mockResolveRawApiConfigForModelRef,
+}));
+
+vi.mock('./piOpenAICompatProxy', () => ({
+  registerPiOpenAICompatUpstream: hoisted.mockRegisterPiOpenAICompatUpstream,
 }));
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
@@ -519,6 +532,118 @@ describe('PiRuntimeAdapter', () => {
           modelRuntime: mockModelRuntime,
         }),
       );
+    });
+
+    it('should route custom OpenAI completions models through the compatibility proxy', async () => {
+      mockGetModel.mockImplementationOnce(() => undefined);
+      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-custom',
+          baseURL: 'https://gateway.example',
+          model: 'agent-model',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'custom_1',
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName: 'Agent Model',
+          contextWindow: 128000,
+          maxTokens: 16000,
+        },
+      });
+
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'custom_1/agent-model',
+      });
+
+      expect(mockRegisterPiOpenAICompatUpstream).toHaveBeenCalledWith('custom_1', {
+        baseURL: 'https://gateway.example',
+        apiKey: 'sk-custom',
+      });
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'custom_1',
+        expect.objectContaining({
+          baseUrl: 'http://127.0.0.1:19191/__pi_openai_compat/custom_1/v1',
+          api: ProviderModelPiApi.OpenAICompletions,
+          models: [
+            expect.objectContaining({
+              provider: 'custom_1',
+              id: 'agent-model',
+              baseUrl: 'http://127.0.0.1:19191/__pi_openai_compat/custom_1/v1',
+            }),
+          ],
+        }),
+      );
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({
+            provider: 'custom_1',
+            id: 'agent-model',
+            baseUrl: 'http://127.0.0.1:19191/__pi_openai_compat/custom_1/v1',
+          }),
+        }),
+      );
+    });
+
+    it('should pass configured Pi runtime options to custom models', async () => {
+      mockGetModel.mockImplementationOnce(() => undefined);
+      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-custom',
+          baseURL: 'https://custom.example/v1',
+          model: 'agent-model',
+          apiType: 'openai' as const,
+        },
+        providerMetadata: {
+          providerName: 'custom_0',
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName: 'Agent Model',
+          contextWindow: 128000,
+          maxTokens: 16000,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Supported,
+            reasoning: ModelCapabilityStatus.Supported,
+          },
+          piRuntime: {
+            api: ProviderModelPiApi.OpenAIResponses,
+            reasoning: true,
+            compat: {
+              supportsDeveloperRole: false,
+              maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
+              requiresToolResultName: true,
+            },
+          },
+        },
+      });
+
+      await adapter.startSession('test', 'Hello Pi', {
+        modelOverride: 'custom_0/agent-model',
+      });
+
+      expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
+        'custom_0',
+        expect.objectContaining({
+          baseUrl: 'https://custom.example/v1',
+          api: ProviderModelPiApi.OpenAIResponses,
+          models: [
+            expect.objectContaining({
+              provider: 'custom_0',
+              id: 'agent-model',
+              api: ProviderModelPiApi.OpenAIResponses,
+              reasoning: true,
+              input: ['text', 'image'],
+              compat: {
+                supportsDeveloperRole: false,
+                maxTokensField: ProviderModelPiMaxTokensField.MaxTokens,
+                requiresToolResultName: true,
+              },
+            }),
+          ],
+        }),
+      );
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('custom_0', 'sk-custom');
     });
 
     it('should not reuse a built-in model when the configured endpoint differs', async () => {

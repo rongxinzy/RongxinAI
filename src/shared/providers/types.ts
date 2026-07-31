@@ -1,4 +1,5 @@
 import type { ApiFormat, ModelCapabilities } from './constants';
+import type { ProviderModelPiRuntimeConfig } from './piRuntime';
 import { ProviderName } from './constants';
 
 export interface ProviderConfig {
@@ -16,6 +17,8 @@ export interface ProviderConfig {
     contextWindow?: number;
     contextTokens?: number;
     maxTokens?: number;
+    /** Pi Runtime-specific model routing and compatibility options for agent workflows. */
+    piRuntime?: ProviderModelPiRuntimeConfig;
   }>;
   displayName?: string;
   codingPlanEnabled?: boolean;

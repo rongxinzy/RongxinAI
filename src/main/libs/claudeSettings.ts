@@ -1,7 +1,10 @@
 import {
   type ApiFormat,
   isProviderEnabled,
+  type ModelCapabilities,
+  normalizeProviderModelPiRuntimeConfig,
   type ProviderConfig,
+  type ProviderModelPiRuntimeConfig,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -44,6 +47,8 @@ type ProviderModelConfig = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
+  capabilities?: Partial<ModelCapabilities>;
+  piRuntime?: ProviderModelPiRuntimeConfig;
   openClawEligibility?: LlamaCppOpenClawEligibility;
 };
 
@@ -54,6 +59,8 @@ type ProviderModelInputConfig = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
+  capabilities?: Partial<ModelCapabilities>;
+  piRuntime?: ProviderModelPiRuntimeConfig;
   openClawEligibility?: LlamaCppOpenClawEligibility;
 };
 
@@ -69,6 +76,8 @@ export type ApiConfigResolution = {
     contextWindow?: number;
     contextTokens?: number;
     maxTokens?: number;
+    capabilities?: Partial<ModelCapabilities>;
+    piRuntime?: ProviderModelPiRuntimeConfig;
   };
 };
 
@@ -243,7 +252,13 @@ function normalizeProviderModels(
           typeof model.maxTokens === 'number' && model.maxTokens > 0
             ? model.maxTokens
             : registeredModel?.maxTokens,
-        openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
+        capabilities: model.capabilities
+          ? { ...model.capabilities }
+          : registeredModel?.capabilities,
+        piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime),
+        openClawEligibility: model.openClawEligibility
+          ? { ...model.openClawEligibility }
+          : undefined,
       };
     });
 }
@@ -266,6 +281,8 @@ type MatchedProvider = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
+  capabilities?: Partial<ModelCapabilities>;
+  piRuntime?: ProviderModelPiRuntimeConfig;
 };
 
 function getEffectiveProviderApiFormat(
@@ -436,6 +453,8 @@ function resolveMatchedProviderFromSelection(
       contextWindow: matchedModel.contextWindow,
       contextTokens: matchedModel.contextTokens,
       maxTokens: matchedModel.maxTokens,
+      capabilities: matchedModel.capabilities,
+      piRuntime: matchedModel.piRuntime,
     },
   };
 }
@@ -517,6 +536,8 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
       contextWindow: matched.contextWindow,
       contextTokens: matched.contextTokens,
       maxTokens: matched.maxTokens,
+      ...(matched.capabilities ? { capabilities: matched.capabilities } : {}),
+      ...(matched.piRuntime ? { piRuntime: matched.piRuntime } : {}),
     },
   };
 }
@@ -664,6 +685,8 @@ export function resolveCurrentApiConfig(
         contextWindow: matched.contextWindow,
         contextTokens: matched.contextTokens,
         maxTokens: matched.maxTokens,
+        ...(matched.capabilities ? { capabilities: matched.capabilities } : {}),
+        ...(matched.piRuntime ? { piRuntime: matched.piRuntime } : {}),
       },
     };
   }
@@ -706,6 +729,8 @@ export function resolveCurrentApiConfig(
       contextWindow: matched.contextWindow,
       contextTokens: matched.contextTokens,
       maxTokens: matched.maxTokens,
+      ...(matched.capabilities ? { capabilities: matched.capabilities } : {}),
+      ...(matched.piRuntime ? { piRuntime: matched.piRuntime } : {}),
     },
   };
 }
@@ -789,6 +814,8 @@ export function resolveRawApiConfig(): ApiConfigResolution {
       contextWindow: matched.contextWindow,
       contextTokens: matched.contextTokens,
       maxTokens: matched.maxTokens,
+      ...(matched.capabilities ? { capabilities: matched.capabilities } : {}),
+      ...(matched.piRuntime ? { piRuntime: matched.piRuntime } : {}),
     },
   };
 }
