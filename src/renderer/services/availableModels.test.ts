@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { ProviderName } from '../../shared/providers';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
-import { collectAvailableModels } from './availableModels';
+import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
 
 function createConfig(): AppConfig {
   return {
@@ -96,4 +96,29 @@ test('collectAvailableModels merges running llama.cpp models only when provider 
     trainedContextWindow: 32768,
   });
   expect(llamaCppModel?.supportsThinkingToggle).toBe(true);
+});
+
+test('preserves contextTokens for custom cloud models', () => {
+  const config = createConfig();
+  config.providers = {
+    custom_usage: {
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'https://example.test/v1',
+      apiFormat: 'openai',
+      models: [
+        {
+          id: 'custom-cloud-model',
+          name: 'Custom Cloud Model',
+          contextTokens: 131_072,
+        },
+      ],
+    },
+  };
+
+  const model = buildConfiguredAvailableModels(config).find(
+    item => item.id === 'custom-cloud-model',
+  );
+
+  expect(model?.contextWindow).toBe(131_072);
 });

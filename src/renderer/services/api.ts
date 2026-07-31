@@ -28,6 +28,13 @@ export interface ApiConfig {
   apiFormat?: 'anthropic' | 'openai' | 'gemini';
 }
 
+interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -367,7 +374,7 @@ class ApiService {
   ): Promise<{
     content: string;
     reasoning?: string;
-    usage?: { inputTokens: number; outputTokens: number };
+    usage?: TokenUsage;
   }> {
     if (!this.config) {
       throw new ApiError(
@@ -377,10 +384,12 @@ class ApiService {
 
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
+    const requestedProviderKey = options.modelProviderKey?.trim();
     const selectedModel = requestedModelId
       ? (modelState.availableModels.find(
           model =>
-            model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId,
+            (model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId) &&
+            (!requestedProviderKey || model.providerKey === requestedProviderKey),
         ) ?? modelState.defaultSelectedModel)
       : modelState.defaultSelectedModel;
     const provider = this.detectProvider(
@@ -532,7 +541,7 @@ class ApiService {
   ): Promise<{
     content: string;
     reasoning?: string;
-    usage?: { inputTokens: number; outputTokens: number };
+    usage?: TokenUsage;
   }> {
     if (!this.config) {
       throw new ApiError(
@@ -541,10 +550,12 @@ class ApiService {
     }
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
+    const requestedProviderKey = options.modelProviderKey?.trim();
     const selectedModel = requestedModelId
       ? (modelState.availableModels.find(
           model =>
-            model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId,
+            (model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId) &&
+            (!requestedProviderKey || model.providerKey === requestedProviderKey),
         ) ?? modelState.defaultSelectedModel)
       : modelState.defaultSelectedModel;
     const provider = this.detectProvider(
@@ -760,6 +771,7 @@ class ApiService {
   ): Promise<any> {
     let content = '';
     let reasoning = '';
+    let usage: Record<string, unknown> | undefined;
     const calls = new Map<number, { id: string; name: string; arguments: string }>();
     await this.consumeSse(
       url,
@@ -767,6 +779,9 @@ class ApiService {
       { ...body, stream: true },
       requestId,
       event => {
+        if (event?.usage && typeof event.usage === 'object') {
+          usage = event.usage;
+        }
         const delta = event?.choices?.[0]?.delta;
         if (!delta) return;
         if (typeof delta.content === 'string') content += delta.content;
@@ -794,6 +809,7 @@ class ApiService {
       abortSignal,
     );
     return {
+      ...(usage ? { usage } : {}),
       choices: [
         {
           message: {
@@ -825,6 +841,7 @@ class ApiService {
     let content = '';
     let reasoning = '';
     let completedOutput: any[] | null = null;
+    let usage: Record<string, unknown> | undefined;
     const output = new Map<number, any>();
     await this.consumeSse(
       url,
@@ -832,6 +849,10 @@ class ApiService {
       { ...body, stream: true },
       requestId,
       event => {
+        const responseUsage = event?.usage ?? event?.response?.usage;
+        if (responseUsage && typeof responseUsage === 'object') {
+          usage = responseUsage;
+        }
         const type = event?.type;
         if (type === 'response.output_text.delta' && typeof event.delta === 'string') {
           content += event.delta;
@@ -864,6 +885,7 @@ class ApiService {
       abortSignal,
     );
     return {
+      ...(usage ? { usage } : {}),
       output_text: content,
       output:
         completedOutput || [...output.entries()].sort(([a], [b]) => a - b).map(([, item]) => item),
@@ -883,6 +905,8 @@ class ApiService {
     let reasoning = '';
     let inputTokens: number | undefined;
     let outputTokens: number | undefined;
+    let cacheReadTokens: number | undefined;
+    let cacheWriteTokens: number | undefined;
     await this.consumeSse(
       url,
       headers,
@@ -896,6 +920,12 @@ class ApiService {
           }
           if (typeof eventUsage.output_tokens === 'number') {
             outputTokens = eventUsage.output_tokens;
+          }
+          if (typeof eventUsage.cache_read_input_tokens === 'number') {
+            cacheReadTokens = eventUsage.cache_read_input_tokens;
+          }
+          if (typeof eventUsage.cache_creation_input_tokens === 'number') {
+            cacheWriteTokens = eventUsage.cache_creation_input_tokens;
           }
         }
         const index = typeof event?.index === 'number' ? event.index : 0;
@@ -940,7 +970,16 @@ class ApiService {
     return {
       content,
       ...(inputTokens !== undefined && outputTokens !== undefined
-        ? { usage: { input_tokens: inputTokens, output_tokens: outputTokens } }
+        ? {
+            usage: {
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              ...(cacheReadTokens !== undefined ? { cache_read_input_tokens: cacheReadTokens } : {}),
+              ...(cacheWriteTokens !== undefined
+                ? { cache_creation_input_tokens: cacheWriteTokens }
+                : {}),
+            },
+          }
         : {}),
     };
   }
@@ -954,6 +993,7 @@ class ApiService {
     abortSignal?: AbortSignal,
   ): Promise<any> {
     let text = '';
+    let usageMetadata: Record<string, unknown> | undefined;
     const functionCalls: any[] = [];
     await this.consumeSse(
       `${url}?alt=sse`,
@@ -961,6 +1001,9 @@ class ApiService {
       body,
       requestId,
       event => {
+        if (event?.usageMetadata && typeof event.usageMetadata === 'object') {
+          usageMetadata = event.usageMetadata;
+        }
         const parts = event?.candidates?.[0]?.content?.parts;
         if (!Array.isArray(parts)) return;
         parts.forEach((part: any) => {
@@ -974,6 +1017,7 @@ class ApiService {
       abortSignal,
     );
     return {
+      ...(usageMetadata ? { usageMetadata } : {}),
       candidates: [
         {
           content: {
@@ -1134,6 +1178,7 @@ class ApiService {
               messages,
               tools: [{ type: 'function', function: this.webSearchTool() }],
               tool_choice: 'auto',
+              stream_options: { include_usage: true },
             },
             requestId,
             onProgress,
@@ -1243,10 +1288,19 @@ class ApiService {
         onProgress?.(text);
         const inputTokens = data?.usage?.input_tokens;
         const outputTokens = data?.usage?.output_tokens;
+        const cacheReadTokens = data?.usage?.cache_read_input_tokens;
+        const cacheWriteTokens = data?.usage?.cache_creation_input_tokens;
         return {
           content: text,
           ...(typeof inputTokens === 'number' && typeof outputTokens === 'number'
-            ? { usage: { inputTokens, outputTokens } }
+            ? {
+                usage: {
+                  inputTokens,
+                  outputTokens,
+                  ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
+                  ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
+                },
+              }
             : {}),
         };
       }
@@ -1355,13 +1409,15 @@ class ApiService {
   ): Promise<{
     content: string;
     reasoning?: string;
-    usage?: { inputTokens: number; outputTokens: number };
+    usage?: TokenUsage;
   }> {
     let fullContent = '';
     let fullReasoning = '';
-    let usage: { inputTokens: number; outputTokens: number } | undefined;
+    let usage: TokenUsage | undefined;
     let inputTokens: number | undefined;
     let outputTokens: number | undefined;
+    let cacheReadTokens: number | undefined;
+    let cacheWriteTokens: number | undefined;
 
     try {
       const requestId = streamRequestId ?? generateRequestId();
@@ -1443,8 +1499,19 @@ class ApiService {
                   if (typeof responseUsage.output_tokens === 'number') {
                     outputTokens = responseUsage.output_tokens;
                   }
+                  if (typeof responseUsage.cache_read_input_tokens === 'number') {
+                    cacheReadTokens = responseUsage.cache_read_input_tokens;
+                  }
+                  if (typeof responseUsage.cache_creation_input_tokens === 'number') {
+                    cacheWriteTokens = responseUsage.cache_creation_input_tokens;
+                  }
                   if (inputTokens !== undefined && outputTokens !== undefined) {
-                    usage = { inputTokens, outputTokens };
+                    usage = {
+                      inputTokens,
+                      outputTokens,
+                      ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+                      ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+                    };
                   }
                 }
 
@@ -1751,14 +1818,15 @@ class ApiService {
     provider: string = 'openai',
     options: DirectChatRequestOptions = {},
     streamRequestId?: string,
+    includeUsage: boolean = true,
   ): Promise<{
     content: string;
     reasoning?: string;
-    usage?: { inputTokens: number; outputTokens: number };
+    usage?: TokenUsage;
   }> {
     let fullContent = '';
     let fullReasoning = '';
-    let usage: { inputTokens: number; outputTokens: number } | undefined;
+    let usage: TokenUsage | undefined;
 
     try {
       const requestId = streamRequestId ?? generateRequestId();
@@ -1972,7 +2040,7 @@ class ApiService {
           requestBody,
           buildLocalThinkingRequestParams(provider, options.localThinkingEnabled),
         );
-        if (provider === ProviderName.LlamaCpp && !useResponsesApi) {
+        if (!useResponsesApi && includeUsage) {
           requestBody.stream_options = { include_usage: true };
         }
 
@@ -1984,7 +2052,7 @@ class ApiService {
             body: JSON.stringify(requestBody),
             requestId,
           })
-          .then(response => {
+          .then(async response => {
             if (!response.ok && !aborted) {
               this.cleanup(requestId);
               let errorMessage = 'API request failed';
@@ -1997,6 +2065,31 @@ class ApiService {
                 } catch {
                   errorMessage = response.error;
                 }
+              }
+              if (
+                !useResponsesApi &&
+                includeUsage &&
+                /stream_options|include_usage|unknown (field|parameter)|extra fields/i.test(errorMessage)
+              ) {
+                try {
+                  resolve(
+                    await this.chatWithOpenAICompatible(
+                      message,
+                      onProgress,
+                      history,
+                      modelId,
+                      config,
+                      supportsImages,
+                      provider,
+                      options,
+                      streamRequestId,
+                      false,
+                    ),
+                  );
+                } catch (retryError) {
+                  reject(retryError);
+                }
+                return;
               }
               reject(new ApiError(errorMessage, response.status));
             }

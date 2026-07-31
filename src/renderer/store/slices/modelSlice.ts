@@ -57,7 +57,7 @@ function buildInitialModels(): Model[] {
               config.apiFormat ?? 'anthropic',
               model,
             ),
-            contextWindow: model.contextWindow,
+            contextWindow: model.contextWindow ?? model.contextTokens,
           });
         });
       }

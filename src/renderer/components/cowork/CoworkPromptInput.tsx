@@ -1162,6 +1162,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     usage={contextUsage}
                     messageUsage={contextMessage?.metadata?.usage}
                     modelId={contextMessage?.metadata?.model}
+                    modelProviderKey={contextMessage?.metadata?.modelProviderKey}
+                    selectedModelId={effectiveSelectedModel?.id}
+                    selectedModelProviderKey={effectiveSelectedModel?.providerKey}
                   />
                   <CoworkModelPicker
                     models={availableModels}
@@ -1226,6 +1229,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       usage={contextUsage}
                       messageUsage={contextMessage?.metadata?.usage}
                       modelId={contextMessage?.metadata?.model}
+                      modelProviderKey={contextMessage?.metadata?.modelProviderKey}
+                      selectedModelId={effectiveSelectedModel?.id}
+                      selectedModelProviderKey={effectiveSelectedModel?.providerKey}
                     />
                     <CoworkModelPicker
                       models={availableModels}

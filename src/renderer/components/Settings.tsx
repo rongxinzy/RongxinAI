@@ -826,6 +826,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
+  const [newModelContextWindow, setNewModelContextWindow] = useState('');
   const [newModelSupportsImage, setNewModelSupportsImage] = useState(false);
   const [newModelCapabilities, setNewModelCapabilities] = useState<Partial<ModelCapabilities>>(
     DEFAULT_CUSTOM_MODEL_CAPABILITIES,
@@ -2180,6 +2181,7 @@ const Settings: React.FC<SettingsProps> = ({
       setEditingModelId(null);
       setNewModelName('');
       setNewModelId('');
+      setNewModelContextWindow('');
       setNewModelSupportsImage(false);
       setModelFormError(null);
     }
@@ -2230,6 +2232,7 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
+    setNewModelContextWindow('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
@@ -2241,6 +2244,7 @@ const Settings: React.FC<SettingsProps> = ({
     modelName: string,
     supportsImage?: boolean,
     capabilities?: Partial<ModelCapabilities>,
+    contextWindow?: number,
     piRuntime?: ProviderModelPiRuntimeConfig,
   ) => {
     setIsAddingModel(false);
@@ -2248,6 +2252,7 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(modelId);
     setNewModelName(modelName);
     setNewModelId(modelId);
+    setNewModelContextWindow(contextWindow?.toString() ?? '');
     setNewModelSupportsImage(!!supportsImage);
     setNewModelCapabilities({ ...DEFAULT_CUSTOM_MODEL_CAPABILITIES, ...capabilities });
     setNewModelPiRuntime(piRuntime);
@@ -2294,6 +2299,11 @@ const Settings: React.FC<SettingsProps> = ({
         : newModelName.trim();
 
     const currentModels = providers[activeProvider].models ?? [];
+    const contextWindow = Number(newModelContextWindow);
+    if (newModelContextWindow.trim() && (!Number.isInteger(contextWindow) || contextWindow <= 0)) {
+      setModelFormError(i18nService.t('modelContextWindowInvalid'));
+      return;
+    }
     const duplicateModel = currentModels.find(
       model => model.id === modelId && (!isEditingModel || model.id !== editingModelId),
     );
@@ -2314,6 +2324,7 @@ const Settings: React.FC<SettingsProps> = ({
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
         : {}),
+      ...(newModelContextWindow.trim() ? { contextWindow } : {}),
     };
     const updatedModels =
       isEditingModel && editingModelId
@@ -2333,6 +2344,7 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
+    setNewModelContextWindow('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
@@ -2345,6 +2357,7 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
+    setNewModelContextWindow('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
@@ -4814,6 +4827,7 @@ const Settings: React.FC<SettingsProps> = ({
                                       model.name,
                                       model.supportsImage,
                                       model.capabilities,
+                                      model.contextWindow ?? model.contextTokens,
                                       model.piRuntime,
                                     )
                                   }
@@ -5515,6 +5529,38 @@ const Settings: React.FC<SettingsProps> = ({
                         placeholder="gpt-4"
                       />
                     </div>
+                    {isCustomProvider(activeProvider) && (
+                      <div>
+                        <label
+                          htmlFor={`${activeProvider}-model-context-window`}
+                          className="block text-xs font-medium text-muted-foreground mb-1"
+                        >
+                          {i18nService.t('modelContextWindow')}
+                        </label>
+                        <Input
+                          id={`${activeProvider}-model-context-window`}
+                          type="number"
+                          min="1"
+                          step="1"
+                          aria-describedby={`${activeProvider}-model-context-window-hint`}
+                          value={newModelContextWindow}
+                          onChange={e => {
+                            setNewModelContextWindow(e.target.value);
+                            if (modelFormError) {
+                              setModelFormError(null);
+                            }
+                          }}
+                          className="text-xs"
+                          placeholder="128000"
+                        />
+                        <p
+                          id={`${activeProvider}-model-context-window-hint`}
+                          className="mt-1 text-xs text-muted-foreground"
+                        >
+                          {i18nService.t('modelContextWindowHint')}
+                        </p>
+                      </div>
+                    )}
                   </>
                 )}
                 <div className="flex items-center space-x-2">

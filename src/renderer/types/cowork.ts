@@ -69,6 +69,7 @@ export interface CoworkMessageMetadata {
   /** Current context measured by the agent runtime after this response. */
   contextUsage?: CoworkContextUsage;
   model?: string;
+  modelProviderKey?: string;
   agentName?: string;
   [key: string]: unknown;
 }

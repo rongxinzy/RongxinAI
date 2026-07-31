@@ -402,6 +402,7 @@ export interface CoworkMessageMetadata {
   };
   contextPercent?: number;
   model?: string;
+  modelProviderKey?: string;
   agentName?: string;
   [key: string]: unknown;
 }

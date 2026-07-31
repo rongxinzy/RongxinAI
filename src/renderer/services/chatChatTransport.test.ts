@@ -124,3 +124,50 @@ test('passes the request id and abort signal through the native tool loop', asyn
   await collectChunks(stream);
   expect(apiService.cancelOngoingRequest).toHaveBeenCalledWith(requestId);
 });
+
+test('emits context only from verified usage and includes cache tokens in the total', async () => {
+  vi.mocked(apiService.chatWithWebSearch).mockResolvedValue({
+    content: 'ok',
+    usage: {
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 10,
+    },
+  });
+  const transport = new ChatChatTransport({ contextWindowTokens: 1_000 });
+  const stream = await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+    abortSignal: undefined,
+  });
+
+  const chunks = await collectChunks(stream);
+  expect(chunks).toContainEqual({
+    type: 'data-context',
+    data: {
+      contextWindowTokens: 1_000,
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 10,
+      usedTokens: 170,
+    },
+  });
+});
+
+test('does not emit context without a verified usage result', async () => {
+  vi.mocked(apiService.chatWithWebSearch).mockResolvedValue({ content: 'ok' });
+  const transport = new ChatChatTransport({ contextWindowTokens: 1_000 });
+  const stream = await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+    abortSignal: undefined,
+  });
+
+  expect((await collectChunks(stream)).some(chunk => chunk.type === 'data-context')).toBe(false);
+});

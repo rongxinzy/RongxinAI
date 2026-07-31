@@ -18,16 +18,29 @@ interface ContextUsageIndicatorProps {
   usage: CoworkContextUsage | undefined;
   messageUsage?: CoworkMessageMetadata['usage'];
   modelId?: string;
+  modelProviderKey?: string;
+  selectedModelId?: string;
+  selectedModelProviderKey?: string;
 }
 
 export function ContextUsageIndicator({
   usage,
   messageUsage,
   modelId,
+  modelProviderKey,
+  selectedModelId,
+  selectedModelProviderKey,
 }: ContextUsageIndicatorProps) {
   // A fresh conversation has no runtime measurement yet. Keep the toolbar
   // clean until the first assistant response provides an actual snapshot.
   if (!usage) return null;
+  if (
+    selectedModelId &&
+    (modelId !== selectedModelId ||
+      (selectedModelProviderKey && modelProviderKey !== selectedModelProviderKey))
+  ) {
+    return null;
+  }
 
   const hasUsage =
     Number.isFinite(usage.usedTokens) &&
@@ -72,13 +85,13 @@ export function ContextUsageIndicator({
     >
       <ContextTrigger
         aria-label={summary}
-        className="h-8 shrink-0 bg-secondary px-2 text-foreground hover:bg-secondary"
+        className="h-8 shrink-0 px-2 text-foreground hover:bg-surface-raised"
       />
       <ContextContent align="end">
         <ContextContentHeader>
           <div className="flex items-center justify-between gap-3 text-xs">
             <span className={`font-medium ${usageStateClassName}`}>{percent.toFixed(1)}%</span>
-            <span className="font-mono text-muted-foreground">
+            <span className="tabular-nums text-muted-foreground">
               {formatTokenCount(usedTokens)} / {formatTokenCount(totalTokens)}
             </span>
           </div>

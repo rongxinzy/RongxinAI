@@ -82,6 +82,8 @@ const DirectChatDataChunkType = {
 } as const;
 
 interface DirectChatContextData {
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   contextWindowTokens: number;
   inputTokens: number;
   outputTokens: number;
@@ -95,6 +97,8 @@ const isDirectChatContextData = (value: unknown): value is DirectChatContextData
   const inputTokens = data.inputTokens;
   const outputTokens = data.outputTokens;
   const usedTokens = data.usedTokens;
+  const cacheReadTokens = data.cacheReadTokens;
+  const cacheWriteTokens = data.cacheWriteTokens;
   if (
     typeof contextWindowTokens !== 'number' ||
     typeof inputTokens !== 'number' ||
@@ -107,7 +111,16 @@ const isDirectChatContextData = (value: unknown): value is DirectChatContextData
   ) {
     return false;
   }
-  return contextWindowTokens > 0 && inputTokens >= 0 && outputTokens >= 0 && usedTokens >= 0;
+  return (
+    contextWindowTokens > 0 &&
+    inputTokens >= 0 &&
+    outputTokens >= 0 &&
+    usedTokens >= 0 &&
+    (cacheReadTokens === undefined ||
+      (typeof cacheReadTokens === 'number' && Number.isFinite(cacheReadTokens) && cacheReadTokens >= 0)) &&
+    (cacheWriteTokens === undefined ||
+      (typeof cacheWriteTokens === 'number' && Number.isFinite(cacheWriteTokens) && cacheWriteTokens >= 0))
+  );
 };
 
 const CoworkView: React.FC<CoworkViewProps> = ({
@@ -528,6 +541,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             contextWindowTokens:
               directChatModel.llamaCppRuntimeContextWindow ?? directChatModel.contextWindow,
             modelId: directChatModelId,
+            modelProviderKey: directChatModel.providerKey,
             localThinkingEnabled,
           });
           const stream = await transport.sendMessages({
@@ -712,9 +726,16 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                           usedTokens: directContextData.usedTokens,
                         },
                         model: directChatModelId,
+                        modelProviderKey: directChatModel.providerKey,
                         usage: {
                           inputTokens: directContextData.inputTokens,
                           outputTokens: directContextData.outputTokens,
+                          ...(directContextData.cacheReadTokens !== undefined
+                            ? { cacheReadTokens: directContextData.cacheReadTokens }
+                            : {}),
+                          ...(directContextData.cacheWriteTokens !== undefined
+                            ? { cacheWriteTokens: directContextData.cacheWriteTokens }
+                            : {}),
                           totalTokens: directContextData.usedTokens,
                         },
                       }
@@ -984,6 +1005,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           contextWindowTokens:
             directChatModel.llamaCppRuntimeContextWindow ?? directChatModel.contextWindow,
           modelId: directChatModelId,
+          modelProviderKey: directChatModel.providerKey,
           localThinkingEnabled,
         });
         const stream = await transport.sendMessages({
@@ -1165,9 +1187,16 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                         usedTokens: directContextData.usedTokens,
                       },
                       model: directChatModelId,
+                      modelProviderKey: directChatModel.providerKey,
                       usage: {
                         inputTokens: directContextData.inputTokens,
                         outputTokens: directContextData.outputTokens,
+                        ...(directContextData.cacheReadTokens !== undefined
+                          ? { cacheReadTokens: directContextData.cacheReadTokens }
+                          : {}),
+                        ...(directContextData.cacheWriteTokens !== undefined
+                          ? { cacheWriteTokens: directContextData.cacheWriteTokens }
+                          : {}),
                         totalTokens: directContextData.usedTokens,
                       },
                     }
