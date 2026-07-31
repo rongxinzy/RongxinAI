@@ -35,7 +35,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: 'anthropic/claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('claude-sonnet-4');
@@ -49,7 +48,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: 'anthropic/claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('gpt-4o');
@@ -62,7 +60,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: '',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('gpt-4o');
@@ -75,7 +72,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: 'anthropic/claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('claude-sonnet-4');
@@ -88,7 +84,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: 'deleted-model',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('gpt-4o');
@@ -101,7 +96,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: 'deepseek-v3.2',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('gpt-4o');
@@ -115,7 +109,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: 'anthropic/claude-sonnet-4',
       availableModels: models,
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('gpt-4o');
@@ -128,7 +121,6 @@ describe('resolveAgentModelSelection', () => {
       agentModel: `${OpenClawProviderId.LlamaCpp}/qwen-local`,
       availableModels: [...models, ineligibleLlamaCppModel],
       fallbackModel: models[0],
-      engine: 'openclaw',
     });
 
     expect(result.selectedModel?.id).toBe('qwen-local');

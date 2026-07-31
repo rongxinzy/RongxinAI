@@ -121,6 +121,14 @@ export const OpenClawEngineIpc = {
 } as const;
 export type OpenClawEngineIpc = (typeof OpenClawEngineIpc)[keyof typeof OpenClawEngineIpc];
 
+// ─── OpenClaw renderer bridge ───────────────────────────────────────────────
+export const OpenClawBridgeIpc = {
+  AskUser: 'openclaw:bridge:askUser',
+  AskUserDismiss: 'openclaw:bridge:askUserDismiss',
+  RespondAskUser: 'openclaw:bridge:respondAskUser',
+} as const;
+export type OpenClawBridgeIpc = (typeof OpenClawBridgeIpc)[keyof typeof OpenClawBridgeIpc];
+
 // ─── Cowork Session ─────────────────────────────────────────────────────────
 export const CoworkSessionIpc = {
   Start: 'cowork:session:start',

@@ -1,5 +1,9 @@
 // Cowork image attachment for vision-capable models
-import type { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
+import type {
+  CoworkPermissionMode,
+  CoworkPermissionOrigin,
+  CoworkSessionMode,
+} from '../../shared/cowork/constants';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
@@ -195,6 +199,7 @@ export interface CoworkMemoryStats {
 
 // Cowork pending permission request
 export interface CoworkPermissionRequest {
+  origin: CoworkPermissionOrigin;
   sessionId: string;
   toolName: string;
   toolInput: Record<string, unknown>;

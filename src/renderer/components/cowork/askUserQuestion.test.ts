@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import { CoworkPermissionOrigin } from '../../../shared/cowork/constants';
 import type { CoworkPermissionRequest } from '../../types/cowork';
 import {
   buildAskUserQuestionAllowResult,
@@ -10,6 +11,7 @@ import {
 } from './askUserQuestion';
 
 const makePermission = (toolInput: Record<string, unknown>): CoworkPermissionRequest => ({
+  origin: CoworkPermissionOrigin.PiWorkbench,
   sessionId: 'session-1',
   requestId: 'request-1',
   toolName: CoworkPermissionToolName.AskUserQuestion,

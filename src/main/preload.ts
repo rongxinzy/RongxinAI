@@ -27,6 +27,7 @@ import {
   McpIpc,
   NetworkIpc,
   OpenAICodexOAuthIpc,
+  OpenClawBridgeIpc,
   OpenClawEngineIpc,
   PermissionsIpc,
   ProjectIpc,
@@ -319,6 +320,14 @@ contextBridge.exposeInMainWorld('electron', {
   getRecentCwds: (limit?: number) => ipcRenderer.invoke(AppConfigIpc.GetRecentCwds, limit),
 
   openclaw: {
+    bridge: {
+      respondToAskUser: (options: { requestId: string; result: unknown }) =>
+        ipcRenderer.invoke(OpenClawBridgeIpc.RespondAskUser, options),
+      onAskUser: (callback: (data: { sessionId: string; request: unknown }) => void) =>
+        onPush(OpenClawBridgeIpc.AskUser, callback),
+      onAskUserDismiss: (callback: (data: { requestId: string }) => void) =>
+        onPush(OpenClawBridgeIpc.AskUserDismiss, callback),
+    },
     engine: {
       getStatus: () => ipcRenderer.invoke(OpenClawEngineIpc.GetStatus),
       install: () => ipcRenderer.invoke(OpenClawEngineIpc.Install),
