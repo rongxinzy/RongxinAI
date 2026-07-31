@@ -438,8 +438,52 @@ describe('PiRuntimeAdapter', () => {
           }),
         }),
       );
-      expect(mockModelRuntimeCreate).not.toHaveBeenCalled();
-      expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('modelRuntime');
+      // The built-in model stays on Pi's catalog, but the user's API key must
+      // still be registered under the built-in provider id — otherwise the
+      // session fails with "No API key found for <provider>".
+      expect(mockModelRuntimeCreate).toHaveBeenCalledOnce();
+      expect(mockModelRuntime.registerProvider).not.toHaveBeenCalled();
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('openai', 'sk-openai');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({ modelRuntime: mockModelRuntime }),
+      );
+    });
+
+    it('should register the API key under the Pi built-in provider id for MiniMax', async () => {
+      mockGetModel.mockImplementationOnce(() => ({
+        provider: 'minimax-cn',
+        id: 'MiniMax-M3',
+        baseUrl: 'https://api.minimaxi.com/anthropic',
+      }));
+      mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-cp-minimax',
+          baseURL: 'https://api.minimaxi.com/anthropic',
+          model: 'MiniMax-M3',
+          apiType: 'anthropic' as const,
+        },
+        providerMetadata: {
+          providerName: 'minimax',
+          codingPlanEnabled: false,
+          supportsImage: false,
+          modelName: 'MiniMax-M3',
+          contextWindow: 1000000,
+          contextTokens: 1000000,
+          maxTokens: 128000,
+        },
+      });
+
+      await adapter.startSession('test', 'Hello Pi', { modelOverride: 'minimax/MiniMax-M3' });
+
+      expect(mockGetModel).toHaveBeenCalledWith('minimax-cn', 'MiniMax-M3');
+      expect(mockModelRuntime.registerProvider).not.toHaveBeenCalled();
+      expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('minimax-cn', 'sk-cp-minimax');
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: expect.objectContaining({ provider: 'minimax-cn', id: 'MiniMax-M3' }),
+          modelRuntime: mockModelRuntime,
+        }),
+      );
     });
 
     it('should register remote custom models with their configured endpoint and API key', async () => {

@@ -1828,7 +1828,20 @@ async function resolvePiCustomModelRuntime(
   if (!config || !providerMetadata) {
     return null;
   }
-  if (canUsePiBuiltinModel(builtinModel, resolution)) return existingModelRuntime ?? null;
+  if (canUsePiBuiltinModel(builtinModel, resolution)) {
+    // Builtin model path (e.g. MiniMax M3 resolves to pi's built-in `minimax-cn`
+    // provider): the agent session authenticates via pi's model registry, which
+    // only knows provider-specific env vars (MINIMAX_CN_API_KEY) that we never
+    // set. Register the user's key under the builtin provider id so the session
+    // can authenticate — otherwise it fails with "No API key found for <id>".
+    const apiKey = config.apiKey?.trim() || '';
+    const builtinProviderId =
+      typeof builtinModel?.provider === 'string' ? builtinModel.provider : null;
+    if (!apiKey || !builtinProviderId) return existingModelRuntime ?? null;
+    const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
+    await modelRuntime.setRuntimeApiKey(builtinProviderId, apiKey);
+    return modelRuntime;
+  }
 
   const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
   const model = buildPiCustomModel(resolution);
