@@ -3568,18 +3568,12 @@ const Settings: React.FC<SettingsProps> = ({
                         }}
                         className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${!minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
                       >
-                        <div className="flex items-start justify-between">
-                          <Key className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                          {!minimaxIsOAuthMode && (
-                            <CheckCircle className="h-4 w-4 text-primary shrink-0" />
-                          )}
+                        <div className="flex items-center justify-center gap-2">
+                          <Key className="h-4 w-4 text-foreground shrink-0" />
+                          <p className="text-xs font-semibold text-foreground">
+                            {i18nService.t('minimaxOAuthTabApiKey')}
+                          </p>
                         </div>
-                        <p className="text-xs font-semibold text-foreground mt-1.5">
-                          {i18nService.t('minimaxOAuthTabApiKey')}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                          {i18nService.t('minimaxAuthApiKeyDesc')}
-                        </p>
                       </Button>
                       <Button
                         type="button"
@@ -3598,18 +3592,12 @@ const Settings: React.FC<SettingsProps> = ({
                         }
                         className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
                       >
-                        <div className="flex items-start justify-between">
-                          <ShieldCheck className="h-4 w-4 text-foreground mt-0.5 shrink-0" />
-                          {minimaxIsOAuthMode && (
-                            <CheckCircle className="h-4 w-4 text-primary shrink-0" />
-                          )}
+                        <div className="flex items-center justify-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
+                          <p className="text-xs font-semibold text-foreground">
+                            {i18nService.t('minimaxOAuthTabOAuth')}
+                          </p>
                         </div>
-                        <p className="text-xs font-semibold text-foreground mt-1.5">
-                          {i18nService.t('minimaxOAuthTabOAuth')}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                          {i18nService.t('minimaxAuthOAuthDesc')}
-                        </p>
                       </Button>
                     </div>
                   </div>
