@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -19,6 +20,7 @@ import {
   setArtifactLayoutMode,
   setPanelWidth,
 } from '@/store/slices/artifactSlice';
+import type { ArtifactActiveTab } from '@/store/slices/artifactSlice';
 import { ArtifactRole, type Artifact, type ArtifactType } from '@/types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
@@ -474,29 +476,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             </div>
 
             {/* Preview/Code tabs */}
-            <div className="flex border-b border-border shrink-0">
-              <Button
-                variant="ghost"
-                onClick={() => dispatch(setActiveTab('preview'))}
-                className={`px-3 py-1.5 text-xs font-medium rounded-none h-8 transition-colors border-b-2 ${
-                  activeTab === 'preview'
-                    ? 'border-primary text-primary hover:bg-transparent'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent'
-                }`}
-              >
-                {t('artifactPreview')}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => dispatch(setActiveTab('code'))}
-                className={`px-3 py-1.5 text-xs font-medium rounded-none h-8 transition-colors border-b-2 ${
-                  activeTab === 'code'
-                    ? 'border-primary text-primary hover:bg-transparent'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-transparent'
-                }`}
-              >
-                {t('artifactCode')}
-              </Button>
+            <div className="flex shrink-0 border-b border-border px-2 py-1.5">
+              <FluidTabs<ArtifactActiveTab>
+                aria-label={t('artifactViewMode')}
+                value={activeTab}
+                onValueChange={value => dispatch(setActiveTab(value))}
+                items={[
+                  { value: 'preview', label: t('artifactPreview') },
+                  { value: 'code', label: t('artifactCode') },
+                ]}
+              />
             </div>
 
             {/* Render area */}

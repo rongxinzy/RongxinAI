@@ -5,7 +5,9 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 
+import PptxSlideNavigator from './PptxSlideNavigator';
 import { normalizePptxData } from './pptxDataNormalizer';
+import { buildPptxSlideDocument, type PptxPreviewSlide } from './pptxSlideNavigation';
 
 const t = (key: string) => i18nService.t(key);
 
@@ -663,15 +665,49 @@ const PdfPageCanvas: React.FC<{
 
 // --- Pptx Sub-Renderer ---
 
+const PPTX_RENDER_WIDTH = 600;
+const PPTX_RENDER_STAGE_HEIGHT = 600;
+
+function snapshotPptxSlide(slideElement: HTMLElement): PptxPreviewSlide | null {
+  const width = Number.parseFloat(slideElement.style.width) || PPTX_RENDER_WIDTH;
+  const height = Number.parseFloat(slideElement.style.height);
+  if (!Number.isFinite(height) || height <= 0) return null;
+
+  const clone = slideElement.cloneNode(true) as HTMLElement;
+  clone.style.position = 'relative';
+  clone.style.top = '0';
+  clone.style.margin = '0';
+
+  const sourceCanvases = slideElement.querySelectorAll('canvas');
+  const clonedCanvases = clone.querySelectorAll('canvas');
+  sourceCanvases.forEach((sourceCanvas, index) => {
+    const clonedCanvas = clonedCanvases[index];
+    if (!clonedCanvas) return;
+
+    try {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.src = sourceCanvas.toDataURL('image/png');
+      image.style.cssText = clonedCanvas.style.cssText;
+      image.width = sourceCanvas.width;
+      image.height = sourceCanvas.height;
+      clonedCanvas.replaceWith(image);
+    } catch {
+      // Keep the cloned canvas when browser security prevents a bitmap snapshot.
+    }
+  });
+
+  return {
+    srcDoc: buildPptxSlideDocument(clone.outerHTML),
+    width,
+    height,
+  };
+}
+
 const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
   const { data, loading, error: loadError } = useFileContent(artifact);
-  const iframeRef = React.useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [rendered, setRendered] = useState(false);
-  const [slideCount, setSlideCount] = useState(0);
-
-  const PPTX_RENDER_WIDTH = 600;
+  const [slides, setSlides] = useState<PptxPreviewSlide[]>([]);
 
   useEffect(() => {
     if (loadError) {
@@ -683,52 +719,62 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     let cancelled = false;
 
     const render = async () => {
+      let offscreen: HTMLDivElement | null = null;
+      let previewer: ReturnType<(typeof import('pptx-preview'))['init']> | null = null;
+
       try {
+        setError(null);
+        setSlides([]);
+
         const pptxPreview = await import('pptx-preview');
         if (cancelled) return;
 
         const fixedData = await normalizePptxData(data);
         if (cancelled) return;
 
-        const offscreen = document.createElement('div');
-        offscreen.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:600px;';
+        offscreen = document.createElement('div');
+        offscreen.style.cssText =
+          'position:fixed;left:-10000px;top:-10000px;width:600px;height:600px;overflow:hidden;';
         document.body.appendChild(offscreen);
 
-        const previewer = pptxPreview.init(offscreen, { width: PPTX_RENDER_WIDTH, mode: 'list' });
-        await previewer.preview(fixedData);
-
-        if (cancelled) {
-          document.body.removeChild(offscreen);
-          return;
-        }
+        previewer = pptxPreview.init(offscreen, {
+          width: PPTX_RENDER_WIDTH,
+          height: PPTX_RENDER_STAGE_HEIGHT,
+          mode: 'slide',
+        });
+        await previewer.load(fixedData);
+        if (cancelled) return;
 
         const count = previewer.slideCount || 0;
-        setSlideCount(count);
+        const renderedSlides: PptxPreviewSlide[] = [];
 
-        const renderedHtml = offscreen.innerHTML;
-        document.body.removeChild(offscreen);
+        for (let index = 0; index < count; index++) {
+          if (cancelled) return;
+          previewer.renderSingleSlide(index);
+          const slideElement = previewer.wrapper.querySelector<HTMLElement>(
+            `.pptx-preview-slide-wrapper-${index}`,
+          );
+          if (!slideElement) break;
 
-        if (count > 0 && renderedHtml.length > 200 && iframeRef.current && !cancelled) {
-          const iframeDoc =
-            iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
-          if (iframeDoc) {
-            iframeDoc.open();
-            iframeDoc.write(`<!DOCTYPE html><html><head><style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { background: var(--muted); padding: 16px; overflow-y: auto; }
-              .pptx-preview-wrapper { background: transparent !important; width: 100% !important; max-width: 100% !important; height: auto !important; overflow: visible !important; }
-              .pptx-preview-wrapper > div { margin-bottom: 16px; box-shadow: var(--shadow-card); border-radius: 4px; overflow: hidden; }
-              .pptx-preview-wrapper > div:last-child { margin-bottom: 0; }
-              canvas { width: 100% !important; height: auto !important; display: block; }
-            </style></head><body>${renderedHtml}</body></html>`);
-            iframeDoc.close();
-          }
-          setRendered(true);
-        } else {
+          await new Promise<void>(resolve => {
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+          });
+
+          const snapshot = snapshotPptxSlide(slideElement);
+          if (!snapshot) break;
+          renderedSlides.push(snapshot);
+        }
+
+        if (renderedSlides.length === count && count > 0 && !cancelled) {
+          setSlides(renderedSlides);
+        } else if (!cancelled) {
           setError('render_failed');
         }
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        previewer?.destroy();
+        offscreen?.remove();
       }
     };
 
@@ -738,28 +784,6 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     };
   }, [data, loadError]);
 
-  // Adaptive zoom for PPTX container
-  useEffect(() => {
-    const container = containerRef.current;
-    const iframe = iframeRef.current;
-    if (!container || !iframe || !rendered) return;
-
-    const updateZoom = () => {
-      const containerWidth = container.clientWidth;
-      if (containerWidth < PPTX_RENDER_WIDTH) {
-        iframe.style.zoom = String(containerWidth / PPTX_RENDER_WIDTH);
-      } else {
-        iframe.style.zoom = '1';
-      }
-    };
-
-    const ro = new ResizeObserver(updateZoom);
-    ro.observe(container);
-    updateZoom();
-
-    return () => ro.disconnect();
-  }, [rendered]);
-
   // Fallback: HTML slides or text extraction when pptx-preview fails
   if (error === 'render_failed') {
     return <PptxHtmlFallback artifact={artifact} data={data!} />;
@@ -767,32 +791,22 @@ const PptxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full text-red-500 text-sm p-4">
+      <div className="flex h-full items-center justify-center p-4 text-sm text-destructive">
         {t('artifactDocumentError')}: {error}
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {slideCount > 0 && (
-        <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0">
-          {t('artifactSlideCount').replace('{count}', String(slideCount))}
+    <div className="relative h-full min-h-0 overflow-hidden">
+      {(loading || slides.length === 0) && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-background text-sm text-muted-foreground">
+          {t('artifactDocumentLoading')}
         </div>
       )}
-      <div ref={containerRef} className="flex-1 relative min-h-0">
-        {(loading || !rendered) && (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm z-10 bg-background">
-            {t('artifactDocumentLoading')}
-          </div>
-        )}
-        <iframe
-          ref={iframeRef}
-          className="w-full h-full border-0"
-          sandbox="allow-same-origin"
-          title={artifact.title || 'PPTX Preview'}
-        />
-      </div>
+      {slides.length > 0 && (
+        <PptxSlideNavigator slides={slides} title={artifact.title || 'PPTX Preview'} />
+      )}
     </div>
   );
 };
@@ -802,7 +816,7 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
   artifact,
   data,
 }) => {
-  const [slideHtmls, setSlideHtmls] = useState<string[]>([]);
+  const [slides, setSlides] = useState<PptxPreviewSlide[]>([]);
   const [loading, setLoading] = useState(true);
   const [useTextFallback, setUseTextFallback] = useState(false);
 
@@ -825,9 +839,9 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
 
       const dir = filePath.substring(0, filePath.lastIndexOf('/'));
       const slidesDir = `${dir}/slides`;
-      const htmls: string[] = [];
+      const nextSlides: PptxPreviewSlide[] = [];
 
-      for (let i = 1; i <= 20; i++) {
+      for (let i = 1; i <= 500; i++) {
         const slidePath = `${slidesDir}/slide${i}.html`;
         try {
           const result = await window.electron?.dialog?.readFileAsDataUrl(slidePath);
@@ -835,7 +849,7 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
           const base64 = result.dataUrl.split(',')[1] || '';
           const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
           const html = new TextDecoder('utf-8').decode(bytes);
-          htmls.push(html);
+          nextSlides.push({ srcDoc: html, width: 960, height: 540 });
         } catch {
           break;
         }
@@ -843,8 +857,8 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
 
       if (cancelled) return;
 
-      if (htmls.length > 0) {
-        setSlideHtmls(htmls);
+      if (nextSlides.length > 0) {
+        setSlides(nextSlides);
       } else {
         setUseTextFallback(true);
       }
@@ -869,26 +883,7 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
     return <PptxTextFallback data={data} />;
   }
 
-  return (
-    <div className="h-full flex flex-col overflow-hidden">
-      <div className="px-3 py-1.5 text-xs text-muted-foreground border-b border-border shrink-0">
-        {t('artifactSlideCount').replace('{count}', String(slideHtmls.length))}
-      </div>
-      <div className="flex-1 overflow-auto p-4 space-y-4 bg-muted">
-        {slideHtmls.map((html, i) => (
-          <div key={i} className="shadow-lg rounded overflow-hidden">
-            <iframe
-              srcDoc={html}
-              className="w-full border-0 rounded"
-              style={{ aspectRatio: '16/9' }}
-              sandbox="allow-same-origin"
-              title={`Slide ${i + 1}`}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <PptxSlideNavigator slides={slides} title={artifact.title || 'PPTX Preview'} />;
 };
 
 // Text extraction fallback for PPTX
