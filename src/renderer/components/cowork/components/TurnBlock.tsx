@@ -9,7 +9,7 @@ import {
   ReasoningTrigger,
 } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
-import { Brain, Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
+import { Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
@@ -155,7 +155,7 @@ export const TurnBlock: React.FC<{
           key={item.message.id}
           className={mutedExecution ? 'text-muted-foreground' : undefined}
           isStreaming={isStreaming}
-          defaultOpen={isStreaming}
+          defaultOpen={false}
           autoClose={false}
           duration={durationSeconds}
           showConnector={!isLastInSequence}
@@ -234,20 +234,21 @@ export const TurnBlock: React.FC<{
   const groups = (() => {
     const result: Array<{
       items: typeof visibleAssistantItems;
-      streaming: boolean;
-      status: ReturnType<typeof getCurrentExecutionStatus>;
+      followedByAnswer: boolean;
     }> = [];
     let currentItems: typeof visibleAssistantItems = [];
 
-    const flush = () => {
+    const flush = (followedByAnswer = false) => {
       if (currentItems.length === 0) return;
-      const status = getCurrentExecutionStatus(currentItems);
-      result.push({ items: [...currentItems], streaming: Boolean(status), status });
+      result.push({ items: [...currentItems], followedByAnswer });
       currentItems = [];
     };
 
     for (const item of visibleAssistantItems) {
-      const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
+      const isAnswer =
+        item.type === 'assistant' &&
+        !item.message.metadata?.isThinking &&
+        hasText(item.message.content);
       const isStep =
         (item.type === 'assistant' && item.message.metadata?.isThinking) ||
         item.type === 'tool_group' ||
@@ -255,11 +256,10 @@ export const TurnBlock: React.FC<{
         item.type === 'system';
 
       if (isAnswer) {
-        flush();
+        flush(true);
         result.push({
           items: [item],
-          streaming: Boolean(item.message.metadata?.isStreaming),
-          status: null,
+          followedByAnswer: false,
         });
       } else if (isStep) {
         currentItems.push(item);
@@ -294,6 +294,15 @@ export const TurnBlock: React.FC<{
   const toolActivityStatus = latestToolActivity
     ? getToolActivityExecutionStatus(latestToolActivity)
     : null;
+  const lastVisibleGroup = visibleGroups[visibleGroups.length - 1];
+  const lastVisibleGroupFirstItem = lastVisibleGroup?.items[0];
+  const hasTrailingExecutionGroup = Boolean(
+    lastVisibleGroupFirstItem &&
+    !(
+      lastVisibleGroupFirstItem.type === 'assistant' &&
+      !lastVisibleGroupFirstItem.message.metadata?.isThinking
+    ),
+  );
 
   const isExecutionStep = (item: (typeof visibleAssistantItems)[number] | undefined) =>
     item?.type === 'tool_group' ||
@@ -312,24 +321,21 @@ export const TurnBlock: React.FC<{
       return renderItem(firstItem, 0, isFinalAnswer);
     }
 
-    const isStreaming = group.streaming;
-    const headerIcon = isStreaming
-      ? group.status?.kind === ExecutionStatusKind.Thinking
-        ? Brain
-        : group.status?.kind === ExecutionStatusKind.Tool
-          ? Wrench
-          : SparklesIcon
-      : SparklesIcon;
+    const showCompletedSummary = group.followedByAnswer;
+    const currentStatus = showCompletedSummary ? null : getCurrentExecutionStatus(group.items);
+    const isActiveTool = currentStatus?.kind === ExecutionStatusKind.Tool;
     return (
       <ChainOfThought
-        key={`${groupKey}-${isStreaming ? 'active' : 'complete'}`}
+        key={`${groupKey}-${showCompletedSummary ? 'summarized' : 'working'}`}
         defaultOpen={false}
       >
-        <ChainOfThoughtHeader icon={headerIcon}>
-          {isStreaming ? (
-            <Shimmer duration={1}>{getExecutionStatusText(group.status!)}</Shimmer>
-          ) : (
+        <ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>
+          {showCompletedSummary ? (
             getCompletedExecutionSummaryText(getExecutionSummary(group.items))
+          ) : currentStatus ? (
+            <Shimmer duration={1}>{getExecutionStatusText(currentStatus)}</Shimmer>
+          ) : (
+            <Shimmer duration={1}>{i18nService.t('coworkIntermediateProcess')}</Shimmer>
           )}
         </ChainOfThoughtHeader>
         <ChainOfThoughtContent>
@@ -364,11 +370,8 @@ export const TurnBlock: React.FC<{
                     index === lastAnswerGroupIndex,
                   ),
                 )}
-            {latestToolActivity && toolActivityStatus && (
-              <ChainOfThought
-                key={`tool-activity-${latestToolActivity.toolCallId}`}
-                defaultOpen={false}
-              >
+            {toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup && (
+              <ChainOfThought key="transient-working-summary" defaultOpen={false}>
                 <ChainOfThoughtHeader icon={Wrench}>
                   <Shimmer duration={1}>{getExecutionStatusText(toolActivityStatus)}</Shimmer>
                 </ChainOfThoughtHeader>

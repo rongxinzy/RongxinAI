@@ -58,9 +58,7 @@ test('prefers the latest active thinking status over prior tool calls', () => {
 });
 
 test('includes a concise target for an active tool call', () => {
-  const status = getCurrentExecutionStatus([
-    toolGroup('read-1', 'read', { path: 'src/app.ts' }),
-  ]);
+  const status = getCurrentExecutionStatus([toolGroup('read-1', 'read', { path: 'src/app.ts' })]);
 
   expect(status).toEqual({
     kind: ExecutionStatusKind.Tool,
@@ -131,7 +129,7 @@ test('omits zero-valued execution counts from the static summary', () => {
       incompleteTools: 0,
     }),
   ).toBe('已完成 3 次工具调用');
-  expect(getCompletedExecutionSummaryText(null)).toBe('任务完成');
+  expect(getCompletedExecutionSummaryText(null)).toBe('正在工作');
 });
 
 test('recognizes only an explicitly marked final answer', () => {
