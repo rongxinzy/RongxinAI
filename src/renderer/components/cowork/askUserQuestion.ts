@@ -1,13 +1,10 @@
+import {
+  CoworkPermissionBehavior,
+  CoworkPermissionToolName,
+} from '../../../shared/cowork/constants';
 import type { CoworkPermissionRequest, CoworkPermissionResult } from '../../types/cowork';
 
-export const CoworkPermissionToolName = {
-  AskUserQuestion: 'AskUserQuestion',
-} as const;
-
-export const CoworkPermissionBehavior = {
-  Allow: 'allow',
-  Deny: 'deny',
-} as const;
+export { CoworkPermissionBehavior, CoworkPermissionToolName };
 
 export const AskUserQuestionAnswerDelimiter = '|||';
 

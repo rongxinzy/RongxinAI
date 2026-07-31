@@ -2,7 +2,11 @@ import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
-import type { CoworkPermissionMode, CoworkSessionMode } from '../../shared/cowork/constants';
+import type {
+  CoworkPermissionMode,
+  CoworkPermissionOrigin,
+  CoworkSessionMode,
+} from '../../shared/cowork/constants';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
   LlamaCppCancelInstallResult,
@@ -172,6 +176,7 @@ interface CoworkMemoryStats {
 }
 
 interface CoworkPermissionRequest {
+  origin: CoworkPermissionOrigin;
   sessionId: string;
   toolName: string;
   toolInput: Record<string, unknown>;
@@ -643,6 +648,19 @@ interface IElectronAPI {
   generateSessionTitle: (userInput: string | null) => Promise<string>;
   getRecentCwds: (limit?: number) => Promise<string[]>;
   openclaw: {
+    bridge: {
+      respondToAskUser: (options: {
+        requestId: string;
+        result: CoworkPermissionResult;
+      }) => Promise<{ success: boolean; error?: string }>;
+      onAskUser: (
+        callback: (data: {
+          sessionId: string;
+          request: Omit<CoworkPermissionRequest, 'origin'>;
+        }) => void,
+      ) => () => void;
+      onAskUserDismiss: (callback: (data: { requestId: string }) => void) => () => void;
+    };
     engine: {
       getStatus: () => Promise<{ success: boolean; status?: OpenClawEngineStatus; error?: string }>;
       install: () => Promise<{ success: boolean; status?: OpenClawEngineStatus; error?: string }>;
@@ -732,7 +750,6 @@ interface IElectronAPI {
       session?: CoworkSession;
       error?: string;
       code?: string;
-      engineStatus?: OpenClawEngineStatus;
     }>;
     continueSession: (options: {
       sessionId: string;
@@ -747,7 +764,6 @@ interface IElectronAPI {
       session?: CoworkSession;
       error?: string;
       code?: string;
-      engineStatus?: OpenClawEngineStatus;
     }>;
     stopSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     saveSession: (session: Record<string, unknown>) => Promise<CoworkSessionResult>;
@@ -855,7 +871,10 @@ interface IElectronAPI {
       }) => void,
     ) => () => void;
     onStreamPermission: (
-      callback: (data: { sessionId: string; request: CoworkPermissionRequest }) => void,
+      callback: (data: {
+        sessionId: string;
+        request: Omit<CoworkPermissionRequest, 'origin'>;
+      }) => void,
     ) => () => void;
     onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) => () => void;
     onStreamComplete: (

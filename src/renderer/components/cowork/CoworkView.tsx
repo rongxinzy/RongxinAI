@@ -7,11 +7,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
-import { OpenClawEnginePhase } from '../../../shared/openclaw/constants';
-import {
-  isOpenClawEngineTransitioning,
-  isOpenClawGatewayRunning,
-} from '../../../shared/openclaw/status';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
 import {
@@ -52,7 +47,6 @@ import {
   type CoworkPermissionRequest,
   type CoworkPermissionResult,
   type CoworkSession,
-  type OpenClawEngineStatus,
 } from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
@@ -63,7 +57,6 @@ import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInpu
 import CoworkSessionViewport from './CoworkSessionViewport';
 import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
-import { useDelayedVisibility } from './useDelayedVisibility';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 
 export interface CoworkViewProps {
@@ -148,16 +141,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   useEffect(() => () => contentBatcher.dispose(), [contentBatcher]);
   const isMac = window.electron.platform === 'darwin';
   const [isInitialized, setIsInitialized] = useState(false);
-  const [openClawStatus, setOpenClawStatus] = useState<OpenClawEngineStatus | null>(null);
-  const [isRestartingGateway, setIsRestartingGateway] = useState(false);
-  const shouldShowEngineStatus = useDelayedVisibility(
-    Boolean(
-      openClawStatus &&
-      !isOpenClawGatewayRunning(openClawStatus.phase) &&
-      !isOpenClawEngineTransitioning(openClawStatus.phase) &&
-      openClawStatus.phase !== OpenClawEnginePhase.Error,
-    ),
-  );
   // Track in-flight direct-chat operations per session so switching to another
   // chat window does not block submission on a global boolean ref.
   const startingSessionIdsRef = useRef(new Set<string>());
@@ -241,46 +224,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     return { noticeI18nKey: key, noticeExtra: error };
   };
 
-  const resolveEngineStatusText = (status: OpenClawEngineStatus): string => {
-    switch (status.phase) {
-      case OpenClawEnginePhase.NotInstalled:
-        return i18nService.t('coworkOpenClawNotInstalledNotice');
-      case OpenClawEnginePhase.Installing:
-        return i18nService.t('coworkOpenClawInstalling');
-      case OpenClawEnginePhase.Ready:
-        return i18nService.t('coworkOpenClawReadyNotice');
-      case OpenClawEnginePhase.Starting:
-      case OpenClawEnginePhase.Compiling:
-      case OpenClawEnginePhase.Restarting:
-        return status.message || i18nService.t('coworkOpenClawStarting');
-      case OpenClawEnginePhase.Error:
-        return i18nService.t('coworkOpenClawError');
-      case OpenClawEnginePhase.Running:
-      default:
-        return i18nService.t('coworkOpenClawRunning');
-    }
-  };
-
-  const handleRestartGateway = async () => {
-    if (isRestartingGateway) return;
-    setIsRestartingGateway(true);
-    try {
-      await coworkService.restartOpenClawGateway();
-    } catch (error) {
-      console.error('[CoworkView] Failed to restart gateway:', error);
-    } finally {
-      setIsRestartingGateway(false);
-    }
-  };
-
   useEffect(() => {
     const init = async () => {
       await coworkService.init();
       await agentService.loadAgents();
-      const initialEngineStatus = await coworkService.getOpenClawEngineStatus();
-      if (initialEngineStatus) {
-        setOpenClawStatus(initialEngineStatus);
-      }
       // Load quick actions with localization
       try {
         quickActionService.initialize();
@@ -304,10 +251,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     };
     init();
 
-    const unsubscribeOpenClawStatus = coworkService.onOpenClawEngineStatus(status => {
-      setOpenClawStatus(status);
-    });
-
     // Subscribe to language changes to reload quick actions
     const unsubscribe = quickActionService.subscribe(async () => {
       try {
@@ -320,7 +263,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
     return () => {
       unsubscribe();
-      unsubscribeOpenClawStatus();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch]);
@@ -1392,8 +1334,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     );
   }
 
-  const isEngineError = openClawStatus?.phase === OpenClawEnginePhase.Error;
-
   const homeHeader = (
     <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
       <div className="non-draggable h-8 flex items-center">
@@ -1426,37 +1366,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     </div>
   );
 
-  // Engine status banner for error/non-running states (starting overlay is now global in App.tsx)
-  const engineStatusBanner =
-    shouldShowEngineStatus && openClawStatus ? (
-      <div
-        className={`shrink-0 flex items-center justify-between px-4 py-2 text-xs ${
-          isEngineError
-            ? 'bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300'
-            : 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300'
-        }`}
-      >
-        <div className="flex items-center gap-2">
-          <span>{resolveEngineStatusText(openClawStatus)}</span>
-          {typeof openClawStatus.progressPercent === 'number' && (
-            <span className="opacity-70">({Math.round(openClawStatus.progressPercent)}%)</span>
-          )}
-        </div>
-        <Button
-          variant={isEngineError ? 'destructive' : 'default'}
-          size="xs"
-          onClick={handleRestartGateway}
-          disabled={isRestartingGateway}
-        >
-          {i18nService.t('coworkOpenClawRestartGateway')}
-        </Button>
-      </div>
-    ) : null;
-
   if (displayedSessionId) {
     return (
       <div className="flex-1 flex flex-col h-full">
-        {engineStatusBanner}
         <CoworkSessionViewport
           sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
@@ -1485,9 +1397,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   // Home view - no current session
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
-      {/* Engine status banner for error states */}
-      {engineStatusBanner}
-
       {/* Header */}
       {homeHeader}
 

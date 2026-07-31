@@ -38,6 +38,8 @@ import {
   COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
+  CoworkPermissionSessionId,
+  CoworkPermissionToolName,
   CoworkSessionMode,
 } from '../shared/cowork/constants';
 import {
@@ -45,7 +47,17 @@ import {
   type CoworkSessionExpertSnapshot,
   CoworkSessionExpertSource,
 } from '../shared/cowork/sessionExperts';
-import { ApiIpc, CoworkStreamIpc, McpIpc, ProjectIpc, SkillsIpc } from '../shared/ipc/channels';
+import {
+  ApiIpc,
+  AuthIpc,
+  CoworkPermissionIpc,
+  CoworkSessionIpc,
+  CoworkStreamIpc,
+  McpIpc,
+  OpenClawBridgeIpc,
+  ProjectIpc,
+  SkillsIpc,
+} from '../shared/ipc/channels';
 import {
   ApiFetchSchema,
   ApiStreamSchema,
@@ -89,6 +101,7 @@ import type {
 import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHandlers/llamacpp';
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
+import { registerOpenClawBridgeIpcHandlers } from './ipcHandlers/openClawBridge';
 import {
   getCronJobService,
   initCronJobServiceManager,
@@ -97,7 +110,6 @@ import {
 } from './ipcHandlers/scheduledTask';
 import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import {
-  type CoworkRuntime,
   OpenClawRuntimeAdapter,
   type PermissionResult,
   PiRuntimeAdapter,
@@ -1000,7 +1012,7 @@ let ollamaManager: OllamaManager | null = null;
 let openClawConfigSync: OpenClawConfigSync | null = null;
 let openClawBootstrapPromise: Promise<OpenClawEngineStatus> | null = null;
 let openClawStatusForwarderBound = false;
-let coworkRuntimeForwarderBound = false;
+let piWorkbenchRuntimeForwarderBound = false;
 let memoryMigrationDone = false;
 let preventSleepBlockerId: number | null = null;
 let appUpdateCoordinator: AppUpdateCoordinator | null = null;
@@ -1108,16 +1120,6 @@ const bindOpenClawStatusForwarder = (): void => {
   });
   openClawStatusForwarderBound = true;
   forwardOpenClawStatus(manager.getStatus());
-};
-
-const getEngineNotReadyResponse = (status: OpenClawEngineStatus) => {
-  const fallbackMessage = 'AI engine is initializing. Please try again in a moment.';
-  return {
-    success: false,
-    code: ENGINE_NOT_READY_CODE,
-    error: status.message || fallbackMessage,
-    engineStatus: status,
-  };
 };
 
 const bootstrapOpenClawEngine = async (
@@ -1714,29 +1716,17 @@ const doSyncOpenClawConfig = async (options: {
   };
 };
 
-/** Forward events from a single runtime to all renderer windows via IPC. */
-const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
+/** Project Pi Work/Chat events to renderer-owned cowork streams. */
+const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void => {
   runtime.on('message', (sessionId: string, message: unknown) => {
     const safeMessage = sanitizeCoworkMessageForIpc(message);
     const windows = BrowserWindow.getAllWindows();
-    const messageType =
-      typeof message === 'object' && message && 'type' in message
-        ? (message as { type?: unknown }).type
-        : undefined;
-    console.log(
-      '[CoworkForwarder] forwarding message: sessionId=',
-      sessionId,
-      'type=',
-      messageType,
-      'windowCount=',
-      windows.length,
-    );
     windows.forEach(win => {
       if (win.isDestroyed()) return;
       try {
-        win.webContents.send('cowork:stream:message', { sessionId, message: safeMessage });
+        win.webContents.send(CoworkStreamIpc.Message, { sessionId, message: safeMessage });
       } catch (error) {
-        console.error('Failed to forward cowork message:', error);
+        console.error('[PiWorkbenchForwarder] failed to forward a message:', error);
       }
     });
   });
@@ -1749,14 +1739,14 @@ const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
       windows.forEach(win => {
         if (win.isDestroyed()) return;
         try {
-          win.webContents.send('cowork:stream:messageUpdate', {
+          win.webContents.send(CoworkStreamIpc.MessageUpdate, {
             sessionId,
             messageId,
             content: safeContent,
             metadata,
           });
         } catch (error) {
-          console.error('Failed to forward cowork message update:', error);
+          console.error('[PiWorkbenchForwarder] failed to forward a message update:', error);
         }
       });
     },
@@ -1771,9 +1761,9 @@ const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
     windows.forEach(win => {
       if (win.isDestroyed()) return;
       try {
-        win.webContents.send('cowork:stream:permission', { sessionId, request: safeRequest });
+        win.webContents.send(CoworkStreamIpc.Permission, { sessionId, request: safeRequest });
       } catch (error) {
-        console.error('Failed to forward cowork permission request:', error);
+        console.error('[PiWorkbenchForwarder] failed to forward a permission request:', error);
       }
     });
   });
@@ -1783,9 +1773,9 @@ const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
     windows.forEach(win => {
       if (win.isDestroyed()) return;
       try {
-        win.webContents.send('cowork:stream:permissionDismiss', { requestId });
+        win.webContents.send(CoworkStreamIpc.PermissionDismiss, { requestId });
       } catch (error) {
-        console.error('Failed to forward cowork permission dismissal:', error);
+        console.error('[PiWorkbenchForwarder] failed to dismiss a permission request:', error);
       }
     });
   });
@@ -1794,14 +1784,14 @@ const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
-      win.webContents.send('cowork:stream:complete', { sessionId, claudeSessionId });
+      win.webContents.send(CoworkStreamIpc.Complete, { sessionId, claudeSessionId });
     });
     try {
       if (shouldRefreshServerQuotaForSession(sessionId)) {
         const windows = BrowserWindow.getAllWindows();
         windows.forEach(win => {
           if (win.isDestroyed()) return;
-          win.webContents.send('auth:quotaChanged');
+          win.webContents.send(AuthIpc.QuotaChanged);
         });
       }
     } catch {
@@ -1818,21 +1808,16 @@ const forwardRuntimeToRenderer = (runtime: CoworkRuntime): void => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
       if (win.isDestroyed()) return;
-      win.webContents.send('cowork:stream:error', { sessionId, error });
+      win.webContents.send(CoworkStreamIpc.Error, { sessionId, error });
     });
   });
 };
 
-const bindCoworkRuntimeForwarder = (): void => {
-  if (coworkRuntimeForwarderBound) return;
+const bindPiWorkbenchRuntimeForwarder = (): void => {
+  if (piWorkbenchRuntimeForwarderBound) return;
 
-  // Dual-kernel: bind both Pi (Work sessions) and OpenClaw (IM sessions).
-  // Both feed into the same cowork:stream:* IPC channels so the UI shows
-  // messages from both sources.
-  forwardRuntimeToRenderer(getPiRuntimeAdapter()); // Work → Pi
-  forwardRuntimeToRenderer(getOpenClawRuntimeAdapter()); // IM → OpenClaw
-
-  coworkRuntimeForwarderBound = true;
+  forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter());
+  piWorkbenchRuntimeForwarderBound = true;
 };
 
 const getOpenClawRuntimeAdapter = (): OpenClawRuntimeAdapter => {
@@ -2199,35 +2184,32 @@ const startMcpBridge = (): Promise<McpBridgeConfig | null> => {
         await mcpBridgeServer.start();
       }
 
-      // Register AskUserQuestion callback — shows a permission modal when the
-      // ask-user-question OpenClaw plugin sends a request via HTTP.
+      // Forward OpenClaw AskUser requests through their own renderer bridge.
       mcpBridgeServer.onAskUser(request => {
         const windows = BrowserWindow.getAllWindows();
         windows.forEach(win => {
           if (win.isDestroyed()) return;
           try {
-            win.webContents.send('cowork:stream:permission', {
-              sessionId: '__askuser__',
+            win.webContents.send(OpenClawBridgeIpc.AskUser, {
+              sessionId: CoworkPermissionSessionId.OpenClawBridge,
               request: {
                 requestId: request.requestId,
-                toolName: 'AskUserQuestion',
+                toolName: CoworkPermissionToolName.AskUserQuestion,
                 toolInput: { questions: request.questions },
               },
             });
           } catch (error) {
-            console.error('[AskUser] failed to send permission request to window:', error);
+            console.error('[OpenClawBridge] failed to forward an AskUser request:', error);
           }
         });
       });
 
-      // Dismiss the AskUser modal when timeout or resolved from server side.
-      // Simulate a deny response to remove it from the renderer's pending queue.
       mcpBridgeServer.onAskUserDismiss(requestId => {
         const windows = BrowserWindow.getAllWindows();
         windows.forEach(win => {
           if (win.isDestroyed()) return;
           try {
-            win.webContents.send('cowork:stream:permissionDismiss', { requestId });
+            win.webContents.send(OpenClawBridgeIpc.AskUserDismiss, { requestId });
           } catch {
             // ignore
           }
@@ -4147,7 +4129,7 @@ if (!gotTheLock) {
   });
 
   // Cowork IPC handlers
-  ipcMain.handle('cowork:session:start', async (_event, rawOptions: unknown) => {
+  ipcMain.handle(CoworkSessionIpc.Start, async (_event, rawOptions: unknown) => {
     const cid = generateCorrelationId();
     const log = createLogger('CoworkSession').withContext({ cid });
     const options = CoworkSessionStartSchema.input.parse(rawOptions);
@@ -4160,23 +4142,6 @@ if (!gotTheLock) {
       try {
         // Work sessions use Pi (SDK mode, instant availability). No need to wait
         // for OpenClaw — that gate is only for IM/Cron paths.
-        const engineStatus: {
-          phase: 'running' | 'error';
-          version: null;
-          message: string;
-          canRetry: boolean;
-        } = getPiRuntimeAdapter()
-          ? { phase: 'running', version: null, message: 'Pi SDK ready', canRetry: false }
-          : {
-              phase: 'error',
-              version: null,
-              message: 'Pi runtime not initialized',
-              canRetry: true,
-            };
-        if (engineStatus.phase !== 'running') {
-          return getEngineNotReadyResponse(engineStatus);
-        }
-
         const coworkStoreInstance = getCoworkStore();
         const config = coworkStoreInstance.getConfig();
         const selectedAgent = getAgentManager().getAgent(options.agentId || 'main');
@@ -4308,7 +4273,7 @@ if (!gotTheLock) {
               const windows = BrowserWindow.getAllWindows();
               windows.forEach(win => {
                 if (win.isDestroyed()) return;
-                win.webContents.send('cowork:stream:error', {
+                win.webContents.send(CoworkStreamIpc.Error, {
                   sessionId: session.id,
                   error: errorMessage,
                 });
@@ -4336,7 +4301,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(
-    'cowork:session:continue',
+    CoworkSessionIpc.Continue,
     async (
       _event,
       options: {
@@ -4351,23 +4316,6 @@ if (!gotTheLock) {
     ) => {
       try {
         // Work sessions use Pi (SDK mode, instant availability).
-        const engineStatus: {
-          phase: 'running' | 'error';
-          version: null;
-          message: string;
-          canRetry: boolean;
-        } = getPiRuntimeAdapter()
-          ? { phase: 'running', version: null, message: 'Pi SDK ready', canRetry: false }
-          : {
-              phase: 'error',
-              version: null,
-              message: 'Pi runtime not initialized',
-              canRetry: true,
-            };
-        if (engineStatus.phase !== 'running') {
-          return getEngineNotReadyResponse(engineStatus);
-        }
-
         const runtime = getPiRuntimeAdapter();
         const store = getCoworkStore();
         let existingSession = store.getSession(options.sessionId);
@@ -4463,7 +4411,7 @@ if (!gotTheLock) {
               const windows = BrowserWindow.getAllWindows();
               windows.forEach(win => {
                 if (win.isDestroyed()) return;
-                win.webContents.send('cowork:stream:error', {
+                win.webContents.send(CoworkStreamIpc.Error, {
                   sessionId: options.sessionId,
                   error: errorMessage,
                 });
@@ -5105,8 +5053,12 @@ if (!gotTheLock) {
     },
   );
 
+  registerOpenClawBridgeIpcHandlers({
+    getMcpBridgeServer: () => mcpBridgeServer,
+  });
+
   ipcMain.handle(
-    'cowork:permission:respond',
+    CoworkPermissionIpc.Respond,
     async (
       _event,
       options: {
@@ -5115,36 +5067,6 @@ if (!gotTheLock) {
       },
     ) => {
       try {
-        // Dual-dispatch pattern: permission responses arrive through one IPC channel
-        // but may target either of two independent subsystems.
-        //
-        // - resolveAskUser() handles AskUserQuestion plugin requests routed through
-        //   the McpBridgeServer HTTP callback. It is a no-op when the requestId does
-        //   not match a pending bridge request (i.e. for normal SDK permission requests).
-        //
-        // - respondToPermission() handles standard Claude Agent SDK permission requests
-        //   managed by the CoworkEngineRouter. It is a no-op when the requestId does
-        //   not match a pending SDK permission (i.e. for bridge plugin requests).
-        //
-        // Both calls are safe to invoke unconditionally; exactly one will match.
-
-        // AskUserQuestion plugin responses go to the bridge server, not the runtime
-        if (mcpBridgeServer && options.requestId) {
-          const result = options.result;
-          const askUserResponse: import('./libs/mcpBridgeServer').AskUserResponse = {
-            behavior: result.behavior === 'allow' ? 'allow' : 'deny',
-            answers:
-              result.behavior === 'allow' &&
-              result.updatedInput &&
-              typeof result.updatedInput === 'object'
-                ? ((result.updatedInput as Record<string, unknown>).answers as
-                    | Record<string, string>
-                    | undefined)
-                : undefined,
-          };
-          mcpBridgeServer.resolveAskUser(options.requestId, askUserResponse);
-        }
-
         const runtime = getPiRuntimeAdapter();
         runtime.respondToPermission(options.requestId, options.result);
         return { success: true };
@@ -7845,7 +7767,9 @@ if (!gotTheLock) {
     const mcpTools = await initMcpServers();
     console.log(`[Main] initApp: MCP init done, ${mcpTools.length} tools available`);
 
-    bindCoworkRuntimeForwarder();
+    bindPiWorkbenchRuntimeForwarder();
+    // Channel/Cron own this runtime directly; it is intentionally not renderer-forwarded.
+    getOpenClawRuntimeAdapter();
     bindOpenClawStatusForwarder();
 
     const defaultAgentModelRef = resolveDefaultAgentModelRef();

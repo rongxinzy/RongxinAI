@@ -6,7 +6,11 @@ import {
 } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
-import { COWORK_SESSION_PAGE_SIZE, CoworkSessionMode } from '../../shared/cowork/constants';
+import {
+  COWORK_SESSION_PAGE_SIZE,
+  CoworkPermissionOrigin,
+  CoworkSessionMode,
+} from '../../shared/cowork/constants';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
 import {
@@ -37,6 +41,7 @@ import type {
   CoworkConfigUpdate,
   CoworkContinueOptions,
   CoworkMemoryStats,
+  CoworkPermissionRequest,
   CoworkPermissionResult,
   CoworkSession,
   CoworkSessionListResult,
@@ -47,6 +52,7 @@ import type {
   OpenClawSessionPolicyConfig,
 } from '../types/cowork';
 import { i18nService } from './i18n';
+import { respondToPermissionByOrigin } from './coworkPermissionRouting';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
 
@@ -84,10 +90,7 @@ class CoworkService {
 
     // Set up stream listeners
     this.setupStreamListeners();
-    this.setupOpenClawEngineListeners();
-
-    // Load OpenClaw status
-    await this.loadOpenClawEngineStatus();
+    this.setupOpenClawBridgeListeners();
 
     this.initialized = true;
   }
@@ -179,6 +182,7 @@ class CoworkService {
     const permissionCleanup = cowork.onStreamPermission(({ sessionId, request }) => {
       store.dispatch(
         enqueuePendingPermission({
+          origin: CoworkPermissionOrigin.PiWorkbench,
           sessionId,
           toolName: request.toolName,
           toolInput: request.toolInput,
@@ -270,6 +274,29 @@ class CoworkService {
         });
     });
     this.streamListenerCleanups.push(sessionsChangedCleanup);
+  }
+
+  private setupOpenClawBridgeListeners(): void {
+    const bridge = window.electron?.openclaw?.bridge;
+    if (!bridge) return;
+
+    const askUserCleanup = bridge.onAskUser(({ sessionId, request }) => {
+      store.dispatch(
+        enqueuePendingPermission({
+          origin: CoworkPermissionOrigin.OpenClawBridge,
+          sessionId,
+          toolName: request.toolName,
+          toolInput: request.toolInput,
+          requestId: request.requestId,
+          toolUseId: request.toolUseId ?? null,
+        }),
+      );
+    });
+    const askUserDismissCleanup = bridge.onAskUserDismiss(({ requestId }) => {
+      store.dispatch(dequeuePendingPermission({ requestId }));
+    });
+
+    this.streamListenerCleanups.push(askUserCleanup, askUserDismissCleanup);
   }
 
   private setupOpenClawEngineListeners(): void {
@@ -435,10 +462,6 @@ class CoworkService {
       return { session: result.session };
     }
 
-    if (result.engineStatus) {
-      this.notifyOpenClawStatus(result.engineStatus);
-    }
-
     // Show a user-visible error when session start fails
     if (result.error) {
       const errorContent =
@@ -471,10 +494,7 @@ class CoworkService {
       imageAttachments: options.imageAttachments,
     });
     if (!result.success) {
-      if (result.engineStatus) {
-        this.notifyOpenClawStatus(result.engineStatus);
-      }
-      if (result.code !== 'ENGINE_NOT_READY') {
+      if (result.code !== ENGINE_NOT_READY_CODE) {
         store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'error' }));
         if (result.error) {
           store.dispatch(
@@ -762,10 +782,17 @@ class CoworkService {
   }
 
   async respondToPermission(requestId: string, result: CoworkPermissionResult): Promise<boolean> {
-    const cowork = window.electron?.cowork;
-    if (!cowork) return false;
+    const permission = store
+      .getState()
+      .cowork.pendingPermissions.find(
+        (pending: CoworkPermissionRequest) => pending.requestId === requestId,
+      );
+    if (!permission) return false;
 
-    const response = await cowork.respondToPermission({ requestId, result });
+    const response = await respondToPermissionByOrigin(permission, result, {
+      respondToPi: window.electron?.cowork?.respondToPermission,
+      respondToOpenClaw: window.electron?.openclaw?.bridge?.respondToAskUser,
+    });
     if (response.success) {
       store.dispatch(dequeuePendingPermission({ requestId }));
       return true;

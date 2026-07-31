@@ -4,7 +4,6 @@ import { useSelector } from 'react-redux';
 import { OpenClawProviderId } from '../../../shared/providers';
 import type { RootState } from '../../store';
 import { type Model, selectAgentSelectedModel } from '../../store/slices/modelSlice';
-import type { CoworkAgentEngine } from '../../types/cowork';
 import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
 
 type ResolveAgentModelSelectionInput = {
@@ -12,7 +11,6 @@ type ResolveAgentModelSelectionInput = {
   agentModel: string;
   availableModels: Model[];
   fallbackModel: Model | null;
-  engine: CoworkAgentEngine;
 };
 
 type ResolveAgentModelSelectionResult = {

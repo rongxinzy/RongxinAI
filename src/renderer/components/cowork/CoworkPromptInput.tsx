@@ -219,7 +219,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
     const agents = useSelector((state: RootState) => state.agent.agents);
     const currentAgent = agents.find(agent => agent.id === currentAgentId);
-    const coworkAgentEngine = useSelector((state: RootState) => state.cowork.config.agentEngine);
     const availableModels = useSelector((state: RootState) => state.model.availableModels);
     const defaultSelectedModel = useSelector(
       (state: RootState) => state.model.defaultSelectedModel,
@@ -325,7 +324,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       agentModel: currentAgent?.model ?? '',
       availableModels,
       fallbackModel: currentAgentSelectedModel,
-      engine: coworkAgentEngine,
     });
 
     const handleModelSelect = useCallback(

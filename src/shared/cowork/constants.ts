@@ -22,3 +22,30 @@ export const CoworkPermissionMode = {
 } as const;
 
 export type CoworkPermissionMode = (typeof CoworkPermissionMode)[keyof typeof CoworkPermissionMode];
+
+export const CoworkPermissionBehavior = {
+  Allow: 'allow',
+  Deny: 'deny',
+} as const;
+
+export type CoworkPermissionBehavior =
+  (typeof CoworkPermissionBehavior)[keyof typeof CoworkPermissionBehavior];
+
+export const CoworkPermissionOrigin = {
+  PiWorkbench: 'pi-workbench',
+  OpenClawBridge: 'openclaw-bridge',
+} as const;
+
+export type CoworkPermissionOrigin =
+  (typeof CoworkPermissionOrigin)[keyof typeof CoworkPermissionOrigin];
+
+export const CoworkPermissionToolName = {
+  AskUserQuestion: 'AskUserQuestion',
+} as const;
+
+export type CoworkPermissionToolName =
+  (typeof CoworkPermissionToolName)[keyof typeof CoworkPermissionToolName];
+
+export const CoworkPermissionSessionId = {
+  OpenClawBridge: 'openclaw-bridge',
+} as const;
