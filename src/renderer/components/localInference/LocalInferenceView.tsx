@@ -748,6 +748,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onConfigureContext={model => {
                     setContextModel(model);
                   }}
+                  onOpenMarketplace={() => handleTabChange('marketplace')}
                   onOpenLaunchLog={launchLogs.openPanelForModel}
                   showRegisteredModelsTitle={false}
                   logPanelVisible={launchLogs.state.visible && !launchLogFullscreen}

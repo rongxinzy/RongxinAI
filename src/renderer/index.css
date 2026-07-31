@@ -735,6 +735,26 @@ select::-ms-expand {
   border-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
   color: var(--zy-destructive-foreground);
 }
+[data-slot='button'][data-local-inference-delete-confirm-button='true'] {
+  background-color: var(--zy-destructive);
+  border-color: var(--zy-destructive);
+  color: var(--zy-destructive-foreground);
+}
+[data-slot='button'][data-local-inference-delete-confirm-action-button='true']:hover:not(:disabled) {
+  box-shadow: 0 10px 18px -12px var(--zy-foreground);
+}
+[data-slot='button'][data-local-inference-delete-confirm-action-button='true']:not(
+  [data-local-inference-delete-confirm-button='true']
+):hover:not(:disabled) {
+  background-color: var(--zy-surface);
+  border-color: var(--zy-border);
+  color: var(--zy-foreground);
+}
+[data-slot='button'][data-local-inference-delete-confirm-button='true']:hover:not(:disabled) {
+  background-color: var(--zy-destructive);
+  border-color: var(--zy-destructive);
+  color: var(--zy-destructive-foreground);
+}
 [data-slot='toggle'][aria-pressed='true'] {
   background-color: var(--zy-surface-raised);
   color: var(--zy-foreground);
