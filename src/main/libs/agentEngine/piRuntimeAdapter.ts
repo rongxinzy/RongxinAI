@@ -24,7 +24,13 @@ import path from 'path';
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
-import { isLocalProviderName, ProviderName } from '../../../shared/providers';
+import {
+  isLocalProviderName,
+  ModelCapabilityStatus,
+  ProviderModelPiApi,
+  ProviderName,
+  resolveProviderModelPiReasoning,
+} from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
 import {
@@ -53,6 +59,7 @@ import {
   ShortcutWorkflowKind,
 } from './piShortcutWorkflow';
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
+import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
@@ -1770,7 +1777,24 @@ function resolvePiBuiltinProviderId(providerName?: string): string | null {
   return PI_BUILTIN_PROVIDER_ID[providerName as keyof typeof PI_BUILTIN_PROVIDER_ID] ?? null;
 }
 
-function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unknown> {
+function resolvePiCustomModelApi(resolution: ApiConfigResolution): ProviderModelPiApi {
+  const configuredApi = resolution.providerMetadata?.piRuntime?.api;
+  if (configuredApi) return configuredApi;
+  return resolution.config?.apiType === 'anthropic'
+    ? ProviderModelPiApi.AnthropicMessages
+    : ProviderModelPiApi.OpenAICompletions;
+}
+
+function hasRecordEntries(value: unknown): value is Record<string, unknown> {
+  return Boolean(
+    value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length,
+  );
+}
+
+function buildPiCustomModel(
+  resolution: ApiConfigResolution,
+  baseUrlOverride?: string,
+): Record<string, unknown> {
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
   if (!config || !providerMetadata) {
@@ -1784,15 +1808,21 @@ function buildPiCustomModel(resolution: ApiConfigResolution): Record<string, unk
   const fallbackMaxTokens = isLocalModel
     ? DEFAULT_PI_LOCAL_MAX_TOKENS
     : DEFAULT_PI_CLOUD_MAX_TOKENS;
+  const capabilities = providerMetadata.capabilities;
+  const piRuntime = providerMetadata.piRuntime;
+  const compat = piRuntime?.compat;
+  const supportsImage =
+    providerMetadata.supportsImage || capabilities?.imageInput === ModelCapabilityStatus.Supported;
 
   return {
     id: config.model,
     name: providerMetadata.modelName || config.model,
-    api: config.apiType === 'anthropic' ? 'anthropic-messages' : 'openai-completions',
+    api: resolvePiCustomModelApi(resolution),
     provider: providerMetadata.providerName,
-    baseUrl: config.baseURL,
-    reasoning: false,
-    input: providerMetadata.supportsImage ? ['text', 'image'] : ['text'],
+    baseUrl: baseUrlOverride || config.baseURL,
+    reasoning: resolveProviderModelPiReasoning(piRuntime, capabilities),
+    input: supportsImage ? ['text', 'image'] : ['text'],
+    ...(hasRecordEntries(compat) ? { compat } : {}),
     cost: {
       input: 0,
       output: 0,
@@ -1817,16 +1847,53 @@ function canUsePiBuiltinModel(
   return normalizePiBaseUrl(builtinModel.baseUrl) === normalizePiBaseUrl(resolution.config.baseURL);
 }
 
+function shouldUsePiOpenAICompatProxy(
+  resolution: ApiConfigResolution,
+  api: ProviderModelPiApi,
+): boolean {
+  const providerName = resolution.providerMetadata?.providerName ?? '';
+  return (
+    providerName.startsWith('custom_') &&
+    resolution.config?.apiType === 'openai' &&
+    api === ProviderModelPiApi.OpenAICompletions
+  );
+}
+
+async function resolvePiCustomModelBaseUrl(
+  resolution: ApiConfigResolution,
+  api: ProviderModelPiApi,
+): Promise<string> {
+  const config = resolution.config;
+  const providerMetadata = resolution.providerMetadata;
+  if (!config || !providerMetadata) {
+    return '';
+  }
+
+  if (!shouldUsePiOpenAICompatProxy(resolution, api)) {
+    return config.baseURL;
+  }
+
+  return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
+    baseURL: config.baseURL,
+    apiKey: config.apiKey,
+  });
+}
+
+interface PiCustomModelRuntimeResolution {
+  modelRuntime: PiModelRuntime | null;
+  customModel: Record<string, unknown> | null;
+}
+
 async function resolvePiCustomModelRuntime(
   pi: PiModules,
   resolution: ApiConfigResolution,
   builtinModel: Record<string, unknown> | null,
   existingModelRuntime?: PiModelRuntime | null,
-): Promise<PiModelRuntime | null> {
+): Promise<PiCustomModelRuntimeResolution> {
   const config = resolution.config;
   const providerMetadata = resolution.providerMetadata;
   if (!config || !providerMetadata) {
-    return null;
+    return { modelRuntime: existingModelRuntime ?? null, customModel: null };
   }
   if (canUsePiBuiltinModel(builtinModel, resolution)) {
     // Builtin model path (e.g. MiniMax M3 resolves to pi's built-in `minimax-cn`
@@ -1837,18 +1904,22 @@ async function resolvePiCustomModelRuntime(
     const apiKey = config.apiKey?.trim() || '';
     const builtinProviderId =
       typeof builtinModel?.provider === 'string' ? builtinModel.provider : null;
-    if (!apiKey || !builtinProviderId) return existingModelRuntime ?? null;
+    if (!apiKey || !builtinProviderId) {
+      return { modelRuntime: existingModelRuntime ?? null, customModel: null };
+    }
     const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
     await modelRuntime.setRuntimeApiKey(builtinProviderId, apiKey);
-    return modelRuntime;
+    return { modelRuntime, customModel: null };
   }
 
   const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
-  const model = buildPiCustomModel(resolution);
+  const api = resolvePiCustomModelApi(resolution);
+  const runtimeBaseUrl = await resolvePiCustomModelBaseUrl(resolution, api);
+  const model = buildPiCustomModel(resolution, runtimeBaseUrl);
   const providerId = providerMetadata.providerName;
   modelRuntime.registerProvider(providerId, {
     name: providerId,
-    baseUrl: config.baseURL,
+    baseUrl: runtimeBaseUrl,
     api: model.api,
     models: [model],
   });
@@ -1856,7 +1927,7 @@ async function resolvePiCustomModelRuntime(
     config.apiKey?.trim() ||
     (isLocalProviderName(providerMetadata.providerName) ? PI_LOCAL_API_KEY : '');
   if (apiKey) await modelRuntime.setRuntimeApiKey(providerId, apiKey);
-  return modelRuntime;
+  return { modelRuntime, customModel: model };
 }
 
 function buildPiBuiltinModel(
@@ -1899,13 +1970,14 @@ async function resolvePiModel(
   }
 
   const builtinModel = buildPiBuiltinModel(pi, resolution);
-  const modelRuntime = await resolvePiCustomModelRuntime(
+  const customRuntime = await resolvePiCustomModelRuntime(
     pi,
     resolution,
     builtinModel,
     existingModelRuntime,
   );
-  const customModel = buildPiCustomModel(resolution);
+  const modelRuntime = customRuntime.modelRuntime;
+  const customModel = customRuntime.customModel ?? buildPiCustomModel(resolution);
   const registeredModel = modelRuntime?.getModel(
     resolution.providerMetadata.providerName,
     resolution.config.model,
@@ -1919,7 +1991,11 @@ async function resolvePiModel(
         ? (registeredModel as Record<string, unknown>)
         : customModel),
     modelRuntime,
-    maxOutputTokens: resolution.providerMetadata.maxTokens || DEFAULT_PI_LOCAL_MAX_TOKENS,
+    maxOutputTokens:
+      resolution.providerMetadata.maxTokens ||
+      (isLocalProviderName(resolution.providerMetadata.providerName)
+        ? DEFAULT_PI_LOCAL_MAX_TOKENS
+        : DEFAULT_PI_CLOUD_MAX_TOKENS),
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
 }

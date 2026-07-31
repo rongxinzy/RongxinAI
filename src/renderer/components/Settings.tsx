@@ -34,6 +34,7 @@ import {
   isProviderEnabled,
   ModelCapabilityStatus,
   type ModelCapabilities,
+  type ProviderModelPiRuntimeConfig,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -48,6 +49,7 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
+import { PiRuntimeModelConfig } from './settings/PiRuntimeModelConfig';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -828,6 +830,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [newModelCapabilities, setNewModelCapabilities] = useState<Partial<ModelCapabilities>>(
     DEFAULT_CUSTOM_MODEL_CAPABILITIES,
   );
+  const [newModelPiRuntime, setNewModelPiRuntime] = useState<
+    ProviderModelPiRuntimeConfig | undefined
+  >(undefined);
   const [modelFormError, setModelFormError] = useState<string | null>(null);
 
   // About tab
@@ -2227,6 +2232,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelId('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
+    setNewModelPiRuntime(undefined);
     setModelFormError(null);
   };
 
@@ -2235,6 +2241,7 @@ const Settings: React.FC<SettingsProps> = ({
     modelName: string,
     supportsImage?: boolean,
     capabilities?: Partial<ModelCapabilities>,
+    piRuntime?: ProviderModelPiRuntimeConfig,
   ) => {
     setIsAddingModel(false);
     setIsEditingModel(true);
@@ -2243,6 +2250,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelId(modelId);
     setNewModelSupportsImage(!!supportsImage);
     setNewModelCapabilities({ ...DEFAULT_CUSTOM_MODEL_CAPABILITIES, ...capabilities });
+    setNewModelPiRuntime(piRuntime);
     setModelFormError(null);
   };
 
@@ -2303,6 +2311,9 @@ const Settings: React.FC<SettingsProps> = ({
         newModelSupportsImage,
       ),
       ...(isCustomProvider(activeProvider) ? { capabilities: newModelCapabilities } : {}),
+      ...(isCustomProvider(activeProvider) && newModelPiRuntime
+        ? { piRuntime: newModelPiRuntime }
+        : {}),
     };
     const updatedModels =
       isEditingModel && editingModelId
@@ -2324,6 +2335,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelId('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
+    setNewModelPiRuntime(undefined);
     setModelFormError(null);
   };
 
@@ -2335,6 +2347,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelId('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
+    setNewModelPiRuntime(undefined);
     setModelFormError(null);
   };
 
@@ -4801,6 +4814,7 @@ const Settings: React.FC<SettingsProps> = ({
                                       model.name,
                                       model.supportsImage,
                                       model.capabilities,
+                                      model.piRuntime,
                                     )
                                   }
                                   aria-label={`${i18nService.t('editModel')} ${model.name}`}
@@ -5517,48 +5531,56 @@ const Settings: React.FC<SettingsProps> = ({
                   </label>
                 </div>
                 {isCustomProvider(activeProvider) && (
-                  <div className="rounded-lg border border-border bg-surface-raised p-3">
-                    <p className="mb-2 text-xs font-medium text-foreground">
-                      {i18nService.t('modelCapabilities')}
-                    </p>
-                    <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
-                      {i18nService.t('modelCapabilitiesHint')}
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
-                        <label
-                          key={field.key}
-                          className="space-y-1 text-[11px] text-muted-foreground"
-                        >
-                          <span>{i18nService.t(field.labelKey)}</span>
-                          <Select
-                            value={newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown}
-                            onValueChange={value =>
-                              setNewModelCapabilities(current => ({
-                                ...current,
-                                [field.key]: value as ModelCapabilityStatus,
-                              }))
-                            }
+                  <>
+                    <div className="rounded-lg border border-border bg-surface-raised p-3">
+                      <p className="mb-2 text-xs font-medium text-foreground">
+                        {i18nService.t('modelCapabilities')}
+                      </p>
+                      <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
+                        {i18nService.t('modelCapabilitiesHint')}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
+                          <label
+                            key={field.key}
+                            className="space-y-1 text-[11px] text-muted-foreground"
                           >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={ModelCapabilityStatus.Supported}>
-                                {i18nService.t('capabilitySupported')}
-                              </SelectItem>
-                              <SelectItem value={ModelCapabilityStatus.Unsupported}>
-                                {i18nService.t('capabilityUnsupported')}
-                              </SelectItem>
-                              <SelectItem value={ModelCapabilityStatus.Unknown}>
-                                {i18nService.t('capabilityUnknown')}
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </label>
-                      ))}
+                            <span>{i18nService.t(field.labelKey)}</span>
+                            <Select
+                              value={
+                                newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown
+                              }
+                              onValueChange={value =>
+                                setNewModelCapabilities(current => ({
+                                  ...current,
+                                  [field.key]: value as ModelCapabilityStatus,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={ModelCapabilityStatus.Supported}>
+                                  {i18nService.t('capabilitySupported')}
+                                </SelectItem>
+                                <SelectItem value={ModelCapabilityStatus.Unsupported}>
+                                  {i18nService.t('capabilityUnsupported')}
+                                </SelectItem>
+                                <SelectItem value={ModelCapabilityStatus.Unknown}>
+                                  {i18nService.t('capabilityUnknown')}
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                    <PiRuntimeModelConfig
+                      value={newModelPiRuntime}
+                      onChange={setNewModelPiRuntime}
+                    />
+                  </>
                 )}
               </div>
 
