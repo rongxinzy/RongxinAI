@@ -7,6 +7,7 @@ import type {
   LlamaCppRuntimeCudaMajor,
   LlamaCppServiceConfigFieldKey,
 } from './constants';
+import type { ModelCapabilities } from '../providers';
 
 export type LlamaCppServerStatus =
   | 'unknown'
@@ -326,6 +327,7 @@ export type LlamaCppCancelInstallResult = {
 
 export type LlamaCppModelPreference = {
   ctxSize?: number;
+  capabilities?: Pick<ModelCapabilities, 'toolCalling'>;
 };
 
 export type LlamaCppModelPreferences = Record<string, LlamaCppModelPreference>;

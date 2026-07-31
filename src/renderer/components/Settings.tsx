@@ -1,4 +1,4 @@
-import { Button } from '@shared/components/ui/button';
+﻿import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { Input } from '@shared/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@shared/components/ui/radio-group';
@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { Textarea } from '@shared/components/ui/textarea';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
@@ -39,6 +40,7 @@ import {
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
 } from '../../shared/providers';
+import type { LlamaCppModelPreference } from '../../shared/llamacpp';
 import { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import {
   type AppConfig,
@@ -118,6 +120,7 @@ import {
 import IMSettings from './im/IMSettings';
 import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
 import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
+import { ModelCapabilitySettingsModal } from './localInference/components/ModelCapabilitySettingsModal';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 
@@ -826,7 +829,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
-  const [newModelContextWindow, setNewModelContextWindow] = useState('');
   const [newModelSupportsImage, setNewModelSupportsImage] = useState(false);
   const [newModelCapabilities, setNewModelCapabilities] = useState<Partial<ModelCapabilities>>(
     DEFAULT_CUSTOM_MODEL_CAPABILITIES,
@@ -835,6 +837,9 @@ const Settings: React.FC<SettingsProps> = ({
     ProviderModelPiRuntimeConfig | undefined
   >(undefined);
   const [modelFormError, setModelFormError] = useState<string | null>(null);
+  const [llamaCapabilityModel, setLlamaCapabilityModel] = useState<Model | null>(null);
+  const [llamaCapabilityPreference, setLlamaCapabilityPreference] =
+    useState<LlamaCppModelPreference>();
 
   // About tab
   const [appVersion, setAppVersion] = useState('');
@@ -2181,7 +2186,6 @@ const Settings: React.FC<SettingsProps> = ({
       setEditingModelId(null);
       setNewModelName('');
       setNewModelId('');
-      setNewModelContextWindow('');
       setNewModelSupportsImage(false);
       setModelFormError(null);
     }
@@ -2232,7 +2236,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelContextWindow('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
@@ -2244,7 +2247,6 @@ const Settings: React.FC<SettingsProps> = ({
     modelName: string,
     supportsImage?: boolean,
     capabilities?: Partial<ModelCapabilities>,
-    contextWindow?: number,
     piRuntime?: ProviderModelPiRuntimeConfig,
   ) => {
     setIsAddingModel(false);
@@ -2252,7 +2254,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(modelId);
     setNewModelName(modelName);
     setNewModelId(modelId);
-    setNewModelContextWindow(contextWindow?.toString() ?? '');
     setNewModelSupportsImage(!!supportsImage);
     setNewModelCapabilities({ ...DEFAULT_CUSTOM_MODEL_CAPABILITIES, ...capabilities });
     setNewModelPiRuntime(piRuntime);
@@ -2271,6 +2272,22 @@ const Settings: React.FC<SettingsProps> = ({
         models: updatedModels,
       },
     }));
+  };
+
+  const handleSaveLlamaCapability = async (
+    model: Model,
+    toolCalling: ModelCapabilityStatus,
+  ): Promise<void> => {
+    const preferences = await window.electron.llamacpp.getModelPreferences();
+    await window.electron.llamacpp.setModelPreference({
+      modelName: model.id,
+      preference: {
+        ...preferences[model.id],
+        capabilities: { toolCalling },
+      },
+    });
+    window.dispatchEvent(new CustomEvent(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT));
+    setLlamaCapabilityModel(null);
   };
 
   const handleSaveNewModel = () => {
@@ -2299,11 +2316,6 @@ const Settings: React.FC<SettingsProps> = ({
         : newModelName.trim();
 
     const currentModels = providers[activeProvider].models ?? [];
-    const contextWindow = Number(newModelContextWindow);
-    if (newModelContextWindow.trim() && (!Number.isInteger(contextWindow) || contextWindow <= 0)) {
-      setModelFormError(i18nService.t('modelContextWindowInvalid'));
-      return;
-    }
     const duplicateModel = currentModels.find(
       model => model.id === modelId && (!isEditingModel || model.id !== editingModelId),
     );
@@ -2324,7 +2336,6 @@ const Settings: React.FC<SettingsProps> = ({
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
         : {}),
-      ...(newModelContextWindow.trim() ? { contextWindow } : {}),
     };
     const updatedModels =
       isEditingModel && editingModelId
@@ -2344,7 +2355,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelContextWindow('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
@@ -2357,7 +2367,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelContextWindow('');
     setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
@@ -4827,7 +4836,6 @@ const Settings: React.FC<SettingsProps> = ({
                                       model.name,
                                       model.supportsImage,
                                       model.capabilities,
-                                      model.contextWindow ?? model.contextTokens,
                                       model.piRuntime,
                                     )
                                   }
@@ -4849,6 +4857,26 @@ const Settings: React.FC<SettingsProps> = ({
                                   <Trash2 />
                                 </Button>
                               </>
+                            )}
+                            {activeProvider === ProviderName.LlamaCpp && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-xs"
+                                onClick={() => {
+                                  void window.electron.llamacpp
+                                    .getModelPreferences()
+                                    .then(preferences => {
+                                      setLlamaCapabilityPreference(preferences[model.id]);
+                                      setLlamaCapabilityModel(model);
+                                    });
+                                }}
+                                aria-label={`${i18nService.t('modelCapabilities')} ${model.name}`}
+                                title={i18nService.t('modelCapabilities')}
+                                className="size-5 text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
+                              >
+                                <Pencil />
+                              </Button>
                             )}
                           </div>
                         </div>
@@ -5441,194 +5469,179 @@ const Settings: React.FC<SettingsProps> = ({
 
               {modelFormError && <p className="mb-3 text-xs text-destructive">{modelFormError}</p>}
 
-              <div className="space-y-3">
-                {activeProvider === 'ollama' ? (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">
-                        {i18nService.t('ollamaModelName')}
-                        <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-                      </label>
-                      <Input
-                        autoFocus
-                        type="text"
-                        value={newModelId}
-                        onChange={e => {
-                          setNewModelId(e.target.value);
-                          if (!newModelName || newModelName === newModelId) {
-                            setNewModelName(e.target.value);
-                          }
-                          if (modelFormError) {
-                            setModelFormError(null);
-                          }
-                        }}
-                        className="text-xs"
-                        placeholder={i18nService.t('ollamaModelNamePlaceholder')}
-                      />
-                      <p className="mt-1 text-[11px] text-muted">
-                        {i18nService.t('ollamaModelNameHint')}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">
-                        {i18nService.t('ollamaDisplayName')}
-                      </label>
-                      <Input
-                        type="text"
-                        value={newModelName === newModelId ? '' : newModelName}
-                        onChange={e => {
-                          setNewModelName(e.target.value || newModelId);
-                          if (modelFormError) {
-                            setModelFormError(null);
-                          }
-                        }}
-                        className="text-xs"
-                        placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
-                      />
-                      <p className="mt-1 text-[11px] text-muted">
-                        {i18nService.t('ollamaDisplayNameHint')}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">
-                        {i18nService.t('modelName')}
-                        <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-                      </label>
-                      <Input
-                        autoFocus
-                        type="text"
-                        value={newModelName}
-                        onChange={e => {
-                          setNewModelName(e.target.value);
-                          if (modelFormError) {
-                            setModelFormError(null);
-                          }
-                        }}
-                        className="text-xs"
-                        placeholder="GPT-4"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1">
-                        {i18nService.t('modelId')}
-                        <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-                      </label>
-                      <Input
-                        type="text"
-                        value={newModelId}
-                        onChange={e => {
-                          setNewModelId(e.target.value);
-                          if (modelFormError) {
-                            setModelFormError(null);
-                          }
-                        }}
-                        className="text-xs"
-                        placeholder="gpt-4"
-                      />
-                    </div>
-                    {isCustomProvider(activeProvider) && (
-                      <div>
-                        <label
-                          htmlFor={`${activeProvider}-model-context-window`}
-                          className="block text-xs font-medium text-muted-foreground mb-1"
-                        >
-                          {i18nService.t('modelContextWindow')}
-                        </label>
-                        <Input
-                          id={`${activeProvider}-model-context-window`}
-                          type="number"
-                          min="1"
-                          step="1"
-                          aria-describedby={`${activeProvider}-model-context-window-hint`}
-                          value={newModelContextWindow}
-                          onChange={e => {
-                            setNewModelContextWindow(e.target.value);
-                            if (modelFormError) {
-                              setModelFormError(null);
-                            }
-                          }}
-                          className="text-xs"
-                          placeholder="128000"
-                        />
-                        <p
-                          id={`${activeProvider}-model-context-window-hint`}
-                          className="mt-1 text-xs text-muted-foreground"
-                        >
-                          {i18nService.t('modelContextWindowHint')}
-                        </p>
-                      </div>
-                    )}
-                  </>
+              <Tabs defaultValue="basic" className="gap-4">
+                {isCustomProvider(activeProvider) && (
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="basic">{i18nService.t('modelName')}</TabsTrigger>
+                    <TabsTrigger value="capabilities">
+                      {i18nService.t('modelCapabilities')}
+                    </TabsTrigger>
+                    <TabsTrigger value="work">{i18nService.t('piRuntimeModelOptions')}</TabsTrigger>
+                  </TabsList>
                 )}
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`${activeProvider}-supportsImage`}
-                    checked={newModelSupportsImage}
-                    onCheckedChange={checked => setNewModelSupportsImage(checked === true)}
-                  />
-                  <label
-                    htmlFor={`${activeProvider}-supportsImage`}
-                    className="text-xs text-muted-foreground"
-                  >
-                    {i18nService.t('supportsImageInput')}
-                  </label>
-                </div>
+                <TabsContent value="basic" className="mt-0">
+                  <div className="space-y-3">
+                    {activeProvider === 'ollama' ? (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            {i18nService.t('ollamaModelName')}
+                            <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                          </label>
+                          <Input
+                            autoFocus
+                            type="text"
+                            value={newModelId}
+                            onChange={e => {
+                              setNewModelId(e.target.value);
+                              if (!newModelName || newModelName === newModelId) {
+                                setNewModelName(e.target.value);
+                              }
+                              if (modelFormError) {
+                                setModelFormError(null);
+                              }
+                            }}
+                            className="text-xs"
+                            placeholder={i18nService.t('ollamaModelNamePlaceholder')}
+                          />
+                          <p className="mt-1 text-[11px] text-muted">
+                            {i18nService.t('ollamaModelNameHint')}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            {i18nService.t('ollamaDisplayName')}
+                          </label>
+                          <Input
+                            type="text"
+                            value={newModelName === newModelId ? '' : newModelName}
+                            onChange={e => {
+                              setNewModelName(e.target.value || newModelId);
+                              if (modelFormError) {
+                                setModelFormError(null);
+                              }
+                            }}
+                            className="text-xs"
+                            placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
+                          />
+                          <p className="mt-1 text-[11px] text-muted">
+                            {i18nService.t('ollamaDisplayNameHint')}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            {i18nService.t('modelName')}
+                            <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                          </label>
+                          <Input
+                            autoFocus
+                            type="text"
+                            value={newModelName}
+                            onChange={e => {
+                              setNewModelName(e.target.value);
+                              if (modelFormError) {
+                                setModelFormError(null);
+                              }
+                            }}
+                            className="text-xs"
+                            placeholder="GPT-4"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-muted-foreground mb-1">
+                            {i18nService.t('modelId')}
+                            <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                          </label>
+                          <Input
+                            type="text"
+                            value={newModelId}
+                            onChange={e => {
+                              setNewModelId(e.target.value);
+                              if (modelFormError) {
+                                setModelFormError(null);
+                              }
+                            }}
+                            className="text-xs"
+                            placeholder="gpt-4"
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`${activeProvider}-supportsImage`}
+                        checked={newModelSupportsImage}
+                        onCheckedChange={checked => setNewModelSupportsImage(checked === true)}
+                      />
+                      <label
+                        htmlFor={`${activeProvider}-supportsImage`}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {i18nService.t('supportsImageInput')}
+                      </label>
+                    </div>
+                  </div>
+                </TabsContent>
                 {isCustomProvider(activeProvider) && (
                   <>
-                    <div className="rounded-lg border border-border bg-surface-raised p-3">
-                      <p className="mb-2 text-xs font-medium text-foreground">
-                        {i18nService.t('modelCapabilities')}
-                      </p>
-                      <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
-                        {i18nService.t('modelCapabilitiesHint')}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
-                          <label
-                            key={field.key}
-                            className="space-y-1 text-[11px] text-muted-foreground"
-                          >
-                            <span>{i18nService.t(field.labelKey)}</span>
-                            <Select
-                              value={
-                                newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown
-                              }
-                              onValueChange={value =>
-                                setNewModelCapabilities(current => ({
-                                  ...current,
-                                  [field.key]: value as ModelCapabilityStatus,
-                                }))
-                              }
+                    <TabsContent value="capabilities" className="mt-0">
+                      <div className="rounded-lg border border-border bg-surface-raised p-3">
+                        <p className="mb-2 text-xs font-medium text-foreground">
+                          {i18nService.t('modelCapabilities')}
+                        </p>
+                        <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
+                          {i18nService.t('modelCapabilitiesHint')}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                          {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
+                            <label
+                              key={field.key}
+                              className="flex flex-col gap-1 text-sm text-foreground"
                             >
-                              <SelectTrigger className="h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={ModelCapabilityStatus.Supported}>
-                                  {i18nService.t('capabilitySupported')}
-                                </SelectItem>
-                                <SelectItem value={ModelCapabilityStatus.Unsupported}>
-                                  {i18nService.t('capabilityUnsupported')}
-                                </SelectItem>
-                                <SelectItem value={ModelCapabilityStatus.Unknown}>
-                                  {i18nService.t('capabilityUnknown')}
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </label>
-                        ))}
+                              <span>{i18nService.t(field.labelKey)}</span>
+                              <Select
+                                value={
+                                  newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown
+                                }
+                                onValueChange={value =>
+                                  setNewModelCapabilities(current => ({
+                                    ...current,
+                                    [field.key]: value as ModelCapabilityStatus,
+                                  }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value={ModelCapabilityStatus.Supported}>
+                                    {i18nService.t('capabilitySupported')}
+                                  </SelectItem>
+                                  <SelectItem value={ModelCapabilityStatus.Unsupported}>
+                                    {i18nService.t('capabilityUnsupported')}
+                                  </SelectItem>
+                                  <SelectItem value={ModelCapabilityStatus.Unknown}>
+                                    {i18nService.t('capabilityUnknown')}
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    <PiRuntimeModelConfig
-                      value={newModelPiRuntime}
-                      onChange={setNewModelPiRuntime}
-                    />
+                    </TabsContent>
+                    <TabsContent value="work" className="mt-0">
+                      <PiRuntimeModelConfig
+                        value={newModelPiRuntime}
+                        onChange={setNewModelPiRuntime}
+                      />
+                    </TabsContent>
                   </>
                 )}
-              </div>
+              </Tabs>
 
               <div className="flex justify-end space-x-2 mt-4">
                 <Button type="button" variant="outline" size="sm" onClick={handleCancelModelEdit}>
@@ -5641,6 +5654,21 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
         )}
+
+        <ModelCapabilitySettingsModal
+          isOpen={Boolean(llamaCapabilityModel)}
+          model={llamaCapabilityModel ? { name: llamaCapabilityModel.name } : null}
+          preference={llamaCapabilityPreference}
+          onClose={() => {
+            setLlamaCapabilityModel(null);
+            setLlamaCapabilityPreference(undefined);
+          }}
+          onSave={toolCalling => {
+            if (llamaCapabilityModel) {
+              void handleSaveLlamaCapability(llamaCapabilityModel, toolCalling);
+            }
+          }}
+        />
 
         {/* Memory Modal */}
         {showMemoryModal && (
