@@ -35,14 +35,14 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import {
   addArtifact,
+  ArtifactLayoutMode,
   closePanel,
-  MAX_PANEL_WIDTH,
+  DEFAULT_PANEL_WIDTH,
   MIN_PANEL_WIDTH,
   EMPTY_ARTIFACTS,
   selectArtifact,
   selectArtifactLayoutMode,
   selectIsPanelOpen,
-  selectPanelWidth,
   selectSessionArtifacts,
   togglePanel,
 } from '../../store/slices/artifactSlice';
@@ -57,7 +57,8 @@ import type {
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { getCompactFolderName } from '../../utils/path';
-import { ArtifactPanel } from '../artifacts';
+import { ArtifactPanelFrame } from '../artifacts';
+import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
@@ -118,9 +119,6 @@ interface CoworkSessionDetailProps {
 
 const NAV_SCROLL_LOCK_DURATION = 800;
 const ARTIFACT_PANEL_TRANSITION_MS = 200;
-const ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH = 4;
-const COWORK_DETAIL_MIN_WIDTH = 480;
-const ARTIFACT_PANEL_MIN_WIDTH_RATIO = 1 / 6;
 class ArtifactPanelErrorBoundary extends React.Component<
   { children: React.ReactNode; onClose: () => void },
   { hasError: boolean; error: Error | null }
@@ -227,14 +225,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   // ─── Artifact detection ─────────────────────────────────────────────
   const isPanelOpen = useSelector(selectIsPanelOpen);
-  const panelWidth = useSelector(selectPanelWidth);
   const artifactLayoutMode = useSelector(selectArtifactLayoutMode);
-  const isArtifactWorkspace = artifactLayoutMode === 'workspace';
+  const isArtifactWorkspace = artifactLayoutMode === ArtifactLayoutMode.Workspace;
   const [shouldRenderArtifactPanel, setShouldRenderArtifactPanel] = useState(isPanelOpen);
   const [isArtifactPanelVisible, setIsArtifactPanelVisible] = useState(isPanelOpen);
   const [isArtifactPanelTransitioning, setIsArtifactPanelTransitioning] = useState(false);
-  const [artifactPanelMinWidth, setArtifactPanelMinWidth] = useState(MIN_PANEL_WIDTH);
-  const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(MAX_PANEL_WIDTH);
+  const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
+    typeof window === 'undefined'
+      ? DEFAULT_PANEL_WIDTH
+      : Math.max(MIN_PANEL_WIDTH, window.innerWidth),
+  );
   const previousArtifactPanelOpenRef = useRef(isPanelOpen);
   const contentRowRef = useRef<HTMLDivElement>(null);
   const sessionArtifacts = useSelector((state: RootState) =>
@@ -316,12 +316,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const updateArtifactPanelMaxWidth = useCallback(() => {
     const contentWidth = contentRowRef.current?.clientWidth ?? 0;
     if (contentWidth <= 0) return;
-    const availablePanelWidth =
-      contentWidth - COWORK_DETAIL_MIN_WIDTH - ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH;
-    const nextMaxWidth = Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, availablePanelWidth));
-    const proportionalMinWidth = Math.floor(contentWidth * ARTIFACT_PANEL_MIN_WIDTH_RATIO);
-    const nextMinWidth = Math.min(nextMaxWidth, Math.max(MIN_PANEL_WIDTH, proportionalMinWidth));
-    setArtifactPanelMinWidth(prev => (prev === nextMinWidth ? prev : nextMinWidth));
+    const nextMaxWidth = Math.max(
+      MIN_PANEL_WIDTH,
+      contentWidth - ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
+    );
     setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
   }, []);
 
@@ -948,11 +946,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     return null;
   }
 
-  const artifactPanelFrameWidth = isArtifactPanelVisible
-    ? Math.max(artifactPanelMinWidth, Math.min(panelWidth, artifactPanelMaxWidth)) +
-      ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH
-    : 0;
-
   const renderConversationTurns = () => {
     let railCounter = 0;
     if (turns.length === 0) {
@@ -1184,10 +1177,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
         <div
           ref={detailRootRef}
-          className={`flex-1 flex flex-col bg-background h-full ${
+          className={`min-w-0 flex-1 flex flex-col bg-background h-full ${
             isArtifactWorkspace ? 'hidden' : ''
           }`}
-          style={{ minWidth: isArtifactWorkspace ? 0 : COWORK_DETAIL_MIN_WIDTH }}
           aria-hidden={isArtifactWorkspace}
         >
           <div className="relative flex-1 min-h-0">
@@ -1495,33 +1487,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           </div>
         </div>
         {shouldRenderArtifactPanel && (
-          <div
-            className={`h-full overflow-hidden ${isArtifactWorkspace ? 'flex-1' : 'shrink-0'} ${
-              isArtifactPanelTransitioning
-                ? 'transition-[width,opacity] duration-200 ease-out motion-reduce:transition-none'
-                : ''
-            } ${isArtifactPanelVisible ? 'opacity-100' : 'pointer-events-none opacity-0'}`}
-            style={{
-              width: isArtifactWorkspace ? '100%' : artifactPanelFrameWidth,
-              maxWidth: isArtifactWorkspace
-                ? 'none'
-                : artifactPanelMaxWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
-            }}
-            aria-hidden={!isPanelOpen}
-          >
-            <div
-              className="flex h-full"
-              style={{ width: isArtifactWorkspace ? '100%' : artifactPanelFrameWidth }}
-            >
-              <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-                <ArtifactPanel
-                  artifacts={sessionArtifacts}
-                  minPanelWidth={artifactPanelMinWidth}
-                  maxPanelWidth={artifactPanelMaxWidth}
-                />
-              </ArtifactPanelErrorBoundary>
-            </div>
-          </div>
+          <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
+            <ArtifactPanelFrame
+              artifacts={sessionArtifacts}
+              isOpen={isPanelOpen}
+              isVisible={isArtifactPanelVisible}
+              isTransitioning={isArtifactPanelTransitioning}
+              layoutMode={artifactLayoutMode}
+              minPanelWidth={MIN_PANEL_WIDTH}
+              maxPanelWidth={artifactPanelMaxWidth}
+            />
+          </ArtifactPanelErrorBoundary>
         )}
       </div>
     </div>

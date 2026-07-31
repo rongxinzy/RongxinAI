@@ -31,11 +31,11 @@ const ScaledSlide = memo<ScaledSlideProps>(({ slide, scale, title, lazy = false 
   return (
     <div
       className="relative overflow-hidden bg-background"
-      style={{ width: scaledWidth, height: scaledHeight }}
+      style={{ width: scaledWidth, height: scaledHeight, contain: 'layout paint' }}
     >
       <iframe
         aria-hidden={lazy || undefined}
-        className="absolute inset-0 border-0"
+        className="pointer-events-none absolute inset-0 select-none border-0"
         loading={lazy ? 'lazy' : 'eager'}
         sandbox=""
         srcDoc={slide.srcDoc}
@@ -44,6 +44,7 @@ const ScaledSlide = memo<ScaledSlideProps>(({ slide, scale, title, lazy = false 
           height: slide.height,
           transform: `scale(${scale})`,
           transformOrigin: 'top left',
+          willChange: lazy ? undefined : 'transform',
         }}
         tabIndex={-1}
         title={title}

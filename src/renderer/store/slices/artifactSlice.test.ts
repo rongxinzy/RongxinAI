@@ -1,7 +1,14 @@
 import { describe, expect, test } from 'vitest';
 
 import { ArtifactRole, type Artifact } from '../../types/artifact';
-import { addArtifact, closePanel, selectArtifact, setArtifactLayoutMode } from './artifactSlice';
+import {
+  addArtifact,
+  ArtifactLayoutMode,
+  closePanel,
+  selectArtifact,
+  setArtifactLayoutMode,
+  setPanelWidth,
+} from './artifactSlice';
 import artifactReducer from './artifactSlice';
 
 const makeArtifact = (overrides: Partial<Artifact> = {}): Artifact => ({
@@ -46,13 +53,19 @@ describe('artifact reducer', () => {
 
   test('keeps artifact focus mode explicit and resets it when the panel closes', () => {
     const selected = artifactReducer(undefined, selectArtifact('artifact-1'));
-    const focused = artifactReducer(selected, setArtifactLayoutMode('workspace'));
+    const focused = artifactReducer(selected, setArtifactLayoutMode(ArtifactLayoutMode.Workspace));
 
     expect(focused.isPanelOpen).toBe(true);
-    expect(focused.layoutMode).toBe('workspace');
+    expect(focused.layoutMode).toBe(ArtifactLayoutMode.Workspace);
 
     const closed = artifactReducer(focused, closePanel());
     expect(closed.isPanelOpen).toBe(false);
-    expect(closed.layoutMode).toBe('split');
+    expect(closed.layoutMode).toBe(ArtifactLayoutMode.Split);
+  });
+
+  test('persists wide panels without a legacy 1000 pixel ceiling', () => {
+    const resized = artifactReducer(undefined, setPanelWidth(1536));
+
+    expect(resized.panelWidth).toBe(1536);
   });
 });
