@@ -17,12 +17,8 @@ interface AppUpdateBadgeProps {
 const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, onClick }) => {
   const label =
     status === AppUpdateStatus.Ready
-      ? i18nService.t('updateReadyPill')
-      : status === AppUpdateStatus.Downloading
-        ? i18nService.t('updateDownloadingPill')
-        : status === AppUpdateStatus.Error
-          ? i18nService.t('updateErrorPill')
-          : i18nService.t('updateAvailablePill');
+      ? i18nService.t('updateReadyConfirm')
+      : i18nService.t('updateErrorPill');
 
   return (
     <Button
@@ -33,8 +29,12 @@ const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, 
       title={`${label} ${latestVersion}`}
       aria-label={`${label} ${latestVersion}`}
     >
-      {status === AppUpdateStatus.Downloading ? <Download className="h-4 w-4 shrink-0" /> : <ArrowUpCircle className="h-4 w-4 shrink-0" />}
-      <span className="truncate">{label} v{latestVersion}</span>
+      {status === AppUpdateStatus.Error ? (
+        <Download className="h-4 w-4 shrink-0" />
+      ) : (
+        <ArrowUpCircle className="h-4 w-4 shrink-0" />
+      )}
+      <span className="truncate">{label}</span>
     </Button>
   );
 };

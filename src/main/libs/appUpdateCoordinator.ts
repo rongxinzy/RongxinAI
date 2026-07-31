@@ -13,18 +13,15 @@ import {
   AppUpdateStatus,
 } from '../../shared/appUpdate/constants';
 import { APP_UPDATE_TRUSTED_KEYS } from '../../shared/appUpdate/trustedKeys';
+import { cancelActiveDownload, downloadUpdate, installUpdate } from './appUpdateInstaller';
 import type { SqliteStore } from '../sqliteStore';
 
 const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
 const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
 const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
+const READY_UPDATE_CACHE_KEY = 'app_update_ready';
 const SUPPORTED_UPDATE_PLATFORMS = new Set(['win32', 'darwin', 'linux']);
 const SUPPORTED_UPDATE_ARCHITECTURES = new Set(['x64', 'arm64']);
-
-type ManifestReleaseNotes = {
-  zh?: { title?: unknown; items?: unknown };
-  en?: { title?: unknown; items?: unknown };
-};
 
 type UpdatePayload = {
   channel?: unknown;
@@ -32,7 +29,6 @@ type UpdatePayload = {
   publishedAt?: unknown;
   minimumSupportedVersion?: unknown;
   mandatory?: unknown;
-  releaseNotes?: ManifestReleaseNotes;
   artifact?: {
     platform?: unknown;
     arch?: unknown;
@@ -56,6 +52,12 @@ type CachedSignedManifest = {
   envelope: unknown;
 };
 
+type ReadyUpdateCache = {
+  info: AppUpdateInfo;
+  filePath: string;
+  sha256: string;
+};
+
 const initialState = (): AppUpdateRuntimeState => ({
   status: AppUpdateStatus.Idle,
   source: null,
@@ -71,23 +73,15 @@ function base64UrlToBuffer(value: string): Buffer {
   return Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
 
-function releaseNotes(value: ManifestReleaseNotes | undefined, language: 'zh' | 'en') {
-  const notes = value?.[language];
-  return {
-    title: typeof notes?.title === 'string' ? notes.title : '',
-    content: Array.isArray(notes?.items)
-      ? notes.items.filter((item): item is string => typeof item === 'string')
-      : [],
-  };
-}
-
 export class AppUpdateCoordinator {
   private state: AppUpdateRuntimeState = initialState();
   private readonly store: SqliteStore;
   private checkPromise: Promise<AppUpdateCheckResult> | null = null;
+  private downloadPromise: Promise<void> | null = null;
 
   constructor(store: SqliteStore) {
     this.store = store;
+    this.restoreReadyUpdate();
   }
 
   getState(): AppUpdateRuntimeState {
@@ -100,6 +94,14 @@ export class AppUpdateCoordinator {
     }
     if (this.checkPromise) return this.checkPromise;
 
+    if (
+      this.state.status === AppUpdateStatus.Ready &&
+      this.state.info &&
+      this.isNewerVersion(this.state.info.latestVersion, this.resolveCurrentVersion())
+    ) {
+      return { success: true, state: this.getState(), updateFound: true };
+    }
+
     const source = options.manual ? AppUpdateSource.Manual : AppUpdateSource.Auto;
     this.checkPromise = this.checkForUpdate(source).finally(() => {
       this.checkPromise = null;
@@ -107,12 +109,25 @@ export class AppUpdateCoordinator {
     return this.checkPromise;
   }
 
-  /** Phase 1 deliberately does not download or execute unsigned installers. */
   async retryDownload(): Promise<AppUpdateRuntimeState> {
+    const info = this.state.info;
+    if (!info || this.downloadPromise || this.state.status === AppUpdateStatus.Installing) {
+      return this.getState();
+    }
+    this.startBackgroundDownload(info, this.state.source ?? AppUpdateSource.Manual);
     return this.getState();
   }
 
   cancelDownload(): AppUpdateRuntimeState {
+    if (this.state.status === AppUpdateStatus.Downloading) {
+      cancelActiveDownload();
+      this.setState({
+        ...initialState(),
+        status: AppUpdateStatus.Available,
+        source: this.state.source,
+        info: this.state.info,
+      });
+    }
     return this.getState();
   }
 
@@ -121,11 +136,39 @@ export class AppUpdateCoordinator {
     state: AppUpdateRuntimeState;
     error?: string;
   }> {
-    return {
-      success: false,
-      state: this.getState(),
-      error: 'In-app installation is not enabled yet',
-    };
+    const { readyFilePath, readyFileHash, info, source } = this.state;
+    if (!readyFilePath || !readyFileHash || !info) {
+      return { success: false, state: this.getState(), error: 'No verified update is ready' };
+    }
+
+    try {
+      const stat = await fs.promises.stat(readyFilePath);
+      if (stat.size !== info.expectedSize) throw new Error('Downloaded update file is no longer valid');
+      const actualHash = await this.sha256File(readyFilePath);
+      if (actualHash !== readyFileHash || actualHash !== info.expectedSha256) {
+        throw new Error('Downloaded update checksum verification failed');
+      }
+      this.setState({
+        ...this.state,
+        status: AppUpdateStatus.Installing,
+        progress: null,
+        errorMessage: null,
+      });
+      await installUpdate(readyFilePath);
+      return { success: true, state: this.getState() };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Update installation failed';
+      const state = this.setState({
+        ...initialState(),
+        status: AppUpdateStatus.Error,
+        source,
+        info,
+        readyFilePath,
+        readyFileHash,
+        errorMessage: message,
+      });
+      return { success: false, state, error: message };
+    }
   }
 
   private async checkForUpdate(source: AppUpdateSource): Promise<AppUpdateCheckResult> {
@@ -137,12 +180,19 @@ export class AppUpdateCoordinator {
         const state = this.setState(initialState());
         return { success: true, state, updateFound: false };
       }
+      if (
+        this.state.status === AppUpdateStatus.Ready &&
+        this.state.info?.latestVersion === info.latestVersion
+      ) {
+        return { success: true, state: this.getState(), updateFound: true };
+      }
       const state = this.setState({
         ...initialState(),
         status: AppUpdateStatus.Available,
         source,
         info,
       });
+      this.startBackgroundDownload(info, source);
       return { success: true, state, updateFound: true };
     } catch (error) {
       console.warn(
@@ -157,6 +207,99 @@ export class AppUpdateCoordinator {
         error: error instanceof Error ? error.message : 'Update check failed',
       };
     }
+  }
+
+  private startBackgroundDownload(info: AppUpdateInfo, source: AppUpdateSource): void {
+    if (this.downloadPromise) return;
+    this.setState({
+      ...initialState(),
+      status: AppUpdateStatus.Downloading,
+      source,
+      info,
+    });
+    this.downloadPromise = downloadUpdate(
+      info.url,
+      source,
+      { size: info.expectedSize, sha256: info.expectedSha256 },
+      progress => {
+        this.setState({ ...this.state, progress });
+      },
+    )
+      .then(({ filePath, sha256 }) => {
+        const readyUpdate: ReadyUpdateCache = { info, filePath, sha256 };
+        this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, readyUpdate);
+        this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.Ready,
+          source,
+          info,
+          readyFilePath: filePath,
+          readyFileHash: sha256,
+        });
+      })
+      .catch(error => {
+        if (
+          this.state.status !== AppUpdateStatus.Downloading ||
+          this.state.info?.latestVersion !== info.latestVersion
+        ) {
+          return;
+        }
+        const message = error instanceof Error ? error.message : 'Update download failed';
+        console.warn('[AppUpdate] background download failed:', message);
+        this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.Error,
+          source,
+          info,
+          errorMessage: message,
+        });
+      })
+      .finally(() => {
+        this.downloadPromise = null;
+      });
+  }
+
+  private restoreReadyUpdate(): void {
+    const cached = this.store.get<unknown>(READY_UPDATE_CACHE_KEY);
+    if (!this.isReadyUpdateCache(cached)) return;
+    try {
+      const stat = fs.statSync(cached.filePath);
+      if (stat.size !== cached.info.expectedSize) throw new Error('size mismatch');
+      if (!this.isNewerVersion(cached.info.latestVersion, this.resolveCurrentVersion())) {
+        throw new Error('not newer than the running app');
+      }
+      this.state = {
+        ...initialState(),
+        status: AppUpdateStatus.Ready,
+        source: AppUpdateSource.Auto,
+        info: cached.info,
+        readyFilePath: cached.filePath,
+        readyFileHash: cached.sha256,
+      };
+    } catch {
+      this.store.delete(READY_UPDATE_CACHE_KEY);
+    }
+  }
+
+  private isReadyUpdateCache(value: unknown): value is ReadyUpdateCache {
+    if (!value || typeof value !== 'object') return false;
+    const cached = value as ReadyUpdateCache;
+    return (
+      typeof cached.filePath === 'string' &&
+      /^[a-f0-9]{64}$/.test(cached.sha256) &&
+      Boolean(cached.info) &&
+      typeof cached.info.latestVersion === 'string' &&
+      typeof cached.info.expectedSize === 'number' &&
+      typeof cached.info.expectedSha256 === 'string'
+    );
+  }
+
+  private async sha256File(filePath: string): Promise<string> {
+    const hash = crypto.createHash('sha256');
+    for await (const chunk of fs.createReadStream(filePath)) {
+      hash.update(chunk);
+    }
+    return hash.digest('hex');
   }
 
   private async fetchUpdateInfo(currentVersion: string): Promise<AppUpdateInfo | null> {
@@ -304,15 +447,9 @@ export class AppUpdateCoordinator {
         : null;
     return {
       latestVersion: payload.version,
-      date: typeof payload.publishedAt === 'string' ? payload.publishedAt : '',
-      changeLog: {
-        zh: releaseNotes(payload.releaseNotes, 'zh'),
-        en: releaseNotes(payload.releaseNotes, 'en'),
-      },
       url: downloadUrl.toString(),
       expectedSize: artifact.size,
       expectedSha256: artifact.sha256,
-      manualDownload: true,
       mandatory: payload.mandatory === true,
       minimumSupportedVersion,
     };

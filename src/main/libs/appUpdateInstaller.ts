@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { exec, spawn } from 'child_process';
 import { app, session } from 'electron';
 import fs from 'fs';
@@ -12,6 +13,11 @@ export interface AppUpdateDownloadProgress {
   total: number | undefined;
   percent: number | undefined;
   speed: number | undefined;
+}
+
+export interface DownloadedAppUpdate {
+  filePath: string;
+  sha256: string;
 }
 
 let activeDownloadController: AbortController | null = null;
@@ -52,8 +58,9 @@ const DOWNLOAD_INACTIVITY_TIMEOUT_MS = 60_000;
 export async function downloadUpdate(
   url: string,
   source: AppUpdateSource,
+  expected: { size: number; sha256: string },
   onProgress: (progress: AppUpdateDownloadProgress) => void,
-): Promise<string> {
+): Promise<DownloadedAppUpdate> {
   if (activeDownloadController) {
     throw new Error('A download is already in progress');
   }
@@ -118,6 +125,7 @@ export async function downloadUpdate(
     console.log(`[AppUpdate] Content-Length: ${totalHeader ?? 'unknown'}`);
 
     let received = 0;
+    const hash = crypto.createHash('sha256');
     let lastSpeedTime = Date.now();
     let lastSpeedBytes = 0;
     let currentSpeed: number | undefined = undefined;
@@ -145,6 +153,7 @@ export async function downloadUpdate(
 
     nodeStream.on('data', (chunk: Buffer) => {
       received += chunk.length;
+      hash.update(chunk);
 
       // Reset inactivity timer on each chunk
       resetInactivityTimer();
@@ -179,6 +188,14 @@ export async function downloadUpdate(
     if (total && Number.isFinite(total) && stat.size !== total) {
       throw new Error(`Download incomplete: expected ${total} bytes but got ${stat.size}`);
     }
+    if (stat.size !== expected.size) {
+      throw new Error(`Downloaded size mismatch: expected ${expected.size} bytes but got ${stat.size}`);
+    }
+
+    const sha256 = hash.digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(sha256, 'hex'), Buffer.from(expected.sha256, 'hex'))) {
+      throw new Error('Downloaded file checksum verification failed');
+    }
 
     // Rename to final path (atomic on same filesystem)
     await fs.promises.rename(downloadPath, finalPath);
@@ -192,7 +209,7 @@ export async function downloadUpdate(
       speed: currentSpeed,
     });
 
-    return finalPath;
+    return { filePath: finalPath, sha256 };
   } catch (error) {
     clearInactivityTimer();
     console.error('[AppUpdate] Download error:', error);
@@ -243,7 +260,48 @@ export async function installUpdate(filePath: string): Promise<void> {
   if (process.platform === 'win32') {
     return installWindowsNsis(filePath);
   }
+  if (process.platform === 'linux') {
+    return installLinuxPackage(filePath);
+  }
   throw new Error('Unsupported platform');
+}
+
+async function installLinuxPackage(packagePath: string): Promise<void> {
+  const appImagePath = process.env.APPIMAGE;
+  const scriptPath = path.join(app.getPath('temp'), `zhiyuan-update-${Date.now()}.sh`);
+  const appPid = process.pid;
+  const waitForExit = `while kill -0 ${appPid} 2>/dev/null; do sleep 1; done`;
+
+  let script: string;
+  if (appImagePath) {
+    await fs.promises.access(path.dirname(appImagePath), fs.constants.W_OK);
+    const stagedPath = `${appImagePath}.updating`;
+    script = [
+      '#!/bin/sh',
+      'set -eu',
+      waitForExit,
+      `cp ${shellEscape(packagePath)} ${shellEscape(stagedPath)}`,
+      `chmod +x ${shellEscape(stagedPath)}`,
+      `mv ${shellEscape(stagedPath)} ${shellEscape(appImagePath)}`,
+      `exec ${shellEscape(appImagePath)}`,
+      '',
+    ].join('\n');
+  } else {
+    script = [
+      '#!/bin/sh',
+      'set -eu',
+      waitForExit,
+      `pkexec /usr/bin/dpkg -i ${shellEscape(packagePath)}`,
+      `exec ${shellEscape(process.execPath)}`,
+      '',
+    ].join('\n');
+  }
+
+  await fs.promises.writeFile(scriptPath, script, { mode: 0o700 });
+  const launcher = spawn('/bin/sh', [scriptPath], { detached: true, stdio: 'ignore' });
+  launcher.unref();
+  console.log(`[AppUpdate] Linux installer scheduled via ${scriptPath}`);
+  app.quit();
 }
 
 async function installMacDmg(dmgPath: string): Promise<void> {
@@ -362,7 +420,7 @@ async function installMacDmg(dmgPath: string): Promise<void> {
 }
 
 async function installWindowsNsis(exePath: string): Promise<void> {
-  console.log(`[AppUpdate] Windows NSIS install (interactive mode)`);
+  console.log(`[AppUpdate] Windows NSIS install (silent mode)`);
   console.log(`[AppUpdate]   installer: ${exePath}`);
   console.log(`[AppUpdate]   appPid: ${process.pid}`);
 
@@ -371,9 +429,8 @@ async function installWindowsNsis(exePath: string): Promise<void> {
   // which kills the entire process tree — including child processes.
   //
   // Strategy: use a tiny PowerShell script (launched via hidden VBS) that
-  // waits for the app to fully exit, then opens the installer with its
-  // normal UI (no /S silent flag). This lets NSIS handle everything:
-  // desktop shortcuts, start menu entries, "Run after finish", etc.
+  // waits for the app to fully exit, then runs the installer without its
+  // wizard. The installer can still request Windows UAC when required.
   const ts = Date.now();
   const tempDir = app.getPath('temp');
   const logPath = path.join(tempDir, `zhiyuan-update-${ts}.log`);
@@ -388,6 +445,7 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     `$logPath = '${psEscape(logPath)}'`,
     `$appPid = ${process.pid}`,
     `$installerPath = '${psEscape(exePath)}'`,
+    `$appPath = '${psEscape(process.execPath)}'`,
     '',
     'function Log($msg) {',
     "    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'",
@@ -410,10 +468,14 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     '    }',
     '    Log "App exited after $waited seconds"',
     '',
-    '    # Launch installer with normal UI (NSIS handles shortcuts & relaunch)',
-    '    Log "Launching installer: $installerPath"',
-    '    Start-Process -FilePath $installerPath',
-    '    Log "Done"',
+    '    # Install without showing the NSIS wizard, then start the updated app.',
+    '    Log "Launching silent installer: $installerPath"',
+    "    $installer = Start-Process -FilePath $installerPath -ArgumentList '/S' -Wait -PassThru",
+    '    Log "Installer exited with code $($installer.ExitCode)"',
+    '    if ($installer.ExitCode -ne 0) { throw "Installer exited with code $($installer.ExitCode)" }',
+    '    if (-not (Test-Path $appPath)) { throw "Updated app executable was not found: $appPath" }',
+    '    Start-Process -FilePath $appPath',
+    '    Log "Updated app relaunched"',
     '} catch {',
     '    Log "ERROR: $($_.Exception.Message)"',
     '}',

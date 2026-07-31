@@ -26,11 +26,6 @@ export const AppUpdateIpc = {
   StateChanged: 'appUpdate:stateChanged',
 } as const;
 
-export interface ChangeLogEntry {
-  title: string;
-  content: string[];
-}
-
 export interface AppUpdateDownloadProgress {
   received: number;
   total: number | undefined;
@@ -40,12 +35,9 @@ export interface AppUpdateDownloadProgress {
 
 export interface AppUpdateInfo {
   latestVersion: string;
-  date: string;
-  changeLog: { zh: ChangeLogEntry; en: ChangeLogEntry };
   url: string;
   expectedSize: number;
   expectedSha256: string;
-  manualDownload: boolean;
   mandatory: boolean;
   minimumSupportedVersion: string | null;
 }
