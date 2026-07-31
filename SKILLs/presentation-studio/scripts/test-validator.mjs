@@ -28,7 +28,7 @@ try {
 
   page.elements = [
     { id: 'cover-title', type: 'text', bounds: [96, 96, 860, 100], style: '$title', text: 'Metrics at a glance', wrap: true },
-    { id: 'metrics', type: 'table', bounds: [96, 240, 500, 180], rows: [['Metric', 'Result'], ['Revenue', '42%']], fontSize: 18 },
+    { id: 'metrics', type: 'table', bounds: [96, 240, 500, 180], rows: [['Metric', 'Result'], ['Revenue', '42%']], fontSize: 18, headerFill: '$primary', headerColor: '$background', borderColor: '$muted' },
     { id: 'trend', type: 'chart', chartType: 'bar', bounds: [640, 240, 500, 220], data: [{ name: 'Growth', labels: ['Q1', 'Q2'], values: [18, 42] }] },
   ];
   fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
@@ -38,6 +38,38 @@ try {
   const compiled = spawnSync(process.execPath, [compiler, path.join(workspace, 'deck.json'), outputPath], { encoding: 'utf8' });
   assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
   assert.ok(fs.statSync(outputPath).size > 0, 'compiler must create a non-empty PPTX for tables and charts');
+
+  page.elements = [
+    { id: 'mask', type: 'shape', shape: 'rect', bounds: [96, 96, 500, 280], fill: '$primary', fillTransparency: 35, decorative: true },
+    { id: 'gradient', type: 'shape', shape: 'rect', bounds: [96, 96, 500, 280], gradient: { from: '$primary', to: '$secondary', direction: 'horizontal', steps: 8 }, decorative: true },
+    { id: 'divider', type: 'shape', shape: 'line', bounds: [96, 410, 500, 1], line: '$accent', lineWidth: 1.5, decorative: true },
+    { id: 'table-style', type: 'table', bounds: [96, 440, 500, 180], rows: [['Metric', 'Result'], ['Revenue', '42%']], fontSize: 18, headerFill: '$secondary', headerColor: '$background', borderColor: '$muted' },
+    { id: 'comparison', type: 'chart', chartType: 'bar', bounds: [640, 240, 500, 220], data: [{ name: 'Plan', labels: ['Q1', 'Q2'], values: [18, 42] }, { name: 'Actual', labels: ['Q1', 'Q2'], values: [12, 36] }], colors: ['$series1', '$series2'] },
+  ];
+  fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
+  const validVisualPrimitives = run();
+  assert.equal(validVisualPrimitives.status, 0, validVisualPrimitives.stdout + validVisualPrimitives.stderr);
+  const visualOutputPath = path.join(workspace, 'output', 'visual-primitives.pptx');
+  const visualCompiled = spawnSync(process.execPath, [compiler, path.join(workspace, 'deck.json'), visualOutputPath], { encoding: 'utf8' });
+  assert.equal(visualCompiled.status, 0, visualCompiled.stdout + visualCompiled.stderr);
+  assert.ok(fs.statSync(visualOutputPath).size > 0, 'compiler must preserve visual primitives as editable PowerPoint elements');
+
+  delete page.elements[4].colors;
+  fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
+  const invalidMultiSeriesChart = run();
+  assert.equal(invalidMultiSeriesChart.status, 1, 'multi-series charts must not silently become monochrome');
+  assert.match(invalidMultiSeriesChart.stdout, /one explicit color per series/);
+
+  page.elements = [{ id: 'edge-ornament', type: 'shape', shape: 'ellipse', bounds: [-40, 60, 180, 180], fill: '$accent', decorative: true, allowOverflow: true }];
+  fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
+  const validOverflowOrnament = run();
+  assert.equal(validOverflowOrnament.status, 0, validOverflowOrnament.stdout + validOverflowOrnament.stderr);
+
+  delete page.elements[0].allowOverflow;
+  fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
+  const invalidOverflowOrnament = run();
+  assert.equal(invalidOverflowOrnament.status, 1, 'decorative overflow requires an explicit opt-in');
+  assert.match(invalidOverflowOrnament.stdout, /element exceeds canvas bounds/);
   console.log('Presentation Studio validator tests passed');
 } finally {
   fs.rmSync(workspace, { recursive: true, force: true });

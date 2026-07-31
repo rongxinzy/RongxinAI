@@ -6,6 +6,7 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 const ALLOWED_TYPES = new Set(['text', 'shape', 'image', 'table', 'chart']);
 const ALLOWED_SIZING = new Set(['cover', 'contain']);
 const ALLOWED_CHART_TYPES = new Set(['area', 'bar', 'doughnut', 'line', 'pie', 'radar']);
+const ALLOWED_GRADIENT_DIRECTIONS = new Set(['horizontal', 'vertical']);
 
 function fail(message) {
   throw new Error(message);
@@ -31,6 +32,10 @@ function resolveColor(value, colors) {
   if (typeof value !== 'string') return null;
   if (value.startsWith('$')) return colors[value.slice(1)] ?? null;
   return value;
+}
+
+function isTransparency(value) {
+  return value === undefined || (Number.isFinite(value) && value >= 0 && value <= 100);
 }
 
 function textMetrics(text, fontSize, width, lineHeight, wrap) {
@@ -78,14 +83,30 @@ function validateDeck(deckPath) {
       if (!isBounds(element.bounds) || element.bounds[2] <= 0 || element.bounds[3] <= 0) { add('error', 'bounds must be [x, y, width, height] with positive size', label); continue; }
       const [x, y, width, height] = element.bounds;
       if (!element.decorative && (x < safeMargin || y < safeMargin || x + width > canvas.width - safeMargin || y + height > canvas.height - safeMargin)) add('warning', `element breaches ${safeMargin}px safe margin`, label);
-      if (x < 0 || y < 0 || x + width > canvas.width || y + height > canvas.height) add('error', 'element exceeds canvas bounds', label);
+      const exceedsCanvas = x < 0 || y < 0 || x + width > canvas.width || y + height > canvas.height;
+      if (exceedsCanvas && !(element.decorative && element.allowOverflow)) add('error', 'element exceeds canvas bounds', label);
       if (element.type === 'image') {
         if (typeof element.src !== 'string' || !element.src) add('error', 'image src is required', label);
         else if (/^https?:\/\//.test(element.src)) add('error', 'remote image URLs are not allowed; download the verified asset into assets/', label);
         else if (!fs.existsSync(path.resolve(baseDir, element.src))) add('error', `image asset not found: ${element.src}`, label);
         if (element.sizing !== undefined && !ALLOWED_SIZING.has(element.sizing)) add('error', 'image sizing must be cover or contain', label);
+        if (!isTransparency(element.transparency)) add('error', 'image transparency must be between 0 and 100', label);
       }
-      if (element.type === 'shape' && !HEX.test(resolveColor(element.fill ?? '$background', colors) ?? '')) add('error', 'shape fill must resolve to #RRGGBB', label);
+      if (element.type === 'shape') {
+        if (!element.fill && !element.line && !element.gradient) add('error', 'shape requires fill, line, or gradient; do not inherit a default primary color', label);
+        if (element.fill && !HEX.test(resolveColor(element.fill, colors) ?? '')) add('error', 'shape fill must resolve to #RRGGBB', label);
+        if (element.line && !HEX.test(resolveColor(element.line, colors) ?? '')) add('error', 'shape line must resolve to #RRGGBB', label);
+        if (!isTransparency(element.fillTransparency) || !isTransparency(element.lineTransparency)) add('error', 'shape transparency must be between 0 and 100', label);
+        if (element.gradient) {
+          if (element.shape && element.shape !== 'rect') add('error', 'gradient shapes must use rect', label);
+          if (!element.gradient || typeof element.gradient !== 'object') add('error', 'gradient must be an object', label);
+          else {
+            if (!HEX.test(resolveColor(element.gradient.from, colors) ?? '') || !HEX.test(resolveColor(element.gradient.to, colors) ?? '')) add('error', 'gradient from and to must resolve to #RRGGBB', label);
+            if (element.gradient.direction !== undefined && !ALLOWED_GRADIENT_DIRECTIONS.has(element.gradient.direction)) add('error', 'gradient direction must be horizontal or vertical', label);
+            if (element.gradient.steps !== undefined && (!Number.isInteger(element.gradient.steps) || element.gradient.steps < 2 || element.gradient.steps > 32)) add('error', 'gradient steps must be an integer between 2 and 32', label);
+          }
+        }
+      }
       if (element.type === 'text') {
         if (typeof element.text !== 'string') add('error', 'text content must be a string', label);
         const style = element.style?.startsWith('$') ? styles[element.style.slice(1)] ?? {} : {};
@@ -108,6 +129,9 @@ function validateDeck(deckPath) {
         else if (element.rows.some(row => row.some(cell => typeof cell !== 'string' && typeof cell !== 'number'))) add('error', 'table cells must be strings or numbers', label);
         const tableFontSize = element.fontSize ?? 18;
         if (!Number.isFinite(tableFontSize) || tableFontSize < 12) add('error', 'table font size must be at least 12pt', label);
+        for (const field of ['fill', 'borderColor', 'headerFill', 'headerColor']) {
+          if (element[field] !== undefined && !HEX.test(resolveColor(element[field], colors) ?? '')) add('error', `table ${field} must resolve to #RRGGBB`, label);
+        }
       }
       if (element.type === 'chart') {
         if (!ALLOWED_CHART_TYPES.has(element.chartType)) add('error', `unsupported chart type ${element.chartType}`, label);
@@ -116,6 +140,8 @@ function validateDeck(deckPath) {
           if (!series || typeof series.name !== 'string' || !Array.isArray(series.labels) || !Array.isArray(series.values)) add('error', 'chart series requires name, labels, and values', label);
           else if (series.labels.length === 0 || series.labels.length !== series.values.length || series.values.some(value => !Number.isFinite(value))) add('error', 'chart labels and numeric values must have matching non-zero lengths', label);
         }
+        if (Array.isArray(element.data) && element.data.length > 1 && (!Array.isArray(element.colors) || element.colors.length < element.data.length)) add('error', 'multi-series chart requires one explicit color per series', label);
+        if (element.colors !== undefined && (!Array.isArray(element.colors) || element.colors.some(value => !HEX.test(resolveColor(value, colors) ?? '')))) add('error', 'chart colors must resolve to #RRGGBB', label);
       }
     }
     for (let i = 0; i < textElements.length; i += 1) for (let j = i + 1; j < textElements.length; j += 1) {

@@ -1,0 +1,1 @@
+Launch a contemporary museum's evening-membership program. Include a cinematic cover, audience promise, membership tiers, a seasonal event path, and conversion metrics. The deck should feel culturally specific and image-led, not like a SaaS pitch.
