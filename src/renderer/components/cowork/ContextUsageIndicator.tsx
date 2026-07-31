@@ -37,7 +37,9 @@ export function ContextUsageIndicator({
   if (
     selectedModelId &&
     (modelId !== selectedModelId ||
-      (selectedModelProviderKey && modelProviderKey !== selectedModelProviderKey))
+      (modelProviderKey &&
+        selectedModelProviderKey &&
+        modelProviderKey !== selectedModelProviderKey))
   ) {
     return null;
   }

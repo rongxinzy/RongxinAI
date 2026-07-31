@@ -61,6 +61,7 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
+import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
 import { useDelayedVisibility } from './useDelayedVisibility';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
@@ -476,8 +477,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           const isStreamActive = status === CoworkSessionStatusValue.Running;
           const isCompleted = status === CoworkSessionStatusValue.Completed;
           const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
-          const messages = [
-            ...baseSession.messages,
+          const messages = mergeDirectChatSnapshotMessages(baseSession.messages, [
             ...(thinkingContent
               ? [
                   {
@@ -507,9 +507,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                       ...(isCompleted && { isFinalAnswer: true }),
                     },
                   },
-                ]
+              ]
               : []),
-          ];
+          ]);
           return {
             ...baseSession,
             status,
@@ -924,8 +924,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         const isStreamActive = status === CoworkSessionStatusValue.Running;
         const isCompleted = status === CoworkSessionStatusValue.Completed;
         const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
-        const messages = [
-          ...baseSession.messages,
+        const messages = mergeDirectChatSnapshotMessages(baseSession.messages, [
           ...(thinkingContent
             ? [
                 {
@@ -955,9 +954,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     ...(isCompleted && { isFinalAnswer: true }),
                   },
                 },
-              ]
+            ]
             : []),
-        ];
+        ]);
         return {
           ...baseSession,
           status,
