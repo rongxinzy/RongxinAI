@@ -716,6 +716,10 @@ const isDev = process.env.NODE_ENV === 'development';
 const isLinux = process.platform === 'linux';
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
+// The packaged Ubuntu smoke test needs an actual painted window. Production
+// startup stays hidden until ready-to-show to avoid a flash of empty content.
+const isLinuxRendererSmoke =
+  isLinux && process.argv.includes('--zhiyuan-linux-renderer-smoke');
 const DEV_SERVER_URL = process.env.ELECTRON_START_URL || 'http://localhost:5175';
 const enableVerboseLogging =
   process.env.ELECTRON_ENABLE_LOGGING === '1' || process.env.ELECTRON_ENABLE_LOGGING === 'true';
@@ -7193,7 +7197,7 @@ if (!gotTheLock) {
         navigateOnDragDrop: false,
       },
       backgroundColor: getInitialTheme() === 'dark' ? '#0F1117' : '#F8F9FB',
-      show: false,
+      show: isLinuxRendererSmoke,
       autoHideMenuBar: true,
       enableLargerThanScreen: false,
     });
@@ -7364,7 +7368,7 @@ if (!gotTheLock) {
     mainWindow.once('ready-to-show', () => {
       emitWindowState();
       // 开机自启时不显示窗口，仅显示托盘图标
-      if (!isAutoLaunched()) {
+      if (isLinuxRendererSmoke || !isAutoLaunched()) {
         mainWindow?.show();
       }
       // Initialize main-process i18n from stored language before creating UI elements.

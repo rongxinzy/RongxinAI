@@ -40,7 +40,15 @@ let applicationOutput = '';
 
 const application = spawn(
   'xvfb-run',
-  ['-a', executablePath, '--no-sandbox', `--remote-debugging-port=${remoteDebuggingPort}`],
+  [
+    '-a',
+    '-s',
+    '-screen 0 1280x800x24',
+    executablePath,
+    '--no-sandbox',
+    '--zhiyuan-linux-renderer-smoke',
+    `--remote-debugging-port=${remoteDebuggingPort}`,
+  ],
   {
     detached: true,
     env: {
@@ -266,6 +274,7 @@ async function stopApplication() {
 async function captureScreenshot(devTools) {
   const screenshot = await devTools.send('Page.captureScreenshot', {
     format: 'png',
+    fromSurface: true,
     captureBeyondViewport: false,
   });
   const screenshotBytes = Buffer.from(screenshot.data, 'base64');
@@ -274,11 +283,31 @@ async function captureScreenshot(devTools) {
   return screenshotBytes;
 }
 
+async function waitForNonBlankScreenshot(devTools) {
+  const deadline = Date.now() + 30_000;
+  let lastAnalysis;
+
+  while (Date.now() < deadline) {
+    const screenshotBytes = await captureScreenshot(devTools);
+    const screenshotAnalysis = analyzeScreenshot(screenshotBytes);
+    lastAnalysis = screenshotAnalysis;
+    if (screenshotAnalysis.distinctColors >= 8 && screenshotAnalysis.nonWhiteRatio >= 0.01) {
+      return screenshotAnalysis;
+    }
+    await delay(500);
+  }
+
+  throw new Error(
+    `Linux renderer screenshot appears blank after 30 seconds: ${JSON.stringify(lastAnalysis)}`,
+  );
+}
+
 let devTools;
 try {
   const page = await waitForPageTarget();
   devTools = await connectToDevTools(page.webSocketDebuggerUrl);
   await devTools.send('Page.enable');
+  await devTools.send('Page.bringToFront');
   let renderedState;
   try {
     renderedState = await waitForRenderedContent(devTools);
@@ -294,13 +323,7 @@ try {
     throw error;
   }
 
-  const screenshotBytes = await captureScreenshot(devTools);
-  const screenshotAnalysis = analyzeScreenshot(screenshotBytes);
-  if (screenshotAnalysis.distinctColors < 8 || screenshotAnalysis.nonWhiteRatio < 0.01) {
-    throw new Error(
-      `Linux renderer screenshot appears blank: ${JSON.stringify(screenshotAnalysis)}`,
-    );
-  }
+  const screenshotAnalysis = await waitForNonBlankScreenshot(devTools);
 
   console.log(
     `[LinuxRendererSmoke] rendered ${renderedState.rootChildren} root element(s) with visible text; screenshot ${screenshotAnalysis.width}x${screenshotAnalysis.height}, ${screenshotAnalysis.distinctColors} sampled colors`,
