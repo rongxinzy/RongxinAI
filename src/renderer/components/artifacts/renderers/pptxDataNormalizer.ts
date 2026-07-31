@@ -1,7 +1,9 @@
 import type JSZip from 'jszip';
 
 const DRAWINGML_NAMESPACE = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const PRESENTATIONML_NAMESPACE = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 const ELEMENT_NODE = 1;
+const PRESENTATION_XML_PATH = 'ppt/presentation.xml';
 const SLIDE_XML_PATH = /^ppt\/slides\/slide\d+\.xml$/;
 
 type XmlParser = Pick<DOMParser, 'parseFromString'>;
@@ -91,6 +93,35 @@ export function materializeParagraphDefaultRunProperties(
   };
 }
 
+export function ensurePresentationDefaultTextStyle(
+  xml: string,
+  parser: XmlParser = new DOMParser(),
+  serializer: XmlSerializer = new XMLSerializer(),
+): { xml: string; changed: boolean } {
+  const document = parser.parseFromString(xml, 'application/xml');
+  if (document.getElementsByTagName('parsererror').length > 0) {
+    return { xml, changed: false };
+  }
+
+  const presentation = document.documentElement;
+  if (
+    presentation.namespaceURI !== PRESENTATIONML_NAMESPACE ||
+    presentation.localName !== 'presentation'
+  ) {
+    return { xml, changed: false };
+  }
+
+  if (getDirectChild(presentation, PRESENTATIONML_NAMESPACE, 'defaultTextStyle')) {
+    return { xml, changed: false };
+  }
+
+  const defaultTextStyle = document.createElementNS(PRESENTATIONML_NAMESPACE, 'p:defaultTextStyle');
+  const extensionList = getDirectChild(presentation, PRESENTATIONML_NAMESPACE, 'extLst');
+  presentation.insertBefore(defaultTextStyle, extensionList ?? null);
+
+  return { xml: serializer.serializeToString(document), changed: true };
+}
+
 async function removeMissingContentTypeOverrides(zip: JSZip): Promise<void> {
   const contentTypesFile = zip.file('[Content_Types].xml');
   if (!contentTypesFile) return;
@@ -117,6 +148,13 @@ export async function normalizePptxData(data: ArrayBuffer): Promise<ArrayBuffer>
   const zip = await JSZipConstructor.loadAsync(data);
 
   await removeMissingContentTypeOverrides(zip);
+
+  const presentationFile = zip.file(PRESENTATION_XML_PATH);
+  if (presentationFile) {
+    const source = await presentationFile.async('string');
+    const normalized = ensurePresentationDefaultTextStyle(source);
+    if (normalized.changed) zip.file(PRESENTATION_XML_PATH, normalized.xml);
+  }
 
   const slideFiles = Object.values(zip.files).filter(
     file => !file.dir && SLIDE_XML_PATH.test(file.name),

@@ -1,9 +1,13 @@
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
 import { expect, test } from 'vitest';
 
-import { materializeParagraphDefaultRunProperties } from './pptxDataNormalizer';
+import {
+  ensurePresentationDefaultTextStyle,
+  materializeParagraphDefaultRunProperties,
+} from './pptxDataNormalizer';
 
 const DRAWINGML_NAMESPACE = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+const PRESENTATIONML_NAMESPACE = 'http://schemas.openxmlformats.org/presentationml/2006/main';
 
 function normalize(xml: string): Document {
   const parser = new DOMParser();
@@ -47,4 +51,28 @@ test('keeps explicit run formatting ahead of paragraph defaults', () => {
   expect(
     runProperties.getElementsByTagNameNS(DRAWINGML_NAMESPACE, 'srgbClr')[0].getAttribute('val'),
   ).toBe('C9A84F');
+});
+
+test('adds the presentation default text style expected by pptx-preview', () => {
+  const parser = new DOMParser();
+  const serializer = new XMLSerializer();
+  const result = ensurePresentationDefaultTextStyle(
+    `<p:presentation xmlns:p="${PRESENTATIONML_NAMESPACE}"><p:sldSz cx="1" cy="1"/><p:extLst/></p:presentation>`,
+    parser,
+    serializer,
+  );
+
+  expect(result.changed).toBe(true);
+  const document = parser.parseFromString(result.xml, 'application/xml');
+  const children = Array.from(document.documentElement.childNodes).filter(
+    (child): child is Element => child.nodeType === 1,
+  );
+  expect(children.map(child => child.localName)).toEqual(['sldSz', 'defaultTextStyle', 'extLst']);
+});
+
+test('preserves an existing presentation default text style', () => {
+  const xml = `<p:presentation xmlns:p="${PRESENTATIONML_NAMESPACE}"><p:defaultTextStyle/></p:presentation>`;
+  const result = ensurePresentationDefaultTextStyle(xml, new DOMParser(), new XMLSerializer());
+
+  expect(result).toEqual({ xml, changed: false });
 });
