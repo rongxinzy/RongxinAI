@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -34,12 +34,9 @@ test('XLSX skill packs its template and runs the mandatory formula validator', (
   }
 });
 
-test('XLSX skill includes a controlled renderer for inspected shortcut previews', () => {
-  const renderer = path.join(skillRoot, 'scripts', 'xlsx_render_preview.sh');
-  assert.equal(existsSync(renderer), true, 'XLSX preview renderer is missing');
-  const usage = spawnSync('bash', [renderer], { encoding: 'utf8', stdio: 'pipe' });
-  // The renderer should require explicit input/output instead of silently
-  // accepting a claimed preview path.
-  assert.equal(usage.status, 2);
-  assert.match(usage.stderr, /Usage:/);
+test('XLSX skill delegates inspected shortcut previews to the bundled application renderer', () => {
+  const instructions = readFileSync(path.join(skillRoot, 'SKILL.md'), 'utf8');
+  assert.match(instructions, /"action": "render_preview"/);
+  assert.match(instructions, /does not require\s+LibreOffice, Poppler, Python/s);
+  assert.doesNotMatch(instructions, /xlsx_render_preview\.sh/);
 });

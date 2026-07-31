@@ -188,17 +188,23 @@ bash scripts/docx_preview.sh doc.docx
 Final text inspection: `bash scripts/docx_preview.sh doc.docx`
 
 For the controlled shortcut, render a real visual preview (not text/XML) before
-recording `workflow_state` role `preview`:
+finishing. First record the DOCX as the deliverable, then ask the application
+to render and record the preview with its bundled cross-platform renderer:
 
-```bash
-bash "<SKILL_DIR>/scripts/docx_render_preview.sh" doc.docx output/doc-page-1.png
+```json
+{
+  "action": "render_preview",
+  "deliverablePath": "doc.docx",
+  "path": "output/doc-page-1.png"
+}
 ```
 
 For the controlled Docs shortcut, save a nonempty `.md`, `.txt`, or `.json`
 validation report in the workspace after this pipeline. Render at least one
-page to a `.png`, `.jpg`, or `.jpeg` preview and inspect it for layout
-defects. Record the DOCX with `workflow_state` role `deliverable`, the report
-with role `validation`, and the inspected image with role `preview`. Do not
+page to a `.png` preview and inspect it for layout defects. Record the DOCX
+with `workflow_state` role `deliverable`, the report with role `validation`,
+then use `workflow_state` action `render_preview`. The application records
+the generated image as role `preview`; inspect it before completion. Do not
 finish from a claimed output path alone.
 
 ## Critical rules

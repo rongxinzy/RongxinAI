@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { createHash } from 'node:crypto';
 import path from 'path';
 
 import {
@@ -30,19 +31,29 @@ export interface PiShortcutWorkflowOptions {
   workspaceRoot: string;
   task: string;
   kind: ShortcutWorkflowKind;
+  validateRasterPreview?: (filePath: string) => boolean;
+  renderOfficePreview?: (
+    deliverablePath: string,
+    outputPath: string,
+    kind: ShortcutWorkflowKind,
+  ) => Promise<void>;
 }
 
 const now = (): string => new Date().toISOString();
+const sha256File = (filePath: string): string =>
+  createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 
 export class PiShortcutWorkflowController {
   readonly runDirectory: string;
   private readonly statePath: string;
+  private readonly workspaceRoot: string;
   private state: WorkflowState;
   private readonly pendingResearcherRuns = new Map<string, number>();
 
   constructor(private readonly options: PiShortcutWorkflowOptions) {
+    this.workspaceRoot = fs.realpathSync(path.resolve(options.workspaceRoot));
     this.runDirectory = path.join(
-      options.workspaceRoot,
+      this.workspaceRoot,
       '.zhiyuan',
       'shortcut-workflows',
       options.sessionId,
@@ -93,7 +104,10 @@ export class PiShortcutWorkflowController {
   }
 
   onAgentEnd(): ShortcutWorkflowEndDecision {
-    const failures = collectShortcutCompletionFailures(this.state);
+    const failures = [
+      ...collectShortcutCompletionFailures(this.state),
+      ...this.collectArtifactIntegrityFailures(),
+    ];
     if (this.state.status === 'completion_requested' && failures.length === 0) {
       this.state.status = 'completed';
       this.writeState();
@@ -152,7 +166,14 @@ export class PiShortcutWorkflowController {
     const resolved = this.resolveWorkspacePath(rawPath);
     if (!resolved)
       return 'File was not recorded: use an existing file inside the selected workspace.';
-    const stat = fs.statSync(resolved);
+    let stat: fs.Stats;
+    let sha256: string;
+    try {
+      stat = fs.statSync(resolved);
+      sha256 = sha256File(resolved);
+    } catch {
+      return 'File was not recorded: it disappeared or could not be read during verification.';
+    }
     if (!stat.isFile() || stat.size === 0)
       return 'File was not recorded: it is missing, not a file, or empty.';
     const extension = path.extname(resolved).toLowerCase();
@@ -167,7 +188,8 @@ export class PiShortcutWorkflowController {
     if (!allowedExtensions.includes(extension)) {
       return `File was not recorded: role "${role}" expects one of ${allowedExtensions.join(', ')}.`;
     }
-    if (role === 'preview' && !isValidRasterPreview(resolved)) {
+    const validateRasterPreview = this.options.validateRasterPreview || isValidRasterPreview;
+    if (role === 'preview' && !validateRasterPreview(resolved)) {
       return 'File was not recorded: preview is not a valid raster image.';
     }
     if (role === 'deliverable') {
@@ -185,28 +207,86 @@ export class PiShortcutWorkflowController {
         return 'File was not recorded: the Office deliverable is not a valid ZIP package.';
       }
     }
-    const normalized = path.relative(this.options.workspaceRoot, resolved);
+    const normalized = path.relative(this.workspaceRoot, resolved);
     let deliverablePath: string | undefined;
+    let deliverableSha256: string | undefined;
     if (role !== 'deliverable') {
       const deliverable = this.resolveWorkspacePath(rawDeliverablePath || '');
       if (!deliverable)
         return 'File was not recorded: validation and preview files must name an existing workspace deliverable.';
-      deliverablePath = path.relative(this.options.workspaceRoot, deliverable);
-      if (
-        !this.state.files.some(
-          file => file.role === 'deliverable' && file.path === deliverablePath,
-        )
-      )
+      deliverablePath = path.relative(this.workspaceRoot, deliverable);
+      const deliverableRecord = this.state.files.find(
+        file => file.role === 'deliverable' && file.path === deliverablePath,
+      );
+      if (!deliverableRecord)
         return 'File was not recorded: record the referenced deliverable before its validation or preview.';
+      try {
+        deliverableSha256 = sha256File(deliverable);
+      } catch {
+        return 'File was not recorded: the referenced deliverable could not be read.';
+      }
+      if (deliverableSha256 !== deliverableRecord.sha256) {
+        return 'File was not recorded: the deliverable changed after verification; record it again first.';
+      }
     }
     const index = this.state.files.findIndex(
       file => file.path === normalized && file.role === role,
     );
-    const value = { path: normalized, role, deliverablePath, verifiedAt: now() };
+    const value = {
+      path: normalized,
+      role,
+      deliverablePath,
+      sha256,
+      deliverableSha256,
+      verifiedAt: now(),
+    };
     if (index >= 0) this.state.files[index] = value;
     else this.state.files.push(value);
     this.writeState();
     return `Verified ${role} file: ${normalized}`;
+  }
+
+  async renderPreview(rawDeliverablePath: string, rawOutputPath: string): Promise<string> {
+    if (
+      this.options.kind !== ShortcutWorkflowKind.Docs &&
+      this.options.kind !== ShortcutWorkflowKind.Sheets
+    ) {
+      return 'Built-in Office preview rendering applies only to Docs and Sheets workflows.';
+    }
+    if (!this.options.renderOfficePreview) {
+      return 'Built-in Office preview rendering is unavailable in this runtime.';
+    }
+    const deliverable = this.resolveWorkspacePath(rawDeliverablePath);
+    if (!deliverable) {
+      return 'Preview was not rendered: use an existing deliverable inside the selected workspace.';
+    }
+    const deliverableRelative = path.relative(this.workspaceRoot, deliverable);
+    const deliverableRecord = this.state.files.find(
+      file => file.role === 'deliverable' && file.path === deliverableRelative,
+    );
+    if (!deliverableRecord) {
+      return 'Preview was not rendered: record the deliverable before rendering its preview.';
+    }
+    let currentDeliverableSha256: string;
+    try {
+      currentDeliverableSha256 = sha256File(deliverable);
+    } catch {
+      return 'Preview was not rendered: the deliverable could not be read.';
+    }
+    if (currentDeliverableSha256 !== deliverableRecord.sha256) {
+      return 'Preview was not rendered: the deliverable changed after verification; record it again first.';
+    }
+    const output = this.resolveWorkspaceOutputPath(rawOutputPath);
+    if (!output || path.extname(output).toLowerCase() !== '.png') {
+      return 'Preview was not rendered: output must be a .png path inside the selected workspace.';
+    }
+    try {
+      fs.mkdirSync(path.dirname(output), { recursive: true });
+      await this.options.renderOfficePreview(deliverable, output, this.options.kind);
+    } catch (error) {
+      return `Preview was not rendered: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    return this.recordFile(output, 'preview', deliverable);
   }
 
   setResearchPlan(angles: string[]): string {
@@ -257,7 +337,10 @@ export class PiShortcutWorkflowController {
   getSnapshot(): Record<string, unknown> {
     return {
       ...this.state,
-      completionFailures: collectShortcutCompletionFailures(this.state),
+      completionFailures: [
+        ...collectShortcutCompletionFailures(this.state),
+        ...this.collectArtifactIntegrityFailures(),
+      ],
       runDirectory: this.runDirectory,
     };
   }
@@ -275,7 +358,10 @@ export class PiShortcutWorkflowController {
     ];
     if (requiresRenderedPreview(this.options.kind)) {
       instructions.push(
-        'Render the deliverable to at least one preview image, inspect it, and record that image with role "preview" and deliverablePath set to that deliverable.',
+        this.options.kind === ShortcutWorkflowKind.Docs ||
+          this.options.kind === ShortcutWorkflowKind.Sheets
+          ? 'After recording the deliverable, call workflow_state action "render_preview" with deliverablePath and a workspace .png output path. Inspect the generated image; it is recorded automatically as preview evidence.'
+          : 'Render the deliverable to at least one preview image, inspect it, and record that image with role "preview" and deliverablePath set to that deliverable.',
       );
     }
     return instructions;
@@ -283,11 +369,84 @@ export class PiShortcutWorkflowController {
 
   private resolveWorkspacePath(rawPath: string): string | null {
     if (!rawPath.trim()) return null;
-    const resolved = path.resolve(this.options.workspaceRoot, rawPath);
-    const relative = path.relative(this.options.workspaceRoot, resolved);
-    if (relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(resolved))
+    const lexical = path.resolve(this.workspaceRoot, rawPath);
+    const lexicalRelative = path.relative(this.workspaceRoot, lexical);
+    if (
+      lexicalRelative.startsWith('..') ||
+      path.isAbsolute(lexicalRelative) ||
+      !fs.existsSync(lexical)
+    )
       return null;
-    return resolved;
+    try {
+      const resolved = fs.realpathSync(lexical);
+      const relative = path.relative(this.workspaceRoot, resolved);
+      return relative.startsWith('..') || path.isAbsolute(relative) ? null : resolved;
+    } catch {
+      return null;
+    }
+  }
+
+  private resolveWorkspaceOutputPath(rawPath: string): string | null {
+    if (!rawPath.trim()) return null;
+    const output = path.resolve(this.workspaceRoot, rawPath);
+    const relative = path.relative(this.workspaceRoot, output);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) return null;
+    if (fs.existsSync(output)) {
+      try {
+        const realOutput = fs.realpathSync(output);
+        const realOutputRelative = path.relative(this.workspaceRoot, realOutput);
+        if (realOutputRelative.startsWith('..') || path.isAbsolute(realOutputRelative)) return null;
+      } catch {
+        return null;
+      }
+    }
+    let ancestor = path.dirname(output);
+    while (!fs.existsSync(ancestor)) {
+      const parent = path.dirname(ancestor);
+      if (parent === ancestor) return null;
+      ancestor = parent;
+    }
+    try {
+      const realAncestor = fs.realpathSync(ancestor);
+      const ancestorRelative = path.relative(this.workspaceRoot, realAncestor);
+      return ancestorRelative.startsWith('..') || path.isAbsolute(ancestorRelative) ? null : output;
+    } catch {
+      return null;
+    }
+  }
+
+  private collectArtifactIntegrityFailures(): string[] {
+    const failures: string[] = [];
+    for (const file of this.state.files) {
+      const resolved = this.resolveWorkspacePath(file.path);
+      if (!resolved) {
+        failures.push(`${file.role} artifact is missing or outside the workspace: ${file.path}`);
+        continue;
+      }
+      let currentSha256: string;
+      try {
+        const stat = fs.statSync(resolved);
+        if (!stat.isFile() || stat.size === 0) {
+          failures.push(`${file.role} artifact is empty or not a file: ${file.path}`);
+          continue;
+        }
+        currentSha256 = sha256File(resolved);
+      } catch {
+        failures.push(`${file.role} artifact cannot be read: ${file.path}`);
+        continue;
+      }
+      if (currentSha256 !== file.sha256) {
+        failures.push(`${file.role} artifact changed after verification: ${file.path}`);
+      }
+      if (file.role === 'deliverable') continue;
+      const deliverable = this.state.files.find(
+        candidate => candidate.role === 'deliverable' && candidate.path === file.deliverablePath,
+      );
+      if (!deliverable || file.deliverableSha256 !== deliverable.sha256) {
+        failures.push(`${file.role} evidence no longer matches its deliverable: ${file.path}`);
+      }
+    }
+    return [...new Set(failures)];
   }
 
   private loadOrCreate(): WorkflowState {
@@ -295,7 +454,7 @@ export class PiShortcutWorkflowController {
       if (fs.existsSync(this.statePath)) {
         const state = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as WorkflowState;
         if (
-          state.version === 1 &&
+          state.version === 2 &&
           state.sessionId === this.options.sessionId &&
           state.kind === this.options.kind
         )
@@ -303,7 +462,7 @@ export class PiShortcutWorkflowController {
       }
     } catch {}
     return {
-      version: 1,
+      version: 2,
       sessionId: this.options.sessionId,
       kind: this.options.kind,
       task: this.options.task,

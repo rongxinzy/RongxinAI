@@ -34,6 +34,7 @@ import {
 } from '../claudeSettings';
 import { getSkillsRoot } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
+import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import {
   createPiAskUserQuestionTool,
   PiAskUserQuestionToolName,
@@ -54,10 +55,7 @@ import {
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
-import {
-  buildPiWorkAcceptanceTool,
-  PiWorkExecutionController,
-} from './piWorkExecution';
+import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import type {
   CoworkContinueOptions,
@@ -435,6 +433,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             workspaceRoot,
             task: prompt,
             kind: shortcutKind,
+            validateRasterPreview: isRasterPreviewDecodable,
+            renderOfficePreview,
           })
         : null;
       if (shortcutWorkflow) {
@@ -572,7 +572,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
           ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
           : workExecution
             ? workExecution.buildInitialPrompt(options._piPromptOverride || prompt)
-          : options._piPromptOverride || prompt;
+            : options._piPromptOverride || prompt;
       if (workExecution) {
         initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
       }
@@ -702,9 +702,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
 
     let nextPrompt = prompt;
     const completionWorkflow =
-      active.researchRun ||
-      active.shortcutWorkflow ||
-      active.workExecution;
+      active.researchRun || active.shortcutWorkflow || active.workExecution;
     if (completionWorkflow && !active.agentLoop.getState().active) {
       completionWorkflow.resumeForPrompt(prompt);
       active.agentLoop.start({

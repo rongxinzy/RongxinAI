@@ -126,17 +126,22 @@ Run `formula_check.py` for static validation. Use `libreoffice_recalc.py` for dy
 
 For the controlled Sheets shortcut, save the validation output as a nonempty
 `.md`, `.txt`, or `.json` workspace report. Render at least one inspected
-`.png`, `.jpg`, or `.jpeg` preview of the finished sheet, including
+`.png` preview of the finished sheet, including
 the formulas, charts, or formatting the user asked for. Record the spreadsheet
 with `workflow_state` role `deliverable`, the report with role `validation`,
 and the preview with role `preview`. A claimed file path does not complete the
 workflow.
 
-Use the bundled renderer for this visual gate; it isolates LibreOffice's user
-profile and rejects a missing or blank preview:
+After recording the spreadsheet as the deliverable, use the application's
+bundled cross-platform renderer for this visual gate. It does not require
+LibreOffice, Poppler, Python, or other user-installed software:
 
-```bash
-bash SKILL_DIR/scripts/xlsx_render_preview.sh output.xlsx output/sheet-page-1.png
+```json
+{
+  "action": "render_preview",
+  "deliverablePath": "output.xlsx",
+  "path": "output/sheet-page-1.png"
+}
 ```
 
 ## Utility Scripts
@@ -150,5 +155,4 @@ python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/work/ out.xlsx          # repack aft
 python3 SKILL_DIR/scripts/xlsx_shift_rows.py /tmp/work/ insert 5 1  # shift rows for insertion
 python3 SKILL_DIR/scripts/xlsx_add_column.py /tmp/work/ --col G ... # add column with formulas
 python3 SKILL_DIR/scripts/xlsx_insert_row.py /tmp/work/ --at 6 ...  # insert row with data
-bash SKILL_DIR/scripts/xlsx_render_preview.sh file.xlsx preview.png # real raster preview
 ```

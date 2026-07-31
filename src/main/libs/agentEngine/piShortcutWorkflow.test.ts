@@ -6,6 +6,7 @@ import JSZip from 'jszip';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  type PiShortcutWorkflowOptions,
   PiShortcutWorkflowController,
   resolveShortcutWorkflowKind,
   ShortcutWorkflowKind,
@@ -13,11 +14,14 @@ import {
 
 const roots: string[] = [];
 const onePixelPng = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAF/gL+ONo+9QAAAABJRU5ErkJggg==',
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
 
-const createRun = (kind: ShortcutWorkflowKind): PiShortcutWorkflowController => {
+const createRun = (
+  kind: ShortcutWorkflowKind,
+  overrides: Partial<PiShortcutWorkflowOptions> = {},
+): PiShortcutWorkflowController => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-shortcut-workflow-'));
   roots.push(root);
   return new PiShortcutWorkflowController({
@@ -25,6 +29,7 @@ const createRun = (kind: ShortcutWorkflowKind): PiShortcutWorkflowController => 
     workspaceRoot: root,
     task: 'Create deliverable',
     kind,
+    ...overrides,
   });
 };
 
@@ -131,8 +136,14 @@ describe('PiShortcutWorkflowController', () => {
       await run.verifySource(`https://source-${index}.example.test/report`);
     }
     const root = rootFor(run);
-    fs.writeFileSync(path.join(root, 'report.md'), '# Report\n\n[1] https://source-0.example.test/report');
-    fs.writeFileSync(path.join(root, 'research-qa.md'), 'Checked citations, scope, and unresolved gaps.');
+    fs.writeFileSync(
+      path.join(root, 'report.md'),
+      '# Report\n\n[1] https://source-0.example.test/report',
+    );
+    fs.writeFileSync(
+      path.join(root, 'research-qa.md'),
+      'Checked citations, scope, and unresolved gaps.',
+    );
     await run.recordFile('report.md', 'deliverable');
     await run.recordFile('research-qa.md', 'validation', 'report.md');
     run.requestCompletion('report is supported');
@@ -176,6 +187,20 @@ describe('PiShortcutWorkflowController', () => {
     );
   });
 
+  it('rejects a truncated PNG that only contains a signature and IHDR dimensions', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    const truncated = Buffer.alloc(24);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(truncated);
+    Buffer.from('IHDR').copy(truncated, 12);
+    truncated.writeUInt32BE(1, 16);
+    truncated.writeUInt32BE(1, 20);
+    fs.writeFileSync(path.join(root, 'fake.png'), truncated);
+    await expect(run.recordFile('fake.png', 'preview')).resolves.toContain(
+      'not a valid raster image',
+    );
+  });
+
   it('binds validation and preview evidence to an already registered deliverable', async () => {
     const run = createRun(ShortcutWorkflowKind.Website);
     const root = rootFor(run);
@@ -194,10 +219,75 @@ describe('PiShortcutWorkflowController', () => {
     await expect(run.recordFile('site.png', 'preview', 'site.html')).resolves.toContain('Verified');
     expect(run.getSnapshot().files).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ path: 'qa.md', role: 'validation', deliverablePath: 'site.html' }),
-        expect.objectContaining({ path: 'site.png', role: 'preview', deliverablePath: 'site.html' }),
+        expect.objectContaining({
+          path: 'qa.md',
+          role: 'validation',
+          deliverablePath: 'site.html',
+        }),
+        expect.objectContaining({
+          path: 'site.png',
+          role: 'preview',
+          deliverablePath: 'site.html',
+        }),
       ]),
     );
+  });
+
+  it('renders Docs previews with the application-owned renderer and records them', async () => {
+    const renderOfficePreview = vi.fn(
+      async (_deliverablePath: string, outputPath: string): Promise<void> => {
+        fs.writeFileSync(outputPath, onePixelPng);
+      },
+    );
+    const run = createRun(ShortcutWorkflowKind.Docs, { renderOfficePreview });
+    const root = rootFor(run);
+    const archive = new JSZip();
+    archive.file('[Content_Types].xml', '<Types />');
+    archive.file(
+      'word/document.xml',
+      '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Report</w:t></w:r></w:p></w:body></w:document>',
+    );
+    fs.writeFileSync(
+      path.join(root, 'report.docx'),
+      await archive.generateAsync({ type: 'nodebuffer' }),
+    );
+    await run.recordFile('report.docx', 'deliverable');
+    await expect(run.renderPreview('report.docx', 'previews/report.png')).resolves.toContain(
+      'Verified preview',
+    );
+    expect(renderOfficePreview).toHaveBeenCalledWith(
+      path.join(root, 'report.docx'),
+      path.join(root, 'previews', 'report.png'),
+      ShortcutWorkflowKind.Docs,
+    );
+    expect(run.getSnapshot().files).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: path.join('previews', 'report.png'),
+          role: 'preview',
+          deliverablePath: 'report.docx',
+        }),
+      ]),
+    );
+  });
+
+  it('fails completion when verified artifacts are deleted or changed', async () => {
+    const run = createRun(ShortcutWorkflowKind.Website);
+    const root = rootFor(run);
+    fs.writeFileSync(path.join(root, 'site.html'), '<main>Version one</main>');
+    fs.writeFileSync(path.join(root, 'qa.md'), 'Checked version one.');
+    fs.writeFileSync(path.join(root, 'site.png'), onePixelPng);
+    await run.recordFile('site.html', 'deliverable');
+    await run.recordFile('qa.md', 'validation', 'site.html');
+    await run.recordFile('site.png', 'preview', 'site.html');
+
+    fs.writeFileSync(path.join(root, 'site.html'), '<main>Unverified replacement</main>');
+    fs.rmSync(path.join(root, 'site.png'));
+    run.requestCompletion('done');
+    const decision = run.onAgentEnd();
+    expect(decision).toMatchObject({ shouldFinish: false });
+    expect(decision.nextPrompt).toContain('deliverable artifact changed after verification');
+    expect(decision.nextPrompt).toContain('preview artifact is missing');
   });
 
   it('does not count failed researcher starts as completed research', () => {
