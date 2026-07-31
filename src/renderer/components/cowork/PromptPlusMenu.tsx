@@ -1,4 +1,5 @@
 import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
+import { Avatar, AvatarFallback, AvatarImage } from '@shared/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -20,7 +21,7 @@ import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts
 import { i18nService } from '../../services/i18n';
 import { mcpService } from '../../services/mcp';
 import { skillService } from '../../services/skill';
-import { resolveSkillIconUrl } from '../../services/skillIcon';
+import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
 import { toggleActiveSkill } from '../../store/slices/skillSlice';
@@ -29,7 +30,6 @@ import {
   PlusMenuExpertsIcon,
   PlusMenuFilesIcon,
   PlusMenuManageIcon,
-  PlusMenuSkillGlyphIcon,
   PlusMenuSkillsIcon,
 } from './plusMenuIcons';
 
@@ -213,20 +213,22 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
           <DropdownMenuSubContent
             align="center"
             sideOffset={8}
-            className="w-[360px] max-w-[calc(100vw-16px)]"
+            className="w-80 max-w-[calc(100vw-16px)]"
           >
-            <DropdownMenuGroup className="max-h-[360px] overflow-y-auto overscroll-contain">
+            <DropdownMenuGroup className="max-h-80 overflow-y-auto overscroll-contain">
               {enabledSkills.length === 0 ? (
                 <DropdownMenuItem disabled>
                   {i18nService.t('noSkillsAvailable')}
                 </DropdownMenuItem>
               ) : (
                 enabledSkills.map(skill => {
-                  const description = skillService.getLocalizedSkillDescription(
-                    skill.id,
-                    skill.name,
-                    skill.description,
-                  );
+                  const description =
+                    (i18nService.getLanguage() === 'zh' && skill.displayDescription) ||
+                    skillService.getLocalizedSkillDescription(
+                      skill.id,
+                      skill.name,
+                      skill.description,
+                    );
 
                   return (
                     <DropdownMenuCheckboxItem
@@ -236,17 +238,20 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                         dispatch(toggleActiveSkill(skill.id));
                         setOpen(false);
                       }}
-                      className="items-start gap-3 py-2.5 pr-8 pl-2"
+                      className="items-start gap-2 py-2 pr-8 pl-2"
                     >
-                      {skill.iconUrl ? (
-                        <img
-                          src={resolveSkillIconUrl(skill.iconUrl)}
-                          alt=""
-                          className="size-10 shrink-0 rounded-md object-contain"
-                        />
-                      ) : (
-                        <PlusMenuSkillGlyphIcon className="size-10 shrink-0" />
-                      )}
+                      <Avatar className="size-8 shrink-0 rounded-md bg-muted after:rounded-md">
+                        {skill.iconUrl && (
+                          <AvatarImage
+                            src={resolveSkillIconUrl(skill.iconUrl)}
+                            alt=""
+                            className="m-auto size-6 rounded-sm object-contain"
+                          />
+                        )}
+                        <AvatarFallback className="rounded-md text-base font-semibold text-muted-foreground">
+                          {getSkillInitial(skill.displayName || skill.name)}
+                        </AvatarFallback>
+                      </Avatar>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">
                           {skill.displayName || skill.name}
