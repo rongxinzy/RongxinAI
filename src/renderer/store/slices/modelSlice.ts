@@ -14,6 +14,7 @@ export interface Model {
   supportsImage?: boolean;
   capabilities?: Partial<ModelCapabilities>;
   supportsThinkingToggle?: boolean;
+  contextWindow?: number;
   isServerModel?: boolean;
   serverApiFormat?: string;
   llamaCppOpenClawEligibility?: LlamaCppOpenClawEligibility;
@@ -56,6 +57,7 @@ function buildInitialModels(): Model[] {
               config.apiFormat ?? 'anthropic',
               model,
             ),
+            contextWindow: model.contextWindow ?? model.contextTokens,
           });
         });
       }

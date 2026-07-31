@@ -61,6 +61,7 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
+import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
 import { useDelayedVisibility } from './useDelayedVisibility';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
@@ -76,6 +77,52 @@ export interface CoworkViewProps {
   inlineQuestionPermission?: CoworkPermissionRequest | null;
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
 }
+
+const DirectChatDataChunkType = {
+  Context: 'data-context',
+} as const;
+
+interface DirectChatContextData {
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  contextWindowTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  usedTokens: number;
+}
+
+const isDirectChatContextData = (value: unknown): value is DirectChatContextData => {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as Record<string, unknown>;
+  const contextWindowTokens = data.contextWindowTokens;
+  const inputTokens = data.inputTokens;
+  const outputTokens = data.outputTokens;
+  const usedTokens = data.usedTokens;
+  const cacheReadTokens = data.cacheReadTokens;
+  const cacheWriteTokens = data.cacheWriteTokens;
+  if (
+    typeof contextWindowTokens !== 'number' ||
+    typeof inputTokens !== 'number' ||
+    typeof outputTokens !== 'number' ||
+    typeof usedTokens !== 'number' ||
+    !Number.isFinite(contextWindowTokens) ||
+    !Number.isFinite(inputTokens) ||
+    !Number.isFinite(outputTokens) ||
+    !Number.isFinite(usedTokens)
+  ) {
+    return false;
+  }
+  return (
+    contextWindowTokens > 0 &&
+    inputTokens >= 0 &&
+    outputTokens >= 0 &&
+    usedTokens >= 0 &&
+    (cacheReadTokens === undefined ||
+      (typeof cacheReadTokens === 'number' && Number.isFinite(cacheReadTokens) && cacheReadTokens >= 0)) &&
+    (cacheWriteTokens === undefined ||
+      (typeof cacheWriteTokens === 'number' && Number.isFinite(cacheWriteTokens) && cacheWriteTokens >= 0))
+  );
+};
 
 const CoworkView: React.FC<CoworkViewProps> = ({
   onRequestAppSettings,
@@ -132,7 +179,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const currentSession = useSelector(selectCurrentSession);
   const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
-  const directChatModelId = useSelector((state: RootState) => state.model.defaultSelectedModel.id);
+  const directChatModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
+  const directChatModelId = directChatModel.id;
 
   // Clear session when workMode changes and current session mode doesn't match.
   // Sessions without an explicit mode field (legacy) are treated as work mode.
@@ -413,6 +461,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let assistantMessageAdded = false;
         let thinkingMessageAdded = false;
         let thinkingDurationMs: number | undefined;
+        let directContextData: DirectChatContextData | undefined;
         const thinkingLifecycle = new ThinkingMessageLifecycle(
           tempSessionId,
           thinkingMsgId,
@@ -428,8 +477,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           const isStreamActive = status === CoworkSessionStatusValue.Running;
           const isCompleted = status === CoworkSessionStatusValue.Completed;
           const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
-          const messages = [
-            ...baseSession.messages,
+          const messages = mergeDirectChatSnapshotMessages(baseSession.messages, [
             ...(thinkingContent
               ? [
                   {
@@ -459,9 +507,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                       ...(isCompleted && { isFinalAnswer: true }),
                     },
                   },
-                ]
+              ]
               : []),
-          ];
+          ]);
           return {
             ...baseSession,
             status,
@@ -490,7 +538,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             throw new Error(created.error || 'Failed to create chat session');
           }
           const transport = new ChatChatTransport({
+            contextWindowTokens:
+              directChatModel.llamaCppRuntimeContextWindow ?? directChatModel.contextWindow,
             modelId: directChatModelId,
+            modelProviderKey: directChatModel.providerKey,
             localThinkingEnabled,
           });
           const stream = await transport.sendMessages({
@@ -506,6 +557,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             if (done || isPendingStartCancelled()) break;
             if (!chunk) continue;
             switch (chunk.type) {
+              case DirectChatDataChunkType.Context:
+                if (isDirectChatContextData(chunk.data)) {
+                  directContextData = chunk.data;
+                }
+                break;
               case 'text-start':
                 if (!assistantMessageAdded) {
                   dispatch(
@@ -658,7 +714,33 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 sessionId: tempSessionId,
                 messageId: assistantMsgId,
                 content: assistantContent,
-                metadata: { isStreaming: false, isFinal: true, isFinalAnswer: true },
+                metadata: {
+                  isStreaming: false,
+                  isFinal: true,
+                  isFinalAnswer: true,
+                  ...(directContextData
+                    ? {
+                        contextUsage: {
+                          contextWindowTokens: directContextData.contextWindowTokens,
+                          updatedAt: Date.now(),
+                          usedTokens: directContextData.usedTokens,
+                        },
+                        model: directChatModelId,
+                        modelProviderKey: directChatModel.providerKey,
+                        usage: {
+                          inputTokens: directContextData.inputTokens,
+                          outputTokens: directContextData.outputTokens,
+                          ...(directContextData.cacheReadTokens !== undefined
+                            ? { cacheReadTokens: directContextData.cacheReadTokens }
+                            : {}),
+                          ...(directContextData.cacheWriteTokens !== undefined
+                            ? { cacheWriteTokens: directContextData.cacheWriteTokens }
+                            : {}),
+                          totalTokens: directContextData.usedTokens,
+                        },
+                      }
+                    : {}),
+                },
               }),
             );
           }
@@ -826,6 +908,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       let assistantMessageAdded = false;
       let thinkingMessageAdded = false;
       let thinkingDurationMs: number | undefined;
+      let directContextData: DirectChatContextData | undefined;
       const thinkingLifecycle = new ThinkingMessageLifecycle(
         currentSession.id,
         thinkingMsgId,
@@ -841,8 +924,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         const isStreamActive = status === CoworkSessionStatusValue.Running;
         const isCompleted = status === CoworkSessionStatusValue.Completed;
         const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
-        const messages = [
-          ...baseSession.messages,
+        const messages = mergeDirectChatSnapshotMessages(baseSession.messages, [
           ...(thinkingContent
             ? [
                 {
@@ -872,9 +954,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     ...(isCompleted && { isFinalAnswer: true }),
                   },
                 },
-              ]
+            ]
             : []),
-        ];
+        ]);
         return {
           ...baseSession,
           status,
@@ -919,7 +1001,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         }
 
         const transport = new ChatChatTransport({
+          contextWindowTokens:
+            directChatModel.llamaCppRuntimeContextWindow ?? directChatModel.contextWindow,
           modelId: directChatModelId,
+          modelProviderKey: directChatModel.providerKey,
           localThinkingEnabled,
         });
         const stream = await transport.sendMessages({
@@ -950,6 +1035,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           if (done) break;
           if (!chunk) continue;
           switch (chunk.type) {
+            case DirectChatDataChunkType.Context:
+              if (isDirectChatContextData(chunk.data)) {
+                directContextData = chunk.data;
+              }
+              break;
             case 'text-start':
               if (!assistantMessageAdded) {
                 dispatch(
@@ -1088,6 +1178,28 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 isStreaming: false,
                 isFinal: true,
                 ...(finalStatus === CoworkSessionStatusValue.Completed && { isFinalAnswer: true }),
+                ...(directContextData
+                  ? {
+                      contextUsage: {
+                        contextWindowTokens: directContextData.contextWindowTokens,
+                        updatedAt: Date.now(),
+                        usedTokens: directContextData.usedTokens,
+                      },
+                      model: directChatModelId,
+                      modelProviderKey: directChatModel.providerKey,
+                      usage: {
+                        inputTokens: directContextData.inputTokens,
+                        outputTokens: directContextData.outputTokens,
+                        ...(directContextData.cacheReadTokens !== undefined
+                          ? { cacheReadTokens: directContextData.cacheReadTokens }
+                          : {}),
+                        ...(directContextData.cacheWriteTokens !== undefined
+                          ? { cacheWriteTokens: directContextData.cacheWriteTokens }
+                          : {}),
+                        totalTokens: directContextData.usedTokens,
+                      },
+                    }
+                  : {}),
               },
             }),
           );

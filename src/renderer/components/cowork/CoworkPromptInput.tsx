@@ -56,6 +56,7 @@ import {
   useAgentSelectedModel,
 } from './agentModelSelection';
 import AttachmentCard from './AttachmentCard';
+import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
@@ -224,6 +225,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       (state: RootState) => state.model.defaultSelectedModel,
     );
     const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
+    const contextMessage = useMemo(
+      () =>
+        [...(currentSession?.messages ?? [])]
+          .reverse()
+          .find(message => message.metadata?.contextUsage),
+      [currentSession?.messages],
+    );
+    const contextUsage = contextMessage?.metadata?.contextUsage;
     const workMode = useSelector(selectWorkMode);
     const persistedExpertIds = useMemo(
       () => currentSession?.experts?.map(expert => expert.expertId) ?? [],
@@ -1148,15 +1157,25 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           <PromptInputFooter className="flex-wrap">
             <PromptInputTools className="min-w-0 flex-1 flex-wrap">
               {!isPlusToolbar && showModelSelector && (
-                <CoworkModelPicker
-                  models={availableModels}
-                  selectedModel={effectiveSelectedModel}
-                  open={modelSelectorOpen}
-                  onOpenChange={setModelSelectorOpen}
-                  onSelect={model => {
-                    void handleModelSelect(model);
-                  }}
-                />
+                <>
+                  <ContextUsageIndicator
+                    usage={contextUsage}
+                    messageUsage={contextMessage?.metadata?.usage}
+                    modelId={contextMessage?.metadata?.model}
+                    modelProviderKey={contextMessage?.metadata?.modelProviderKey}
+                    selectedModelId={effectiveSelectedModel?.id}
+                    selectedModelProviderKey={effectiveSelectedModel?.providerKey}
+                  />
+                  <CoworkModelPicker
+                    models={availableModels}
+                    selectedModel={effectiveSelectedModel}
+                    open={modelSelectorOpen}
+                    onOpenChange={setModelSelectorOpen}
+                    onSelect={model => {
+                      void handleModelSelect(model);
+                    }}
+                  />
+                </>
               )}
               {!isPlusToolbar && (
                 <LocalThinkingToggle
@@ -1205,15 +1224,25 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   />
                 )}
                 {showModelSelector && (
-                  <CoworkModelPicker
-                    models={availableModels}
-                    selectedModel={effectiveSelectedModel}
-                    open={modelSelectorOpen}
-                    onOpenChange={setModelSelectorOpen}
-                    onSelect={model => {
-                      void handleModelSelect(model);
-                    }}
-                  />
+                  <>
+                    <ContextUsageIndicator
+                      usage={contextUsage}
+                      messageUsage={contextMessage?.metadata?.usage}
+                      modelId={contextMessage?.metadata?.model}
+                      modelProviderKey={contextMessage?.metadata?.modelProviderKey}
+                      selectedModelId={effectiveSelectedModel?.id}
+                      selectedModelProviderKey={effectiveSelectedModel?.providerKey}
+                    />
+                    <CoworkModelPicker
+                      models={availableModels}
+                      selectedModel={effectiveSelectedModel}
+                      open={modelSelectorOpen}
+                      onOpenChange={setModelSelectorOpen}
+                      onSelect={model => {
+                        void handleModelSelect(model);
+                      }}
+                    />
+                  </>
                 )}
               </div>
             )}

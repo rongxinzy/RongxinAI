@@ -159,7 +159,27 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             requestId,
             abortSignal,
           )
-          .then(() => {
+          .then(result => {
+            const contextWindowTokens = directChatOptions.contextWindowTokens;
+            if (result.usage && contextWindowTokens && contextWindowTokens > 0) {
+              const cacheReadTokens = result.usage.cacheReadTokens ?? 0;
+              const cacheWriteTokens = result.usage.cacheWriteTokens ?? 0;
+              enqueue({
+                type: 'data-context',
+                data: {
+                  contextWindowTokens,
+                  inputTokens: result.usage.inputTokens,
+                  outputTokens: result.usage.outputTokens,
+                  ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
+                  ...(cacheWriteTokens > 0 ? { cacheWriteTokens } : {}),
+                  usedTokens:
+                    result.usage.inputTokens +
+                    cacheReadTokens +
+                    cacheWriteTokens +
+                    result.usage.outputTokens,
+                },
+              } as UIMessageChunk);
+            }
             close();
           })
           .catch((error: Error) => {
