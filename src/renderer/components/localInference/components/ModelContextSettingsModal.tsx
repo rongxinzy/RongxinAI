@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { LlamaCppModel } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
 import Modal from '../../common/Modal';
-import { localInferenceMutedTextClass } from '../constants';
+import { localInferenceCompactButtonClass, localInferenceMutedTextClass } from '../constants';
 
 const CONTEXT_SLIDER_DEFAULT_VALUE = 32768;
 const CONTEXT_SLIDER_DEFAULT_MAX = 131072;
@@ -94,10 +94,20 @@ export function ModelContextSettingsModal({
         </div>
 
         <div className="flex items-center justify-end gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+          <Button
+            type="button"
+            variant="outline"
+            className={localInferenceCompactButtonClass}
+            onClick={onClose}
+          >
             {i18nService.t('cancel')}
           </Button>
-          <Button type="button" size="sm" onClick={() => onSave(contextSize)}>
+          <Button
+            type="button"
+            variant="outline"
+            className={localInferenceCompactButtonClass}
+            onClick={() => onSave(contextSize)}
+          >
             {i18nService.t('save')}
           </Button>
         </div>

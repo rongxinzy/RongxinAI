@@ -3,17 +3,23 @@ import { Button } from '@shared/components/ui/button';
 import { Button21st } from '@shared/components/ui/button-21st';
 import { Card, CardHeader, CardTitle } from '@shared/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@shared/components/ui/dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@shared/components/ui/dropdown-menu';
+import {
+  Empty,
+  EmptyDescription,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { Box, Clock3, Settings2 } from 'lucide-react';
+import { ArrowRight, Box, Clock3, Ellipsis, Settings2, Trash2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   type ComponentType,
@@ -48,7 +54,7 @@ import {
   XiaomiIcon,
   ZhipuIcon,
 } from '../../icons/providers';
-import { localInferenceMutedTextClass } from '../constants';
+import { localInferenceCompactButtonClass, localInferenceMutedTextClass } from '../constants';
 import {
   readLocalModelOrder,
   reconcileLocalModelOrder,
@@ -56,6 +62,7 @@ import {
   writeLocalModelOrder,
 } from '../utils/modelOrder';
 import { ListPagination } from '../../common/ListPagination';
+import Modal from '../../common/Modal';
 import { type LocalModelProvider, resolveLocalModelProvider } from '../utils/modelProvider';
 import { formatBytes, formatDate } from '../utils/progress';
 
@@ -103,6 +110,7 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
+  onOpenMarketplace?: () => void;
   onOpenLaunchLog?: (modelName: string) => void;
   renderLoadButton?: (
     model: LlamaCppModel,
@@ -123,6 +131,7 @@ type ModelCardProps = {
   onLoadModel: () => void;
   onConfigureContext: () => void;
   onUnload: () => void;
+  onDelete: () => void;
   dragging: boolean;
   onDragStart: (event: DragEvent<HTMLDivElement>) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
@@ -148,6 +157,7 @@ export function ModelsPanel({
   onUnload,
   onDelete,
   onConfigureContext,
+  onOpenMarketplace,
   onOpenLaunchLog,
   renderLoadButton,
   showRegisteredModelsTitle = true,
@@ -258,6 +268,18 @@ export function ModelsPanel({
   const pendingDeleteBusy =
     loading || (!!pendingDeleteModel && unloadingModelName === pendingDeleteModel.name);
 
+  const handleCancelDelete = () => {
+    setPendingDeleteModel(null);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!pendingDeleteModel || pendingDeleteRunningModel) return;
+
+    const modelName = pendingDeleteModel.name;
+    setPendingDeleteModel(null);
+    onDelete(modelName);
+  };
+
   const handleCardDragStart = (event: DragEvent<HTMLDivElement>, modelName: string) => {
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', modelName);
@@ -308,6 +330,7 @@ export function ModelsPanel({
                   onLoadModel={() => onLoadModel(model)}
                   onConfigureContext={() => onConfigureContext(model)}
                   onUnload={() => onUnload(model.name)}
+                  onDelete={() => setPendingDeleteModel(model)}
                   dragging={draggedModelName === model.name}
                   onDragStart={event => handleCardDragStart(event, model.name)}
                   onDragOver={event => event.preventDefault()}
@@ -327,45 +350,81 @@ export function ModelsPanel({
               className="pt-1"
             />
           </>
-        ) : null}
+        ) : (
+          <Empty className="mx-auto min-h-80 w-full max-w-[800px] rounded-lg border border-dashed border-border bg-card p-6">
+            <EmptyMedia className="size-12 rounded-lg bg-muted text-muted-foreground" variant="icon">
+              <Box size={32} className="size-8 text-foreground" />
+            </EmptyMedia>
+            <EmptyHeader>
+              <EmptyTitle className="text-lg font-semibold">
+                {i18nService.t('localInferenceLocalModelsEmptyTitle')}
+              </EmptyTitle>
+              <EmptyDescription>
+                {i18nService.t('localInferenceLocalModelsEmptyDescription')}
+              </EmptyDescription>
+            </EmptyHeader>
+            {onOpenMarketplace ? (
+              <EmptyContent>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-9 min-w-28 cursor-pointer px-4 shadow-none transition-[background-color,border-color,box-shadow] duration-200 ease-out hover:shadow-lg hover:shadow-foreground/10 active:shadow-inset"
+                  onClick={onOpenMarketplace}
+                >
+                  {i18nService.t('localInferenceLocalModelsEmptyAction')}
+                  <ArrowRight data-icon="inline-end" />
+                </Button>
+              </EmptyContent>
+            ) : null}
+          </Empty>
+        )}
       </section>
 
-      <Dialog
-        open={Boolean(pendingDeleteModel)}
-        onOpenChange={open => {
-          if (!open) setPendingDeleteModel(null);
-        }}
-      >
-        <DialogContent className="max-w-sm" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>{i18nService.t('confirmDelete')}</DialogTitle>
-            <DialogDescription>
-              {pendingDeleteRunningModel
-                ? i18nService.t('localInferenceDeleteRunningBlocked')
-                : i18nService
-                    .t('localInferenceDeleteConfirmMessage')
-                    .replace('{name}', pendingDeleteDisplayName)}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setPendingDeleteModel(null)}>
-              {i18nService.t('cancel')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={pendingDeleteBusy || Boolean(pendingDeleteRunningModel)}
-              onClick={() => {
-                if (!pendingDeleteModel || pendingDeleteRunningModel) return;
-                setPendingDeleteModel(null);
-                onDelete(pendingDeleteModel.name);
-              }}
-            >
-              {i18nService.t('delete')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {pendingDeleteModel ? (
+        <Modal
+          isOpen={Boolean(pendingDeleteModel)}
+          onClose={handleCancelDelete}
+          className="w-full max-w-sm rounded-2xl border border-border bg-surface p-0 shadow-2xl"
+        >
+          <div className="flex flex-col gap-5 p-6">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-base font-semibold text-foreground">
+                {i18nService.t('confirmDelete')}
+              </h2>
+              <p className={cn('text-sm leading-6', localInferenceMutedTextClass)}>
+                {pendingDeleteRunningModel
+                  ? i18nService.t('localInferenceDeleteRunningBlocked')
+                  : i18nService
+                      .t('localInferenceDeleteConfirmMessage')
+                      .replace('{name}', pendingDeleteDisplayName)}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className={localInferenceCompactButtonClass}
+                data-local-inference-delete-confirm-action-button="true"
+                onClick={handleCancelDelete}
+              >
+                {i18nService.t('cancel')}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className={localInferenceCompactButtonClass}
+                disabled={pendingDeleteBusy || Boolean(pendingDeleteRunningModel)}
+                data-local-inference-delete-confirm-action-button="true"
+                data-local-inference-delete-confirm-button="true"
+                onClick={handleConfirmDelete}
+              >
+                {i18nService.t('delete')}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -386,6 +445,7 @@ function ModelCard({
   onLoadModel,
   onConfigureContext,
   onUnload,
+  onDelete,
   dragging,
   onDragStart,
   onDragOver,
@@ -495,6 +555,40 @@ function ModelCard({
             <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
               {displayName}
             </CardTitle>
+            <div className="ml-auto shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground"
+                      disabled={buttonsDisabled}
+                      aria-label={i18nService.t('coworkSessionActions')}
+                      title={i18nService.t('coworkSessionActions')}
+                      data-local-inference-model-actions-button="true"
+                    >
+                      <Ellipsis className="size-5" />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onClick={onConfigureContext}>
+                    <Settings2 className="size-4" />
+                    {i18nService.t('localInferenceConfigureContext')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    data-local-inference-delete-button="true"
+                    onClick={onDelete}
+                  >
+                    <Trash2 className="size-4" />
+                    {i18nService.t('delete')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -504,17 +598,6 @@ function ModelCard({
                 <span>{modifiedDate}</span>
               </div>
             ) : null}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="cursor-pointer hover:bg-background hover:shadow-lg hover:shadow-foreground/10"
-              disabled={buttonsDisabled}
-              onClick={onConfigureContext}
-            >
-              <Settings2 data-icon="inline-start" />
-              {i18nService.t('localInferenceConfigureContext')}
-            </Button>
           </div>
 
           <div className="flex min-w-0 flex-nowrap items-center gap-1.5 whitespace-nowrap">
