@@ -399,6 +399,9 @@
     !insertmacro GetTimestamp $8
     FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-confirmation-required exit=$0 output=$1$\r$\n"
     FileClose $2
+    ; /S is used only after the user explicitly chooses Restart to Update.
+    ; Continue unattended instead of blocking the background updater on a MessageBox.
+    IfSilent LlamaCppBackendLocalSigningConfirmed 0
     MessageBox MB_OKCANCEL|MB_ICONQUESTION "The local inference backend contains unsigned executable files. ZhiYuan Agent can create a local code-signing certificate and sign only the unsigned inference files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
 
   LlamaCppBackendLocalSigningConfirmed:

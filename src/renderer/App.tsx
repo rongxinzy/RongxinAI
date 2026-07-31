@@ -22,7 +22,6 @@ import Sidebar from './components/Sidebar';
 import { SkillsView } from './components/skills';
 import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
-import AppUpdateModal from './components/update/AppUpdateModal';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig } from './config';
 import type { ApiConfig } from './services/api';
@@ -78,15 +77,12 @@ const App: React.FC = () => {
     readyFileHash: null,
     errorMessage: null,
   });
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [enterpriseConfig, setEnterpriseConfig] = useState<{
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
   } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const hasInitialized = useRef(false);
-  const previousUpdateStatusRef = useRef<AppUpdateRuntimeState['status']>(AppUpdateStatus.Idle);
-  const shouldInstallReadyUpdateRef = useRef(false);
   const dispatch = useDispatch();
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const currentSessionId = useSelector(selectCurrentSessionId);
@@ -422,7 +418,6 @@ const App: React.FC = () => {
         const state = await window.electron.appUpdate.getState();
         if (mounted) {
           setAppUpdateState(state);
-          previousUpdateStatusRef.current = state.status;
         }
       } catch (error) {
         console.error('[App] failed to load initial app update state:', error);
@@ -432,20 +427,8 @@ const App: React.FC = () => {
     void loadInitialUpdateState();
 
     const unsubscribe = window.electron.appUpdate.onStateChanged(state => {
-      const previousStatus = previousUpdateStatusRef.current;
-      previousUpdateStatusRef.current = state.status;
       setAppUpdateState(state);
 
-      if (state.status === AppUpdateStatus.Ready && previousStatus !== AppUpdateStatus.Ready) {
-        if (shouldInstallReadyUpdateRef.current && state.readyFilePath) {
-          shouldInstallReadyUpdateRef.current = false;
-          void window.electron.appUpdate.installReady().then(installResult => {
-            if (!installResult.success) {
-              showToast(installResult.error || i18nService.t('updateInstallFailed'));
-            }
-          });
-        }
-      }
     });
 
     return () => {
@@ -460,71 +443,18 @@ const App: React.FC = () => {
 
   const updateInfo = appUpdateState.info;
 
-  const handleOpenUpdateModal = useCallback(() => {
-    if (!updateInfo) return;
-    setShowUpdateModal(true);
-  }, [updateInfo]);
-
-  const handleConfirmUpdate = useCallback(async () => {
-    if (!updateInfo) return;
-
-    if (appUpdateState.readyFilePath) {
-      shouldInstallReadyUpdateRef.current = false;
+  const handleUpdateAction = useCallback(async () => {
+    if (appUpdateState.status === AppUpdateStatus.Ready && appUpdateState.readyFilePath) {
       const installResult = await window.electron.appUpdate.installReady();
       if (!installResult.success) {
         showToast(installResult.error || i18nService.t('updateInstallFailed'));
       }
       return;
     }
-
-    if (
-      appUpdateState.status === AppUpdateStatus.Error ||
-      appUpdateState.status === AppUpdateStatus.Available
-    ) {
-      const isManualUrl = updateInfo.manualDownload;
-      if (!isManualUrl) {
-        shouldInstallReadyUpdateRef.current = appUpdateState.status === AppUpdateStatus.Available;
-        const retryResult = await window.electron.appUpdate.retryDownload();
-        if (!retryResult.success) {
-          shouldInstallReadyUpdateRef.current = false;
-          showToast(i18nService.t('updateDownloadFailed'));
-        }
-        return;
-      }
+    if (appUpdateState.status === AppUpdateStatus.Error) {
+      await window.electron.appUpdate.retryDownload();
     }
-
-    if (updateInfo.manualDownload) {
-      shouldInstallReadyUpdateRef.current = false;
-      setShowUpdateModal(false);
-      try {
-        const result = await window.electron.shell.openExternal(updateInfo.url);
-        if (!result.success) {
-          showToast(i18nService.t('updateOpenFailed'));
-        }
-      } catch (error) {
-        console.error('Failed to open update url:', error);
-        showToast(i18nService.t('updateOpenFailed'));
-      }
-      return;
-    }
-  }, [appUpdateState.readyFilePath, appUpdateState.status, showToast, updateInfo]);
-
-  const handleCancelDownload = useCallback(async () => {
-    shouldInstallReadyUpdateRef.current = false;
-    await window.electron.appUpdate.cancelDownload();
-  }, []);
-
-  const handleRetryUpdate = useCallback(async () => {
-    if (!updateInfo) return;
-    if (updateInfo.manualDownload) {
-      shouldInstallReadyUpdateRef.current = false;
-      setShowUpdateModal(false);
-      await window.electron.shell.openExternal(updateInfo.url);
-      return;
-    }
-    shouldInstallReadyUpdateRef.current = false;
-    await window.electron.appUpdate.retryDownload();
-  }, [updateInfo]);
+  }, [appUpdateState.readyFilePath, appUpdateState.status, showToast]);
 
   const handlePermissionResponse = useCallback(
     async (result: CoworkPermissionResult) => {
@@ -690,16 +620,15 @@ const App: React.FC = () => {
     );
   }, [pendingPermission, handlePermissionResponse, isInlineAskUserQuestion]);
 
-  const isOverlayActive = showSettings || showUpdateModal || permissionModal !== null;
+  const isOverlayActive = showSettings || permissionModal !== null;
   const shouldShowUpdateBadge =
     updateInfo &&
-    appUpdateState.status !== AppUpdateStatus.Checking &&
-    appUpdateState.status !== AppUpdateStatus.Downloading;
+    (appUpdateState.status === AppUpdateStatus.Ready || appUpdateState.status === AppUpdateStatus.Error);
   const updateEntry = shouldShowUpdateBadge ? (
     <AppUpdateBadge
       latestVersion={updateInfo.latestVersion}
       status={appUpdateState.status}
-      onClick={handleOpenUpdateModal}
+      onClick={handleUpdateAction}
     />
   ) : null;
   const windowsStandaloneTitleBar = isWindows ? (
@@ -862,22 +791,6 @@ const App: React.FC = () => {
             initialTab={settingsOptions.initialTab}
             notice={settingsOptions.notice}
             enterpriseConfig={enterpriseConfig}
-          />
-        )}
-        {showUpdateModal && updateInfo && (
-          <AppUpdateModal
-            updateState={appUpdateState}
-            onCancel={() => {
-              if (
-                appUpdateState.status !== AppUpdateStatus.Downloading &&
-                appUpdateState.status !== AppUpdateStatus.Installing
-              ) {
-                setShowUpdateModal(false);
-              }
-            }}
-            onConfirm={handleConfirmUpdate}
-            onCancelDownload={handleCancelDownload}
-            onRetry={handleRetryUpdate}
           />
         )}
         {permissionModal}

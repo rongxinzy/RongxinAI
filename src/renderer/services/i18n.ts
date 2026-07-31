@@ -1386,7 +1386,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     updateDownloadingPill: '正在下载',
     updateDownloadCancel: '取消下载',
     updateReadyTitle: '检测到新版本',
-    updateReadyConfirm: '立即更新',
+    updateReadyConfirm: '重启更新',
     updateReadyLater: '稍后',
     updateReadyPill: '有新版本',
     updateErrorPill: '更新失败',

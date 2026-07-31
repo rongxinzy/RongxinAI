@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { exec, spawn } from 'child_process';
 import { app, session } from 'electron';
 import fs from 'fs';
@@ -12,6 +13,11 @@ export interface AppUpdateDownloadProgress {
   total: number | undefined;
   percent: number | undefined;
   speed: number | undefined;
+}
+
+export interface DownloadedAppUpdate {
+  filePath: string;
+  sha256: string;
 }
 
 let activeDownloadController: AbortController | null = null;
@@ -43,6 +49,65 @@ function execAsync(command: string, timeoutMs = 120_000): Promise<string> {
   });
 }
 
+function spawnDetachedAndConfirm(command: string, args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('spawn', () => {
+      child.unref();
+      resolve();
+    });
+  });
+}
+
+export function buildMacReplacementScript(options: {
+  appPid: number;
+  backupApp: string;
+  failedApp: string;
+  stagedApp: string;
+  targetApp: string;
+}): string {
+  const { appPid, backupApp, failedApp, stagedApp, targetApp } = options;
+  return [
+    '#!/bin/sh',
+    'set -u',
+    `TARGET=${shellEscape(targetApp)}`,
+    `STAGED=${shellEscape(stagedApp)}`,
+    `BACKUP=${shellEscape(backupApp)}`,
+    `FAILED=${shellEscape(failedApp)}`,
+    'waited=0',
+    `while kill -0 ${appPid} 2>/dev/null; do`,
+    '  if [ "$waited" -ge 120 ]; then exit 1; fi',
+    '  sleep 1',
+    '  waited=$((waited + 1))',
+    'done',
+    'if [ ! -f "$STAGED/Contents/Info.plist" ]; then exit 1; fi',
+    'had_target=0',
+    'if [ -e "$TARGET" ]; then',
+    '  if ! mv "$TARGET" "$BACKUP"; then exit 1; fi',
+    '  had_target=1',
+    'fi',
+    'if mv "$STAGED" "$TARGET"; then',
+    '  rm -rf "$BACKUP"',
+    '  /usr/bin/open "$TARGET"',
+    '  exit 0',
+    'fi',
+    '# Preserve any unexpected partial target before restoring the previous app.',
+    'if [ -e "$TARGET" ]; then mv "$TARGET" "$FAILED" || true; fi',
+    'if [ "$had_target" -eq 1 ] && [ -e "$BACKUP" ] && [ ! -e "$TARGET" ]; then',
+    '  mv "$BACKUP" "$TARGET" || true',
+    'fi',
+    'if [ -e "$TARGET" ]; then',
+    '  rm -rf "$FAILED"',
+    '  /usr/bin/open "$TARGET"',
+    'elif [ -e "$BACKUP" ]; then',
+    '  /usr/bin/open "$BACKUP"',
+    'fi',
+    'exit 1',
+    '',
+  ].join('\n');
+}
+
 /** Minimum interval between progress IPC events (ms). */
 const PROGRESS_THROTTLE_MS = 200;
 
@@ -52,8 +117,9 @@ const DOWNLOAD_INACTIVITY_TIMEOUT_MS = 60_000;
 export async function downloadUpdate(
   url: string,
   source: AppUpdateSource,
+  expected: { size: number; sha256: string },
   onProgress: (progress: AppUpdateDownloadProgress) => void,
-): Promise<string> {
+): Promise<DownloadedAppUpdate> {
   if (activeDownloadController) {
     throw new Error('A download is already in progress');
   }
@@ -118,6 +184,7 @@ export async function downloadUpdate(
     console.log(`[AppUpdate] Content-Length: ${totalHeader ?? 'unknown'}`);
 
     let received = 0;
+    const hash = crypto.createHash('sha256');
     let lastSpeedTime = Date.now();
     let lastSpeedBytes = 0;
     let currentSpeed: number | undefined = undefined;
@@ -145,6 +212,7 @@ export async function downloadUpdate(
 
     nodeStream.on('data', (chunk: Buffer) => {
       received += chunk.length;
+      hash.update(chunk);
 
       // Reset inactivity timer on each chunk
       resetInactivityTimer();
@@ -179,6 +247,16 @@ export async function downloadUpdate(
     if (total && Number.isFinite(total) && stat.size !== total) {
       throw new Error(`Download incomplete: expected ${total} bytes but got ${stat.size}`);
     }
+    if (stat.size !== expected.size) {
+      throw new Error(
+        `Downloaded size mismatch: expected ${expected.size} bytes but got ${stat.size}`,
+      );
+    }
+
+    const sha256 = hash.digest('hex');
+    if (!crypto.timingSafeEqual(Buffer.from(sha256, 'hex'), Buffer.from(expected.sha256, 'hex'))) {
+      throw new Error('Downloaded file checksum verification failed');
+    }
 
     // Rename to final path (atomic on same filesystem)
     await fs.promises.rename(downloadPath, finalPath);
@@ -192,7 +270,7 @@ export async function downloadUpdate(
       speed: currentSpeed,
     });
 
-    return finalPath;
+    return { filePath: finalPath, sha256 };
   } catch (error) {
     clearInactivityTimer();
     console.error('[AppUpdate] Download error:', error);
@@ -243,11 +321,57 @@ export async function installUpdate(filePath: string): Promise<void> {
   if (process.platform === 'win32') {
     return installWindowsNsis(filePath);
   }
+  if (process.platform === 'linux') {
+    return installLinuxPackage(filePath);
+  }
   throw new Error('Unsupported platform');
+}
+
+async function installLinuxPackage(packagePath: string): Promise<void> {
+  const appImagePath = process.env.APPIMAGE;
+  const scriptPath = path.join(app.getPath('temp'), `zhiyuan-update-${Date.now()}.sh`);
+  const appPid = process.pid;
+  const waitForExit = `while kill -0 ${appPid} 2>/dev/null; do sleep 1; done`;
+
+  let script: string;
+  if (appImagePath) {
+    await fs.promises.access(path.dirname(appImagePath), fs.constants.W_OK);
+    const stagedPath = `${appImagePath}.updating`;
+    script = [
+      '#!/bin/sh',
+      'set -eu',
+      waitForExit,
+      `cp ${shellEscape(packagePath)} ${shellEscape(stagedPath)}`,
+      `chmod +x ${shellEscape(stagedPath)}`,
+      `mv ${shellEscape(stagedPath)} ${shellEscape(appImagePath)}`,
+      `exec ${shellEscape(appImagePath)}`,
+      '',
+    ].join('\n');
+  } else {
+    script = [
+      '#!/bin/sh',
+      'set -eu',
+      waitForExit,
+      `pkexec /usr/bin/dpkg -i ${shellEscape(packagePath)}`,
+      `exec ${shellEscape(process.execPath)}`,
+      '',
+    ].join('\n');
+  }
+
+  await fs.promises.writeFile(scriptPath, script, { mode: 0o700 });
+  const launcher = spawn('/bin/sh', [scriptPath], {
+    detached: true,
+    stdio: 'ignore',
+  });
+  launcher.unref();
+  console.log(`[AppUpdate] Linux installer scheduled via ${scriptPath}`);
+  app.quit();
 }
 
 async function installMacDmg(dmgPath: string): Promise<void> {
   let mountPoint: string | null = null;
+  let stagedApp: string | null = null;
+  let installScheduled = false;
 
   try {
     // Mount the DMG (timeout 60s)
@@ -277,49 +401,47 @@ async function installMacDmg(dmgPath: string): Promise<void> {
     const sourceApp = path.join(mountPoint, appBundle);
     console.log(`[AppUpdate] Source app: ${sourceApp}`);
 
-    // Determine target path: current running app location
-    // process.resourcesPath is .app/Contents/Resources, go up 3 levels
-    const currentAppPath = path.resolve(process.resourcesPath, '..', '..', '..');
+    // process.resourcesPath is <bundle>.app/Contents/Resources, so two parent
+    // traversals resolve the bundle itself.
+    const currentAppPath = path.resolve(process.resourcesPath, '..', '..');
     let targetApp: string;
 
-    if (currentAppPath.endsWith('.app')) {
+    if (currentAppPath.endsWith('.app') && !currentAppPath.startsWith('/Volumes/')) {
       targetApp = currentAppPath;
     } else {
-      // Fallback to /Applications
       targetApp = `/Applications/${appBundle}`;
     }
     console.log(`[AppUpdate] Target app: ${targetApp}`);
 
-    // Try to copy the .app bundle (use shellEscape to prevent injection)
+    // Fully stage the new bundle beside the target. Keeping both directories on
+    // the same filesystem makes the post-exit mv operations atomic.
+    const timestamp = Date.now();
+    const targetDir = path.dirname(targetApp);
+    stagedApp = path.join(targetDir, `.${appBundle}.update-${timestamp}`);
+    const backupApp = path.join(targetDir, `.${appBundle}.backup-${timestamp}`);
+    const failedApp = path.join(targetDir, `.${appBundle}.failed-${timestamp}`);
+    let needsElevation = false;
+    const dittoCommand = `/usr/bin/ditto ${shellEscape(sourceApp)} ${shellEscape(stagedApp)}`;
+
     try {
-      console.log('[AppUpdate] Copying app bundle...');
-      await execAsync(
-        `rm -rf ${shellEscape(targetApp)} && cp -R ${shellEscape(sourceApp)} ${shellEscape(targetApp)}`,
-        300_000,
-      );
-      console.log('[AppUpdate] Copy succeeded');
+      console.log('[AppUpdate] Staging app bundle...');
+      await execAsync(dittoCommand, 300_000);
     } catch {
-      // Permission denied: try with admin privileges via osascript
-      console.log('[AppUpdate] Normal copy failed, requesting admin privileges...');
+      console.log('[AppUpdate] Staging requires administrator privileges...');
+      needsElevation = true;
       try {
-        // For osascript, escape backslashes and double quotes for the inner shell
-        const escapeForInnerShell = (s: string) =>
-          s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
-        const escapedTarget = escapeForInnerShell(targetApp);
-        const escapedSource = escapeForInnerShell(sourceApp);
-        await execAsync(
-          `osascript -e 'do shell script "rm -rf \\"${escapedTarget}\\" && cp -R \\"${escapedSource}\\" \\"${escapedTarget}\\"" with administrator privileges'`,
-          300_000,
-        );
-        console.log('[AppUpdate] Admin copy succeeded');
+        const privilegedStageCommand = `/bin/rm -rf ${shellEscape(stagedApp)} && ${dittoCommand}`;
+        const appleScript = `do shell script ${JSON.stringify(privilegedStageCommand)} with administrator privileges`;
+        await execAsync(`/usr/bin/osascript -e ${shellEscape(appleScript)}`, 300_000);
       } catch (adminError) {
         throw new Error(
-          `Installation failed: insufficient permissions. ${adminError instanceof Error ? adminError.message : ''}`,
+          `Installation staging failed: insufficient permissions. ${adminError instanceof Error ? adminError.message : ''}`,
         );
       }
     }
+    await fs.promises.access(path.join(stagedApp, 'Contents', 'Info.plist'), fs.constants.R_OK);
+    console.log(`[AppUpdate] Staged app verified: ${stagedApp}`);
 
-    // Detach DMG (timeout 30s)
     try {
       await execAsync(`hdiutil detach ${shellEscape(mountPoint)} -force`, 30_000);
     } catch {
@@ -327,25 +449,34 @@ async function installMacDmg(dmgPath: string): Promise<void> {
     }
     mountPoint = null;
 
-    // Clean up downloaded DMG
     try {
       await fs.promises.unlink(dmgPath);
     } catch {
       // Best effort
     }
 
-    // Relaunch from the new app location
-    const executablePath = path.join(targetApp, 'Contents', 'MacOS');
-    const execEntries = await fs.promises.readdir(executablePath);
-    const executable = execEntries[0]; // Should be the app executable
+    // The running bundle is never modified. A detached helper waits for this
+    // process to exit, then swaps the staged bundle into place and rolls back
+    // to the backup if the replacement cannot be completed.
+    const scriptPath = path.join(app.getPath('temp'), `zhiyuan-mac-update-${timestamp}.sh`);
+    const script = buildMacReplacementScript({
+      appPid: process.pid,
+      backupApp,
+      failedApp,
+      stagedApp,
+      targetApp,
+    });
+    await fs.promises.writeFile(scriptPath, script, { mode: 0o700 });
 
-    if (executable) {
-      console.log(`[AppUpdate] Relaunching: ${path.join(executablePath, executable)}`);
-      app.relaunch({ execPath: path.join(executablePath, executable) });
+    if (needsElevation) {
+      const helperCommand = `/bin/sh ${shellEscape(scriptPath)}`;
+      const appleScript = `do shell script ${JSON.stringify(helperCommand)} with administrator privileges`;
+      await spawnDetachedAndConfirm('/usr/bin/osascript', ['-e', appleScript]);
     } else {
-      console.log('[AppUpdate] Relaunching (default)');
-      app.relaunch();
+      await spawnDetachedAndConfirm('/bin/sh', [scriptPath]);
     }
+    installScheduled = true;
+    console.log(`[AppUpdate] macOS replacement scheduled via ${scriptPath}`);
     app.quit();
   } catch (error) {
     console.error('[AppUpdate] macOS install error:', error);
@@ -357,12 +488,15 @@ async function installMacDmg(dmgPath: string): Promise<void> {
         // Best effort
       }
     }
+    if (stagedApp && !installScheduled) {
+      await fs.promises.rm(stagedApp, { recursive: true, force: true }).catch(() => {});
+    }
     throw error;
   }
 }
 
 async function installWindowsNsis(exePath: string): Promise<void> {
-  console.log(`[AppUpdate] Windows NSIS install (interactive mode)`);
+  console.log(`[AppUpdate] Windows NSIS install (silent mode)`);
   console.log(`[AppUpdate]   installer: ${exePath}`);
   console.log(`[AppUpdate]   appPid: ${process.pid}`);
 
@@ -371,9 +505,8 @@ async function installWindowsNsis(exePath: string): Promise<void> {
   // which kills the entire process tree — including child processes.
   //
   // Strategy: use a tiny PowerShell script (launched via hidden VBS) that
-  // waits for the app to fully exit, then opens the installer with its
-  // normal UI (no /S silent flag). This lets NSIS handle everything:
-  // desktop shortcuts, start menu entries, "Run after finish", etc.
+  // waits for the app to fully exit, then runs the installer without its
+  // wizard. The installer can still request Windows UAC when required.
   const ts = Date.now();
   const tempDir = app.getPath('temp');
   const logPath = path.join(tempDir, `zhiyuan-update-${ts}.log`);
@@ -388,6 +521,7 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     `$logPath = '${psEscape(logPath)}'`,
     `$appPid = ${process.pid}`,
     `$installerPath = '${psEscape(exePath)}'`,
+    `$appPath = '${psEscape(process.execPath)}'`,
     '',
     'function Log($msg) {',
     "    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'",
@@ -410,10 +544,14 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     '    }',
     '    Log "App exited after $waited seconds"',
     '',
-    '    # Launch installer with normal UI (NSIS handles shortcuts & relaunch)',
-    '    Log "Launching installer: $installerPath"',
-    '    Start-Process -FilePath $installerPath',
-    '    Log "Done"',
+    '    # Install without showing the NSIS wizard, then start the updated app.',
+    '    Log "Launching silent installer: $installerPath"',
+    "    $installer = Start-Process -FilePath $installerPath -ArgumentList '/S' -Wait -PassThru",
+    '    Log "Installer exited with code $($installer.ExitCode)"',
+    '    if ($installer.ExitCode -ne 0) { throw "Installer exited with code $($installer.ExitCode)" }',
+    '    if (-not (Test-Path $appPath)) { throw "Updated app executable was not found: $appPath" }',
+    '    Start-Process -FilePath $appPath',
+    '    Log "Updated app relaunched"',
     '} catch {',
     '    Log "ERROR: $($_.Exception.Message)"',
     '}',
