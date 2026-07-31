@@ -8,17 +8,15 @@ import { i18nService } from '@/services/i18n';
 import type { RootState } from '@/store';
 import {
   addArtifact,
+  ArtifactLayoutMode,
   closePanel,
-  MAX_PANEL_WIDTH,
   MIN_PANEL_WIDTH,
   selectActiveTab,
   selectArtifactLayoutMode,
   selectArtifact,
-  selectPanelWidth,
   selectSelectedArtifact,
   setActiveTab,
   setArtifactLayoutMode,
-  setPanelWidth,
 } from '@/store/slices/artifactSlice';
 import type { ArtifactActiveTab } from '@/store/slices/artifactSlice';
 import { ArtifactRole, type Artifact, type ArtifactType } from '@/types/artifact';
@@ -26,6 +24,7 @@ import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
 import ArtifactRenderer from './ArtifactRenderer';
 import FileDirectoryView from './FileDirectoryView';
+import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
 import CodeRenderer from './renderers/CodeRenderer';
 
 const t = (key: string) => i18nService.t(key);
@@ -57,18 +56,23 @@ function escapeHtml(str: string): string {
 
 interface ArtifactPanelProps {
   artifacts: Artifact[];
+  panelWidth: number;
   minPanelWidth?: number;
-  maxPanelWidth?: number;
+  maxPanelWidth: number;
+  onResizeFrame: (width: number) => void;
+  onResizeComplete: (width: number) => void;
 }
 
 const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   artifacts,
+  panelWidth,
   minPanelWidth = MIN_PANEL_WIDTH,
-  maxPanelWidth = MAX_PANEL_WIDTH,
+  maxPanelWidth,
+  onResizeFrame,
+  onResizeComplete,
 }) => {
   const dispatch = useDispatch();
   const selectedArtifact = useSelector(selectSelectedArtifact);
-  const panelWidth = useSelector(selectPanelWidth);
   const activeTab = useSelector(selectActiveTab);
   const layoutMode = useSelector(selectArtifactLayoutMode);
   const selectedArtifactId = useSelector((state: RootState) => state.artifact.selectedArtifactId);
@@ -101,63 +105,6 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     </Button>
   );
 
-  const isResizing = useRef(false);
-  const startX = useRef(0);
-  const startWidth = useRef(0);
-  const constrainedMaxPanelWidth = Math.max(
-    MIN_PANEL_WIDTH,
-    Math.min(MAX_PANEL_WIDTH, maxPanelWidth),
-  );
-  const constrainedMinPanelWidth = Math.min(
-    constrainedMaxPanelWidth,
-    Math.max(MIN_PANEL_WIDTH, minPanelWidth),
-  );
-  const constrainedPanelWidth = Math.max(
-    constrainedMinPanelWidth,
-    Math.min(constrainedMaxPanelWidth, panelWidth),
-  );
-
-  const handleResizeStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isResizing.current = true;
-      startX.current = e.clientX;
-      startWidth.current = constrainedPanelWidth;
-      document.body.classList.add('select-none');
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        if (!isResizing.current) return;
-        const nextWidth = startWidth.current + startX.current - moveEvent.clientX;
-        if (nextWidth < constrainedMinPanelWidth) {
-          isResizing.current = false;
-          document.body.classList.remove('select-none');
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-          dispatch(closePanel());
-          return;
-        }
-        dispatch(setPanelWidth(Math.min(constrainedMaxPanelWidth, nextWidth)));
-      };
-
-      const handleMouseUp = () => {
-        isResizing.current = false;
-        document.body.classList.remove('select-none');
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    },
-    [constrainedMaxPanelWidth, constrainedMinPanelWidth, constrainedPanelWidth, dispatch],
-  );
-
-  useEffect(() => {
-    return () => {
-      document.body.classList.remove('select-none');
-    };
-  }, []);
-
   useEffect(() => {
     const syncFullscreenState = () => {
       setIsFullscreen(document.fullscreenElement === panelRef.current);
@@ -167,10 +114,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   }, []);
 
   useEffect(() => {
-    if (layoutMode !== 'workspace' || isFullscreen) return;
+    if (layoutMode !== ArtifactLayoutMode.Workspace || isFullscreen) return;
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        dispatch(setArtifactLayoutMode('split'));
+        dispatch(setArtifactLayoutMode(ArtifactLayoutMode.Split));
       }
     };
     document.addEventListener('keydown', handleEscape);
@@ -204,7 +151,13 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     if (document.fullscreenElement === panelRef.current) {
       await document.exitFullscreen();
     }
-    dispatch(setArtifactLayoutMode(layoutMode === 'workspace' ? 'split' : 'workspace'));
+    dispatch(
+      setArtifactLayoutMode(
+        layoutMode === ArtifactLayoutMode.Workspace
+          ? ArtifactLayoutMode.Split
+          : ArtifactLayoutMode.Workspace,
+      ),
+    );
   }, [dispatch, layoutMode]);
 
   const handleToggleFullscreen = useCallback(async () => {
@@ -213,7 +166,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
       return;
     }
 
-    dispatch(setArtifactLayoutMode('workspace'));
+    dispatch(setArtifactLayoutMode(ArtifactLayoutMode.Workspace));
     try {
       await panelRef.current?.requestFullscreen();
     } catch {
@@ -309,24 +262,28 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 
   return (
     <>
-      {/* Drag handle */}
-      <div
-        className={`w-1 shrink-0 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors ${
-          layoutMode === 'workspace' ? 'hidden' : ''
-        }`}
-        onMouseDown={handleResizeStart}
-      />
+      {layoutMode !== ArtifactLayoutMode.Workspace && (
+        <ArtifactPanelResizeHandle
+          currentWidth={panelWidth}
+          minWidth={minPanelWidth}
+          maxWidth={maxPanelWidth}
+          onResizeFrame={onResizeFrame}
+          onResizeComplete={onResizeComplete}
+        />
+      )}
       <aside
         ref={panelRef}
+        data-artifact-panel=""
         style={{
-          width: layoutMode === 'workspace' || isFullscreen ? '100%' : constrainedPanelWidth,
-          height: layoutMode === 'workspace' || isFullscreen ? '100vh' : undefined,
-          maxWidth: layoutMode === 'workspace' || isFullscreen ? 'none' : constrainedMaxPanelWidth,
+          width: layoutMode === ArtifactLayoutMode.Workspace || isFullscreen ? '100%' : undefined,
+          height: layoutMode === ArtifactLayoutMode.Workspace || isFullscreen ? '100vh' : undefined,
+          maxWidth:
+            layoutMode === ArtifactLayoutMode.Workspace || isFullscreen ? 'none' : undefined,
         }}
         className={`bg-background flex flex-col h-full overflow-hidden ${
-          layoutMode === 'workspace' || isFullscreen
+          layoutMode === ArtifactLayoutMode.Workspace || isFullscreen
             ? 'fixed inset-0 z-200 w-screen border-0'
-            : 'relative shrink border-l border-border'
+            : 'relative min-w-0 flex-1 border-l border-border'
         }`}
       >
         {/* Floating file list overlay */}
@@ -418,13 +375,17 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 onClick={() => void handleToggleWorkspace()}
                 className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
                 title={t(
-                  layoutMode === 'workspace' ? 'artifactExitFullWindow' : 'artifactEnterFullWindow',
+                  layoutMode === ArtifactLayoutMode.Workspace
+                    ? 'artifactExitFullWindow'
+                    : 'artifactEnterFullWindow',
                 )}
                 aria-label={t(
-                  layoutMode === 'workspace' ? 'artifactExitFullWindow' : 'artifactEnterFullWindow',
+                  layoutMode === ArtifactLayoutMode.Workspace
+                    ? 'artifactExitFullWindow'
+                    : 'artifactEnterFullWindow',
                 )}
               >
-                {layoutMode === 'workspace' ? (
+                {layoutMode === ArtifactLayoutMode.Workspace ? (
                   <Shrink className="h-3.5 w-3.5" />
                 ) : (
                   <Expand className="h-3.5 w-3.5" />

@@ -1,0 +1,106 @@
+import { cn } from '@shared/lib/utils';
+import React, { memo, useCallback, useRef } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+
+import {
+  selectPanelWidth,
+  setArtifactLayoutMode,
+  setPanelWidth,
+  ArtifactLayoutMode,
+} from '@/store/slices/artifactSlice';
+import type { Artifact } from '@/types/artifact';
+
+import ArtifactPanel from './ArtifactPanel';
+import {
+  ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
+  clampArtifactPanelWidth,
+  isArtifactPanelAtMaximum,
+} from './artifactPanelResize';
+
+interface ArtifactPanelFrameProps {
+  artifacts: Artifact[];
+  isOpen: boolean;
+  isVisible: boolean;
+  isTransitioning: boolean;
+  layoutMode: ArtifactLayoutMode;
+  minPanelWidth: number;
+  maxPanelWidth: number;
+}
+
+const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
+  artifacts,
+  isOpen,
+  isVisible,
+  isTransitioning,
+  layoutMode,
+  minPanelWidth,
+  maxPanelWidth,
+}) => {
+  const dispatch = useDispatch();
+  const storedPanelWidth = useSelector(selectPanelWidth);
+  const frameRef = useRef<HTMLDivElement>(null);
+  const transientPanelWidthRef = useRef<number | null>(null);
+  const panelWidth = clampArtifactPanelWidth(storedPanelWidth, minPanelWidth, maxPanelWidth);
+  const isWorkspace = layoutMode === ArtifactLayoutMode.Workspace;
+
+  const applyFrameWidth = useCallback(
+    (width: number) => {
+      const nextWidth = clampArtifactPanelWidth(width, minPanelWidth, maxPanelWidth);
+      transientPanelWidthRef.current = nextWidth;
+      if (frameRef.current) {
+        frameRef.current.style.width = `${nextWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH}px`;
+      }
+    },
+    [maxPanelWidth, minPanelWidth],
+  );
+
+  const completeResize = useCallback(
+    (width: number) => {
+      const nextWidth = clampArtifactPanelWidth(width, minPanelWidth, maxPanelWidth);
+      if (isArtifactPanelAtMaximum(nextWidth, maxPanelWidth)) {
+        transientPanelWidthRef.current = null;
+        dispatch(setArtifactLayoutMode(ArtifactLayoutMode.Workspace));
+        return;
+      }
+      dispatch(setPanelWidth(nextWidth));
+      transientPanelWidthRef.current = null;
+    },
+    [dispatch, maxPanelWidth, minPanelWidth],
+  );
+
+  const renderedFrameWidth =
+    (transientPanelWidthRef.current ?? panelWidth) + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH;
+  const frameStyle: React.CSSProperties = {
+    width: isWorkspace ? '100%' : isVisible ? renderedFrameWidth : 0,
+    maxWidth: isWorkspace ? 'none' : maxPanelWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
+  };
+
+  return (
+    <div
+      ref={frameRef}
+      aria-hidden={!isOpen}
+      data-artifact-panel-frame=""
+      className={cn(
+        'h-full overflow-hidden',
+        isWorkspace ? 'flex-1' : 'shrink-0',
+        isTransitioning &&
+          'transition-[width,opacity] duration-200 ease-out motion-reduce:transition-none',
+        isVisible ? 'opacity-100' : 'pointer-events-none opacity-0',
+      )}
+      style={frameStyle}
+    >
+      <div className="flex h-full w-full">
+        <ArtifactPanel
+          artifacts={artifacts}
+          panelWidth={panelWidth}
+          minPanelWidth={minPanelWidth}
+          maxPanelWidth={maxPanelWidth}
+          onResizeFrame={applyFrameWidth}
+          onResizeComplete={completeResize}
+        />
+      </div>
+    </div>
+  );
+};
+
+export default memo(ArtifactPanelFrame);

@@ -6,11 +6,14 @@ import type { RootState } from '../index';
 
 const DEFAULT_PANEL_WIDTH = 560;
 const MIN_PANEL_WIDTH = 180;
-const MAX_PANEL_WIDTH = 1000;
 
 export type ArtifactPanelView = 'files' | 'preview';
 export type ArtifactActiveTab = 'preview' | 'code';
-export type ArtifactLayoutMode = 'split' | 'workspace';
+export const ArtifactLayoutMode = {
+  Split: 'split',
+  Workspace: 'workspace',
+} as const;
+export type ArtifactLayoutMode = (typeof ArtifactLayoutMode)[keyof typeof ArtifactLayoutMode];
 
 interface ArtifactState {
   artifactsBySession: Record<string, Artifact[]>;
@@ -29,7 +32,7 @@ const initialState: ArtifactState = {
   activeTab: 'preview',
   panelView: 'files',
   panelWidth: DEFAULT_PANEL_WIDTH,
-  layoutMode: 'split',
+  layoutMode: ArtifactLayoutMode.Split,
 };
 
 function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
@@ -93,13 +96,13 @@ const artifactSlice = createSlice({
     togglePanel(state) {
       state.isPanelOpen = !state.isPanelOpen;
       if (!state.isPanelOpen) {
-        state.layoutMode = 'split';
+        state.layoutMode = ArtifactLayoutMode.Split;
       }
     },
 
     closePanel(state) {
       state.isPanelOpen = false;
-      state.layoutMode = 'split';
+      state.layoutMode = ArtifactLayoutMode.Split;
     },
 
     setActiveTab(state, action: PayloadAction<ArtifactActiveTab>) {
@@ -111,7 +114,7 @@ const artifactSlice = createSlice({
     },
 
     setPanelWidth(state, action: PayloadAction<number>) {
-      state.panelWidth = Math.max(MIN_PANEL_WIDTH, Math.min(MAX_PANEL_WIDTH, action.payload));
+      state.panelWidth = Math.max(MIN_PANEL_WIDTH, action.payload);
     },
 
     setArtifactLayoutMode(state, action: PayloadAction<ArtifactLayoutMode>) {
@@ -121,7 +124,7 @@ const artifactSlice = createSlice({
     clearSessionArtifacts(state, action: PayloadAction<string>) {
       delete state.artifactsBySession[action.payload];
       state.selectedArtifactId = null;
-      state.layoutMode = 'split';
+      state.layoutMode = ArtifactLayoutMode.Split;
     },
   },
 });
@@ -161,6 +164,6 @@ export const selectActiveTab = (state: RootState): ArtifactActiveTab => state.ar
 export const selectArtifactLayoutMode = (state: RootState): ArtifactLayoutMode =>
   state.artifact.layoutMode;
 
-export { DEFAULT_PANEL_WIDTH, MAX_PANEL_WIDTH, MIN_PANEL_WIDTH };
+export { DEFAULT_PANEL_WIDTH, MIN_PANEL_WIDTH };
 
 export default artifactSlice.reducer;
