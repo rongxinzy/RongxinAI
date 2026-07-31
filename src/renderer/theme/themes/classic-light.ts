@@ -14,6 +14,8 @@ export const classicLight: ThemeDefinition = {
     'primary-foreground': 'oklch(0.985 0.001 106.423)',
     'primary-hover': 'oklch(0.147 0.004 49.25)',
     'primary-muted': 'oklch(0.97 0.001 106.424)',
+    'switch-track-checked': 'var(--zy-primary)',
+    'switch-track-checked-hover': 'var(--zy-primary-hover)',
     accent: 'oklch(0.97 0.001 106.424)',
     'accent-foreground': 'oklch(0.216 0.006 56.043)',
     background: 'oklch(1 0 0)',

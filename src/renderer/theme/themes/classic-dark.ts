@@ -14,6 +14,8 @@ export const classicDark: ThemeDefinition = {
     'primary-foreground': 'oklch(0.216 0.006 56.043)',
     'primary-hover': 'oklch(1 0 0)',
     'primary-muted': 'oklch(0.268 0.007 34.298)',
+    'switch-track-checked': 'var(--zy-gray-5)',
+    'switch-track-checked-hover': 'var(--zy-gray-6)',
     accent: 'oklch(0.268 0.007 34.298)',
     'accent-foreground': 'oklch(0.985 0.001 106.423)',
     background: 'oklch(0.147 0.004 49.25)',
