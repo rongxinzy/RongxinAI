@@ -10,7 +10,6 @@ import {
   Download,
   Folder,
   Image as ImageIcon,
-  MessageCirclePlus,
   PanelLeft,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -26,6 +25,7 @@ import {
 } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { RootState } from '../../store';
 import {
   selectCurrentMessagesLength,
@@ -1059,7 +1059,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 onClick={onNewChat}
                 className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
               >
-                <MessageCirclePlus className="size-4" />
+                <SidebarAnimatedMessageCirclePlusIcon />
               </Button>
               {updateBadge}
             </div>

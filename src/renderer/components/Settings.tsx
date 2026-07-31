@@ -12,22 +12,17 @@ import {
 import { Switch } from '@shared/components/ui/switch';
 import { Textarea } from '@shared/components/ui/textarea';
 import { cn } from '@shared/lib/utils';
+import { useReducedMotion } from 'motion/react';
 import {
-  Box,
-  Brain,
   CheckCircle,
   ExternalLink,
   Eye,
   EyeOff,
-  Info,
   Key,
-  Mail,
-  MessageCircle,
   Pencil,
   PlusCircle,
   ShieldCheck,
   Signal,
-  Sun,
   Trash2,
   X,
   XCircle,
@@ -86,6 +81,38 @@ import Modal from './common/Modal';
 import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
 import ErrorMessage from './ErrorMessage';
 import { GitHubCopilotIcon } from './icons/providers';
+import {
+  SettingsAnimatedSlidersHorizontalIcon,
+  type SettingsAnimatedSlidersHorizontalIconHandle,
+} from './icons/SettingsAnimatedSlidersHorizontalIcon';
+import {
+  SettingsAnimatedCircleHelpIcon,
+  type SettingsAnimatedCircleHelpIconHandle,
+} from './icons/SettingsAnimatedCircleHelpIcon';
+import {
+  SettingsAnimatedBrainIcon,
+  type SettingsAnimatedBrainIconHandle,
+} from './icons/SettingsAnimatedBrainIcon';
+import {
+  SettingsAnimatedKeyboardIcon,
+  type SettingsAnimatedKeyboardIconHandle,
+} from './icons/SettingsAnimatedKeyboardIcon';
+import {
+  SettingsAnimatedMailCheckIcon,
+  type SettingsAnimatedMailCheckIconHandle,
+} from './icons/SettingsAnimatedMailCheckIcon';
+import {
+  SettingsAnimatedMessageCircleMoreIcon,
+  type SettingsAnimatedMessageCircleMoreIconHandle,
+} from './icons/SettingsAnimatedMessageCircleMoreIcon';
+import {
+  SettingsAnimatedSunMediumIcon,
+  type SettingsAnimatedSunMediumIconHandle,
+} from './icons/SettingsAnimatedSunMediumIcon';
+import {
+  SettingsAnimatedBoxIcon,
+  type SettingsAnimatedBoxIconHandle,
+} from './icons/SettingsAnimatedBoxIcon';
 import IMSettings from './im/IMSettings';
 import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
 import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
@@ -105,23 +132,10 @@ type TabType =
   | 'email'
   | 'about';
 
-const SettingsSlidersIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M14 17H5" />
-    <path d="M19 7h-9" />
-    <circle cx="17" cy="17" r="3" />
-    <circle cx="7" cy="7" r="3" />
-  </svg>
-);
+type AnimatedIconHandle = {
+  startAnimation: () => void;
+  stopAnimation: () => void;
+};
 
 export type SettingsOpenOptions = {
   initialTab?: TabType;
@@ -716,6 +730,33 @@ const Settings: React.FC<SettingsProps> = ({
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
   const didSaveRef = useRef(false);
   const emailSettingsRef = useRef<EmailSettingsHandle>(null);
+  const generalIconRef = useRef<SettingsAnimatedSlidersHorizontalIconHandle>(null);
+  const aboutIconRef = useRef<SettingsAnimatedCircleHelpIconHandle>(null);
+  const shortcutsIconRef = useRef<SettingsAnimatedKeyboardIconHandle>(null);
+  const memoryIconRef = useRef<SettingsAnimatedBrainIconHandle>(null);
+  const emailIconRef = useRef<SettingsAnimatedMailCheckIconHandle>(null);
+  const imIconRef = useRef<SettingsAnimatedMessageCircleMoreIconHandle>(null);
+  const appearanceIconRef = useRef<SettingsAnimatedSunMediumIconHandle>(null);
+  const modelIconRef = useRef<SettingsAnimatedBoxIconHandle>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const settingsIconRefs: Partial<Record<TabType, { current: AnimatedIconHandle | null }>> = {
+    general: generalIconRef,
+    appearance: appearanceIconRef,
+    model: modelIconRef,
+    im: imIconRef,
+    email: emailIconRef,
+    coworkMemory: memoryIconRef,
+    shortcuts: shortcutsIconRef,
+    about: aboutIconRef,
+  };
+
+  const startSettingsIconAnimation = (tab: TabType) => {
+    if (!prefersReducedMotion) settingsIconRefs[tab]?.current?.startAnimation();
+  };
+
+  const stopSettingsIconAnimation = (tab: TabType) => {
+    settingsIconRefs[tab]?.current?.stopAnimation();
+  };
 
   // Add state for active provider
   const [activeProvider, setActiveProvider] = useState<ProviderType>(getDefaultActiveProvider());
@@ -2902,56 +2943,42 @@ const Settings: React.FC<SettingsProps> = ({
       {
         key: 'general' as TabType,
         label: i18nService.t('general'),
-        icon: <SettingsSlidersIcon className="h-5 w-5" />,
+        icon: <SettingsAnimatedSlidersHorizontalIcon ref={generalIconRef} />,
       },
       {
         key: 'appearance' as TabType,
         label: i18nService.t('appearance'),
-        icon: <Sun className="h-5 w-5" />,
+        icon: <SettingsAnimatedSunMediumIcon ref={appearanceIconRef} />,
       },
-      { key: 'model' as TabType, label: i18nService.t('model'), icon: <Box className="h-5 w-5" /> },
+      {
+        key: 'model' as TabType,
+        label: i18nService.t('model'),
+        icon: <SettingsAnimatedBoxIcon ref={modelIconRef} />,
+      },
       {
         key: 'im' as TabType,
         label: i18nService.t('imBot'),
-        icon: <MessageCircle className="h-5 w-5" />,
+        icon: <SettingsAnimatedMessageCircleMoreIcon ref={imIconRef} />,
       },
       {
         key: 'email' as TabType,
         label: i18nService.t('emailTab'),
-        icon: <Mail className="h-5 w-5" />,
+        icon: <SettingsAnimatedMailCheckIcon ref={emailIconRef} />,
       },
       {
         key: 'coworkMemory' as TabType,
         label: i18nService.t('coworkMemoryTitle'),
-        icon: <Brain className="h-5 w-5" />,
+        icon: <SettingsAnimatedBrainIcon ref={memoryIconRef} />,
       },
       {
         key: 'shortcuts' as TabType,
         label: i18nService.t('shortcuts'),
-        icon: (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={1.5}
-            stroke="currentColor"
-            className="h-5 w-5"
-          >
-            <rect x="2" y="4" width="20" height="14" rx="2" />
-            <line x1="6" y1="8" x2="8" y2="8" />
-            <line x1="10" y1="8" x2="12" y2="8" />
-            <line x1="14" y1="8" x2="16" y2="8" />
-            <line x1="6" y1="12" x2="8" y2="12" />
-            <line x1="10" y1="12" x2="14" y2="12" />
-            <line x1="16" y1="12" x2="18" y2="12" />
-            <line x1="8" y1="15.5" x2="16" y2="15.5" />
-          </svg>
-        ),
+        icon: <SettingsAnimatedKeyboardIcon ref={shortcutsIconRef} />,
       },
       {
         key: 'about' as TabType,
         label: i18nService.t('about'),
-        icon: <Info className="h-5 w-5" />,
+        icon: <SettingsAnimatedCircleHelpIcon ref={aboutIconRef} />,
       },
     ];
     // Filter out tabs hidden by enterprise config
@@ -5174,6 +5201,8 @@ const Settings: React.FC<SettingsProps> = ({
                 key={tab.key}
                 variant="ghost"
                 onClick={() => handleTabChange(tab.key)}
+                onMouseEnter={() => startSettingsIconAnimation(tab.key)}
+                onMouseLeave={() => stopSettingsIconAnimation(tab.key)}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium justify-start w-full',
                   activeTab === tab.key
