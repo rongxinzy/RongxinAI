@@ -116,7 +116,17 @@ bun install
 bun run electron:dev
 ```
 
-To prepare the bundled agent runtime and local inference runtime before starting Electron:
+To prepare the runtimes separately:
+
+```bash
+# Download the llama.cpp runtime for the current host
+bun run llamacpp:runtime:download
+
+# Fetch and build the pinned agent runtime for the current host
+bun run openclaw:runtime:host
+```
+
+Or prepare the bundled agent runtime and local inference runtime, then start Electron:
 
 ```bash
 bun run electron:dev:openclaw

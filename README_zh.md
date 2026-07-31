@@ -120,7 +120,17 @@ bun install
 bun run electron:dev
 ```
 
-同时准备内置 Agent 运行时和本地推理运行时：
+分别准备运行时：
+
+```bash
+# 下载当前主机对应的 llama.cpp 运行时
+bun run llamacpp:runtime:download
+
+# 获取并构建当前主机对应的固定版本 Agent 运行时
+bun run openclaw:runtime:host
+```
+
+或者同时准备内置 Agent 运行时和本地推理运行时，并启动 Electron：
 
 ```bash
 bun run electron:dev:openclaw
