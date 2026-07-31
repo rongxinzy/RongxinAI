@@ -10,6 +10,10 @@ import path from 'path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  CoworkToolActivityEventType,
+  CoworkToolActivityPhase,
+} from '../../../shared/cowork/toolActivity';
+import {
   ModelCapabilityStatus,
   ProviderModelPiApi,
   ProviderModelPiMaxTokensField,
@@ -1055,6 +1059,71 @@ describe('PiRuntimeAdapter', () => {
       expect(toolUse!.metadata?.toolName).toBe('Bash');
       expect(toolUse!.metadata?.toolUseId).toBe('call-1');
       expect(toolUse!.metadata?.toolInput).toEqual({ command: 'ls' });
+    });
+
+    it('emits a bounded Write summary while arguments are still streaming', async () => {
+      const events: Array<{ kind: string; payload: unknown }> = [];
+      adapter.on('toolActivity', (_sessionId, event) => {
+        events.push({ kind: 'activity', payload: event });
+      });
+      adapter.on('message', (_sessionId, message) => {
+        if (message.type === 'tool_use') events.push({ kind: 'tool_use', payload: message });
+      });
+      await adapter.startSession('test', 'Write a file');
+
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: [
+            {
+              type: 'toolCall',
+              id: 'write-1',
+              name: 'Write',
+              arguments: { path: 'src/app.ts', content: 'x'.repeat(10_000) },
+            },
+          ],
+        },
+        assistantMessageEvent: {
+          type: 'toolcall_delta',
+          contentIndex: 0,
+          partial: {
+            content: [
+              {
+                type: 'toolCall',
+                id: 'write-1',
+                name: 'Write',
+                arguments: { path: 'src/app.ts', content: 'x'.repeat(10_000) },
+              },
+            ],
+          },
+        },
+      });
+
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        kind: 'activity',
+        payload: {
+          type: CoworkToolActivityEventType.Upsert,
+          activity: {
+            toolCallId: 'write-1',
+            phase: CoworkToolActivityPhase.Preparing,
+            toolName: 'Write',
+            toolInput: { path: 'src/app.ts' },
+          },
+        },
+      });
+
+      listener!({
+        type: 'tool_execution_start',
+        toolCallId: 'write-1',
+        toolName: 'Write',
+        args: { path: 'src/app.ts', content: 'x'.repeat(10_000) },
+      });
+
+      expect(events.at(-1)?.kind).toBe('tool_use');
     });
 
     it('should emit a linked tool_result message on tool_execution_end', async () => {

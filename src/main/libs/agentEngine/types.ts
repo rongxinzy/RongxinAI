@@ -1,5 +1,6 @@
 import type { CoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
+import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivity';
 import type { CoworkMessage } from '../../coworkStore';
 
 export type CoworkAgentEngine = 'openclaw' | 'pi';
@@ -35,6 +36,7 @@ export interface CoworkRuntimeEvents {
     content: string,
     metadata?: Record<string, unknown>,
   ) => void;
+  toolActivity: (sessionId: string, event: CoworkToolActivityEvent) => void;
   permissionRequest: (sessionId: string, request: PermissionRequest) => void;
   permissionDismiss: (requestId: string) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;

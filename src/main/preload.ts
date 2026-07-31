@@ -37,6 +37,7 @@ import {
   WindowIpc,
 } from '../shared/ipc/channels';
 import type { CoworkPermissionMode, CoworkSessionMode } from '../shared/cowork/constants';
+import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
@@ -543,6 +544,9 @@ contextBridge.exposeInMainWorld('electron', {
         metadata?: Record<string, unknown>;
       }) => void,
     ) => onPush(CoworkStreamIpc.MessageUpdate, callback),
+    onStreamToolActivity: (
+      callback: (data: { sessionId: string; event: CoworkToolActivityEvent }) => void,
+    ) => onPush(CoworkStreamIpc.ToolActivity, callback),
     onStreamPermission: (callback: (data: { sessionId: string; request: unknown }) => void) =>
       onPush(CoworkStreamIpc.Permission, callback),
     onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) =>

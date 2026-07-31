@@ -1,12 +1,14 @@
 import { expect, test } from 'vitest';
 
 import type { AssistantTurnItem } from './messageGrouping';
+import { CoworkToolActivityPhase } from '../../../../shared/cowork/toolActivity';
 import {
   ExecutionStatusKind,
   getCompletedExecutionSummaryText,
   getCurrentExecutionStatus,
   getExecutionSummary,
   getFinalAnswerIndex,
+  getToolActivityExecutionStatus,
 } from './executionStatus';
 
 const toolGroup = (
@@ -63,6 +65,22 @@ test('includes a concise target for an active tool call', () => {
   expect(status).toEqual({
     kind: ExecutionStatusKind.Tool,
     toolName: 'read',
+    target: 'src/app.ts',
+  });
+});
+
+test('formats a transient Write activity before tool execution starts', () => {
+  expect(
+    getToolActivityExecutionStatus({
+      toolCallId: 'write-1',
+      phase: CoworkToolActivityPhase.Preparing,
+      toolName: 'Write',
+      toolInput: { path: 'src/app.ts' },
+      updatedAt: 1,
+    }),
+  ).toEqual({
+    kind: ExecutionStatusKind.Tool,
+    toolName: 'Write',
     target: 'src/app.ts',
   });
 });

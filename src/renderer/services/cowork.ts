@@ -31,6 +31,7 @@ import {
   setRemoteManaged,
   setSessions,
   updateMessageContent,
+  updateToolActivity,
   updateSessionPinned,
   updateSessionStatus,
   updateSessionTitle,
@@ -177,6 +178,11 @@ class CoworkService {
       messageUpdateCleanup();
     };
     this.streamListenerCleanups.push(messageUpdateRafCleanup);
+
+    const toolActivityCleanup = cowork.onStreamToolActivity(payload => {
+      store.dispatch(updateToolActivity(payload));
+    });
+    this.streamListenerCleanups.push(toolActivityCleanup);
 
     // Permission request listener
     const permissionCleanup = cowork.onStreamPermission(({ sessionId, request }) => {

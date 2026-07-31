@@ -12,6 +12,10 @@
 import { z } from 'zod';
 
 import { CoworkPermissionMode, CoworkSessionMode } from '../cowork/constants';
+import {
+  CoworkToolActivityEventType,
+  CoworkToolActivityPhase,
+} from '../cowork/toolActivity';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -707,6 +711,26 @@ export const CoworkStreamMessageUpdateSchema = {
     messageId: z.string(),
     content: z.string(),
     metadata: z.record(z.string(), z.unknown()).optional(),
+  }),
+};
+
+export const CoworkStreamToolActivitySchema = {
+  output: z.object({
+    sessionId: z.string(),
+    event: z.discriminatedUnion('type', [
+      z.object({
+        type: z.literal(CoworkToolActivityEventType.Upsert),
+        activity: z.object({
+          toolCallId: z.string(),
+          phase: z.enum([CoworkToolActivityPhase.Preparing, CoworkToolActivityPhase.Running]),
+          toolName: z.string().optional(),
+          toolInput: z.record(z.string(), z.unknown()).optional(),
+          updatedAt: z.number(),
+        }),
+      }),
+      z.object({ type: z.literal(CoworkToolActivityEventType.Remove), toolCallId: z.string() }),
+      z.object({ type: z.literal(CoworkToolActivityEventType.Clear) }),
+    ]),
   }),
 };
 

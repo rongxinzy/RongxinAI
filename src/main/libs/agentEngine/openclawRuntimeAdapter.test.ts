@@ -13,6 +13,7 @@ vi.mock('electron', () => ({
 }));
 
 import { OpenClawRuntimeAdapter, pickPersistedAssistantSegment } from './openclawRuntimeAdapter';
+import { ToolActivityTracker } from './toolActivity';
 
 function setAvailabilityGuard(
   adapter: OpenClawRuntimeAdapter,
@@ -833,6 +834,7 @@ test('lifecycle fallback repairs managed session assistant text from history', a
     toolUseMessageIdByToolCallId: new Map(),
     toolResultMessageIdByToolCallId: new Map(),
     toolResultTextByToolCallId: new Map(),
+    toolActivityTracker: new ToolActivityTracker(),
     stopRequested: false,
     pendingUserSync: false,
     bufferedChatPayloads: [],

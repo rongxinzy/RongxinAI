@@ -6,6 +6,7 @@ import * as path from 'path';
 
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
+import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
 import type {
   CoworkExecutionMode,
@@ -53,6 +54,11 @@ import {
   extractProviderId,
   shouldAllowSwitch,
 } from './modelTriage';
+import {
+  extractOpenClawPreparingToolActivities,
+  ToolActivityTracker,
+  toToolActivityInput,
+} from './toolActivity';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -208,6 +214,7 @@ type ActiveTurn = {
   toolUseMessageIdByToolCallId: Map<string, string>;
   toolResultMessageIdByToolCallId: Map<string, string>;
   toolResultTextByToolCallId: Map<string, string>;
+  toolActivityTracker: ToolActivityTracker;
   stopRequested: boolean;
   /** True while async user message prefetch is in progress for channel sessions. */
   pendingUserSync: boolean;
@@ -2104,6 +2111,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       toolUseMessageIdByToolCallId: new Map(),
       toolResultMessageIdByToolCallId: new Map(),
       toolResultTextByToolCallId: new Map(),
+      toolActivityTracker: new ToolActivityTracker(),
       startedAtMs: Date.now(),
       stopRequested: false,
       pendingUserSync: false,
@@ -3492,6 +3500,18 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const toolNameRaw = typeof data.name === 'string' ? data.name.trim() : '';
     const toolName = toolNameRaw || 'Tool';
 
+    if (phase !== 'result' && !turn.toolUseMessageIdByToolCallId.has(toolCallId)) {
+      const activityEvent = turn.toolActivityTracker.upsert(
+        {
+          toolCallId,
+          toolName,
+          toolInput: toToolActivityInput(data.args),
+        },
+        CoworkToolActivityPhase.Running,
+      );
+      if (activityEvent) this.emit('toolActivity', sessionId, activityEvent);
+    }
+
     if (toolNameRaw.toLowerCase() === 'browser') {
       const isError = Boolean(data.isError);
       // Log full data keys and values for diagnosis
@@ -3601,6 +3621,8 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     }
 
     if (phase === 'result') {
+      const removeActivity = turn.toolActivityTracker.remove(toolCallId);
+      if (removeActivity) this.emit('toolActivity', sessionId, removeActivity);
       const incoming = extractToolText(data.result);
       const previous = turn.toolResultTextByToolCallId.get(toolCallId) ?? '';
       const isError = Boolean(data.isError);
@@ -3821,6 +3843,18 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     }
   }
 
+  private processPreparingToolActivities(
+    sessionId: string,
+    turn: ActiveTurn,
+    payload: unknown,
+  ): void {
+    for (const activity of extractOpenClawPreparingToolActivities(payload)) {
+      if (turn.toolUseMessageIdByToolCallId.has(activity.toolCallId)) continue;
+      const event = turn.toolActivityTracker.upsert(activity);
+      if (event) this.emit('toolActivity', sessionId, event);
+    }
+  }
+
   /**
    * Process agent assistant-stream text directly from handleGatewayEvent.
    * This bypasses handleAgentEvent's session resolution (which may enqueue events),
@@ -3863,6 +3897,10 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       }
     }
     const turn = sessionId ? this.activeTurns.get(sessionId) : undefined;
+
+    if (turn && sessionId) {
+      this.processPreparingToolActivities(sessionId, turn, payload);
+    }
 
     if (!text || !turn || !sessionId) {
       if (text) {
@@ -3997,6 +4035,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   }
 
   private handleChatDelta(sessionId: string, turn: ActiveTurn, payload: ChatEventPayload): void {
+    this.processPreparingToolActivities(sessionId, turn, payload.message);
     const previousText = turn.currentText;
     const previousContentText = turn.currentContentText;
     const previousContentBlocks = [...turn.currentContentBlocks];
@@ -5687,6 +5726,8 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   private cleanupSessionTurn(sessionId: string): void {
     const turn = this.activeTurns.get(sessionId);
     if (turn) {
+      const clearActivity = turn.toolActivityTracker.clear();
+      if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
       // Clear client-side timeout watchdog
       if (turn.timeoutTimer) {
         clearTimeout(turn.timeoutTimer);
@@ -5887,6 +5928,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       toolUseMessageIdByToolCallId: new Map(),
       toolResultMessageIdByToolCallId: new Map(),
       toolResultTextByToolCallId: new Map(),
+      toolActivityTracker: new ToolActivityTracker(),
       startedAtMs: Date.now(),
       stopRequested: false,
       pendingUserSync: !!isChannel,

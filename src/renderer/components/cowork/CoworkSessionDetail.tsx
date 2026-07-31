@@ -30,6 +30,7 @@ import { RootState } from '../../store';
 import {
   selectCurrentMessagesLength,
   selectCurrentSession,
+  selectCurrentToolActivities,
   selectIsStreaming,
   selectRemoteManaged,
 } from '../../store/selectors/coworkSelectors';
@@ -180,6 +181,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const isMac = window.electron.platform === 'darwin';
   const currentSession = useSelector(selectCurrentSession);
   const isStreaming = useSelector(selectIsStreaming);
+  const toolActivities = useSelector(selectCurrentToolActivities);
   const remoteManaged = useSelector(selectRemoteManaged);
   const messagesLength = useSelector(selectCurrentMessagesLength);
   const skills = useSelector((state: RootState) => state.skill.skills);
@@ -959,7 +961,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               assistantItems: [],
             }}
             resolveLocalFilePath={resolveLocalFilePath}
-            showTypingIndicator
+            showTypingIndicator={toolActivities.length === 0}
+            toolActivities={toolActivities}
             showCopyButtons={!isStreaming}
             isTurnComplete={false}
           />
@@ -969,8 +972,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     return turns.map((turn, index) => {
       const isLastTurn = index === turns.length - 1;
-      const showTypingIndicator = isStreaming && isLastTurn && !hasRenderableAssistantContent(turn);
-      const showAssistantBlock = turn.assistantItems.length > 0 || showTypingIndicator;
+      const hasActiveToolActivity = isStreaming && isLastTurn && toolActivities.length > 0;
+      const showTypingIndicator =
+        isStreaming && isLastTurn && !hasRenderableAssistantContent(turn) && !hasActiveToolActivity;
+      const showAssistantBlock =
+        turn.assistantItems.length > 0 || showTypingIndicator || hasActiveToolActivity;
       // Compute rail indices for user/assistant messages (must match rail IIFE logic)
       let asstContent = '';
       for (const item of turn.assistantItems) {
@@ -1023,6 +1029,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 resolveLocalFilePath={resolveLocalFilePath}
                 mapDisplayText={mapDisplayText}
                 showTypingIndicator={showTypingIndicator}
+                toolActivities={isLastTurn ? toolActivities : undefined}
                 showCopyButtons={!isStreaming || !isLastTurn}
                 isTurnComplete={!isStreaming || !isLastTurn}
               />

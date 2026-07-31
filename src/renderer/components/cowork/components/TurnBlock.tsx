@@ -15,6 +15,7 @@ import React from 'react';
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
+import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 import { i18nService } from '../../../services/i18n';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
@@ -26,6 +27,7 @@ import {
   getExecutionStatusText,
   getExecutionSummary,
   getFinalAnswerIndex,
+  getToolActivityExecutionStatus,
 } from '../helpers/executionStatus';
 import type { ConversationTurn } from '../helpers/messageGrouping';
 import { getToolResultLineCount, getVisibleAssistantItems } from '../helpers/messageGrouping';
@@ -44,6 +46,7 @@ export const TurnBlock: React.FC<{
   showTypingIndicator?: boolean;
   showCopyButtons?: boolean;
   isTurnComplete?: boolean;
+  toolActivities?: CoworkToolActivity[];
 }> = ({
   turn,
   artifacts,
@@ -52,6 +55,7 @@ export const TurnBlock: React.FC<{
   showTypingIndicator = false,
   showCopyButtons = true,
   isTurnComplete = true,
+  toolActivities = [],
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
@@ -286,6 +290,10 @@ export const TurnBlock: React.FC<{
       ? visibleAssistantItems.filter((_, index) => index !== finalAnswerIndex)
       : [];
   const executionSummary = getExecutionSummary(executionItems);
+  const latestToolActivity = toolActivities[toolActivities.length - 1];
+  const toolActivityStatus = latestToolActivity
+    ? getToolActivityExecutionStatus(latestToolActivity)
+    : null;
 
   const isExecutionStep = (item: (typeof visibleAssistantItems)[number] | undefined) =>
     item?.type === 'tool_group' ||
@@ -315,7 +323,7 @@ export const TurnBlock: React.FC<{
     return (
       <ChainOfThought
         key={`${groupKey}-${isStreaming ? 'active' : 'complete'}`}
-        defaultOpen={isStreaming}
+        defaultOpen={false}
       >
         <ChainOfThoughtHeader icon={headerIcon}>
           {isStreaming ? (
@@ -356,6 +364,16 @@ export const TurnBlock: React.FC<{
                     index === lastAnswerGroupIndex,
                   ),
                 )}
+            {latestToolActivity && toolActivityStatus && (
+              <ChainOfThought
+                key={`tool-activity-${latestToolActivity.toolCallId}`}
+                defaultOpen={false}
+              >
+                <ChainOfThoughtHeader icon={Wrench}>
+                  <Shimmer duration={1}>{getExecutionStatusText(toolActivityStatus)}</Shimmer>
+                </ChainOfThoughtHeader>
+              </ChainOfThought>
+            )}
             {showTypingIndicator && <TypingDots />}
             {artifacts?.some(artifact => artifact.role === ArtifactRole.Deliverable) && (
               <div className="flex flex-wrap gap-2 pt-1">

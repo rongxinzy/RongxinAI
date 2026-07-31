@@ -1752,6 +1752,18 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     },
   );
 
+  runtime.on('toolActivity', (sessionId, event) => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.send(CoworkStreamIpc.ToolActivity, { sessionId, event });
+      } catch (error) {
+        console.error('[CoworkForwarder] failed to forward tool activity:', error);
+      }
+    });
+  });
+
   runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
     if (runtime.getSessionConfirmationMode(sessionId) === 'text') {
       return;

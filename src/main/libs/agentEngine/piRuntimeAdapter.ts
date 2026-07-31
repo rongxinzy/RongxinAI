@@ -24,6 +24,7 @@ import path from 'path';
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import {
   isLocalProviderName,
   ModelCapabilityStatus,
@@ -64,6 +65,11 @@ import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
+import {
+  getPiPreparingToolActivity,
+  ToolActivityTracker,
+  toToolActivityInput,
+} from './toolActivity';
 import type {
   CoworkContinueOptions,
   CoworkRuntime,
@@ -127,6 +133,9 @@ interface PiEvent {
     type: string; // text_delta | thinking_delta | text_end | thinking_end | ...
     delta?: string;
     content?: string;
+    contentIndex?: number;
+    partial?: unknown;
+    toolCall?: unknown;
   };
   // tool_execution_start / _update / _end fields
   toolCallId?: string;
@@ -167,6 +176,8 @@ interface ActivePiSession {
   aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
+  preparingToolCallIdByContentIndex: Map<number, string>;
+  toolActivityTracker: ToolActivityTracker;
   /** Long-horizon agent loop controller for this session (agent_loop tool). */
   agentLoop: PiAgentLoopController;
   /** Present only for the controlled academic-research workflow. */
@@ -573,6 +584,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         unsubscribe: () => {},
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
+        preparingToolCallIdByContentIndex: new Map(),
+        toolActivityTracker: new ToolActivityTracker(),
         agentLoop,
         researchRun,
         shortcutWorkflow,
@@ -710,6 +723,9 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     active.lastCompletedAnswerMessageId = null;
     active.lastCompletedAnswerText = '';
     active.toolResultMessageIdByCallId.clear();
+    active.preparingToolCallIdByContentIndex.clear();
+    const clearActivity = active.toolActivityTracker.clear();
+    if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
     active.writeTokenLimitRecovery.reset();
     active.pendingError = null;
 
@@ -780,6 +796,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     this.dismissAskUserQuestionsBySession(sessionId);
     active.agentLoop.stop();
     active.pendingError = null;
+    const clearActivity = active.toolActivityTracker.clear();
+    if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
     active.piSession.abortBash();
     active.abortController.abort();
     active.unsubscribe();
@@ -800,6 +818,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     active.agentLoop.stop();
     // Drop any deferred error without surfacing it — the user stopped the turn.
     active.pendingError = null;
+    const clearActivity = active.toolActivityTracker.clear();
+    if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
 
     // Only abort the current turn — keep the session entry in activeSessions
     // so isSessionActive still reports true for IM routing, but do not reuse
@@ -956,6 +976,11 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         break;
 
       case 'turn_start':
+        active.preparingToolCallIdByContentIndex.clear();
+        {
+          const clearActivity = active.toolActivityTracker.clear();
+          if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
+        }
         // New turn → fresh answer + thinking messages, created lazily on first content.
         active.assistantMessageId = null;
         active.thinkingMessageId = null;
@@ -968,6 +993,24 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         break;
 
       case 'message_update': {
+        const assistantEvent = event.assistantMessageEvent;
+        if (assistantEvent?.type.startsWith('toolcall_')) {
+          const contentIndex = assistantEvent.contentIndex ?? -1;
+          const fallbackToolCallId =
+            active.preparingToolCallIdByContentIndex.get(contentIndex) ??
+            `pi-preparing:${event.message?.id ?? sessionId}:${contentIndex}`;
+          const activity = getPiPreparingToolActivity(assistantEvent, fallbackToolCallId);
+          if (activity) {
+            const previousToolCallId = active.preparingToolCallIdByContentIndex.get(contentIndex);
+            if (previousToolCallId && previousToolCallId !== activity.toolCallId) {
+              const removeEvent = active.toolActivityTracker.remove(previousToolCallId);
+              if (removeEvent) this.emit('toolActivity', sessionId, removeEvent);
+            }
+            active.preparingToolCallIdByContentIndex.set(contentIndex, activity.toolCallId);
+            const activityEvent = active.toolActivityTracker.upsert(activity);
+            if (activityEvent) this.emit('toolActivity', sessionId, activityEvent);
+          }
+        }
         // message.content is the FULL accumulating snapshot (not a delta), split into
         // text and thinking blocks. Derive full snapshots and SET (never append) —
         // appending the snapshot each tick is what caused the repeated content.
@@ -1061,6 +1104,15 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
         // Mirrors OpenClaw adapter's tool_use construction.
         if (!event.toolCallId || !event.toolName) break;
+        const runningActivity = active.toolActivityTracker.upsert(
+          {
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            toolInput: toToolActivityInput(event.args),
+          },
+          CoworkToolActivityPhase.Running,
+        );
+        if (runningActivity) this.emit('toolActivity', sessionId, runningActivity);
         if (event.toolName === PiSubagentToolName) {
           active.researchRun?.recordSubagentStart(event.toolCallId, event.args);
           active.shortcutWorkflow?.recordSubagentStart(event.toolCallId, event.args);
@@ -1088,6 +1140,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       case 'tool_execution_end': {
         // Tool finished → emit tool_result linked by toolUseId.
         if (!event.toolCallId) break;
+        const removeActivity = active.toolActivityTracker.remove(event.toolCallId);
+        if (removeActivity) this.emit('toolActivity', sessionId, removeActivity);
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
         const resultText = extractToolResultText(event.result);
@@ -1132,6 +1186,8 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
       case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
         this.markFinalAnswer(sessionId, active);
+        const clearActivity = active.toolActivityTracker.clear();
+        if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
         // Failed attempt (deferred error pending): do not continue the agent
         // loop, mark completed, or emit complete. flushPendingError surfaces
         // the error when the run settles (auto_retry_end / agent_settled).

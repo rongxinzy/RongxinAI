@@ -185,6 +185,7 @@ export type CoworkBootstrapIpc = (typeof CoworkBootstrapIpc)[keyof typeof Cowork
 export const CoworkStreamIpc = {
   Message: 'cowork:stream:message',
   MessageUpdate: 'cowork:stream:messageUpdate',
+  ToolActivity: 'cowork:stream:toolActivity',
   Permission: 'cowork:stream:permission',
   PermissionDismiss: 'cowork:stream:permissionDismiss',
   Complete: 'cowork:stream:complete',
