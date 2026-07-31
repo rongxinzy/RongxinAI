@@ -213,7 +213,8 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 
 **UI Components**:
 
-- Right-side panel (300-800px resizable width)
+- Right-side resizable panel for side-by-side work
+- Full-window focus mode and native fullscreen mode for large artifacts
 - Header with type icon, title, copy/download/close buttons
 - Artifact badges in messages to switch between artifacts
 
