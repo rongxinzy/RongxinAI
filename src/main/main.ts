@@ -110,7 +110,7 @@ import {
 } from './ipcHandlers/scheduledTask';
 import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
 import {
-  OpenClawRuntimeAdapter,
+  OpenClawChannelGateway,
   type PermissionResult,
   PiRuntimeAdapter,
 } from './libs/agentEngine';
@@ -952,7 +952,7 @@ process.on('exit', code => {
 
 let store: SqliteStore | null = null;
 let coworkStore: CoworkStore | null = null;
-let openClawRuntimeAdapter: OpenClawRuntimeAdapter | null = null;
+let openClawChannelGateway: OpenClawChannelGateway | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
 
 const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
@@ -1408,7 +1408,7 @@ const DEFERRED_RESTART_POLL_MS = 3_000;
 const DEFERRED_RESTART_MAX_WAIT_MS = 5 * 60_000; // 5 minutes hard cap
 
 const hasActiveGatewayWorkloads = (): boolean => {
-  if (openClawRuntimeAdapter?.hasActiveSessions()) return true;
+  if (openClawChannelGateway?.hasActiveSessions()) return true;
   try {
     if (getCronJobService()?.hasRunningJobs()) return true;
   } catch {
@@ -1696,8 +1696,8 @@ const doSyncOpenClawConfig = async (options: {
   console.log(
     `${D()} ──── HARD RESTART EXECUTING. reason=${options.reason}, phase=${gatewayStatus.phase}, port=${gatewayStatus.message?.match(/loopback:(\d+)/)?.[1] ?? 'unknown'}`,
   );
-  if (openClawRuntimeAdapter) {
-    openClawRuntimeAdapter.disconnectGatewayClient();
+  if (openClawChannelGateway) {
+    openClawChannelGateway.disconnectGatewayClient();
   }
 
   const restarted = await manager.restartGateway(`config-sync:${options.reason}`);
@@ -1832,9 +1832,9 @@ const bindPiWorkbenchRuntimeForwarder = (): void => {
   piWorkbenchRuntimeForwarderBound = true;
 };
 
-const getOpenClawRuntimeAdapter = (): OpenClawRuntimeAdapter => {
-  if (!openClawRuntimeAdapter) {
-    openClawRuntimeAdapter = new OpenClawRuntimeAdapter(
+const getOpenClawChannelGateway = (): OpenClawChannelGateway => {
+  if (!openClawChannelGateway) {
+    openClawChannelGateway = new OpenClawChannelGateway(
       getCoworkStore(),
       getOpenClawEngineManager(),
       {
@@ -1865,10 +1865,10 @@ const getOpenClawRuntimeAdapter = (): OpenClawRuntimeAdapter => {
           onBindingChanged: (sessionKey, _platform, newAgentId) => {
             const agent = getCoworkStore().getAgent(newAgentId);
             const model = agent?.model || '';
-            if (model && openClawRuntimeAdapter) {
+            if (model && openClawChannelGateway) {
               const availability = validateSessionModelAvailability(model);
               if (!availability.available) return;
-              const client = openClawRuntimeAdapter.getGatewayClient();
+              const client = openClawChannelGateway.getGatewayClient();
               if (client) {
                 void client.request('sessions.patch', { key: sessionKey, model }).catch(err => {
                   console.warn(
@@ -1880,13 +1880,13 @@ const getOpenClawRuntimeAdapter = (): OpenClawRuntimeAdapter => {
             }
           },
         });
-        openClawRuntimeAdapter.setChannelSessionSync(channelSessionSync);
+        openClawChannelGateway.setChannelSessionSync(channelSessionSync);
       }
     } catch (error) {
       console.warn('[Main] Failed to set up channel session sync:', error);
     }
   }
-  return openClawRuntimeAdapter;
+  return openClawChannelGateway;
 };
 
 const getSkillManager = () => {
@@ -2359,10 +2359,10 @@ const getIMGatewayManager = () => {
     // IM always uses OpenClaw directly, bypassing the engine router.
     // This ensures IM/Cron remain on OpenClaw regardless of the user's
     // Work/Chat engine selection (Pi / OpenClaw).
-    if (!openClawRuntimeAdapter) {
+    if (!openClawChannelGateway) {
       throw new Error('[IMGateway] OpenClaw runtime adapter not initialized');
     }
-    const runtime = openClawRuntimeAdapter;
+    const runtime = openClawChannelGateway;
     const store = getCoworkStore();
 
     imGatewayManager = new IMGatewayManager(sqliteStore.getDatabase(), {
@@ -2382,20 +2382,20 @@ const getIMGatewayManager = () => {
         });
       },
       ensureOpenClawGatewayConnected: async () => {
-        if (openClawRuntimeAdapter) {
-          await openClawRuntimeAdapter.connectGatewayIfNeeded();
+        if (openClawChannelGateway) {
+          await openClawChannelGateway.connectGatewayIfNeeded();
         }
       },
-      getOpenClawGatewayClient: () => openClawRuntimeAdapter?.getGatewayClient() ?? null,
+      getOpenClawGatewayClient: () => openClawChannelGateway?.getGatewayClient() ?? null,
       ensureOpenClawGatewayReady: async () => {
-        if (!openClawRuntimeAdapter) {
+        if (!openClawChannelGateway) {
           throw new Error('OpenClaw runtime adapter not initialized.');
         }
-        await openClawRuntimeAdapter.ensureReady();
-        await openClawRuntimeAdapter.connectGatewayIfNeeded();
+        await openClawChannelGateway.ensureReady();
+        await openClawChannelGateway.connectGatewayIfNeeded();
       },
       getOpenClawSessionKeysForCoworkSession: (sessionId: string) => {
-        return openClawRuntimeAdapter?.getSessionKeysForSession(sessionId) ?? [];
+        return openClawChannelGateway?.getSessionKeysForSession(sessionId) ?? [];
       },
       createScheduledTask: async ({ sessionId, message, request }) => {
         // if (message.platform === 'dingtalk') {
@@ -2529,11 +2529,11 @@ const getIMGatewayManager = () => {
     });
 
     // Wire gateway lifecycle notifications
-    if (openClawRuntimeAdapter) {
-      openClawRuntimeAdapter.onGatewayDisconnect(reason => {
+    if (openClawChannelGateway) {
+      openClawChannelGateway.onGatewayDisconnect(reason => {
         imGatewayManager?.onOpenClawDisconnected(reason);
       });
-      openClawRuntimeAdapter.onGatewayReconnect(() => {
+      openClawChannelGateway.onGatewayReconnect(() => {
         imGatewayManager?.onOpenClawReconnected();
       });
     }
@@ -5555,7 +5555,7 @@ if (!gotTheLock) {
   // ==================== Scheduled Task IPC Handlers (OpenClaw) ====================
 
   initCronJobServiceManager({
-    getOpenClawRuntimeAdapter: () => openClawRuntimeAdapter,
+    getOpenClawChannelGateway: () => openClawChannelGateway,
   });
   initScheduledTaskHelpers({
     getIMGatewayManager: () => ({
@@ -5590,7 +5590,7 @@ if (!gotTheLock) {
           coworkSessionId,
         ),
     }),
-    getOpenClawRuntimeAdapter: () => openClawRuntimeAdapter,
+    getOpenClawChannelGateway: () => openClawChannelGateway,
   });
 
   // ==================== Permissions IPC Handlers ====================
@@ -5678,9 +5678,9 @@ if (!gotTheLock) {
       });
       // After config sync, ensure the runtime adapter's WebSocket client
       // is connected so channel events are received.
-      if (openClawRuntimeAdapter) {
+      if (openClawChannelGateway) {
         try {
-          await openClawRuntimeAdapter.connectGatewayIfNeeded();
+          await openClawChannelGateway.connectGatewayIfNeeded();
         } catch (connectError) {
           console.error('[IM] Failed to connect gateway client after config sync:', connectError);
         }
@@ -7356,7 +7356,7 @@ if (!gotTheLock) {
     // Stop all active sessions from both kernels without blocking shutdown.
     console.log('[Main] Stopping cowork sessions...');
     if (piRuntimeAdapter) piRuntimeAdapter.stopAllSessions();
-    if (openClawRuntimeAdapter) openClawRuntimeAdapter.stopAllSessions();
+    if (openClawChannelGateway) openClawChannelGateway.stopAllSessions();
 
     await stopCoworkOpenAICompatProxy().catch(error => {
       console.error('Failed to stop OpenAI compatibility proxy:', error);
@@ -7781,7 +7781,7 @@ if (!gotTheLock) {
 
     bindPiWorkbenchRuntimeForwarder();
     // Channel/Cron own this runtime directly; it is intentionally not renderer-forwarded.
-    getOpenClawRuntimeAdapter();
+    getOpenClawChannelGateway();
     bindOpenClawStatusForwarder();
 
     const defaultAgentModelRef = resolveDefaultAgentModelRef();
@@ -7973,8 +7973,8 @@ if (!gotTheLock) {
 
     // Reconnect OpenClaw gateway WS after system wake from sleep/suspend
     powerMonitor.on('resume', () => {
-      if (openClawRuntimeAdapter) {
-        openClawRuntimeAdapter.onSystemResume();
+      if (openClawChannelGateway) {
+        openClawChannelGateway.onSystemResume();
       }
       if (Date.now() - lastSuccessfulAppUpdateCheckAt >= APP_UPDATE_POLL_INTERVAL_MS) {
         checkForAppUpdate();

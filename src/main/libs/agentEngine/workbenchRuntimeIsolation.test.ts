@@ -21,9 +21,9 @@ describe('Work/Chat runtime isolation', () => {
   test('projects only Pi runtime events into cowork streams', () => {
     expect(mainSource).toContain('forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter())');
     expect(mainSource).not.toContain(
-      'forwardPiWorkbenchRuntimeToRenderer(getOpenClawRuntimeAdapter())',
+      'forwardPiWorkbenchRuntimeToRenderer(getOpenClawChannelGateway())',
     );
-    expect(mainSource).toContain('getOpenClawRuntimeAdapter();');
+    expect(mainSource).toContain('getOpenClawChannelGateway();');
     expect(mainSource).not.toContain("webContents.send('cowork:stream:");
   });
 

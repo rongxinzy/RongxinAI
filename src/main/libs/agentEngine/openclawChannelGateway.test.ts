@@ -12,11 +12,11 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { OpenClawRuntimeAdapter, pickPersistedAssistantSegment } from './openclawRuntimeAdapter';
+import { OpenClawChannelGateway, pickPersistedAssistantSegment } from './openclawChannelGateway';
 import { ToolActivityTracker } from './toolActivity';
 
 function setAvailabilityGuard(
-  adapter: OpenClawRuntimeAdapter,
+  adapter: OpenClawChannelGateway,
   guard: (modelRef: string) => { available: boolean; message?: string },
 ): void {
   (
@@ -107,7 +107,7 @@ function createPatchAdapter(options?: {
       clientEntryPath: '/tmp/openclaw-gateway-client.js',
     }),
   };
-  const adapter = new OpenClawRuntimeAdapter(store as never, engineManager as never);
+  const adapter = new OpenClawChannelGateway(store as never, engineManager as never);
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -260,7 +260,7 @@ function createRunTurnAdapter(
       clientEntryPath: '/tmp/openclaw-gateway-client.js',
     }),
   };
-  const adapter = new OpenClawRuntimeAdapter(store as never, engineManager as never);
+  const adapter = new OpenClawChannelGateway(store as never, engineManager as never);
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -617,7 +617,7 @@ test('reconcileWithHistory: already in sync — skips replace', async () => {
     { id: 'msg-2', type: 'assistant', content: 'Hi there', timestamp: 2, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -641,7 +641,7 @@ test('reconcileWithHistory: missing assistant message — triggers replace', asy
     // assistant message missing locally
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -669,7 +669,7 @@ test('reconcileWithHistory: carries gateway timestamps into replacement entries'
     { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -694,7 +694,7 @@ test('reconcileWithHistory: filters heartbeat prompt and ack entries', async () 
     { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -730,7 +730,7 @@ test('reconcileWithHistory: duplicate messages locally — triggers replace', as
     { id: 'msg-3', type: 'assistant', content: 'Hi there', timestamp: 3, metadata: {} }, // duplicate
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -756,7 +756,7 @@ test('reconcileWithHistory: content mismatch — triggers replace', async () => 
     { id: 'msg-2', type: 'assistant', content: 'Streaming partial...', timestamp: 2, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -803,7 +803,7 @@ test('lifecycle fallback repairs managed session assistant text from history', a
     },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -862,7 +862,7 @@ test('late lifecycle fallback event does not reopen a completed managed session'
       metadata: { isStreaming: false, isFinal: true },
     },
   ]);
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   const sessionKey = `agent:main:zhiyuan:${session.id}`;
 
   adapter.rememberSessionKey(session.id, sessionKey);
@@ -893,7 +893,7 @@ test('late event for a closed run does not recreate a managed session turn', () 
       metadata: { isStreaming: false, isFinal: true },
     },
   ]);
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   const sessionKey = `agent:main:zhiyuan:${session.id}`;
 
   adapter.rememberSessionKey(session.id, sessionKey);
@@ -925,7 +925,7 @@ test('reconcileWithHistory: preserves tool messages', async () => {
     { id: 'msg-4', type: 'assistant', content: 'Done!', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -950,7 +950,7 @@ test('reconcileWithHistory: gateway returns tail subset — preserves older loca
     { id: 'msg-4', type: 'assistant', content: 'I am fine', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -976,7 +976,7 @@ test('reconcileWithHistory: tail window starting with assistant does not rewrite
     { id: 'msg-4', type: 'assistant', content: 'Second answer', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1003,7 +1003,7 @@ test('reconcileWithHistory: tail window starting with assistant updates anchored
     { id: 'msg-4', type: 'assistant', content: 'Streaming partial...', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1042,7 +1042,7 @@ test('reconcileWithHistory: tail window repairs stale leading assistant before a
     { id: 'msg-4', type: 'assistant', content: 'Streaming partial...', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1071,7 +1071,7 @@ test('reconcileWithHistory: empty history — sets cursor to 0', async () => {
     { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1091,7 +1091,7 @@ test('reconcileWithHistory: multi-turn conversation — correct order', async ()
     // Missing second turn
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1119,7 +1119,7 @@ test('reconcileWithHistory: gateway error — does not crash', async () => {
     { id: 'msg-1', type: 'user', content: 'Hello', timestamp: 1, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1142,7 +1142,7 @@ test('reconcileWithHistory: tail content mismatch — replaces only tail, preser
     { id: 'msg-4', type: 'assistant', content: 'Streaming partial...', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1193,7 +1193,7 @@ test('reconcileWithHistory: long conversation — preserves prefix, replaces tai
   const { session, store, getReplaceCallCount, getLastReplaceArgs } =
     createReconcileStore(localMessages);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1229,7 +1229,7 @@ test('reconcileWithHistory: no overlap — full replace for dashboard consistenc
     { id: 'msg-2', type: 'assistant', content: 'Old reply 1', timestamp: 2, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1258,7 +1258,7 @@ test('reconcileWithHistory: identical user messages — aligns to latest match',
     { id: 'msg-4', type: 'assistant', content: 'Hi (second)', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1285,7 +1285,7 @@ test('reconcileWithHistory: new messages arrived — preserves old and adds new'
     { id: 'msg-4', type: 'assistant', content: 'Answer 2', timestamp: 4, metadata: {} },
   ]);
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1387,7 +1387,7 @@ test('syncFullChannelHistory seeds gateway history cursor so old reminders are n
     { role: 'system', content: 'Reminder: old reminder' },
   ];
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1424,7 +1424,7 @@ test('prefetchChannelUserMessages also consumes existing reminder history backlo
     { role: 'user', content: 'new user turn' },
   ];
 
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   adapter.gatewayClient = {
     start: () => {},
     stop: () => {},
@@ -1448,7 +1448,7 @@ test('prefetchChannelUserMessages also consumes existing reminder history backlo
 
 test('syncSystemMessagesFromHistory skips pure heartbeat ack system messages', () => {
   const { session, store } = createHistoryStore([]);
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
   const historyMessages = [
     { role: 'system', content: 'HEARTBEAT_OK' },
     { role: 'system', content: 'Reminder fired' },
@@ -1464,7 +1464,7 @@ test('syncSystemMessagesFromHistory skips pure heartbeat ack system messages', (
 
 test('collectChannelHistoryEntries skips heartbeat prompt and ack messages', () => {
   const { store } = createHistoryStore([]);
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
 
   const entries = adapter.collectChannelHistoryEntries([
     { role: 'user', content: 'regular user' },
@@ -1487,7 +1487,7 @@ If nothing needs attention, reply HEARTBEAT_OK.`,
 
 test('getSessionKeysForSession prefers channel keys before managed fallback', () => {
   const { store } = createHistoryStore([]);
-  const adapter = new OpenClawRuntimeAdapter(store, {});
+  const adapter = new OpenClawChannelGateway(store, {});
 
   adapter.rememberSessionKey(
     'session-1',

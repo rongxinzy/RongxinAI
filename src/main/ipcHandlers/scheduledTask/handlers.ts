@@ -41,7 +41,7 @@ export interface ScheduledTaskHandlerDeps {
       coworkSessionId: string,
     ) => Promise<void>;
   } | null;
-  getOpenClawRuntimeAdapter: () => {
+  getOpenClawChannelGateway: () => {
     getGatewayClient: () => unknown;
     fetchSessionByKey: (sessionKey: string) => Promise<unknown>;
   } | null;
@@ -100,7 +100,7 @@ async function applyAnnounceDeliveryNormalization(
 }
 
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {
-  const { getCronJobService, getIMGatewayManager, getOpenClawRuntimeAdapter } = deps;
+  const { getCronJobService, getIMGatewayManager, getOpenClawChannelGateway } = deps;
 
   ipcMain.handle(ScheduledTaskIpc.List, async () => {
     try {
@@ -262,7 +262,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
     try {
       if (!sessionKey) return { success: true, session: null };
       // Fetch session history from OpenClaw (returns transient session, not persisted)
-      const session = await getOpenClawRuntimeAdapter()?.fetchSessionByKey(sessionKey);
+      const session = await getOpenClawChannelGateway()?.fetchSessionByKey(sessionKey);
       return { success: true, session: session ?? null };
     } catch (error) {
       return {

@@ -22,7 +22,7 @@ test('task-list handler delegates to CronJobService even before a gateway client
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ listJobs }) as unknown as CronJobService,
     getIMGatewayManager: () => null,
-    getOpenClawRuntimeAdapter: () => ({
+    getOpenClawChannelGateway: () => ({
       getGatewayClient: () => null,
       fetchSessionByKey: async () => null,
     }),
