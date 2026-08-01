@@ -4,7 +4,6 @@ import {
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
 import {
-  Reasoning,
   ReasoningContent,
   ReasoningTrigger,
 } from '@shared/components/ai-elements/reasoning';
@@ -35,6 +34,7 @@ import { getThinkingPresentation } from '../helpers/thinkingPresentation';
 import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
 import { ExecutionSummary } from './ExecutionSummary';
+import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
 
@@ -151,8 +151,9 @@ const TurnBlockComponent: React.FC<{
       );
       const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
-        <Reasoning
+        <PersistentReasoning
           key={item.message.id}
+          persistKey={`reasoning-${item.message.id}`}
           className={mutedExecution ? 'text-muted-foreground' : undefined}
           isStreaming={isStreaming}
           defaultOpen={false}
@@ -168,7 +169,7 @@ const TurnBlockComponent: React.FC<{
             }}
           />
           <ReasoningContent className="pl-4">{content}</ReasoningContent>
-        </Reasoning>
+        </PersistentReasoning>
       );
     }
 
@@ -325,8 +326,9 @@ const TurnBlockComponent: React.FC<{
     const currentStatus = showCompletedSummary ? null : getCurrentExecutionStatus(group.items);
     const isActiveTool = currentStatus?.kind === ExecutionStatusKind.Tool;
     return (
-      <ChainOfThought
+      <PersistentChainOfThought
         key={`${groupKey}-${showCompletedSummary ? 'summarized' : 'working'}`}
+        persistKey={`cot-${turn.id}-${groupKey}`}
         defaultOpen={false}
       >
         <ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>
@@ -343,7 +345,7 @@ const TurnBlockComponent: React.FC<{
             renderItem(item, idx, false, false, true, idx === group.items.length - 1),
           )}
         </ChainOfThoughtContent>
-      </ChainOfThought>
+      </PersistentChainOfThought>
     );
   };
   return (

@@ -802,8 +802,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }, NAV_SCROLL_LOCK_DURATION);
 
     // Try to scroll to the exact data-rail-index element if it's mounted;
-    // otherwise let the virtualizer bring the target turn into view, which
-    // mounts the element, and refine to it on the next frames.
+    // otherwise let the virtualizer bring the target turn into view, then
+    // refine to the exact block once it mounts.
     const container = scrollContainerRef.current;
     if (container) {
       const el = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
@@ -811,6 +811,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (targetTurnIdx >= 0) {
         virtualizedTurnListRef.current?.scrollToTurn(targetTurnIdx);
+        const refine = (attemptsLeft: number) => {
+          const target = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else if (attemptsLeft > 0) {
+            window.requestAnimationFrame(() => refine(attemptsLeft - 1));
+          }
+        };
+        window.requestAnimationFrame(() => refine(30));
       }
     }
 
