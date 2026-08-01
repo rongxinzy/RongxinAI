@@ -12,6 +12,7 @@ const toPreview = (text: string | undefined): string | undefined => {
 };
 
 export type BuildChannelRunSummaryInput = {
+  runId: string;
   sessionId: string;
   platform: string;
   conversationId: string;
@@ -24,6 +25,7 @@ export type BuildChannelRunSummaryInput = {
 
 /** Pure summary builder for Channel/Cron run lifecycle events (issue #225). */
 export const buildChannelRunSummary = (input: BuildChannelRunSummaryInput): ChannelRunSummary => ({
+  runId: input.runId,
   sessionId: input.sessionId,
   platform: input.platform,
   conversationId: input.conversationId,

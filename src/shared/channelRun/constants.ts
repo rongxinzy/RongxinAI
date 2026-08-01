@@ -29,6 +29,8 @@ export type ChannelRunIpc = (typeof ChannelRunIpc)[keyof typeof ChannelRunIpc];
 
 /** Read-only summary of one Channel/Cron run lifecycle transition. */
 export type ChannelRunSummary = {
+  /** Stable identity shared by every lifecycle event for this run. */
+  runId: string;
   sessionId: string;
   platform: string;
   conversationId: string;

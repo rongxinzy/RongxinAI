@@ -1,5 +1,10 @@
 import type { LlamaCppRunningModel } from '../../shared/llamacpp';
-import { isProviderEnabled, ProviderName, ProviderRegistry } from '../../shared/providers';
+import {
+  isProviderEnabled,
+  ProviderName,
+  ProviderRegistry,
+  resolveCodingPlanBaseUrl,
+} from '../../shared/providers';
 import { type AppConfig, getProviderDisplayName } from '../config';
 import type { Model } from '../store/slices/modelSlice';
 import { getRunningModelOpenClawEligibility } from '../utils/llamacppOpenClawEligibility';
@@ -26,25 +31,48 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
     if (providerName === ProviderName.LlamaCpp) {
       return;
     }
-    if (!isProviderEnabled(providerName, providerConfig) || !providerConfig.models) {
+    if (!isProviderEnabled(providerName, providerConfig)) {
       return;
     }
 
-    providerConfig.models.forEach(model => {
+    const providerDefinition = ProviderRegistry.get(providerName);
+    const configuredModels =
+      providerConfig.codingPlanEnabled && providerDefinition?.codingPlanModels
+        ? providerDefinition.codingPlanModels
+        : providerConfig.models;
+    if (!configuredModels) {
+      return;
+    }
+    const configuredApiFormat =
+      providerConfig.apiFormat ?? providerDefinition?.defaultApiFormat ?? 'anthropic';
+    const effectiveApiFormat =
+      providerConfig.codingPlanEnabled &&
+      (configuredApiFormat === 'anthropic' || configuredApiFormat === 'openai')
+        ? resolveCodingPlanBaseUrl(providerName, true, configuredApiFormat, providerConfig.baseUrl)
+            .effectiveFormat
+        : configuredApiFormat;
+
+    configuredModels.forEach(model => {
+      const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+        providerName,
+        model.id,
+        model.supportsImage,
+      );
       models.push({
         id: model.id,
         name: model.name,
         provider: getProviderDisplayName(providerName, providerConfig),
         providerKey: providerName,
         openClawProviderId: ProviderRegistry.getOpenClawProviderId(providerName),
-        supportsImage: model.supportsImage ?? false,
+        supportsImage,
         capabilities: ProviderRegistry.resolveModelCapabilities(
           providerName,
           model.id,
-          providerConfig.apiFormat ?? 'anthropic',
-          model,
+          effectiveApiFormat,
+          { ...model, supportsImage },
         ),
-        contextWindow: model.contextWindow ?? model.contextTokens,
+        contextWindow:
+          model.contextWindow ?? ('contextTokens' in model ? model.contextTokens : undefined),
       });
     });
   });

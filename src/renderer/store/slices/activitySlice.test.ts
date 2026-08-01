@@ -5,6 +5,7 @@ import type { ChannelRunSummary } from '../../../shared/channelRun/constants';
 import activityReducer, { clearChannelRuns, recordChannelRun } from './activitySlice';
 
 const summary = (overrides: Partial<ChannelRunSummary> = {}): ChannelRunSummary => ({
+  runId: 'run-1',
   sessionId: 'session-1',
   platform: 'feishu',
   conversationId: 'conv-1',

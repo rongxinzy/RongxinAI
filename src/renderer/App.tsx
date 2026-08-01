@@ -60,6 +60,9 @@ const SkillsView = React.lazy(() =>
 const ScheduledTasksView = React.lazy(() =>
   import('./components/scheduledTasks').then(module => ({ default: module.ScheduledTasksView })),
 );
+const ActivityView = React.lazy(() =>
+  import('./components/activity').then(module => ({ default: module.ActivityView })),
+);
 const McpView = React.lazy(() =>
   import('./components/mcp').then(module => ({ default: module.McpView })),
 );
@@ -88,7 +91,7 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [mainView, setMainView] = useState<
-    'cowork' | 'skills' | 'scheduledTasks' | 'mcp' | 'localInference' | 'expert'
+    'cowork' | 'skills' | 'scheduledTasks' | 'activity' | 'mcp' | 'localInference' | 'expert'
   >('cowork');
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
@@ -363,6 +366,10 @@ const App: React.FC = () => {
 
   const handleShowScheduledTasks = useCallback(() => {
     setMainView('scheduledTasks');
+  }, []);
+
+  const handleShowActivity = useCallback(() => {
+    setMainView('activity');
   }, []);
 
   const handleShowMcp = useCallback((registryId?: McpRegistryId) => {
@@ -741,6 +748,7 @@ const App: React.FC = () => {
             onShowSkills={handleShowSkills}
             onShowCowork={handleShowCowork}
             onShowScheduledTasks={handleShowScheduledTasks}
+            onShowActivity={handleShowActivity}
             onShowMcp={handleShowMcp}
             onShowLocalInference={handleShowLocalInference}
             onShowExpert={handleShowExpert}
@@ -789,6 +797,13 @@ const App: React.FC = () => {
                     />
                   ) : mainView === 'scheduledTasks' ? (
                     <ScheduledTasksView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                    />
+                  ) : mainView === 'activity' ? (
+                    <ActivityView
                       isSidebarCollapsed={isSidebarCollapsed}
                       onToggleSidebar={handleToggleSidebar}
                       onNewChat={handleNewChat}

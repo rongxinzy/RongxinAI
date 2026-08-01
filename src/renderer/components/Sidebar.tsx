@@ -56,6 +56,7 @@ interface SidebarProps {
   onShowSkills: () => void;
   onShowCowork: () => void;
   onShowScheduledTasks: () => void;
+  onShowActivity: () => void;
   onShowMcp: () => void;
   onShowLocalInference: () => void;
   onShowExpert: () => void;
@@ -77,6 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeView,
   onShowCowork,
   onShowScheduledTasks,
+  onShowActivity,
   onShowLocalInference,
   onShowExpert,
   onNewChat,
@@ -524,6 +526,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowExpert={onShowExpert}
               onShowLocalInference={onShowLocalInference}
               onShowScheduledTasks={onShowScheduledTasks}
+              onShowActivity={onShowActivity}
               onWorkModeChange={handleWorkModeChange}
               workMode={workMode}
               onPrefetchView={onPrefetchView}

@@ -323,7 +323,10 @@ const TurnBlockComponent: React.FC<{
       return renderItem(firstItem, 0, isFinalAnswer);
     }
 
-    const showCompletedSummary = group.followedByAnswer;
+    // A turn that has ended (completed, stopped, or failed) never shows a
+    // live "working" shimmer: trailing execution groups settle into their
+    // completed summary even when no answer follows them.
+    const showCompletedSummary = group.followedByAnswer || isTurnComplete;
     const currentStatus = showCompletedSummary ? null : getCurrentExecutionStatus(group.items);
     const isActiveTool = currentStatus?.kind === ExecutionStatusKind.Tool;
     return (

@@ -222,7 +222,8 @@ function buildServerFallbackModels(
 
 function normalizeProviderModels(
   providerName: string,
-  models?: ProviderModelInputConfig[],
+  models?: readonly ProviderModelInputConfig[],
+  apiFormat: ApiFormat = ProviderRegistry.get(providerName)?.defaultApiFormat ?? 'anthropic',
 ): ProviderModelConfig[] {
   return (models ?? [])
     .filter(model => model.id?.trim())
@@ -232,14 +233,23 @@ function normalizeProviderModels(
         ...(providerDefinition?.defaultModels ?? []),
         ...(providerDefinition?.codingPlanModels ?? []),
       ].find(candidate => candidate.id === model.id);
+      const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+        providerName,
+        model.id,
+        model.supportsImage,
+      );
+      const capabilities =
+        registeredModel || model.capabilities
+          ? ProviderRegistry.resolveModelCapabilities(providerName, model.id, apiFormat, {
+              ...model,
+              supportsImage,
+            })
+          : undefined;
       return {
         ...model,
         name: model.name || model.id,
-        supportsImage: ProviderRegistry.resolveModelSupportsImage(
-          providerName,
-          model.id,
-          model.supportsImage,
-        ),
+        supportsImage,
+        capabilities,
         contextWindow:
           typeof model.contextWindow === 'number' && model.contextWindow > 0
             ? model.contextWindow
@@ -252,9 +262,6 @@ function normalizeProviderModels(
           typeof model.maxTokens === 'number' && model.maxTokens > 0
             ? model.maxTokens
             : registeredModel?.maxTokens,
-        capabilities: model.capabilities
-          ? { ...model.capabilities }
-          : registeredModel?.capabilities,
         piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime),
         openClawEligibility: model.openClawEligibility
           ? { ...model.openClawEligibility }
@@ -314,7 +321,21 @@ function getEffectiveProviderModels(
   if (providerName === ProviderName.LlamaCpp) {
     return getLlamaCppRunningModels();
   }
-  return normalizeProviderModels(providerName, providerConfig.models);
+  const providerDefinition = ProviderRegistry.get(providerName);
+  const configuredModels =
+    providerConfig.codingPlanEnabled && providerDefinition?.codingPlanModels
+      ? providerDefinition.codingPlanModels
+      : providerConfig.models;
+  const configuredApiFormat = getEffectiveProviderApiFormat(providerName, providerConfig.apiFormat);
+  const effectiveApiFormat = providerConfig.codingPlanEnabled
+    ? resolveCodingPlanBaseUrl(
+        providerName,
+        true,
+        configuredApiFormat,
+        providerConfig.baseUrl ?? '',
+      ).effectiveFormat
+    : configuredApiFormat;
+  return normalizeProviderModels(providerName, configuredModels, effectiveApiFormat);
 }
 
 function getOpenClawEligibleProviderModels(
@@ -947,7 +968,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
     if (shouldUseOpenAICodexOAuth(providerName, providerConfig)) {
       const baseURL = providerConfig.baseUrl?.trim() || 'https://api.openai.com/v1';
-      const models = normalizeProviderModels(providerName, providerConfig.models);
+      const models = normalizeProviderModels(providerName, providerConfig.models, 'openai');
       if (models.length === 0) continue;
       result.push({
         providerName,

@@ -45,17 +45,22 @@ function buildInitialModels(): Model[] {
     Object.entries(defaultConfig.providers).forEach(([providerName, config]) => {
       if (config.enabled && config.models) {
         config.models.forEach(model => {
+          const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+            providerName,
+            model.id,
+            model.supportsImage,
+          );
           models.push({
             id: model.id,
             name: model.name,
             provider: getProviderDisplayName(providerName, config),
             providerKey: providerName,
-            supportsImage: model.supportsImage ?? false,
+            supportsImage,
             capabilities: ProviderRegistry.resolveModelCapabilities(
               providerName,
               model.id,
               config.apiFormat ?? 'anthropic',
-              model,
+              { ...model, supportsImage },
             ),
             contextWindow: model.contextWindow ?? model.contextTokens,
           });

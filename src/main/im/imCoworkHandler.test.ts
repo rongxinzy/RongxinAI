@@ -1,8 +1,29 @@
 import EventEmitter from 'node:events';
 
-import { expect, test } from 'vitest';
+import { beforeEach, expect, test, vi } from 'vitest';
 
+import { CoworkErrorKind } from '../../common/coworkError';
+import { ChannelRunIpc, ChannelRunStatus } from '../../shared/channelRun/constants';
 import { IMCoworkHandler } from './imCoworkHandler';
+
+const electronMocks = vi.hoisted(() => ({
+  send: vi.fn(),
+}));
+
+vi.mock('electron', () => ({
+  BrowserWindow: {
+    getAllWindows: () => [
+      {
+        isDestroyed: () => false,
+        webContents: { send: electronMocks.send },
+      },
+    ],
+  },
+}));
+
+beforeEach(() => {
+  electronMocks.send.mockClear();
+});
 
 class FakeRuntime extends EventEmitter {
   startCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> = [];
@@ -362,6 +383,89 @@ test('falls back to normal agent execution when detector does not recognize a sc
 
   const reply = await pending;
   expect(reply).toBe('这是会议纪要摘要。');
+
+  handler.destroy();
+});
+
+test('emits a matching terminal run event when a session fails while waiting for permission', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+
+  const response = handler.processMessage(createMessage({ content: '删除临时文件' }));
+  await new Promise(resolve => setImmediate(resolve));
+
+  runtime.emit('permissionRequest', 'session-1', {
+    requestId: 'permission-1',
+    toolName: 'Bash',
+    toolInput: { command: 'rm temporary.txt' },
+  });
+
+  await expect(response).resolves.toMatch(/请在 60 秒内回复/u);
+
+  runtime.emit('error', 'session-1', {
+    kind: CoworkErrorKind.NetworkError,
+    message: 'connection lost',
+  });
+
+  const runEvents = electronMocks.send.mock.calls
+    .filter(([channel]) => channel === ChannelRunIpc.RunEvent)
+    .map(([, summary]) => summary);
+
+  expect(runEvents).toHaveLength(2);
+  expect(runEvents.map(event => event.status)).toEqual([
+    ChannelRunStatus.Started,
+    ChannelRunStatus.Failed,
+  ]);
+  expect(runEvents[1].runId).toBe(runEvents[0].runId);
+
+  handler.destroy();
+});
+
+test('closes a started run when existing-session setup fails before runtime execution', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  let failSkillsPrompt = false;
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore,
+    getSkillsPrompt: async () => {
+      if (failSkillsPrompt) throw new Error('skill prompt unavailable');
+      return null;
+    },
+  });
+
+  const firstResponse = handler.processMessage(createMessage({ content: '第一条消息' }));
+  await new Promise(resolve => setImmediate(resolve));
+  runtime.emit('message', 'session-1', {
+    id: 'assistant-1',
+    type: 'assistant',
+    content: '第一条回复',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-1', null);
+  await expect(firstResponse).resolves.toBe('第一条回复');
+
+  imStore.settings.skillsEnabled = true;
+  failSkillsPrompt = true;
+  await expect(
+    handler.processMessage(createMessage({ messageId: 'im-msg-2', content: '第二条消息' })),
+  ).rejects.toThrow('skill prompt unavailable');
+
+  const runEvents = electronMocks.send.mock.calls
+    .filter(([channel]) => channel === ChannelRunIpc.RunEvent)
+    .map(([, summary]) => summary);
+  const secondRunEvents = runEvents.slice(-2);
+  expect(secondRunEvents.map(event => event.status)).toEqual([
+    ChannelRunStatus.Started,
+    ChannelRunStatus.Failed,
+  ]);
+  expect(secondRunEvents[1].runId).toBe(secondRunEvents[0].runId);
+  expect(secondRunEvents[1].errorMessage).toBe('skill prompt unavailable');
 
   handler.destroy();
 });

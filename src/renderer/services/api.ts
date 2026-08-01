@@ -1,11 +1,13 @@
 import {
   isProviderEnabled,
+  type ModelCapabilities,
   ModelCapabilityStatus,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
 } from '../../shared/providers';
 import { store } from '../store';
+import type { Model } from '../store/slices/modelSlice';
 import { ChatMessagePayload, ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import { configService } from './config';
 import { i18nService } from './i18n';
@@ -52,9 +54,21 @@ const generateRequestId = () => `req_${Date.now()}_${Math.random().toString(36).
 class ApiService {
   private config: ApiConfig | null = null;
   private readonly streamRequests = new StreamRequestRegistry();
+  private readonly runtimeCapabilityCache = new Map<string, Partial<ModelCapabilities>>();
+  private readonly runtimeCapabilityRequests = new Map<
+    string,
+    Promise<Partial<ModelCapabilities>>
+  >();
+  private runtimeCapabilityGeneration = 0;
 
   setConfig(config: ApiConfig) {
     this.config = config;
+    // Provider settings may have changed even when the legacy fallback config
+    // is identical. Do not carry endpoint-specific capability evidence across
+    // a settings refresh.
+    this.runtimeCapabilityCache.clear();
+    this.runtimeCapabilityRequests.clear();
+    this.runtimeCapabilityGeneration += 1;
   }
 
   cancelOngoingRequest(requestId?: string) {
@@ -78,6 +92,71 @@ class ApiService {
       return 'gemini';
     }
     return 'anthropic';
+  }
+
+  private supportsRuntimeCapabilityProbe(provider: string): boolean {
+    return (
+      provider === ProviderName.OpenRouter ||
+      provider === ProviderName.Ollama ||
+      provider === ProviderName.LlamaCpp
+    );
+  }
+
+  private async getRuntimeModelCapabilities(
+    provider: string,
+    modelId: string,
+    config: ApiConfig,
+  ): Promise<Partial<ModelCapabilities>> {
+    if (!this.supportsRuntimeCapabilityProbe(provider)) {
+      return {};
+    }
+
+    const key = `${provider}\u0000${modelId}\u0000${config.baseUrl.trim()}`;
+    const cached = this.runtimeCapabilityCache.get(key);
+    if (cached) {
+      return cached;
+    }
+    const pending = this.runtimeCapabilityRequests.get(key);
+    if (pending) {
+      return pending;
+    }
+
+    const generation = this.runtimeCapabilityGeneration;
+    const request = probeRuntimeModelCapabilities(provider, modelId, config)
+      .then(capabilities => {
+        // An empty result is usually a transient fetch failure or an endpoint
+        // that did not describe this model. Keep it retryable.
+        if (
+          generation === this.runtimeCapabilityGeneration &&
+          Object.keys(capabilities).length > 0
+        ) {
+          this.runtimeCapabilityCache.set(key, capabilities);
+        }
+        return capabilities;
+      })
+      .finally(() => {
+        if (this.runtimeCapabilityRequests.get(key) === request) {
+          this.runtimeCapabilityRequests.delete(key);
+        }
+      });
+    this.runtimeCapabilityRequests.set(key, request);
+    return request;
+  }
+
+  private async resolveRequestModelCapabilities(
+    provider: string,
+    model: Model,
+    config: ApiConfig,
+  ): Promise<ModelCapabilities> {
+    const apiFormat = this.normalizeApiFormat(config.apiFormat);
+    const declared = ProviderRegistry.resolveModelCapabilities(
+      provider,
+      model.id,
+      apiFormat,
+      model,
+    );
+    const detected = await this.getRuntimeModelCapabilities(provider, model.id, config);
+    return { ...declared, ...detected };
   }
 
   private buildOpenAICompatibleChatCompletionsUrl(baseUrl: string): string {
@@ -270,26 +349,13 @@ class ApiService {
 
   // 检测当前选择的模型属于哪个 provider
   private detectProvider(modelId: string, providerHint?: string): string {
-    const normalizedHint = providerHint?.toLowerCase();
+    const normalizedHint = providerHint?.trim().toLowerCase();
     if (
       normalizedHint &&
-      ([
-        'openai',
-        'deepseek',
-        'moonshot',
-        'zhipu',
-        'minimax',
-        'qwen',
-        'openrouter',
-        'gemini',
-        'anthropic',
-        'xiaomi',
-        'stepfun',
-        'volcengine',
-        'github-copilot',
-        'ollama',
-      ].includes(normalizedHint) ||
+      (ProviderRegistry.get(normalizedHint) !== undefined ||
+        normalizedHint === ProviderName.ZhiyuanServer ||
         normalizedHint === ProviderName.LlamaCpp ||
+        normalizedHint === ProviderName.Custom ||
         normalizedHint.startsWith('custom_'))
     ) {
       return normalizedHint;
@@ -388,7 +454,8 @@ class ApiService {
     const selectedModel = requestedModelId
       ? (modelState.availableModels.find(
           model =>
-            (model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId) &&
+            (model.id === requestedModelId ||
+              `${model.provider}/${model.id}` === requestedModelId) &&
             (!requestedProviderKey || model.providerKey === requestedProviderKey),
         ) ?? modelState.defaultSelectedModel)
       : modelState.defaultSelectedModel;
@@ -396,7 +463,6 @@ class ApiService {
       selectedModel.id,
       selectedModel.providerKey ?? selectedModel.provider,
     );
-    const supportsImages = !!selectedModel.supportsImage;
     const userMessage: ChatUserMessageInput =
       typeof message === 'string'
         ? { content: message }
@@ -420,6 +486,12 @@ class ApiService {
     // - openai: OpenAI 兼容协议 (OpenAI provider uses /v1/responses)
     // - gemini: Google Gemini 原生协议 (streamGenerateContent)
     const normalizedApiFormat = this.normalizeApiFormat(effectiveConfig.apiFormat);
+    const capabilities = await this.resolveRequestModelCapabilities(
+      provider,
+      selectedModel,
+      effectiveConfig,
+    );
+    const supportsImages = capabilities.imageInput === ModelCapabilityStatus.Supported;
     console.log(
       `[api-chat] provider=${provider}, model=${selectedModel.id}, apiFormat=${normalizedApiFormat}, baseUrl=${effectiveConfig.baseUrl}`,
     );
@@ -554,7 +626,8 @@ class ApiService {
     const selectedModel = requestedModelId
       ? (modelState.availableModels.find(
           model =>
-            (model.id === requestedModelId || `${model.provider}/${model.id}` === requestedModelId) &&
+            (model.id === requestedModelId ||
+              `${model.provider}/${model.id}` === requestedModelId) &&
             (!requestedProviderKey || model.providerKey === requestedProviderKey),
         ) ?? modelState.defaultSelectedModel)
       : modelState.defaultSelectedModel;
@@ -569,23 +642,12 @@ class ApiService {
       );
     }
     const apiFormat = this.normalizeApiFormat(config.apiFormat);
-    let capabilities = ProviderRegistry.resolveModelCapabilities(
+    const capabilities = await this.resolveRequestModelCapabilities(
       provider,
-      selectedModel.id,
-      apiFormat,
       selectedModel,
+      config,
     );
-    if (capabilities.toolCalling === ModelCapabilityStatus.Unknown) {
-      const detectedCapabilities = await probeRuntimeModelCapabilities(
-        provider,
-        selectedModel.id,
-        config,
-      );
-      capabilities = {
-        ...capabilities,
-        toolCalling: detectedCapabilities.toolCalling ?? capabilities.toolCalling,
-      };
-    }
+    const supportsImages = capabilities.imageInput === ModelCapabilityStatus.Supported;
     if (capabilities.toolCalling !== ModelCapabilityStatus.Supported) {
       const capabilityMessage =
         capabilities.toolCalling === ModelCapabilityStatus.Unsupported
@@ -608,7 +670,7 @@ class ApiService {
 
     if (apiFormat === 'anthropic') {
       const messages = [...history.filter(item => item.role !== 'system'), userMessage]
-        .map(item => this.formatAnthropicMessage(item, !!selectedModel.supportsImage))
+        .map(item => this.formatAnthropicMessage(item, supportsImages))
         .filter(Boolean) as any[];
       return this.runAnthropicWebSearchLoop(
         messages,
@@ -639,7 +701,7 @@ class ApiService {
     }
     if (this.shouldUseOpenAIResponsesApi(provider)) {
       const input = [...history.filter(item => item.role !== 'system'), userMessage]
-        .map(item => this.formatOpenAIResponsesInputMessage(item, !!selectedModel.supportsImage))
+        .map(item => this.formatOpenAIResponsesInputMessage(item, supportsImages))
         .filter(Boolean) as any[];
       return this.runOpenAIResponsesWebSearchLoop(
         input,
@@ -655,7 +717,7 @@ class ApiService {
       { role: 'system', content: system },
       ...history
         .filter(item => item.role !== 'system')
-        .map(item => this.formatOpenAIMessage(item, !!selectedModel.supportsImage))
+        .map(item => this.formatOpenAIMessage(item, supportsImages))
         .filter(Boolean),
       { role: 'user', content: message },
     ];
@@ -770,6 +832,7 @@ class ApiService {
     abortSignal?: AbortSignal,
   ): Promise<any> {
     let content = '';
+    let reasoningContent = '';
     let reasoning = '';
     let usage: Record<string, unknown> | undefined;
     const calls = new Map<number, { id: string; name: string; arguments: string }>();
@@ -785,14 +848,15 @@ class ApiService {
         const delta = event?.choices?.[0]?.delta;
         if (!delta) return;
         if (typeof delta.content === 'string') content += delta.content;
-        const reasoningDelta =
-          typeof delta.reasoning_content === 'string'
-            ? delta.reasoning_content
-            : typeof delta.reasoning === 'string'
-              ? delta.reasoning
-              : '';
+        const reasoningContentDelta =
+          typeof delta.reasoning_content === 'string' ? delta.reasoning_content : '';
+        const reasoningDelta = typeof delta.reasoning === 'string' ? delta.reasoning : '';
+        reasoningContent += reasoningContentDelta;
         reasoning += reasoningDelta;
-        if (delta.content || reasoningDelta) onProgress?.(content, reasoning || undefined);
+        const fullReasoning = `${reasoningContent}${reasoning}`;
+        if (delta.content || reasoningContentDelta || reasoningDelta) {
+          onProgress?.(content, fullReasoning || undefined);
+        }
         if (Array.isArray(delta.tool_calls)) {
           delta.tool_calls.forEach((toolCall: any) => {
             const index = typeof toolCall.index === 'number' ? toolCall.index : calls.size;
@@ -815,6 +879,8 @@ class ApiService {
           message: {
             role: 'assistant',
             content: content || null,
+            ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+            ...(reasoning ? { reasoning } : {}),
             ...(calls.size
               ? {
                   tool_calls: [...calls.values()].map(call => ({
@@ -942,8 +1008,15 @@ class ApiService {
             event.delta?.type === 'thinking_delta' &&
             typeof event.delta.thinking === 'string'
           ) {
+            block.type = 'thinking';
+            block.thinking = `${block.thinking || ''}${event.delta.thinking}`;
             reasoning += event.delta.thinking;
             onProgress?.(text, reasoning);
+          } else if (
+            event.delta?.type === 'signature_delta' &&
+            typeof event.delta.signature === 'string'
+          ) {
+            block.signature = `${block.signature || ''}${event.delta.signature}`;
           } else if (
             event.delta?.type === 'input_json_delta' &&
             typeof event.delta.partial_json === 'string'
@@ -959,13 +1032,14 @@ class ApiService {
       .sort(([a], [b]) => a - b)
       .map(([, block]) => {
         if (block.type !== 'tool_use') return block;
+        const { inputJson, ...toolBlock } = block;
         let input = {};
         try {
-          input = block.inputJson ? JSON.parse(block.inputJson) : block.input || {};
+          input = inputJson ? JSON.parse(inputJson) : block.input || {};
         } catch {
           input = {};
         }
-        return { ...block, input };
+        return { ...toolBlock, input };
       });
     return {
       content,
@@ -974,7 +1048,9 @@ class ApiService {
             usage: {
               input_tokens: inputTokens,
               output_tokens: outputTokens,
-              ...(cacheReadTokens !== undefined ? { cache_read_input_tokens: cacheReadTokens } : {}),
+              ...(cacheReadTokens !== undefined
+                ? { cache_read_input_tokens: cacheReadTokens }
+                : {}),
               ...(cacheWriteTokens !== undefined
                 ? { cache_creation_input_tokens: cacheWriteTokens }
                 : {}),
@@ -1177,8 +1253,6 @@ class ApiService {
               model,
               messages,
               tools: [{ type: 'function', function: this.webSearchTool() }],
-              tool_choice: 'auto',
-              stream_options: { include_usage: true },
             },
             requestId,
             onProgress,
@@ -1206,7 +1280,14 @@ class ApiService {
       const calls = Array.isArray(assistant.tool_calls)
         ? assistant.tool_calls.filter((call: any) => call?.function?.name === 'web_search')
         : [];
-      messages.push(assistant);
+      messages.push(
+        provider === ProviderName.DeepSeek && calls.length
+          ? {
+              ...assistant,
+              content: typeof assistant.content === 'string' ? assistant.content : '',
+            }
+          : assistant,
+      );
       if (!calls.length) {
         const content = typeof assistant.content === 'string' ? assistant.content : '';
         onProgress?.(content);
@@ -2069,7 +2150,9 @@ class ApiService {
               if (
                 !useResponsesApi &&
                 includeUsage &&
-                /stream_options|include_usage|unknown (field|parameter)|extra fields/i.test(errorMessage)
+                /stream_options|include_usage|unknown (field|parameter)|extra fields/i.test(
+                  errorMessage,
+                )
               ) {
                 try {
                   resolve(

@@ -1,10 +1,14 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
+import { Activity } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
+import { useSelector } from 'react-redux';
 
 import { i18nService } from '../services/i18n';
+import type { RootState } from '../store';
+import { selectHasActiveChannelRun } from '../store/selectors/activitySelectors';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import {
@@ -28,6 +32,7 @@ export type SidebarActiveView =
   | 'cowork'
   | 'skills'
   | 'scheduledTasks'
+  | 'activity'
   | 'mcp'
   | 'localInference'
   | 'expert';
@@ -38,6 +43,7 @@ interface SidebarNavigationControlsProps {
   onShowExpert: () => void;
   onShowLocalInference: () => void;
   onShowScheduledTasks: () => void;
+  onShowActivity: () => void;
   onWorkModeChange: (checked: boolean) => void;
   workMode: WorkMode;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
@@ -45,8 +51,11 @@ interface SidebarNavigationControlsProps {
 }
 
 const sidebarNavItemClassName =
-  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-normal text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground';
-const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-surface-raised text-foreground`;
+  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-normal text-muted-foreground transition-[background-color,color,box-shadow] duration-150 hover:bg-card hover:text-foreground';
+const activeSidebarNavItemClassName = cn(
+  sidebarNavItemClassName,
+  'bg-card font-medium text-foreground shadow-sm ring-1 ring-inset ring-border hover:bg-card',
+);
 
 export const SidebarNavigationControls = ({
   activeView,
@@ -54,10 +63,12 @@ export const SidebarNavigationControls = ({
   onShowExpert,
   onShowLocalInference,
   onShowScheduledTasks,
+  onShowActivity,
   onWorkModeChange,
   workMode,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
+  const hasActiveChannelRun = useSelector((state: RootState) => selectHasActiveChannelRun(state));
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
@@ -69,7 +80,12 @@ export const SidebarNavigationControls = ({
   };
 
   return (
-    <div className={cn('mt-[5px] space-y-0.5 px-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
+    <div
+      className={cn(
+        'mt-[5px] flex flex-col gap-0.5 px-3',
+        workMode === WorkMode.Chat ? 'pb-0' : 'pb-3',
+      )}
+    >
       <div
         className="relative h-7 w-full cursor-pointer"
         onClick={() => onWorkModeChange(workMode !== WorkMode.Chat)}
@@ -157,6 +173,28 @@ export const SidebarNavigationControls = ({
         >
           <SidebarAnimatedAlarmClockIcon ref={scheduledTasksIconRef} />
           {i18nService.t('scheduledTasks')}
+        </Button>
+      )}
+      {workMode !== WorkMode.Chat && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onShowActivity}
+          onMouseEnter={() => onPrefetchView?.('activity')}
+          onFocus={() => onPrefetchView?.('activity')}
+          className={
+            activeView === 'activity' ? activeSidebarNavItemClassName : sidebarNavItemClassName
+          }
+          aria-current={activeView === 'activity' ? 'page' : undefined}
+        >
+          <Activity data-icon="inline-start" />
+          {i18nService.t('activityTitle')}
+          {hasActiveChannelRun && (
+            <span
+              className="ml-auto size-1.5 rounded-full bg-primary motion-safe:animate-pulse"
+              aria-hidden="true"
+            />
+          )}
         </Button>
       )}
       {workMode !== WorkMode.Chat && (
