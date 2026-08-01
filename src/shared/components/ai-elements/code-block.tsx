@@ -22,13 +22,12 @@ import {
   useState,
 } from 'react';
 import type { BundledLanguage, BundledTheme, HighlighterGeneric, ThemedToken } from 'shiki';
-import { bundledLanguages, createHighlighter } from 'shiki';
+import { bundledLanguagesInfo } from 'shiki/langs';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;
 const isBold = (fontStyle: number | undefined) => fontStyle && fontStyle & 2;
-const isUnderline = (fontStyle: number | undefined) =>
-  fontStyle && fontStyle & 4;
+const isUnderline = (fontStyle: number | undefined) => fontStyle && fontStyle & 4;
 
 // Transform tokens to include pre-computed keys to avoid noArrayIndexKey lint
 interface KeyedToken {
@@ -135,15 +134,24 @@ const LANGUAGE_ALIASES: Record<string, BundledLanguage> = {
   pyt: 'python',
 };
 
+// Language ids and aliases are tiny metadata, safe to keep eager; the
+// Shiki core and grammars load on first highlight instead (issue #141).
+// Aliases (js, ts, py, bash, …) resolve to their canonical grammar id,
+// matching the previous bundledLanguages key lookup.
+const LANGUAGE_ID_BY_ALIAS = new Map<string, BundledLanguage>();
+for (const info of bundledLanguagesInfo) {
+  LANGUAGE_ID_BY_ALIAS.set(info.id, info.id as BundledLanguage);
+  for (const alias of info.aliases ?? []) {
+    LANGUAGE_ID_BY_ALIAS.set(alias, info.id as BundledLanguage);
+  }
+}
+
 /** Normalize transient or unsupported Markdown language labels before Shiki loads them. */
 export const normalizeCodeLanguage = (language: string): BundledLanguage | null => {
   const normalized = language.trim().toLowerCase();
   const alias = LANGUAGE_ALIASES[normalized];
   if (alias) return alias;
-  if (Object.prototype.hasOwnProperty.call(bundledLanguages, normalized)) {
-    return normalized as BundledLanguage;
-  }
-  return null;
+  return LANGUAGE_ID_BY_ALIAS.get(normalized) ?? null;
 };
 
 const getTokensCacheKey = (code: string, language: string) => {
@@ -160,10 +168,14 @@ const getHighlighter = (
     return cached;
   }
 
-  const highlighterPromise = createHighlighter({
-    langs: [language],
-    themes: ['github-light', 'github-dark'],
-  });
+  // Shiki core loads on first highlight rather than at app startup; the
+  // caller already handles the async upgrade from raw to highlighted tokens.
+  const highlighterPromise = import('shiki').then(({ createHighlighter }) =>
+    createHighlighter({
+      langs: [language],
+      themes: ['github-light', 'github-dark'],
+    }),
+  );
 
   highlighterCache.set(language, highlighterPromise);
   return highlighterPromise;

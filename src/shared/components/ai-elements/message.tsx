@@ -10,16 +10,23 @@ import {
 } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import { cjk } from '@streamdown/cjk';
-import { code } from '@streamdown/code';
-import { math } from '@streamdown/math';
-import { mermaid } from '@streamdown/mermaid';
 import type { UIMessage } from 'ai';
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import type { ComponentProps, HTMLAttributes, ReactElement } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { Streamdown } from 'streamdown';
 
-import { AiPre } from './streamdown-code-block';
+// Code/math/mermaid plugins (and their Shiki/KaTeX/Mermaid runtimes) load
+// on demand when the content actually needs them (issue #141).
+const RichMessageResponse = React.lazy(() => import('./richMessageResponse'));
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -277,17 +284,34 @@ export const MessageBranchPage = ({ className, ...props }: MessageBranchPageProp
 
 export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
-const streamdownPlugins = { cjk, code, math, mermaid };
+const basePlugins = { cjk };
+
+// Fenced code, math or mermaid content needs the rich plugin pipeline.
+const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4}|\t)\S/;
 
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
-    <Streamdown
-      className={cn('size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}
-      plugins={streamdownPlugins}
-      components={{ pre: AiPre }}
-      {...props}
-    />
-  ),
+  ({ className, children, ...props }: MessageResponseProps) => {
+    const base = (
+      <Streamdown
+        className={cn('size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0', className)}
+        plugins={basePlugins}
+        {...props}
+      >
+        {children}
+      </Streamdown>
+    );
+    const text = typeof children === 'string' ? children : '';
+    if (!RICH_CONTENT_PATTERN.test(text)) {
+      return base;
+    }
+    return (
+      <React.Suspense fallback={base}>
+        <RichMessageResponse className={className} {...props}>
+          {children}
+        </RichMessageResponse>
+      </React.Suspense>
+    );
+  },
   (prevProps, nextProps) =>
     prevProps.children === nextProps.children && nextProps.isAnimating === prevProps.isAnimating,
 );
