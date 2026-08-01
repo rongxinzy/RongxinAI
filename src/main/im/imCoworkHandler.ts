@@ -9,11 +9,14 @@ import path from 'path';
 
 import { type CoworkError, CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
+import { ChannelRunStatus, ChannelRunTrigger } from '../../shared/channelRun/constants';
+import { buildChannelRunSummary } from '../../shared/channelRun/summary';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
 import { t } from '../i18n';
 import type { CoworkRuntime, PermissionRequest, PermissionResult } from '../libs/agentEngine/types';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
 import { serializeForLog } from '../libs/sanitizeForLog';
+import { emitChannelRunEvent } from './channelRunEvents';
 import { buildIMMediaInstruction } from './imMediaInstruction';
 import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
 import {
@@ -219,6 +222,18 @@ export class IMCoworkHandler extends EventEmitter {
       }
 
       const responsePromise = this.createAccumulatorPromise(coworkSessionId);
+
+      // Project the run lifecycle to the renderer (read-only; issue #225).
+      emitChannelRunEvent(
+        buildChannelRunSummary({
+          sessionId: coworkSessionId,
+          platform: message.platform,
+          conversationId: message.conversationId,
+          trigger: ChannelRunTrigger.Channel,
+          status: ChannelRunStatus.Started,
+          input: formattedContent,
+        }),
+      );
 
       // Start or continue session
       const isActive = this.coworkRuntime.isSessionActive(coworkSessionId);
@@ -910,6 +925,22 @@ export class IMCoworkHandler extends EventEmitter {
 
     this.cleanupAccumulator(sessionId);
 
+    {
+      const conversation = this.sessionConversationMap.get(sessionId);
+      emitChannelRunEvent(
+        buildChannelRunSummary({
+          sessionId,
+          platform: conversation?.platform ?? '',
+          conversationId: conversation?.conversationId ?? '',
+          trigger: accumulator.backgroundDelivery
+            ? ChannelRunTrigger.Cron
+            : ChannelRunTrigger.Channel,
+          status: ChannelRunStatus.Completed,
+          reply: replyText,
+        }),
+      );
+    }
+
     if (accumulator.backgroundDelivery) {
       if (!this.sendAsyncReply || !replyText || replyText === '处理完成，但没有生成回复。') {
         console.warn('[IMCoworkHandler] cannot send async IM reminder reply', replyText);
@@ -959,6 +990,21 @@ export class IMCoworkHandler extends EventEmitter {
     // Generate differentiated IM reply based on error kind
     const replyText = this.formatErrorReply(error);
     this.cleanupAccumulator(sessionId);
+
+    const conversation = this.sessionConversationMap.get(sessionId);
+    emitChannelRunEvent(
+      buildChannelRunSummary({
+        sessionId,
+        platform: conversation?.platform ?? '',
+        conversationId: conversation?.conversationId ?? '',
+        trigger: accumulator.backgroundDelivery
+          ? ChannelRunTrigger.Cron
+          : ChannelRunTrigger.Channel,
+        status: ChannelRunStatus.Failed,
+        error: replyText,
+      }),
+    );
+
     accumulator.reject?.(new Error(replyText));
   }
 
