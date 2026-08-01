@@ -22,13 +22,12 @@ import {
   useState,
 } from 'react';
 import type { BundledLanguage, BundledTheme, HighlighterGeneric, ThemedToken } from 'shiki';
-import { bundledLanguages, createHighlighter } from 'shiki';
+import { bundledLanguagesInfo } from 'shiki/langs';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;
 const isBold = (fontStyle: number | undefined) => fontStyle && fontStyle & 2;
-const isUnderline = (fontStyle: number | undefined) =>
-  fontStyle && fontStyle & 4;
+const isUnderline = (fontStyle: number | undefined) => fontStyle && fontStyle & 4;
 
 // Transform tokens to include pre-computed keys to avoid noArrayIndexKey lint
 interface KeyedToken {
@@ -135,12 +134,16 @@ const LANGUAGE_ALIASES: Record<string, BundledLanguage> = {
   pyt: 'python',
 };
 
+// Language ids are tiny metadata, safe to keep eager; the Shiki core and
+// grammars load on first highlight instead (issue #141).
+const BUNDLED_LANGUAGE_IDS = new Set(bundledLanguagesInfo.map(info => info.id));
+
 /** Normalize transient or unsupported Markdown language labels before Shiki loads them. */
 export const normalizeCodeLanguage = (language: string): BundledLanguage | null => {
   const normalized = language.trim().toLowerCase();
   const alias = LANGUAGE_ALIASES[normalized];
   if (alias) return alias;
-  if (Object.prototype.hasOwnProperty.call(bundledLanguages, normalized)) {
+  if (BUNDLED_LANGUAGE_IDS.has(normalized as BundledLanguage)) {
     return normalized as BundledLanguage;
   }
   return null;
@@ -160,10 +163,14 @@ const getHighlighter = (
     return cached;
   }
 
-  const highlighterPromise = createHighlighter({
-    langs: [language],
-    themes: ['github-light', 'github-dark'],
-  });
+  // Shiki core loads on first highlight rather than at app startup; the
+  // caller already handles the async upgrade from raw to highlighted tokens.
+  const highlighterPromise = import('shiki').then(({ createHighlighter }) =>
+    createHighlighter({
+      langs: [language],
+      themes: ['github-light', 'github-dark'],
+    }),
+  );
 
   highlighterCache.set(language, highlighterPromise);
   return highlighterPromise;

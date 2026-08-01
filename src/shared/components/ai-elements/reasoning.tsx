@@ -8,12 +8,9 @@ import {
 } from '@shared/components/ui/collapsible';
 import { cn } from '@shared/lib/utils';
 import { cjk } from '@streamdown/cjk';
-import { code } from '@streamdown/code';
-import { math } from '@streamdown/math';
-import { mermaid } from '@streamdown/mermaid';
 import { BrainIcon, ChevronDownIcon } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
-import {
+import React, {
   createContext,
   memo,
   useCallback,
@@ -26,7 +23,10 @@ import {
 import { Streamdown } from 'streamdown';
 
 import { Shimmer } from './shimmer';
-import { AiPre } from './streamdown-code-block';
+
+// Same on-demand pipeline as MessageResponse: plain reasoning text never
+// pays for the Shiki/KaTeX/Mermaid runtimes (issue #141).
+const RichMessageResponse = React.lazy(() => import('./richMessageResponse'));
 
 interface ReasoningContextValue {
   isStreaming: boolean;
@@ -204,10 +204,16 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
   children: string;
 };
 
-const streamdownPlugins = { cjk, code, math, mermaid };
+const basePlugins = { cjk };
+
+// Fenced code, math or mermaid content needs the rich plugin pipeline.
+const RICH_CONTENT_PATTERN = /```|\$\$|\\\(|\\\[|\$[^$\n]+?\$/;
 
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { showConnector } = useReasoning();
+
+  const base = <Streamdown plugins={basePlugins}>{children}</Streamdown>;
+  const text = typeof children === 'string' ? children : '';
 
   return (
     <CollapsibleContent
@@ -219,9 +225,13 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
       )}
       {...props}
     >
-      <Streamdown plugins={streamdownPlugins} components={{ pre: AiPre }}>
-        {children}
-      </Streamdown>
+      {RICH_CONTENT_PATTERN.test(text) ? (
+        <React.Suspense fallback={base}>
+          <RichMessageResponse>{children}</RichMessageResponse>
+        </React.Suspense>
+      ) : (
+        base
+      )}
     </CollapsibleContent>
   );
 });
