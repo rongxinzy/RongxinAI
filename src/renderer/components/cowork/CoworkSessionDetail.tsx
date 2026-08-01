@@ -89,6 +89,7 @@ import {
 } from './helpers/messageGrouping';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
 import { useTurnArtifacts } from './helpers/useTurnArtifacts';
+import { setPersistentToggleNamespace } from './hooks/usePersistentToggle';
 // toolUtils helpers used in sub-components
 import {
   normalizeLocalPath,
@@ -910,6 +911,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // every streaming token (issue #141).
   const turns = useStableConversationTurns(rawTurns);
   const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
+  // Scope persisted collapsible state to this session (orphan turn ids are
+  // positional and would collide across sessions). Rendered sessions are
+  // shown one at a time, so a render-time namespace assignment is safe.
+  setPersistentToggleNamespace(currentSession?.id ?? '');
   // Rail indices come from data, not DOM, so virtualized (unmounted) turns
   // keep correct rail numbering.
   const turnRailIndices = useMemo(() => buildTurnRailIndices(turns), [turns]);
@@ -1498,7 +1503,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         </div>
         {shouldRenderArtifactPanel && (
           <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-            <React.Suspense fallback={<ArtifactPanelFallback />}>
+            <React.Suspense
+              fallback={
+                <ArtifactPanelFallback
+                  layoutMode={artifactLayoutMode}
+                  minPanelWidth={MIN_PANEL_WIDTH}
+                  maxPanelWidth={artifactPanelMaxWidth}
+                />
+              }
+            >
               <ArtifactPanelFrame
                 artifacts={sessionArtifacts}
                 isOpen={isPanelOpen}

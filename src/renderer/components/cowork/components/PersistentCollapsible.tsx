@@ -13,7 +13,8 @@ type PersistentProps<P> = P & { persistKey: string };
  * ChainOfThought/Reasoning whose expansion state survives unmounts. Turn
  * rows unmount under virtualization and remount during image export;
  * without persistence every collapsed/expanded block would reset
- * (issue #141).
+ * (issue #141). defaultOpen is forwarded so the wrapped component keeps
+ * its own streaming heuristics.
  */
 export const PersistentReasoning: React.FC<PersistentProps<ReasoningProps>> = ({
   persistKey,
@@ -21,7 +22,9 @@ export const PersistentReasoning: React.FC<PersistentProps<ReasoningProps>> = ({
   ...props
 }) => {
   const [open, setOpen] = usePersistentToggle(persistKey, defaultOpen);
-  return <Reasoning {...props} open={open} onOpenChange={setOpen} />;
+  return (
+    <Reasoning {...props} defaultOpen={defaultOpen} open={open} onOpenChange={setOpen} />
+  );
 };
 
 export const PersistentChainOfThought: React.FC<PersistentProps<ChainOfThoughtProps>> = ({
@@ -30,5 +33,7 @@ export const PersistentChainOfThought: React.FC<PersistentProps<ChainOfThoughtPr
   ...props
 }) => {
   const [open, setOpen] = usePersistentToggle(persistKey, defaultOpen);
-  return <ChainOfThought {...props} open={open} onOpenChange={setOpen} />;
+  return (
+    <ChainOfThought {...props} defaultOpen={defaultOpen} open={open} onOpenChange={setOpen} />
+  );
 };

@@ -355,7 +355,7 @@ const TurnBlockComponent: React.FC<{
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-3">
             {finalAnswerItem && executionItems.length > 0 && (
-              <ExecutionSummary summary={executionSummary}>
+              <ExecutionSummary summary={executionSummary} persistKey={`execsummary-${turn.id}`}>
                 {executionItems.map((item, index) => {
                   const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
                   const connectsToNextStep =
