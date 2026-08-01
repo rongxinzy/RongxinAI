@@ -63,6 +63,10 @@ import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
+import {
+  VirtualizedTurnList,
+  type VirtualizedTurnListHandle,
+} from './components/VirtualizedTurnList';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import type { CaptureRect } from './helpers/exportUtils';
@@ -79,6 +83,7 @@ import {
 import {
   buildConversationTurns,
   buildDisplayItems,
+  buildTurnRailIndices,
   hasRenderableAssistantContent,
 } from './helpers/messageGrouping';
 import { useStableConversationTurns } from './helpers/useStableConversationTurns';
@@ -220,7 +225,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const turnToRailRangeRef = useRef<{ first: number; last: number }[]>([]);
   const isNavigatingRef = useRef(false);
   const navigatingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const turnElsCacheRef = useRef<HTMLElement[]>([]);
+  const virtualizedTurnListRef = useRef<VirtualizedTurnListHandle>(null);
   const railLinesRef = useRef<HTMLDivElement>(null);
   const [hoveredRailIndex, setHoveredRailIndex] = useState<number | null>(null);
   const [isRailHovered, setIsRailHovered] = useState(false);
@@ -448,7 +453,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     setCurrentRailIndex(-1);
     currentRailIndexRef.current = -1;
     isNavigatingRef.current = false;
-    turnElsCacheRef.current = [];
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
     setHoveredRailIndex(null);
   }, [currentSession?.id]);
@@ -774,7 +778,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     setCurrentRailIndex(-1);
     currentRailIndexRef.current = -1;
     isNavigatingRef.current = false;
-    turnElsCacheRef.current = [];
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
     setHoveredRailIndex(null);
   }, [currentSession?.id]);
@@ -798,18 +801,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       isNavigatingRef.current = false;
     }, NAV_SCROLL_LOCK_DURATION);
 
-    // Try to scroll to the exact data-rail-index element if it's in the DOM
+    // Try to scroll to the exact data-rail-index element if it's mounted;
+    // otherwise let the virtualizer bring the target turn into view, which
+    // mounts the element, and refine to it on the next frames.
     const container = scrollContainerRef.current;
     if (container) {
       const el = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (targetTurnIdx >= 0) {
-        // Fallback: scroll to the turn element (always in DOM)
-        const turnEls = turnElsCacheRef.current;
-        if (targetTurnIdx < turnEls.length) {
-          turnEls[targetTurnIdx].scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        virtualizedTurnListRef.current?.scrollToTurn(targetTurnIdx);
       }
     }
 
@@ -902,6 +903,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // every streaming token (issue #141).
   const turns = useStableConversationTurns(rawTurns);
   const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
+  // Rail indices come from data, not DOM, so virtualized (unmounted) turns
+  // keep correct rail numbering.
+  const turnRailIndices = useMemo(() => buildTurnRailIndices(turns), [turns]);
 
   useSessionHistoryPagination({
     sessionId,
@@ -910,18 +914,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     rootRef: detailRootRef,
   });
   useInitialConversationPosition({ sessionId, rootRef: detailRootRef });
-
-  // Cache turn-level DOM elements (data-turn-index, always in DOM even for lazy turns)
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) {
-      turnElsCacheRef.current = [];
-      return;
-    }
-    turnElsCacheRef.current = Array.from(
-      container.querySelectorAll<HTMLElement>('[data-turn-index]'),
-    );
-  }, [turns]);
 
   // Sync rail index when turns change or rail first appears ((turns.length > 1) becomes true)
   useEffect(() => {
@@ -963,7 +955,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   }
 
   const renderConversationTurns = () => {
-    let railCounter = 0;
     if (turns.length === 0) {
       if (!isStreaming) return null;
       return (
@@ -984,38 +975,21 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       );
     }
 
-    return turns.map((turn, index) => {
+    const renderTurn = (turn: (typeof turns)[number], index: number) => {
       const isLastTurn = index === turns.length - 1;
       const hasActiveToolActivity = isStreaming && isLastTurn && toolActivities.length > 0;
       const showTypingIndicator =
         isStreaming && isLastTurn && !hasRenderableAssistantContent(turn) && !hasActiveToolActivity;
       const showAssistantBlock =
         turn.assistantItems.length > 0 || showTypingIndicator || hasActiveToolActivity;
-      // Compute rail indices for user/assistant messages (must match rail IIFE logic)
-      let asstContent = '';
-      for (const item of turn.assistantItems) {
-        if (item.type === 'assistant' && item.message?.content) {
-          asstContent += item.message.content;
-        }
-      }
-      const userRailIdx = turn.userMessage ? railCounter++ : -1;
-      const asstRailIdx = asstContent ? railCounter++ : -1;
+      // Rail indices are precomputed from data (virtualized turns may be unmounted)
+      const userRailIdx = turnRailIndices[index]?.user ?? -1;
+      const asstRailIdx = turnRailIndices[index]?.assistant ?? -1;
 
       const turnArtifacts = turnArtifactsMap.get(turn.id) ?? [];
 
       return (
-        // Off-screen history turns skip layout/paint via content-visibility
-        // while staying in the DOM, so rail navigation, export capture and
-        // pagination keep working (issue #141; interim step before full
-        // virtualization). The streaming tail is excluded to avoid layout
-        // churn on every token.
-        <div
-          key={turn.id}
-          data-turn-index={index}
-          style={
-            isLastTurn ? undefined : { contentVisibility: 'auto', containIntrinsicSize: 'auto 200px' }
-          }
-        >
+        <div key={turn.id} data-turn-index={index}>
           {turn.userMessage && (
             <div
               data-export-role="user-message"
@@ -1049,7 +1023,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           )}
         </div>
       );
-    });
+    };
+
+    return (
+      <VirtualizedTurnList
+        ref={virtualizedTurnListRef}
+        turns={turns}
+        renderTurn={renderTurn}
+        renderAll={isExportingImage}
+      />
+    );
   };
 
   return (
