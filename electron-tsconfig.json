@@ -18,5 +18,12 @@
     }
   },
   "include": ["src/main", "src/common", "src/shared"],
-  "exclude": ["src/**/*.test.*", "src/**/*.spec.*"]
+  "exclude": [
+    "src/**/*.test.*",
+    "src/**/*.spec.*",
+    // Renderer-only chat UI; never imported by the main process. Excluding
+    // it lets the renderer use extensionless dynamic imports that NodeNext
+    // resolution would otherwise reject.
+    "src/shared/components/ai-elements"
+  ]
 }
