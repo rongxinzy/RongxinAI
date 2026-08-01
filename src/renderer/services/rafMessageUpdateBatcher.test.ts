@@ -34,28 +34,28 @@ const update = (messageId: string, content: string): StreamMessageUpdate => ({
 });
 
 test('keeps the latest update for each message in the same frame', () => {
-  const applied: StreamMessageUpdate[] = [];
+  const applied: StreamMessageUpdate[][] = [];
   const frame = createScheduler();
-  const batcher = new RafMessageUpdateBatcher(item => applied.push(item), frame.scheduler);
+  const batcher = new RafMessageUpdateBatcher(batch => applied.push(batch), frame.scheduler);
 
   batcher.enqueue(update('thinking', 'partial'));
   batcher.enqueue(update('answer', 'answer'));
   batcher.enqueue(update('thinking', 'complete reasoning'));
   frame.runFrame();
 
-  expect(applied).toEqual([update('thinking', 'complete reasoning'), update('answer', 'answer')]);
+  expect(applied).toEqual([[update('thinking', 'complete reasoning'), update('answer', 'answer')]]);
 });
 
 test('discards a finalised message without dropping other pending messages', () => {
-  const applied: StreamMessageUpdate[] = [];
+  const applied: StreamMessageUpdate[][] = [];
   const frame = createScheduler();
-  const batcher = new RafMessageUpdateBatcher(item => applied.push(item), frame.scheduler);
+  const batcher = new RafMessageUpdateBatcher(batch => applied.push(batch), frame.scheduler);
 
   batcher.enqueue(update('thinking', 'stale'));
   batcher.enqueue(update('answer', 'current'));
   batcher.discard('session-1', 'thinking');
   frame.runFrame();
 
-  expect(applied).toEqual([update('answer', 'current')]);
+  expect(applied).toEqual([[update('answer', 'current')]]);
   expect(frame.wasCanceled()).toBe(false);
 });

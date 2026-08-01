@@ -158,6 +158,53 @@ const updateSessionSummary = (
   if (session) update(session);
 };
 
+type MessageContentUpdate = {
+  sessionId: string;
+  messageId: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+};
+
+/**
+ * Applies a streaming content delta to the streaming cache and the current
+ * session. Session summaries and unread state intentionally stay untouched:
+ * token-frequency updates must not invalidate the sidebar list (issue #141)
+ * — summaries refresh on message add / status change / completion instead.
+ */
+const applyMessageContentUpdate = (state: CoworkState, update: MessageContentUpdate): void => {
+  const { sessionId, messageId, content, metadata } = update;
+  const updatedAt = Date.now();
+
+  const streamingSession = state.streamingSessions[sessionId];
+  if (streamingSession) {
+    const messageIndex = streamingSession.messages.findIndex(m => m.id === messageId);
+    if (messageIndex !== -1) {
+      streamingSession.messages[messageIndex].content = content;
+      if (metadata) {
+        streamingSession.messages[messageIndex].metadata = {
+          ...streamingSession.messages[messageIndex].metadata,
+          ...metadata,
+        };
+      }
+      streamingSession.updatedAt = updatedAt;
+    }
+  }
+
+  if (state.currentSession?.id === sessionId) {
+    const messageIndex = state.currentSession.messages.findIndex(m => m.id === messageId);
+    if (messageIndex !== -1) {
+      state.currentSession.messages[messageIndex].content = content;
+      if (metadata) {
+        state.currentSession.messages[messageIndex].metadata = {
+          ...state.currentSession.messages[messageIndex].metadata,
+          ...metadata,
+        };
+      }
+      state.currentSession.updatedAt = updatedAt;
+    }
+  }
+};
+
 const retainUnreadSessionIds = (state: CoworkState): void => {
   const validSessionIds = new Set([
     ...state.sessions.map(session => session.id),
@@ -410,55 +457,18 @@ const coworkSlice = createSlice({
       state.currentSession.messagesOffset = newOffset;
     },
 
-    updateMessageContent(
-      state,
-      action: PayloadAction<{
-        sessionId: string;
-        messageId: string;
-        content: string;
-        metadata?: Record<string, unknown>;
-      }>,
-    ) {
-      const { sessionId, messageId, content, metadata } = action.payload;
-      const updatedAt = Date.now();
+    updateMessageContent(state, action: PayloadAction<MessageContentUpdate>) {
+      applyMessageContentUpdate(state, action.payload);
+    },
 
-      const streamingSession = state.streamingSessions[sessionId];
-      if (streamingSession) {
-        const messageIndex = streamingSession.messages.findIndex(m => m.id === messageId);
-        if (messageIndex !== -1) {
-          streamingSession.messages[messageIndex].content = content;
-          if (metadata) {
-            streamingSession.messages[messageIndex].metadata = {
-              ...streamingSession.messages[messageIndex].metadata,
-              ...metadata,
-            };
-          }
-          streamingSession.updatedAt = updatedAt;
-        }
+    /**
+     * Applies one RAF frame of stream deltas with a single store
+     * notification, instead of one reducer pass per message (issue #141).
+     */
+    updateMessageContents(state, action: PayloadAction<MessageContentUpdate[]>) {
+      for (const update of action.payload) {
+        applyMessageContentUpdate(state, update);
       }
-
-      if (state.currentSession?.id === sessionId) {
-        const messageIndex = state.currentSession.messages.findIndex(m => m.id === messageId);
-        if (messageIndex !== -1) {
-          state.currentSession.messages[messageIndex].content = content;
-          if (metadata) {
-            state.currentSession.messages[messageIndex].metadata = {
-              ...state.currentSession.messages[messageIndex].metadata,
-              ...metadata,
-            };
-          }
-          state.currentSession.updatedAt = updatedAt;
-        }
-      }
-
-      updateSessionSummary(state.sessions, sessionId, session => {
-        session.updatedAt = updatedAt;
-      });
-      updateSessionSummary(state.chatSessions, sessionId, session => {
-        session.updatedAt = updatedAt;
-      });
-
-      markSessionUnread(state, sessionId);
     },
 
     updateToolActivity(
@@ -624,6 +634,7 @@ export const {
   addMessage,
   prependMessages,
   updateMessageContent,
+  updateMessageContents,
   updateToolActivity,
   setRemoteManaged,
   updateSessionPinned,
