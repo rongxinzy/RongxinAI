@@ -58,7 +58,6 @@ import type {
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { getCompactFolderName } from '../../utils/path';
-import { ArtifactPanelFrame } from '../artifacts';
 import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon } from './components/StreamingBar';
@@ -82,6 +81,8 @@ import {
   buildDisplayItems,
   hasRenderableAssistantContent,
 } from './helpers/messageGrouping';
+import { useStableConversationTurns } from './helpers/useStableConversationTurns';
+import { useTurnArtifacts } from './helpers/useTurnArtifacts';
 // toolUtils helpers used in sub-components
 import {
   normalizeLocalPath,
@@ -93,6 +94,15 @@ import { useInitialConversationPosition } from './hooks/useInitialConversationPo
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
+
+// The artifact panel only mounts when the user opens it, so keep its code
+// (and the whole renderers tree behind it) out of the cowork startup chunk.
+const ArtifactPanelFrame = React.lazy(() =>
+  import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
+);
+
+/** Size-stable placeholder shown while the artifact panel chunk loads. */
+const artifactPanelFallback = <div className="h-full w-full animate-pulse bg-muted/30" />;
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
@@ -887,7 +897,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   });
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);
   const displayItems = useMemo(() => (messages ? buildDisplayItems(messages) : []), [messages]);
-  const turns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
+  const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
+  // Stabilize turn object identity so completed turns do not re-render on
+  // every streaming token (issue #141).
+  const turns = useStableConversationTurns(rawTurns);
+  const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
 
   useSessionHistoryPagination({
     sessionId,
@@ -987,20 +1001,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const userRailIdx = turn.userMessage ? railCounter++ : -1;
       const asstRailIdx = asstContent ? railCounter++ : -1;
 
-      const turnMessageIds = new Set<string>();
-      for (const item of turn.assistantItems) {
-        if (item.type === 'assistant' || item.type === 'system' || item.type === 'tool_result') {
-          turnMessageIds.add(item.message.id);
-        } else if (item.type === 'tool_group') {
-          turnMessageIds.add(item.group.toolUse.id);
-          if (item.group.toolResult) {
-            turnMessageIds.add(item.group.toolResult.id);
-          }
-        }
-      }
-      const turnArtifacts = sessionArtifacts.filter(
-        a => turnMessageIds.has(a.messageId) && PREVIEWABLE_ARTIFACT_TYPES.has(a.type),
-      );
+      const turnArtifacts = turnArtifactsMap.get(turn.id) ?? [];
 
       return (
         <div key={turn.id} data-turn-index={index}>
@@ -1495,15 +1496,17 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         </div>
         {shouldRenderArtifactPanel && (
           <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-            <ArtifactPanelFrame
-              artifacts={sessionArtifacts}
-              isOpen={isPanelOpen}
-              isVisible={isArtifactPanelVisible}
-              isTransitioning={isArtifactPanelTransitioning}
-              layoutMode={artifactLayoutMode}
-              minPanelWidth={MIN_PANEL_WIDTH}
-              maxPanelWidth={artifactPanelMaxWidth}
-            />
+            <React.Suspense fallback={artifactPanelFallback}>
+              <ArtifactPanelFrame
+                artifacts={sessionArtifacts}
+                isOpen={isPanelOpen}
+                isVisible={isArtifactPanelVisible}
+                isTransitioning={isArtifactPanelTransitioning}
+                layoutMode={artifactLayoutMode}
+                minPanelWidth={MIN_PANEL_WIDTH}
+                maxPanelWidth={artifactPanelMaxWidth}
+              />
+            </React.Suspense>
           </ArtifactPanelErrorBoundary>
         )}
       </div>

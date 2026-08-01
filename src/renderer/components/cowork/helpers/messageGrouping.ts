@@ -120,6 +120,63 @@ export const buildConversationTurns = (items: DisplayItem[]): ConversationTurn[]
   return turns;
 };
 
+// ── Incremental turn stabilization (issue #141) ──
+
+/**
+ * Reuses the previous assistant item when its payload is referentially
+ * unchanged, so memoized turn children can bail out during streaming.
+ */
+const reuseAssistantTurnItem = (
+  previous: AssistantTurnItem | undefined,
+  next: AssistantTurnItem,
+): AssistantTurnItem => {
+  if (!previous || previous.type !== next.type) return next;
+  if (next.type === 'tool_group') {
+    const previousGroup = (previous as Extract<AssistantTurnItem, { type: 'tool_group' }>).group;
+    return previousGroup.toolUse === next.group.toolUse &&
+      previousGroup.toolResult === next.group.toolResult
+      ? previous
+      : next;
+  }
+  return (previous as { message: CoworkMessage }).message ===
+    (next as { message: CoworkMessage }).message
+    ? previous
+    : next;
+};
+
+const reuseConversationTurn = (
+  previous: ConversationTurn | undefined,
+  next: ConversationTurn,
+): ConversationTurn => {
+  if (!previous || previous.userMessage !== next.userMessage) return next;
+  if (previous.assistantItems.length !== next.assistantItems.length) return next;
+  const items = next.assistantItems.map((item, index) =>
+    reuseAssistantTurnItem(previous.assistantItems[index], item),
+  );
+  const allReused = items.every((item, index) => item === previous.assistantItems[index]);
+  return allReused ? previous : { ...next, assistantItems: items };
+};
+
+/**
+ * Rebuilds the turn list while preserving object identity for every turn
+ * whose messages did not change. Streaming deltas only alter the active
+ * tail turn, so all completed turns keep stable references and memoized
+ * TurnBlock subtrees skip re-rendering entirely.
+ */
+export const stabilizeConversationTurns = (
+  previousTurns: ConversationTurn[],
+  nextTurns: ConversationTurn[],
+): ConversationTurn[] => {
+  const previousById = new Map(previousTurns.map(turn => [turn.id, turn]));
+  let allReused = previousTurns.length === nextTurns.length;
+  const stabilized = nextTurns.map(nextTurn => {
+    const turn = reuseConversationTurn(previousById.get(nextTurn.id), nextTurn);
+    if (turn !== previousById.get(nextTurn.id)) allReused = false;
+    return turn;
+  });
+  return allReused ? previousTurns : stabilized;
+};
+
 // ── Filter helpers ──
 
 export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
