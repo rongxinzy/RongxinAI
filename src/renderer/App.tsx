@@ -15,6 +15,7 @@ import {
 import type { ExpertTab } from './components/expert/ExpertView';
 import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/Settings';
+import { LazyChunkErrorBoundary } from './components/LazyChunkErrorBoundary';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
@@ -175,41 +176,43 @@ const App: React.FC = () => {
         themeService.initialize();
         mark('themeService done');
 
-        // Everything below only depends on configService.init and the steps
-        // are independent of each other, so run them in parallel instead of
-        // as a serial waterfall before the shell can show.
-        mark('enterprise/i18n/auth/models init begin');
-        const applyLocalConfig = async () => {
-          const config = configService.getConfig();
-          dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
-          const apiConfig: ApiConfig = {
-            apiKey: config.api.key,
-            baseUrl: config.api.baseUrl,
-          };
-          apiService.setConfig(apiConfig);
-
-          const resolvedModels = await collectAvailableModels(config);
-          if (resolvedModels.length > 0) {
-            dispatch(setAvailableModels(resolvedModels));
-            const allModels = store.getState().model.availableModels;
-            const preferredModel =
-              allModels.find(
-                model =>
-                  model.id === config.model.defaultModel &&
-                  (!config.model.defaultModelProvider ||
-                    model.providerKey === config.model.defaultModelProvider),
-              ) ?? allModels[0];
-            dispatch(setDefaultSelectedModel(preferredModel));
-          }
-        };
+        // Enterprise/i18n/auth only depend on configService.init and are
+        // independent of each other, so run them in parallel. Model
+        // resolution must run AFTER authService.init: it reads the merged
+        // model list (including server models) to pick the configured
+        // default, and racing it against setServerModels can pin a local
+        // model for logged-in users.
+        mark('enterprise/i18n/auth init begin');
         const [entConfig] = await Promise.all([
           window.electron.enterprise.getConfig(),
           waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
           authService.init(),
-          applyLocalConfig(),
         ]);
         setEnterpriseConfig(entConfig);
-        mark('enterprise/i18n/auth/models init done');
+        mark('enterprise/i18n/auth init done');
+
+        const config = configService.getConfig();
+        dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
+        const apiConfig: ApiConfig = {
+          apiKey: config.api.key,
+          baseUrl: config.api.baseUrl,
+        };
+        apiService.setConfig(apiConfig);
+
+        const resolvedModels = await collectAvailableModels(config);
+        if (resolvedModels.length > 0) {
+          dispatch(setAvailableModels(resolvedModels));
+          const allModels = store.getState().model.availableModels;
+          const preferredModel =
+            allModels.find(
+              model =>
+                model.id === config.model.defaultModel &&
+                (!config.model.defaultModelProvider ||
+                  model.providerKey === config.model.defaultModelProvider),
+            ) ?? allModels[0];
+          dispatch(setDefaultSelectedModel(preferredModel));
+        }
+        mark('model resolution done');
 
         setIsInitialized(true);
         mark('shell ready');
@@ -709,14 +712,16 @@ const App: React.FC = () => {
             </div>
           </div>
           {showSettings && (
-            <React.Suspense fallback={null}>
-              <Settings
-                onClose={handleCloseSettings}
-                initialTab={settingsOptions.initialTab}
-                notice={settingsOptions.notice}
-                enterpriseConfig={enterpriseConfig}
-              />
-            </React.Suspense>
+            <LazyChunkErrorBoundary>
+              <React.Suspense fallback={null}>
+                <Settings
+                  onClose={handleCloseSettings}
+                  initialTab={settingsOptions.initialTab}
+                  notice={settingsOptions.notice}
+                  enterpriseConfig={enterpriseConfig}
+                />
+              </React.Suspense>
+            </LazyChunkErrorBoundary>
           )}
         </div>
       </div>
@@ -755,85 +760,91 @@ const App: React.FC = () => {
                   }
                 >
                   {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
-                  <React.Suspense fallback={null}>
-                    <LocalInferenceView
+                  <LazyChunkErrorBoundary>
+                    <React.Suspense fallback={null}>
+                      <LocalInferenceView
+                        isSidebarCollapsed={isSidebarCollapsed}
+                        isVisible={mainView === 'localInference'}
+                        onToggleSidebar={handleToggleSidebar}
+                        onNewChat={handleNewChat}
+                        updateBadge={null}
+                      />
+                    </React.Suspense>
+                  </LazyChunkErrorBoundary>
+                </div>
+              )}
+              <LazyChunkErrorBoundary>
+                <React.Suspense fallback={lazyViewFallback}>
+                  {mainView === 'skills' ? (
+                    <SkillsView
                       isSidebarCollapsed={isSidebarCollapsed}
-                      isVisible={mainView === 'localInference'}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      onCreateSkillByChat={handleCreateSkillByChat}
+                      onTrySkill={handleTrySkill}
+                      updateBadge={null}
+                      readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                    />
+                  ) : mainView === 'scheduledTasks' ? (
+                    <ScheduledTasksView
+                      isSidebarCollapsed={isSidebarCollapsed}
                       onToggleSidebar={handleToggleSidebar}
                       onNewChat={handleNewChat}
                       updateBadge={null}
                     />
-                  </React.Suspense>
-                </div>
-              )}
-              <React.Suspense fallback={lazyViewFallback}>
-                {mainView === 'skills' ? (
-                  <SkillsView
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    onToggleSidebar={handleToggleSidebar}
-                    onNewChat={handleNewChat}
-                    onCreateSkillByChat={handleCreateSkillByChat}
-                    onTrySkill={handleTrySkill}
-                    updateBadge={null}
-                    readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                  />
-                ) : mainView === 'scheduledTasks' ? (
-                  <ScheduledTasksView
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    onToggleSidebar={handleToggleSidebar}
-                    onNewChat={handleNewChat}
-                    updateBadge={null}
-                  />
-                ) : mainView === 'mcp' ? (
-                  <McpView
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    onToggleSidebar={handleToggleSidebar}
-                    onNewChat={handleNewChat}
-                    onUseMcp={handleTryMcp}
-                    updateBadge={null}
-                    openRegistryId={mcpOpenRegistryId}
-                    openMarketplace={mcpOpenMarketplace}
-                  />
-                ) : mainView === 'expert' ? (
-                  <ExpertView
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    onToggleSidebar={handleToggleSidebar}
-                    onNewChat={handleNewChat}
-                    updateBadge={null}
-                    readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                    onCreateSkillByChat={handleCreateSkillByChat}
-                    onTrySkill={handleTrySkill}
-                    onUseMcp={handleTryMcp}
-                    initialTab={expertInitialTab}
-                  />
-                ) : mainView === 'localInference' ? null : (
-                  <CoworkView
-                    onRequestAppSettings={handleShowSettings}
-                    onShowSkills={handleShowSkills}
-                    onShowConnectors={handleShowMcpMarketplace}
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    onToggleSidebar={handleToggleSidebar}
-                    onNewChat={handleNewChat}
-                    updateBadge={null}
-                    inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
-                    onRespondToInlineQuestion={handlePermissionResponse}
-                  />
-                )}
-              </React.Suspense>
+                  ) : mainView === 'mcp' ? (
+                    <McpView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      onUseMcp={handleTryMcp}
+                      updateBadge={null}
+                      openRegistryId={mcpOpenRegistryId}
+                      openMarketplace={mcpOpenMarketplace}
+                    />
+                  ) : mainView === 'expert' ? (
+                    <ExpertView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                      readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                      onCreateSkillByChat={handleCreateSkillByChat}
+                      onTrySkill={handleTrySkill}
+                      onUseMcp={handleTryMcp}
+                      initialTab={expertInitialTab}
+                    />
+                  ) : mainView === 'localInference' ? null : (
+                    <CoworkView
+                      onRequestAppSettings={handleShowSettings}
+                      onShowSkills={handleShowSkills}
+                      onShowConnectors={handleShowMcpMarketplace}
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                      inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
+                      onRespondToInlineQuestion={handlePermissionResponse}
+                    />
+                  )}
+                </React.Suspense>
+              </LazyChunkErrorBoundary>
             </div>
           </div>
         </div>
 
         {/* 设置窗口显示在所有主内容之上，但不影响主界面的交互 */}
         {showSettings && (
-          <React.Suspense fallback={null}>
-            <Settings
-              onClose={handleCloseSettings}
-              initialTab={settingsOptions.initialTab}
-              notice={settingsOptions.notice}
-              enterpriseConfig={enterpriseConfig}
-            />
-          </React.Suspense>
+          <LazyChunkErrorBoundary>
+            <React.Suspense fallback={null}>
+              <Settings
+                onClose={handleCloseSettings}
+                initialTab={settingsOptions.initialTab}
+                notice={settingsOptions.notice}
+                enterpriseConfig={enterpriseConfig}
+              />
+            </React.Suspense>
+          </LazyChunkErrorBoundary>
         )}
         {permissionModal}
       </div>
