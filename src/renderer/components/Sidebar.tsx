@@ -46,6 +46,7 @@ import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
 import Modal from './common/Modal';
 import LoginButton from './LoginButton';
+import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import { SidebarNavigationControls, type SidebarActiveView } from './SidebarNavigationControls';
 
 interface SidebarProps {
@@ -63,6 +64,8 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   updateEntry?: React.ReactNode;
   hideLogin?: boolean;
+  /** Warms the lazily loaded chunk for a view on hover/focus intent. */
+  onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
 
 const DEFAULT_SIDEBAR_WIDTH = 244;
@@ -81,6 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   updateEntry,
   hideLogin,
+  onPrefetchView,
 }) => {
   const dispatch = useDispatch();
   const currentAgentId = useSelector((state: RootState) => state.agent.currentAgentId);
@@ -522,6 +526,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowScheduledTasks={onShowScheduledTasks}
               onWorkModeChange={handleWorkModeChange}
               workMode={workMode}
+              onPrefetchView={onPrefetchView}
             />
           </div>
           <div className="relative flex min-h-0 flex-1 flex-col">
@@ -696,7 +701,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => onShowSettings()}
                   onMouseEnter={() => {
                     if (!prefersReducedMotion) settingsIconRef.current?.startAnimation();
+                    onPrefetchView?.('settings');
                   }}
+                  onFocus={() => onPrefetchView?.('settings')}
                   onMouseLeave={() => settingsIconRef.current?.stopAnimation()}
                   className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
                   aria-label={i18nService.t('settings')}

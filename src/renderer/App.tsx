@@ -15,6 +15,7 @@ import {
 import type { ExpertTab } from './components/expert/ExpertView';
 import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/Settings';
+import { prefetchFeatureView } from './components/featureViewPrefetch';
 import { LazyChunkErrorBoundary } from './components/LazyChunkErrorBoundary';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
@@ -748,6 +749,7 @@ const App: React.FC = () => {
             onToggleCollapse={handleToggleSidebar}
             updateEntry={!isSidebarCollapsed ? updateEntry : null}
             hideLogin={true}
+            onPrefetchView={prefetchFeatureView}
           />
           <div
             className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
