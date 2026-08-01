@@ -1,6 +1,7 @@
 import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
+import type { ChannelRunSummary } from '../../shared/channelRun/constants';
 import type { NvidiaSmiSnapshot } from '../../shared/hardware';
 import type {
   CoworkPermissionMode,
@@ -374,7 +375,10 @@ interface IElectronAPI {
       pinned: boolean;
     }) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     delete: (id: string) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
-      download: (source: string, options?: { iconUrl?: string; displayName?: string }) => Promise<{
+    download: (
+      source: string,
+      options?: { iconUrl?: string; displayName?: string },
+    ) => Promise<{
       success: boolean;
       skills?: Skill[];
       error?: string;
@@ -387,7 +391,9 @@ interface IElectronAPI {
       action: string,
     ) => Promise<{ success: boolean; skills?: Skill[]; error?: string }>;
     getRoot: () => Promise<{ success: boolean; path?: string; error?: string }>;
-    getContent: (skillId: string) => Promise<{ success: boolean; content?: string; error?: string }>;
+    getContent: (
+      skillId: string,
+    ) => Promise<{ success: boolean; content?: string; error?: string }>;
     autoRoutingPrompt: () => Promise<{ success: boolean; prompt?: string | null; error?: string }>;
     getConfig: (
       skillId: string,
@@ -400,15 +406,15 @@ interface IElectronAPI {
       skillId: string,
       config: Record<string, string>,
     ) => Promise<{ success: boolean; result?: EmailConnectivityTestResult; error?: string }>;
-      fetchMarketplace: (options?: {
-        pageNumber?: number;
-        pageSize?: number;
-      }) => Promise<{ success: boolean; data?: string; error?: string }>;
-      fetchMarketplaceContent: (skillId: string) => Promise<{
-        success: boolean;
-        content?: string | null;
-        error?: string;
-      }>;
+    fetchMarketplace: (options?: {
+      pageNumber?: number;
+      pageSize?: number;
+    }) => Promise<{ success: boolean; data?: string; error?: string }>;
+    fetchMarketplaceContent: (skillId: string) => Promise<{
+      success: boolean;
+      content?: string | null;
+      error?: string;
+    }>;
     onChanged: (callback: () => void) => () => void;
   };
   mcp: {
@@ -434,7 +440,9 @@ interface IElectronAPI {
       error?: string;
     }>;
     refreshBridge: () => Promise<{ success: boolean; tools: number; error?: string }>;
-    authorize: (data: any) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
+    authorize: (
+      data: any,
+    ) => Promise<{ success: boolean; servers?: McpServerConfigIPC[]; error?: string }>;
     cancelAuthorize: (requestId: string) => Promise<{ success: boolean }>;
     getFeishuCliStatus: () => Promise<{ success: boolean; installed: boolean; error?: string }>;
     prepareFeishuCli: () => Promise<{ success: boolean; error?: string }>;
@@ -505,9 +513,7 @@ interface IElectronAPI {
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;
     importModelFiles: (paths: string[]) => Promise<LlamaCppImportModelFilesResult>;
-    deleteModel: (
-      name: string,
-    ) => Promise<{
+    deleteModel: (name: string) => Promise<{
       success: boolean;
       deleted?: boolean;
       reason?: 'not-local-file' | 'not-app-managed';
@@ -593,9 +599,7 @@ interface IElectronAPI {
       },
     ) => Promise<Agent>;
     delete: (id: string) => Promise<boolean>;
-    importExpertPackage: (
-      expertDir: string,
-    ) => Promise<{
+    importExpertPackage: (expertDir: string) => Promise<{
       success: boolean;
       agentIds?: string[];
       expertType?: string;
@@ -619,7 +623,10 @@ interface IElectronAPI {
   api: {
     webSearch: (input: { query: string; maxResults?: number; requestId?: string }) => Promise<{
       ok: boolean;
-      data?: { query: string; results: Array<{ title: string; url: string; snippet: string; content?: string }> };
+      data?: {
+        query: string;
+        results: Array<{ title: string; url: string; snippet: string; content?: string }>;
+      };
       error?: string;
     }>;
     fetch: (options: {
@@ -712,10 +719,7 @@ interface IElectronAPI {
       workspaces?: import('../../shared/workspace').Workspace[];
       error?: string;
     }>;
-    ensureWorkspace: (options: {
-      path: string;
-      name?: string;
-    }) => Promise<{
+    ensureWorkspace: (options: { path: string; name?: string }) => Promise<{
       success: boolean;
       workspace?: import('../../shared/workspace').Workspace;
       error?: string;
@@ -728,9 +732,7 @@ interface IElectronAPI {
       workspace?: import('../../shared/workspace').Workspace;
       error?: string;
     }>;
-    deleteWorkspace: (
-      id: string,
-    ) => Promise<{
+    deleteWorkspace: (id: string) => Promise<{
       success: boolean;
       deletedSessionIds?: string[];
       error?: string;
@@ -919,10 +921,7 @@ interface IElectronAPI {
   };
   project: {
     getDefaultBaseDir: () => Promise<{ success: boolean; path: string | null; error?: string }>;
-    createDirectory: (options: {
-      name: string;
-      baseDir?: string;
-    }) => Promise<{
+    createDirectory: (options: { name: string; baseDir?: string }) => Promise<{
       success: boolean;
       path: string | null;
       code?: 'invalid-name' | 'already-exists';
@@ -1346,6 +1345,10 @@ interface IElectronAPI {
       | { loggedIn: true; email: string | null; accountId: string | null; expiresAt: number }
       | { loggedIn: false }
     >;
+  };
+
+  channelRun: {
+    onRunEvent: (callback: (summary: ChannelRunSummary) => void) => () => void;
   };
 }
 

@@ -4,6 +4,7 @@ import type { CoworkError } from '../common/coworkError';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
+import { ChannelRunIpc, type ChannelRunSummary } from '../shared/channelRun/constants';
 import {
   ApiIpc,
   AppConfigIpc,
@@ -811,5 +812,11 @@ contextBridge.exposeInMainWorld('electron', {
     cancel: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Cancel),
     logout: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Logout),
     status: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Status),
+  },
+
+  // Read-only Channel/Cron run lifecycle projection (issue #225)
+  channelRun: {
+    onRunEvent: (callback: (summary: ChannelRunSummary) => void) =>
+      onPush(ChannelRunIpc.RunEvent, callback),
   },
 });
