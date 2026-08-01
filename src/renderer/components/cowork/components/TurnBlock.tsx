@@ -19,7 +19,7 @@ import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity'
 import { i18nService } from '../../../services/i18n';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
-import { ArtifactPreviewCard } from '../../artifacts';
+import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
 import {
   ExecutionStatusKind,
   getCompletedExecutionSummaryText,
@@ -38,7 +38,7 @@ import { ExecutionSummary } from './ExecutionSummary';
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
 
-export const TurnBlock: React.FC<{
+const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
   artifacts?: Artifact[];
   resolveLocalFilePath?: (href: string, text: string) => string | null;
@@ -393,3 +393,7 @@ export const TurnBlock: React.FC<{
     </div>
   );
 };
+
+// Memo boundary: with stabilized turn references, completed turns skip
+// re-rendering entirely while the streaming tail updates (issue #141).
+export const TurnBlock = React.memo(TurnBlockComponent);
