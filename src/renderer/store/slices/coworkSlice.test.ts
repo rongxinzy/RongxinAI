@@ -18,6 +18,7 @@ import coworkReducer, {
   setChatSessions,
   setSessions,
   updateCurrentSessionModelOverride,
+  updateMessageContents,
   updateToolActivity,
   updateSessionStatus,
 } from './coworkSlice';
@@ -147,10 +148,7 @@ test('chat sessions use the chat cache without invalidating work sessions', () =
 });
 
 test('refreshing chat sessions keeps the work session array stable', () => {
-  const workState = coworkReducer(
-    undefined,
-    setSessions([makeSession({ id: 'work-session-1' })]),
-  );
+  const workState = coworkReducer(undefined, setSessions([makeSession({ id: 'work-session-1' })]));
   const chatState = coworkReducer(
     workState,
     setChatSessions([makeSession({ id: 'chat-session-1', mode: 'chat' })]),
@@ -414,4 +412,34 @@ test('clears transient tool activities when a session stops running', () => {
   );
 
   expect(completedState.toolActivitiesBySession['session-1']).toBeUndefined();
+});
+
+test('applies a batched stream frame without touching summaries or unread state', () => {
+  const session = makeSession({
+    id: 'session-1',
+    status: CoworkSessionStatusValue.Running,
+    updatedAt: 5,
+    messages: [
+      { id: 'thinking', type: 'assistant', content: 'partial thinking', timestamp: 2 },
+      { id: 'answer', type: 'assistant', content: 'partial answer', timestamp: 3 },
+    ],
+  });
+  const withSession = coworkReducer(undefined, addSession(session));
+  const unreadBefore = withSession.unreadSessionIds;
+
+  const updated = coworkReducer(
+    withSession,
+    updateMessageContents([
+      { sessionId: 'session-1', messageId: 'thinking', content: 'full thinking' },
+      { sessionId: 'session-1', messageId: 'answer', content: 'full answer' },
+    ]),
+  );
+
+  expect(updated.currentSession?.messages.map(message => message.content)).toEqual([
+    'full thinking',
+    'full answer',
+  ]);
+  // Token-frequency deltas must not invalidate the sidebar summary list (issue #141).
+  expect(updated.sessions[0]?.updatedAt).toBe(5);
+  expect(updated.unreadSessionIds).toBe(unreadBefore);
 });

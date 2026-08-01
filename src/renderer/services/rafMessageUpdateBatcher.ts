@@ -27,7 +27,7 @@ export class RafMessageUpdateBatcher {
   private readonly pending = new Map<string, StreamMessageUpdate>();
 
   constructor(
-    private readonly applyUpdate: (update: StreamMessageUpdate) => void,
+    private readonly applyUpdates: (updates: StreamMessageUpdate[]) => void,
     private readonly scheduler: AnimationFrameScheduler = browserAnimationFrameScheduler,
   ) {}
 
@@ -53,7 +53,9 @@ export class RafMessageUpdateBatcher {
     }
     const updates = Array.from(this.pending.values());
     this.pending.clear();
-    updates.forEach(this.applyUpdate);
+    if (updates.length > 0) {
+      this.applyUpdates(updates);
+    }
   }
 
   dispose(): void {

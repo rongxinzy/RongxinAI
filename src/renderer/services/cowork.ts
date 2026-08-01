@@ -30,7 +30,7 @@ import {
   setHasMoreSessions,
   setRemoteManaged,
   setSessions,
-  updateMessageContent,
+  updateMessageContents,
   updateToolActivity,
   updateSessionPinned,
   updateSessionStatus,
@@ -167,8 +167,8 @@ class CoworkService {
 
     // Keep the latest update per message for the next frame. Thinking and answer
     // messages can be finalized back-to-back, so a single pending slot loses one.
-    const updateBatcher = new RafMessageUpdateBatcher(update => {
-      store.dispatch(updateMessageContent(update));
+    const updateBatcher = new RafMessageUpdateBatcher(updates => {
+      store.dispatch(updateMessageContents(updates));
     });
     const messageUpdateCleanup = cowork.onStreamMessageUpdate(update => {
       updateBatcher.enqueue(update);

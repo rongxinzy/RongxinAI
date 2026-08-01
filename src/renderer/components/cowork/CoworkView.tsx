@@ -36,6 +36,7 @@ import {
   clearCurrentSession,
   setCurrentSession,
   updateMessageContent,
+  updateMessageContents,
   updateSessionStatus,
 } from '../../store/slices/coworkSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
@@ -111,9 +112,13 @@ const isDirectChatContextData = (value: unknown): value is DirectChatContextData
     outputTokens >= 0 &&
     usedTokens >= 0 &&
     (cacheReadTokens === undefined ||
-      (typeof cacheReadTokens === 'number' && Number.isFinite(cacheReadTokens) && cacheReadTokens >= 0)) &&
+      (typeof cacheReadTokens === 'number' &&
+        Number.isFinite(cacheReadTokens) &&
+        cacheReadTokens >= 0)) &&
     (cacheWriteTokens === undefined ||
-      (typeof cacheWriteTokens === 'number' && Number.isFinite(cacheWriteTokens) && cacheWriteTokens >= 0))
+      (typeof cacheWriteTokens === 'number' &&
+        Number.isFinite(cacheWriteTokens) &&
+        cacheWriteTokens >= 0))
   );
 };
 
@@ -132,8 +137,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const contentBatcherRef = useRef<RafMessageUpdateBatcher | null>(null);
   if (!contentBatcherRef.current) {
-    contentBatcherRef.current = new RafMessageUpdateBatcher(update => {
-      dispatch(updateMessageContent(update));
+    contentBatcherRef.current = new RafMessageUpdateBatcher(updates => {
+      dispatch(updateMessageContents(updates));
     });
   }
   const contentBatcher = contentBatcherRef.current;
@@ -449,7 +454,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                       ...(isCompleted && { isFinalAnswer: true }),
                     },
                   },
-              ]
+                ]
               : []),
           ]);
           return {
@@ -896,7 +901,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     ...(isCompleted && { isFinalAnswer: true }),
                   },
                 },
-            ]
+              ]
             : []),
         ]);
         return {
