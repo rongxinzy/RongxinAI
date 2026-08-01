@@ -1,11 +1,11 @@
 /**
  * Pi Runtime Adapter
  *
- * Implements CoworkRuntime using the Pi SDK (in-process).
+ * Implements the Pi-native PiRuntime interface using the Pi SDK (in-process).
  * Pi is an embeddable agent loop library — no subprocess, no HTTP, just import.
  *
  * Architecture:
- *   startSession    → createAgentSession() → session.subscribe() → emit CoworkRuntimeEvents
+ *   startSession    → createAgentSession() → session.subscribe() → emit PiRuntimeEvents
  *   continueSession → session.prompt()
  *   stopSession     → session.abort()
  *
@@ -22,7 +22,6 @@ import * as os from 'os';
 import path from 'path';
 
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
-import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import {
@@ -71,12 +70,13 @@ import {
   toToolActivityInput,
 } from './toolActivity';
 import type {
-  CoworkContinueOptions,
-  CoworkRuntime,
-  CoworkRuntimeEvents,
-  CoworkStartOptions,
-  PermissionResult,
-} from './types';
+  PiContinueOptions,
+  PiPermissionResult,
+  PiRuntime,
+  PiRuntimeEvents,
+  PiSessionPatch,
+  PiStartOptions,
+} from './piRuntimeTypes';
 
 // ── Types ──
 
@@ -88,11 +88,13 @@ interface PiSession {
   abortBash(): void;
   reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
-  getContextUsage?(): {
-    tokens: number | null;
-    contextWindow: number;
-    percent: number | null;
-  } | undefined;
+  getContextUsage?():
+    | {
+        tokens: number | null;
+        contextWindow: number;
+        percent: number | null;
+      }
+    | undefined;
   subscribe(listener: (event: PiEvent) => void): () => void;
 }
 
@@ -309,7 +311,7 @@ const haveSameStringList = (left: string[] | undefined, right: string[] | undefi
 // tools won't emit escape sequences without this env var.
 if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 
-export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
+export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
   private readonly approvalSessionMap = new Map<string, string>();
   private readonly pendingAskUserQuestions = new Map<
@@ -351,19 +353,13 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   >();
   private readonly pendingStoreUpdateTimer = new Map<string, ReturnType<typeof setTimeout>>();
 
-  // ── CoworkRuntime.on/off ──
+  // ── PiRuntime.on/off ──
 
-  override on<U extends keyof CoworkRuntimeEvents>(
-    event: U,
-    listener: CoworkRuntimeEvents[U],
-  ): this {
+  override on<U extends keyof PiRuntimeEvents>(event: U, listener: PiRuntimeEvents[U]): this {
     return super.on(event, listener);
   }
 
-  override off<U extends keyof CoworkRuntimeEvents>(
-    event: U,
-    listener: CoworkRuntimeEvents[U],
-  ): this {
+  override off<U extends keyof PiRuntimeEvents>(event: U, listener: PiRuntimeEvents[U]): this {
     return super.off(event, listener);
   }
 
@@ -372,7 +368,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   async startSession(
     sessionId: string,
     prompt: string,
-    options: CoworkStartOptions = {},
+    options: PiStartOptions = {},
   ): Promise<void> {
     const hasContent =
       prompt.trim() || (options.imageAttachments && options.imageAttachments.length > 0);
@@ -634,7 +630,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
   async continueSession(
     sessionId: string,
     prompt: string,
-    options: CoworkContinueOptions = {},
+    options: PiContinueOptions = {},
   ): Promise<void> {
     const active = this.activeSessions.get(sessionId);
     if (!active || active.aborted) {
@@ -771,7 +767,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     }
   }
 
-  async patchSession(sessionId: string, patch: OpenClawSessionPatch): Promise<void> {
+  async patchSession(sessionId: string, patch: PiSessionPatch): Promise<void> {
     const active = this.activeSessions.get(sessionId);
     if (!active || !patch.model) return;
 
@@ -837,7 +833,7 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
     }
   }
 
-  respondToPermission(requestId: string, result: PermissionResult): void {
+  respondToPermission(requestId: string, result: PiPermissionResult): void {
     const pendingQuestion = this.pendingAskUserQuestions.get(requestId);
     if (pendingQuestion) {
       this.finishAskUserQuestion(requestId, {
@@ -1085,7 +1081,12 @@ export class PiRuntimeAdapter extends EventEmitter implements CoworkRuntime {
             this.finalizeMessage(sessionId, active, 'answer', finalAnswer);
             active.lastCompletedAnswerMessageId = active.assistantMessageId;
             active.lastCompletedAnswerText = finalAnswer;
-            this.scheduleContextUsageSync(sessionId, active.assistantMessageId, event.message.usage, event.message.model);
+            this.scheduleContextUsageSync(
+              sessionId,
+              active.assistantMessageId,
+              event.message.usage,
+              event.message.model,
+            );
           }
 
           // Turn's segments are done; next turn starts fresh messages.

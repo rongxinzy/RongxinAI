@@ -9,8 +9,15 @@ const readSource = (relativePath: string): string =>
 const mainSource = readSource('../../main.ts');
 const coworkViewSource = readSource('../../../renderer/components/cowork/CoworkView.tsx');
 const coworkServiceSource = readSource('../../../renderer/services/cowork.ts');
+const piRuntimeAdapterSource = readSource('./piRuntimeAdapter.ts');
 
 describe('Work/Chat runtime isolation', () => {
+  test('Pi workbench runtime does not implement the OpenClaw CoworkRuntime glue', () => {
+    expect(piRuntimeAdapterSource).not.toContain("from './types'");
+    expect(piRuntimeAdapterSource).not.toContain('CoworkRuntime');
+    expect(piRuntimeAdapterSource).toContain('implements PiRuntime');
+  });
+
   test('projects only Pi runtime events into cowork streams', () => {
     expect(mainSource).toContain('forwardPiWorkbenchRuntimeToRenderer(getPiRuntimeAdapter())');
     expect(mainSource).not.toContain(
