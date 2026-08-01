@@ -1,3 +1,4 @@
+import { Button } from '@shared/components/ui/button';
 import {
   Terminal,
   TerminalActions,
@@ -22,6 +23,7 @@ import React, { useMemo } from 'react';
 import { i18nService } from '../../../services/i18n';
 import DiffView, { extractDiffFromToolInput } from '../DiffView';
 import type { ToolGroupItem } from '../helpers/messageGrouping';
+import { usePersistentToggle } from '../hooks/usePersistentToggle';
 import type { ParsedTodoItem } from '../helpers/toolUtils';
 import {
   formatToolInput,
@@ -71,7 +73,9 @@ export const ToolCard: React.FC<{
   isLastInSequence?: boolean;
   muted?: boolean;
   mapDisplayText?: (value: string) => string;
-}> = ({ group, isLastInSequence = true, muted = false, mapDisplayText }) => {
+  /** Bypass the collapsed-result preview (e.g. image export capture). */
+  forceExpand?: boolean;
+}> = ({ group, isLastInSequence = true, muted = false, mapDisplayText, forceExpand = false }) => {
   const { toolUse, toolResult } = group;
   const rawToolName =
     typeof toolUse.metadata?.toolName === 'string' ? toolUse.metadata.toolName : 'Tool';
@@ -98,15 +102,19 @@ export const ToolCard: React.FC<{
       : ('output-available' as const)
     : ('input-available' as const);
   const toolResultDisplay = toolResult ? mapText(getToolResultDisplay(toolResult)) : '';
-  const [isResultExpanded, setIsResultExpanded] = React.useState(false);
+  // Expansion persists across virtualization unmounts and export remounts.
+  const [isResultExpanded, setIsResultExpanded] = usePersistentToggle(
+    `toolresult-${toolUse.id}`,
+    false,
+  );
   const isResultCollapsible = useMemo(() => {
     if (isError || !toolResultDisplay) return false;
     return toolResultDisplay.split('\n').length > TOOL_RESULT_COLLAPSE_LINE_LIMIT;
   }, [isError, toolResultDisplay]);
   const visibleResultDisplay = useMemo(() => {
-    if (!isResultCollapsible || isResultExpanded) return toolResultDisplay;
+    if (!isResultCollapsible || isResultExpanded || forceExpand) return toolResultDisplay;
     return toolResultDisplay.split('\n').slice(0, TOOL_RESULT_COLLAPSE_LINE_LIMIT).join('\n');
-  }, [isResultCollapsible, isResultExpanded, toolResultDisplay]);
+  }, [isResultCollapsible, isResultExpanded, forceExpand, toolResultDisplay]);
   // Terminal preserves ANSI codes.  Pi runs bash via spawn + pipe (no TTY), so
   // commands won't auto-color.  We force the prompt to cyan, matching the
   // official ai-elements Terminal example (`[36m$`).
@@ -167,11 +175,14 @@ export const ToolCard: React.FC<{
                     : undefined
                 }
               />
-              {isResultCollapsible && (
-                <button
+              {isResultCollapsible && !forceExpand && (
+                <Button
                   type="button"
-                  onClick={() => setIsResultExpanded(expanded => !expanded)}
-                  className="inline-flex items-center gap-1 self-start text-xs text-muted-foreground transition-colors hover:text-foreground"
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded={isResultExpanded}
+                  onClick={() => setIsResultExpanded(!isResultExpanded)}
+                  className="inline-flex items-center gap-1 self-start text-xs text-muted-foreground"
                 >
                   <ChevronDown
                     className={cn(
@@ -182,7 +193,7 @@ export const ToolCard: React.FC<{
                   {isResultExpanded
                     ? i18nService.t('coworkToolResultCollapse')
                     : i18nService.t('coworkToolResultShowAll')}
-                </button>
+                </Button>
               )}
             </>
           )}
