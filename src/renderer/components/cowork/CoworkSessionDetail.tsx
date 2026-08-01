@@ -1004,7 +1004,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       const turnArtifacts = turnArtifactsMap.get(turn.id) ?? [];
 
       return (
-        <div key={turn.id} data-turn-index={index}>
+        // Off-screen history turns skip layout/paint via content-visibility
+        // while staying in the DOM, so rail navigation, export capture and
+        // pagination keep working (issue #141; interim step before full
+        // virtualization). The streaming tail is excluded to avoid layout
+        // churn on every token.
+        <div
+          key={turn.id}
+          data-turn-index={index}
+          style={
+            isLastTurn ? undefined : { contentVisibility: 'auto', containIntrinsicSize: 'auto 200px' }
+          }
+        >
           {turn.userMessage && (
             <div
               data-export-role="user-message"
