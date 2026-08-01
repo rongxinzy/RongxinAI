@@ -3,10 +3,7 @@ import {
   ChainOfThoughtContent,
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
-import {
-  ReasoningContent,
-  ReasoningTrigger,
-} from '@shared/components/ai-elements/reasoning';
+import { ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
@@ -47,6 +44,8 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons?: boolean;
   isTurnComplete?: boolean;
   toolActivities?: CoworkToolActivity[];
+  /** Expand long tool results fully (image export capture). */
+  expandToolResults?: boolean;
 }> = ({
   turn,
   artifacts,
@@ -56,6 +55,7 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons = true,
   isTurnComplete = true,
   toolActivities = [],
+  expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
@@ -182,6 +182,7 @@ const TurnBlockComponent: React.FC<{
           isLastInSequence={isLastInSequence}
           muted={mutedExecution}
           mapDisplayText={mapDisplayText}
+          forceExpand={expandToolResults}
         />
       );
     }

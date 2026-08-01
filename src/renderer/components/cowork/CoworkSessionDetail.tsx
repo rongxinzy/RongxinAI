@@ -58,6 +58,7 @@ import type {
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { getCompactFolderName } from '../../utils/path';
+import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
 import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon } from './components/StreamingBar';
@@ -105,9 +106,6 @@ import AskUserQuestionCard from './AskUserQuestionCard';
 const ArtifactPanelFrame = React.lazy(() =>
   import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
 );
-
-/** Size-stable placeholder shown while the artifact panel chunk loads. */
-const artifactPanelFallback = <div className="h-full w-full animate-pulse bg-muted/30" />;
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
@@ -1027,6 +1025,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 toolActivities={isLastTurn ? toolActivities : undefined}
                 showCopyButtons={!isStreaming || !isLastTurn}
                 isTurnComplete={!isStreaming || !isLastTurn}
+                expandToolResults={isExportingImage}
               />
             </div>
           )}
@@ -1499,7 +1498,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         </div>
         {shouldRenderArtifactPanel && (
           <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-            <React.Suspense fallback={artifactPanelFallback}>
+            <React.Suspense fallback={<ArtifactPanelFallback />}>
               <ArtifactPanelFrame
                 artifacts={sessionArtifacts}
                 isOpen={isPanelOpen}
