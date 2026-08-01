@@ -762,7 +762,7 @@ const App: React.FC = () => {
                   }
                 >
                   {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
-                  <LazyChunkErrorBoundary>
+                  <LazyChunkErrorBoundary resetKey={mainView}>
                     <React.Suspense fallback={null}>
                       <LocalInferenceView
                         isSidebarCollapsed={isSidebarCollapsed}
@@ -775,7 +775,7 @@ const App: React.FC = () => {
                   </LazyChunkErrorBoundary>
                 </div>
               )}
-              <LazyChunkErrorBoundary>
+              <LazyChunkErrorBoundary resetKey={mainView}>
                 <React.Suspense fallback={lazyViewFallback}>
                   {mainView === 'skills' ? (
                     <SkillsView
