@@ -9,7 +9,7 @@ type GatewayClientLike = {
 };
 
 export interface CronJobServiceDeps {
-  getOpenClawRuntimeAdapter: () => {
+  getOpenClawChannelGateway: () => {
     getGatewayClient: () => GatewayClientLike | null;
     ensureReady: () => Promise<void>;
     onGatewayDisconnect: (callback: (reason: string) => void) => () => void;
@@ -31,7 +31,7 @@ export function getCronJobService(): CronJobService {
         'CronJobServiceManager not initialized. Call initCronJobServiceManager() first.',
       );
     }
-    const adapter = deps.getOpenClawRuntimeAdapter();
+    const adapter = deps.getOpenClawChannelGateway();
     if (!adapter) {
       throw new Error(
         'OpenClaw runtime adapter not initialized. CronJobService requires OpenClaw.',

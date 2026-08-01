@@ -13,7 +13,7 @@ test('forwards gateway lifecycle events to the cron job service', () => {
   let reconnectCallback: (() => void) | null = null;
 
   initCronJobServiceManager({
-    getOpenClawRuntimeAdapter: () => ({
+    getOpenClawChannelGateway: () => ({
       getGatewayClient: () => null,
       ensureReady: async () => {},
       onGatewayDisconnect: callback => {

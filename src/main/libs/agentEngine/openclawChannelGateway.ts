@@ -137,7 +137,7 @@ type GatewayClientLike = {
 
 type GatewayClientCtor = new (options: Record<string, unknown>) => GatewayClientLike;
 
-type OpenClawRuntimeAdapterOptions = {
+type OpenClawChannelGatewayOptions = {
   normalizeModelRef?: (modelRef: string) => string;
   isModelAvailableForSession?: (modelRef: string) => { available: boolean; message?: string };
   getModelContextWindow?: (modelRef: string) => number | undefined;
@@ -890,10 +890,18 @@ const waitWithTimeout = async (promise: Promise<void>, timeoutMs: number): Promi
   }
 };
 
-export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntime {
+/**
+ * OpenClaw Channel/Cron domain gateway (issue #225).
+ *
+ * This class is the OpenClaw-side glue for Channel sessions, IM handlers,
+ * Cron jobs and Gateway lifecycle. `CoworkRuntime` remains its internal
+ * integration interface only — the Pi workbench never implements or
+ * references it (see piRuntimeTypes.ts).
+ */
+export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntime {
   private readonly store: CoworkStore;
   private readonly engineManager: OpenClawEngineManager;
-  private readonly options: OpenClawRuntimeAdapterOptions;
+  private readonly options: OpenClawChannelGatewayOptions;
   private readonly activeTurns = new Map<string, ActiveTurn>();
   private readonly sessionIdBySessionKey = new Map<string, string>();
   private readonly sessionIdByRunId = new Map<string, string>();
@@ -1138,7 +1146,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   constructor(
     store: CoworkStore,
     engineManager: OpenClawEngineManager,
-    options: OpenClawRuntimeAdapterOptions = {},
+    options: OpenClawChannelGatewayOptions = {},
   ) {
     super();
     this.store = store;
@@ -1197,7 +1205,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         'chat.history',
         {
           sessionKey,
-          limit: OpenClawRuntimeAdapter.FULL_HISTORY_SYNC_LIMIT,
+          limit: OpenClawChannelGateway.FULL_HISTORY_SYNC_LIMIT,
         },
         { timeoutMs: 10_000 },
       );
@@ -1439,7 +1447,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     void this.pollChannelSessions();
     this.channelPollingTimer = setInterval(() => {
       void this.pollChannelSessions();
-    }, OpenClawRuntimeAdapter.CHANNEL_POLL_INTERVAL_MS);
+    }, OpenClawChannelGateway.CHANNEL_POLL_INTERVAL_MS);
   }
 
   stopChannelPolling(): void {
@@ -2592,7 +2600,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
       }
     }
 
-    while (this.recentlyClosedRunIds.size > OpenClawRuntimeAdapter.RECENTLY_CLOSED_RUN_ID_LIMIT) {
+    while (this.recentlyClosedRunIds.size > OpenClawChannelGateway.RECENTLY_CLOSED_RUN_ID_LIMIT) {
       const oldestRunId = this.recentlyClosedRunIds.keys().next().value as string | undefined;
       if (!oldestRunId) return;
       this.recentlyClosedRunIds.delete(oldestRunId);
@@ -2605,7 +2613,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const now = Date.now();
     this.recentlyClosedRunIds.set(
       normalizedRunId,
-      now + OpenClawRuntimeAdapter.RECENTLY_CLOSED_RUN_ID_TTL_MS,
+      now + OpenClawChannelGateway.RECENTLY_CLOSED_RUN_ID_TTL_MS,
     );
     this.pruneRecentlyClosedRunIds(now);
   }
@@ -2640,7 +2648,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const lastEmit = this.lastMessageUpdateEmitTime.get(messageId) ?? 0;
     const elapsed = now - lastEmit;
 
-    if (elapsed >= OpenClawRuntimeAdapter.MESSAGE_UPDATE_THROTTLE_MS) {
+    if (elapsed >= OpenClawChannelGateway.MESSAGE_UPDATE_THROTTLE_MS) {
       this.clearPendingMessageUpdate(messageId);
       this.lastMessageUpdateEmitTime.set(messageId, now);
       this.emit('messageUpdate', sessionId, messageId, content);
@@ -2655,7 +2663,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         this.pendingMessageUpdateTimer.delete(messageId);
         this.lastMessageUpdateEmitTime.set(messageId, Date.now());
         this.emit('messageUpdate', sessionId, messageId, content);
-      }, OpenClawRuntimeAdapter.MESSAGE_UPDATE_THROTTLE_MS - elapsed),
+      }, OpenClawChannelGateway.MESSAGE_UPDATE_THROTTLE_MS - elapsed),
     );
   }
 
@@ -2682,7 +2690,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const lastUpdate = this.lastStoreUpdateTime.get(messageId) ?? 0;
     const elapsed = now - lastUpdate;
 
-    if (elapsed >= OpenClawRuntimeAdapter.STORE_UPDATE_THROTTLE_MS) {
+    if (elapsed >= OpenClawChannelGateway.STORE_UPDATE_THROTTLE_MS) {
       this.clearPendingStoreUpdate(messageId);
       this.lastStoreUpdateTime.set(messageId, now);
       this.store.updateMessage(sessionId, messageId, { content, metadata });
@@ -2701,7 +2709,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
         if (activeTurn?.assistantMessageId === messageId) {
           this.store.updateMessage(sessionId, messageId, { content, metadata });
         }
-      }, OpenClawRuntimeAdapter.STORE_UPDATE_THROTTLE_MS - elapsed),
+      }, OpenClawChannelGateway.STORE_UPDATE_THROTTLE_MS - elapsed),
     );
   }
 
@@ -2734,7 +2742,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     console.log('[TickWatchdog] started');
     this.tickWatchdogTimer = setInterval(() => {
       this.checkTickHealth();
-    }, OpenClawRuntimeAdapter.TICK_WATCHDOG_INTERVAL_MS);
+    }, OpenClawChannelGateway.TICK_WATCHDOG_INTERVAL_MS);
   }
 
   private stopTickWatchdog(): void {
@@ -2747,10 +2755,10 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   private checkTickHealth(): void {
     if (this.lastTickTimestamp <= 0) return;
     const elapsed = Date.now() - this.lastTickTimestamp;
-    if (elapsed <= OpenClawRuntimeAdapter.TICK_TIMEOUT_MS) return;
+    if (elapsed <= OpenClawChannelGateway.TICK_TIMEOUT_MS) return;
 
     console.warn(
-      `[TickWatchdog] no tick received for ${Math.round(elapsed / 1000)}s (threshold: ${OpenClawRuntimeAdapter.TICK_TIMEOUT_MS / 1000}s) — connection is likely dead, triggering reconnect`,
+      `[TickWatchdog] no tick received for ${Math.round(elapsed / 1000)}s (threshold: ${OpenClawChannelGateway.TICK_TIMEOUT_MS / 1000}s) — connection is likely dead, triggering reconnect`,
     );
     this.cancelGatewayReconnect();
     this.stopGatewayClient();
@@ -2783,21 +2791,21 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
    * Called from onClose when the connection drops unexpectedly after a successful handshake.
    */
   private scheduleGatewayReconnect(): void {
-    if (this.gatewayReconnectAttempt >= OpenClawRuntimeAdapter.GATEWAY_RECONNECT_MAX_ATTEMPTS) {
+    if (this.gatewayReconnectAttempt >= OpenClawChannelGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS) {
       console.error(
         '[GatewayReconnect] max attempts reached (' +
-          OpenClawRuntimeAdapter.GATEWAY_RECONNECT_MAX_ATTEMPTS +
+          OpenClawChannelGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS +
           '), giving up. Restart the app to reconnect.',
       );
       return;
     }
 
-    const delays = OpenClawRuntimeAdapter.GATEWAY_RECONNECT_DELAYS;
+    const delays = OpenClawChannelGateway.GATEWAY_RECONNECT_DELAYS;
     const delay = delays[Math.min(this.gatewayReconnectAttempt, delays.length - 1)];
     this.gatewayReconnectAttempt++;
 
     console.log(
-      `[GatewayReconnect] scheduling reconnect attempt ${this.gatewayReconnectAttempt}/${OpenClawRuntimeAdapter.GATEWAY_RECONNECT_MAX_ATTEMPTS} in ${delay}ms`,
+      `[GatewayReconnect] scheduling reconnect attempt ${this.gatewayReconnectAttempt}/${OpenClawChannelGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS} in ${delay}ms`,
     );
 
     this.gatewayReconnectTimer = setTimeout(() => {
@@ -4917,7 +4925,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     }
 
     const limit = options?.isFullSync
-      ? OpenClawRuntimeAdapter.FULL_HISTORY_SYNC_LIMIT
+      ? OpenClawChannelGateway.FULL_HISTORY_SYNC_LIMIT
       : FINAL_HISTORY_SYNC_LIMIT;
 
     try {
@@ -5766,7 +5774,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
     const turn = this.activeTurns.get(sessionId);
     if (!turn) return;
     const timeoutMs =
-      this.agentTimeoutSeconds * 1000 + OpenClawRuntimeAdapter.CLIENT_TIMEOUT_GRACE_MS;
+      this.agentTimeoutSeconds * 1000 + OpenClawChannelGateway.CLIENT_TIMEOUT_GRACE_MS;
     turn.timeoutTimer = setTimeout(() => {
       const currentTurn = this.activeTurns.get(sessionId);
       if (!currentTurn || currentTurn.turnToken !== turn.turnToken) return;
@@ -5840,7 +5848,7 @@ export class OpenClawRuntimeAdapter extends EventEmitter implements CoworkRuntim
   private isSessionInStopCooldown(sessionId: string): boolean {
     const stoppedAt = this.stoppedSessions.get(sessionId);
     if (stoppedAt === undefined) return false;
-    if (Date.now() - stoppedAt < OpenClawRuntimeAdapter.STOP_COOLDOWN_MS) {
+    if (Date.now() - stoppedAt < OpenClawChannelGateway.STOP_COOLDOWN_MS) {
       return true;
     }
     // Cooldown expired, remove the entry

@@ -75,7 +75,7 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 
 - Window lifecycle management
 - SQLite storage via `better-sqlite3` (`src/main/sqliteStore.ts`)
-- Agent engine routing (`src/main/libs/agentEngine/coworkEngineRouter.ts`) - dispatches to `openclawRuntimeAdapter.ts` (OpenClaw)
+- Agent engines (`src/main/libs/agentEngine/`) - `piRuntimeAdapter.ts` is the sole Work/Chat execution runtime; `openclawChannelGateway.ts` (OpenClawChannelGateway) is the OpenClaw Channel/Cron domain glue, the only place that still implements the internal `CoworkRuntime` interface
 - llama.cpp lifecycle and local inference management (`src/main/libs/llamacppManager.ts`, `src/shared/llamacpp/`)
 - Skill management (`src/main/skillManager.ts`)
 - MCP server configuration and marketplace integration
@@ -104,8 +104,10 @@ src/main/
 ├── im/                  # IM/email gateway integrations
 └── libs/
     ├── agentEngine/
-    │   ├── coworkEngineRouter.ts    # Routes to OpenClaw runtime
-    │   └── openclawRuntimeAdapter.ts # OpenClaw gateway adapter
+    │   ├── piRuntimeAdapter.ts      # Pi runtime — sole Work/Chat execution kernel
+    │   ├── piRuntimeTypes.ts        # Pi-native runtime/event/approval types
+    │   ├── openclawChannelGateway.ts # OpenClaw Channel/Cron domain gateway
+    │   └── types.ts                 # CoworkRuntime glue (OpenClaw-internal only)
     ├── openclawEngineManager.ts # OpenClaw runtime lifecycle (install/start/status)
     ├── openclawConfigSync.ts    # Syncs cowork config → OpenClaw config files
     ├── llamacppManager.ts       # llama.cpp service lifecycle and configuration
@@ -141,8 +143,8 @@ SKILLs/                  # Custom skill definitions for cowork sessions
 ### Data Flow
 
 1. **Initialization**: `src/renderer/App.tsx` → `coworkService.init()` → loads config/sessions via IPC → sets up stream listeners
-2. **Cowork Session**: User sends prompt → `coworkService.startSession()` → IPC to main → `CoworkEngineRouter` → OpenClaw gateway (primary) → streaming events back to renderer via IPC → Redux updates
-3. **Tool Permissions**: Agent requests tool use → `CoworkEngineRouter` emits `permissionRequest` → UI shows `CoworkPermissionModal` → user approves/denies → result sent back to engine
+2. **Cowork Session**: User sends prompt → `coworkService.startSession()` → IPC to main → `PiRuntimeAdapter` → streaming events back to renderer via IPC → Redux updates
+3. **Tool Permissions**: Agent requests tool use → `PiRuntimeAdapter` emits `permissionRequest` → UI shows `CoworkPermissionModal` → user approves/denies → result sent back to engine
 4. **Persistence**: Cowork sessions stored in SQLite (`cowork_sessions`, `cowork_messages` tables)
 5. **Local Inference**: Renderer invokes llama.cpp IPC → main process manages `llama-server`, model install/list/load state, and service/model launch parameters
 
@@ -157,9 +159,10 @@ The Cowork feature provides AI-assisted coding sessions:
 
 **Agent Engine** (configured via `agentEngine` in cowork config):
 
-- `openclaw` - OpenClaw gateway (`openclawRuntimeAdapter.ts`); requires the bundled OpenClaw runtime to be running. Engine lifecycle managed by `OpenClawEngineManager` with states: `not_installed → ready → starting → running | error`
+- `pi` - Pi in-process runtime (`piRuntimeAdapter.ts`); the only engine used for Work/Chat sessions.
+- `openclaw` - OpenClaw Channel/Cron gateway (`openclawChannelGateway.ts`); requires the bundled OpenClaw runtime to be running. Engine lifecycle managed by `OpenClawEngineManager` with states: `not_installed → ready → starting → running | error`
 
-The `CoworkEngineRouter` exposes stream events to the renderer, which is engine-agnostic. Engine-specific IPC: `openclaw:engine:*` channels manage runtime lifecycle separately from `cowork:*` session channels.
+The Pi runtime forwards stream events to the renderer (`cowork:stream:*` carries Pi workbench sessions only). Engine-specific IPC: `openclaw:engine:*` channels manage the OpenClaw Channel/Cron runtime lifecycle separately from `cowork:*` session channels.
 
 **Memory System**: File-based persistent memory stored in the OpenClaw working directory:
 

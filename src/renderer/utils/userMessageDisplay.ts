@@ -4,7 +4,7 @@
  * DISPLAY ONLY — does not affect what is sent to the AI model.
  *
  * NOTE: Some stripping (e.g. stripFeishuSystemHeader) already happens server-side
- * in openclawRuntimeAdapter.ts before the message is stored. This means some messages
+ * in openclawChannelGateway.ts before the message is stored. This means some messages
  * arrive here already partially stripped (e.g. Feishu messages may be just a bare path).
  */
 
