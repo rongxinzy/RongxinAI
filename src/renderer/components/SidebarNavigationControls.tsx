@@ -1,10 +1,14 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
+import { Activity } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
+import { useSelector } from 'react-redux';
 
 import { i18nService } from '../services/i18n';
+import type { RootState } from '../store';
+import { selectHasActiveChannelRun } from '../store/selectors/activitySelectors';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import {
@@ -28,6 +32,7 @@ export type SidebarActiveView =
   | 'cowork'
   | 'skills'
   | 'scheduledTasks'
+  | 'activity'
   | 'mcp'
   | 'localInference'
   | 'expert';
@@ -38,6 +43,7 @@ interface SidebarNavigationControlsProps {
   onShowExpert: () => void;
   onShowLocalInference: () => void;
   onShowScheduledTasks: () => void;
+  onShowActivity: () => void;
   onWorkModeChange: (checked: boolean) => void;
   workMode: WorkMode;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
@@ -54,10 +60,12 @@ export const SidebarNavigationControls = ({
   onShowExpert,
   onShowLocalInference,
   onShowScheduledTasks,
+  onShowActivity,
   onWorkModeChange,
   workMode,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
+  const hasActiveChannelRun = useSelector((state: RootState) => selectHasActiveChannelRun(state));
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
@@ -157,6 +165,28 @@ export const SidebarNavigationControls = ({
         >
           <SidebarAnimatedAlarmClockIcon ref={scheduledTasksIconRef} />
           {i18nService.t('scheduledTasks')}
+        </Button>
+      )}
+      {workMode !== WorkMode.Chat && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onShowActivity}
+          onMouseEnter={() => onPrefetchView?.('activity')}
+          onFocus={() => onPrefetchView?.('activity')}
+          className={
+            activeView === 'activity' ? activeSidebarNavItemClassName : sidebarNavItemClassName
+          }
+          aria-current={activeView === 'activity' ? 'page' : undefined}
+        >
+          <Activity className="size-4" />
+          {i18nService.t('activityTitle')}
+          {hasActiveChannelRun && (
+            <span
+              className="ml-auto size-1.5 rounded-full bg-primary motion-safe:animate-pulse"
+              aria-hidden="true"
+            />
+          )}
         </Button>
       )}
       {workMode !== WorkMode.Chat && (
