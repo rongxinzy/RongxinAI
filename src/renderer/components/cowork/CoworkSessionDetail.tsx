@@ -58,6 +58,7 @@ import type {
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { getCompactFolderName } from '../../utils/path';
+import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
 import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon } from './components/StreamingBar';
@@ -105,9 +106,6 @@ import AskUserQuestionCard from './AskUserQuestionCard';
 const ArtifactPanelFrame = React.lazy(() =>
   import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
 );
-
-/** Size-stable placeholder shown while the artifact panel chunk loads. */
-const artifactPanelFallback = <div className="h-full w-full animate-pulse bg-muted/30" />;
 
 interface CoworkSessionDetailProps {
   onManageSkills?: () => void;
@@ -802,8 +800,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }, NAV_SCROLL_LOCK_DURATION);
 
     // Try to scroll to the exact data-rail-index element if it's mounted;
-    // otherwise let the virtualizer bring the target turn into view, which
-    // mounts the element, and refine to it on the next frames.
+    // otherwise let the virtualizer bring the target turn into view, then
+    // refine to the exact block once it mounts.
     const container = scrollContainerRef.current;
     if (container) {
       const el = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
@@ -811,6 +809,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else if (targetTurnIdx >= 0) {
         virtualizedTurnListRef.current?.scrollToTurn(targetTurnIdx);
+        const refine = (attemptsLeft: number) => {
+          const target = container.querySelector<HTMLElement>(`[data-rail-index="${railIndex}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else if (attemptsLeft > 0) {
+            window.requestAnimationFrame(() => refine(attemptsLeft - 1));
+          }
+        };
+        window.requestAnimationFrame(() => refine(30));
       }
     }
 
@@ -1018,6 +1025,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 toolActivities={isLastTurn ? toolActivities : undefined}
                 showCopyButtons={!isStreaming || !isLastTurn}
                 isTurnComplete={!isStreaming || !isLastTurn}
+                expandToolResults={isExportingImage}
               />
             </div>
           )}
@@ -1490,7 +1498,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         </div>
         {shouldRenderArtifactPanel && (
           <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
-            <React.Suspense fallback={artifactPanelFallback}>
+            <React.Suspense fallback={<ArtifactPanelFallback />}>
               <ArtifactPanelFrame
                 artifacts={sessionArtifacts}
                 isOpen={isPanelOpen}

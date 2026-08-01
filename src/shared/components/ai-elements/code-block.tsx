@@ -134,19 +134,24 @@ const LANGUAGE_ALIASES: Record<string, BundledLanguage> = {
   pyt: 'python',
 };
 
-// Language ids are tiny metadata, safe to keep eager; the Shiki core and
-// grammars load on first highlight instead (issue #141).
-const BUNDLED_LANGUAGE_IDS = new Set(bundledLanguagesInfo.map(info => info.id));
+// Language ids and aliases are tiny metadata, safe to keep eager; the
+// Shiki core and grammars load on first highlight instead (issue #141).
+// Aliases (js, ts, py, bash, …) resolve to their canonical grammar id,
+// matching the previous bundledLanguages key lookup.
+const LANGUAGE_ID_BY_ALIAS = new Map<string, BundledLanguage>();
+for (const info of bundledLanguagesInfo) {
+  LANGUAGE_ID_BY_ALIAS.set(info.id, info.id as BundledLanguage);
+  for (const alias of info.aliases ?? []) {
+    LANGUAGE_ID_BY_ALIAS.set(alias, info.id as BundledLanguage);
+  }
+}
 
 /** Normalize transient or unsupported Markdown language labels before Shiki loads them. */
 export const normalizeCodeLanguage = (language: string): BundledLanguage | null => {
   const normalized = language.trim().toLowerCase();
   const alias = LANGUAGE_ALIASES[normalized];
   if (alias) return alias;
-  if (BUNDLED_LANGUAGE_IDS.has(normalized as BundledLanguage)) {
-    return normalized as BundledLanguage;
-  }
-  return null;
+  return LANGUAGE_ID_BY_ALIAS.get(normalized) ?? null;
 };
 
 const getTokensCacheKey = (code: string, language: string) => {

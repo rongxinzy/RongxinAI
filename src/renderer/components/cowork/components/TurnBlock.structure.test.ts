@@ -7,9 +7,9 @@ const source = readFileSync(fileURLToPath(new URL('./TurnBlock.tsx', import.meta
 
 test('keeps execution groups and nested thinking collapsed by default', () => {
   expect(source).toMatch(
-    /<ChainOfThought\s+key=\{`\$\{groupKey\}-\$\{showCompletedSummary \? 'summarized' : 'working'\}`\}\s+defaultOpen=\{false\}/,
+    /<PersistentChainOfThought\s+key=\{`\$\{groupKey\}-\$\{showCompletedSummary \? 'summarized' : 'working'\}`\}\s+persistKey=\{`cot-\$\{turn\.id\}-\$\{groupKey\}`\}\s+defaultOpen=\{false\}/,
   );
-  expect(source).toMatch(/<Reasoning[\s\S]*?defaultOpen=\{false\}/);
+  expect(source).toMatch(/<PersistentReasoning[\s\S]*?defaultOpen=\{false\}/);
 });
 
 test('shows completed execution counts only after an answer follows the group', () => {
