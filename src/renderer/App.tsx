@@ -12,14 +12,11 @@ import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
-import ExpertView, { type ExpertTab } from './components/expert/ExpertView';
-import { LocalInferenceView } from './components/localInference';
-import { McpView } from './components/mcp';
+import type { ExpertTab } from './components/expert/ExpertView';
 import type { McpRegistryId } from './components/mcp/constants';
-import { ScheduledTasksView } from './components/scheduledTasks';
-import Settings, { type SettingsOpenOptions } from './components/Settings';
+import type { SettingsOpenOptions } from './components/Settings';
+import { LazyChunkErrorBoundary } from './components/LazyChunkErrorBoundary';
 import Sidebar from './components/Sidebar';
-import { SkillsView } from './components/skills';
 import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
@@ -52,6 +49,39 @@ import type { CoworkPermissionResult } from './types/cowork';
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
 const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
 const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
+
+// Feature areas outside the default cowork view are code-split so they stay
+// out of the initial preload graph (see issue #141).
+const Settings = React.lazy(() => import('./components/Settings'));
+const SkillsView = React.lazy(() =>
+  import('./components/skills').then(module => ({ default: module.SkillsView })),
+);
+const ScheduledTasksView = React.lazy(() =>
+  import('./components/scheduledTasks').then(module => ({ default: module.ScheduledTasksView })),
+);
+const McpView = React.lazy(() =>
+  import('./components/mcp').then(module => ({ default: module.McpView })),
+);
+const LocalInferenceView = React.lazy(() =>
+  import('./components/localInference').then(module => ({ default: module.LocalInferenceView })),
+);
+const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
+
+/**
+ * Full-area fallback shown while a lazily loaded feature chunk downloads.
+ * Content-shaped skeleton blocks with a soft staggered pulse communicate
+ * "view is loading" and keep the layout stable when the real view mounts.
+ */
+const lazyViewFallback = (
+  <div className="flex h-full min-h-0 flex-col gap-4 p-6">
+    <div className="h-9 w-48 animate-pulse rounded-lg bg-muted/40" />
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="h-28 animate-pulse rounded-xl bg-muted/30" />
+      <div className="h-28 animate-pulse rounded-xl bg-muted/30 [animation-delay:150ms]" />
+      <div className="h-28 animate-pulse rounded-xl bg-muted/30 [animation-delay:300ms]" />
+    </div>
+  </div>
+);
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -143,22 +173,25 @@ const App: React.FC = () => {
         await waitWithTimeout(configService.init(), initTimeoutMs, 'configService.init');
         mark('configService.init done');
 
-        const entConfig = await window.electron.enterprise.getConfig();
-        setEnterpriseConfig(entConfig);
-        mark('enterprise.getConfig done');
-
         themeService.initialize();
         mark('themeService done');
 
-        mark('i18nService.initialize begin');
-        await waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize');
-        mark('i18nService.initialize done');
+        // Enterprise/i18n/auth only depend on configService.init and are
+        // independent of each other, so run them in parallel. Model
+        // resolution must run AFTER authService.init: it reads the merged
+        // model list (including server models) to pick the configured
+        // default, and racing it against setServerModels can pin a local
+        // model for logged-in users.
+        mark('enterprise/i18n/auth init begin');
+        const [entConfig] = await Promise.all([
+          window.electron.enterprise.getConfig(),
+          waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
+          authService.init(),
+        ]);
+        setEnterpriseConfig(entConfig);
+        mark('enterprise/i18n/auth init done');
 
-        mark('authService.init begin');
-        await authService.init();
-        mark('authService.init done');
-
-        const config = await configService.getConfig();
+        const config = configService.getConfig();
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
         const apiConfig: ApiConfig = {
           apiKey: config.api.key,
@@ -371,13 +404,16 @@ const App: React.FC = () => {
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
-  const handleTryMcp = useCallback((prompt?: string) => {
-    if (prompt?.trim()) {
-      dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
-    }
-    dispatch(setWorkMode(WorkMode.Work));
-    handleNewChat();
-  }, [dispatch, handleNewChat]);
+  const handleTryMcp = useCallback(
+    (prompt?: string) => {
+      if (prompt?.trim()) {
+        dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
+      }
+      dispatch(setWorkMode(WorkMode.Work));
+      handleNewChat();
+    },
+    [dispatch, handleNewChat],
+  );
 
   const handleCreateSkillByChat = useCallback(() => {
     dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
@@ -428,7 +464,6 @@ const App: React.FC = () => {
 
     const unsubscribe = window.electron.appUpdate.onStateChanged(state => {
       setAppUpdateState(state);
-
     });
 
     return () => {
@@ -623,7 +658,8 @@ const App: React.FC = () => {
   const isOverlayActive = showSettings || permissionModal !== null;
   const shouldShowUpdateBadge =
     updateInfo &&
-    (appUpdateState.status === AppUpdateStatus.Ready || appUpdateState.status === AppUpdateStatus.Error);
+    (appUpdateState.status === AppUpdateStatus.Ready ||
+      appUpdateState.status === AppUpdateStatus.Error);
   const updateEntry = shouldShowUpdateBadge ? (
     <AppUpdateBadge
       latestVersion={updateInfo.latestVersion}
@@ -676,12 +712,16 @@ const App: React.FC = () => {
             </div>
           </div>
           {showSettings && (
-            <Settings
-              onClose={handleCloseSettings}
-              initialTab={settingsOptions.initialTab}
-              notice={settingsOptions.notice}
-              enterpriseConfig={enterpriseConfig}
-            />
+            <LazyChunkErrorBoundary>
+              <React.Suspense fallback={null}>
+                <Settings
+                  onClose={handleCloseSettings}
+                  initialTab={settingsOptions.initialTab}
+                  notice={settingsOptions.notice}
+                  enterpriseConfig={enterpriseConfig}
+                />
+              </React.Suspense>
+            </LazyChunkErrorBoundary>
           )}
         </div>
       </div>
@@ -719,79 +759,92 @@ const App: React.FC = () => {
                     mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
                   }
                 >
-                  <LocalInferenceView
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    isVisible={mainView === 'localInference'}
-                    onToggleSidebar={handleToggleSidebar}
-                    onNewChat={handleNewChat}
-                    updateBadge={null}
-                  />
+                  {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
+                  <LazyChunkErrorBoundary resetKey={mainView}>
+                    <React.Suspense fallback={null}>
+                      <LocalInferenceView
+                        isSidebarCollapsed={isSidebarCollapsed}
+                        isVisible={mainView === 'localInference'}
+                        onToggleSidebar={handleToggleSidebar}
+                        onNewChat={handleNewChat}
+                        updateBadge={null}
+                      />
+                    </React.Suspense>
+                  </LazyChunkErrorBoundary>
                 </div>
               )}
-              {mainView === 'skills' ? (
-                <SkillsView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  onCreateSkillByChat={handleCreateSkillByChat}
-                  onTrySkill={handleTrySkill}
-                  updateBadge={null}
-                  readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                />
-              ) : mainView === 'scheduledTasks' ? (
-                <ScheduledTasksView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  updateBadge={null}
-                />
-              ) : mainView === 'mcp' ? (
-                <McpView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  onUseMcp={handleTryMcp}
-                  updateBadge={null}
-                  openRegistryId={mcpOpenRegistryId}
-                  openMarketplace={mcpOpenMarketplace}
-                />
-              ) : mainView === 'expert' ? (
-                <ExpertView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  updateBadge={null}
-                  readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                  onCreateSkillByChat={handleCreateSkillByChat}
-                  onTrySkill={handleTrySkill}
-                  onUseMcp={handleTryMcp}
-                  initialTab={expertInitialTab}
-                />
-              ) : mainView === 'localInference' ? null : (
-                <CoworkView
-                  onRequestAppSettings={handleShowSettings}
-                  onShowSkills={handleShowSkills}
-                  onShowConnectors={handleShowMcpMarketplace}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  updateBadge={null}
-                  inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
-                  onRespondToInlineQuestion={handlePermissionResponse}
-                />
-              )}
+              <LazyChunkErrorBoundary resetKey={mainView}>
+                <React.Suspense fallback={lazyViewFallback}>
+                  {mainView === 'skills' ? (
+                    <SkillsView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      onCreateSkillByChat={handleCreateSkillByChat}
+                      onTrySkill={handleTrySkill}
+                      updateBadge={null}
+                      readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                    />
+                  ) : mainView === 'scheduledTasks' ? (
+                    <ScheduledTasksView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                    />
+                  ) : mainView === 'mcp' ? (
+                    <McpView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      onUseMcp={handleTryMcp}
+                      updateBadge={null}
+                      openRegistryId={mcpOpenRegistryId}
+                      openMarketplace={mcpOpenMarketplace}
+                    />
+                  ) : mainView === 'expert' ? (
+                    <ExpertView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                      readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                      onCreateSkillByChat={handleCreateSkillByChat}
+                      onTrySkill={handleTrySkill}
+                      onUseMcp={handleTryMcp}
+                      initialTab={expertInitialTab}
+                    />
+                  ) : mainView === 'localInference' ? null : (
+                    <CoworkView
+                      onRequestAppSettings={handleShowSettings}
+                      onShowSkills={handleShowSkills}
+                      onShowConnectors={handleShowMcpMarketplace}
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                      inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
+                      onRespondToInlineQuestion={handlePermissionResponse}
+                    />
+                  )}
+                </React.Suspense>
+              </LazyChunkErrorBoundary>
             </div>
           </div>
         </div>
 
         {/* 设置窗口显示在所有主内容之上，但不影响主界面的交互 */}
         {showSettings && (
-          <Settings
-            onClose={handleCloseSettings}
-            initialTab={settingsOptions.initialTab}
-            notice={settingsOptions.notice}
-            enterpriseConfig={enterpriseConfig}
-          />
+          <LazyChunkErrorBoundary>
+            <React.Suspense fallback={null}>
+              <Settings
+                onClose={handleCloseSettings}
+                initialTab={settingsOptions.initialTab}
+                notice={settingsOptions.notice}
+                enterpriseConfig={enterpriseConfig}
+              />
+            </React.Suspense>
+          </LazyChunkErrorBoundary>
         )}
         {permissionModal}
       </div>

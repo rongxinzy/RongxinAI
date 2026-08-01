@@ -127,8 +127,11 @@ export default defineConfig(async () => ({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    sourcemap: true,
-    minify: false,
+    // Production packages ship minified JS without sourcemaps to keep the
+    // initial bundle small. Set VITE_RENDERER_SOURCEMAP=1 to emit maps for
+    // diagnostics builds only.
+    sourcemap: process.env.VITE_RENDERER_SOURCEMAP === '1',
+    minify: 'esbuild',
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
