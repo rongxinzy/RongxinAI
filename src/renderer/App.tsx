@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { Spinner } from '@shared/components/ui/spinner';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { MessageCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -12,14 +13,10 @@ import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
-import ExpertView, { type ExpertTab } from './components/expert/ExpertView';
-import { LocalInferenceView } from './components/localInference';
-import { McpView } from './components/mcp';
+import type { ExpertTab } from './components/expert/ExpertView';
 import type { McpRegistryId } from './components/mcp/constants';
-import { ScheduledTasksView } from './components/scheduledTasks';
-import Settings, { type SettingsOpenOptions } from './components/Settings';
+import type { SettingsOpenOptions } from './components/Settings';
 import Sidebar from './components/Sidebar';
-import { SkillsView } from './components/skills';
 import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
@@ -52,6 +49,30 @@ import type { CoworkPermissionResult } from './types/cowork';
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
 const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
 const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
+
+// Feature areas outside the default cowork view are code-split so they stay
+// out of the initial preload graph (see issue #141).
+const Settings = React.lazy(() => import('./components/Settings'));
+const SkillsView = React.lazy(() =>
+  import('./components/skills').then(module => ({ default: module.SkillsView })),
+);
+const ScheduledTasksView = React.lazy(() =>
+  import('./components/scheduledTasks').then(module => ({ default: module.ScheduledTasksView })),
+);
+const McpView = React.lazy(() =>
+  import('./components/mcp').then(module => ({ default: module.McpView })),
+);
+const LocalInferenceView = React.lazy(() =>
+  import('./components/localInference').then(module => ({ default: module.LocalInferenceView })),
+);
+const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
+
+/** Full-area fallback shown while a lazily loaded feature chunk downloads. */
+const lazyViewFallback = (
+  <div className="flex h-full min-h-0 items-center justify-center">
+    <Spinner className="size-6 text-muted-foreground" />
+  </div>
+);
 
 const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
@@ -143,43 +164,44 @@ const App: React.FC = () => {
         await waitWithTimeout(configService.init(), initTimeoutMs, 'configService.init');
         mark('configService.init done');
 
-        const entConfig = await window.electron.enterprise.getConfig();
-        setEnterpriseConfig(entConfig);
-        mark('enterprise.getConfig done');
-
         themeService.initialize();
         mark('themeService done');
 
-        mark('i18nService.initialize begin');
-        await waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize');
-        mark('i18nService.initialize done');
+        // Everything below only depends on configService.init and the steps
+        // are independent of each other, so run them in parallel instead of
+        // as a serial waterfall before the shell can show.
+        mark('enterprise/i18n/auth/models init begin');
+        const applyLocalConfig = async () => {
+          const config = configService.getConfig();
+          dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
+          const apiConfig: ApiConfig = {
+            apiKey: config.api.key,
+            baseUrl: config.api.baseUrl,
+          };
+          apiService.setConfig(apiConfig);
 
-        mark('authService.init begin');
-        await authService.init();
-        mark('authService.init done');
-
-        const config = await configService.getConfig();
-        dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
-        const apiConfig: ApiConfig = {
-          apiKey: config.api.key,
-          baseUrl: config.api.baseUrl,
+          const resolvedModels = await collectAvailableModels(config);
+          if (resolvedModels.length > 0) {
+            dispatch(setAvailableModels(resolvedModels));
+            const allModels = store.getState().model.availableModels;
+            const preferredModel =
+              allModels.find(
+                model =>
+                  model.id === config.model.defaultModel &&
+                  (!config.model.defaultModelProvider ||
+                    model.providerKey === config.model.defaultModelProvider),
+              ) ?? allModels[0];
+            dispatch(setDefaultSelectedModel(preferredModel));
+          }
         };
-        apiService.setConfig(apiConfig);
-
-        const resolvedModels = await collectAvailableModels(config);
-        if (resolvedModels.length > 0) {
-          dispatch(setAvailableModels(resolvedModels));
-          const allModels = store.getState().model.availableModels;
-          const preferredModel =
-            allModels.find(
-              model =>
-                model.id === config.model.defaultModel &&
-                (!config.model.defaultModelProvider ||
-                  model.providerKey === config.model.defaultModelProvider),
-            ) ?? allModels[0];
-          dispatch(setDefaultSelectedModel(preferredModel));
-        }
-        mark('model resolution done');
+        const [entConfig] = await Promise.all([
+          window.electron.enterprise.getConfig(),
+          waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
+          authService.init(),
+          applyLocalConfig(),
+        ]);
+        setEnterpriseConfig(entConfig);
+        mark('enterprise/i18n/auth/models init done');
 
         setIsInitialized(true);
         mark('shell ready');
@@ -371,13 +393,16 @@ const App: React.FC = () => {
     }, 0);
   }, [dispatch, mainView, currentSessionId]);
 
-  const handleTryMcp = useCallback((prompt?: string) => {
-    if (prompt?.trim()) {
-      dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
-    }
-    dispatch(setWorkMode(WorkMode.Work));
-    handleNewChat();
-  }, [dispatch, handleNewChat]);
+  const handleTryMcp = useCallback(
+    (prompt?: string) => {
+      if (prompt?.trim()) {
+        dispatch(setDraftPrompt({ sessionId: '__home__', draft: prompt }));
+      }
+      dispatch(setWorkMode(WorkMode.Work));
+      handleNewChat();
+    },
+    [dispatch, handleNewChat],
+  );
 
   const handleCreateSkillByChat = useCallback(() => {
     dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
@@ -428,7 +453,6 @@ const App: React.FC = () => {
 
     const unsubscribe = window.electron.appUpdate.onStateChanged(state => {
       setAppUpdateState(state);
-
     });
 
     return () => {
@@ -623,7 +647,8 @@ const App: React.FC = () => {
   const isOverlayActive = showSettings || permissionModal !== null;
   const shouldShowUpdateBadge =
     updateInfo &&
-    (appUpdateState.status === AppUpdateStatus.Ready || appUpdateState.status === AppUpdateStatus.Error);
+    (appUpdateState.status === AppUpdateStatus.Ready ||
+      appUpdateState.status === AppUpdateStatus.Error);
   const updateEntry = shouldShowUpdateBadge ? (
     <AppUpdateBadge
       latestVersion={updateInfo.latestVersion}
@@ -676,12 +701,14 @@ const App: React.FC = () => {
             </div>
           </div>
           {showSettings && (
-            <Settings
-              onClose={handleCloseSettings}
-              initialTab={settingsOptions.initialTab}
-              notice={settingsOptions.notice}
-              enterpriseConfig={enterpriseConfig}
-            />
+            <React.Suspense fallback={null}>
+              <Settings
+                onClose={handleCloseSettings}
+                initialTab={settingsOptions.initialTab}
+                notice={settingsOptions.notice}
+                enterpriseConfig={enterpriseConfig}
+              />
+            </React.Suspense>
           )}
         </div>
       </div>
@@ -719,79 +746,86 @@ const App: React.FC = () => {
                     mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
                   }
                 >
-                  <LocalInferenceView
+                  {/* Dedicated boundary so another view's lazy chunk loading never unmounts this keep-alive view. */}
+                  <React.Suspense fallback={null}>
+                    <LocalInferenceView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      isVisible={mainView === 'localInference'}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
+                    />
+                  </React.Suspense>
+                </div>
+              )}
+              <React.Suspense fallback={lazyViewFallback}>
+                {mainView === 'skills' ? (
+                  <SkillsView
                     isSidebarCollapsed={isSidebarCollapsed}
-                    isVisible={mainView === 'localInference'}
+                    onToggleSidebar={handleToggleSidebar}
+                    onNewChat={handleNewChat}
+                    onCreateSkillByChat={handleCreateSkillByChat}
+                    onTrySkill={handleTrySkill}
+                    updateBadge={null}
+                    readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                  />
+                ) : mainView === 'scheduledTasks' ? (
+                  <ScheduledTasksView
+                    isSidebarCollapsed={isSidebarCollapsed}
                     onToggleSidebar={handleToggleSidebar}
                     onNewChat={handleNewChat}
                     updateBadge={null}
                   />
-                </div>
-              )}
-              {mainView === 'skills' ? (
-                <SkillsView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  onCreateSkillByChat={handleCreateSkillByChat}
-                  onTrySkill={handleTrySkill}
-                  updateBadge={null}
-                  readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                />
-              ) : mainView === 'scheduledTasks' ? (
-                <ScheduledTasksView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  updateBadge={null}
-                />
-              ) : mainView === 'mcp' ? (
-                <McpView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  onUseMcp={handleTryMcp}
-                  updateBadge={null}
-                  openRegistryId={mcpOpenRegistryId}
-                  openMarketplace={mcpOpenMarketplace}
-                />
-              ) : mainView === 'expert' ? (
-                <ExpertView
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  updateBadge={null}
-                  readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
-                  onCreateSkillByChat={handleCreateSkillByChat}
-                  onTrySkill={handleTrySkill}
-                  onUseMcp={handleTryMcp}
-                  initialTab={expertInitialTab}
-                />
-              ) : mainView === 'localInference' ? null : (
-                <CoworkView
-                  onRequestAppSettings={handleShowSettings}
-                  onShowSkills={handleShowSkills}
-                  onShowConnectors={handleShowMcpMarketplace}
-                  isSidebarCollapsed={isSidebarCollapsed}
-                  onToggleSidebar={handleToggleSidebar}
-                  onNewChat={handleNewChat}
-                  updateBadge={null}
-                  inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
-                  onRespondToInlineQuestion={handlePermissionResponse}
-                />
-              )}
+                ) : mainView === 'mcp' ? (
+                  <McpView
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    onToggleSidebar={handleToggleSidebar}
+                    onNewChat={handleNewChat}
+                    onUseMcp={handleTryMcp}
+                    updateBadge={null}
+                    openRegistryId={mcpOpenRegistryId}
+                    openMarketplace={mcpOpenMarketplace}
+                  />
+                ) : mainView === 'expert' ? (
+                  <ExpertView
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    onToggleSidebar={handleToggleSidebar}
+                    onNewChat={handleNewChat}
+                    updateBadge={null}
+                    readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
+                    onCreateSkillByChat={handleCreateSkillByChat}
+                    onTrySkill={handleTrySkill}
+                    onUseMcp={handleTryMcp}
+                    initialTab={expertInitialTab}
+                  />
+                ) : mainView === 'localInference' ? null : (
+                  <CoworkView
+                    onRequestAppSettings={handleShowSettings}
+                    onShowSkills={handleShowSkills}
+                    onShowConnectors={handleShowMcpMarketplace}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    onToggleSidebar={handleToggleSidebar}
+                    onNewChat={handleNewChat}
+                    updateBadge={null}
+                    inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
+                    onRespondToInlineQuestion={handlePermissionResponse}
+                  />
+                )}
+              </React.Suspense>
             </div>
           </div>
         </div>
 
         {/* 设置窗口显示在所有主内容之上，但不影响主界面的交互 */}
         {showSettings && (
-          <Settings
-            onClose={handleCloseSettings}
-            initialTab={settingsOptions.initialTab}
-            notice={settingsOptions.notice}
-            enterpriseConfig={enterpriseConfig}
-          />
+          <React.Suspense fallback={null}>
+            <Settings
+              onClose={handleCloseSettings}
+              initialTab={settingsOptions.initialTab}
+              notice={settingsOptions.notice}
+              enterpriseConfig={enterpriseConfig}
+            />
+          </React.Suspense>
         )}
         {permissionModal}
       </div>

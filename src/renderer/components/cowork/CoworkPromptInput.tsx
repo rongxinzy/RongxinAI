@@ -49,7 +49,7 @@ import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
-import { ActiveSkillBadge } from '../skills';
+import ActiveSkillBadge from '../skills/ActiveSkillBadge';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
