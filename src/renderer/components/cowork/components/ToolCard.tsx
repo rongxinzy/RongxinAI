@@ -103,6 +103,7 @@ export const ToolCard: React.FC<{
     : ('input-available' as const);
   const toolResultDisplay = toolResult ? mapText(getToolResultDisplay(toolResult)) : '';
   // Expansion persists across virtualization unmounts and export remounts.
+  const [isToolOpen, setIsToolOpen] = usePersistentToggle(`tool-${toolUse.id}`, false);
   const [isResultExpanded, setIsResultExpanded] = usePersistentToggle(
     `toolresult-${toolUse.id}`,
     false,
@@ -129,7 +130,11 @@ export const ToolCard: React.FC<{
       {!isLastInSequence && (
         <div className="absolute top-full -bottom-3 left-2 w-px bg-border" aria-hidden="true" />
       )}
-      <Tool className={cn('mb-0', muted && 'text-muted-foreground')}>
+      <Tool
+        className={cn('mb-0', muted && 'text-muted-foreground')}
+        open={isToolOpen}
+        onOpenChange={setIsToolOpen}
+      >
         <ToolHeader
           type={`tool-${rawToolName}` as ToolUIPart['type']}
           state={toolState}
