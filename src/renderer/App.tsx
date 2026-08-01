@@ -1,5 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import { Spinner } from '@shared/components/ui/spinner';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { MessageCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -67,10 +66,19 @@ const LocalInferenceView = React.lazy(() =>
 );
 const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
 
-/** Full-area fallback shown while a lazily loaded feature chunk downloads. */
+/**
+ * Full-area fallback shown while a lazily loaded feature chunk downloads.
+ * Content-shaped skeleton blocks with a soft staggered pulse communicate
+ * "view is loading" and keep the layout stable when the real view mounts.
+ */
 const lazyViewFallback = (
-  <div className="flex h-full min-h-0 items-center justify-center">
-    <Spinner className="size-6 text-muted-foreground" />
+  <div className="flex h-full min-h-0 flex-col gap-4 p-6">
+    <div className="h-9 w-48 animate-pulse rounded-lg bg-muted/40" />
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="h-28 animate-pulse rounded-xl bg-muted/30" />
+      <div className="h-28 animate-pulse rounded-xl bg-muted/30 [animation-delay:150ms]" />
+      <div className="h-28 animate-pulse rounded-xl bg-muted/30 [animation-delay:300ms]" />
+    </div>
   </div>
 );
 
