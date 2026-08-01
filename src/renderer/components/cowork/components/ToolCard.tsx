@@ -16,7 +16,7 @@ import {
 } from '@shared/components/ai-elements/tool';
 import { cn } from '@shared/lib/utils';
 import type { ToolUIPart } from 'ai';
-import { Check } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import React, { useMemo } from 'react';
 
 import { i18nService } from '../../../services/i18n';
@@ -31,6 +31,13 @@ import {
   isTodoWriteToolName,
   parseTodoWriteItems,
 } from '../helpers/toolUtils';
+
+/**
+ * Long tool results are mounted lazily: beyond this many lines only the
+ * head is rendered until the user expands, so a huge output does not
+ * create thousands of DOM nodes and Shiki token spans (issue #141).
+ */
+const TOOL_RESULT_COLLAPSE_LINE_LIMIT = 200;
 
 const TodoWriteInputView: React.FC<{ items: ParsedTodoItem[] }> = ({ items }) => (
   <div className="flex flex-col gap-2">
@@ -91,6 +98,15 @@ export const ToolCard: React.FC<{
       : ('output-available' as const)
     : ('input-available' as const);
   const toolResultDisplay = toolResult ? mapText(getToolResultDisplay(toolResult)) : '';
+  const [isResultExpanded, setIsResultExpanded] = React.useState(false);
+  const isResultCollapsible = useMemo(() => {
+    if (isError || !toolResultDisplay) return false;
+    return toolResultDisplay.split('\n').length > TOOL_RESULT_COLLAPSE_LINE_LIMIT;
+  }, [isError, toolResultDisplay]);
+  const visibleResultDisplay = useMemo(() => {
+    if (!isResultCollapsible || isResultExpanded) return toolResultDisplay;
+    return toolResultDisplay.split('\n').slice(0, TOOL_RESULT_COLLAPSE_LINE_LIMIT).join('\n');
+  }, [isResultCollapsible, isResultExpanded, toolResultDisplay]);
   // Terminal preserves ANSI codes.  Pi runs bash via spawn + pipe (no TTY), so
   // commands won't auto-color.  We force the prompt to cyan, matching the
   // official ai-elements Terminal example (`[36m$`).
@@ -142,12 +158,33 @@ export const ToolCard: React.FC<{
             <>{toolInputDisplay && <ToolInput input={toolInput ?? {}} />}</>
           )}
           {!isBashTool && hasResult && (
-            <ToolOutput
-              output={isEditWithDiff ? undefined : toolResultDisplay || undefined}
-              errorText={
-                isError ? toolResultDisplay || i18nService.t('coworkToolNoErrorDetail') : undefined
-              }
-            />
+            <>
+              <ToolOutput
+                output={isEditWithDiff ? undefined : visibleResultDisplay || undefined}
+                errorText={
+                  isError
+                    ? toolResultDisplay || i18nService.t('coworkToolNoErrorDetail')
+                    : undefined
+                }
+              />
+              {isResultCollapsible && (
+                <button
+                  type="button"
+                  onClick={() => setIsResultExpanded(expanded => !expanded)}
+                  className="inline-flex items-center gap-1 self-start text-xs text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <ChevronDown
+                    className={cn(
+                      'size-3 transition-transform duration-200',
+                      isResultExpanded && 'rotate-180',
+                    )}
+                  />
+                  {isResultExpanded
+                    ? i18nService.t('coworkToolResultCollapse')
+                    : i18nService.t('coworkToolResultShowAll')}
+                </button>
+              )}
+            </>
           )}
         </ToolContent>
       </Tool>
