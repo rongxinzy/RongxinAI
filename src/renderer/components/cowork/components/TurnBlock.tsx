@@ -3,11 +3,7 @@ import {
   ChainOfThoughtContent,
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from '@shared/components/ai-elements/reasoning';
+import { ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
 import { Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
@@ -35,6 +31,7 @@ import { getThinkingPresentation } from '../helpers/thinkingPresentation';
 import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
 import { ExecutionSummary } from './ExecutionSummary';
+import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
 
@@ -47,6 +44,8 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons?: boolean;
   isTurnComplete?: boolean;
   toolActivities?: CoworkToolActivity[];
+  /** Expand long tool results fully (image export capture). */
+  expandToolResults?: boolean;
 }> = ({
   turn,
   artifacts,
@@ -56,6 +55,7 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons = true,
   isTurnComplete = true,
   toolActivities = [],
+  expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
@@ -151,8 +151,9 @@ const TurnBlockComponent: React.FC<{
       );
       const content = mapDisplayText ? mapDisplayText(item.message.content) : item.message.content;
       return (
-        <Reasoning
+        <PersistentReasoning
           key={item.message.id}
+          persistKey={`reasoning-${item.message.id}`}
           className={mutedExecution ? 'text-muted-foreground' : undefined}
           isStreaming={isStreaming}
           defaultOpen={false}
@@ -168,7 +169,7 @@ const TurnBlockComponent: React.FC<{
             }}
           />
           <ReasoningContent className="pl-4">{content}</ReasoningContent>
-        </Reasoning>
+        </PersistentReasoning>
       );
     }
 
@@ -181,6 +182,7 @@ const TurnBlockComponent: React.FC<{
           isLastInSequence={isLastInSequence}
           muted={mutedExecution}
           mapDisplayText={mapDisplayText}
+          forceExpand={expandToolResults}
         />
       );
     }
@@ -325,8 +327,9 @@ const TurnBlockComponent: React.FC<{
     const currentStatus = showCompletedSummary ? null : getCurrentExecutionStatus(group.items);
     const isActiveTool = currentStatus?.kind === ExecutionStatusKind.Tool;
     return (
-      <ChainOfThought
+      <PersistentChainOfThought
         key={`${groupKey}-${showCompletedSummary ? 'summarized' : 'working'}`}
+        persistKey={`cot-${turn.id}-${groupKey}`}
         defaultOpen={false}
       >
         <ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>
@@ -343,7 +346,7 @@ const TurnBlockComponent: React.FC<{
             renderItem(item, idx, false, false, true, idx === group.items.length - 1),
           )}
         </ChainOfThoughtContent>
-      </ChainOfThought>
+      </PersistentChainOfThought>
     );
   };
   return (
@@ -352,7 +355,7 @@ const TurnBlockComponent: React.FC<{
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-3">
             {finalAnswerItem && executionItems.length > 0 && (
-              <ExecutionSummary summary={executionSummary}>
+              <ExecutionSummary summary={executionSummary} persistKey={`execsummary-${turn.id}`}>
                 {executionItems.map((item, index) => {
                   const isAnswer = item.type === 'assistant' && !item.message.metadata?.isThinking;
                   const connectsToNextStep =

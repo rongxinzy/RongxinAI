@@ -177,6 +177,39 @@ export const stabilizeConversationTurns = (
   return allReused ? previousTurns : stabilized;
 };
 
+// ── Rail indices (data-driven; issue #141) ──
+
+export type TurnRailIndices = {
+  /** Rail item index for the user message, or -1 when the turn has none. */
+  user: number;
+  /** Rail item index for the aggregated assistant content, or -1 when empty. */
+  assistant: number;
+};
+
+/**
+ * Computes the navigation-rail item index for every turn from data alone,
+ * so turn rows can mount lazily (virtualization) without breaking rail
+ * numbering. Counting must stay in sync with the rail item list: one item
+ * per user message plus one per turn with non-empty assistant content.
+ */
+export const buildTurnRailIndices = (turns: ConversationTurn[]): TurnRailIndices[] => {
+  const indices: TurnRailIndices[] = [];
+  let counter = 0;
+  for (const turn of turns) {
+    let assistantContent = '';
+    for (const item of turn.assistantItems) {
+      if (item.type === 'assistant' && item.message?.content) {
+        assistantContent += item.message.content;
+      }
+    }
+    indices.push({
+      user: turn.userMessage ? counter++ : -1,
+      assistant: assistantContent ? counter++ : -1,
+    });
+  }
+  return indices;
+};
+
 // ── Filter helpers ──
 
 export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {

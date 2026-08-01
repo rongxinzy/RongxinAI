@@ -4,6 +4,7 @@ import type { CoworkMessage } from '../../../types/cowork';
 import {
   buildConversationTurns,
   buildDisplayItems,
+  buildTurnRailIndices,
   stabilizeConversationTurns,
 } from './messageGrouping';
 
@@ -75,4 +76,32 @@ test('keeps tool group turns stable while an unrelated turn streams', () => {
   );
 
   expect(second[0]).toBe(first[0]);
+});
+
+test('buildTurnRailIndices numbers user and assistant rail items from data', () => {
+  const turns = buildTurns([
+    message('user-1', 'user', 'first question'),
+    message('assistant-1', 'assistant', 'first answer'),
+    message('assistant-1b', 'assistant', ''),
+    message('user-2', 'user', 'second question'),
+    message('assistant-2', 'assistant', 'second answer'),
+  ]);
+  const indices = buildTurnRailIndices(turns);
+
+  expect(indices).toEqual([
+    { user: 0, assistant: 1 },
+    { user: 2, assistant: 3 },
+  ]);
+});
+
+test('buildTurnRailIndices skips turns without user or assistant content', () => {
+  const turns = buildTurns([
+    message('assistant-0', 'assistant', 'orphan answer'),
+    message('user-1', 'user', 'question'),
+    message('tool-1', 'tool_use', 'call'),
+  ]);
+  const indices = buildTurnRailIndices(turns);
+
+  expect(indices[0]).toEqual({ user: -1, assistant: 0 });
+  expect(indices[1]).toEqual({ user: 1, assistant: -1 });
 });

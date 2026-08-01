@@ -207,7 +207,7 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
 const basePlugins = { cjk };
 
 // Fenced code, math or mermaid content needs the rich plugin pipeline.
-const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4}|\t)\S/;
+const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4,}|\t+)\S/;
 
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { showConnector } = useReasoning();
