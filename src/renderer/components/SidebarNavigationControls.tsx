@@ -6,6 +6,7 @@ import { type RefObject, useRef } from 'react';
 
 import { i18nService } from '../services/i18n';
 import { WorkMode } from '../store/workMode/constants';
+import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import {
   SidebarAnimatedAlarmClockIcon,
   type SidebarAnimatedAlarmClockIconHandle,
@@ -39,6 +40,8 @@ interface SidebarNavigationControlsProps {
   onShowScheduledTasks: () => void;
   onWorkModeChange: (checked: boolean) => void;
   workMode: WorkMode;
+  /** Warms the lazily loaded chunk for a view on hover/focus intent. */
+  onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
 
 const sidebarNavItemClassName =
@@ -53,6 +56,7 @@ export const SidebarNavigationControls = ({
   onShowScheduledTasks,
   onWorkModeChange,
   workMode,
+  onPrefetchView,
 }: SidebarNavigationControlsProps) => {
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
@@ -116,7 +120,11 @@ export const SidebarNavigationControls = ({
           type="button"
           variant="ghost"
           onClick={onShowLocalInference}
-          onMouseEnter={() => startIconAnimation(localInferenceIconRef)}
+          onMouseEnter={() => {
+            startIconAnimation(localInferenceIconRef);
+            onPrefetchView?.('localInference');
+          }}
+          onFocus={() => onPrefetchView?.('localInference')}
           onMouseLeave={() => localInferenceIconRef.current?.stopAnimation()}
           className={
             activeView === 'localInference'
@@ -134,7 +142,11 @@ export const SidebarNavigationControls = ({
           type="button"
           variant="ghost"
           onClick={onShowScheduledTasks}
-          onMouseEnter={() => startIconAnimation(scheduledTasksIconRef)}
+          onMouseEnter={() => {
+            startIconAnimation(scheduledTasksIconRef);
+            onPrefetchView?.('scheduledTasks');
+          }}
+          onFocus={() => onPrefetchView?.('scheduledTasks')}
           onMouseLeave={() => scheduledTasksIconRef.current?.stopAnimation()}
           className={
             activeView === 'scheduledTasks'
@@ -152,7 +164,11 @@ export const SidebarNavigationControls = ({
           type="button"
           variant="ghost"
           onClick={onShowExpert}
-          onMouseEnter={() => startIconAnimation(expertIconRef)}
+          onMouseEnter={() => {
+            startIconAnimation(expertIconRef);
+            onPrefetchView?.('expert');
+          }}
+          onFocus={() => onPrefetchView?.('expert')}
           onMouseLeave={() => expertIconRef.current?.stopAnimation()}
           className={
             activeView === 'expert' ? activeSidebarNavItemClassName : sidebarNavItemClassName
