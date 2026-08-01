@@ -51,8 +51,11 @@ interface SidebarNavigationControlsProps {
 }
 
 const sidebarNavItemClassName =
-  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-normal text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground';
-const activeSidebarNavItemClassName = `${sidebarNavItemClassName} bg-surface-raised text-foreground`;
+  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-normal text-muted-foreground transition-[background-color,color,box-shadow] duration-150 hover:bg-card hover:text-foreground';
+const activeSidebarNavItemClassName = cn(
+  sidebarNavItemClassName,
+  'bg-card font-medium text-foreground shadow-sm ring-1 ring-inset ring-border hover:bg-card',
+);
 
 export const SidebarNavigationControls = ({
   activeView,
@@ -77,7 +80,12 @@ export const SidebarNavigationControls = ({
   };
 
   return (
-    <div className={cn('mt-[5px] space-y-0.5 px-3', workMode === WorkMode.Chat ? 'pb-0' : 'pb-3')}>
+    <div
+      className={cn(
+        'mt-[5px] flex flex-col gap-0.5 px-3',
+        workMode === WorkMode.Chat ? 'pb-0' : 'pb-3',
+      )}
+    >
       <div
         className="relative h-7 w-full cursor-pointer"
         onClick={() => onWorkModeChange(workMode !== WorkMode.Chat)}
@@ -179,7 +187,7 @@ export const SidebarNavigationControls = ({
           }
           aria-current={activeView === 'activity' ? 'page' : undefined}
         >
-          <Activity className="size-4" />
+          <Activity data-icon="inline-start" />
           {i18nService.t('activityTitle')}
           {hasActiveChannelRun && (
             <span

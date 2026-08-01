@@ -54,12 +54,24 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
     >
       {/* Status: one quiet dot. Running breathes with a slow pulse. */}
       <span className="flex w-3 shrink-0 items-start justify-center pt-[7px]">
+        <span className="sr-only">
+          {i18nService.t(
+            isRunning
+              ? 'activityStatusRunning'
+              : isFailed
+                ? 'activityStatusFailed'
+                : 'activityStatusCompleted',
+          )}
+        </span>
         {isRunning ? (
-          <span className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse" />
+          <span
+            className="size-1.5 rounded-full bg-primary motion-safe:animate-pulse"
+            aria-hidden="true"
+          />
         ) : isFailed ? (
-          <span className="size-1.5 rounded-full bg-destructive" />
+          <span className="size-1.5 rounded-full bg-destructive" aria-hidden="true" />
         ) : (
-          <span className="size-1.5 rounded-full bg-success" />
+          <span className="size-1.5 rounded-full bg-success" aria-hidden="true" />
         )}
       </span>
 

@@ -123,6 +123,53 @@ test('resolveRawApiConfig uses registered DeepSeek V4 capacity when saved metada
   });
 });
 
+test('resolveRawApiConfig repairs stale catalog capabilities before Pi runtime routing', () => {
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config'
+            ? {
+                model: {
+                  defaultModel: 'gpt-5.4',
+                  defaultModelProvider: ProviderName.OpenAI,
+                },
+                providers: {
+                  [ProviderName.OpenAI]: {
+                    enabled: true,
+                    apiKey: 'test-key',
+                    baseUrl: 'https://api.openai.com/v1',
+                    apiFormat: 'openai',
+                    models: [
+                      {
+                        id: 'gpt-5.4',
+                        name: 'GPT-5.4',
+                        supportsImage: false,
+                        capabilities: {
+                          toolCalling: ModelCapabilityStatus.Unsupported,
+                          imageInput: ModelCapabilityStatus.Unsupported,
+                        },
+                      },
+                    ],
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  const result = resolveRawApiConfig();
+
+  expect(result.providerMetadata).toMatchObject({
+    providerName: ProviderName.OpenAI,
+    supportsImage: true,
+    capabilities: {
+      toolCalling: ModelCapabilityStatus.Supported,
+      imageInput: ModelCapabilityStatus.Supported,
+    },
+  });
+});
+
 test('resolveRawApiConfig uses registered coding-plan capacity when saved metadata is absent', () => {
   setStoreGetter(
     () =>
@@ -161,6 +208,47 @@ test('resolveRawApiConfig uses registered coding-plan capacity when saved metada
     providerName: ProviderName.Moonshot,
     contextWindow: 262_144,
     maxTokens: 32_768,
+  });
+});
+
+test('resolveRawApiConfig ignores stale general models while coding plan is enabled', () => {
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config'
+            ? {
+                model: {
+                  defaultModel: 'kimi-k2.6',
+                  defaultModelProvider: ProviderName.Moonshot,
+                },
+                providers: {
+                  [ProviderName.Moonshot]: {
+                    enabled: true,
+                    apiKey: 'test-key',
+                    baseUrl: 'https://api.moonshot.cn/v1',
+                    apiFormat: 'openai',
+                    codingPlanEnabled: true,
+                    models: [
+                      { id: 'kimi-k2.6', name: 'Kimi K2.6', supportsImage: true },
+                      { id: 'kimi-for-coding', name: 'Kimi K2.5', supportsImage: true },
+                    ],
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  const result = resolveRawApiConfig();
+
+  expect(result.config).toMatchObject({
+    model: 'kimi-for-coding',
+    apiType: 'anthropic',
+  });
+  expect(result.providerMetadata).toMatchObject({
+    providerName: ProviderName.Moonshot,
+    modelName: 'Kimi for Coding',
   });
 });
 

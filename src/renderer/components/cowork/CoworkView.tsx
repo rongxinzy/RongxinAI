@@ -699,10 +699,23 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
           await coworkService.saveChatSession(savedSession);
         } catch (error) {
+          contentBatcher.discard(tempSessionId, assistantMsgId);
           thinkingDurationMs = thinkingLifecycle.complete({
             content: thinkingContent,
             messageExists: thinkingMessageAdded,
           });
+          // Finalize the partial answer so the turn does not render as still
+          // streaming after the failure.
+          if (assistantMessageAdded) {
+            dispatch(
+              updateMessageContent({
+                sessionId: tempSessionId,
+                messageId: assistantMsgId,
+                content: assistantContent,
+                metadata: { isStreaming: false, isFinal: true },
+              }),
+            );
+          }
           dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
           dispatch(
             addMessage({
@@ -717,7 +730,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               },
             }),
           );
-          persistChatSnapshot(true);
+          if (persistTimer) clearTimeout(persistTimer);
+          await coworkService
+            .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Error))
+            .catch(saveError =>
+              console.error('[CoworkView] Failed to persist failed chat session:', saveError),
+            );
         } finally {
           if (persistTimer) clearTimeout(persistTimer);
           if (directChatAbortControllersRef.current.get(tempSessionId) === abortController) {
@@ -1160,10 +1178,23 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         );
         await coworkService.saveChatSession(buildChatSnapshot(finalStatus));
       } catch (error) {
+        contentBatcher.discard(currentSession.id, assistantMsgId);
         thinkingDurationMs = thinkingLifecycle.complete({
           content: thinkingContent,
           messageExists: thinkingMessageAdded,
         });
+        // Finalize the partial answer so the turn does not render as still
+        // streaming after the failure.
+        if (assistantMessageAdded) {
+          dispatch(
+            updateMessageContent({
+              sessionId: currentSession.id,
+              messageId: assistantMsgId,
+              content: assistantContent,
+              metadata: { isStreaming: false, isFinal: true },
+            }),
+          );
+        }
         dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
         dispatch(
           addMessage({
@@ -1178,8 +1209,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             },
           }),
         );
-        dispatch(updateSessionStatus({ sessionId: currentSession.id, status: 'error' }));
-        persistChatSnapshot(true);
+        if (persistTimer) clearTimeout(persistTimer);
+        await coworkService
+          .saveChatSession(buildChatSnapshot(CoworkSessionStatusValue.Error))
+          .catch(saveError =>
+            console.error('[CoworkView] Failed to persist failed chat continuation:', saveError),
+          );
       } finally {
         if (persistTimer) clearTimeout(persistTimer);
         if (directChatAbortControllersRef.current.get(currentSession.id) === abortController) {

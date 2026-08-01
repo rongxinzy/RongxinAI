@@ -31,8 +31,6 @@ export const formatActivityTime = (timestampMs: number, nowMs: number = Date.now
   });
 };
 
-const DAY_MS = 86_400_000;
-
 const startOfDay = (timestampMs: number): number => {
   const date = new Date(timestampMs);
   date.setHours(0, 0, 0, 0);
@@ -40,17 +38,22 @@ const startOfDay = (timestampMs: number): number => {
 };
 
 /** Day-group label for the feed: 今天 / 昨天 / locale date. */
-export const formatActivityDayLabel = (timestampMs: number, nowMs: number = Date.now()): string => {
+export const formatActivityDayLabel = (
+  timestampMs: number,
+  nowMs: number = Date.now(),
+  language: 'zh' | 'en' = i18nService.getLanguage(),
+): string => {
   const todayStart = startOfDay(nowMs);
   const dayStart = startOfDay(timestampMs);
   if (dayStart === todayStart) {
     return i18nService.t('activityGroupToday');
   }
-  if (dayStart === todayStart - DAY_MS) {
+  const yesterday = new Date(todayStart);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dayStart === yesterday.getTime()) {
     return i18nService.t('activityGroupYesterday');
   }
-  const lang = i18nService.getLanguage();
-  return new Date(timestampMs).toLocaleDateString(lang === 'zh' ? 'zh-CN' : 'en-US', {
+  return new Date(timestampMs).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US', {
     month: 'long',
     day: 'numeric',
   });

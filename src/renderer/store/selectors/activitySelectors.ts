@@ -9,11 +9,11 @@ import type { RootState } from '../index';
 
 /**
  * One aggregated Channel/Cron run. The activity slice stores raw lifecycle
- * events (started → completed/failed); the feed folds them by session so one
+ * events (started → completed/failed); the feed folds them by run ID so one
  * run renders as a single row whose status updates in place (issue #225).
  */
 export interface ActivityRun {
-  /** Stable React key: sessionId + first-seen timestamp. */
+  /** Stable run identity supplied by the main-process execution boundary. */
   id: string;
   sessionId: string;
   platform: string;
@@ -30,7 +30,7 @@ export interface ActivityRun {
 }
 
 const toRun = (event: ChannelRunSummary): ActivityRun => ({
-  id: `${event.sessionId}:${event.timestamp}`,
+  id: event.runId,
   sessionId: event.sessionId,
   platform: event.platform,
   conversationId: event.conversationId,
@@ -46,31 +46,28 @@ const toRun = (event: ChannelRunSummary): ActivityRun => ({
 /**
  * Fold the raw event stream into aggregated runs, newest first. Events are
  * stored newest-first, so the fold walks oldest-first: a started event opens
- * a fresh run and a terminal event closes the most recent open run of the
- * same session (one conversation sees many runs over time).
+ * a fresh run and a terminal event closes that exact run. A session may see
+ * several requests over time (or a replacement while one is still active),
+ * so sessionId alone is not a valid lifecycle identity.
  */
 export const foldChannelRunEvents = (events: ChannelRunSummary[]): ActivityRun[] => {
   const runs: ActivityRun[] = [];
-  const openRunBySession = new Map<string, ActivityRun>();
+  const runById = new Map<string, ActivityRun>();
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
-    if (event.status === ChannelRunStatus.Started) {
-      const run = toRun(event);
+    let run = runById.get(event.runId);
+    if (!run) {
+      run = toRun(event);
       runs.push(run);
-      openRunBySession.set(event.sessionId, run);
+      runById.set(event.runId, run);
+    }
+    if (event.status === ChannelRunStatus.Started) {
       continue;
     }
-    const openRun = openRunBySession.get(event.sessionId);
-    if (openRun) {
-      openRun.status = event.status;
-      openRun.updatedAt = event.timestamp;
-      openRun.replyPreview = event.replyPreview ?? openRun.replyPreview;
-      openRun.errorMessage = event.errorMessage ?? openRun.errorMessage;
-      openRunBySession.delete(event.sessionId);
-    } else {
-      // Terminal event whose started event fell out of the history window.
-      runs.push(toRun(event));
-    }
+    run.status = event.status;
+    run.updatedAt = event.timestamp;
+    run.replyPreview = event.replyPreview ?? run.replyPreview;
+    run.errorMessage = event.errorMessage ?? run.errorMessage;
   }
   return runs.reverse();
 };

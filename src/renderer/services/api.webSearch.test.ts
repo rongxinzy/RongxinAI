@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { ModelCapabilityStatus } from '../../shared/providers';
+import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
 import { store } from '../store';
 import { setAvailableModels, setDefaultSelectedModel } from '../store/slices/modelSlice';
 import { apiService } from './api';
@@ -97,6 +97,91 @@ test('OpenRouter model metadata enables the tool loop only when tools are declar
     headers: { Authorization: 'Bearer openrouter-key' },
   });
   expect(loop).toHaveBeenCalledOnce();
+});
+
+test('regular chat uses and caches runtime image capability metadata', async () => {
+  const model = {
+    id: 'vendor/vision-model',
+    name: 'OpenRouter Vision Model',
+    providerKey: ProviderName.OpenRouter,
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({
+    apiKey: 'openrouter-key',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    apiFormat: 'openai',
+  });
+  const fetch = vi.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    data: {
+      data: [
+        {
+          id: model.id,
+          supported_parameters: [],
+          architecture: { input_modalities: ['text', 'image'] },
+        },
+      ],
+    },
+  });
+  vi.stubGlobal('window', { electron: { api: { fetch } } });
+  const regularChat = vi
+    .spyOn(apiService as any, 'chatWithOpenAICompatible')
+    .mockResolvedValue({ content: 'vision answer' });
+  const input = {
+    content: 'describe this image',
+    images: [
+      {
+        id: 'image-1',
+        name: 'image.png',
+        type: 'image/png',
+        size: 10,
+        dataUrl: 'data:image/png;base64,AAAA',
+      },
+    ],
+  };
+
+  await apiService.chat(input);
+  await apiService.chat(input);
+
+  expect(fetch).toHaveBeenCalledOnce();
+  expect(regularChat).toHaveBeenCalledTimes(2);
+  expect(regularChat.mock.calls[0][5]).toBe(true);
+});
+
+test('provider hints are resolved from the registry instead of a stale allowlist', () => {
+  expect(
+    (
+      apiService as unknown as { detectProvider: (modelId: string, hint?: string) => string }
+    ).detectProvider('qianfan-code-latest', ProviderName.Qianfan),
+  ).toBe(ProviderName.Qianfan);
+});
+
+test('a catalog model absent from the provider support table does not receive tools', async () => {
+  const model = {
+    id: 'ernie-4.5-8k',
+    name: 'ERNIE 4.5 8K',
+    providerKey: ProviderName.Qianfan,
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  apiService.setConfig({
+    apiKey: 'qianfan-key',
+    baseUrl: 'https://qianfan.baidubce.com/v2',
+    apiFormat: 'openai',
+  });
+  const regularChat = vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+  const toolLoop = vi.spyOn(apiService as any, 'runOpenAIWebSearchLoop');
+
+  await apiService.chatWithWebSearch('latest news');
+
+  expect(regularChat).toHaveBeenCalledOnce();
+  expect(toolLoop).not.toHaveBeenCalled();
 });
 
 test('web-search fallback message follows the selected UI language', async () => {
@@ -250,6 +335,178 @@ test('native OpenAI tool calls are assembled from the cancellable SSE channel', 
     id: 'call-1',
     function: { name: 'web_search', arguments: '{"query":"latest"}' },
   });
+});
+
+test('OpenAI-compatible streams preserve provider reasoning fields for tool replay', async () => {
+  let onData: ((chunk: string) => void) | undefined;
+  let onDone: (() => void) | undefined;
+  const api = {
+    onStreamData: vi.fn((_requestId: string, callback: (chunk: string) => void) => {
+      onData = callback;
+      return vi.fn();
+    }),
+    onStreamDone: vi.fn((_requestId: string, callback: () => void) => {
+      onDone = callback;
+      return vi.fn();
+    }),
+    onStreamError: vi.fn(() => vi.fn()),
+    onStreamAbort: vi.fn(() => vi.fn()),
+    stream: vi.fn(async () => {
+      queueMicrotask(() => {
+        onData?.(
+          `data: ${JSON.stringify({
+            choices: [
+              {
+                delta: {
+                  reasoning_content: 'inspect ',
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: 'call-reasoning',
+                      function: { name: 'web_search', arguments: '{"query":"status"}' },
+                    },
+                  ],
+                },
+              },
+            ],
+          })}\n\n`,
+        );
+        onData?.(
+          `data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: 'sources' } }] })}\n\n`,
+        );
+        onDone?.();
+      });
+      return { ok: true, status: 200, statusText: 'OK' };
+    }),
+  };
+  vi.stubGlobal('window', { electron: { api } });
+
+  const response = await (apiService as any).streamOpenAIChatResponse(
+    'https://example.com/v1/chat/completions',
+    {},
+    { model: 'deepseek-v4-flash' },
+    'request-reasoning',
+  );
+
+  expect(response.choices[0].message).toMatchObject({
+    content: null,
+    reasoning_content: 'inspect sources',
+  });
+});
+
+test('DeepSeek tool turns replay reasoning and a non-null assistant content field', async () => {
+  const streamResponse = vi
+    .spyOn(apiService as any, 'streamOpenAIChatResponse')
+    .mockResolvedValueOnce({
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: null,
+            reasoning_content: 'need current sources',
+            tool_calls: [
+              {
+                id: 'call-deepseek',
+                type: 'function',
+                function: { name: 'web_search', arguments: '{"query":"latest"}' },
+              },
+            ],
+          },
+        },
+      ],
+    })
+    .mockResolvedValueOnce({
+      choices: [{ message: { role: 'assistant', content: 'final answer' } }],
+    });
+  vi.stubGlobal('window', {
+    electron: {
+      api: { webSearch: vi.fn().mockResolvedValue({ ok: true, data: { results: [] } }) },
+    },
+  });
+
+  await (apiService as any).runOpenAIWebSearchLoop(
+    [],
+    'deepseek-v4-flash',
+    { apiKey: 'deepseek-key', baseUrl: 'https://api.deepseek.com' },
+    ProviderName.DeepSeek,
+    undefined,
+    'request-deepseek',
+  );
+
+  const secondBody = streamResponse.mock.calls[1][2] as { messages: any[] };
+  const firstBody = streamResponse.mock.calls[0][2] as Record<string, unknown>;
+  expect(firstBody).not.toHaveProperty('tool_choice');
+  expect(firstBody).not.toHaveProperty('stream_options');
+  expect(secondBody.messages[0]).toMatchObject({
+    role: 'assistant',
+    content: '',
+    reasoning_content: 'need current sources',
+  });
+});
+
+test('Anthropic streams preserve thinking text and signatures for the next tool turn', async () => {
+  let onData: ((chunk: string) => void) | undefined;
+  let onDone: (() => void) | undefined;
+  const api = {
+    onStreamData: vi.fn((_requestId: string, callback: (chunk: string) => void) => {
+      onData = callback;
+      return vi.fn();
+    }),
+    onStreamDone: vi.fn((_requestId: string, callback: () => void) => {
+      onDone = callback;
+      return vi.fn();
+    }),
+    onStreamError: vi.fn(() => vi.fn()),
+    onStreamAbort: vi.fn(() => vi.fn()),
+    stream: vi.fn(async () => {
+      queueMicrotask(() => {
+        const events = [
+          { type: 'content_block_start', index: 0, content_block: { type: 'thinking' } },
+          {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'thinking_delta', thinking: 'inspect' },
+          },
+          {
+            type: 'content_block_delta',
+            index: 0,
+            delta: { type: 'signature_delta', signature: 'signed' },
+          },
+          {
+            type: 'content_block_start',
+            index: 1,
+            content_block: { type: 'tool_use', id: 'tool-1', name: 'web_search', input: {} },
+          },
+          {
+            type: 'content_block_delta',
+            index: 1,
+            delta: { type: 'input_json_delta', partial_json: '{"query":"latest"}' },
+          },
+        ];
+        events.forEach(event => onData?.(`data: ${JSON.stringify(event)}\n\n`));
+        onDone?.();
+      });
+      return { ok: true, status: 200, statusText: 'OK' };
+    }),
+  };
+  vi.stubGlobal('window', { electron: { api } });
+
+  const response = await (apiService as any).streamAnthropicResponse(
+    'https://example.com/v1/messages',
+    {},
+    { model: 'claude-sonnet-4-6' },
+    'request-anthropic-thinking',
+  );
+
+  expect(response.content).toEqual([
+    { type: 'thinking', thinking: 'inspect', signature: 'signed' },
+    {
+      type: 'tool_use',
+      id: 'tool-1',
+      name: 'web_search',
+      input: { query: 'latest' },
+    },
+  ]);
 });
 
 test('an already-aborted signal never starts the provider stream', async () => {

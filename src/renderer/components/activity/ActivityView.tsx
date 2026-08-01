@@ -30,6 +30,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
 }) => {
   const isMac = window.electron.platform === 'darwin';
   const runs = useSelector((state: RootState) => selectActivityRuns(state));
+  const [language, setLanguage] = useState(i18nService.getLanguage());
   const [triggerFilter, setTriggerFilter] = useState<ActivityTriggerFilter>(
     ActivityTriggerFilter.All,
   );
@@ -40,11 +41,12 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   const openedAtRef = useRef(Date.now());
 
   // Minute tick so "N 分钟前" labels stay honest while the feed sits open.
-  const [, setTimeTick] = useState(0);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   useEffect(() => {
-    const timer = window.setInterval(() => setTimeTick(tick => tick + 1), TIME_TICK_MS);
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), TIME_TICK_MS);
     return () => window.clearInterval(timer);
   }, []);
+  useEffect(() => i18nService.subscribe(() => setLanguage(i18nService.getLanguage())), []);
 
   const filteredRuns = useMemo(
     () =>
@@ -63,7 +65,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   const dayGroups = useMemo(() => {
     const groups: { label: string; runs: ActivityRun[] }[] = [];
     for (const run of filteredRuns) {
-      const label = formatActivityDayLabel(run.updatedAt);
+      const label = formatActivityDayLabel(run.updatedAt, currentTime, language);
       const last = groups[groups.length - 1];
       if (last && last.label === label) {
         last.runs.push(run);
@@ -72,7 +74,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
       }
     }
     return groups;
-  }, [filteredRuns]);
+  }, [currentTime, filteredRuns, language]);
 
   const hasAnyRun = runs.length > 0;
 
@@ -140,6 +142,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                       ? 'bg-secondary text-foreground'
                       : 'bg-card text-muted-foreground'
                   }
+                  aria-pressed={triggerFilter === option.value}
                   onClick={() => setTriggerFilter(option.value)}
                 >
                   {i18nService.t(option.labelKey)}
@@ -157,6 +160,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
                       ? 'bg-secondary text-foreground'
                       : 'bg-card text-muted-foreground'
                   }
+                  aria-pressed={statusFilter === option.value}
                   onClick={() =>
                     setStatusFilter(current =>
                       current === option.value ? ActivityStatusFilter.All : option.value,

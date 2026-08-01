@@ -51,7 +51,7 @@ describe('ProviderRegistry', () => {
     }
   });
 
-  test('registers complete capability metadata and gates tools by endpoint', () => {
+  test('registers complete capability metadata and gates catalog tools by endpoint', () => {
     for (const provider of ProviderRegistry.providerIds) {
       const def = ProviderRegistry.get(provider)!;
       for (const model of [...def.defaultModels, ...(def.codingPlanModels ?? [])]) {
@@ -78,6 +78,26 @@ describe('ProviderRegistry', () => {
         ApiFormat.Anthropic,
       ).toolCalling,
     ).toBe(ModelCapabilityStatus.Unsupported);
+    // The Kimi for Coding plan endpoints support tool calling in both formats,
+    // even though the general Moonshot /anthropic endpoint does not.
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Moonshot,
+        'kimi-for-coding',
+        ApiFormat.Anthropic,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Supported);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(ProviderName.Moonshot, 'kimi-k3', ApiFormat.OpenAI)
+        .toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Moonshot,
+        'kimi-for-coding',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Supported);
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.OpenRouter,
@@ -85,15 +105,70 @@ describe('ProviderRegistry', () => {
         ApiFormat.OpenAI,
       ).toolCalling,
     ).toBe(ModelCapabilityStatus.Unknown);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.OpenAI,
+        'unregistered-openai-compatible-model',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.OpenAI,
+        'unregistered-openai-compatible-model',
+        ApiFormat.OpenAI,
+        {
+          capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+        },
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unsupported);
     for (const provider of [ProviderName.Zhipu, ProviderName.Volcengine]) {
-      expect(
-        ProviderRegistry.resolveModelCapabilities(
-          provider,
-          ProviderRegistry.get(provider)!.defaultModels[0].id,
-          ApiFormat.Anthropic,
-        ).toolCalling,
-      ).toBe(ModelCapabilityStatus.Supported);
+      const capability = ProviderRegistry.resolveModelCapabilities(
+        provider,
+        ProviderRegistry.get(provider)!.defaultModels[0].id,
+        ApiFormat.Anthropic,
+      ).toolCalling;
+      expect(capability).toBe(
+        provider === ProviderName.Zhipu
+          ? ModelCapabilityStatus.Supported
+          : ModelCapabilityStatus.Unknown,
+      );
     }
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Qianfan,
+        'deepseek-v3.2',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Supported);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Qianfan,
+        'ernie-4.5-8k',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.StepFun,
+        'step-3.7-flash',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-reasoner',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.OpenRouter,
+        'unlisted-model',
+        ApiFormat.OpenAI,
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unknown);
   });
 
   test('get returns undefined for unknown provider', () => {
@@ -123,6 +198,15 @@ describe('ProviderRegistry', () => {
     expect(ProviderRegistry.resolveModelSupportsImage('custom_0', 'unknown-model', true)).toBe(
       true,
     );
+  });
+
+  test('does not infer image support from the same bare model id on another provider', () => {
+    expect(ProviderRegistry.resolveModelSupportsImage(ProviderName.OpenAI, 'qwen3.6-plus')).toBe(
+      false,
+    );
+    expect(
+      ProviderRegistry.resolveModelSupportsImage(ProviderName.OpenAI, 'qwen3.6-plus', false),
+    ).toBe(false);
   });
 
   test('supportsCodingPlan is true for moonshot, qwen, zhipu, volcengine, qianfan, xiaomi', () => {

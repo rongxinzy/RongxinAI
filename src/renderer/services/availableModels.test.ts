@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { ProviderName } from '../../shared/providers';
+import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
@@ -121,4 +121,47 @@ test('preserves contextTokens for custom cloud models', () => {
   );
 
   expect(model?.contextWindow).toBe(131_072);
+});
+
+test('uses repaired provider metadata consistently for image flags and capabilities', () => {
+  const config = createConfig();
+  config.providers = {
+    [ProviderName.Qwen]: {
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      apiFormat: 'openai',
+      // Simulate a stale saved config from before qwen3.6-plus gained image metadata.
+      models: [{ id: 'qwen3.6-plus', name: 'Qwen3.6 Plus', supportsImage: false }],
+    },
+  };
+
+  const model = buildConfiguredAvailableModels(config)[0];
+
+  expect(model.supportsImage).toBe(true);
+  expect(model.capabilities?.imageInput).toBe(ModelCapabilityStatus.Supported);
+});
+
+test('uses the canonical coding-plan catalog instead of stale saved provider models', () => {
+  const config = createConfig();
+  config.providers = {
+    [ProviderName.Moonshot]: {
+      enabled: true,
+      apiKey: 'test-key',
+      baseUrl: 'https://api.moonshot.cn/v1',
+      apiFormat: 'openai',
+      codingPlanEnabled: true,
+      // Reproduce a legacy config where the Settings view and chat picker diverged.
+      models: [
+        { id: 'kimi-k2.6', name: 'Kimi K2.6', supportsImage: true },
+        { id: 'kimi-for-coding', name: 'Kimi K2.5', supportsImage: true },
+      ],
+    },
+  };
+
+  const models = buildConfiguredAvailableModels(config);
+
+  expect(models.map(model => [model.id, model.name])).toEqual([
+    ['kimi-for-coding', 'Kimi for Coding'],
+  ]);
 });

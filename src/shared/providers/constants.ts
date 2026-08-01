@@ -300,6 +300,10 @@ const PROVIDER_DEFINITIONS = [
         id: 'kimi-for-coding',
         name: 'Kimi for Coding',
         supportsImage: true,
+        // The Kimi for Coding endpoints (api.kimi.com/coding) support tool
+        // calling in both API formats — unlike the general Moonshot
+        // /anthropic endpoint this provider maps to Unsupported below.
+        capabilities: { toolCalling: ModelCapabilityStatus.Supported },
         contextWindow: 262_144,
         maxTokens: 32_768,
       },
@@ -921,7 +925,15 @@ export interface ProviderDef {
 // 5. Registry Implementation
 // ═══════════════════════════════════════════════════════
 
-const PROVIDER_TOOL_CAPABILITIES: Readonly<
+/**
+ * Tool support verified for the provider protocol used by catalog models.
+ *
+ * This is deliberately not a provider-wide fallback for arbitrary model IDs:
+ * accepting an endpoint protocol does not prove that every model routed through
+ * that endpoint can emit tool calls. Unknown/custom models must stay Unknown
+ * unless they carry explicit metadata or a runtime probe confirms support.
+ */
+const CATALOG_PROVIDER_TOOL_CAPABILITIES: Readonly<
   Record<string, Partial<Record<ApiFormat, ModelCapabilityStatus>>>
 > = {
   [ProviderName.OpenAI]: { [ApiFormat.OpenAI]: ModelCapabilityStatus.Supported },
@@ -959,24 +971,48 @@ const PROVIDER_TOOL_CAPABILITIES: Readonly<
   },
 };
 
+/**
+ * Catalog models with current model-level tool-calling evidence.
+ *
+ * Keep this separate from protocol support: an endpoint accepting `tools`
+ * does not mean every model routed through it can produce tool calls. Sources
+ * are the providers' current model support tables (OpenAI Models, Gemini
+ * Function Calling, Claude Tool Use, DeepSeek Tool Calls, Alibaba Model Studio
+ * Function Calling, Zhipu Tool Calling, MiniMax API Overview, Qianfan Function
+ * Calling, StepFun Tool Call, and MiMo release notes). Models absent from those
+ * tables deliberately remain Unknown.
+ */
+const CATALOG_TOOL_CALLING_MODEL_IDS: Readonly<Record<string, readonly string[]>> = {
+  [ProviderName.OpenAI]: ['gpt-5.4', 'gpt-5.2', 'gpt-5.3-codex', 'gpt-5.2-codex'],
+  [ProviderName.Gemini]: ['gemini-3.1-pro-preview'],
+  [ProviderName.Anthropic]: ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-6', 'claude-opus-4-6'],
+  [ProviderName.DeepSeek]: ['deepseek-v4-flash', 'deepseek-v4-pro'],
+  [ProviderName.Qwen]: [
+    'qwen3.7-max',
+    'qwen3.7-plus',
+    'qwen3.6-plus',
+    'qwen3.5-plus',
+    'qwen3-coder-next',
+    'qwen3-coder-plus',
+  ],
+  [ProviderName.Zhipu]: ['glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo', 'glm-4.7'],
+  [ProviderName.Minimax]: ['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.5'],
+  [ProviderName.Qianfan]: ['deepseek-v3.2'],
+  [ProviderName.StepFun]: ['step-3.5-flash'],
+  [ProviderName.Xiaomi]: ['mimo-v2-flash'],
+};
+
 class ProviderRegistryImpl {
   private readonly defs: readonly ProviderDef[];
   private readonly idIndex: ReadonlyMap<string, ProviderDef>;
-  private readonly modelCapabilityIndex: ReadonlyMap<string, boolean>;
 
   constructor(definitions: readonly ProviderDef[]) {
     this.defs = definitions;
     const idx = new Map<string, ProviderDef>();
-    const modelIdx = new Map<string, boolean>();
     for (const def of definitions) {
       idx.set(def.id, def);
-      for (const model of [...def.defaultModels, ...(def.codingPlanModels ?? [])]) {
-        const existing = modelIdx.get(model.id);
-        modelIdx.set(model.id, existing === true || model.supportsImage);
-      }
     }
     this.idIndex = idx;
-    this.modelCapabilityIndex = modelIdx;
   }
 
   /** All provider IDs in definition order. */
@@ -1026,10 +1062,6 @@ class ProviderRegistryImpl {
     return model?.supportsImage;
   }
 
-  getKnownModelSupportsImage(modelId: string): boolean | undefined {
-    return this.modelCapabilityIndex.get(modelId);
-  }
-
   resolveModelCapabilities(
     providerName: string,
     modelId: string,
@@ -1050,22 +1082,37 @@ class ProviderRegistryImpl {
           configured?.supportsImage !== undefined &&
           candidate.supportsImage === configured.supportsImage,
       ) ?? providerModels.find(candidate => candidate.id === modelId);
+    const isCatalogModel = providerModel !== undefined;
+    const hasVerifiedCatalogToolCalling =
+      CATALOG_TOOL_CALLING_MODEL_IDS[providerName]?.includes(modelId) === true;
+    const endpointToolCalling = CATALOG_PROVIDER_TOOL_CAPABILITIES[providerName]?.[apiFormat];
+    const configuredCapabilities = isCatalogModel ? undefined : configured?.capabilities;
     const imageSupport = this.resolveModelSupportsImage(
       providerName,
       modelId,
       configured?.supportsImage,
     );
+    const declaredImageCapability =
+      providerModel?.capabilities?.imageInput ?? configuredCapabilities?.imageInput;
+    const imageCapability =
+      declaredImageCapability ??
+      (isCatalogModel || configured?.supportsImage !== undefined
+        ? imageSupport
+          ? ModelCapabilityStatus.Supported
+          : ModelCapabilityStatus.Unsupported
+        : ModelCapabilityStatus.Unknown);
     return {
       ...UNKNOWN_MODEL_CAPABILITIES,
       ...providerModel?.capabilities,
-      ...configured?.capabilities,
-      imageInput: imageSupport
-        ? ModelCapabilityStatus.Supported
-        : ModelCapabilityStatus.Unsupported,
+      ...configuredCapabilities,
+      imageInput: imageCapability,
       toolCalling:
         providerModel?.capabilities?.toolCalling ??
-        PROVIDER_TOOL_CAPABILITIES[providerName]?.[apiFormat] ??
-        configured?.capabilities?.toolCalling ??
+        (endpointToolCalling === ModelCapabilityStatus.Unsupported
+          ? ModelCapabilityStatus.Unsupported
+          : undefined) ??
+        configuredCapabilities?.toolCalling ??
+        (isCatalogModel && hasVerifiedCatalogToolCalling ? endpointToolCalling : undefined) ??
         ModelCapabilityStatus.Unknown,
     };
   }
@@ -1075,13 +1122,6 @@ class ProviderRegistryImpl {
     modelId: string,
     configuredSupportsImage?: boolean,
   ): boolean {
-    if (
-      (providerName === ProviderName.Custom ||
-        providerName.startsWith(`${ProviderName.Custom}_`)) &&
-      configuredSupportsImage !== undefined
-    ) {
-      return configuredSupportsImage;
-    }
     const providerModels = [
       ...(this.get(providerName)?.defaultModels ?? []),
       ...(this.get(providerName)?.codingPlanModels ?? []),
@@ -1093,17 +1133,12 @@ class ProviderRegistryImpl {
     ) {
       return configuredSupportsImage;
     }
-    const providerModelSupportsImage = this.getProviderModelSupportsImage(providerName, modelId);
-    if (providerModelSupportsImage !== undefined) {
-      return providerModelSupportsImage;
+    if (providerModels.length > 0) {
+      return providerModels[0].supportsImage;
     }
-    if (configuredSupportsImage === true) {
-      return true;
-    }
-    const knownModelSupportsImage = this.getKnownModelSupportsImage(modelId);
-    if (knownModelSupportsImage === true) {
-      return true;
-    }
+
+    // A bare model ID is not a capability proof across providers. Preserve the
+    // provider-specific explicit value and otherwise stay conservatively false.
     return configuredSupportsImage ?? false;
   }
 

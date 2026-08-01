@@ -4,6 +4,7 @@ import { ChannelRunStatus, ChannelRunTrigger } from './constants';
 import { buildChannelRunSummary } from './summary';
 
 const baseInput = {
+  runId: 'run-1',
   sessionId: 'session-1',
   platform: 'feishu',
   conversationId: 'conv-1',
@@ -56,6 +57,7 @@ test('keeps trigger and identity fields verbatim', () => {
   });
 
   expect(summary.trigger).toBe(ChannelRunTrigger.Cron);
+  expect(summary.runId).toBe('run-1');
   expect(summary.sessionId).toBe('session-1');
   expect(summary.platform).toBe('feishu');
   expect(summary.conversationId).toBe('conv-1');

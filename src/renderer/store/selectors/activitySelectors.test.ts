@@ -17,6 +17,7 @@ let eventCounter = 0;
 const makeEvent = (overrides: Partial<ChannelRunSummary>): ChannelRunSummary => {
   eventCounter += 1;
   return {
+    runId: `run-${eventCounter}`,
     sessionId: `session-${eventCounter}`,
     platform: 'feishu',
     conversationId: 'conv-1',
@@ -32,8 +33,9 @@ const stateWith = (channelRuns: ChannelRunSummary[]): RootState =>
 
 describe('foldChannelRunEvents', () => {
   it('folds a started/completed pair into one run with the terminal status', () => {
-    const started = makeEvent({ sessionId: 's1', inputPreview: 'hello' });
+    const started = makeEvent({ runId: 'r1', sessionId: 's1', inputPreview: 'hello' });
     const completed = makeEvent({
+      runId: 'r1',
       sessionId: 's1',
       status: ChannelRunStatus.Completed,
       timestamp: started.timestamp + 500,
@@ -60,13 +62,15 @@ describe('foldChannelRunEvents', () => {
   });
 
   it('treats repeated runs on the same session as separate runs', () => {
-    const first = makeEvent({ sessionId: 's1', inputPreview: 'one' });
+    const first = makeEvent({ runId: 'r1', sessionId: 's1', inputPreview: 'one' });
     const firstDone = makeEvent({
+      runId: 'r1',
       sessionId: 's1',
       status: ChannelRunStatus.Completed,
       timestamp: first.timestamp + 100,
     });
     const second = makeEvent({
+      runId: 'r2',
       sessionId: 's1',
       inputPreview: 'two',
       timestamp: first.timestamp + 200,
@@ -100,15 +104,48 @@ describe('foldChannelRunEvents', () => {
   });
 
   it('generates unique ids for runs on the same session', () => {
-    const first = makeEvent({ sessionId: 's1' });
+    const first = makeEvent({ runId: 'r1', sessionId: 's1' });
     const firstDone = makeEvent({
+      runId: 'r1',
       sessionId: 's1',
       status: ChannelRunStatus.Completed,
       timestamp: first.timestamp + 100,
     });
-    const second = makeEvent({ sessionId: 's1', timestamp: first.timestamp + 200 });
+    const second = makeEvent({
+      runId: 'r2',
+      sessionId: 's1',
+      timestamp: first.timestamp + 200,
+    });
     const runs = foldChannelRunEvents([second, firstDone, first]);
     expect(new Set(runs.map(run => run.id)).size).toBe(runs.length);
+  });
+
+  it('pairs interleaved lifecycle events by run id instead of session id', () => {
+    const first = makeEvent({ runId: 'r1', sessionId: 's1', inputPreview: 'one' });
+    const second = makeEvent({
+      runId: 'r2',
+      sessionId: 's1',
+      inputPreview: 'two',
+      timestamp: first.timestamp + 10,
+    });
+    const firstDone = makeEvent({
+      runId: 'r1',
+      sessionId: 's1',
+      status: ChannelRunStatus.Failed,
+      timestamp: first.timestamp + 20,
+    });
+    const secondDone = makeEvent({
+      runId: 'r2',
+      sessionId: 's1',
+      status: ChannelRunStatus.Completed,
+      timestamp: first.timestamp + 30,
+    });
+
+    const runs = foldChannelRunEvents([secondDone, firstDone, second, first]);
+
+    expect(runs).toHaveLength(2);
+    expect(runs.find(run => run.id === 'r1')?.status).toBe(ChannelRunStatus.Failed);
+    expect(runs.find(run => run.id === 'r2')?.status).toBe(ChannelRunStatus.Completed);
   });
 });
 
@@ -127,8 +164,9 @@ describe('selectHasActiveChannelRun', () => {
   });
 
   it('is false once every run reached a terminal status', () => {
-    const started = makeEvent({ sessionId: 's1' });
+    const started = makeEvent({ runId: 'r1', sessionId: 's1' });
     const completed = makeEvent({
+      runId: 'r1',
       sessionId: 's1',
       status: ChannelRunStatus.Completed,
       timestamp: started.timestamp + 100,
