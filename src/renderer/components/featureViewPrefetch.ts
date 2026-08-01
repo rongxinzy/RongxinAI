@@ -15,22 +15,22 @@ export type PrefetchableFeatureView =
 export const prefetchFeatureView = (view: PrefetchableFeatureView): void => {
   switch (view) {
     case 'settings':
-      void import('./Settings');
+      void import('./Settings').catch(() => undefined);
       break;
     case 'skills':
-      void import('./skills');
+      void import('./skills').catch(() => undefined);
       break;
     case 'scheduledTasks':
-      void import('./scheduledTasks');
+      void import('./scheduledTasks').catch(() => undefined);
       break;
     case 'mcp':
-      void import('./mcp');
+      void import('./mcp').catch(() => undefined);
       break;
     case 'localInference':
-      void import('./localInference');
+      void import('./localInference').catch(() => undefined);
       break;
     case 'expert':
-      void import('./expert/ExpertView');
+      void import('./expert/ExpertView').catch(() => undefined);
       break;
   }
 };
