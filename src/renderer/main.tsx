@@ -37,6 +37,14 @@ async function renderRoot(): Promise<void> {
   }
 
   const [{ default: App }, { store }] = await Promise.all([import('./App'), import('./store')]);
+
+  // Channel/Cron runs are projected into a read-only activity list; they
+  // never become cowork sessions (issue #225).
+  const { recordChannelRun } = await import('./store/slices/activitySlice');
+  window.electron.channelRun.onRunEvent(summary => {
+    store.dispatch(recordChannelRun(summary));
+  });
+
   root.render(
     <React.StrictMode>
       <Provider store={store}>
