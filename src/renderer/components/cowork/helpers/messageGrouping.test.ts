@@ -105,3 +105,63 @@ test('buildTurnRailIndices skips turns without user or assistant content', () =>
   expect(indices[0]).toEqual({ user: -1, assistant: 0 });
   expect(indices[1]).toEqual({ user: 1, assistant: -1 });
 });
+
+// ── Scale fixtures (issue #141: 20/200/1000-turn sessions) ──
+
+const buildFixtureMessages = (turnCount: number): CoworkMessage[] => {
+  const messages: CoworkMessage[] = [];
+  for (let i = 0; i < turnCount; i++) {
+    messages.push(message(`user-${i}`, 'user', `question ${i}`));
+    messages.push(message(`tool-${i}`, 'tool_use', `read file ${i}`));
+    messages.push(message(`assistant-${i}`, 'assistant', `answer ${i}`));
+  }
+  return messages;
+};
+
+for (const turnCount of [20, 200, 1000]) {
+  test(`groups and numbers a ${turnCount}-turn session`, () => {
+    const turns = buildTurns(buildFixtureMessages(turnCount));
+    expect(turns).toHaveLength(turnCount);
+    expect(turns[0]?.id).toBe('user-0');
+    expect(turns[turnCount - 1]?.id).toBe(`user-${turnCount - 1}`);
+
+    const indices = buildTurnRailIndices(turns);
+    expect(indices[0]).toEqual({ user: 0, assistant: 1 });
+    expect(indices[turnCount - 1]).toEqual({
+      user: (turnCount - 1) * 2,
+      assistant: (turnCount - 1) * 2 + 1,
+    });
+  });
+}
+
+test('a tail delta at 1000 turns only re-creates the tail turn', () => {
+  const fixtureMessages = buildFixtureMessages(1000);
+  const base = buildTurns(fixtureMessages);
+  const streamed = buildTurns([
+    ...fixtureMessages.slice(0, -1),
+    message('assistant-999', 'assistant', 'answer 999 plus one token'),
+  ]);
+
+  const started = performance.now();
+  const stabilized = stabilizeConversationTurns(base, streamed);
+  const elapsedMs = performance.now() - started;
+
+  for (let i = 0; i < 999; i++) {
+    expect(stabilized[i]).toBe(base[i]);
+  }
+  expect(stabilized[999]).not.toBe(base[999]);
+  expect(elapsedMs).toBeLessThan(500);
+});
+
+test('pagination prepend keeps existing turn references', () => {
+  const fixtureMessages = buildFixtureMessages(50);
+  const initial = buildTurns(fixtureMessages.slice(-100)); // turns ~17..49
+  const prepended = stabilizeConversationTurns(initial, buildTurns(fixtureMessages));
+
+  const initialById = new Map(initial.map(turn => [turn.id, turn]));
+  for (const turn of prepended) {
+    const previous = initialById.get(turn.id);
+    if (previous) expect(turn).toBe(previous);
+  }
+  expect(prepended.length).toBe(50);
+});
