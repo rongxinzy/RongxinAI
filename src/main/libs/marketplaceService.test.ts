@@ -70,38 +70,47 @@ function verifiedModel(repoId = 'Qwen/Qwen3-8B-GGUF') {
   };
 }
 
-test('MarketplaceService marks installed models from the configured local-model directory', () => {
+test('MarketplaceService marks installed models from the configured local-model directory', async () => {
   const modelsDir = createTempDir();
   const installedPath = path.join(
     modelsDir,
     'modelscope',
     'Qwen',
-    'Qwen2.5-7B-Instruct-GGUF',
-    'qwen2.5-7b-instruct-q4_k_m.gguf',
+    'Qwen3-8B-GGUF',
+    'qwen3-8b-q4_k_m.gguf',
   );
   fs.mkdirSync(path.dirname(installedPath), { recursive: true });
   fs.writeFileSync(installedPath, '');
 
-  const service = new MarketplaceService(() => modelsDir);
-  const result = service.searchLocal({ query: 'Qwen2.5 7B Instruct', limit: 10 });
-  const model = result.find(item => item.repoId === 'Qwen/Qwen2.5-7B-Instruct-GGUF');
+  const fetchMock = vi.fn(async () =>
+    Response.json({ models: [verifiedModel()], totalCount: 1 }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => modelsDir, {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({ limit: 10 });
+  const model = result.models.find(item => item.repoId === 'Qwen/Qwen3-8B-GGUF');
 
   expect(model?.installed).toBe(true);
   expect(model?.installedPath).toBe(installedPath);
 });
 
-test('MarketplaceService excludes embedding GGUF records from bundled recommendations', () => {
-  const service = new MarketplaceService(() => createTempDir());
-  const result = service.searchLocal({ limit: 100 });
+test('MarketplaceService returns an empty result with a warning when the catalogue is down and uncached', async () => {
+  const fetchMock = vi.fn(async () => {
+    throw new Error('network unreachable');
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
 
-  expect(
-    result.some(model =>
-      /bge|embed|e5|gte|rerank|embedding/i.test(
-        [model.repoId, model.name, model.description, ...model.tags].join(' '),
-      ),
-    ),
-  ).toBe(false);
-  expect(service.searchLocal({ query: 'bge-large-zh-v1.5', limit: 20 })).toEqual([]);
+  const result = await service.search({ query: 'qwen3', limit: 20 });
+
+  expect(result.models).toHaveLength(0);
+  expect(result.totalCount).toBe(0);
+  expect(result.warning).toMatch(/CATALOG_ERROR/);
 });
 
 test('MarketplaceService uses the cloud catalogue without sending a local ModelScope token', async () => {
@@ -178,7 +187,7 @@ test('MarketplaceService filters embedding records even if a malformed cloud res
   expect(result.models.map(model => model.repoId)).toEqual(['Qwen/Qwen3-8B-GGUF']);
 });
 
-test('MarketplaceService falls back to bundled recommendations without a token warning', async () => {
+test('MarketplaceService reports catalogue failures without leaking token details', async () => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('not found', { status: 404 })));
   const service = new MarketplaceService(() => createTempDir(), {
     catalogApiUrl: 'https://catalog.example.test',
@@ -186,7 +195,8 @@ test('MarketplaceService falls back to bundled recommendations without a token w
 
   const result = await service.search({ query: 'qwen', limit: 8 });
 
-  expect(result.source).toBe('curated');
+  expect(result.source).toBe('cloud-catalog');
+  expect(result.models).toHaveLength(0);
   expect(result.warning).toMatch(/^CATALOG_ERROR:/);
   expect(result.warning).not.toMatch(/token|api key/i);
 });

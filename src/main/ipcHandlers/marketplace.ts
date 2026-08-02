@@ -18,11 +18,12 @@ export function registerMarketplaceIpcHandlers(options: {
     try {
       return await service.search(params);
     } catch (error) {
-      console.warn('[Marketplace] catalog search failed; using bundled GGUF recommendations:', error);
+      console.warn('[Marketplace] catalog search failed:', error);
       return {
-        models: service.searchLocal(params),
-        source: 'curated' as const,
-        warning: '云端 GGUF 目录暂时不可用，正在展示内置推荐。',
+        models: [],
+        totalCount: 0,
+        source: 'cloud-catalog' as const,
+        warning: '云端 GGUF 目录暂时不可用。',
       };
     }
   });

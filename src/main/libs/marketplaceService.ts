@@ -8,10 +8,8 @@ import {
   type MarketplaceSearchParams,
   type MarketplaceSearchResult,
 } from '../../shared/marketplace';
-import curatedModels from '../resources/modelscope-gguf-curated-models.json';
 import {
   resolveMarketplaceParameterCount,
-  resolveParameterCount,
   sortMarketplaceModels,
 } from './marketplaceModelOrder';
 import { ModelCatalogClient, type CatalogFetchLike, resolveModelCatalogUrl } from './modelCatalogClient';
@@ -33,27 +31,12 @@ const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DETAIL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CACHE_MAX_FILES = 300;
 
-type CuratedModelEntry = {
-  name: string;
-  description: string;
-  tags: string[];
-  sizes: string[];
-  recommendedTag: string;
-  filePath?: string;
-  downloads?: number;
-  detailUrl?: string;
-  parameterCount?: number;
-  featuredRank?: number;
-};
-
 type InstalledModelRecord = {
   repoId: string;
   installedPath: string;
 };
 
-const MARKETPLACE_SOURCE = 'modelscope-gguf' as const;
 const DEFAULT_LIMIT = 120;
-const LOCAL_LIMIT = 100;
 const CATALOG_ERROR_PREFIX = 'CATALOG_ERROR:';
 const NON_GENERATIVE_GGUF_PATTERN =
   /\b(?:embedding|embed|bge(?:[-_]|\b)|e5(?:[-_]|\b)|gte(?:[-_]|\b)|rerank(?:er)?|sentence[-_ ]transformers?|clip|siglip|colbert|vector(?:izer)?|text[-_ ]embedding)\b/i;
@@ -61,10 +44,10 @@ const NON_GENERATIVE_GGUF_PATTERN =
 /**
  * Desktop catalogue adapter.
  *
- * Network metadata is accepted only from the Cloudflare catalogue. The desktop never sends a
- * ModelScope credential and never falls back to the ModelScope API directly. Bundled entries are
- * browse-only fallback records and cannot be installed until the catalogue supplies a verified
- * file revision, byte size and SHA-256 digest.
+ * Network metadata is accepted only from the Cloudflare catalogue. The desktop
+ * never sends a ModelScope credential and never falls back to the ModelScope
+ * API directly. Offline resilience comes from the on-disk cache of catalogue
+ * responses; there is no bundled browse-only fallback.
  */
 export class MarketplaceService {
   private readonly cache: MarketplaceDiskCache | null;
@@ -81,8 +64,12 @@ export class MarketplaceService {
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
     const catalogUrl = this.resolveCatalogUrl();
     if (!catalogUrl) {
-      const models = this.searchLocal(params);
-      return { models, totalCount: models.length, source: 'curated' };
+      return {
+        models: [],
+        totalCount: 0,
+        warning: `${CATALOG_ERROR_PREFIX}云端模型目录未配置。`,
+        source: 'cloud-catalog',
+      };
     }
 
     try {
@@ -113,13 +100,12 @@ export class MarketplaceService {
       const models = this.processCatalog(catalog, params);
       return { ...catalog, models, totalCount: catalog.totalCount ?? models.length };
     } catch (error) {
-      console.warn('[Marketplace] cloud catalogue unavailable; using bundled records:', error);
-      const models = this.searchLocal(params);
+      console.warn('[Marketplace] cloud catalogue unavailable:', error);
       return {
-        models,
-        totalCount: models.length,
+        models: [],
+        totalCount: 0,
         warning: `${CATALOG_ERROR_PREFIX}${toMarketplaceWarning(error)}`,
-        source: 'curated',
+        source: 'cloud-catalog',
       };
     }
   }
@@ -136,17 +122,6 @@ export class MarketplaceService {
       ),
       params,
     ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT));
-  }
-
-  searchLocal(params: MarketplaceSearchParams = {}): MarketplaceModel[] {
-    const installed = scanInstalledModels(this.getModelsDir());
-    const models = (curatedModels as CuratedModelEntry[])
-      .map(entry => toMarketplaceModel(entry))
-      .filter(isGenerativeLanguageModel);
-    return sortMarketplaceModels(
-      annotateInstalledModels(filterMarketplaceModels(models, params), installed),
-      params,
-    ).slice(0, resolveLimit(params.limit, LOCAL_LIMIT));
   }
 
   async resolveModel(repoId: string): Promise<MarketplaceModel | null> {
@@ -177,11 +152,7 @@ export class MarketplaceService {
       }
     }
 
-    return (
-      this.searchLocal({ query: normalizedRepoId, limit: LOCAL_LIMIT }).find(
-        model => model.repoId === normalizedRepoId,
-      ) ?? null
-    );
+    return null;
   }
 
   private resolveCatalogUrl(): string | null {
@@ -189,31 +160,6 @@ export class MarketplaceService {
       ? resolveModelCatalogUrl()
       : this.options.catalogApiUrl;
   }
-}
-
-function toMarketplaceModel(entry: CuratedModelEntry): MarketplaceModel {
-  const repoId = entry.name.trim();
-  const capabilities = classifyCapabilities(repoId, entry.description, entry.tags);
-  return {
-    source: MARKETPLACE_SOURCE,
-    id: repoId,
-    repoId,
-    name: repoId,
-    description: entry.description,
-    tags: unique([...entry.tags, ...capabilities]),
-    sizes: entry.sizes,
-    recommendedTag: entry.recommendedTag,
-    capability: resolvePrimaryCapability(capabilities),
-    capabilities,
-    filePath: entry.filePath,
-    downloads: entry.downloads,
-    detailUrl: entry.detailUrl ?? `https://www.modelscope.cn/models/${repoId}`,
-    parameterCount: entry.parameterCount ?? resolveParameterCount(entry.sizes),
-    installed: false,
-    isFeatured: true,
-    featuredRank: entry.featuredRank,
-    metadataStatus: 'pending',
-  };
 }
 
 function annotateInstalledModels(
@@ -330,36 +276,8 @@ function matchesSizeFilter(
   return size !== 'large' || billions > 32;
 }
 
-function classifyCapabilities(name: string, description: string, tags: string[]): MarketplaceCapability[] {
-  const source = `${name} ${description} ${tags.join(' ')}`.toLowerCase();
-  const capabilities = new Set<MarketplaceCapability>();
-  if (/\b(reasoning|thinking|reasoner|math|stem|qwq|r1)\b/.test(source))
-    capabilities.add(MarketplaceCapability.Reasoning);
-  if (/\b(code|coder|coding|programming|developer|swe|devstral)\b/.test(source))
-    capabilities.add(MarketplaceCapability.Code);
-  if (/\b(vision|visual|vl|multimodal|ocr|image)\b/.test(source))
-    capabilities.add(MarketplaceCapability.Vision);
-  if (/\b(chat|instruct|assistant|conversation|dialogue)\b/.test(source) || capabilities.size === 0)
-    capabilities.add(MarketplaceCapability.Chat);
-  return [...capabilities];
-}
-
-function resolvePrimaryCapability(capabilities: MarketplaceCapability[]): MarketplaceCapability {
-  const priority = [
-    MarketplaceCapability.Reasoning,
-    MarketplaceCapability.Code,
-    MarketplaceCapability.Vision,
-    MarketplaceCapability.Chat,
-  ];
-  return priority.find(capability => capabilities.includes(capability)) ?? MarketplaceCapability.Chat;
-}
-
 function tagsForTask(task?: MarketplaceSearchParams['task']): MarketplaceCapability[] {
   return task && task !== 'all' ? [task] : [];
-}
-
-function unique<T>(items: T[]): T[] {
-  return [...new Set(items)];
 }
 
 function resolveLimit(limit: number | undefined, fallback: number): number {
