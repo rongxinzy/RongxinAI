@@ -9,6 +9,8 @@ import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
+import { Skeleton } from '@shared/components/ui/skeleton';
+
 import type { MarketplaceModel, MarketplaceSearchParams, MarketplaceTaskFilter } from '../../../../shared/marketplace';
 import {
   formatMarketplaceHardwareSummary,
@@ -28,7 +30,6 @@ import {
 } from '@shared/components/ui/select';
 import {
   localInferenceCompactButtonClass,
-  localInferenceMutedTextClass,
   MARKETPLACE_PAGE_SIZE,
 } from '../constants';
 import type { InstallProgressState } from '../types';
@@ -233,6 +234,9 @@ export function MarketplacePanel({
     : resultContext === 'category'
       ? `${i18nService.t('marketplaceResultCategory')} · ${taskLabel ?? taskFilter}`
       : i18nService.t(resultContext === 'recommended' ? 'marketplaceResultRecommended' : 'marketplaceResultAll');
+  // The server total keeps the count consistent with pagination ("共 11222 个
+  // 结果" next to "第 1 / 1403 页"); it is hidden when local filtering leaves
+  // zero cards so a non-empty server total is never shown over an empty grid.
   const resultCount = totalCount ?? installableModels.length;
   const searchParamsForPage = useCallback(
     (pageNumber?: number, queryValue = submittedQuery): MarketplaceSearchParams => ({
@@ -241,7 +245,13 @@ export function MarketplacePanel({
       limit: pageSize,
       task: taskFilter,
       fit: fitFilter,
-      featuredOnly: !queryValue.trim() && taskFilter === 'all' && browseMode === 'recommended',
+      featuredOnly:
+        !queryValue.trim() &&
+        taskFilter === 'all' &&
+        browseMode === 'recommended' &&
+        // "不限" browses the whole catalogue; only the recommended default is
+        // pinned to the curated featured list.
+        fitFilter !== 'all',
     }),
     [browseMode, fitFilter, pageSize, submittedQuery, taskFilter],
   );
@@ -368,7 +378,7 @@ export function MarketplacePanel({
           >
             <div className="flex gap-2">
               <InputGroup
-                className={hasSearched ? 'h-9 min-w-0 flex-1' : 'h-16 flex-1 rounded-3xl'}
+                className={hasSearched ? 'h-9 min-w-0 flex-1' : 'h-12 flex-1 rounded-xl'}
               >
                 <InputGroupAddon>
                   <Search />
@@ -377,13 +387,17 @@ export function MarketplacePanel({
                   value={query}
                   onChange={event => onQueryChange(event.target.value)}
                   placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-                  className={hasSearched ? 'text-xs' : 'h-16 text-lg'}
+                  className={hasSearched ? 'text-xs' : 'h-12 text-base'}
                 />
               </InputGroup>
               <Button
                 type="submit"
                 disabled={marketplaceLoading}
-                className={`${localInferenceCompactButtonClass} self-center`}
+                className={
+                  hasSearched
+                    ? `${localInferenceCompactButtonClass} self-center`
+                    : 'h-12 shrink-0 cursor-pointer self-center px-6'
+                }
                 variant="outline"
               >
                 {marketplaceLoading && (
@@ -400,7 +414,7 @@ export function MarketplacePanel({
         <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-sm font-semibold text-foreground">{resultTitle}</span>
-            {hasSearched ? (
+            {hasSearched && !marketplaceLoading && installableModels.length > 0 ? (
               <span className="text-xs text-muted-foreground">
                 {i18nService.t('marketplaceResultCount').replace('{count}', String(resultCount))}
               </span>
@@ -411,15 +425,26 @@ export function MarketplacePanel({
               <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
                 {i18nService.t('marketplaceBrowse')}
               </span>
-              <FluidTabs
-                aria-label={i18nService.t('marketplaceBrowse')}
-                value={browseMode}
-                onValueChange={value => setBrowseMode(value as MarketplaceBrowseMode)}
-                items={[
-                  { value: 'recommended', label: i18nService.t('marketplaceBrowseRecommended') },
-                  { value: 'all', label: i18nService.t('marketplaceBrowseAll') },
-                ]}
-              />
+              <div className="flex items-center gap-0.5">
+                {(['recommended', 'all'] as const).map(mode => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className={
+                      browseMode === mode
+                        ? 'font-semibold text-foreground'
+                        : 'font-normal text-muted-foreground hover:text-foreground'
+                    }
+                    onClick={() => setBrowseMode(mode)}
+                  >
+                    {i18nService.t(
+                      mode === 'recommended' ? 'marketplaceBrowseRecommended' : 'marketplaceBrowseAll',
+                    )}
+                  </Button>
+                ))}
+              </div>
             </div>
           ) : null}
         </div>
@@ -447,7 +472,7 @@ export function MarketplacePanel({
                 {i18nService.t('marketplaceFilterFit')}
               </span>
               <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-                <SelectTrigger size="sm" className="min-w-32 rounded-full border-border/60 bg-background/70 px-3">
+                <SelectTrigger size="sm" className="min-w-32">
                   <SelectValue>{fitFilterLabel}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -478,21 +503,23 @@ export function MarketplacePanel({
       ) : null}
 
       {marketplaceLoading ? (
-        <div
-          className={`flex min-h-[620px] items-center justify-center text-sm ${localInferenceMutedTextClass}`}
-        >
-          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-          {i18nService.t('loading')}
-        </div>
+        <MarketplaceGridSkeleton columnCount={gridColumnCount} />
       ) : !hasSearched ? null : installableModels.length === 0 ? (
         <div className="flex min-h-[620px] flex-col gap-4">
           {installedModelActions ?? (
             <EmptyState
               title={i18nService.t('marketplaceNoModels')}
               action={
-                <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
-                  {i18nService.t('marketplaceFilterClear')}
-                </Button>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {fitFilter !== 'all' ? (
+                    <Button type="button" size="sm" onClick={() => setFitFilter('all')}>
+                      {i18nService.t('marketplaceEmptyShowAll')}
+                    </Button>
+                  ) : null}
+                  <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
+                    {i18nService.t('marketplaceFilterClear')}
+                  </Button>
+                </div>
               }
             />
           )}
@@ -523,7 +550,7 @@ export function MarketplacePanel({
           {hasSearched && installableModels.length > 0 && (
             <div
               ref={paginationRef}
-              className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border/40 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+              className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border-subtle bg-background px-3 py-3"
             >
               <Button
                 type="button"
@@ -558,6 +585,44 @@ export function MarketplacePanel({
         </div>
       )}
 
+    </div>
+  );
+}
+
+// In-place loading placeholder that mirrors the model card grid, so the first
+// paint of a search never flashes a centered spinner (DESIGN.md: skeletons,
+// not full-screen spinners).
+function MarketplaceGridSkeleton({ columnCount }: { columnCount: number }) {
+  return (
+    <div
+      aria-hidden="true"
+      className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
+      style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+    >
+      {Array.from({ length: columnCount * 2 }, (_, index) => (
+        <div
+          key={index}
+          className="flex h-full flex-col gap-3 rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+        >
+          <div className="flex items-center gap-2">
+            <Skeleton className="size-8 rounded-lg" />
+            <Skeleton className="h-5 w-2/3" />
+          </div>
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-3 w-12" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Skeleton className="h-6 w-14 rounded-md" />
+            <Skeleton className="h-6 w-10 rounded-md" />
+            <Skeleton className="h-6 w-12 rounded-md" />
+          </div>
+          <div className="mt-auto flex items-center justify-between border-t border-border/50 pt-3">
+            <Skeleton className="h-5 w-16 rounded-md" />
+            <Skeleton className="h-8 w-20 rounded-md" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
