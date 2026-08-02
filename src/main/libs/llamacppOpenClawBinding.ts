@@ -3,7 +3,7 @@ import {
   type LlamaCppOpenClawEligibility,
   type LlamaCppRunningModel,
 } from '../../shared/llamacpp';
-import type { ProviderConfig } from '../../shared/providers';
+import type { ModelCapabilities, ProviderConfig } from '../../shared/providers';
 import { ApiFormat, ProviderName, ProviderRegistry } from '../../shared/providers';
 
 export type { LlamaCppOpenClawEligibility } from '../../shared/llamacpp';
@@ -24,6 +24,7 @@ export type LlamaCppRunningModelBinding = {
   contextWindow?: number;
   contextTokens?: number;
   maxTokens?: number;
+  capabilities?: Pick<ModelCapabilities, 'toolCalling'>;
   openClawEligibility: LlamaCppOpenClawEligibility;
 };
 
@@ -61,6 +62,7 @@ function normalizeLlamaCppProviderModels(
       contextWindow: model.contextWindow,
       contextTokens: model.contextTokens,
       maxTokens: model.maxTokens,
+      capabilities: model.capabilities,
     }))
     .sort((modelA, modelB) => {
       const keyA = `${modelA.id.trim()}::${modelA.name.trim()}`;

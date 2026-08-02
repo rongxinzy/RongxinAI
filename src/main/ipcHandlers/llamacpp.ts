@@ -31,6 +31,7 @@ import {
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
 import { isProviderEnabled, ProviderName } from '../../shared/providers';
+import { ModelCapabilityStatus } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
@@ -254,11 +255,16 @@ export function registerLlamaCppIpcHandlers(
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
     reason: string,
   ): Promise<void> => {
+    const store = options.getStore();
+    const modelPreferences = getLlamaCppModelPreferences(store);
     const bindingModels = runningModels
       .map(model => buildLlamaCppRunningModelBinding(model))
-      .filter((model): model is NonNullable<typeof model> => Boolean(model));
+      .filter((model): model is NonNullable<typeof model> => Boolean(model))
+      .map(model => {
+        const capabilities = modelPreferences[model.id]?.capabilities;
+        return capabilities ? { ...model, capabilities } : model;
+      });
     const runningModelsChanged = updateLlamaCppRunningModels(bindingModels);
-    const store = options.getStore();
     const current = store.get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
     const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
     if (appConfigUpdate.changed) {
@@ -526,6 +532,7 @@ export function registerLlamaCppIpcHandlers(
     const current = getLlamaCppModelPreferences(store);
     const next = sanitizeUpdatedModelPreferences(current, input);
     store.set(LLAMACPP_MODEL_PREFERENCES_KEY, next);
+    await refreshRunningModelBindings();
     return next;
   });
   ipcMain.handle(LlamaCppIpcChannel.ImportModelFiles, async (_event, input: unknown) => {
@@ -577,7 +584,8 @@ export function registerLlamaCppIpcHandlers(
         const store = options.getStore();
         const serviceConfig = getLlamaCppServiceConfig(store);
         const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(store, input);
-        let processOutputPhase: LlamaCppModelLaunchLogPhase = LlamaCppModelLaunchLogPhase.CheckingService;
+        let processOutputPhase: LlamaCppModelLaunchLogPhase =
+          LlamaCppModelLaunchLogPhase.CheckingService;
         const unsubscribeProcessOutput = subscribeToLlamaCppProcessOutput(
           manager,
           launchLogger.report,
@@ -621,7 +629,8 @@ export function registerLlamaCppIpcHandlers(
 
           const localModels = await manager.listLocalModels();
           const targetModel = localModels.find(
-            model => model.name === modelName || model.id === modelName || model.model === modelName,
+            model =>
+              model.name === modelName || model.id === modelName || model.model === modelName,
           );
           launchLogger.info(LlamaCppModelLaunchLogPhase.PreparingModel, undefined, {
             modelFound: Boolean(targetModel),
@@ -630,10 +639,12 @@ export function registerLlamaCppIpcHandlers(
           });
           processOutputPhase = LlamaCppModelLaunchLogPhase.CheckingRuntime;
           launchLogger.info(LlamaCppModelLaunchLogPhase.CheckingRuntime);
-          const runtimeCapabilities = await manager.getRuntimeCapabilities().catch((error): null => {
-            launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
-            return null;
-          });
+          const runtimeCapabilities = await manager
+            .getRuntimeCapabilities()
+            .catch((error): null => {
+              launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
+              return null;
+            });
           const nvidiaSnapshot = await getNvidiaSmiSnapshot().catch((error): null => {
             launchLogger.warn(LlamaCppModelLaunchLogPhase.CheckingRuntime, undefined, error);
             return null;
@@ -643,14 +654,17 @@ export function registerLlamaCppIpcHandlers(
           try {
             const result = await loadLlamaCppModelThroughPipeline({
               launchInput: { ...inputWithPreferences, model: modelName },
-              runtimeBackend: serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
+              runtimeBackend:
+                serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
               runtimeCapabilities,
               nvidiaSnapshot,
               modelSizeBytes: targetModel?.size,
               onLog: launchLogger.report,
-              loadModel: async (loadInput: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> =>
-                manager.loadModel(loadInput),
-              listModels: (timeoutMs: number): Promise<LlamaCppModel[]> => manager.listRouterModels(timeoutMs),
+              loadModel: async (
+                loadInput: LlamaCppModelLaunchInput,
+              ): Promise<LlamaCppModelLaunchResult> => manager.loadModel(loadInput),
+              listModels: (timeoutMs: number): Promise<LlamaCppModel[]> =>
+                manager.listRouterModels(timeoutMs),
               listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
               detectService: (): Promise<LlamaCppStatusSnapshot> => manager.detect(),
               unloadModel: async unloadModelName => {
@@ -897,7 +911,7 @@ function sanitizeLlamaCppModelPreference(preference: unknown): LlamaCppModelPref
     return null;
   }
 
-  const candidate = preference as { ctxSize?: unknown };
+  const candidate = preference as { ctxSize?: unknown; capabilities?: { toolCalling?: unknown } };
   const parsedCtxSize =
     typeof candidate.ctxSize === 'number'
       ? candidate.ctxSize
@@ -907,16 +921,24 @@ function sanitizeLlamaCppModelPreference(preference: unknown): LlamaCppModelPref
   const ctxSizeRange =
     LLAMACPP_STRUCTURED_INTEGER_RANGES[LlamaCppStructuredServiceFieldKey.CtxSize];
 
-  if (
+  const ctxSize =
     typeof parsedCtxSize === 'number' &&
     Number.isFinite(parsedCtxSize) &&
     parsedCtxSize >= ctxSizeRange.min &&
     parsedCtxSize <= ctxSizeRange.max
-  ) {
-    return { ctxSize: parsedCtxSize };
-  }
+      ? parsedCtxSize
+      : undefined;
+  const toolCalling = candidate.capabilities?.toolCalling;
+  const capabilities =
+    toolCalling === ModelCapabilityStatus.Supported ||
+    toolCalling === ModelCapabilityStatus.Unsupported ||
+    toolCalling === ModelCapabilityStatus.Unknown
+      ? { toolCalling }
+      : undefined;
 
-  return null;
+  return ctxSize || capabilities
+    ? { ...(ctxSize ? { ctxSize } : {}), ...(capabilities ? { capabilities } : {}) }
+    : null;
 }
 
 export function sanitizeLlamaCppServiceConfig(
@@ -1190,13 +1212,15 @@ function subscribeToLlamaCppProcessOutput(
 ): () => void {
   const handleProcessOutput = (event: LlamaCppProcessOutputEvent) => {
     report({
-      level: event.stream === LlamaCppProcessOutputStream.Stderr
-        ? LlamaCppModelLaunchLogLevel.Warn
-        : LlamaCppModelLaunchLogLevel.Debug,
+      level:
+        event.stream === LlamaCppProcessOutputStream.Stderr
+          ? LlamaCppModelLaunchLogLevel.Warn
+          : LlamaCppModelLaunchLogLevel.Debug,
       phase: getPhase(),
-      message: event.stream === LlamaCppProcessOutputStream.Stderr
-        ? 'llama-server stderr'
-        : 'llama-server stdout',
+      message:
+        event.stream === LlamaCppProcessOutputStream.Stderr
+          ? 'llama-server stderr'
+          : 'llama-server stdout',
       detail: event.text,
     });
   };

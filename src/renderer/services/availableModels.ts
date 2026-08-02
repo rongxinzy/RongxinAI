@@ -1,4 +1,4 @@
-import type { LlamaCppRunningModel } from '../../shared/llamacpp';
+import type { LlamaCppModelPreferences, LlamaCppRunningModel } from '../../shared/llamacpp';
 import {
   isProviderEnabled,
   ProviderName,
@@ -88,7 +88,10 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   }));
 }
 
-export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]): Model[] {
+export function buildLlamaCppRunningModels(
+  runningModels: LlamaCppRunningModel[],
+  preferences: LlamaCppModelPreferences = {},
+): Model[] {
   const models: Model[] = [];
 
   runningModels.forEach(model => {
@@ -104,6 +107,7 @@ export function buildLlamaCppRunningModels(runningModels: LlamaCppRunningModel[]
       providerKey: ProviderName.LlamaCpp,
       openClawProviderId: ProviderRegistry.getOpenClawProviderId(ProviderName.LlamaCpp),
       supportsImage: false,
+      capabilities: preferences[name]?.capabilities,
       supportsThinkingToggle: model.supportsThinkingToggle,
       llamaCppOpenClawEligibility: eligibility,
       llamaCppRuntimeContextWindow: eligibility.runtimeContextWindow,
@@ -141,7 +145,16 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
 
   try {
     const runningModels = await window.electron.llamacpp.listRunningModels();
-    return mergeAvailableModels(configuredModels, buildLlamaCppRunningModels(runningModels));
+    let preferences: LlamaCppModelPreferences = {};
+    try {
+      preferences = (await window.electron.llamacpp.getModelPreferences?.()) ?? {};
+    } catch {
+      // Model preferences are optional metadata; keep the running model list available.
+    }
+    return mergeAvailableModels(
+      configuredModels,
+      buildLlamaCppRunningModels(runningModels, preferences),
+    );
   } catch {
     return configuredModels;
   }

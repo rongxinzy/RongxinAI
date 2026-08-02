@@ -19,7 +19,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { ArrowRight, Box, Clock3, Ellipsis, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRight, Box, Clock3, Ellipsis, Pencil, Settings2, Trash2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   type ComponentType,
@@ -110,6 +110,7 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
+  onConfigureCapabilities: (model: LlamaCppModel) => void;
   onOpenMarketplace?: () => void;
   onOpenLaunchLog?: (modelName: string) => void;
   renderLoadButton?: (
@@ -130,6 +131,7 @@ type ModelCardProps = {
   unloading: boolean;
   onLoadModel: () => void;
   onConfigureContext: () => void;
+  onConfigureCapabilities: () => void;
   onUnload: () => void;
   onDelete: () => void;
   dragging: boolean;
@@ -157,6 +159,7 @@ export function ModelsPanel({
   onUnload,
   onDelete,
   onConfigureContext,
+  onConfigureCapabilities,
   onOpenMarketplace,
   onOpenLaunchLog,
   renderLoadButton,
@@ -329,6 +332,7 @@ export function ModelsPanel({
                   unloading={unloadingModelName === model.name}
                   onLoadModel={() => onLoadModel(model)}
                   onConfigureContext={() => onConfigureContext(model)}
+                  onConfigureCapabilities={() => onConfigureCapabilities(model)}
                   onUnload={() => onUnload(model.name)}
                   onDelete={() => setPendingDeleteModel(model)}
                   dragging={draggedModelName === model.name}
@@ -352,7 +356,10 @@ export function ModelsPanel({
           </>
         ) : (
           <Empty className="mx-auto min-h-80 w-full max-w-[800px] rounded-lg border border-dashed border-border bg-card p-6">
-            <EmptyMedia className="size-12 rounded-lg bg-muted text-muted-foreground" variant="icon">
+            <EmptyMedia
+              className="size-12 rounded-lg bg-muted text-muted-foreground"
+              variant="icon"
+            >
               <Box size={32} className="size-8 text-foreground" />
             </EmptyMedia>
             <EmptyHeader>
@@ -444,6 +451,7 @@ function ModelCard({
   unloading,
   onLoadModel,
   onConfigureContext,
+  onConfigureCapabilities,
   onUnload,
   onDelete,
   dragging,
@@ -555,7 +563,19 @@ function ModelCard({
             <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
               {displayName}
             </CardTitle>
-            <div className="ml-auto shrink-0">
+            <div className="ml-auto flex shrink-0 items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="text-muted-foreground hover:text-foreground"
+                disabled={buttonsDisabled}
+                onClick={onConfigureCapabilities}
+                aria-label={i18nService.t('modelCapabilities')}
+                title={i18nService.t('modelCapabilities')}
+              >
+                <Pencil className="size-4" />
+              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -749,9 +769,11 @@ function getModelDetails(
 function getModelCardTags(contextValue?: number): ModelCardTag[] {
   if (!contextValue) return [];
 
-  return [{
-    label: `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`,
-  }];
+  return [
+    {
+      label: `${formatContextValue(contextValue)} ${i18nService.t('localInferenceContextShort')}`,
+    },
+  ];
 }
 
 function formatModelFormatTag(value?: string): string | null {

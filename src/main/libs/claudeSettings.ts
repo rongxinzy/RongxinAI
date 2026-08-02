@@ -157,6 +157,7 @@ function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
         contextWindow: model.contextWindow,
         contextTokens: model.contextTokens,
         maxTokens: model.maxTokens,
+        capabilities: model.capabilities,
         openClawEligibility: model.openClawEligibility,
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
@@ -174,6 +175,7 @@ export function updateLlamaCppRunningModels(models: ProviderModelInputConfig[]):
 export function getLlamaCppRunningModels(): ProviderModelConfig[] {
   return llamaCppRunningModelCache.map(model => ({
     ...model,
+    capabilities: model.capabilities ? { ...model.capabilities } : undefined,
     openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
   }));
 }

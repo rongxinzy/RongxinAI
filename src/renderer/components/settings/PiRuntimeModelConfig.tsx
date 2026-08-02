@@ -1,13 +1,10 @@
 import { Checkbox } from '@shared/components/ui/checkbox';
 import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldLegend,
-  FieldSet,
-} from '@shared/components/ui/field';
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@shared/components/ui/collapsible';
+import { Field, FieldGroup, FieldLabel, FieldSet } from '@shared/components/ui/field';
 import {
   Select,
   SelectContent,
@@ -26,6 +23,7 @@ import {
   type ProviderModelPiRuntimeConfig,
 } from '../../../shared/providers';
 import { i18nService } from '../../services/i18n';
+import { ChevronDown } from 'lucide-react';
 
 const PiRuntimeSelectValue = {
   Auto: 'auto',
@@ -129,17 +127,13 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
 
   return (
     <FieldSet className="rounded-lg border border-border bg-surface-raised p-3">
-      <FieldLegend className="text-xs">{i18nService.t('piRuntimeModelOptions')}</FieldLegend>
-      <FieldDescription className="text-[11px] leading-4">
-        {i18nService.t('piRuntimeModelOptionsHint')}
-      </FieldDescription>
-      <FieldGroup className="gap-3">
-        <Field>
+      <FieldGroup className="grid grid-cols-2 gap-3">
+        <Field orientation="horizontal" className="items-center justify-between gap-2">
           <FieldLabel className="text-[11px] text-muted-foreground">
             {i18nService.t('piRuntimeApi')}
           </FieldLabel>
           <Select value={value?.api ?? PiRuntimeSelectValue.Auto} onValueChange={updateApi}>
-            <SelectTrigger className="h-8 text-xs">
+            <SelectTrigger className="h-8 w-32 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -157,171 +151,173 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
           </Select>
         </Field>
 
-        <Field orientation="horizontal">
+        <Field orientation="horizontal" className="items-center justify-between gap-2">
+          <FieldLabel
+            htmlFor="custom-model-pi-runtime-reasoning"
+            className="text-[11px] text-muted-foreground"
+          >
+            {i18nService.t('piRuntimeReasoning')}
+          </FieldLabel>
           <Checkbox
             id="custom-model-pi-runtime-reasoning"
             checked={value?.reasoning === true}
             onCheckedChange={checked => updateReasoning(checked === true)}
           />
-          <FieldContent>
-            <FieldLabel
-              htmlFor="custom-model-pi-runtime-reasoning"
-              className="text-[11px] text-muted-foreground"
-            >
-              {i18nService.t('piRuntimeReasoning')}
-            </FieldLabel>
-            <FieldDescription className="text-[11px] leading-4">
-              {i18nService.t('piRuntimeReasoningHint')}
-            </FieldDescription>
-          </FieldContent>
         </Field>
 
-        <Field>
-          <FieldLabel className="text-[11px] text-muted-foreground">
+        <Collapsible defaultOpen={false} className="col-span-2">
+          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-1 py-1 text-xs font-medium text-foreground hover:bg-muted">
             {i18nService.t('piRuntimeCompat')}
-          </FieldLabel>
-          <div className="grid grid-cols-2 gap-2">
-            {COMPAT_BOOLEAN_FIELDS.map(field => (
-              <label
-                key={field.key}
-                className="flex flex-col gap-1 text-[11px] text-muted-foreground"
-              >
-                <span>{i18nService.t(field.labelKey)}</span>
-                <Select
-                  value={booleanToSelectValue(value?.compat?.[field.key])}
-                  onValueChange={nextValue =>
-                    onChange(updateCompatField(value, field.key, selectValueToBoolean(nextValue)))
-                  }
-                >
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value={PiRuntimeSelectValue.Auto}>
-                        {i18nService.t('piRuntimeCompatAuto')}
-                      </SelectItem>
-                      <SelectItem value={PiRuntimeSelectValue.Enabled}>
-                        {i18nService.t('enabled')}
-                      </SelectItem>
-                      <SelectItem value={PiRuntimeSelectValue.Disabled}>
-                        {i18nService.t('disabled')}
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </label>
-            ))}
-          </div>
-        </Field>
+            <ChevronDown className="size-4 text-muted-foreground" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-2">
+                {COMPAT_BOOLEAN_FIELDS.map(field => (
+                  <label
+                    key={field.key}
+                    className="flex min-w-0 items-center justify-between gap-2 text-xs text-muted-foreground"
+                  >
+                    <span className="min-w-0 leading-tight">{i18nService.t(field.labelKey)}</span>
+                    <Select
+                      value={booleanToSelectValue(value?.compat?.[field.key])}
+                      onValueChange={nextValue =>
+                        onChange(
+                          updateCompatField(value, field.key, selectValueToBoolean(nextValue)),
+                        )
+                      }
+                    >
+                      <SelectTrigger className="h-8 w-24 shrink-0 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value={PiRuntimeSelectValue.Auto}>
+                            {i18nService.t('piRuntimeCompatAuto')}
+                          </SelectItem>
+                          <SelectItem value={PiRuntimeSelectValue.Enabled}>
+                            {i18nService.t('enabled')}
+                          </SelectItem>
+                          <SelectItem value={PiRuntimeSelectValue.Disabled}>
+                            {i18nService.t('disabled')}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </label>
+                ))}
+              </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <Field>
-            <FieldLabel className="text-[11px] text-muted-foreground">
-              {i18nService.t('piRuntimeMaxTokensField')}
-            </FieldLabel>
-            <Select
-              value={value?.compat?.maxTokensField ?? PiRuntimeSelectValue.Auto}
-              onValueChange={nextValue =>
-                onChange(
-                  updateCompatField(
-                    value,
-                    'maxTokensField',
-                    nextValue === PiRuntimeSelectValue.Auto || nextValue === null
-                      ? undefined
-                      : (nextValue as ProviderModelPiMaxTokensField),
-                  ),
-                )
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={PiRuntimeSelectValue.Auto}>
-                    {i18nService.t('piRuntimeCompatAuto')}
-                  </SelectItem>
-                  {MAX_TOKENS_FIELD_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {i18nService.t(option.labelKey)}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
+              <div className="grid grid-cols-2 gap-2">
+                <Field orientation="horizontal" className="items-center justify-between gap-2">
+                  <FieldLabel className="text-[11px] text-muted-foreground">
+                    {i18nService.t('piRuntimeMaxTokensField')}
+                  </FieldLabel>
+                  <Select
+                    value={value?.compat?.maxTokensField ?? PiRuntimeSelectValue.Auto}
+                    onValueChange={nextValue =>
+                      onChange(
+                        updateCompatField(
+                          value,
+                          'maxTokensField',
+                          nextValue === PiRuntimeSelectValue.Auto || nextValue === null
+                            ? undefined
+                            : (nextValue as ProviderModelPiMaxTokensField),
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={PiRuntimeSelectValue.Auto}>
+                          {i18nService.t('piRuntimeCompatAuto')}
+                        </SelectItem>
+                        {MAX_TOKENS_FIELD_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {i18nService.t(option.labelKey)}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-          <Field>
-            <FieldLabel className="text-[11px] text-muted-foreground">
-              {i18nService.t('piRuntimeThinkingFormat')}
-            </FieldLabel>
-            <Select
-              value={value?.compat?.thinkingFormat ?? PiRuntimeSelectValue.Auto}
-              onValueChange={nextValue =>
-                onChange(
-                  updateCompatField(
-                    value,
-                    'thinkingFormat',
-                    nextValue === PiRuntimeSelectValue.Auto || nextValue === null
-                      ? undefined
-                      : (nextValue as ProviderModelPiThinkingFormat),
-                  ),
-                )
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={PiRuntimeSelectValue.Auto}>
-                    {i18nService.t('piRuntimeCompatAuto')}
-                  </SelectItem>
-                  {THINKING_FORMAT_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
+                <Field orientation="horizontal" className="items-center justify-between gap-2">
+                  <FieldLabel className="text-[11px] text-muted-foreground">
+                    {i18nService.t('piRuntimeThinkingFormat')}
+                  </FieldLabel>
+                  <Select
+                    value={value?.compat?.thinkingFormat ?? PiRuntimeSelectValue.Auto}
+                    onValueChange={nextValue =>
+                      onChange(
+                        updateCompatField(
+                          value,
+                          'thinkingFormat',
+                          nextValue === PiRuntimeSelectValue.Auto || nextValue === null
+                            ? undefined
+                            : (nextValue as ProviderModelPiThinkingFormat),
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={PiRuntimeSelectValue.Auto}>
+                          {i18nService.t('piRuntimeCompatAuto')}
+                        </SelectItem>
+                        {THINKING_FORMAT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
 
-          <Field>
-            <FieldLabel className="text-[11px] text-muted-foreground">
-              {i18nService.t('piRuntimeCacheControlFormat')}
-            </FieldLabel>
-            <Select
-              value={value?.compat?.cacheControlFormat ?? PiRuntimeSelectValue.Auto}
-              onValueChange={nextValue =>
-                onChange(
-                  updateCompatField(
-                    value,
-                    'cacheControlFormat',
-                    nextValue === PiRuntimeSelectValue.Auto || nextValue === null
-                      ? undefined
-                      : ProviderModelPiCacheControlFormat.Anthropic,
-                  ),
-                )
-              }
-            >
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={PiRuntimeSelectValue.Auto}>
-                    {i18nService.t('piRuntimeCompatAuto')}
-                  </SelectItem>
-                  <SelectItem value={ProviderModelPiCacheControlFormat.Anthropic}>
-                    {i18nService.t('piRuntimeCacheControlAnthropic')}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
+                <Field orientation="horizontal" className="items-center justify-between gap-2">
+                  <FieldLabel className="text-[11px] text-muted-foreground">
+                    {i18nService.t('piRuntimeCacheControlFormat')}
+                  </FieldLabel>
+                  <Select
+                    value={value?.compat?.cacheControlFormat ?? PiRuntimeSelectValue.Auto}
+                    onValueChange={nextValue =>
+                      onChange(
+                        updateCompatField(
+                          value,
+                          'cacheControlFormat',
+                          nextValue === PiRuntimeSelectValue.Auto || nextValue === null
+                            ? undefined
+                            : ProviderModelPiCacheControlFormat.Anthropic,
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={PiRuntimeSelectValue.Auto}>
+                          {i18nService.t('piRuntimeCompatAuto')}
+                        </SelectItem>
+                        <SelectItem value={ProviderModelPiCacheControlFormat.Anthropic}>
+                          {i18nService.t('piRuntimeCacheControlAnthropic')}
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </FieldGroup>
     </FieldSet>
   );
