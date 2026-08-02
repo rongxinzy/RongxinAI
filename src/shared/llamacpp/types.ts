@@ -397,13 +397,28 @@ export type LlamaCppModelUnloadResult = {
   warning?: string;
 };
 
+export type LlamaCppInstallExtraFile = {
+  path: string;
+  downloadUrl?: string;
+  revision?: string;
+  sha256?: string;
+  sizeBytes?: number;
+};
+
 export type LlamaCppInstallModelInput = {
   modelId: string;
   filePath?: string;
   mmprojFilePath?: string;
+  mmprojDownloadUrl?: string;
   revision?: string;
   displayName?: string;
   downloadUrl?: string;
+  sha256?: string;
+  mmprojSha256?: string;
+  fileSizeBytes?: number;
+  // Remaining parts of a split-GGUF variant. The primary file (filePath) is
+  // the first part; llama.cpp loads the sharded model from the whole set.
+  extraFiles?: LlamaCppInstallExtraFile[];
 };
 
 export type LlamaCppSetModelPreferenceInput = {

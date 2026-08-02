@@ -1,1 +1,1 @@
-export type { NvidiaGpuInfo, NvidiaSmiSnapshot } from './types';
+export type { NvidiaGpuInfo, NvidiaSmiSnapshot, SystemMemorySnapshot } from './types';

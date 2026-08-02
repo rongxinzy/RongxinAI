@@ -12,3 +12,12 @@ export type NvidiaSmiSnapshot = {
   gpus: NvidiaGpuInfo[];
   error?: string;
 };
+
+export type SystemMemorySnapshot = {
+  source: 'system';
+  available: boolean;
+  checkedAt: string;
+  totalMemoryMiB: number;
+  freeMemoryMiB: number;
+  error?: string;
+};

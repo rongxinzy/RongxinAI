@@ -25,6 +25,7 @@ export type MarketplaceModel = {
   sizes: string[];
   recommendedTag: string;
   capability: MarketplaceCapability;
+  capabilities?: MarketplaceCapability[];
   filePath?: string;
   downloads?: number;
   detailUrl?: string;
@@ -33,6 +34,77 @@ export type MarketplaceModel = {
   installedPath?: string;
   isFeatured?: boolean;
   featuredRank?: number;
+  score?: MarketplaceScore;
+  fit?: MarketplaceFit;
+  files?: MarketplaceModelFile[];
+  license?: string;
+  licenseStatus?: 'permissive' | 'restricted' | 'unknown';
+  lastModifiedAt?: string;
+  qualityScore?: number;
+  trustScore?: number;
+  communityScore?: number;
+  runtimeCompatibility?: number;
+  evidence?: MarketplaceEvidence[];
+  publisherVerified?: boolean;
+  mmprojFilePath?: string;
+  runtime?: MarketplaceRuntimeEvidence;
+  metadataStatus?: 'verified' | 'pending' | 'unavailable';
+};
+
+export type MarketplaceRuntimeEvidence = {
+  format: 'gguf';
+  status: 'documented' | 'candidate' | 'verified' | 'unsupported';
+  architecture?: string;
+  ggufFilesVerified: boolean;
+  sha256Verified: boolean;
+  chatTemplate?: 'documented' | 'unknown';
+  toolCalling?: 'documented' | 'unknown';
+  mmproj?: 'available' | 'not-required' | 'unknown';
+  source: 'modelscope-file-api' | 'local-runtime';
+  observedAt: string;
+  revision?: string;
+  reasons: string[];
+};
+
+export type MarketplaceEvidence = {
+  source: string;
+  kind: 'modelscope' | 'benchmark' | 'runtime' | 'community' | 'license';
+  label: string;
+  value?: string | number;
+  observedAt?: string;
+  confidence?: 'A' | 'B' | 'C' | 'D';
+};
+
+export type MarketplaceModelFile = {
+  path: string;
+  sizeBytes?: number;
+  sha256?: string;
+  quantization?: string;
+  isRecommended?: boolean;
+  downloadUrl?: string;
+  revision?: string;
+  kind?: 'model' | 'mmproj';
+};
+
+export type MarketplaceScore = {
+  stars: number;
+  value: number;
+  confidence: 'A' | 'B' | 'C' | 'D';
+  taskQuality: number;
+  deviceFit: number;
+  runtimeCompatibility: number;
+  trust: number;
+  community: number;
+  reasons: string[];
+  scoreVersion: string;
+};
+
+export type MarketplaceFit = {
+  status: 'excellent' | 'good' | 'limited' | 'unsupported' | 'unknown';
+  estimatedVramMiB?: number;
+  estimatedSystemMemoryMiB?: number;
+  recommendedContext?: number;
+  reason?: string;
 };
 
 export type MarketplaceSearchParams = {
@@ -44,6 +116,10 @@ export type MarketplaceSearchParams = {
   limit?: number;
   pageNumber?: number;
   featuredOnly?: boolean;
+  fit?: 'all' | 'recommended' | 'excellent' | 'compatible' | 'unsupported';
+  quantization?: string;
+  minStars?: number;
+  language?: string;
 };
 
 export type MarketplaceSearchResult = {
@@ -51,4 +127,7 @@ export type MarketplaceSearchResult = {
   totalCount?: number;
   nextPageNumber?: number;
   warning?: string;
+  source?: 'cloud-catalog' | 'modelscope' | 'curated';
+  catalogUpdatedAt?: string;
+  scoreVersion?: string;
 };

@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { app } from 'electron';
+import { app, net } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
 import path from 'path';
@@ -143,7 +143,10 @@ export class LlamaCppManager extends EventEmitter {
   ) {
     super();
     this.marketplaceService =
-      marketplaceService ?? new MarketplaceService(() => this.getModelsDir());
+      marketplaceService ?? new MarketplaceService(() => this.getModelsDir(), {
+        fetchImpl: net.fetch,
+        cacheDir: path.join(app.getPath('userData'), 'marketplace-cache'),
+      });
     this.storage = storage;
   }
 

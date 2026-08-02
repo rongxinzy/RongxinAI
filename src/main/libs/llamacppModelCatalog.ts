@@ -7,7 +7,15 @@ import { ggufSupportsThinkingToggle } from './ggufMetadata';
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
   const root = path.resolve(modelsDir);
   if (!fs.existsSync(root)) return [];
-  const files = walkGgufFiles(root).filter(filePath => !/^mmproj/i.test(path.basename(filePath)));
+  const files = walkGgufFiles(root).filter(filePath => {
+    const baseName = path.basename(filePath);
+    if (/^mmproj/i.test(baseName)) return false;
+    // Split-GGUF models are registered once, under their first part; later
+    // parts would otherwise show up as duplicate standalone models.
+    const shard = baseName.match(/-(\d{5})-of-\d{5}\.gguf$/i);
+    if (shard && shard[1] !== '00001') return false;
+    return true;
+  });
   const nameCounts = new Map<string, number>();
   return files.map(filePath => {
     const baseName = resolveInstalledModelName(root, filePath);

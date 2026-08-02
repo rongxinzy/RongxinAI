@@ -230,8 +230,6 @@ contextBridge.exposeInMainWorld('electron', {
   },
   marketplace: {
     search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
-    getToken: () => ipcRenderer.invoke(MarketplaceIpcChannel.GetToken),
-    setToken: (token: string) => ipcRenderer.invoke(MarketplaceIpcChannel.SetToken, token),
   },
 
   triage: {
@@ -241,6 +239,7 @@ contextBridge.exposeInMainWorld('electron', {
 
   hardware: {
     nvidiaSmi: () => ipcRenderer.invoke(HardwareIpc.NvidiaSmi),
+    systemMemory: () => ipcRenderer.invoke(HardwareIpc.SystemMemory),
   },
 
   permissions: {

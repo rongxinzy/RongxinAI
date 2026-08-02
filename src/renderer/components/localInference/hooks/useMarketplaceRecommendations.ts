@@ -19,7 +19,10 @@ export function useMarketplaceRecommendations({
 }): void {
   useEffect(() => {
     if (activeTab !== 'marketplace' || hasSearched) return;
-    const params = buildMarketplaceSearchParams({ query });
+    // fit: 'compatible' keeps the first paint consistent with the default
+    // "可运行" filter shown in the panel — an unrestricted first load would
+    // list models the device cannot run while the filter claims otherwise.
+    const params = buildMarketplaceSearchParams({ query, featuredOnly: true, fit: 'compatible' });
     if (!params) return;
     onHasSearchedChange(true);
     void onSearch(params);
