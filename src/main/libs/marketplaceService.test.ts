@@ -21,6 +21,16 @@ function createTempDir(): string {
   return dir;
 }
 
+function expireCacheEntries(cacheDir: string): void {
+  for (const name of fs.readdirSync(cacheDir)) {
+    if (!name.endsWith('.json')) continue;
+    const filePath = path.join(cacheDir, name);
+    const entry = JSON.parse(fs.readFileSync(filePath, 'utf8')) as { cachedAt: number };
+    entry.cachedAt = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    fs.writeFileSync(filePath, JSON.stringify(entry), 'utf8');
+  }
+}
+
 function verifiedModel(repoId = 'Qwen/Qwen3-8B-GGUF') {
   return {
     source: 'modelscope-gguf',
@@ -196,4 +206,80 @@ test('MarketplaceService resolves install metadata only through the cloud catalo
   expect(result?.filePath).toBe('Qwen3-8B-Q4_K_M.gguf');
   expect(result?.files?.[0]?.sha256).toBe(SHA);
   expect(fetchMock).toHaveBeenCalledOnce();
+});
+
+test('MarketplaceService serves repeated searches from the disk cache', async () => {
+  const fetchMock = vi.fn(async () =>
+    Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+    cacheDir: createTempDir(),
+  });
+
+  await service.search({ query: 'qwen3', limit: 20, pageNumber: 1 });
+  const second = await service.search({ query: 'qwen3', limit: 20, pageNumber: 1 });
+
+  // The second call is answered from disk without hitting the network.
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(second.models).toHaveLength(1);
+  expect(second.totalCount).toBe(593);
+});
+
+test('MarketplaceService falls back to a stale cached search when the catalogue is down', async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(
+      Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 }),
+    )
+    .mockRejectedValueOnce(new Error('network unreachable'));
+  vi.stubGlobal('fetch', fetchMock);
+  const cacheDir = createTempDir();
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+    cacheDir,
+  });
+
+  await service.search({ query: 'qwen3', limit: 20, pageNumber: 1 });
+  expireCacheEntries(cacheDir);
+  const result = await service.search({ query: 'qwen3', limit: 20, pageNumber: 1 });
+
+  expect(result.models).toHaveLength(1);
+  expect(result.warning).toMatch(/缓存/);
+  expect(result.source).toBe('cloud-catalog');
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+test('MarketplaceService caches resolved model details and serves them offline', async () => {
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ model: verifiedModel() }))
+    .mockRejectedValueOnce(new Error('network unreachable'));
+  vi.stubGlobal('fetch', fetchMock);
+  const cacheDir = createTempDir();
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+    cacheDir,
+  });
+
+  const first = await service.resolveModel('Qwen/Qwen3-8B-GGUF');
+  expireCacheEntries(cacheDir);
+  const second = await service.resolveModel('Qwen/Qwen3-8B-GGUF');
+
+  expect(first?.repoId).toBe('Qwen/Qwen3-8B-GGUF');
+  expect(second?.repoId).toBe('Qwen/Qwen3-8B-GGUF');
+  expect(fetchMock).toHaveBeenCalledTimes(2); // fresh hit + failed refresh fallback
+});
+
+test('MarketplaceService works without a cache directory', async () => {
+  const fetchMock = vi.fn(async () => Response.json({ models: [verifiedModel()] }));
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  await service.search({ query: 'qwen3' });
+  await service.search({ query: 'qwen3' });
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });

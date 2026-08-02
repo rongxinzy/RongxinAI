@@ -1,14 +1,17 @@
 import { ipcMain, net } from 'electron';
+import path from 'path';
 
 import { MarketplaceIpcChannel } from '../../shared/marketplace';
 import { MarketplaceService } from '../libs/marketplaceService';
 
 export function registerMarketplaceIpcHandlers(options: {
   getModelsDir: () => string;
+  userDataPath: string;
 }): void {
   const service = new MarketplaceService(options.getModelsDir, {
     catalogApiUrl: process.env.ZHIYUAN_MODEL_CATALOG_URL?.trim() || undefined,
     fetchImpl: net.fetch,
+    cacheDir: path.join(options.userDataPath, 'marketplace-cache'),
   });
 
   ipcMain.handle(MarketplaceIpcChannel.Search, async (_event, params) => {

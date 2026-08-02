@@ -7526,6 +7526,7 @@ if (!gotTheLock) {
     });
     registerMarketplaceIpcHandlers({
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
+      userDataPath: app.getPath('userData'),
     });
     // Inject auth getters for zhiyuan-server provider routing
     // The getter proactively triggers a background token refresh when the

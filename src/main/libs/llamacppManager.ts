@@ -145,6 +145,7 @@ export class LlamaCppManager extends EventEmitter {
     this.marketplaceService =
       marketplaceService ?? new MarketplaceService(() => this.getModelsDir(), {
         fetchImpl: net.fetch,
+        cacheDir: path.join(app.getPath('userData'), 'marketplace-cache'),
       });
     this.storage = storage;
   }

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { createHash } from 'crypto';
 
 import {
   MarketplaceCapability,
@@ -18,7 +19,19 @@ import { ModelCatalogClient, type CatalogFetchLike, resolveModelCatalogUrl } fro
 type MarketplaceServiceOptions = {
   catalogApiUrl?: string | null;
   fetchImpl?: CatalogFetchLike;
+  // Optional directory for a disk cache of catalogue responses. The catalogue
+  // changes rarely, so a stale copy still beats a failed round-trip — it keeps
+  // first paint and pagination instant and shields the user from upstream
+  // outages. When absent, caching is disabled.
+  cacheDir?: string;
 };
+
+// Model catalogue data changes rarely; keep copies fresh long enough that
+// repeated visits never hit the network, and treat expired copies as
+// last-resort fallbacks when the catalogue is unreachable.
+const SEARCH_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const DETAIL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_MAX_FILES = 300;
 
 type CuratedModelEntry = {
   name: string;
@@ -54,10 +67,16 @@ const NON_GENERATIVE_GGUF_PATTERN =
  * file revision, byte size and SHA-256 digest.
  */
 export class MarketplaceService {
+  private readonly cache: MarketplaceDiskCache | null;
+
   constructor(
     private readonly getModelsDir: () => string = () => '',
     private readonly options: MarketplaceServiceOptions = {},
-  ) {}
+  ) {
+    this.cache = options.cacheDir?.trim()
+      ? new MarketplaceDiskCache(options.cacheDir.trim())
+      : null;
+  }
 
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
     const catalogUrl = this.resolveCatalogUrl();
@@ -67,18 +86,31 @@ export class MarketplaceService {
     }
 
     try {
-      const catalog = await new ModelCatalogClient(
-        catalogUrl,
-        this.options.fetchImpl,
-      ).search(params);
-      const installed = scanInstalledModels(this.getModelsDir());
-      const models = sortMarketplaceModels(
-        annotateInstalledModels(
-          filterMarketplaceModels(catalog.models, { ...params, fit: undefined }),
-          installed,
-        ),
-        params,
-      ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT));
+      const client = new ModelCatalogClient(catalogUrl, this.options.fetchImpl);
+      const cacheKey = searchCacheKey(params);
+      const cached = this.cache?.read<MarketplaceSearchResult>(cacheKey);
+      if (cached && Date.now() - cached.cachedAt < SEARCH_CACHE_TTL_MS) {
+        const models = this.processCatalog(cached.response, params);
+        return { ...cached.response, models, totalCount: cached.response.totalCount ?? models.length };
+      }
+      let catalog: MarketplaceSearchResult;
+      try {
+        catalog = await client.search(params);
+      } catch (error) {
+        if (cached) {
+          console.warn('[Marketplace] catalogue unreachable; serving cached search:', error);
+          const models = this.processCatalog(cached.response, params);
+          return {
+            ...cached.response,
+            models,
+            totalCount: cached.response.totalCount ?? models.length,
+            warning: '云端 GGUF 目录暂时不可用，正在展示最近一次缓存的目录。',
+          };
+        }
+        throw error;
+      }
+      this.cache?.write(cacheKey, catalog);
+      const models = this.processCatalog(catalog, params);
       return { ...catalog, models, totalCount: catalog.totalCount ?? models.length };
     } catch (error) {
       console.warn('[Marketplace] cloud catalogue unavailable; using bundled records:', error);
@@ -90,6 +122,20 @@ export class MarketplaceService {
         source: 'curated',
       };
     }
+  }
+
+  private processCatalog(
+    catalog: MarketplaceSearchResult,
+    params: MarketplaceSearchParams,
+  ): MarketplaceModel[] {
+    const installed = scanInstalledModels(this.getModelsDir());
+    return sortMarketplaceModels(
+      annotateInstalledModels(
+        filterMarketplaceModels(catalog.models, { ...params, fit: undefined }),
+        installed,
+      ),
+      params,
+    ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT));
   }
 
   searchLocal(params: MarketplaceSearchParams = {}): MarketplaceModel[] {
@@ -109,14 +155,25 @@ export class MarketplaceService {
 
     const catalogUrl = this.resolveCatalogUrl();
     if (catalogUrl) {
-      try {
-        const model = await new ModelCatalogClient(
-          catalogUrl,
-          this.options.fetchImpl,
-        ).resolveModel(normalizedRepoId);
+      const client = new ModelCatalogClient(catalogUrl, this.options.fetchImpl);
+      const cacheKey = `detail:${normalizedRepoId}`;
+      const cached = this.cache?.read<MarketplaceModel>(cacheKey);
+      if (cached && Date.now() - cached.cachedAt < DETAIL_CACHE_TTL_MS) {
+        const model = cached.response;
         if (model && isGenerativeLanguageModel(model)) return model;
+      }
+      try {
+        const model = await client.resolveModel(normalizedRepoId);
+        if (model && isGenerativeLanguageModel(model)) {
+          this.cache?.write(cacheKey, model);
+          return model;
+        }
       } catch (error) {
         console.warn('[Marketplace] verified catalogue detail unavailable:', error);
+        if (cached) {
+          const model = cached.response;
+          if (model && isGenerativeLanguageModel(model)) return model;
+        }
       }
     }
 
@@ -311,4 +368,79 @@ function resolveLimit(limit: number | undefined, fallback: number): number {
 
 function toMarketplaceWarning(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+type CachedMarketplaceEntry<T> = {
+  cachedAt: number;
+  response: T;
+};
+
+class MarketplaceDiskCache {
+  constructor(private readonly dir: string) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {
+      // Cache is best-effort; a read-only data dir must not break the service.
+    }
+  }
+
+  read<T>(key: string): CachedMarketplaceEntry<T> | null {
+    try {
+      const raw = fs.readFileSync(this.fileFor(key), 'utf8');
+      const parsed = JSON.parse(raw) as CachedMarketplaceEntry<T>;
+      if (!parsed || typeof parsed.cachedAt !== 'number' || !parsed.response) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  write<T>(key: string, response: T): void {
+    try {
+      const entry: CachedMarketplaceEntry<T> = { cachedAt: Date.now(), response };
+      const filePath = this.fileFor(key);
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, JSON.stringify(entry), 'utf8');
+      this.prune();
+    } catch (error) {
+      console.warn('[Marketplace] cache write failed:', error);
+    }
+  }
+
+  private fileFor(key: string): string {
+    const digest = createHash('sha256').update(key).digest('hex');
+    return path.join(this.dir, `${digest}.json`);
+  }
+
+  private prune(): void {
+    try {
+      const entries = fs
+        .readdirSync(this.dir)
+        .filter(name => name.endsWith('.json'))
+        .map(name => {
+          const filePath = path.join(this.dir, name);
+          return { filePath, mtime: fs.statSync(filePath).mtimeMs };
+        })
+        .sort((left, right) => left.mtime - right.mtime);
+      if (entries.length <= CACHE_MAX_FILES) return;
+      for (const entry of entries.slice(0, entries.length - CACHE_MAX_FILES)) {
+        fs.rmSync(entry.filePath, { force: true });
+      }
+    } catch {
+      // Pruning is best-effort.
+    }
+  }
+}
+
+function searchCacheKey(params: MarketplaceSearchParams): string {
+  const parts = [
+    params.query?.trim().toLowerCase() ?? '',
+    params.task ?? '',
+    params.size ?? '',
+    (params.tags ?? []).slice().sort().join(','),
+    params.limit ?? '',
+    params.pageNumber ?? '',
+    params.featuredOnly ? 'featured' : '',
+  ];
+  return `search:${parts.join('|')}`;
 }
