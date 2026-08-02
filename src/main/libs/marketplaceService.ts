@@ -13,10 +13,11 @@ import {
   resolveParameterCount,
   sortMarketplaceModels,
 } from './marketplaceModelOrder';
-import { ModelCatalogClient, resolveModelCatalogUrl } from './modelCatalogClient';
+import { ModelCatalogClient, type CatalogFetchLike, resolveModelCatalogUrl } from './modelCatalogClient';
 
 type MarketplaceServiceOptions = {
   catalogApiUrl?: string | null;
+  fetchImpl?: CatalogFetchLike;
 };
 
 type CuratedModelEntry = {
@@ -66,7 +67,10 @@ export class MarketplaceService {
     }
 
     try {
-      const catalog = await new ModelCatalogClient(catalogUrl).search(params);
+      const catalog = await new ModelCatalogClient(
+        catalogUrl,
+        this.options.fetchImpl,
+      ).search(params);
       const installed = scanInstalledModels(this.getModelsDir());
       const models = sortMarketplaceModels(
         annotateInstalledModels(
@@ -106,7 +110,10 @@ export class MarketplaceService {
     const catalogUrl = this.resolveCatalogUrl();
     if (catalogUrl) {
       try {
-        const model = await new ModelCatalogClient(catalogUrl).resolveModel(normalizedRepoId);
+        const model = await new ModelCatalogClient(
+          catalogUrl,
+          this.options.fetchImpl,
+        ).resolveModel(normalizedRepoId);
         if (model && isGenerativeLanguageModel(model)) return model;
       } catch (error) {
         console.warn('[Marketplace] verified catalogue detail unavailable:', error);

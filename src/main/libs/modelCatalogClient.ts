@@ -12,6 +12,11 @@ const CATALOG_TIMEOUT_MS = 30_000;
 const NON_GENERATIVE_GGUF_PATTERN =
   /(?:^|[/\s._-])(?:embedding|embed|bge|e5|gte|rerank(?:er)?|sentence[-_ ]transformers?|clip|siglip|colbert|vector(?:izer)?|text[-_ ]embedding|flux|comfyui|stable[-_ ]diffusion|sdxl|controlnet|diffusion|vae|image[-_ ]generation|image[-_ ]to[-_ ]image|lora|adapter)(?=$|[/\s._-])/i;
 
+// Injected at construction so the Electron main process can use net.fetch
+// (Chromium network stack, honours the system proxy) instead of the plain
+// undici fetch, which ignores both system and HTTP(S)_PROXY settings.
+export type CatalogFetchLike = (input: string | Request, init?: RequestInit) => Promise<Response>;
+
 type CatalogModelPayload = Omit<MarketplaceModel, 'capability' | 'sizes'> & {
   capability?: string | string[];
   sizes?: string[];
@@ -62,9 +67,14 @@ function isGenerativeLanguageModel(model: MarketplaceModel): boolean {
 
 export class ModelCatalogClient {
   readonly baseUrl: string;
+  private readonly fetchImpl: CatalogFetchLike;
 
-  constructor(baseUrl = process.env.ZHIYUAN_MODEL_CATALOG_URL || DEFAULT_CATALOG_URL) {
+  constructor(
+    baseUrl = process.env.ZHIYUAN_MODEL_CATALOG_URL || DEFAULT_CATALOG_URL,
+    fetchImpl: CatalogFetchLike = fetch,
+  ) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.fetchImpl = fetchImpl;
   }
 
   async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
@@ -115,7 +125,7 @@ export class ModelCatalogClient {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
     try {
-      const response = await fetch(url, {
+      const response = await this.fetchImpl(url, {
         headers: {
           Accept: 'application/json',
           'X-Zhiyuan-Client-Id': 'zhiyuan-desktop-catalog-v1',

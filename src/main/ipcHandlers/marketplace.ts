@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, net } from 'electron';
 
 import { MarketplaceIpcChannel } from '../../shared/marketplace';
 import { MarketplaceService } from '../libs/marketplaceService';
@@ -8,6 +8,7 @@ export function registerMarketplaceIpcHandlers(options: {
 }): void {
   const service = new MarketplaceService(options.getModelsDir, {
     catalogApiUrl: process.env.ZHIYUAN_MODEL_CATALOG_URL?.trim() || undefined,
+    fetchImpl: net.fetch,
   });
 
   ipcMain.handle(MarketplaceIpcChannel.Search, async (_event, params) => {
