@@ -49,6 +49,7 @@ import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
 import {
   buildMarketplaceSearchParams,
   filterMarketplaceModelsForDevice,
+  groupMarketplaceVariants,
 } from './utils/marketplace';
 import {
   isInstallTerminalPhase,
@@ -330,6 +331,22 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           model.files?.find(file => file.path === model.filePath) ??
           model.files?.find(file => file.isRecommended);
         const mmprojFile = model.files?.find(file => file.path === model.mmprojFilePath);
+        // Split-GGUF variants: the card pins filePath to the first part; the
+        // remaining sibling parts must travel with the install request because
+        // prefill short-circuits when downloadUrl+sha256 are already present.
+        const selectedVariant =
+          groupMarketplaceVariants(model.files).find(variant =>
+            variant.files.some(file => file.path === model.filePath),
+          ) ?? groupMarketplaceVariants(model.files)[0];
+        const extraFiles = (selectedVariant?.files ?? [])
+          .filter(file => file.path !== selectedFile?.path)
+          .map(file => ({
+            path: file.path,
+            downloadUrl: file.downloadUrl,
+            revision: file.revision,
+            sha256: file.sha256,
+            sizeBytes: file.sizeBytes,
+          }));
         const result = await window.electron.llamacpp.installModel({
           modelId: model.repoId,
           filePath: selectedFile?.path,
@@ -338,6 +355,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           revision: selectedFile?.revision ?? model.runtime?.revision,
           sha256: selectedFile?.sha256,
           fileSizeBytes: selectedFile?.sizeBytes,
+          extraFiles,
           mmprojFilePath: mmprojFile?.path,
           mmprojDownloadUrl: mmprojFile?.downloadUrl,
           mmprojSha256: mmprojFile?.sha256,

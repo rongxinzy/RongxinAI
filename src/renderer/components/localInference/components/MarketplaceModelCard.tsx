@@ -9,10 +9,18 @@ import {
   CardTitle,
 } from '@shared/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import { cn } from '@shared/lib/utils';
 import { Download, ExternalLink, Star, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ComponentType } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { ProviderName } from '../../../../shared/providers';
@@ -46,12 +54,13 @@ import {
   getMarketplaceRecommendedQuantization,
   formatDownloadCount,
   formatMarketplaceScore,
+  groupMarketplaceVariants,
   marketplaceFitLabel,
   MARKETPLACE_GGUF_FORMAT,
   openExternalUrl,
 } from '../utils/marketplace';
 import { resolveModelProviderName, type LocalModelProvider } from '../utils/modelProvider';
-import { formatPullProgress } from '../utils/progress';
+import { formatBytes, formatPullProgress } from '../utils/progress';
 import { InstallProgressBar } from './Common';
 
 const marketplaceCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal shadow-none';
@@ -96,22 +105,29 @@ export function MarketplaceModelCard({
   const displayName = getMarketplaceDisplayName(model.repoId);
   const modelProvider = resolveModelProviderName(displayName);
   const ModelIcon = modelProvider ? marketplaceModelIcons[modelProvider] : CustomProviderIcon;
+  const variants = useMemo(() => groupMarketplaceVariants(model.files), [model.files]);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const selectedVariant = variants.find(variant => variant.id === selectedVariantId) ?? variants[0];
   const details = [
-    { label: i18nService.t('marketplaceModelSizeLabel'), value: model.sizes[0]?.trim() || null },
+    {
+      label: i18nService.t('marketplaceModelSizeLabel'),
+      value: selectedVariant?.totalSizeBytes
+        ? formatBytes(selectedVariant.totalSizeBytes)
+        : model.sizes[0]?.trim() || null,
+    },
     {
       label: i18nService.t('marketplaceRecommendedQuantizationLabel'),
-      value: getMarketplaceRecommendedQuantization(model.recommendedTag),
+      value: selectedVariant?.quantization || getMarketplaceRecommendedQuantization(model.recommendedTag),
     },
     { label: i18nService.t('marketplaceFormatLabel'), value: MARKETPLACE_GGUF_FORMAT },
   ];
-  const selectedFile =
-    model.files?.find(file => file.path === model.filePath) ??
-    model.files?.find(file => file.isRecommended);
   const installable = Boolean(
     model.metadataStatus === 'verified' &&
-      selectedFile?.downloadUrl &&
-      selectedFile.sha256 &&
-      selectedFile.sizeBytes,
+      selectedVariant &&
+      selectedVariant.files.length > 0 &&
+      selectedVariant.files.every(
+        file => file.downloadUrl && file.sha256 && (file.sizeBytes ?? 0) > 0,
+      ),
   );
   const runtimeLabel = model.runtime?.status === 'verified'
     ? i18nService.t('marketplaceRuntimeVerified')
@@ -219,6 +235,33 @@ export function MarketplaceModelCard({
                 </Badge>
               ))}
             </div>
+
+            {variants.length > 1 ? (
+              <Select
+                value={selectedVariant?.id ?? ''}
+                onValueChange={value => { if (value) setSelectedVariantId(value); }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={i18nService.t('marketplaceSelectQuantization')}
+                  className="h-7 w-full text-xs"
+                >
+                  <SelectValue>
+                    {selectedVariant
+                      ? `${selectedVariant.quantization ?? MARKETPLACE_GGUF_FORMAT} · ${formatBytes(selectedVariant.totalSizeBytes)}${selectedVariant.isSplit ? ` · ${selectedVariant.files.length}${i18nService.t('marketplaceVariantParts')}` : ''}`
+                      : MARKETPLACE_GGUF_FORMAT}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {variants.map(variant => (
+                    <SelectItem key={variant.id} value={variant.id}>
+                      {variant.quantization ?? MARKETPLACE_GGUF_FORMAT} · {formatBytes(variant.totalSizeBytes)}
+                      {variant.isSplit ? ` · ${variant.files.length}${i18nService.t('marketplaceVariantParts')}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
           </CardContent>
 
           <CardFooter className="justify-between border-t border-border/50">
@@ -229,7 +272,7 @@ export function MarketplaceModelCard({
                   {i18nService.t('marketplaceCancelInstall')}
                 </Button>
               ) : (
-                <Button type="button" disabled={loading || !installable} size="sm" onClick={() => void onInstall(model)}>
+                <Button type="button" disabled={loading || !installable} size="sm" onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}>
                   <Download data-icon="inline-start" />
                   {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceMetadataPending')}
                 </Button>

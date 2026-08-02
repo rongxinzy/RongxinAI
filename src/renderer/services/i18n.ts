@@ -316,6 +316,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceCancel: '取消',
     marketplaceCancelling: '取消中...',
     marketplaceNoModels: '没有找到匹配的模型',
+    marketplaceEmptyShowAll: '不限适配，查看全部模型',
     marketplaceFilterClear: '清除筛选',
     marketplaceError: '搜索失败',
     marketplacePullStarted: '开始拉取模型 {name}',
@@ -383,6 +384,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceInstallDone: '安装完成',
     marketplaceInstallFailed: '安装失败',
     marketplaceCancelInstall: '取消安装',
+    marketplaceSelectQuantization: '选择量化版本',
+    marketplaceVariantParts: ' 部分',
     localInferencePullTitle: '从 ModelScope 安装 GGUF 仓库',
     localInferencePullHint:
       '输入 owner/repo 仓库名即可安装，若未指定文件，后端会自动选择推荐 GGUF 量化。',
@@ -2955,6 +2958,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceCancel: 'Cancel',
     marketplaceCancelling: 'Cancelling...',
     marketplaceNoModels: 'No matching models found',
+    marketplaceEmptyShowAll: 'Show all models regardless of fit',
     marketplaceFilterClear: 'Clear filters',
     marketplaceError: 'Search failed',
     marketplacePullStarted: 'Started pulling model {name}',
@@ -3024,6 +3028,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     marketplaceInstallDone: 'Installation complete',
     marketplaceInstallFailed: 'Installation failed',
     marketplaceCancelInstall: 'Cancel Installation',
+    marketplaceSelectQuantization: 'Select quantization',
+    marketplaceVariantParts: ' parts',
     localInferencePullTitle: 'Install GGUF Repo From ModelScope',
     localInferencePullHint:
       'Enter an owner/repo repository. If no file is specified, the backend chooses a recommended GGUF quantization.',

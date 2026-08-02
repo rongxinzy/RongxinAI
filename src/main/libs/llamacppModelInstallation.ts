@@ -3,14 +3,44 @@ import path from 'path';
 import { createHash } from 'crypto';
 
 import type {
+  LlamaCppInstallExtraFile,
   LlamaCppInstallModelInput,
   LlamaCppInstallProgress,
   LlamaCppModel,
 } from '../../shared/llamacpp';
 import { resolveInstalledModelName } from './llamacppModelCatalog';
 import { MarketplaceService } from './marketplaceService';
+import type { MarketplaceModelFile } from '../../shared/marketplace';
 
 type RequestOptions = { signal?: AbortSignal };
+
+export function shardGroupKey(filePath: string): string | null {
+  const match = filePath.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Collects the sibling parts of a split-GGUF variant. The primary file is
+ * model.filePath; every other file sharing its shard-group key must be
+ * downloaded too so llama.cpp can load the sharded model.
+ */
+export function collectSplitVariantFiles(
+  files: MarketplaceModelFile[] | undefined,
+  primaryPath: string,
+): LlamaCppInstallExtraFile[] {
+  if (!files?.length) return [];
+  const primaryKey = shardGroupKey(primaryPath);
+  if (!primaryKey) return [];
+  return files
+    .filter(file => file.path !== primaryPath && shardGroupKey(file.path) === primaryKey)
+    .map(file => ({
+      path: file.path,
+      downloadUrl: file.downloadUrl,
+      revision: file.revision,
+      sha256: file.sha256,
+      sizeBytes: file.sizeBytes,
+    }));
+}
 
 export async function prefillInstallInputFromMarketplace(
   input: LlamaCppInstallModelInput,
@@ -40,6 +70,7 @@ export async function prefillInstallInputFromMarketplace(
     revision: selectedFile.revision ?? model.runtime?.revision ?? input.revision,
     sha256: selectedFile.sha256,
     fileSizeBytes: selectedFile.sizeBytes,
+    extraFiles: collectSplitVariantFiles(model.files, selectedFile.path),
     ...(mmprojFile?.path && mmprojFile.sha256 && mmprojFile.downloadUrl
       ? {
           mmprojFilePath: mmprojFile.path,
@@ -65,8 +96,24 @@ export async function installModelOnce(input: {
   const url = resolved.downloadUrl || buildModelScopeFileUrl(modelId, filePath, request.revision);
   const targetPath = resolveModelScopeTargetPath(safeModelDir, filePath);
   const installedThisAttempt = new Set<string>();
+  // Split-GGUF variants download every sibling part; the primary file is the
+  // first part and llama.cpp loads the sharded model from the whole set.
+  const extraFiles = (request.extraFiles ?? []).map(extra => ({
+    ...extra,
+    targetPath: resolveModelScopeTargetPath(safeModelDir, extra.path),
+  }));
 
-  if (fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0) {
+  const primaryPresent =
+    fs.existsSync(targetPath) && fs.statSync(targetPath).size > 0;
+  const extrasPresent = extraFiles.every(extra => {
+    if (!fs.existsSync(extra.targetPath)) return false;
+    const actualSize = fs.statSync(extra.targetPath).size;
+    if (actualSize <= 0) return false;
+    // Mirror the download-time byte-size check so a truncated or corrupted
+    // part is not silently accepted just because a previous run touched it.
+    return !extra.sizeBytes || actualSize === extra.sizeBytes;
+  });
+  if (primaryPresent && extrasPresent) {
     const actualSize = fs.statSync(targetPath).size;
     const actualSha256 = await sha256File(targetPath);
     if (
@@ -84,6 +131,7 @@ export async function installModelOnce(input: {
       await input.refreshModelsAfterInstall();
       return buildInstalledModelRecord(modelsDir, targetPath);
     }
+    for (const extra of extraFiles) fs.rmSync(extra.targetPath, { force: true });
     fs.rmSync(targetPath, { force: true });
   }
 
@@ -114,6 +162,42 @@ export async function installModelOnce(input: {
       request.fileSizeBytes,
     );
     installedThisAttempt.add(targetPath);
+
+    for (const extra of extraFiles) {
+      if (!extra.sha256?.trim()) {
+        throw new Error(
+          'The cloud catalogue did not provide a SHA-256 checksum for every split part of this model.',
+        );
+      }
+      const extraUrl =
+        extra.downloadUrl?.trim() ||
+        buildModelScopeFileUrl(modelId, extra.path, extra.revision ?? request.revision);
+      onProgress?.({
+        phase: 'downloading',
+        modelId,
+        modelName: request.displayName ?? modelId,
+        targetPath: extra.targetPath,
+      });
+      await downloadFile(
+        extraUrl,
+        extra.targetPath,
+        (completed, total) => {
+          onProgress?.({
+            phase: 'downloading-progress',
+            modelId,
+            modelName: request.displayName ?? modelId,
+            completed,
+            total,
+            percent: total ? Math.round((completed / total) * 100) : undefined,
+            targetPath: extra.targetPath,
+          });
+        },
+        options.signal,
+        extra.sha256,
+        extra.sizeBytes,
+      );
+      installedThisAttempt.add(extra.targetPath);
+    }
 
     if (request.mmprojFilePath?.trim()) {
       const mmprojFilePath = request.mmprojFilePath.trim();
@@ -189,6 +273,7 @@ export async function refreshInstallInputFromMarketplace(
     revision: selectedFile.revision ?? model.runtime?.revision ?? input.revision,
     sha256: selectedFile.sha256,
     fileSizeBytes: selectedFile.sizeBytes,
+    extraFiles: collectSplitVariantFiles(model.files, selectedFile.path),
     ...(mmprojFile?.path && mmprojFile.sha256 && mmprojFile.downloadUrl
       ? {
           mmprojFilePath: mmprojFile.path,
@@ -211,6 +296,11 @@ export function isSameInstallRequest(
   previous: LlamaCppInstallModelInput,
   next: LlamaCppInstallModelInput,
 ): boolean {
+  const extraPaths = (input: LlamaCppInstallModelInput): string =>
+    (input.extraFiles ?? [])
+      .map(file => file.path?.trim() ?? '')
+      .sort()
+      .join('|');
   return (
     (previous.filePath?.trim() ?? '') === (next.filePath?.trim() ?? '') &&
     (previous.mmprojFilePath?.trim() ?? '') === (next.mmprojFilePath?.trim() ?? '') &&
@@ -218,7 +308,8 @@ export function isSameInstallRequest(
     (previous.mmprojDownloadUrl?.trim() ?? '') === (next.mmprojDownloadUrl?.trim() ?? '') &&
     (previous.revision?.trim() ?? '') === (next.revision?.trim() ?? '') &&
     (previous.sha256?.trim().toLowerCase() ?? '') === (next.sha256?.trim().toLowerCase() ?? '') &&
-    (previous.mmprojSha256?.trim().toLowerCase() ?? '') === (next.mmprojSha256?.trim().toLowerCase() ?? '')
+    (previous.mmprojSha256?.trim().toLowerCase() ?? '') === (next.mmprojSha256?.trim().toLowerCase() ?? '') &&
+    extraPaths(previous) === extraPaths(next)
   );
 }
 

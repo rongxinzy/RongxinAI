@@ -2,6 +2,7 @@ import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import {
   MarketplaceCapability,
   type MarketplaceModel,
+  type MarketplaceModelFile,
   type MarketplaceSearchParams,
 } from '../../../../shared/marketplace';
 import { i18nService } from '../../../services/i18n';
@@ -109,12 +110,6 @@ export function filterMarketplaceModelsForDevice(
     .filter(model => !minStars || (model.score?.stars ?? 0) >= minStars)
     .filter(model => {
       const status = model.fit?.status ?? 'unknown';
-      // The marketplace is an install-and-run surface for llama.cpp, not a
-      // model directory: models the current device cannot run are never
-      // shown, regardless of the fit filter. Unknown (hardware not detected
-      // or file size missing) stays visible so a healthy default never
-      // collapses to an empty page.
-      if (status === 'unsupported') return false;
       switch (fit) {
         case 'recommended':
           return status === 'excellent' || status === 'good';
@@ -123,9 +118,15 @@ export function filterMarketplaceModelsForDevice(
         case 'compatible':
           return status === 'excellent' || status === 'good' || status === 'limited' || status === 'unknown';
         case 'unsupported':
+          // The explicit unsupported filter is removed from the UI; kept for
+          // type completeness of the fit filter union.
           return false;
         case 'all':
         default:
+          // "不限" lists every GGUF model, including ones this device cannot
+          // run — the card marks them as not fitting so the choice stays
+          // honest while the directory stays complete. Unknown (hardware not
+          // detected) is always visible so a healthy default never collapses.
           return true;
       }
     });
@@ -257,4 +258,89 @@ export function getMarketplaceGridColumnCount({
   }
 
   return Math.max(1, Math.round((gridWidth + columnGap) / (cardWidth + columnGap)));
+}
+
+const GGUF_SHARD_PATTERN = /-\d{5}-of-\d{5}\.gguf$/i;
+const GGUF_MMPROJ_PATTERN = /(?:^|[/_.-])mmproj(?:[/_.-]|$)/i;
+const QUANTIZATION_PATTERN =
+  /(?:^|[-_.])(q[234568](?:_[0-9]+)?(?:_[kmst](?:_?[sml])?)?|iq[1-4]_[a-z0-9]+|f16|f32)(?:[-_.]|$)/i;
+
+export type MarketplaceVariant = {
+  id: string;
+  quantization: string | null;
+  files: MarketplaceModelFile[];
+  totalSizeBytes: number;
+  isSplit: boolean;
+  isRecommended: boolean;
+};
+
+export function extractQuantization(filePath: string): string | null {
+  const base = filePath.split('/').at(-1) ?? filePath;
+  return base.match(QUANTIZATION_PATTERN)?.[1]?.toUpperCase() ?? null;
+}
+
+function shardGroupKey(filePath: string): string | null {
+  const match = filePath.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Groups a repo's GGUF files into installable variants. Standalone files are
+ * one variant each; split-GGUF repos (a quantization sharded into
+ * `-00001-of-N.gguf` parts, e.g. unsloth directory layouts or QwQ-32B) become
+ * one variant per part group — installing a split variant downloads every part
+ * so llama.cpp can load the sharded model. mmproj files are excluded: they are
+ * downloaded automatically alongside a vision model, never installed alone.
+ */
+export function groupMarketplaceVariants(
+  files: MarketplaceModelFile[] | undefined,
+): MarketplaceVariant[] {
+  if (!files?.length) return [];
+  const shardGroups = new Map<string, MarketplaceModelFile[]>();
+  const standalone: MarketplaceModelFile[] = [];
+  for (const file of files) {
+    if (GGUF_MMPROJ_PATTERN.test(file.path)) continue;
+    if (GGUF_SHARD_PATTERN.test(file.path)) {
+      const key = shardGroupKey(file.path);
+      if (!key) continue;
+      const group = shardGroups.get(key) ?? [];
+      group.push(file);
+      shardGroups.set(key, group);
+      continue;
+    }
+    standalone.push(file);
+  }
+  const variants: MarketplaceVariant[] = standalone.map(file => ({
+    id: file.path,
+    quantization: extractQuantization(file.path),
+    files: [file],
+    totalSizeBytes: file.sizeBytes ?? 0,
+    isSplit: false,
+    isRecommended: Boolean(file.isRecommended),
+  }));
+  for (const [key, group] of shardGroups) {
+    const sorted = [...group].sort((left, right) =>
+      left.path.localeCompare(right.path, undefined, { numeric: true }),
+    );
+    variants.push({
+      id: key,
+      quantization: extractQuantization(key.split('/').at(-1) ?? key),
+      files: sorted,
+      totalSizeBytes: group.reduce((sum, file) => sum + (file.sizeBytes ?? 0), 0),
+      isSplit: true,
+      isRecommended: sorted.some(file => file.isRecommended),
+    });
+  }
+  const preferences = ['Q4_K_M', 'Q5_K_M', 'Q5_0', 'Q4_0', 'Q6_K', 'Q8_0'];
+  const preferenceRank = (variant: MarketplaceVariant): number => {
+    const index = preferences.indexOf((variant.quantization ?? '').toUpperCase());
+    return index === -1 ? preferences.length : index;
+  };
+  variants.sort((left, right) => {
+    if (left.isRecommended !== right.isRecommended) return left.isRecommended ? -1 : 1;
+    const rankDelta = preferenceRank(left) - preferenceRank(right);
+    if (rankDelta !== 0) return rankDelta;
+    return left.totalSizeBytes - right.totalSizeBytes;
+  });
+  return variants;
 }
