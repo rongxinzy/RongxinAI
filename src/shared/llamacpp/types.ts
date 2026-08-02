@@ -399,9 +399,13 @@ export type LlamaCppInstallModelInput = {
   modelId: string;
   filePath?: string;
   mmprojFilePath?: string;
+  mmprojDownloadUrl?: string;
   revision?: string;
   displayName?: string;
   downloadUrl?: string;
+  sha256?: string;
+  mmprojSha256?: string;
+  fileSizeBytes?: number;
 };
 
 export type LlamaCppSetModelPreferenceInput = {

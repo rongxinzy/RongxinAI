@@ -61,6 +61,7 @@ export type McpIpc = (typeof McpIpc)[keyof typeof McpIpc];
 // ─── Hardware ───────────────────────────────────────────────────────────────
 export const HardwareIpc = {
   NvidiaSmi: 'hardware:nvidia-smi',
+  SystemMemory: 'hardware:system-memory',
 } as const;
 export type HardwareIpc = (typeof HardwareIpc)[keyof typeof HardwareIpc];
 

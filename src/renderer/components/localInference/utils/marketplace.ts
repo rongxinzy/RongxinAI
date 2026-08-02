@@ -26,17 +26,49 @@ const MARKETPLACE_CAPABILITY_ORDER = [
 export function buildMarketplaceSearchParams(input: {
   query: string;
   pageNumber?: number;
+  task?: MarketplaceSearchParams['task'];
+  size?: MarketplaceSearchParams['size'];
+  fit?: MarketplaceSearchParams['fit'];
+  minStars?: number;
+  featuredOnly?: boolean;
 }): MarketplaceSearchParams | null {
   const query = input.query.trim();
   if (!query) {
-    return { limit: MARKETPLACE_INITIAL_MODEL_COUNT };
+    return {
+      limit: MARKETPLACE_INITIAL_MODEL_COUNT,
+      pageNumber: input.pageNumber,
+      featuredOnly: input.featuredOnly ?? true,
+      task: input.task,
+      size: input.size,
+      fit: input.fit,
+      minStars: input.minStars,
+    };
   }
   if (!isMarketplaceSearchQuery(query)) return null;
   return {
     query,
     limit: MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
     pageNumber: input.pageNumber,
+    task: input.task,
+    size: input.size,
+    fit: input.fit,
+    minStars: input.minStars,
   };
+}
+
+export function formatMarketplaceScore(stars?: number, confidence?: string): string {
+  if (!stars || stars <= 0) return i18nService.t('marketplaceScoreUnavailable');
+  return `${stars.toFixed(1)}★${confidence ? ` · ${confidence}` : ''}`;
+}
+
+export function marketplaceFitLabel(status?: NonNullable<MarketplaceModel['fit']>['status']): string {
+  switch (status) {
+    case 'excellent': return i18nService.t('marketplaceFitExcellent');
+    case 'good': return i18nService.t('marketplaceFitGood');
+    case 'limited': return i18nService.t('marketplaceFitLimited');
+    case 'unsupported': return i18nService.t('marketplaceFitUnsupported');
+    default: return i18nService.t('marketplaceFitUnknown');
+  }
 }
 
 function isMarketplaceSearchQuery(value: string): boolean {
@@ -62,6 +94,31 @@ export function getInstallableMarketplaceModels(
       : undefined;
     return !model.installed && !installedModelName;
   });
+}
+
+export function filterMarketplaceModelsForDevice(
+  models: MarketplaceModel[],
+  fit: MarketplaceSearchParams['fit'],
+  minStars?: number,
+): MarketplaceModel[] {
+  return models
+    .filter(model => !minStars || (model.score?.stars ?? 0) >= minStars)
+    .filter(model => {
+      const status = model.fit?.status ?? 'unknown';
+      switch (fit) {
+        case 'recommended':
+          return status === 'excellent' || status === 'good';
+        case 'excellent':
+          return status === 'excellent';
+        case 'compatible':
+          return status === 'excellent' || status === 'good' || status === 'limited';
+        case 'unsupported':
+          return status === 'unsupported';
+        case 'all':
+        default:
+          return true;
+      }
+    });
 }
 
 export function getMarketplaceInstallProgress(
@@ -103,6 +160,7 @@ export function getMarketplaceCapabilityTags(
 ): MarketplaceModel['capability'][] {
   const capabilities = new Set<MarketplaceModel['capability']>([
     model.capability,
+    ...(model.capabilities ?? []),
     ...model.tags.filter(isMarketplaceCapability),
   ]);
   return MARKETPLACE_CAPABILITY_ORDER.filter(capability => capabilities.has(capability));

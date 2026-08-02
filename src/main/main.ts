@@ -53,6 +53,7 @@ import {
   CoworkPermissionIpc,
   CoworkSessionIpc,
   CoworkStreamIpc,
+  HardwareIpc,
   McpIpc,
   OpenClawBridgeIpc,
   ProjectIpc,
@@ -171,6 +172,7 @@ import {
 } from './libs/modelscopeSkillMarketplace';
 import { createModelScopeTokenPool, ModelScopeStoreKey } from './libs/modelscopeTokenPool';
 import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
+import { getSystemMemorySnapshot } from './libs/systemMemory';
 import { OllamaManager } from './libs/ollamaManager';
 import { parsePrimaryModelRef, resolveQualifiedAgentModelRef } from './libs/openclawAgentModels';
 import {
@@ -2913,6 +2915,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
+  ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
 
   // Network status change handler
   // Remove any existing listener first to avoid duplicate registrations
@@ -7523,7 +7526,6 @@ if (!gotTheLock) {
     });
     registerMarketplaceIpcHandlers({
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
-      getStore,
     });
     // Inject auth getters for zhiyuan-server provider routing
     // The getter proactively triggers a background token refresh when the

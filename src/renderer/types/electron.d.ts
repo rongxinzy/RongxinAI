@@ -2,7 +2,7 @@ import type { CoworkError } from '../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ChannelRunSummary } from '../../shared/channelRun/constants';
-import type { NvidiaSmiSnapshot } from '../../shared/hardware';
+import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
   CoworkPermissionMode,
   CoworkPermissionOrigin,
@@ -556,8 +556,6 @@ interface IElectronAPI {
   };
   marketplace: {
     search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
-    getToken: () => Promise<string | null>;
-    setToken: (token: string) => Promise<void>;
   };
   triage: {
     getConfig: () => Promise<TriageConfig>;
@@ -565,6 +563,7 @@ interface IElectronAPI {
   };
   hardware: {
     nvidiaSmi: () => Promise<NvidiaSmiSnapshot>;
+    systemMemory: () => Promise<SystemMemorySnapshot>;
   };
   agents: {
     list: () => Promise<Agent[]>;

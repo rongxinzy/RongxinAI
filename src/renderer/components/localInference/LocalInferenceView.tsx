@@ -13,6 +13,7 @@ import type {
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
 import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
+import { createMarketplaceHardwareProfile, withMarketplaceScore, type MarketplaceHardwareProfile } from '../../../shared/marketplace/scoring';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
 import WindowTitleBar from '../window/WindowTitleBar';
@@ -45,7 +46,10 @@ import type {
 } from './types';
 import { LocalInferenceToastKind } from './types';
 import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
-import { buildMarketplaceSearchParams } from './utils/marketplace';
+import {
+  buildMarketplaceSearchParams,
+  filterMarketplaceModelsForDevice,
+} from './utils/marketplace';
 import {
   isInstallTerminalPhase,
   isPullInProgress,
@@ -108,7 +112,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
   const contentViewportRef = useRef<HTMLDivElement>(null);
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
-  const [marketplaceToken, setMarketplaceToken] = useState<string | null>(null);
+  const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number>();
+  const [marketplaceSearchParams, setMarketplaceSearchParams] =
+    useState<MarketplaceSearchParams>({});
+  const [marketplaceHardware, setMarketplaceHardware] = useState<MarketplaceHardwareProfile>();
+  const [marketplaceHardwareChecked, setMarketplaceHardwareChecked] = useState(false);
   useI18nLanguage();
   const launchLogs = useModelLaunchLogs();
   const [launchLogFullscreen, setLaunchLogFullscreen] = useState(false);
@@ -129,11 +137,32 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 
   useEffect(() => {
-    void window.electron.marketplace
-      .getToken()
-      .then(setMarketplaceToken)
-      .catch(() => setMarketplaceToken(null));
+    void Promise.all([
+      typeof window.electron.hardware.nvidiaSmi === 'function'
+        ? window.electron.hardware.nvidiaSmi().catch(() => null)
+        : Promise.resolve(null),
+      typeof window.electron.hardware.systemMemory === 'function'
+        ? window.electron.hardware.systemMemory().catch(() => null)
+        : Promise.resolve(null),
+    ]).then(([gpuSnapshot, memorySnapshot]) => {
+      setMarketplaceHardware(createMarketplaceHardwareProfile(gpuSnapshot, memorySnapshot));
+      setMarketplaceHardwareChecked(true);
+    });
   }, []);
+
+  const visibleMarketplaceModels = useMemo(() => {
+    const scored = marketplaceModels.map(model =>
+      withMarketplaceScore(model, {
+        hardware: marketplaceHardware,
+        task: marketplaceSearchParams.task,
+      }),
+    );
+    return filterMarketplaceModelsForDevice(
+      scored,
+      marketplaceSearchParams.fit,
+      marketplaceSearchParams.minStars,
+    );
+  }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
   const dismissToast = useCallback(() => {
     if (toastTimerRef.current) {
@@ -194,7 +223,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     try {
       const result = await window.electron.marketplace.search(params);
       if (id === marketplaceSearchRef.current) {
+        setMarketplaceSearchParams(params);
         setMarketplaceModels(result.models);
+        setMarketplaceTotalCount(result.totalCount);
         setMarketplaceError(result.warning ?? null);
       }
     } catch (searchError) {
@@ -208,13 +239,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     }
   }, []);
 
-  const handleMarketplaceSearch = useCallback(() => {
+  const handleMarketplaceSearch = useCallback((overrides: MarketplaceSearchParams = {}) => {
     const params = buildMarketplaceSearchParams({
-      query: marketplaceQuery,
+      ...overrides,
+      query: overrides.query ?? marketplaceQuery,
     });
     if (!params) {
       setMarketplaceHasSearched(false);
       setMarketplaceModels([]);
+      setMarketplaceTotalCount(undefined);
       setMarketplaceError(null);
       return;
     }
@@ -290,10 +323,21 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       }));
       dismissToast();
       try {
+        const selectedFile =
+          model.files?.find(file => file.path === model.filePath) ??
+          model.files?.find(file => file.isRecommended);
+        const mmprojFile = model.files?.find(file => file.path === model.mmprojFilePath);
         const result = await window.electron.llamacpp.installModel({
           modelId: model.repoId,
-          filePath: model.filePath,
+          filePath: selectedFile?.path,
           displayName: model.repoId,
+          downloadUrl: selectedFile?.downloadUrl,
+          revision: selectedFile?.revision ?? model.runtime?.revision,
+          sha256: selectedFile?.sha256,
+          fileSizeBytes: selectedFile?.sizeBytes,
+          mmprojFilePath: mmprojFile?.path,
+          mmprojDownloadUrl: mmprojFile?.downloadUrl,
+          mmprojSha256: mmprojFile?.sha256,
         });
         if (!result.success) return;
         await refreshLocalModels();
@@ -486,7 +530,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return () => window.clearInterval(timer);
   }, [isRunning, refreshRunningModels]);
 
-  const handleLoadModel = (model: OllamaModel) => {
+  const handleLoadModel = useCallback((model: OllamaModel) => {
     const modelName = model.name;
     if (loadingModelNameRef.current) return;
     loadingModelNameRef.current = modelName;
@@ -513,7 +557,26 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setLoadingModelName(current => (current === modelName ? null : current));
       }
     });
-  };
+  }, [launchLogs, runAction, showToast]);
+
+  const handleMarketplaceOpenInstalled = useCallback(
+    (model: MarketplaceModel) => {
+      const target = localModels.find(candidate => {
+        if (!candidate.path) return false;
+        if (model.installedPath && candidate.path === model.installedPath) return true;
+        const normalizedPath = candidate.path.toLowerCase();
+        const repoId = model.repoId.toLowerCase();
+        return normalizedPath.includes(repoId) || normalizedPath.includes(repoId.replace('/', '\\'));
+      });
+      if (target) {
+        setActiveTab('models');
+        handleLoadModel(target);
+        return;
+      }
+      showToast(i18nService.t('marketplaceInstalledNotIndexed'), LocalInferenceToastKind.Info);
+    },
+    [handleLoadModel, localModels, showToast],
+  );
 
   const handleUnload = (modelName: string) => {
     if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
@@ -764,19 +827,20 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               >
                 <MarketplacePanel
                   loading={loading}
-                  models={marketplaceModels}
+                  models={visibleMarketplaceModels}
                   hasSearched={marketplaceHasSearched}
                   marketplaceLoading={marketplaceLoading}
                   marketplaceError={marketplaceError}
                   query={marketplaceQuery}
                   installedModelPathMap={installedModelPathMap}
                   installProgress={pullProgress}
-                  savedToken={marketplaceToken}
-                  onTokenSaved={setMarketplaceToken}
+                  hardwareSummary={marketplaceHardware}
+                  hardwareSummaryReady={marketplaceHardwareChecked}
+                  totalCount={marketplaceTotalCount}
+                  onOpenInstalled={handleMarketplaceOpenInstalled}
                   onQueryChange={setMarketplaceQuery}
                   onSearch={handleMarketplaceSearch}
                   onInstall={handleMarketplaceInstall}
-                  contentViewportRef={contentViewportRef}
                 />
               </LayeredTabsContent>
             </div>

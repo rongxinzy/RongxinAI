@@ -3,26 +3,28 @@ import { Button } from '@shared/components/ui/button';
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupButton,
   InputGroupInput,
 } from '@shared/components/ui/input-group';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  RefreshCw,
-  Search,
-  SlidersHorizontal,
-  X,
-} from 'lucide-react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { MarketplaceModel } from '../../../../shared/marketplace';
+import type { MarketplaceModel, MarketplaceSearchParams, MarketplaceTaskFilter } from '../../../../shared/marketplace';
+import {
+  formatMarketplaceHardwareSummary,
+  type MarketplaceHardwareProfile,
+} from '../../../../shared/marketplace/scoring';
 import { i18nService } from '../../../services/i18n';
-import Modal from '../../common/Modal';
 import { EmptyState } from '../components/Common';
 import { MarketplaceModelCard } from '../components/MarketplaceModelCard';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
 import {
   localInferenceCompactButtonClass,
   localInferenceMutedTextClass,
@@ -31,11 +33,12 @@ import {
 import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
-  getMarketplaceGridColumnCount,
   getMarketplaceInstallProgress,
-  getMarketplacePageSize,
 } from '../utils/marketplace';
 import { isPullInProgress } from '../utils/progress';
+
+type MarketplaceBrowseMode = 'recommended' | 'all';
+type MarketplaceResultContext = 'recommended' | 'all' | 'search' | 'category';
 
 export function MarketplacePanel({
   loading,
@@ -46,12 +49,13 @@ export function MarketplacePanel({
   query,
   installedModelPathMap,
   installProgress,
-  savedToken,
-  onTokenSaved,
+  hardwareSummary,
+  onOpenInstalled,
   onQueryChange,
   onSearch,
   onInstall,
-  contentViewportRef,
+  hardwareSummaryReady,
+  totalCount,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -61,135 +65,44 @@ export function MarketplacePanel({
   query: string;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
-  savedToken: string | null;
-  onTokenSaved: (token: string | null) => void;
+  onOpenInstalled: (model: MarketplaceModel) => void;
   onQueryChange: (v: string) => void;
-  onSearch: () => void;
+  onSearch: (params?: MarketplaceSearchParams) => void;
+  hardwareSummary?: MarketplaceHardwareProfile;
+  hardwareSummaryReady: boolean;
+  totalCount?: number;
   onInstall: (model: MarketplaceModel) => Promise<void>;
-  contentViewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
-  const [tokenModalOpen, setTokenModalOpen] = useState(false);
-  const [tokenInput, setTokenInput] = useState('');
-  const [tokenInputVisible, setTokenInputVisible] = useState(false);
+  const [taskFilter, setTaskFilter] = useState<MarketplaceTaskFilter>('all');
+  const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('all');
+  const [browseMode, setBrowseMode] = useState<MarketplaceBrowseMode>('recommended');
+  const [submittedQuery, setSubmittedQuery] = useState('');
+  const [resultContext, setResultContext] = useState<MarketplaceResultContext>('recommended');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(MARKETPLACE_PAGE_SIZE);
-  const [panelMinHeight, setPanelMinHeight] = useState<number | null>(null);
+  const pageSize = MARKETPLACE_PAGE_SIZE;
   const pageRef = useRef(page);
-  const pageSizeRef = useRef(pageSize);
-  const resizeFrameRef = useRef<number | null>(null);
-  const layoutSignatureRef = useRef<string | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const paginationRef = useRef<HTMLDivElement>(null);
+  const appliedFilterSignatureRef = useRef<string | null>(null);
+  const hasObservedSearchRef = useRef(false);
 
   useEffect(() => {
     pageRef.current = page;
   }, [page]);
 
-  useEffect(() => {
-    if (tokenModalOpen) setTokenInput(savedToken ?? '');
-    else setTokenInputVisible(false);
-  }, [savedToken, tokenModalOpen]);
-
   const installableModels = useMemo(
     () => getInstallableMarketplaceModels(models, installedModelPathMap),
     [installedModelPathMap, models],
   );
-  const pageCount = Math.max(1, Math.ceil(installableModels.length / pageSize));
-  const currentPage = Math.min(page, pageCount);
-  const pageStart = (currentPage - 1) * pageSize;
-  const visibleModels = useMemo(
-    () => installableModels.slice(pageStart, pageStart + pageSize),
-    [installableModels, pageStart, pageSize],
+  const installedModels = useMemo(
+    () => models.filter(model => model.installed),
+    [models],
   );
-
-  useLayoutEffect(() => {
-    const contentViewport = contentViewportRef.current;
-    const panel = panelRef.current;
-    const grid = gridRef.current;
-    if (!contentViewport || !panel || !grid || visibleModels.length === 0) return;
-
-    layoutSignatureRef.current = null;
-
-    const updatePageSize = () => {
-      const gridStyle = window.getComputedStyle(grid);
-      const viewportRect = contentViewport.getBoundingClientRect();
-      const gridRect = grid.getBoundingClientRect();
-      const pagination = paginationRef.current;
-      const paginationHeight = pagination ? pagination.getBoundingClientRect().height : 0;
-      const content = contentViewport.firstElementChild as HTMLElement | null;
-      const contentPaddingBottom = content
-        ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
-        : 0;
-      const cards = Array.from(grid.children) as HTMLElement[];
-      const cardRects = cards.map(card => card.getBoundingClientRect());
-      const cardHeight = Math.max(...cardRects.map(rect => rect.height));
-      const cardWidth = Math.max(...cardRects.map(rect => rect.width));
-      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
-      const columnGap = Number.parseFloat(gridStyle.columnGap) || 0;
-      const columnCount = getMarketplaceGridColumnCount({
-        gridWidth: grid.clientWidth,
-        cardWidth,
-        columnGap,
-      });
-      const gridTop = gridRect.top - viewportRect.top;
-      const panelTop = panel.getBoundingClientRect().top - viewportRect.top;
-      const nextPanelMinHeight = Math.max(
-        0,
-        Math.floor(contentViewport.clientHeight - panelTop - contentPaddingBottom),
-      );
-      setPanelMinHeight(value => (value === nextPanelMinHeight ? value : nextPanelMinHeight));
-      const layoutSignature = [
-        contentViewport.clientWidth,
-        contentViewport.clientHeight,
-        columnCount,
-        gridTop,
-        paginationHeight,
-        contentPaddingBottom,
-        cardHeight,
-        rowGap,
-      ].join(':');
-      if (layoutSignature === layoutSignatureRef.current) return;
-
-      const availableGridHeight =
-        contentViewport.clientHeight - gridTop - paginationHeight - contentPaddingBottom;
-      const nextPageSize = getMarketplacePageSize({
-        availableGridHeight,
-        cardHeight,
-        columnCount,
-        rowGap,
-      });
-      layoutSignatureRef.current = layoutSignature;
-      const currentPageSize = pageSizeRef.current;
-      if (nextPageSize === currentPageSize) return;
-
-      const firstVisibleIndex = (pageRef.current - 1) * currentPageSize;
-      const nextPage = Math.floor(firstVisibleIndex / nextPageSize) + 1;
-      pageSizeRef.current = nextPageSize;
-      pageRef.current = nextPage;
-      setPageSize(nextPageSize);
-      setPage(nextPage);
-    };
-    const schedulePageSizeUpdate = () => {
-      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-      resizeFrameRef.current = requestAnimationFrame(updatePageSize);
-    };
-
-    const resizeObserver = new ResizeObserver(schedulePageSizeUpdate);
-    resizeObserver.observe(contentViewport);
-    resizeObserver.observe(panel);
-    resizeObserver.observe(grid);
-    if (paginationRef.current) resizeObserver.observe(paginationRef.current);
-    schedulePageSizeUpdate();
-    window.addEventListener('resize', schedulePageSizeUpdate);
-
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', schedulePageSizeUpdate);
-      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-    };
-  }, [contentViewportRef, hasSearched, marketplaceError, models, pageCount, visibleModels.length]);
+  const pageCount = Math.max(
+    1,
+    totalCount ? Math.ceil(totalCount / pageSize) : Math.ceil(installableModels.length / pageSize),
+  );
+  const currentPage = Math.min(page, pageCount);
+  const visibleModels = installableModels;
 
   useEffect(() => {
     pageRef.current = 1;
@@ -202,13 +115,6 @@ export function MarketplacePanel({
       setPage(pageCount);
     }
   }, [page, pageCount]);
-
-  const handleSaveToken = async () => {
-    const trimmed = tokenInput.trim();
-    await window.electron.marketplace.setToken(trimmed);
-    onTokenSaved(trimmed || null);
-    setTokenModalOpen(false);
-  };
 
   const handleInstall = async (model: MarketplaceModel) => {
     setInstallingModelIds(prev => new Set(prev).add(model.id));
@@ -223,38 +129,94 @@ export function MarketplacePanel({
     }
   };
 
-  const handleNextPage = () => {
-    setPage(value => {
-      const nextPage = Math.min(pageCount, value + 1);
-      pageRef.current = nextPage;
-      return nextPage;
-    });
+  const handlePageChange = (nextPage: number) => {
+    const boundedPage = Math.min(pageCount, Math.max(1, nextPage));
+    pageRef.current = boundedPage;
+    setPage(boundedPage);
+    onSearch(searchParamsForPage(boundedPage));
   };
 
-  const tokenSettingsButton = (
-    <Button
-      type="button"
-      onClick={() => setTokenModalOpen(true)}
-      size="xs"
-      variant={savedToken ? 'secondary' : 'outline'}
-      title={
-        savedToken
-          ? i18nService.t('marketplaceTokenConfigured')
-          : i18nService.t('marketplaceTokenNotConfigured')
-      }
-    >
-      <SlidersHorizontal data-icon="inline-start" />
-      {savedToken
-        ? i18nService.t('marketplaceTokenConfigured')
-        : i18nService.t('marketplaceTokenSettings')}
-    </Button>
+  const hasQuery = Boolean(submittedQuery.trim());
+  const taskLabel = {
+    chat: i18nService.t('marketplaceFilterTaskChat'),
+    reasoning: i18nService.t('marketplaceFilterTaskReasoning'),
+    code: i18nService.t('marketplaceFilterTaskCode'),
+    vision: i18nService.t('marketplaceFilterTaskVision'),
+  }[taskFilter as 'chat' | 'reasoning' | 'code' | 'vision'];
+  const fitFilterLabel = {
+    all: i18nService.t('marketplaceFilterFitAll'),
+    recommended: i18nService.t('marketplaceFitExcellent'),
+    excellent: i18nService.t('marketplaceFitExcellent'),
+    compatible: i18nService.t('marketplaceFitCompatible'),
+    unsupported: i18nService.t('marketplaceFitUnsupported'),
+  }[fitFilter];
+  const resultTitle = resultContext === 'search'
+    ? `${i18nService.t('marketplaceResultSearch')}${taskFilter !== 'all' ? ` · ${taskLabel ?? taskFilter}` : ''}`
+    : resultContext === 'category'
+      ? `${i18nService.t('marketplaceResultCategory')} · ${taskLabel ?? taskFilter}`
+      : i18nService.t(resultContext === 'recommended' ? 'marketplaceResultRecommended' : 'marketplaceResultAll');
+  const resultCount = totalCount ?? installableModels.length;
+  const searchParamsForPage = useCallback(
+    (pageNumber?: number, queryValue = submittedQuery): MarketplaceSearchParams => ({
+      query: queryValue,
+      pageNumber,
+      task: taskFilter,
+      fit: fitFilter,
+      featuredOnly: !queryValue.trim() && taskFilter === 'all' && browseMode === 'recommended',
+    }),
+    [browseMode, fitFilter, submittedQuery, taskFilter],
   );
+  const filterSignature = `${browseMode}:${taskFilter}:${fitFilter}`;
+  const submitSearch = () => {
+    const nextQuery = query.trim();
+    setSubmittedQuery(nextQuery);
+    setResultContext(
+      nextQuery ? 'search' : taskFilter !== 'all' ? 'category' : browseMode === 'recommended' ? 'recommended' : 'all',
+    );
+    appliedFilterSignatureRef.current = filterSignature;
+    pageRef.current = 1;
+    setPage(1);
+    onSearch(searchParamsForPage(1, nextQuery));
+  };
+
+  useEffect(() => {
+    if (!hasSearched) {
+      hasObservedSearchRef.current = false;
+      appliedFilterSignatureRef.current = null;
+      setSubmittedQuery('');
+      setResultContext('recommended');
+      return;
+    }
+    if (!hasObservedSearchRef.current) {
+      hasObservedSearchRef.current = true;
+      setSubmittedQuery(query.trim());
+      setResultContext(query.trim() ? 'search' : taskFilter !== 'all' ? 'category' : browseMode === 'recommended' ? 'recommended' : 'all');
+      appliedFilterSignatureRef.current = filterSignature;
+      return;
+    }
+    if (appliedFilterSignatureRef.current === filterSignature) return;
+    appliedFilterSignatureRef.current = filterSignature;
+    pageRef.current = 1;
+    setPage(1);
+    setResultContext(hasQuery ? 'search' : taskFilter !== 'all' ? 'category' : browseMode === 'recommended' ? 'recommended' : 'all');
+    onSearch(searchParamsForPage(1));
+  }, [browseMode, filterSignature, hasQuery, hasSearched, onSearch, query, searchParamsForPage, taskFilter]);
+
+  const installedModelActions = installedModels.length > 0 ? (
+    <div className="mx-auto mb-4 flex w-full max-w-5xl flex-wrap items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+      <span className="mr-1 text-xs font-medium text-foreground">{i18nService.t('marketplaceInstalledNext')}</span>
+      {installedModels.slice(0, 4).map(model => (
+        <Button key={model.repoId} type="button" size="xs" variant="secondary" onClick={() => onOpenInstalled(model)}>
+          {model.name || model.repoId}
+          <span className="ml-1 text-[10px] text-muted-foreground">{i18nService.t('marketplaceRun')}</span>
+        </Button>
+      ))}
+    </div>
+  ) : null;
 
   return (
     <div
-      ref={panelRef}
       className="flex flex-col gap-4"
-      style={panelMinHeight === null ? undefined : { minHeight: panelMinHeight }}
     >
       <div
         className={
@@ -267,9 +229,8 @@ export function MarketplacePanel({
           <div className="w-full max-w-3xl space-y-3 text-center">
             <div className="flex items-center justify-center gap-3">
               <h2 className="text-2xl font-semibold text-foreground">
-                {i18nService.t('marketplaceTitle')}
+              {i18nService.t('marketplaceTitle')}
               </h2>
-              {tokenSettingsButton}
             </div>
           </div>
         ) : null}
@@ -282,7 +243,7 @@ export function MarketplacePanel({
             className={`min-w-0 ${hasSearched ? 'basis-1/2' : 'mx-auto w-full max-w-4xl'}`}
             onSubmit={event => {
               event.preventDefault();
-              onSearch();
+              submitSearch();
             }}
           >
             <div className="flex gap-2">
@@ -312,18 +273,84 @@ export function MarketplacePanel({
               </Button>
             </div>
           </form>
-          {hasSearched ? <div className="shrink-0">{tokenSettingsButton}</div> : null}
         </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5">
+        <div className="flex w-full items-center justify-between gap-3 border-b border-border/40 pb-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-sm font-semibold text-foreground">{resultTitle}</span>
+            {hasSearched ? (
+              <span className="text-xs text-muted-foreground">
+                {i18nService.t('marketplaceResultCount').replace('{count}', String(resultCount))}
+              </span>
+            ) : null}
+          </div>
+          {!hasQuery ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {i18nService.t('marketplaceBrowse')}
+              </span>
+              <FluidTabs
+                aria-label={i18nService.t('marketplaceBrowse')}
+                value={browseMode}
+                onValueChange={value => setBrowseMode(value as MarketplaceBrowseMode)}
+                items={[
+                  { value: 'recommended', label: i18nService.t('marketplaceBrowseRecommended') },
+                  { value: 'all', label: i18nService.t('marketplaceBrowseAll') },
+                ]}
+              />
+            </div>
+          ) : null}
+        </div>
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {i18nService.t('marketplaceFilterTask')}
+          </span>
+          <FluidTabs
+            aria-label={i18nService.t('marketplaceFilterTask')}
+            value={taskFilter}
+            onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
+            items={[
+              { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
+              { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
+              { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
+              { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
+              { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            {i18nService.t('marketplaceFilterFit')}
+          </span>
+          <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
+            <SelectTrigger size="sm" className="min-w-32 rounded-full border-border/60 bg-background/70 px-3">
+              <SelectValue>{fitFilterLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
+                <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
+                <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
+                <SelectItem value="unsupported">{i18nService.t('marketplaceFitUnsupported')}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+        <span className="w-full border-t border-border/40 pt-2 text-xs text-muted-foreground sm:w-auto sm:border-t-0 sm:border-l sm:pl-3 sm:pt-0">
+          {hardwareSummaryReady ? formatMarketplaceHardwareSummary(hardwareSummary) : i18nService.t('marketplaceHardwareDetecting')}
+        </span>
       </div>
 
       {marketplaceError ? (
         <Alert>
           <AlertTitle>
-            {marketplaceError.startsWith('AUTH_ERROR:')
-              ? i18nService.t('marketplaceSearchStatusTokenInvalid')
+            {marketplaceError.startsWith('CATALOG_ERROR:')
+              ? i18nService.t('marketplaceSearchStatusCatalogUnavailable')
               : i18nService.t('marketplaceSearchStatusWarning')}
           </AlertTitle>
-          <AlertDescription>{marketplaceError.replace(/^AUTH_ERROR:\s*/, '')}</AlertDescription>
+          <AlertDescription>{marketplaceError.replace(/^(?:CATALOG_ERROR|AUTH_ERROR):\s*/, '')}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -335,12 +362,14 @@ export function MarketplacePanel({
           {i18nService.t('loading')}
         </div>
       ) : !hasSearched ? null : installableModels.length === 0 ? (
-        <EmptyState title={i18nService.t('marketplaceNoModels')} className="min-h-[620px]" />
+        <div className="flex min-h-[620px] flex-col gap-4">
+          {installedModelActions ?? <EmptyState title={i18nService.t('marketplaceNoModels')} />}
+        </div>
       ) : (
         <div className="flex flex-1 flex-col">
+          {installedModelActions}
           <div
-            ref={gridRef}
-            className="mx-auto grid w-full max-w-5xl auto-rows-min content-start gap-3 md:grid-cols-2"
+            className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4 sm:grid-cols-2 xl:grid-cols-3"
           >
             {visibleModels.map(model => {
               const progress = getMarketplaceInstallProgress(installProgress, model);
@@ -359,18 +388,11 @@ export function MarketplacePanel({
           </div>
           {pageCount > 1 && (
             <div
-              ref={paginationRef}
-              className="sticky bottom-0 z-10 mt-auto flex items-center justify-center gap-6 bg-background pb-2 pt-6"
+              className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border/40 bg-background/95 px-3 py-3 shadow-[0_-8px_24px_-20px_hsl(var(--foreground)/0.45)] backdrop-blur supports-[backdrop-filter]:bg-background/80"
             >
               <Button
                 type="button"
-                onClick={() => {
-                  setPage(value => {
-                    const previousPage = Math.max(1, value - 1);
-                    pageRef.current = previousPage;
-                    return previousPage;
-                  });
-                }}
+                onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
                 variant="ghost"
                 size="icon-sm"
@@ -387,7 +409,7 @@ export function MarketplacePanel({
               </span>
               <Button
                 type="button"
-                onClick={() => void handleNextPage()}
+                onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage >= pageCount}
                 variant="ghost"
                 size="icon-sm"
@@ -401,80 +423,6 @@ export function MarketplacePanel({
         </div>
       )}
 
-      <Modal
-        isOpen={tokenModalOpen}
-        onClose={() => setTokenModalOpen(false)}
-        overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-        className="mx-4 w-full max-w-md rounded-2xl border border-border bg-surface p-6 shadow-2xl"
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-foreground">
-              {i18nService.t('marketplaceTokenSettingsTitle')}
-            </h3>
-            <Button
-              type="button"
-              onClick={() => setTokenModalOpen(false)}
-              size="icon-sm"
-              variant="ghost"
-              aria-label={i18nService.t('close')}
-            >
-              <X />
-            </Button>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <InputGroup>
-              <InputGroupInput
-                id="marketplace-token"
-                type={tokenInputVisible ? 'text' : 'password'}
-                value={tokenInput}
-                onChange={event => setTokenInput(event.target.value)}
-                placeholder={i18nService.t('marketplaceTokenPlaceholder')}
-              />
-              <InputGroupAddon align="inline-end">
-                {tokenInput && (
-                  <InputGroupButton
-                    onClick={() => setTokenInput('')}
-                    aria-label={i18nService.t('marketplaceTokenClear')}
-                    size="icon-xs"
-                  >
-                    <X />
-                  </InputGroupButton>
-                )}
-                <InputGroupButton
-                  onClick={() => setTokenInputVisible(v => !v)}
-                  aria-label={i18nService.t(tokenInputVisible ? 'hide' : 'show')}
-                  size="icon-xs"
-                >
-                  {tokenInputVisible ? <EyeOff /> : <Eye />}
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
-          </div>
-          <div className="flex items-center justify-end pt-1">
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                onClick={() => setTokenModalOpen(false)}
-                size="sm"
-                variant="outline"
-                className={localInferenceCompactButtonClass}
-              >
-                {i18nService.t('cancel')}
-              </Button>
-              <Button
-                type="button"
-                className={localInferenceCompactButtonClass}
-                onClick={() => void handleSaveToken()}
-                size="sm"
-                variant="outline"
-              >
-                {i18nService.t('marketplaceTokenSave')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

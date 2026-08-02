@@ -1,4 +1,5 @@
 import { execFile } from 'child_process';
+import path from 'path';
 import { promisify } from 'util';
 
 import type { NvidiaGpuInfo, NvidiaSmiSnapshot } from '../../shared/hardware';
@@ -25,28 +26,56 @@ type ExecFileRunner = (
 
 export async function getNvidiaSmiSnapshot(
   runner: ExecFileRunner = execFileAsync as ExecFileRunner,
+  platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
 ): Promise<NvidiaSmiSnapshot> {
   const checkedAt = new Date().toISOString();
-  try {
-    const { stdout } = await runner('nvidia-smi', NVIDIA_SMI_QUERY_ARGS, {
-      encoding: 'utf8',
-      maxBuffer: NVIDIA_SMI_MAX_BUFFER,
-      timeout: NVIDIA_SMI_TIMEOUT_MS,
-      windowsHide: true,
-    });
-    const gpus = parseNvidiaSmiCsv(stdout);
-    if (gpus.length === 0) {
-      return unavailableSnapshot(checkedAt, 'nvidia-smi returned no GPU rows');
+  let lastError: unknown;
+  for (const executable of getNvidiaSmiExecutableCandidates(platform, env)) {
+    try {
+      const { stdout } = await runner(executable, NVIDIA_SMI_QUERY_ARGS, {
+        encoding: 'utf8',
+        maxBuffer: NVIDIA_SMI_MAX_BUFFER,
+        timeout: NVIDIA_SMI_TIMEOUT_MS,
+        windowsHide: true,
+      });
+      const gpus = parseNvidiaSmiCsv(stdout);
+      if (gpus.length === 0) {
+        return unavailableSnapshot(checkedAt, 'nvidia-smi returned no GPU rows');
+      }
+      return {
+        source: 'nvidia-smi',
+        available: true,
+        checkedAt,
+        gpus,
+      };
+    } catch (error) {
+      lastError = error;
     }
-    return {
-      source: 'nvidia-smi',
-      available: true,
-      checkedAt,
-      gpus,
-    };
-  } catch (error) {
-    return unavailableSnapshot(checkedAt, normalizeNvidiaSmiError(error));
   }
+  return unavailableSnapshot(checkedAt, normalizeNvidiaSmiError(lastError));
+}
+
+export function getNvidiaSmiExecutableCandidates(
+  platform = process.platform,
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  if (platform !== 'win32') return ['nvidia-smi'];
+
+  const candidates = [
+    'nvidia-smi.exe',
+    env.ProgramFiles
+      ? path.win32.join(env.ProgramFiles, 'NVIDIA Corporation', 'NVSMI', 'nvidia-smi.exe')
+      : undefined,
+    env.ProgramW6432
+      ? path.win32.join(env.ProgramW6432, 'NVIDIA Corporation', 'NVSMI', 'nvidia-smi.exe')
+      : undefined,
+    env['ProgramFiles(x86)']
+      ? path.win32.join(env['ProgramFiles(x86)'], 'NVIDIA Corporation', 'NVSMI', 'nvidia-smi.exe')
+      : undefined,
+    env.SystemRoot ? path.win32.join(env.SystemRoot, 'System32', 'nvidia-smi.exe') : undefined,
+  ];
+  return [...new Set(candidates.filter((candidate): candidate is string => Boolean(candidate)))];
 }
 
 export function parseNvidiaSmiCsv(output: string): NvidiaGpuInfo[] {

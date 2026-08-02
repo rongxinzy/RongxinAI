@@ -19,7 +19,7 @@ export function useMarketplaceRecommendations({
 }): void {
   useEffect(() => {
     if (activeTab !== 'marketplace' || hasSearched) return;
-    const params = buildMarketplaceSearchParams({ query });
+    const params = buildMarketplaceSearchParams({ query, featuredOnly: true });
     if (!params) return;
     onHasSearchedChange(true);
     void onSearch(params);

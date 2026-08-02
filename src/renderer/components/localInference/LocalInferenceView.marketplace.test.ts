@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
   buildMarketplaceSearchParams,
+  filterMarketplaceModelsForDevice,
   getInstallableMarketplaceModels,
   getMarketplaceGridColumnCount,
   getMarketplacePageSize,
@@ -74,17 +75,40 @@ test('grid column count uses track geometry when the last page has a partial row
 test('marketplace search params load recommended models for an empty query and use the app cap for a search', () => {
   expect(buildMarketplaceSearchParams({ query: ' qwen ' })).toEqual({
     query: 'qwen',
-    limit: 300,
+    limit: 8,
   });
 
   expect(buildMarketplaceSearchParams({ query: ' qwen ', pageNumber: 4 })).toEqual({
     query: 'qwen',
-    limit: 300,
+    limit: 8,
     pageNumber: 4,
   });
 
-  expect(buildMarketplaceSearchParams({ query: '' })).toEqual({ limit: 24 });
+  expect(buildMarketplaceSearchParams({ query: '' })).toEqual({
+    limit: 8,
+    featuredOnly: true,
+  });
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
+});
+
+test('marketplace browse modes carry their result context into server pagination', () => {
+  expect(buildMarketplaceSearchParams({ query: '', pageNumber: 3, featuredOnly: false })).toMatchObject({
+    limit: 8,
+    pageNumber: 3,
+    featuredOnly: false,
+  });
+  expect(buildMarketplaceSearchParams({ query: '', task: 'chat', pageNumber: 2, featuredOnly: false })).toMatchObject({
+    limit: 8,
+    pageNumber: 2,
+    task: 'chat',
+    featuredOnly: false,
+  });
+  expect(buildMarketplaceSearchParams({ query: 'qwen', pageNumber: 2, task: 'code' })).toMatchObject({
+    query: 'qwen',
+    limit: 8,
+    pageNumber: 2,
+    task: 'code',
+  });
 });
 
 test('marketplace only keeps installable models in the visible list', () => {
@@ -99,6 +123,25 @@ test('marketplace only keeps installable models in the visible list', () => {
       new Map([['/models/Qwen/C.gguf', 'C']]),
     ).map(model => model.id),
   ).toEqual(['a']);
+});
+
+test('device-fit filters are applied locally after scoring', () => {
+  const models = [
+    { source: 'modelscope-gguf', id: 'excellent', repoId: 'Qwen/Excellent-GGUF', name: 'Excellent', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'excellent' }, score: { stars: 4.8 } },
+    { source: 'modelscope-gguf', id: 'limited', repoId: 'Qwen/Limited-GGUF', name: 'Limited', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'limited' }, score: { stars: 4.2 } },
+    { source: 'modelscope-gguf', id: 'unsupported', repoId: 'Qwen/Unsupported-GGUF', name: 'Unsupported', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'unsupported' }, score: { stars: 3.8 } },
+  ] as never[];
+
+  expect(filterMarketplaceModelsForDevice(models, 'recommended').map(model => model.id)).toEqual([
+    'excellent',
+  ]);
+  expect(filterMarketplaceModelsForDevice(models, 'compatible').map(model => model.id)).toEqual([
+    'excellent',
+    'limited',
+  ]);
+  expect(filterMarketplaceModelsForDevice(models, 'all', 4.5).map(model => model.id)).toEqual([
+    'excellent',
+  ]);
 });
 
 test('model action guard blocks operations for the unloading model only', async () => {

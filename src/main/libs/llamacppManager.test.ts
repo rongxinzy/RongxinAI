@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { createHash } from 'crypto';
 import { expect, test, vi } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
@@ -859,352 +860,214 @@ test('clearLastLoadedModel prevents a service restart from restoring the old mod
   expect(storage.has('llamacpp_last_loaded_model')).toBe(false);
 });
 
-test('installModel cleans already-downloaded files when a later stage is cancelled', async () => {
-  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-cancel-'));
-  const manager = new LlamaCppManager(() => ({ modelsDir }));
-  manager.refreshModelsAfterInstall = async () => undefined as any;
+function verifiedMarketplaceModel(input: {
+  repoId?: string;
+  filePath?: string;
+  downloadUrl?: string;
+  sha256: string;
+  mmproj?: { path: string; downloadUrl: string; sha256: string };
+}): MarketplaceModel {
+  const repoId = input.repoId ?? 'Qwen/Qwen3-8B-GGUF';
+  const filePath = input.filePath ?? 'Qwen3-8B-Q4_K_M.gguf';
+  const files = [
+    {
+      path: filePath,
+      sizeBytes: 8,
+      sha256: input.sha256,
+      isRecommended: true,
+      kind: 'model' as const,
+      revision: 'commit-sha',
+      downloadUrl: input.downloadUrl ?? 'https://download.test/model.gguf',
+    },
+    ...(input.mmproj
+      ? [
+          {
+            path: input.mmproj.path,
+            sizeBytes: 8,
+            sha256: input.mmproj.sha256,
+            kind: 'mmproj' as const,
+            revision: 'commit-sha',
+            downloadUrl: input.mmproj.downloadUrl,
+          },
+        ]
+      : []),
+  ];
+  return {
+    source: 'modelscope-gguf',
+    id: repoId,
+    repoId,
+    name: repoId,
+    description: 'verified cloud metadata',
+    tags: ['chat', 'gguf'],
+    sizes: ['desktop'],
+    recommendedTag: 'Q4_K_M',
+    capability: 'chat',
+    capabilities: ['chat'],
+    filePath,
+    installed: false,
+    files,
+    mmprojFilePath: input.mmproj?.path,
+    metadataStatus: 'verified',
+    runtime: {
+      format: 'gguf',
+      status: 'candidate',
+      ggufFilesVerified: true,
+      sha256Verified: true,
+      source: 'modelscope-file-api',
+      observedAt: '2026-08-01T00:00:00.000Z',
+      revision: 'commit-sha',
+      reasons: ['端侧加载探针待执行。'],
+    },
+  };
+}
 
-  const originalFetch = global.fetch;
-  try {
-    global.fetch = async (input: string | URL | Request, init?: RequestInit) => {
-      const url = String(input);
-      if (url.includes('/repo/files?')) {
-        return new Response(
-          JSON.stringify({
-            Data: {
-              Files: [
-                { Path: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf' },
-                { Path: 'mmproj-F16.gguf' },
-              ],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (url.includes('/resolve/master/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf')) {
-        return new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      const controllerSignal = init?.signal;
-      await new Promise((_, reject) => {
-        controllerSignal?.addEventListener('abort', () => reject(new Error('Install cancelled')), {
-          once: true,
-        });
-      });
-      throw new Error('Install cancelled');
-    };
+test('installModel rejects a repository without cloud-verified GGUF metadata', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-model-install-unverified-'));
+  const marketplaceService = {
+    resolveModel: async () => null,
+  } as MarketplaceService;
+  const manager = new LlamaCppManager(() => ({ modelsDir }), marketplaceService);
+  const fetchMock = vi.fn();
+  vi.stubGlobal('fetch', fetchMock);
 
-    const controller = new AbortController();
-    const installPromise = manager.installModel(
-      {
-        modelId: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
-        filePath: 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
-        mmprojFilePath: 'mmproj-F16.gguf',
-        displayName: 'unsloth/DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
-      },
-      undefined,
-      { signal: controller.signal },
-    );
-
-    controller.abort(new Error('Install cancelled'));
-
-    await expect(installPromise).rejects.toThrow();
-
-    const repoDir = path.join(
-      modelsDir,
-      'modelscope',
-      'unsloth',
-      'DeepSeek-R1-Distill-Qwen-1.5B-GGUF',
-    );
-    expect(fs.existsSync(path.join(repoDir, 'DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf'))).toBe(
-      false,
-    );
-    expect(fs.existsSync(path.join(repoDir, 'mmproj-F16.gguf'))).toBe(false);
-    expect(fs.existsSync(repoDir)).toBe(false);
-  } finally {
-    global.fetch = originalFetch;
-  }
+  await expect(
+    manager.installModel({ modelId: 'owner/unverified-GGUF' }),
+  ).rejects.toThrow('cloud catalogue has not verified');
+  expect(fetchMock).not.toHaveBeenCalled();
 });
 
-test('installModel retries once with refreshed marketplace metadata after HTTP 404', async () => {
-  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-retry-'));
+test('installModel downloads and verifies the exact GGUF selected by the cloud catalogue', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-model-install-verified-'));
+  const bytes = new Uint8Array([0x47, 0x47, 0x55, 0x46, 3, 0, 0, 0]);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
   const marketplaceService = {
-    resolveModel: async (): Promise<MarketplaceModel> => ({
-      source: 'modelscope-gguf',
-      id: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      repoId: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      name: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      description: 'updated metadata',
-      tags: ['chat'],
-      sizes: ['7B'],
-      recommendedTag: 'Q4_K_M',
-      capability: 'chat',
-      filePath: 'updated.gguf',
-      installed: false,
-    }),
+    resolveModel: async () => verifiedMarketplaceModel({ sha256 }),
   } as MarketplaceService;
   const manager = new LlamaCppManager(() => ({ modelsDir }), marketplaceService);
   manager.refreshModelsAfterInstall = async () => undefined as any;
+  const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    expect(String(input)).toBe('https://download.test/model.gguf');
+    return new Response(bytes, { status: 200, headers: { 'content-length': '8' } });
+  });
+  vi.stubGlobal('fetch', fetchMock);
 
-  let fetchCount = 0;
-  const originalFetch = global.fetch;
-  try {
-    global.fetch = async (input: string | URL | Request) => {
-      fetchCount += 1;
-      const url = String(input);
-      if (url.includes('/repo/files?')) {
-        return new Response('repo files unavailable', { status: 503 });
-      }
-      if (fetchCount === 2) {
-        expect(url).toContain('/resolve/master/original.gguf');
-        return new Response('not found', { status: 404 });
-      }
-      expect(url).toContain('/resolve/master/updated.gguf');
-      return new Response(new Uint8Array([1, 2, 3]), {
-        status: 200,
-        headers: { 'content-length': '3' },
-      });
-    };
+  const result = await manager.installModel({ modelId: 'Qwen/Qwen3-8B-GGUF' });
 
-    const result = await manager.installModel({
-      modelId: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      filePath: 'original.gguf',
-      displayName: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-    });
-
-    expect(fetchCount).toBe(5);
-    expect(result.path).toContain(path.join('Qwen', 'Qwen2.5-7B-Instruct-GGUF', 'updated.gguf'));
-    expect(fs.existsSync(result.path)).toBe(true);
-  } finally {
-    global.fetch = originalFetch;
-  }
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.path).toContain(path.join('Qwen', 'Qwen3-8B-GGUF', 'Qwen3-8B-Q4_K_M.gguf'));
+  expect(fs.readFileSync(result.path)).toEqual(Buffer.from(bytes));
 });
 
-test('installModel retries with repo file listing after HTTP 404 and refreshes mmproj path', async () => {
-  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-retry-repo-files-'));
-  const manager = new LlamaCppManager(() => ({ modelsDir }));
-  manager.refreshModelsAfterInstall = async () => undefined as any;
-
-  let fetchCount = 0;
-  const originalFetch = global.fetch;
-  try {
-    global.fetch = async (input: string | URL | Request) => {
-      fetchCount += 1;
-      const url = String(input);
-      if (fetchCount === 1) {
-        expect(url).toContain('/repo/files?');
-        return new Response(
-          JSON.stringify({
-            Data: {
-              Files: [{ Path: 'original.gguf' }, { Path: 'old-mmproj.gguf' }],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (fetchCount === 2) {
-        expect(url).toContain('/resolve/master/original.gguf');
-        return new Response('not found', { status: 404 });
-      }
-      if (url.includes('/repo/files?')) {
-        return new Response(
-          JSON.stringify({
-            Data: {
-              Files: [{ Path: 'updated.gguf' }, { Path: 'mmproj-F16.gguf' }],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (url.includes('/resolve/master/updated.gguf')) {
-        return new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      if (url.includes('/resolve/master/mmproj-F16.gguf')) {
-        return new Response(new Uint8Array([4, 5, 6]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      throw new Error(`Unexpected fetch URL: ${url}`);
-    };
-
-    const result = await manager.installModel({
-      modelId: 'Qwen/Qwen2.5-VL-7B-Instruct-GGUF',
-      filePath: 'original.gguf',
-      mmprojFilePath: 'old-mmproj.gguf',
-      displayName: 'Qwen/Qwen2.5-VL-7B-Instruct-GGUF',
-    });
-
-    expect(fetchCount).toBe(6);
-    expect(result.path).toContain(path.join('Qwen', 'Qwen2.5-VL-7B-Instruct-GGUF', 'updated.gguf'));
-    expect(fs.existsSync(result.path)).toBe(true);
-    expect(fs.existsSync(path.join(path.dirname(result.path), 'mmproj-F16.gguf'))).toBe(true);
-  } finally {
-    global.fetch = originalFetch;
-  }
-});
-
-test('installModel retries when only the mmproj file path changes after HTTP 404', async () => {
-  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-retry-mmproj-only-'));
-  const manager = new LlamaCppManager(() => ({ modelsDir }));
-  manager.refreshModelsAfterInstall = async () => undefined as any;
-
-  let fetchCount = 0;
-  const originalFetch = global.fetch;
-  try {
-    global.fetch = async (input: string | URL | Request) => {
-      fetchCount += 1;
-      const url = String(input);
-      if (fetchCount === 1) {
-        expect(url).toContain('/repo/files?');
-        return new Response(
-          JSON.stringify({
-            Data: {
-              Files: [{ Path: 'updated.gguf' }, { Path: 'old-mmproj.gguf' }],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (url.includes('/resolve/master/updated.gguf')) {
-        return new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      if (url.includes('/resolve/master/old-mmproj.gguf')) {
-        return new Response('not found', { status: 404 });
-      }
-      if (url.includes('/repo/files?')) {
-        return new Response(
-          JSON.stringify({
-            Data: {
-              Files: [{ Path: 'updated.gguf' }, { Path: 'mmproj-F16.gguf' }],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (url.includes('/resolve/master/mmproj-F16.gguf')) {
-        return new Response(new Uint8Array([4, 5, 6]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      throw new Error(`Unexpected fetch URL: ${url}`);
-    };
-
-    const result = await manager.installModel({
-      modelId: 'Qwen/Qwen2.5-VL-7B-Instruct-GGUF',
-      filePath: 'updated.gguf',
-      mmprojFilePath: 'old-mmproj.gguf',
-      displayName: 'Qwen/Qwen2.5-VL-7B-Instruct-GGUF',
-    });
-
-    expect(fetchCount).toBe(7);
-    expect(result.path).toContain(path.join('Qwen', 'Qwen2.5-VL-7B-Instruct-GGUF', 'updated.gguf'));
-    expect(fs.existsSync(path.join(path.dirname(result.path), 'mmproj-F16.gguf'))).toBe(true);
-  } finally {
-    global.fetch = originalFetch;
-  }
-});
-
-test('installModel retries when curated file casing is stale for Qwen3-8B-GGUF', async () => {
-  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-retry-qwen3-'));
-  const manager = new LlamaCppManager(() => ({ modelsDir }));
-  manager.refreshModelsAfterInstall = async () => undefined as any;
-
-  let fetchCount = 0;
-  const originalFetch = global.fetch;
-  try {
-    global.fetch = async (input: string | URL | Request) => {
-      fetchCount += 1;
-      const url = String(input);
-      if (url.includes('/repo/files?')) {
-        return new Response(
-          JSON.stringify({
-            Data: {
-              Files: [{ Path: 'Qwen3-8B-Q4_K_M.gguf' }, { Path: 'Qwen3-8B-Q5_0.gguf' }],
-            },
-          }),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }
-      if (url.includes('/resolve/master/Qwen3-8B-Q4_K_M.gguf')) {
-        return new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      throw new Error(`Unexpected fetch URL: ${url}`);
-    };
-
-    const result = await manager.installModel({
-      modelId: 'Qwen/Qwen3-8B-GGUF',
-      filePath: 'qwen3-8b-q4_k_m.gguf',
-      displayName: 'Qwen/Qwen3-8B-GGUF',
-    });
-
-    expect(fetchCount).toBe(2);
-    expect(result.path).toContain(path.join('Qwen', 'Qwen3-8B-GGUF', 'Qwen3-8B-Q4_K_M.gguf'));
-    expect(fs.existsSync(result.path)).toBe(true);
-  } finally {
-    global.fetch = originalFetch;
-  }
-});
-
-test('installModel uses marketplace metadata when repo files are unavailable before the first download', async () => {
-  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-install-marketplace-prefill-'));
+test('installModel rejects checksum-valid bytes that are not a GGUF container', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-model-install-invalid-gguf-'));
+  const bytes = new Uint8Array([0x4e, 0x4f, 0x54, 0x47, 3, 0, 0, 0]);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
   const marketplaceService = {
-    resolveModel: async (): Promise<MarketplaceModel> => ({
-      source: 'modelscope-gguf',
-      id: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      repoId: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      name: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      description: 'prefilled metadata',
-      tags: ['chat'],
-      sizes: ['7B'],
-      recommendedTag: 'Q4_K_M',
-      capability: 'chat',
-      filePath: 'updated.gguf',
-      installed: false,
-    }),
+    resolveModel: async () => verifiedMarketplaceModel({ sha256 }),
   } as MarketplaceService;
   const manager = new LlamaCppManager(() => ({ modelsDir }), marketplaceService);
   manager.refreshModelsAfterInstall = async () => undefined as any;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response(bytes, { status: 200, headers: { 'content-length': '8' } })),
+  );
 
-  let fetchCount = 0;
-  const originalFetch = global.fetch;
-  try {
-    global.fetch = async (input: string | URL | Request) => {
-      fetchCount += 1;
-      const url = String(input);
-      if (url.includes('/repo/files?')) {
-        return new Response('repo files unavailable', { status: 503 });
+  await expect(manager.installModel({ modelId: 'Qwen/Qwen3-8B-GGUF' })).rejects.toThrow(
+    'invalid GGUF magic bytes',
+  );
+  expect(
+    fs.existsSync(
+      path.join(
+        modelsDir,
+        'modelscope',
+        'Qwen',
+        'Qwen3-8B-GGUF',
+        'Qwen3-8B-Q4_K_M.gguf.download',
+      ),
+    ),
+  ).toBe(false);
+});
+
+test('installModel keeps an interrupted partial file for a later Range resume', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-model-install-resume-'));
+  const bytes = new Uint8Array([0x47, 0x47, 0x55, 0x46, 3, 0, 0, 0]);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const marketplaceService = {
+    resolveModel: async () =>
+      verifiedMarketplaceModel({
+        sha256,
+        mmproj: {
+          path: 'mmproj-F16.gguf',
+          downloadUrl: 'https://download.test/mmproj.gguf',
+          sha256,
+        },
+      }),
+  } as MarketplaceService;
+  const manager = new LlamaCppManager(() => ({ modelsDir }), marketplaceService);
+  manager.refreshModelsAfterInstall = async () => undefined as any;
+  const controller = new AbortController();
+  vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+    if (String(input).endsWith('/model.gguf')) {
+      return new Response(bytes, { status: 200, headers: { 'content-length': '8' } });
+    }
+    return new Response(
+      new ReadableStream({
+        start(streamController) {
+          streamController.enqueue(new Uint8Array([4]));
+          streamController.close();
+        },
+      }),
+      { status: 200, headers: { 'content-length': '3' } },
+    );
+  }));
+
+  const install = manager.installModel(
+    { modelId: 'Qwen/Qwen3-8B-GGUF' },
+    progress => {
+      if (progress.targetPath?.endsWith('mmproj-F16.gguf') && progress.completed === 1) {
+        controller.abort(new Error('Install cancelled'));
       }
-      if (url.includes('/resolve/master/updated.gguf')) {
-        return new Response(new Uint8Array([1, 2, 3]), {
-          status: 200,
-          headers: { 'content-length': '3' },
-        });
-      }
-      throw new Error(`Unexpected fetch URL: ${url}`);
-    };
+    },
+    { signal: controller.signal },
+  );
 
-    const result = await manager.installModel({
-      modelId: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-      displayName: 'Qwen/Qwen2.5-7B-Instruct-GGUF',
-    });
+  await expect(install).rejects.toThrow();
+  const repoDir = path.join(modelsDir, 'modelscope', 'Qwen', 'Qwen3-8B-GGUF');
+  expect(fs.existsSync(path.join(repoDir, 'Qwen3-8B-Q4_K_M.gguf'))).toBe(false);
+  expect(fs.existsSync(path.join(repoDir, 'mmproj-F16.gguf.download'))).toBe(true);
+});
 
-    expect(fetchCount).toBe(2);
-    expect(result.path).toContain(path.join('Qwen', 'Qwen2.5-7B-Instruct-GGUF', 'updated.gguf'));
-    expect(fs.existsSync(result.path)).toBe(true);
-  } finally {
-    global.fetch = originalFetch;
-  }
+test('installModel refreshes cloud metadata once after a stale download URL returns 404', async () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'local-model-install-refresh-'));
+  const bytes = new Uint8Array([0x47, 0x47, 0x55, 0x46, 3, 0, 0, 0]);
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  let resolveCount = 0;
+  const marketplaceService = {
+    resolveModel: async () => {
+      resolveCount += 1;
+      return verifiedMarketplaceModel({
+        filePath: resolveCount === 1 ? 'stale.gguf' : 'fresh.gguf',
+        downloadUrl:
+          resolveCount === 1
+            ? 'https://download.test/stale.gguf'
+            : 'https://download.test/fresh.gguf',
+        sha256,
+      });
+    },
+  } as MarketplaceService;
+  const manager = new LlamaCppManager(() => ({ modelsDir }), marketplaceService);
+  manager.refreshModelsAfterInstall = async () => undefined as any;
+  const fetchMock = vi.fn(async (input: string | URL | Request) =>
+    String(input).endsWith('/stale.gguf')
+      ? new Response('not found', { status: 404 })
+      : new Response(bytes, { status: 200, headers: { 'content-length': '8' } }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+
+  const result = await manager.installModel({ modelId: 'Qwen/Qwen3-8B-GGUF' });
+
+  expect(resolveCount).toBe(2);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(result.path).toContain('fresh.gguf');
 });
