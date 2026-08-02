@@ -841,6 +841,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   hardwareSummaryReady={marketplaceHardwareChecked}
                   totalCount={marketplaceTotalCount}
                   nextPageNumber={marketplaceNextPage}
+                  contentViewportRef={contentViewportRef}
                   onOpenInstalled={handleMarketplaceOpenInstalled}
                   onQueryChange={setMarketplaceQuery}
                   onSearch={handleMarketplaceSearch}

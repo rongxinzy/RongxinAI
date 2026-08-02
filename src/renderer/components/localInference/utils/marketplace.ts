@@ -31,11 +31,15 @@ export function buildMarketplaceSearchParams(input: {
   fit?: MarketplaceSearchParams['fit'];
   minStars?: number;
   featuredOnly?: boolean;
+  limit?: number;
 }): MarketplaceSearchParams | null {
   const query = input.query.trim();
+  const limit =
+    input.limit ??
+    (query ? MARKETPLACE_SEARCH_MAX_MODEL_COUNT : MARKETPLACE_INITIAL_MODEL_COUNT);
   if (!query) {
     return {
-      limit: MARKETPLACE_INITIAL_MODEL_COUNT,
+      limit,
       pageNumber: input.pageNumber,
       featuredOnly: input.featuredOnly ?? true,
       task: input.task,
@@ -47,7 +51,7 @@ export function buildMarketplaceSearchParams(input: {
   if (!isMarketplaceSearchQuery(query)) return null;
   return {
     query,
-    limit: MARKETPLACE_SEARCH_MAX_MODEL_COUNT,
+    limit,
     pageNumber: input.pageNumber,
     task: input.task,
     size: input.size,

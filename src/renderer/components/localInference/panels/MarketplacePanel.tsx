@@ -6,7 +6,8 @@ import {
   InputGroupInput,
 } from '@shared/components/ui/input-group';
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 
 import type { MarketplaceModel, MarketplaceSearchParams, MarketplaceTaskFilter } from '../../../../shared/marketplace';
 import {
@@ -33,7 +34,9 @@ import {
 import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
+  getMarketplaceGridColumnCount,
   getMarketplaceInstallProgress,
+  getMarketplacePageSize,
 } from '../utils/marketplace';
 import { isPullInProgress } from '../utils/progress';
 
@@ -57,6 +60,7 @@ export function MarketplacePanel({
   hardwareSummaryReady,
   totalCount,
   nextPageNumber,
+  contentViewportRef,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -74,6 +78,7 @@ export function MarketplacePanel({
   totalCount?: number;
   nextPageNumber?: number;
   onInstall: (model: MarketplaceModel) => Promise<void>;
+  contentViewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [taskFilter, setTaskFilter] = useState<MarketplaceTaskFilter>('all');
@@ -82,8 +87,15 @@ export function MarketplacePanel({
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [resultContext, setResultContext] = useState<MarketplaceResultContext>('recommended');
   const [page, setPage] = useState(1);
-  const pageSize = MARKETPLACE_PAGE_SIZE;
+  const [pageSize, setPageSize] = useState(MARKETPLACE_PAGE_SIZE);
+  const [gridColumnCount, setGridColumnCount] = useState(3);
   const pageRef = useRef(page);
+  const pageSizeRef = useRef(pageSize);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const paginationRef = useRef<HTMLDivElement>(null);
+  const resizeFrameRef = useRef<number | null>(null);
+  const layoutSignatureRef = useRef<string | null>(null);
   const appliedFilterSignatureRef = useRef<string | null>(null);
   const hasObservedSearchRef = useRef(false);
 
@@ -135,6 +147,71 @@ export function MarketplacePanel({
     }
   };
 
+  // Measure the grid geometry and derive the column count and page size from
+  // the actual viewport, keeping every page a whole number of grid rows.
+  useLayoutEffect(() => {
+    const contentViewport = contentViewportRef.current;
+    const panel = panelRef.current;
+    const grid = gridRef.current;
+    if (!contentViewport || !panel || !grid) return;
+    if (marketplaceLoading || installableModels.length === 0) return;
+
+    const updateLayout = () => {
+      const gridStyle = window.getComputedStyle(grid);
+      const viewportRect = contentViewport.getBoundingClientRect();
+      const gridRect = grid.getBoundingClientRect();
+      const paginationHeight = paginationRef.current
+        ? paginationRef.current.getBoundingClientRect().height
+        : 0;
+      const content = contentViewport.firstElementChild as HTMLElement | null;
+      const contentPaddingBottom = content
+        ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
+        : 0;
+      const cards = Array.from(grid.children) as HTMLElement[];
+      if (cards.length === 0) return;
+      const cardRects = cards.map(card => card.getBoundingClientRect());
+      const cardHeight = Math.max(...cardRects.map(rect => rect.height));
+      const cardWidth = Math.max(...cardRects.map(rect => rect.width));
+      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
+      const columnGap = Number.parseFloat(gridStyle.columnGap) || 0;
+      const nextColumnCount = getMarketplaceGridColumnCount({
+        gridWidth: grid.clientWidth,
+        cardWidth,
+        columnGap,
+      });
+      const gridTop = gridRect.top - viewportRect.top;
+      const availableGridHeight =
+        contentViewport.clientHeight - gridTop - paginationHeight - contentPaddingBottom;
+      const nextPageSize = getMarketplacePageSize({
+        availableGridHeight,
+        cardHeight,
+        columnCount: nextColumnCount,
+        rowGap,
+      });
+      const signature = [nextColumnCount, nextPageSize, contentViewport.clientHeight].join(':');
+      if (layoutSignatureRef.current === signature) return;
+      layoutSignatureRef.current = signature;
+      setGridColumnCount(nextColumnCount);
+      setPageSize(nextPageSize);
+    };
+    const scheduleUpdate = () => {
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+      resizeFrameRef.current = requestAnimationFrame(updateLayout);
+    };
+    const resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(contentViewport);
+    resizeObserver.observe(panel);
+    resizeObserver.observe(grid);
+    if (paginationRef.current) resizeObserver.observe(paginationRef.current);
+    scheduleUpdate();
+    window.addEventListener('resize', scheduleUpdate);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', scheduleUpdate);
+      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
+    };
+  }, [contentViewportRef, installableModels.length, marketplaceLoading]);
+
   const hasQuery = Boolean(submittedQuery.trim());
   const taskLabel = {
     chat: i18nService.t('marketplaceFilterTaskChat'),
@@ -161,11 +238,12 @@ export function MarketplacePanel({
     (pageNumber?: number, queryValue = submittedQuery): MarketplaceSearchParams => ({
       query: queryValue,
       pageNumber,
+      limit: pageSize,
       task: taskFilter,
       fit: fitFilter,
       featuredOnly: !queryValue.trim() && taskFilter === 'all' && browseMode === 'recommended',
     }),
-    [browseMode, fitFilter, submittedQuery, taskFilter],
+    [browseMode, fitFilter, pageSize, submittedQuery, taskFilter],
   );
   const handlePageChange = useCallback(
     (nextPage: number) => {
@@ -176,6 +254,15 @@ export function MarketplacePanel({
     },
     [onSearch, pageCount, searchParamsForPage],
   );
+  // When the measured page size changes, restart from page 1 with the new
+  // server-side limit so every page holds whole rows of cards.
+  useEffect(() => {
+    if (pageSize === pageSizeRef.current) return;
+    pageSizeRef.current = pageSize;
+    pageRef.current = 1;
+    setPage(1);
+    onSearch(searchParamsForPage(1));
+  }, [onSearch, pageSize, searchParamsForPage]);
   const filterSignature = `${browseMode}:${taskFilter}:${fitFilter}`;
   const submitSearch = () => {
     const nextQuery = query.trim();
@@ -231,8 +318,8 @@ export function MarketplacePanel({
     pageRef.current = 1;
     setPage(1);
     setResultContext('recommended');
-    onSearch({ query: '', pageNumber: 1, task: 'all', fit: 'compatible', featuredOnly: true });
-  }, [onQueryChange, onSearch]);
+    onSearch({ query: '', pageNumber: 1, limit: pageSize, task: 'all', fit: 'compatible', featuredOnly: true });
+  }, [onQueryChange, onSearch, pageSize]);
 
   const installedModelActions = installedModels.length > 0 ? (
     <div className="mx-auto mb-4 flex w-full max-w-6xl flex-wrap items-center gap-2 rounded-xl border border-success/20 bg-success/5 px-3 py-2">
@@ -248,6 +335,7 @@ export function MarketplacePanel({
 
   return (
     <div
+      ref={panelRef}
       className="flex flex-col gap-4"
     >
       <div
@@ -413,7 +501,9 @@ export function MarketplacePanel({
         <div className="flex flex-1 flex-col">
           {installedModelActions}
           <div
-            className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            ref={gridRef}
+            className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
+            style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
           >
             {visibleModels.map(model => {
               const progress = getMarketplaceInstallProgress(installProgress, model);
@@ -431,7 +521,9 @@ export function MarketplacePanel({
             })}
           </div>
           {hasSearched && installableModels.length > 0 && (
-            <div className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border/40 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+            <div
+              ref={paginationRef}
+              className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border/40 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"
             >
               <Button
                 type="button"

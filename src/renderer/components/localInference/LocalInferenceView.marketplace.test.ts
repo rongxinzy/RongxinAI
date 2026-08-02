@@ -91,6 +91,17 @@ test('marketplace search params load recommended models for an empty query and u
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
 });
 
+test('marketplace search params honour a caller-supplied page size', () => {
+  expect(buildMarketplaceSearchParams({ query: 'qwen', limit: 12 })).toEqual({
+    query: 'qwen',
+    limit: 12,
+  });
+  expect(buildMarketplaceSearchParams({ query: '', limit: 16 })).toEqual({
+    limit: 16,
+    featuredOnly: true,
+  });
+});
+
 test('marketplace browse modes carry their result context into server pagination', () => {
   expect(buildMarketplaceSearchParams({ query: '', pageNumber: 3, featuredOnly: false })).toMatchObject({
     limit: 8,
