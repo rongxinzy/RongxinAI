@@ -105,15 +105,21 @@ export function filterMarketplaceModelsForDevice(
     .filter(model => !minStars || (model.score?.stars ?? 0) >= minStars)
     .filter(model => {
       const status = model.fit?.status ?? 'unknown';
+      // The marketplace is an install-and-run surface for llama.cpp, not a
+      // model directory: models the current device cannot run are never
+      // shown, regardless of the fit filter. Unknown (hardware not detected
+      // or file size missing) stays visible so a healthy default never
+      // collapses to an empty page.
+      if (status === 'unsupported') return false;
       switch (fit) {
         case 'recommended':
           return status === 'excellent' || status === 'good';
         case 'excellent':
           return status === 'excellent';
         case 'compatible':
-          return status === 'excellent' || status === 'good' || status === 'limited';
+          return status === 'excellent' || status === 'good' || status === 'limited' || status === 'unknown';
         case 'unsupported':
-          return status === 'unsupported';
+          return false;
         case 'all':
         default:
           return true;

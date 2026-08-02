@@ -77,7 +77,7 @@ export function MarketplacePanel({
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [taskFilter, setTaskFilter] = useState<MarketplaceTaskFilter>('all');
-  const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('all');
+  const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('compatible');
   const [browseMode, setBrowseMode] = useState<MarketplaceBrowseMode>('recommended');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [resultContext, setResultContext] = useState<MarketplaceResultContext>('recommended');
@@ -147,6 +147,8 @@ export function MarketplacePanel({
     recommended: i18nService.t('marketplaceFitExcellent'),
     excellent: i18nService.t('marketplaceFitExcellent'),
     compatible: i18nService.t('marketplaceFitCompatible'),
+    // Unreachable: the unsupported filter is removed from the UI; kept for
+    // type completeness of the fit filter union.
     unsupported: i18nService.t('marketplaceFitUnsupported'),
   }[fitFilter];
   const resultTitle = resultContext === 'search'
@@ -220,16 +222,16 @@ export function MarketplacePanel({
   }, [currentPage, handlePageChange, hasSearched, installableModels.length, marketplaceLoading, nextPageNumber]);
 
   const handleResetFilters = useCallback(() => {
-    appliedFilterSignatureRef.current = 'recommended:all:all';
+    appliedFilterSignatureRef.current = 'recommended:all:compatible';
     onQueryChange('');
     setSubmittedQuery('');
     setTaskFilter('all');
-    setFitFilter('all');
+    setFitFilter('compatible');
     setBrowseMode('recommended');
     pageRef.current = 1;
     setPage(1);
     setResultContext('recommended');
-    onSearch({ query: '', pageNumber: 1, task: 'all', fit: 'all', featuredOnly: true });
+    onSearch({ query: '', pageNumber: 1, task: 'all', fit: 'compatible', featuredOnly: true });
   }, [onQueryChange, onSearch]);
 
   const installedModelActions = installedModels.length > 0 ? (
@@ -362,10 +364,9 @@ export function MarketplacePanel({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
                     <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
                     <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
-                    <SelectItem value="unsupported">{i18nService.t('marketplaceFitUnsupported')}</SelectItem>
+                    <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
