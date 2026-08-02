@@ -144,10 +144,13 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
   }
 
   try {
-    const [runningModels, preferences] = await Promise.all([
-      window.electron.llamacpp.listRunningModels(),
-      window.electron.llamacpp.getModelPreferences(),
-    ]);
+    const runningModels = await window.electron.llamacpp.listRunningModels();
+    let preferences: LlamaCppModelPreferences = {};
+    try {
+      preferences = (await window.electron.llamacpp.getModelPreferences?.()) ?? {};
+    } catch {
+      // Model preferences are optional metadata; keep the running model list available.
+    }
     return mergeAvailableModels(
       configuredModels,
       buildLlamaCppRunningModels(runningModels, preferences),
