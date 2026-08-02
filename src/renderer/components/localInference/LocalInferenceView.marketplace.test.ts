@@ -155,7 +155,7 @@ test('device-fit filters are applied locally after scoring', () => {
   ]);
 });
 
-test('models the current device cannot run are never shown', () => {
+test('models the current device cannot run are only shown when fit is unrestricted', () => {
   const models = [
     { source: 'modelscope-gguf', id: 'excellent', repoId: 'Qwen/Excellent-GGUF', name: 'Excellent', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'excellent' }, score: { stars: 4.8 } },
     { source: 'modelscope-gguf', id: 'limited', repoId: 'Qwen/Limited-GGUF', name: 'Limited', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'limited' }, score: { stars: 4.2 } },
@@ -163,11 +163,13 @@ test('models the current device cannot run are never shown', () => {
     { source: 'modelscope-gguf', id: 'unknown', repoId: 'Qwen/Unknown-GGUF', name: 'Unknown', description: '', tags: [], sizes: [], recommendedTag: 'Q4_K_M', capability: 'chat', installed: false, fit: { status: 'unknown' }, score: { stars: 4.0 } },
   ] as never[];
 
-  // 'all' and the explicit unsupported filter both hide unsupported models;
-  // unknown (hardware not detected) stays visible so the default never collapses.
+  // "不限" lists every GGUF model, unsupported included — the card flags them
+  // as not fitting. The explicit unsupported filter and the default tiers
+  // still hide them; unknown (hardware not detected) stays visible everywhere.
   expect(filterMarketplaceModelsForDevice(models, 'all').map(model => model.id)).toEqual([
     'excellent',
     'limited',
+    'unsupported',
     'unknown',
   ]);
   expect(filterMarketplaceModelsForDevice(models, 'unsupported').map(model => model.id)).toEqual([]);

@@ -1,0 +1,210 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+
+import type { MarketplaceModel } from '../../../../shared/marketplace';
+import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
+import { MarketplaceModelCard } from './MarketplaceModelCard';
+
+function makeModel(overrides: Partial<MarketplaceModel> = {}): MarketplaceModel {
+  return {
+    source: 'modelscope-gguf',
+    id: 'alpha',
+    repoId: 'acme/alpha-GGUF',
+    name: 'Alpha',
+    description: '',
+    tags: [],
+    sizes: ['1.1B'],
+    recommendedTag: 'Q4_K_M',
+    capability: 'chat',
+    installed: false,
+    metadataStatus: 'verified',
+    fit: { status: 'excellent', reason: 'fits' },
+    score: {
+      stars: 4.5,
+      value: 4.5,
+      confidence: 'B',
+      taskQuality: 0.8,
+      deviceFit: 0.8,
+      runtimeCompatibility: 0.8,
+      trust: 0.8,
+      community: 0.8,
+      reasons: [],
+      scoreVersion: 'test',
+    },
+    files: [
+      {
+        path: 'model.gguf',
+        isRecommended: true,
+        downloadUrl: 'https://example.com/model.gguf',
+        sha256: 'a'.repeat(64),
+        sizeBytes: 1024,
+        quantization: 'Q4_K_M',
+      },
+    ],
+    filePath: 'model.gguf',
+    downloads: 100,
+    runtime: {
+      format: 'gguf',
+      status: 'verified',
+      ggufFilesVerified: true,
+      sha256Verified: true,
+      chatTemplate: 'documented',
+      toolCalling: 'documented',
+      mmproj: 'not-required',
+      source: 'modelscope-file-api',
+      observedAt: '2026-01-01',
+      reasons: [],
+    },
+    ...overrides,
+  };
+}
+
+function renderCard(
+  model: MarketplaceModel = makeModel(),
+  overrides: Partial<Parameters<typeof MarketplaceModelCard>[0]> = {},
+) {
+  const props = {
+    model,
+    loading: false,
+    installing: false,
+    installProgress: {},
+    onInstall: vi.fn(),
+    ...overrides,
+  };
+  return { ...render(<MarketplaceModelCard {...props} />), props };
+}
+
+describe('MarketplaceModelCard', () => {
+  beforeEach(() => {
+    (window as unknown as { electron?: unknown }).electron = {
+      llamacpp: { cancelInstall: vi.fn() },
+    };
+  });
+
+  test('renders the display name and an enabled install button for verified models', () => {
+    renderCard(makeModel({ name: 'Alpha Model', repoId: 'acme/Alpha Model-GGUF' }));
+
+    expect(screen.getByText('Alpha Model')).toBeInTheDocument();
+    const installButton = screen.getByRole('button', { name: /安装/ });
+    expect(installButton).toBeEnabled();
+  });
+
+  test('disables install while metadata is pending', () => {
+    renderCard(makeModel({ metadataStatus: 'pending' }));
+
+    const pendingButton = screen.getByRole('button', { name: /等待校验/ });
+    expect(pendingButton).toBeDisabled();
+  });
+
+  test('offers cancel while installing and calls the main-process canceller', async () => {
+    const user = userEvent.setup();
+    renderCard(makeModel(), {
+      installing: true,
+      installProgress: {
+        'acme/alpha-GGUF': { phase: 'downloading', percent: 42 } as LlamaCppInstallProgress,
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: /取消安装/ }));
+
+    expect(
+      (window as unknown as { electron: { llamacpp: { cancelInstall: ReturnType<typeof vi.fn> } } })
+        .electron.llamacpp.cancelInstall,
+    ).toHaveBeenCalledWith('acme/alpha-GGUF');
+  });
+
+  test('shows the pull progress overlay while downloading', () => {
+    renderCard(makeModel(), {
+      installing: true,
+      installProgress: {
+        'acme/alpha-GGUF': { phase: 'downloading', percent: 42 } as LlamaCppInstallProgress,
+      },
+    });
+
+    expect(screen.getByText('42%')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /取消安装/ })).toBeInTheDocument();
+  });
+
+  test('offers a quantization selector when a repo ships multiple GGUF files', async () => {
+    // unsloth-style repos bundle several quantizations of one model as files
+    // under a single repo; the card must let the user pick which one installs.
+    const user = userEvent.setup();
+    const onInstall = vi.fn();
+    const model = makeModel({
+      filePath: 'model-Q4_K_M.gguf',
+      files: [
+        {
+          path: 'model-Q4_K_M.gguf',
+          quantization: 'Q4_K_M',
+          sizeBytes: 4_683_073_248,
+          isRecommended: true,
+          downloadUrl: 'https://example.com/q4.gguf',
+          sha256: 'b'.repeat(64),
+        },
+        {
+          path: 'model-Q5_K_M.gguf',
+          quantization: 'Q5_K_M',
+          sizeBytes: 5_444_830_944,
+          downloadUrl: 'https://example.com/q5.gguf',
+          sha256: 'c'.repeat(64),
+        },
+      ],
+    });
+    renderCard(model, { onInstall });
+
+    // The selector shows the recommended file first.
+    expect(screen.getByRole('combobox', { name: '选择量化版本' })).toHaveTextContent('Q4_K_M');
+
+    await user.click(screen.getByRole('combobox', { name: '选择量化版本' }));
+    await user.click(await screen.findByRole('option', { name: /Q5_K_M/ }));
+
+    await user.click(screen.getByRole('button', { name: /安装/ }));
+    expect(onInstall).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: 'model-Q5_K_M.gguf' }),
+    );
+  });
+
+  test('hides the quantization selector for single-file repos', () => {
+    renderCard(makeModel());
+    expect(screen.queryByRole('combobox', { name: '选择量化版本' })).not.toBeInTheDocument();
+  });
+
+  test('split-only repos are installable and install the first part', async () => {
+    // QwQ-32B-style repo: a single quantization sharded across many parts.
+    const user = userEvent.setup();
+    const onInstall = vi.fn();
+    const model = makeModel({
+      filePath: 'qwq-32b-fp16-00001-of-00017.gguf',
+      files: [
+        {
+          path: 'qwq-32b-fp16-00001-of-00017.gguf',
+          sizeBytes: 3_900_000_000,
+          isRecommended: true,
+          downloadUrl: 'https://example.com/p1.gguf',
+          sha256: 'd'.repeat(64),
+        },
+        {
+          path: 'qwq-32b-fp16-00002-of-00017.gguf',
+          sizeBytes: 3_900_000_000,
+          downloadUrl: 'https://example.com/p2.gguf',
+          sha256: 'e'.repeat(64),
+        },
+      ],
+    });
+    renderCard(model, { onInstall });
+
+    // A single split variant has nothing to choose, but it must be installable
+    // (previously such repos were dropped entirely as "pending").
+    expect(screen.queryByRole('combobox', { name: '选择量化版本' })).not.toBeInTheDocument();
+    const installButton = screen.getByRole('button', { name: /安装/ });
+    expect(installButton).toBeEnabled();
+
+    await user.click(installButton);
+    expect(onInstall).toHaveBeenCalledWith(
+      expect.objectContaining({ filePath: 'qwq-32b-fp16-00001-of-00017.gguf' }),
+    );
+  });
+});

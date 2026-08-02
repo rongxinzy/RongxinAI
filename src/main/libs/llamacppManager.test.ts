@@ -735,6 +735,20 @@ test('scanLocalGgufModels finds nested ModelScope downloads', () => {
   ]);
 });
 
+test('scanLocalGgufModels registers split-GGUF models once under their first part', () => {
+  const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-split-'));
+  const repoDir = path.join(modelsDir, 'modelscope', 'Qwen', 'QwQ-32B-GGUF');
+  fs.mkdirSync(repoDir, { recursive: true });
+  fs.writeFileSync(path.join(repoDir, 'qwq-32b-fp16-00001-of-00003.gguf'), 'gguf1');
+  fs.writeFileSync(path.join(repoDir, 'qwq-32b-fp16-00002-of-00003.gguf'), 'gguf2');
+  fs.writeFileSync(path.join(repoDir, 'qwq-32b-fp16-00003-of-00003.gguf'), 'gguf3');
+
+  const models = scanLocalGgufModels(modelsDir);
+  expect(models).toHaveLength(1);
+  expect(models[0].name).toBe('QwQ-32B-GGUF');
+  expect(path.basename(models[0].path)).toBe('qwq-32b-fp16-00001-of-00003.gguf');
+});
+
 test('loadModel reloads the router catalog after writing a new model preset', async () => {
   const modelsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-load-'));
   const presetPath = path.join(modelsDir, 'models-preset.ini');
