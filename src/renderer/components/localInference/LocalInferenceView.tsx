@@ -113,6 +113,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const contentViewportRef = useRef<HTMLDivElement>(null);
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number>();
+  const [marketplaceNextPage, setMarketplaceNextPage] = useState<number>();
   const [marketplaceSearchParams, setMarketplaceSearchParams] =
     useState<MarketplaceSearchParams>({});
   const [marketplaceHardware, setMarketplaceHardware] = useState<MarketplaceHardwareProfile>();
@@ -226,6 +227,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setMarketplaceSearchParams(params);
         setMarketplaceModels(result.models);
         setMarketplaceTotalCount(result.totalCount);
+        setMarketplaceNextPage(result.nextPageNumber);
         setMarketplaceError(result.warning ?? null);
       }
     } catch (searchError) {
@@ -248,6 +250,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       setMarketplaceHasSearched(false);
       setMarketplaceModels([]);
       setMarketplaceTotalCount(undefined);
+      setMarketplaceNextPage(undefined);
       setMarketplaceError(null);
       return;
     }
@@ -837,6 +840,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   hardwareSummary={marketplaceHardware}
                   hardwareSummaryReady={marketplaceHardwareChecked}
                   totalCount={marketplaceTotalCount}
+                  nextPageNumber={marketplaceNextPage}
                   onOpenInstalled={handleMarketplaceOpenInstalled}
                   onQueryChange={setMarketplaceQuery}
                   onSearch={handleMarketplaceSearch}

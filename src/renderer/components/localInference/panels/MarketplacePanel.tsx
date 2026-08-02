@@ -56,6 +56,7 @@ export function MarketplacePanel({
   onInstall,
   hardwareSummaryReady,
   totalCount,
+  nextPageNumber,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -71,6 +72,7 @@ export function MarketplacePanel({
   hardwareSummary?: MarketplaceHardwareProfile;
   hardwareSummaryReady: boolean;
   totalCount?: number;
+  nextPageNumber?: number;
   onInstall: (model: MarketplaceModel) => Promise<void>;
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
@@ -99,7 +101,11 @@ export function MarketplacePanel({
   );
   const pageCount = Math.max(
     1,
-    totalCount ? Math.ceil(totalCount / pageSize) : Math.ceil(installableModels.length / pageSize),
+    totalCount
+      ? Math.ceil(totalCount / pageSize)
+      : nextPageNumber
+        ? nextPageNumber
+        : Math.ceil(installableModels.length / pageSize),
   );
   const currentPage = Math.min(page, pageCount);
   const visibleModels = installableModels;
@@ -127,13 +133,6 @@ export function MarketplacePanel({
         return next;
       });
     }
-  };
-
-  const handlePageChange = (nextPage: number) => {
-    const boundedPage = Math.min(pageCount, Math.max(1, nextPage));
-    pageRef.current = boundedPage;
-    setPage(boundedPage);
-    onSearch(searchParamsForPage(boundedPage));
   };
 
   const hasQuery = Boolean(submittedQuery.trim());
@@ -165,6 +164,15 @@ export function MarketplacePanel({
       featuredOnly: !queryValue.trim() && taskFilter === 'all' && browseMode === 'recommended',
     }),
     [browseMode, fitFilter, submittedQuery, taskFilter],
+  );
+  const handlePageChange = useCallback(
+    (nextPage: number) => {
+      const boundedPage = Math.min(pageCount, Math.max(1, nextPage));
+      pageRef.current = boundedPage;
+      setPage(boundedPage);
+      onSearch(searchParamsForPage(boundedPage));
+    },
+    [onSearch, pageCount, searchParamsForPage],
   );
   const filterSignature = `${browseMode}:${taskFilter}:${fitFilter}`;
   const submitSearch = () => {
@@ -202,8 +210,30 @@ export function MarketplacePanel({
     onSearch(searchParamsForPage(1));
   }, [browseMode, filterSignature, hasQuery, hasSearched, onSearch, query, searchParamsForPage, taskFilter]);
 
+  // Skip over server pages that end up empty after local verified/fit/installed
+  // filtering, so pagination never lands on a blank grid.
+  useEffect(() => {
+    if (marketplaceLoading || !hasSearched) return;
+    if (installableModels.length > 0) return;
+    if (!nextPageNumber || nextPageNumber <= currentPage) return;
+    handlePageChange(nextPageNumber);
+  }, [currentPage, handlePageChange, hasSearched, installableModels.length, marketplaceLoading, nextPageNumber]);
+
+  const handleResetFilters = useCallback(() => {
+    appliedFilterSignatureRef.current = 'recommended:all:all';
+    onQueryChange('');
+    setSubmittedQuery('');
+    setTaskFilter('all');
+    setFitFilter('all');
+    setBrowseMode('recommended');
+    pageRef.current = 1;
+    setPage(1);
+    setResultContext('recommended');
+    onSearch({ query: '', pageNumber: 1, task: 'all', fit: 'all', featuredOnly: true });
+  }, [onQueryChange, onSearch]);
+
   const installedModelActions = installedModels.length > 0 ? (
-    <div className="mx-auto mb-4 flex w-full max-w-5xl flex-wrap items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2">
+    <div className="mx-auto mb-4 flex w-full max-w-6xl flex-wrap items-center gap-2 rounded-xl border border-success/20 bg-success/5 px-3 py-2">
       <span className="mr-1 text-xs font-medium text-foreground">{i18nService.t('marketplaceInstalledNext')}</span>
       {installedModels.slice(0, 4).map(model => (
         <Button key={model.repoId} type="button" size="xs" variant="secondary" onClick={() => onOpenInstalled(model)}>
@@ -228,7 +258,7 @@ export function MarketplacePanel({
         {!hasSearched ? (
           <div className="w-full max-w-3xl space-y-3 text-center">
             <div className="flex items-center justify-center gap-3">
-              <h2 className="text-2xl font-semibold text-foreground">
+              <h2 className="text-xl font-semibold text-foreground">
               {i18nService.t('marketplaceTitle')}
               </h2>
             </div>
@@ -236,11 +266,11 @@ export function MarketplacePanel({
         ) : null}
         <div
           className={
-            hasSearched ? 'mx-auto flex w-full items-center justify-center gap-3' : 'w-full'
+            hasSearched ? 'mx-auto flex w-full max-w-6xl items-center gap-3' : 'w-full'
           }
         >
           <form
-            className={`min-w-0 ${hasSearched ? 'basis-1/2' : 'mx-auto w-full max-w-4xl'}`}
+            className={`min-w-0 ${hasSearched ? 'flex-1' : 'mx-auto w-full max-w-4xl'}`}
             onSubmit={event => {
               event.preventDefault();
               submitSearch();
@@ -248,7 +278,7 @@ export function MarketplacePanel({
           >
             <div className="flex gap-2">
               <InputGroup
-                className={hasSearched ? 'h-9 min-w-0 flex-1' : 'h-16 flex-1 rounded-2xl'}
+                className={hasSearched ? 'h-9 min-w-0 flex-1' : 'h-16 flex-1 rounded-3xl'}
               >
                 <InputGroupAddon>
                   <Search />
@@ -276,8 +306,8 @@ export function MarketplacePanel({
         </div>
       </div>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/50 bg-muted/20 px-3 py-2.5">
-        <div className="flex w-full items-center justify-between gap-3 border-b border-border/40 pb-2">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-2.5 rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5">
+        <div className="flex w-full flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-sm font-semibold text-foreground">{resultTitle}</span>
             {hasSearched ? (
@@ -303,44 +333,48 @@ export function MarketplacePanel({
             </div>
           ) : null}
         </div>
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            {i18nService.t('marketplaceFilterTask')}
+        <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border/40 pt-2.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {i18nService.t('marketplaceFilterTask')}
+              </span>
+              <FluidTabs
+                aria-label={i18nService.t('marketplaceFilterTask')}
+                value={taskFilter}
+                onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
+                items={[
+                  { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
+                  { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
+                  { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
+                  { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
+                  { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
+                ]}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {i18nService.t('marketplaceFilterFit')}
+              </span>
+              <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
+                <SelectTrigger size="sm" className="min-w-32 rounded-full border-border/60 bg-background/70 px-3">
+                  <SelectValue>{fitFilterLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
+                    <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
+                    <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
+                    <SelectItem value="unsupported">{i18nService.t('marketplaceFitUnsupported')}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <span className="shrink-0 text-xs text-muted-foreground">
+            {hardwareSummaryReady ? formatMarketplaceHardwareSummary(hardwareSummary) : i18nService.t('marketplaceHardwareDetecting')}
           </span>
-          <FluidTabs
-            aria-label={i18nService.t('marketplaceFilterTask')}
-            value={taskFilter}
-            onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
-            items={[
-              { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
-              { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
-              { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
-              { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
-              { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
-            ]}
-          />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-            {i18nService.t('marketplaceFilterFit')}
-          </span>
-          <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-            <SelectTrigger size="sm" className="min-w-32 rounded-full border-border/60 bg-background/70 px-3">
-              <SelectValue>{fitFilterLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
-                <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
-                <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
-                <SelectItem value="unsupported">{i18nService.t('marketplaceFitUnsupported')}</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-        <span className="w-full border-t border-border/40 pt-2 text-xs text-muted-foreground sm:w-auto sm:border-t-0 sm:border-l sm:pl-3 sm:pt-0">
-          {hardwareSummaryReady ? formatMarketplaceHardwareSummary(hardwareSummary) : i18nService.t('marketplaceHardwareDetecting')}
-        </span>
       </div>
 
       {marketplaceError ? (
@@ -363,7 +397,16 @@ export function MarketplacePanel({
         </div>
       ) : !hasSearched ? null : installableModels.length === 0 ? (
         <div className="flex min-h-[620px] flex-col gap-4">
-          {installedModelActions ?? <EmptyState title={i18nService.t('marketplaceNoModels')} />}
+          {installedModelActions ?? (
+            <EmptyState
+              title={i18nService.t('marketplaceNoModels')}
+              action={
+                <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
+                  {i18nService.t('marketplaceFilterClear')}
+                </Button>
+              }
+            />
+          )}
         </div>
       ) : (
         <div className="flex flex-1 flex-col">
@@ -386,9 +429,8 @@ export function MarketplacePanel({
               );
             })}
           </div>
-          {pageCount > 1 && (
-            <div
-              className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border/40 bg-background/95 px-3 py-3 shadow-[0_-8px_24px_-20px_hsl(var(--foreground)/0.45)] backdrop-blur supports-[backdrop-filter]:bg-background/80"
+          {hasSearched && installableModels.length > 0 && (
+            <div className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border/40 bg-background/95 px-3 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80"
             >
               <Button
                 type="button"

@@ -173,7 +173,7 @@ export function MarketplaceModelCard({
 
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-1 text-sm font-semibold text-amber-500">
+              <div className="inline-flex items-center gap-1 text-sm font-semibold text-warning">
                 <Star className="size-3.5 fill-current" aria-hidden="true" />
                 <span>{formatMarketplaceScore(model.score?.stars, model.score?.confidence)}</span>
               </div>
@@ -196,7 +196,7 @@ export function MarketplaceModelCard({
                     </Badge>
                   }
                 />
-                <HoverCardContent side="right" align="start" className="w-auto min-w-64 p-3">
+                <HoverCardContent side="top" align="start" className="w-auto min-w-64 p-3">
                   <div className="flex flex-col gap-2">
                     {details.map(item => (
                       <MetadataRow
