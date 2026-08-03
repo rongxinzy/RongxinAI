@@ -51,6 +51,7 @@ import {
   ApiIpc,
   AuthIpc,
   CoworkPermissionIpc,
+  CoworkQueueIpc,
   CoworkSessionIpc,
   CoworkStreamIpc,
   HardwareIpc,
@@ -59,6 +60,12 @@ import {
   ProjectIpc,
   SkillsIpc,
 } from '../shared/ipc/channels';
+import {
+  CoworkQueueEnqueueSchema,
+  CoworkQueueItemSchema,
+  CoworkQueueSessionSchema,
+  CoworkQueueUpdateSchema,
+} from '../shared/ipc/queueSchemas';
 import {
   ApiFetchSchema,
   ApiStreamSchema,
@@ -1774,6 +1781,18 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
         win.webContents.send(CoworkStreamIpc.ToolActivity, { sessionId, event });
       } catch (error) {
         console.error('[CoworkForwarder] failed to forward tool activity:', error);
+      }
+    });
+  });
+
+  runtime.on('queueUpdated', (sessionId, items) => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.send(CoworkStreamIpc.QueueUpdated, { sessionId, items });
+      } catch (error) {
+        console.error('[PiWorkbenchForwarder] failed to forward queue update:', error);
       }
     });
   });
@@ -4461,6 +4480,78 @@ if (!gotTheLock) {
       }
     },
   );
+
+  ipcMain.handle(CoworkQueueIpc.List, async (_event, rawInput: unknown) => {
+    try {
+      const sessionId = CoworkQueueSessionSchema.parse(rawInput);
+      return { success: true, items: getPiRuntimeAdapter().listPendingMessages(sessionId) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list pending messages',
+      };
+    }
+  });
+
+  ipcMain.handle(CoworkQueueIpc.Enqueue, async (_event, rawInput: unknown) => {
+    try {
+      const input = CoworkQueueEnqueueSchema.parse(rawInput);
+      return getPiRuntimeAdapter().enqueuePendingMessage(input.sessionId, input.text);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to enqueue pending message',
+      };
+    }
+  });
+
+  ipcMain.handle(CoworkQueueIpc.Update, async (_event, rawInput: unknown) => {
+    try {
+      const input = CoworkQueueUpdateSchema.parse(rawInput);
+      return getPiRuntimeAdapter().updatePendingMessage(input.sessionId, input.itemId, input.text);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update pending message',
+      };
+    }
+  });
+
+  ipcMain.handle(CoworkQueueIpc.Delete, async (_event, rawInput: unknown) => {
+    try {
+      const input = CoworkQueueItemSchema.parse(rawInput);
+      return getPiRuntimeAdapter().deletePendingMessage(input.sessionId, input.itemId);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to delete pending message',
+      };
+    }
+  });
+
+  ipcMain.handle(CoworkQueueIpc.Steer, async (_event, rawInput: unknown) => {
+    try {
+      const input = CoworkQueueItemSchema.parse(rawInput);
+      return await getPiRuntimeAdapter().steerPendingMessage(input.sessionId, input.itemId);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to steer pending message',
+      };
+    }
+  });
+
+  ipcMain.handle(CoworkQueueIpc.FollowUp, async (_event, rawInput: unknown) => {
+    try {
+      const input = CoworkQueueItemSchema.parse(rawInput);
+      return await getPiRuntimeAdapter().followUpPendingMessage(input.sessionId, input.itemId);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send follow-up message',
+      };
+    }
+  });
 
   ipcMain.handle('cowork:session:stop', async (_event, sessionId: string) => {
     try {

@@ -152,6 +152,17 @@ export const CoworkSessionIpc = {
 } as const;
 export type CoworkSessionIpc = (typeof CoworkSessionIpc)[keyof typeof CoworkSessionIpc];
 
+// 鈹€鈹€鈹€ Cowork pending Work messages 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+export const CoworkQueueIpc = {
+  List: 'cowork:queue:list',
+  Enqueue: 'cowork:queue:enqueue',
+  Update: 'cowork:queue:update',
+  Delete: 'cowork:queue:delete',
+  Steer: 'cowork:queue:steer',
+  FollowUp: 'cowork:queue:followUp',
+} as const;
+export type CoworkQueueIpc = (typeof CoworkQueueIpc)[keyof typeof CoworkQueueIpc];
+
 // ─── Cowork Permission ──────────────────────────────────────────────────────
 export const CoworkPermissionIpc = {
   Respond: 'cowork:permission:respond',
@@ -191,6 +202,7 @@ export const CoworkStreamIpc = {
   PermissionDismiss: 'cowork:stream:permissionDismiss',
   Complete: 'cowork:stream:complete',
   Error: 'cowork:stream:error',
+  QueueUpdated: 'cowork:stream:queueUpdated',
   SessionsChanged: 'cowork:sessions:changed',
 } as const;
 export type CoworkStreamIpc = (typeof CoworkStreamIpc)[keyof typeof CoworkStreamIpc];

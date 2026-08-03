@@ -1813,4 +1813,48 @@ describe('PiRuntimeAdapter', () => {
       expect(mockStore.updateSession).not.toHaveBeenCalledWith('test', { status: 'completed' });
     });
   });
+
+  describe('pending Work messages', () => {
+    it('queues follow-ups during a running Work session and steers on demand', async () => {
+      await adapter.startSession('queue-session', 'Start work', { sessionMode: 'work' });
+
+      const queued = adapter.enqueuePendingMessage('queue-session', 'Change direction');
+      expect(queued.success).toBe(true);
+      expect(adapter.listPendingMessages('queue-session')).toHaveLength(1);
+
+      const steered = await adapter.steerPendingMessage('queue-session', queued.item!.id);
+      expect(steered.success).toBe(true);
+      expect(mockSession.steer).toHaveBeenCalledWith('Change direction');
+      expect(adapter.listPendingMessages('queue-session')).toEqual([]);
+    });
+
+    it('delivers queued follow-ups in order after Pi settles', async () => {
+      let listener: ((event: { type: string }) => void) | null = null;
+      mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
+        listener = callback;
+        return () => {};
+      });
+      await adapter.startSession('queue-session', 'Start work', { sessionMode: 'work' });
+      const first = adapter.enqueuePendingMessage('queue-session', 'First follow-up');
+      adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
+
+      listener!({ type: 'agent_end' });
+      listener!({ type: 'agent_settled' });
+      await vi.waitFor(() => {
+        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up');
+      });
+      expect(adapter.listPendingMessages('queue-session').map(item => item.text)).toEqual([
+        'Second follow-up',
+      ]);
+      expect(first.success).toBe(true);
+    });
+
+    it('rejects queue controls for Chat sessions', async () => {
+      await adapter.startSession('chat-session', 'Hello', { sessionMode: 'chat' });
+
+      expect(adapter.enqueuePendingMessage('chat-session', 'Not allowed')).toMatchObject({
+        success: false,
+      });
+    });
+  });
 });
