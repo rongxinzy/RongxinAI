@@ -5611,6 +5611,11 @@ if (!gotTheLock) {
         const previousConfig = getCoworkStore().getConfig();
         const previousWorkingDir = previousConfig.workingDirectory;
         getCoworkStore().setConfig(normalizedConfig);
+        if (normalizedPermissionMode !== undefined) {
+          getPiRuntimeAdapter().setAutoApproveForActiveSessions(
+            normalizedPermissionMode === CoworkPermissionMode.AllowAll,
+          );
+        }
         if (
           normalizedConfig.workingDirectory !== undefined &&
           normalizedConfig.workingDirectory !== previousWorkingDir
