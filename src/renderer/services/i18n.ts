@@ -691,8 +691,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelNameAndIdRequired: '请填写模型名称和模型ID',
     modelIdExists: '模型ID已存在，请使用不同的ID',
     modelContextWindow: '上下文窗口（Token）',
+    modelContextWindowK: '上下文窗口（K Token）',
     modelContextWindowHint: '填写模型官方标注的上下文上限，用于显示上下文进度。',
     modelContextWindowInvalid: '上下文窗口必须是大于 0 的整数',
+    modelMaxOutputTokens: '最大输出 Token',
+    modelMaxOutputTokensK: '最大输出（K Token）',
+    modelMaxOutputTokensHint: '最大输出 Token（可选）',
     ollamaModelName: '模型名称',
     ollamaModelNameHint: '输入 Ollama 中已安装的模型名称，如 qwen3:8b、lfm2:latest',
     ollamaModelNamePlaceholder: 'qwen3:8b',
@@ -1409,6 +1413,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '?? 本地推理 ??????????????????? Agent 引擎 ? 32K?32768?????????????????????????????',
     agentLlamaCppContextTooSmallHint: '?? 本地推理 ??????????????????????? 32K?32768??????????????',
     agentLlamaCppTrainedContextTooSmallHint: '?? 本地推理 ???????????? 32K?32768?????????????????',
+    agentLocalModelToolCallingUnsupportedHint:
+      '该本地模型不支持工具调用，不能用于 Work，请改用支持工具调用的模型。',
+    agentLocalModelToolCallingUnknownHint:
+      '该本地模型的工具调用能力未知，请先完成能力探测或配置后再用于 Work。',
     agentDefaultWorkingDirectory: 'Agent 默认工作目录',
     agentDefaultWorkingDirectoryHint: '新建会话默认在此目录执行',
     agentModelInvalidHint: '当前模型已不可用，请重新选择',
@@ -3450,8 +3458,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     modelNameAndIdRequired: 'Model name and model ID are required',
     modelIdExists: 'Model ID already exists. Use a different one',
     modelContextWindow: 'Context window (tokens)',
+    modelContextWindowK: 'Context window (K tokens)',
     modelContextWindowHint: 'Enter the model’s documented context limit to show context progress.',
     modelContextWindowInvalid: 'The context window must be a positive integer',
+    modelMaxOutputTokens: 'Maximum output tokens',
+    modelMaxOutputTokensK: 'Maximum output (K tokens)',
+    modelMaxOutputTokensHint: 'Maximum output tokens (optional)',
     ollamaModelName: 'Model Name',
     ollamaModelNameHint:
       'Enter the name of a model installed in Ollama, e.g. qwen3:8b, lfm2:latest',
@@ -4248,6 +4260,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'This local inference model is currently unavailable for this task. Reload it with a context window of at least 32K (32768), or switch to another model.',
     agentLlamaCppTrainedContextTooSmallHint:
       'This local inference model was trained with a context window below 32K (32768), so it cannot be used for this task. Switch to another model.',
+    agentLocalModelToolCallingUnsupportedHint:
+      'This local model does not support tool calling and cannot be used for Work. Choose a model with tool-calling support.',
+    agentLocalModelToolCallingUnknownHint:
+      'This local model has unknown tool-calling support. Detect or configure its capability before using it for Work.',
     agentDefaultWorkingDirectory: 'Agent Default Working Directory',
     agentDefaultWorkingDirectoryHint: 'New sessions run in this directory by default',
     agentModelInvalidHint: 'Model unavailable. Please select another',

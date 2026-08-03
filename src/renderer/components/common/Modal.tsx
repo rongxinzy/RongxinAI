@@ -6,6 +6,7 @@ interface ModalProps {
   onClose: () => void;
   className?: string;
   overlayClassName?: string;
+  preventOutsideClose?: boolean;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   children: React.ReactNode;
 }
@@ -22,6 +23,7 @@ const Modal: React.FC<ModalProps> = ({
   onClose,
   className,
   overlayClassName,
+  preventOutsideClose = false,
   onClick,
   children,
 }) => {
@@ -30,6 +32,7 @@ const Modal: React.FC<ModalProps> = ({
   return (
     <Dialog
       open={open}
+      disablePointerDismissal={preventOutsideClose}
       onOpenChange={nextOpen => {
         if (!nextOpen) onClose();
       }}
