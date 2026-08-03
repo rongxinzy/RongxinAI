@@ -312,26 +312,17 @@ export function MarketplaceModelCard({
                   {i18nService.t('marketplaceCancelInstall')}
                 </Button21st>
               ) : (
-<<<<<<< HEAD
-                <Button type="button" disabled={loading} size="sm" onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}>
-                  <Download data-icon="inline-start" />
-                  {installable
-                    ? i18nService.t('marketplaceInstall')
-                    : i18nService.t('marketplaceVerifyAndInstall')}
-                </Button>
-=======
                 <Button21st
                   type="button"
                   variant="primary"
                   size="sm"
                   className="h-8 min-w-16 px-3"
-                  isDisabled={loading || !installable}
+                  isDisabled={loading}
                   onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}
                 >
                   <Download data-icon="inline-start" />
-                  {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceMetadataPending')}
+                  {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceVerifyAndInstall')}
                 </Button21st>
->>>>>>> 30355ec9 (feat(模型市场): 修改了模型市场中的模型卡片呈现效果)
               )}
             </div>
           </div>

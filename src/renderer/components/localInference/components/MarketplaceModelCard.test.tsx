@@ -93,14 +93,6 @@ describe('MarketplaceModelCard', () => {
     expect(installButton).toBeEnabled();
   });
 
-<<<<<<< HEAD
-  test('pending models offer verify-and-install instead of a dead button', async () => {
-    // Listing-only catalogue records carry no file metadata yet; the button
-    // stays actionable so the install flow can hydrate the model on demand.
-    const user = userEvent.setup();
-    const onInstall = vi.fn();
-    const model = makeModel({ metadataStatus: 'pending', files: [] });
-=======
   test('moves the ModelScope link to the model title', async () => {
     const user = userEvent.setup();
     const detailUrl = 'https://modelscope.cn/models/acme/Alpha-Model';
@@ -117,19 +109,22 @@ describe('MarketplaceModelCard', () => {
         .electron.shell.openExternal,
     ).toHaveBeenCalledWith(detailUrl);
   });
-  test('disables install while metadata is pending', () => {
-    renderCard(makeModel({ metadataStatus: 'pending' }));
->>>>>>> 30355ec9 (feat(模型市场): 修改了模型市场中的模型卡片呈现效果)
+
+  test('pending models offer verify-and-install instead of a dead button', async () => {
+    // Listing-only catalogue records carry no file metadata yet; the button
+    // stays actionable so the install flow can hydrate the model on demand.
+    const user = userEvent.setup();
+    const onInstall = vi.fn();
+    const model = makeModel({ metadataStatus: 'pending', files: [] });
 
     renderCard(model, { onInstall });
 
-    const verifyButton = screen.getByRole('button', { name: /校验并安装/ });
+    const verifyButton = screen.getByRole('button', { name: /校验并安装|Verify & install/ });
     expect(verifyButton).toBeEnabled();
 
     await user.click(verifyButton);
     expect(onInstall).toHaveBeenCalledWith(expect.objectContaining({ repoId: model.repoId }));
   });
-
   test('offers cancel while installing and calls the main-process canceller', async () => {
     const user = userEvent.setup();
     renderCard(makeModel(), {
