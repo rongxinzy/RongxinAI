@@ -519,6 +519,7 @@ export interface CoworkConfig {
   memoryUserMemoriesMaxItems: number;
   skipMissedJobs: boolean;
   permissionMode: CoworkPermissionModeType;
+  permissionModeBySession: Record<string, CoworkPermissionModeType>;
   embeddingEnabled: boolean;
   embeddingProvider: string;
   embeddingModel: string;
@@ -541,6 +542,7 @@ export type CoworkConfigUpdate = Partial<
     | 'memoryUserMemoriesMaxItems'
     | 'skipMissedJobs'
     | 'permissionMode'
+    | 'permissionModeBySession'
     | 'embeddingEnabled'
     | 'embeddingProvider'
     | 'embeddingModel'
@@ -1572,6 +1574,7 @@ export class CoworkStore {
       'memoryUserMemoriesMaxItems',
       'skipMissedJobs',
       'permissionMode',
+      'permissionModeBySession',
       'embeddingEnabled',
       'embeddingProvider',
       'embeddingModel',
@@ -1606,6 +1609,20 @@ export class CoworkStore {
       ),
       skipMissedJobs: parseBooleanConfig(cfg.get('skipMissedJobs'), true),
       permissionMode: normalizePermissionMode(cfg.get('permissionMode')),
+      permissionModeBySession: (() => {
+        try {
+          const parsed = JSON.parse(cfg.get('permissionModeBySession') || '{}');
+          if (!parsed || typeof parsed !== 'object') return {};
+          return Object.fromEntries(
+            Object.entries(parsed).filter(
+              ([, value]) =>
+                value === CoworkPermissionMode.Ask || value === CoworkPermissionMode.AllowAll,
+            ),
+          ) as Record<string, CoworkPermissionModeType>;
+        } catch {
+          return {};
+        }
+      })(),
       embeddingEnabled: parseBooleanConfig(cfg.get('embeddingEnabled'), DEFAULT_EMBEDDING_ENABLED),
       embeddingProvider: cfg.get('embeddingProvider') || DEFAULT_EMBEDDING_PROVIDER,
       embeddingModel: cfg.get('embeddingModel') || DEFAULT_EMBEDDING_MODEL,
@@ -1662,6 +1679,9 @@ export class CoworkStore {
     }
     if (config.permissionMode !== undefined) {
       this.upsertConfig('permissionMode', normalizePermissionMode(config.permissionMode), now);
+    }
+    if (config.permissionModeBySession !== undefined) {
+      this.upsertConfig('permissionModeBySession', JSON.stringify(config.permissionModeBySession), now);
     }
     if (config.embeddingEnabled !== undefined) {
       this.upsertConfig('embeddingEnabled', config.embeddingEnabled ? '1' : '0', now);

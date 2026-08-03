@@ -103,6 +103,7 @@ import { useConversationRailScrollSync } from './hooks/useConversationRailScroll
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
+import CoworkPermissionModal from './CoworkPermissionModal';
 import { WorkbenchTaskStatusBar } from './WorkbenchTaskStatus';
 
 // The artifact panel only mounts when the user opens it, so keep its code
@@ -133,6 +134,8 @@ interface CoworkSessionDetailProps {
   onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
   inlineQuestionPermission?: CoworkPermissionRequest | null;
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
+  inlinePermission?: CoworkPermissionRequest | null;
+  onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
 }
 
 const NAV_SCROLL_LOCK_DURATION = 800;
@@ -193,6 +196,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onLocalThinkingEnabledChange,
   inlineQuestionPermission,
   onRespondToInlineQuestion,
+  inlinePermission,
+  onRespondToInlinePermission,
 }) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
@@ -1204,7 +1209,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
         <div
           ref={detailRootRef}
-          className={`min-w-0 flex-1 flex flex-col bg-background h-full ${
+          className={`relative min-w-0 flex-1 flex flex-col bg-background h-full ${
             isArtifactWorkspace ? 'hidden' : ''
           }`}
           aria-hidden={isArtifactWorkspace}
@@ -1474,6 +1479,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               )}
           </div>
 
+          {inlinePermission && onRespondToInlinePermission && (
+            <div className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4">
+              <div className="w-full max-w-5xl mx-auto">
+                <CoworkPermissionModal
+                  permission={inlinePermission}
+                  onRespond={onRespondToInlinePermission}
+                  inline
+                />
+              </div>
+            </div>
+          )}
+
           {/* Input Area */}
           <div className="px-4 pb-4 shrink-0">
             <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
@@ -1500,7 +1517,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                       ? 'chatPlaceholder'
                       : 'coworkContinuePlaceholder',
                 )}
-                disabled={remoteManaged || isAwaitingInlineQuestion}
+                disabled={remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission)}
                 size="large"
                 remoteManaged={remoteManaged}
                 onManageSkills={remoteManaged ? undefined : onManageSkills}

@@ -5542,6 +5542,7 @@ if (!gotTheLock) {
         memoryUserMemoriesMaxItems?: number;
         skipMissedJobs?: boolean;
         permissionMode?: CoworkPermissionMode;
+        permissionModeBySession?: Record<string, CoworkPermissionMode>;
         embeddingEnabled?: boolean;
         embeddingProvider?: string;
         embeddingModel?: string;
@@ -5594,6 +5595,15 @@ if (!gotTheLock) {
           config.permissionMode === CoworkPermissionMode.AllowAll
             ? config.permissionMode
             : undefined;
+        const normalizedPermissionModeBySession =
+          config.permissionModeBySession && typeof config.permissionModeBySession === 'object'
+            ? Object.fromEntries(
+                Object.entries(config.permissionModeBySession).filter(
+                  ([, value]) =>
+                    value === CoworkPermissionMode.Ask || value === CoworkPermissionMode.AllowAll,
+                ),
+              )
+            : undefined;
         const normalizedEmbedding = normalizeEmbeddingConfig(config);
         const normalizedConfig: Parameters<CoworkStore['setConfig']>[0] = {
           ...config,
@@ -5606,11 +5616,20 @@ if (!gotTheLock) {
           memoryUserMemoriesMaxItems: normalizedMemoryUserMemoriesMaxItems,
           skipMissedJobs: normalizedSkipMissedJobs,
           permissionMode: normalizedPermissionMode,
+          permissionModeBySession: normalizedPermissionModeBySession,
           ...normalizedEmbedding,
         };
         const previousConfig = getCoworkStore().getConfig();
         const previousWorkingDir = previousConfig.workingDirectory;
         getCoworkStore().setConfig(normalizedConfig);
+        if (normalizedPermissionModeBySession !== undefined) {
+          for (const [sessionId, mode] of Object.entries(normalizedPermissionModeBySession)) {
+            getPiRuntimeAdapter().setAutoApproveForSession(
+              sessionId,
+              mode === CoworkPermissionMode.AllowAll,
+            );
+          }
+        }
         if (
           normalizedConfig.workingDirectory !== undefined &&
           normalizedConfig.workingDirectory !== previousWorkingDir

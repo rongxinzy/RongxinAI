@@ -13,6 +13,8 @@ const internalControlTools = new Set([
 const reversibleTools = new Set(['write', 'edit']);
 const irreversibleShellPattern =
   /(?:\brm\b|\brmdir\b|\bdel\b|\bremove-item\b|\bformat\b|\bshutdown\b|\bgit\s+push\b|\bgit\s+reset\s+--hard\b|\bdrop\s+(?:table|database)\b)/i;
+const safeShellCommandPattern =
+  /^(?:\s*(?:cd\s+[^;&|]+\s*&&\s*)?(?:pwd|ls(?:\s+[-\w./]+)?|find\s+[-\w./'"\s]+|grep\s+[-\w./'"\s]+|rg\s+[-\w./'"\s]+|python(?:3)?\s+--version|node\s+--version)\s*)$/i;
 
 const stableValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(stableValue);
@@ -42,6 +44,10 @@ export function classifyWorkbenchToolRisk(
       : WorkbenchApprovalRiskLevel.Unknown;
   }
   return WorkbenchApprovalRiskLevel.Unknown;
+}
+
+export function isSafeShellCommand(command: string): boolean {
+  return safeShellCommandPattern.test(command.trim()) && !irreversibleShellPattern.test(command);
 }
 
 export function createToolIdempotencyKey(

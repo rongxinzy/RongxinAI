@@ -21,6 +21,8 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { selectPendingPermissions } from '../../store/selectors/coworkSelectors';
+import { useSelector } from 'react-redux';
 import { BatchSelectionCheckbox } from './BatchSelectionCheckbox';
 import { AgentSidebarIndicator } from './constants';
 import OverflowingSessionTitle from './OverflowingSessionTitle';
@@ -100,10 +102,13 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
       : i18nService.t('myAgentSidebarUnreadResult');
   const relativeTime = formatAgentTaskRelativeTime(task.updatedAt || task.createdAt);
   const isRunning = task.indicator === AgentSidebarIndicator.Running;
-  const showRelativeTime = !isRunning;
   const pinLabel = task.pinned
     ? i18nService.t('coworkUnpinSession')
     : i18nService.t('coworkPinSession');
+  const hasPendingPermission = useSelector(selectPendingPermissions).some(
+    permission => permission.sessionId === task.id,
+  );
+  const showRelativeTime = !isRunning && !hasPendingPermission;
 
   return (
     <div
@@ -140,7 +145,14 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
           className="min-w-0 flex-1 border border-border bg-background px-1.5 py-0.5 text-[14px] font-normal"
         />
       ) : (
-        <OverflowingSessionTitle title={task.title} />
+        <>
+          <OverflowingSessionTitle title={task.title} />
+          {hasPendingPermission && (
+            <span className="inline-flex shrink-0 items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+              {i18nService.t('workbenchTaskStatusWaitingApproval')}
+            </span>
+          )}
+        </>
       )}
 
       {!isBatchMode && !isRenaming && (
@@ -153,7 +165,15 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
               {relativeTime.compact}
             </span>
           )}
-          {isRunning && (
+          {hasPendingPermission && (
+            <span
+              className="absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
+              title={i18nService.t('workbenchTaskStatusWaitingApproval')}
+            >
+              <Loader className="size-3 animate-spin text-success [animation-duration:1.8s]" />
+            </span>
+          )}
+          {!hasPendingPermission && isRunning && (
             <span
               className="absolute inset-y-0 right-0 inline-flex size-6 items-center justify-center transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
               title={indicatorLabel}

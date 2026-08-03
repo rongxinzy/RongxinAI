@@ -752,6 +752,7 @@ interface IElectronAPI {
       agentId?: string;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
+      permissionModeBySession?: Record<string, CoworkPermissionMode>;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => Promise<{
       success: boolean;

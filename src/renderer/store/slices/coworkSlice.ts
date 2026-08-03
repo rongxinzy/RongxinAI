@@ -78,6 +78,7 @@ const initialState: CoworkState = {
     memoryUserMemoriesMaxItems: 12,
     skipMissedJobs: true,
     permissionMode: CoworkPermissionMode.Ask,
+    permissionModeBySession: {},
     embeddingEnabled: false,
     embeddingProvider: 'openai',
     embeddingModel: '',

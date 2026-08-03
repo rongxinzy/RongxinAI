@@ -3,7 +3,10 @@ import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
-import { selectUnreadSessionIds } from '../../store/selectors/coworkSelectors';
+import {
+  selectPendingPermissions,
+  selectUnreadSessionIds,
+} from '../../store/selectors/coworkSelectors';
 import type { CoworkSessionSummary } from '../../types/cowork';
 import CoworkSessionItem from './CoworkSessionItem';
 
@@ -43,7 +46,12 @@ const CoworkSessionList: React.FC<CoworkSessionListProps> = ({
   emptyHint,
 }) => {
   const unreadSessionIds = useSelector(selectUnreadSessionIds);
+  const pendingPermissions = useSelector(selectPendingPermissions);
   const unreadSessionIdSet = useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
+  const pendingSessionIdSet = useMemo(
+    () => new Set(pendingPermissions.map(permission => permission.sessionId)),
+    [pendingPermissions],
+  );
 
   const sortedSessions = useMemo(() => {
     const sortByPinOrder = (a: CoworkSessionSummary, b: CoworkSessionSummary) => {
@@ -113,6 +121,7 @@ const CoworkSessionList: React.FC<CoworkSessionListProps> = ({
           key={session.id}
           session={session}
           hasUnread={unreadSessionIdSet.has(session.id)}
+          hasPendingPermission={pendingSessionIdSet.has(session.id)}
           isActive={session.id === currentSessionId}
           isBatchMode={isBatchMode}
           isSelected={selectedIds.has(session.id)}

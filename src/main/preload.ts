@@ -518,6 +518,7 @@ contextBridge.exposeInMainWorld('electron', {
       memoryUserMemoriesMaxItems?: number;
       skipMissedJobs?: boolean;
       permissionMode?: CoworkPermissionMode;
+      permissionModeBySession?: Record<string, CoworkPermissionMode>;
       embeddingEnabled?: boolean;
       embeddingProvider?: string;
       embeddingModel?: string;

@@ -994,6 +994,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
   }
 
+  /** Applies the global permission mode to sessions that are already running. */
+  setAutoApproveForSession(sessionId: string, autoApprove: boolean): void {
+    const active = this.activeSessions.get(sessionId);
+    if (active) active.autoApprove = autoApprove;
+  }
+
   respondToPermission(requestId: string, result: PiPermissionResult): void {
     const pendingQuestion = this.pendingAskUserQuestions.get(requestId);
     if (pendingQuestion) {

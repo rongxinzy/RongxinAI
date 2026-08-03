@@ -133,6 +133,7 @@ export interface CoworkConfig {
   memoryUserMemoriesMaxItems: number;
   skipMissedJobs: boolean;
   permissionMode: CoworkPermissionMode;
+  permissionModeBySession?: Record<string, CoworkPermissionMode>;
   embeddingEnabled: boolean;
   embeddingProvider: string;
   embeddingModel: string;
@@ -156,6 +157,7 @@ export type CoworkConfigUpdate = Partial<
     | 'memoryUserMemoriesMaxItems'
     | 'skipMissedJobs'
     | 'permissionMode'
+    | 'permissionModeBySession'
     | 'embeddingEnabled'
     | 'embeddingProvider'
     | 'embeddingModel'
