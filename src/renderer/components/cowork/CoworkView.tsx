@@ -17,6 +17,7 @@ import {
 import { resolveSkillPlaceholderKey } from '../chat/constants';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { coworkService } from '../../services/cowork';
+import { coworkQueueService } from '../../services/coworkQueue';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
 import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
@@ -848,6 +849,27 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   ) => {
     if (!currentSession) return;
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
+
+    // Work keeps the prompt editable while Pi is running. Normal input during
+    // a live turn becomes an ordered Follow-up item; Chat retains its existing
+    // direct/agent multi-turn behavior and never enters this queue.
+    if (
+      workMode === WorkMode.Work &&
+      isStreaming &&
+      (currentSession.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work
+    ) {
+      const result = await coworkQueueService.enqueue(currentSession.id, prompt);
+      if (!result.success) {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', {
+            detail: result.error || i18nService.t('coworkQueueEnqueueFailed'),
+          }),
+        );
+        return false;
+      }
+      return true;
+    }
+
 
     // Direct chat: stream from the configured LLM via apiService. Chat
     // sessions that are agent-backed (skills attached now or persisted on the

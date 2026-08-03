@@ -6,6 +6,21 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    coworkQueueTitle: '\u5f85\u5904\u7406\u6d88\u606f',
+    coworkQueueCount: '{count} \u6761\u5f85\u5904\u7406\u6d88\u606f',
+    coworkQueueEmpty: '\u961f\u5217\u4e3a\u7a7a',
+    coworkQueueMore: '\u66f4\u591a\u64cd\u4f5c',
+    coworkQueueStatusPending: '\u5f85\u53d1\u9001',
+    coworkQueueStatusSending: '\u53d1\u9001\u4e2d',
+    coworkQueueStatusFollowUp: '\u4f1a\u8bdd\u7ed3\u675f\u540e\u81ea\u52a8\u53d1\u9001',
+    coworkQueueStatusFailed: '\u53d1\u9001\u5931\u8d25',
+    coworkQueueSteer: '\u5f15\u5bfc',
+    coworkQueueRetry: '\u91cd\u8bd5',
+    coworkQueueUpdateFailed: '\u66f4\u65b0\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
+    coworkQueueDeleteFailed: '\u5220\u9664\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
+    coworkQueueSteerFailed: '\u5f15\u5bfc\u6d88\u606f\u53d1\u9001\u5931\u8d25',
+    coworkQueueRetryFailed: '\u91cd\u8bd5\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
+    coworkQueueEnqueueFailed: '\u6dfb\u52a0\u5f85\u5904\u7406\u6d88\u606f\u5931\u8d25',
     // 通用
     save: '保存',
     cancel: '取消',
@@ -2691,6 +2706,21 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailDeleting: '删除中...',
   },
   en: {
+    coworkQueueTitle: 'Pending messages',
+    coworkQueueCount: '{count} pending',
+    coworkQueueEmpty: 'Queue is empty',
+    coworkQueueMore: 'More actions',
+    coworkQueueStatusPending: 'Pending',
+    coworkQueueStatusSending: 'Sending',
+    coworkQueueStatusFollowUp: 'Sends after the current task',
+    coworkQueueStatusFailed: 'Send failed',
+    coworkQueueSteer: 'Steer',
+    coworkQueueRetry: 'Retry',
+    coworkQueueUpdateFailed: 'Failed to update pending message',
+    coworkQueueDeleteFailed: 'Failed to delete pending message',
+    coworkQueueSteerFailed: 'Failed to steer the message',
+    coworkQueueRetryFailed: 'Failed to retry the queued message',
+    coworkQueueEnqueueFailed: 'Failed to add pending message',
     // Common
     save: 'Save',
     cancel: 'Cancel',

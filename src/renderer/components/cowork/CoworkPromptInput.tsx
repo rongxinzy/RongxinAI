@@ -17,7 +17,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
-import { CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -233,6 +233,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     );
     const contextUsage = contextMessage?.metadata?.contextUsage;
     const workMode = useSelector(selectWorkMode);
+    const canQueueWhileStreaming =
+      workMode === WorkMode.Work &&
+      !isDirectChat &&
+      (currentSession?.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work;
     const persistedExpertIds = useMemo(
       () => currentSession?.experts?.map(expert => expert.expertId) ?? [],
       [currentSession?.experts],
@@ -510,7 +514,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
 
       const trimmedValue = value.trim();
-      if ((!trimmedValue && attachments.length === 0) || isStreaming || disabled || isPatchingModel)
+      if (
+        (!trimmedValue && attachments.length === 0) ||
+        (isStreaming && !canQueueWhileStreaming) ||
+        disabled ||
+        isPatchingModel
+      )
         return;
       if (!isDirectChat && hasUnavailableLlamaCppModel) {
         window.dispatchEvent(
@@ -648,6 +657,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       effectiveSelectedModel?.id,
       modelSupportsImage,
       selectedExpertIds,
+      canQueueWhileStreaming,
     ]);
 
     const handleManageSkills = useCallback(() => {
@@ -697,7 +707,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           break;
       }
 
-      if (isSendCombo && !isStreaming && !disabled && !isPatchingModel) {
+      if (
+        isSendCombo &&
+        (!isStreaming || canQueueWhileStreaming) &&
+        !disabled &&
+        !isPatchingModel
+      ) {
         event.preventDefault();
         handleSubmit();
       } else {
@@ -1138,7 +1153,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               {i18nService.t('coworkDropFileHint')}
             </div>
           )}
-          {isStreaming && !disabled && (
+          {isStreaming && !disabled && !canQueueWhileStreaming && (
             <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-input/50 dark:bg-input/80" />
           )}
           <PromptInputBody>

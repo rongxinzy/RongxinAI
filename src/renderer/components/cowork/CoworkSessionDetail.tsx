@@ -16,7 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
@@ -70,6 +70,7 @@ import {
 } from './components/VirtualizedTurnList';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
+import PendingMessageQueue from './PendingMessageQueue';
 import type { CaptureRect } from './helpers/exportUtils';
 import {
   composeExportCanvas,
@@ -1470,7 +1471,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <CoworkPromptInput
                 ref={promptInputRef}
                 topAccessory={
-                  <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
+                  <>
+                    {workMode === CoworkSessionMode.Work && !isDirectChat && currentSession?.id && (
+                      <PendingMessageQueue
+                        sessionId={currentSession.id}
+                        isStreaming={isStreaming}
+                      />
+                    )}
+                    <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
+                  </>
                 }
                 onSubmit={onContinue}
                 onStop={onStop}
