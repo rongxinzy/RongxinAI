@@ -51,7 +51,9 @@ import { getLocalInferenceUserFacingErrorMessage } from './utils/errors';
 import {
   buildMarketplaceSearchParams,
   filterMarketplaceModelsForDevice,
+  filterMarketplaceModelsForRecommendation,
   groupMarketplaceVariants,
+  sortMarketplaceModelsForRecommendation,
 } from './utils/marketplace';
 import {
   isInstallTerminalPhase,
@@ -162,11 +164,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         task: marketplaceSearchParams.task,
       }),
     );
-    return filterMarketplaceModelsForDevice(
-      scored,
-      marketplaceSearchParams.fit,
-      marketplaceSearchParams.minStars,
-    );
+    const filtered = marketplaceSearchParams.featuredOnly
+      ? filterMarketplaceModelsForRecommendation(scored, Boolean(marketplaceHardware))
+      : filterMarketplaceModelsForDevice(
+          scored,
+          marketplaceSearchParams.fit,
+          marketplaceSearchParams.minStars,
+        );
+    return marketplaceSearchParams.featuredOnly
+      ? sortMarketplaceModelsForRecommendation(filtered)
+      : filtered;
   }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
   const dismissToast = useCallback(() => {

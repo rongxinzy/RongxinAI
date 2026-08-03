@@ -15,7 +15,18 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { cn } from '@shared/lib/utils';
-import { AlertTriangle, BadgeCheck, Download, Info, Star, X } from 'lucide-react';
+import {
+  Ban,
+  BadgeCheck,
+  CheckCircle2,
+  CircleHelp,
+  Download,
+  Gauge,
+  Info,
+  Star,
+  ThumbsUp,
+  X,
+} from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ComponentType } from 'react';
 import { useMemo, useState } from 'react';
@@ -129,7 +140,7 @@ export function MarketplaceModelCard({
       : i18nService.t('marketplaceRuntimePending');
 
   return (
-    <div className="group relative z-0 h-full w-full rounded-xl transition-[box-shadow] duration-200 hover:shadow-xl hover:shadow-foreground/20">
+    <div data-marketplace-model-card="true" className="group relative z-0 h-full w-full rounded-xl transition-[box-shadow,z-index] duration-200 hover:z-20 hover:shadow-xl hover:shadow-foreground/20 focus-within:z-20">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 z-0 rounded-xl border border-border/70 bg-card ring-1 ring-border"
@@ -185,16 +196,7 @@ export function MarketplaceModelCard({
                   {publisher}
                 </div>
               ) : null}
-              {model.fit?.status === 'limited' || model.fit?.status === 'unsupported' ? (
-                <div className="inline-flex h-8 min-w-16 items-center justify-center gap-1.5 rounded-md border border-warning/30 bg-warning/5 px-3 py-0 text-sm font-medium text-warning">
-                  <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
-                  <span>{marketplaceFitLabel(model.fit?.status)}</span>
-                </div>
-              ) : (
-                <span className="text-sm text-muted-foreground">
-                  {marketplaceFitLabel(model.fit?.status)}
-                </span>
-              )}
+              <MarketplaceFitStatusBadge status={model.fit?.status} />
             </div>
           </CardHeader>
 
@@ -240,8 +242,8 @@ export function MarketplaceModelCard({
                           </div>
                           <div className="flex flex-col gap-2">
                             {scoreReasons.map(reason => (
-                              <div key={reason} className="flex items-start gap-2 text-xs leading-5 text-muted-foreground">
-                                <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+                              <div key={reason} className="flex items-center gap-2 text-xs leading-5 text-muted-foreground">
+                                <Info className="size-3.5 shrink-0" aria-hidden="true" />
                                 <span className="min-w-0 break-words">{reason}</span>
                               </div>
                             ))}
@@ -265,6 +267,8 @@ export function MarketplaceModelCard({
 
 
           </CardContent>
+
+        </motion.div>
 
           <div className="flex min-w-0 items-center gap-3 px-5 pb-3">
             <div className="min-w-0 flex-1">
@@ -307,7 +311,7 @@ export function MarketplaceModelCard({
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
               {installing ? (
-                <Button21st type="button" variant="danger" size="sm" className="h-8 min-w-16 px-3" onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}>
+                <Button21st type="button" variant="danger" size="sm" className="h-8 min-w-16 border-destructive/40 bg-destructive/10 px-3 font-semibold hover:border-destructive/60 hover:bg-destructive/15" onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}>
                   <X data-icon="inline-start" />
                   {i18nService.t('marketplaceCancelInstall')}
                 </Button21st>
@@ -326,7 +330,6 @@ export function MarketplaceModelCard({
               )}
             </div>
           </div>
-        </motion.div>
 
         <AnimatePresence initial={false}>
           {progress ? (
@@ -352,6 +355,31 @@ export function MarketplaceModelCard({
   );
 }
 
+type MarketplaceFitStatus = NonNullable<MarketplaceModel['fit']>['status'];
+
+function MarketplaceFitStatusBadge({ status }: { status?: MarketplaceFitStatus }) {
+  const normalizedStatus = status ?? 'unknown';
+  const statusPresentation = {
+    excellent: { icon: CheckCircle2, className: 'border-success/35 bg-success/10 text-success' },
+    good: { icon: ThumbsUp, className: 'border-blue-500/35 bg-blue-500/10 text-blue-600 dark:text-blue-400' },
+    limited: { icon: Gauge, className: 'border-warning/35 bg-warning/10 text-warning' },
+    unsupported: { icon: Ban, className: 'border-destructive/35 bg-destructive/10 text-destructive' },
+    unknown: { icon: CircleHelp, className: 'border-muted-foreground/30 bg-muted/40 text-muted-foreground' },
+  } satisfies Record<MarketplaceFitStatus, { icon: typeof CheckCircle2; className: string }>;
+  const { icon: StatusIcon, className } = statusPresentation[normalizedStatus];
+
+  return (
+    <div
+      className={cn(
+        'inline-flex h-8 min-w-16 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border px-3 py-0 text-sm font-medium',
+        className,
+      )}
+    >
+      <StatusIcon className="size-4 shrink-0" aria-hidden="true" />
+      <span>{marketplaceFitLabel(normalizedStatus)}</span>
+    </div>
+  );
+}
 function MetadataRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[68px_minmax(0,1fr)] items-start gap-2.5">

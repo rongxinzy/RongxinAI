@@ -186,8 +186,8 @@ describe('MarketplacePanel result grid and count consistency', () => {
       onSearch,
     });
 
-    // pageSize is 6, so 24 models span 4 pages.
-    expect(screen.getByText('第 1 / 4 页')).toBeInTheDocument();
+    // pageSize is 8, so 24 models span 3 pages.
+    expect(screen.getByText('第 1 / 3 页')).toBeInTheDocument();
 
     const nextButton = screen.getByRole('button', { name: '下一页' });
     expect(nextButton).toBeEnabled();
