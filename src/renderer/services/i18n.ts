@@ -1679,6 +1679,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     noSessionExperts: '暂无可用专家',
     // Skills
     skills: '技能',
+    goalMode: '目标',
+    clearGoalMode: '取消目标模式',
     searchSkills: '搜索技能',
     manageSkills: '管理技能',
     permissionModeAsk: '请求权限',
@@ -4509,6 +4511,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     noSessionExperts: 'No experts available',
     // Skills
     skills: 'Skills',
+    goalMode: 'Goal',
+    clearGoalMode: 'Turn off Goal mode',
     searchSkills: 'Search skills',
     manageSkills: 'Manage Skills',
     permissionModeAsk: 'Ask for permission',

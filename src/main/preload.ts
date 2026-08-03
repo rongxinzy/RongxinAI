@@ -432,6 +432,7 @@ contextBridge.exposeInMainWorld('electron', {
       systemPrompt?: string;
       title?: string;
       mode?: CoworkSessionMode;
+      goalMode?: boolean;
       activeSkillIds?: string[];
       workspaceId?: string;
       agentId?: string;
@@ -446,6 +447,7 @@ contextBridge.exposeInMainWorld('electron', {
       prompt: string;
       systemPrompt?: string;
       activeSkillIds?: string[];
+      goalMode?: boolean;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;

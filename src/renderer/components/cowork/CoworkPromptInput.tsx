@@ -12,7 +12,7 @@ import {
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
 import { CoreSkillId } from '@shared/skills/constants';
-import { ChevronDown, Folder, TriangleAlert, X } from 'lucide-react';
+import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -67,6 +67,24 @@ import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
 // so that attachment state survives view switches (cowork ↔ skills, etc.)
 type CoworkAttachment = DraftAttachment;
+
+const GoalModeChip: React.FC<{ onRemove: () => void }> = ({ onRemove }) => (
+  <span className="inline-flex h-6 items-center gap-1.5 rounded-full px-1.5 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)">
+    <Target className="size-3.5" />
+    <span className="max-w-24 truncate">{i18nService.t('goalMode')}</span>
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      onClick={onRemove}
+      aria-label={i18nService.t('clearGoalMode')}
+      title={i18nService.t('clearGoalMode')}
+      className="ml-0.5 size-4 rounded-full hover:bg-(--zy-skill-blue-foreground)/10"
+    >
+      <X />
+    </Button>
+  </span>
+);
 
 // Stable empty array reference to avoid unnecessary re-renders from useSelector
 // returning a new [] on every call (when draftAttachments[draftKey] is undefined).
@@ -153,6 +171,7 @@ interface CoworkPromptInputProps {
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     expertIds?: string[],
+    goalMode?: boolean,
   ) => boolean | void | Promise<boolean | void>;
   onStop?: () => void;
   isStreaming?: boolean;
@@ -250,6 +269,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           : [],
     );
     const [value, setValue] = useState(draftPrompt);
+    const [goalMode, setGoalMode] = useState(false);
 
     // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
     // Without this, every controller reference change triggers a re-render cascade
@@ -631,6 +651,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         skillPrompt,
         imageAtts.length > 0 ? imageAtts : undefined,
         selectedExpertIds,
+        goalMode,
       );
       dispatch(clearActiveSkills());
       const result = await submission;
@@ -657,6 +678,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       effectiveSelectedModel?.id,
       modelSupportsImage,
       selectedExpertIds,
+      goalMode,
       canQueueWhileStreaming,
     ]);
 
@@ -1212,6 +1234,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                         ? { selectedExpertIds, onChange: setSelectedExpertIds }
                         : undefined
                     }
+                    goalMode={goalMode}
+                    onGoalModeChange={setGoalMode}
                     disabled={disabled || isStreaming || isAddingFile}
                   />
                   {isWorkVariant && (
@@ -1221,6 +1245,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       disabled={disabled || isStreaming}
                     />
                   )}
+                  {isWorkVariant && goalMode && <GoalModeChip onRemove={() => setGoalMode(false)} />}
                   <ActiveSkillBadge />
                 </>
               )}
