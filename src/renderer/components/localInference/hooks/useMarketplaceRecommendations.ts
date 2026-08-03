@@ -19,9 +19,9 @@ export function useMarketplaceRecommendations({
 }): void {
   useEffect(() => {
     if (activeTab !== 'marketplace' || hasSearched) return;
-    // Recommendations show the curated cloud list without applying a device-fit
-    // filter. Fit is displayed on each card and can be selected in all-models mode.
-    const params = buildMarketplaceSearchParams({ query, featuredOnly: true, fit: 'all' });
+    // Recommendations show curated models that are runnable on the current device.
+    // The renderer applies the final fit filter after local hardware scoring.
+    const params = buildMarketplaceSearchParams({ query, featuredOnly: true, fit: 'recommended' });
     if (!params) return;
     onHasSearchedChange(true);
     void onSearch(params);

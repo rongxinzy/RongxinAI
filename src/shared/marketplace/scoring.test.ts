@@ -46,7 +46,7 @@ describe('marketplace device scoring', () => {
       { source: 'nvidia-smi', available: false, checkedAt: new Date().toISOString(), gpus: [] },
       memorySnapshot,
     );
-    expect(formatMarketplaceHardwareSummary(profile)).toBe('NVIDIA GPU 未检测到 · 64GB 内存');
+    expect(formatMarketplaceHardwareSummary(profile)).toBe('未检测到GPU · 64GB 内存');
   });
 
   it('keeps a memory-resident CPU fallback limited instead of claiming GPU-quality fit or no support', () => {
@@ -57,6 +57,23 @@ describe('marketplace device scoring', () => {
     const result = scoreMarketplaceModel(model, { hardware: profile, task: 'chat' });
     expect(result.fit.status).toBe('limited');
     expect(result.fit.reason).toContain('CPU');
+  });
+
+  it('sums split GGUF shards before deciding CPU fit', () => {
+    const profile = createMarketplaceHardwareProfile(
+      { source: 'nvidia-smi', available: false, checkedAt: new Date().toISOString(), gpus: [] },
+      { source: 'system', available: true, checkedAt: new Date().toISOString(), totalMemoryMiB: 16 * 1024, freeMemoryMiB: 16 * 1024 },
+    );
+    const splitModel: MarketplaceModel = {
+      ...model,
+      files: Array.from({ length: 5 }, (_, index) => ({
+        path: `glm-0000${index + 1}-of-00005.gguf`,
+        sizeBytes: Math.round((169.2 * 1024 ** 3) / 5),
+        isRecommended: index === 0,
+      })),
+    };
+    const result = scoreMarketplaceModel(splitModel, { hardware: profile });
+    expect(result.fit.status).toBe('unsupported');
   });
 
   it('provides evidence-backed stars and fit status', () => {

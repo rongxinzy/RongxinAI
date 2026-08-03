@@ -85,6 +85,18 @@ describe('MarketplaceModelCard', () => {
     };
   });
 
+  test.each([
+    ['excellent', '推荐运行', 'text-success'],
+    ['good', '适合运行', 'text-blue-600'],
+    ['limited', '性能受限', 'text-warning'],
+    ['unsupported', '暂不适配', 'text-destructive'],
+    ['unknown', '待检测', 'text-muted-foreground'],
+  ] as const)('renders the %s device-fit state with its visual treatment', (status, label, tone) => {
+    renderCard(makeModel({ fit: { status } }));
+
+    const statusLabel = screen.getByText(label);
+    expect(statusLabel.parentElement).toHaveClass(tone);
+  });
   test('renders the display name and an enabled install button for verified models', () => {
     renderCard(makeModel({ name: 'Alpha Model', repoId: 'acme/Alpha Model-GGUF' }));
 

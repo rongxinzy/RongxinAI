@@ -14,6 +14,9 @@ import type { MarketplaceModelFile } from '../../shared/marketplace';
 
 type RequestOptions = { signal?: AbortSignal };
 
+const DOWNLOAD_SPEED_SAMPLE_INTERVAL_MS = 500;
+const DOWNLOAD_SPEED_MIN_SAMPLE_DURATION_MS = 100;
+
 export function shardGroupKey(filePath: string): string | null {
   const match = filePath.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i);
   return match ? match[1] : null;
@@ -146,13 +149,14 @@ export async function installModelOnce(input: {
     await downloadFile(
       url,
       targetPath,
-      (completed, total) => {
+      (completed, total, speed) => {
         onProgress?.({
           phase: 'downloading-progress',
           modelId,
           modelName: request.displayName ?? modelId,
           completed,
           total,
+          speed,
           percent: total ? Math.round((completed / total) * 100) : undefined,
           targetPath,
         });
@@ -181,13 +185,14 @@ export async function installModelOnce(input: {
       await downloadFile(
         extraUrl,
         extra.targetPath,
-        (completed, total) => {
+        (completed, total, speed) => {
           onProgress?.({
             phase: 'downloading-progress',
             modelId,
             modelName: request.displayName ?? modelId,
             completed,
             total,
+            speed,
             percent: total ? Math.round((completed / total) * 100) : undefined,
             targetPath: extra.targetPath,
           });
@@ -217,13 +222,14 @@ export async function installModelOnce(input: {
       await downloadFile(
         mmprojUrl,
         mmprojTargetPath,
-        (completed, total) => {
+        (completed, total, speed) => {
           onProgress?.({
             phase: 'downloading-progress',
             modelId,
             modelName: request.displayName ?? modelId,
             completed,
             total,
+            speed,
             percent: total ? Math.round((completed / total) * 100) : undefined,
             targetPath: mmprojTargetPath,
           });
@@ -479,7 +485,7 @@ function buildInstalledModelRecord(modelsDir: string, targetPath: string): Llama
 async function downloadFile(
   url: string,
   targetPath: string,
-  onProgress: (completed: number, total?: number) => void,
+  onProgress: (completed: number, total?: number, speed?: number) => void,
   signal?: AbortSignal,
   expectedSha256?: string,
   expectedSizeBytes?: number,
@@ -488,6 +494,23 @@ async function downloadFile(
   let completedSuccessfully = false;
   try {
     const resumeFrom = fs.existsSync(tempPath) ? fs.statSync(tempPath).size : 0;
+    let speedSampleAt = Date.now();
+    let speedSampleCompleted = resumeFrom;
+    let latestSpeed: number | undefined;
+    const calculateSpeed = (completed: number): number | undefined => {
+      const now = Date.now();
+      const elapsedMs = now - speedSampleAt;
+      if (elapsedMs >= DOWNLOAD_SPEED_SAMPLE_INTERVAL_MS || latestSpeed === undefined) {
+        const transferred = completed - speedSampleCompleted;
+        if (transferred > 0) {
+          const sampleDurationMs = Math.max(elapsedMs, DOWNLOAD_SPEED_MIN_SAMPLE_DURATION_MS);
+          latestSpeed = transferred / (sampleDurationMs / 1000);
+        }
+        speedSampleAt = now;
+        speedSampleCompleted = completed;
+      }
+      return latestSpeed;
+    };
     let response: Response;
     try {
       response = await fetch(url, {
@@ -526,7 +549,7 @@ async function downloadFile(
         if (!file.write(Buffer.from(value))) {
           await new Promise<void>(resolve => file.once('drain', resolve));
         }
-        onProgress(completed, Number.isFinite(total) ? total : undefined);
+        onProgress(completed, Number.isFinite(total) ? total : undefined, calculateSpeed(completed));
       }
       completedSuccessfully = true;
     } finally {

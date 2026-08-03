@@ -42,7 +42,16 @@ export function createMarketplaceHardwareProfile(
 
 function modelFileSizeMiB(model: MarketplaceModel): number | undefined {
   const file = model.files?.find((candidate) => candidate.isRecommended) ?? model.files?.[0];
-  if (file?.sizeBytes && file.sizeBytes > 0) return file.sizeBytes / 1024 / 1024;
+  if (file?.sizeBytes && file.sizeBytes > 0) {
+    const shardGroup = file.path.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i)?.[1];
+    if (shardGroup) {
+      const totalSizeBytes = model.files
+        ?.filter((candidate) => candidate.path.match(/^(.*?)-?\d{5}-of-\d{5}\.gguf$/i)?.[1] === shardGroup)
+        .reduce((total, candidate) => total + (candidate.sizeBytes ?? 0), 0);
+      if (totalSizeBytes && totalSizeBytes > 0) return totalSizeBytes / 1024 / 1024;
+    }
+    return file.sizeBytes / 1024 / 1024;
+  }
   if (model.parameterCount && model.parameterCount > 0) return model.parameterCount * 512;
   return undefined;
 }
@@ -158,7 +167,7 @@ export function formatMarketplaceHardwareSummary(hardware?: MarketplaceHardwareP
   if (!hardware) return '设备信息不可用';
   const gpu = hardware.gpuCount
     ? `${hardware.gpuCount} GPU · ${Math.round(hardware.totalVramMiB / 1024)}GB 显存`
-    : 'NVIDIA GPU 未检测到';
+    : '未检测到GPU';
   const memory = hardware.systemMemoryMiB
     ? `${Math.round(hardware.systemMemoryMiB / 1024)}GB 内存`
     : '系统内存未检测到';

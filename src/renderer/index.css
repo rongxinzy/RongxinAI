@@ -863,6 +863,8 @@ select::-ms-expand {
   border-radius: 9999px;
   background-clip: padding-box;
 }
+
+
 /* Local inference log viewer theme adapter */
 [data-local-inference-log-viewer] .react-lazylog {
   background-color: var(--zy-surface) !important;
