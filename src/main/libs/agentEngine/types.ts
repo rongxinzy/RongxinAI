@@ -64,6 +64,8 @@ export type CoworkStartOptions = {
   confirmationMode?: 'modal' | 'text';
   /** UI session mode, used to apply Work-only execution controls. */
   sessionMode?: 'work' | 'chat';
+  /** Work-only: run the prompt as a long-horizon Goal loop. */
+  goalMode?: boolean;
   imageAttachments?: CoworkImageAttachment[];
   agentId?: string;
   expertIds?: string[];
@@ -79,6 +81,8 @@ export type CoworkContinueOptions = {
   skillIds?: string[];
   /** UI session mode, preserved when a skill change recreates the Pi session. */
   sessionMode?: 'work' | 'chat';
+  /** Work-only: enable or keep the long-horizon Goal loop. */
+  goalMode?: boolean;
   imageAttachments?: CoworkImageAttachment[];
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;

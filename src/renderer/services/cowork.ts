@@ -495,6 +495,7 @@ class CoworkService {
       prompt: options.prompt,
       systemPrompt: options.systemPrompt,
       activeSkillIds: options.activeSkillIds,
+      goalMode: options.goalMode,
       expertIds: options.expertIds,
       permissionMode: options.permissionMode,
       imageAttachments: options.imageAttachments,

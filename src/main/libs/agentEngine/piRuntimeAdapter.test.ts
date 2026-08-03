@@ -790,6 +790,39 @@ describe('PiRuntimeAdapter', () => {
       expect(beginRun).toHaveBeenCalledTimes(2);
     });
 
+    it('starts the Goal loop only when Work explicitly enables goal mode', async () => {
+      await adapter.startSession('goal-work', 'Finish the requested task', {
+        sessionMode: 'work',
+        goalMode: true,
+      });
+
+      expect(mockSession.prompt).toHaveBeenCalledWith(
+        expect.stringContaining('Loop started. Iteration 1. Goal: Finish the requested task'),
+      );
+    });
+
+    it('restarts a completed Goal loop with the full loop protocol prompt', async () => {
+      await adapter.startSession('goal-restart', 'First goal', {
+        sessionMode: 'work',
+        goalMode: true,
+      });
+      const activeSessions = (
+        adapter as unknown as {
+          activeSessions: Map<string, { agentLoop: { stop(): void } }>;
+        }
+      ).activeSessions;
+      activeSessions.get('goal-restart')?.agentLoop.stop();
+
+      await adapter.continueSession('goal-restart', 'Second goal', {
+        sessionMode: 'work',
+        goalMode: true,
+      });
+
+      expect(mockSession.prompt).toHaveBeenLastCalledWith(
+        expect.stringContaining('Loop started. Iteration 1. Goal: Second goal'),
+      );
+    });
+
     it('uses the durable acceptance loop when an arbitrary skill is added to a Work session', async () => {
       const workspaceRoot = createTemporaryWorkspace();
       await adapter.startSession('dynamic-skill', 'First', { sessionMode: 'work', workspaceRoot });
@@ -1826,6 +1859,24 @@ describe('PiRuntimeAdapter', () => {
       expect(steered.success).toBe(true);
       expect(mockSession.steer).toHaveBeenCalledWith('Change direction');
       expect(adapter.listPendingMessages('queue-session')).toEqual([]);
+    });
+
+    it('preserves Allow All across internal follow-up continuations', async () => {
+      await adapter.startSession('allow-all-session', 'Start work', {
+        sessionMode: 'work',
+        autoApprove: true,
+      });
+
+      await adapter.continueSession('allow-all-session', 'Continue work', {
+        sessionMode: 'work',
+      });
+
+      const activeSessions = (
+        adapter as unknown as {
+          activeSessions: Map<string, { autoApprove: boolean }>;
+        }
+      ).activeSessions;
+      expect(activeSessions.get('allow-all-session')?.autoApprove).toBe(true);
     });
 
     it('delivers queued follow-ups in order after Pi settles', async () => {

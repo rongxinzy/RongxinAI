@@ -290,6 +290,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     expertIds: string[] = [],
+    goalMode = false,
   ): Promise<boolean | void> => {
     console.log('[CoworkView] handleStartSession: imageAttachments diagnosis', {
       hasImageAttachments: !!imageAttachments,
@@ -809,6 +810,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         workspaceId: currentWorkspaceId || undefined,
         agentId: currentAgentId,
         expertIds,
+        goalMode,
         modelOverride: sessionModelOverride,
         permissionMode: config.permissionMode,
         imageAttachments,
@@ -853,6 +855,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
     expertIds: string[] = [],
+    goalMode = false,
   ) => {
     if (!currentSession) return;
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
@@ -1272,6 +1275,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
         expertIds,
         permissionMode: sessionPermissionMode,
+        goalMode,
         imageAttachments,
       });
     } finally {

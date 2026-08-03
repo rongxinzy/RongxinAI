@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
-import { Cable, Plus } from 'lucide-react';
+import { Cable, Plus, Target } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -47,6 +47,9 @@ interface PromptPlusMenuProps {
   onManageConnectors: () => void;
   /** Work mode only: session expert multi-select shown as a 专家 submenu */
   experts?: PromptPlusMenuExpertsProps;
+  /** Work mode only: run the next prompt as a long-horizon Goal. */
+  goalMode?: boolean;
+  onGoalModeChange?: (enabled: boolean) => void;
   disabled?: boolean;
 }
 
@@ -60,6 +63,8 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   onManageSkills,
   onManageConnectors,
   experts,
+  goalMode = false,
+  onGoalModeChange,
   disabled = false,
 }) => {
   const dispatch = useDispatch();
@@ -204,6 +209,16 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
           <PlusMenuFilesIcon className="size-4" />
           <span className="truncate">{i18nService.t('filesAndImages')}</span>
         </DropdownMenuItem>
+
+        {experts && onGoalModeChange && (
+          <DropdownMenuCheckboxItem
+            checked={goalMode}
+            onCheckedChange={checked => onGoalModeChange(checked === true)}
+          >
+            <Target className="size-4" />
+            <span className="truncate">{i18nService.t('goalMode')}</span>
+          </DropdownMenuCheckboxItem>
+        )}
 
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>

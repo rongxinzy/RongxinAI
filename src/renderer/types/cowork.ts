@@ -250,6 +250,7 @@ export interface CoworkStartOptions {
   systemPrompt?: string;
   title?: string;
   mode?: CoworkSessionMode;
+  goalMode?: boolean;
   activeSkillIds?: string[];
   workspaceId?: string;
   agentId?: string;
@@ -265,6 +266,7 @@ export interface CoworkContinueOptions {
   prompt: string;
   systemPrompt?: string;
   activeSkillIds?: string[];
+  goalMode?: boolean;
   expertIds?: string[];
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];

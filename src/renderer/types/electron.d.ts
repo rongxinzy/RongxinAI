@@ -748,6 +748,7 @@ interface IElectronAPI {
       systemPrompt?: string;
       title?: string;
       activeSkillIds?: string[];
+      goalMode?: boolean;
       workspaceId?: string;
       agentId?: string;
       expertIds?: string[];
@@ -765,6 +766,7 @@ interface IElectronAPI {
       prompt: string;
       systemPrompt?: string;
       activeSkillIds?: string[];
+      goalMode?: boolean;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;

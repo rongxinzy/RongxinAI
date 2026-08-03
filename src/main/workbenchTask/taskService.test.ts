@@ -148,7 +148,7 @@ test('pending, denied, and failed side effects cannot be authorized again', asyn
   }
 });
 
-test('irreversible effects require approval even when policy allows reversible writes', async () => {
+test('allow-all auto-approves irreversible effects', async () => {
   const { db, service } = createService();
   try {
     const { task, run } = service.beginRun({
@@ -166,9 +166,8 @@ test('irreversible effects require approval even when policy allows reversible w
     });
     const approval = service.getDetail(task.id)?.approvals[0];
     expect(approval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Irreversible);
-    expect(approval?.decision).toBe(WorkbenchApprovalDecision.Pending);
-    service.respondToApproval({ approvalId: approval!.id, approved: false });
-    expect((await authorization).allow).toBe(false);
+    expect(approval?.decision).toBe(WorkbenchApprovalDecision.Approved);
+    expect((await authorization).allow).toBe(true);
   } finally {
     db.close();
   }

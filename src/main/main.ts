@@ -4301,6 +4301,7 @@ if (!gotTheLock) {
             workspaceRoot: taskWorkingDirectory,
             confirmationMode: 'modal',
             sessionMode: options.mode ?? CoworkSessionMode.Work,
+            goalMode: options.goalMode,
             autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
             agentId: options.agentId,
@@ -4355,6 +4356,7 @@ if (!gotTheLock) {
         prompt: string;
         systemPrompt?: string;
         activeSkillIds?: string[];
+        goalMode?: boolean;
         expertIds?: string[];
         permissionMode?: CoworkPermissionMode;
         imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
@@ -4438,6 +4440,7 @@ if (!gotTheLock) {
               existingSession?.mode === CoworkSessionMode.Chat
                 ? CoworkSessionMode.Chat
                 : CoworkSessionMode.Work,
+            goalMode: options.goalMode,
             imageAttachments: options.imageAttachments,
             workspaceRoot: existingSession?.cwd,
             agentId: existingSession?.agentId,

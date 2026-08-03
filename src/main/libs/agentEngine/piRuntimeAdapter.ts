@@ -203,6 +203,8 @@ interface ActivePiSession {
   shortcutWorkflow: PiShortcutWorkflowController | null;
   /** Present for arbitrary skills loaded in Work mode. */
   workExecution: PiWorkExecutionController | null;
+  /** Whether this Work session was explicitly started in Goal mode. */
+  goalMode: boolean;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
   /**
    * Error from the latest failed attempt (message_end with stopReason=error).
@@ -629,16 +631,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // Agent loop tool: lets the LLM drive multi-iteration long-horizon
       // loops; the controller continues the session on agent_end.
       const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
+      const shouldRunGoalLoop =
+        options.goalMode === true && options.sessionMode === CoworkSessionMode.Work;
       const agentLoop = new PiAgentLoopController(completionWorkflow || undefined);
       let workLoopPrompt = '';
-      if (researchRun || shortcutWorkflow || workExecution) {
+      if (completionWorkflow || shouldRunGoalLoop) {
         const loopPrompt = agentLoop.start({
           mode: PiAgentLoopMode.Goal,
-          goal: (researchRun || shortcutWorkflow || workExecution)!.goal,
+          goal: completionWorkflow?.goal || prompt,
           passes: 0,
           stages: [],
         });
-        if (workExecution) workLoopPrompt = loopPrompt;
+        if (workExecution || shouldRunGoalLoop) workLoopPrompt = loopPrompt;
       }
       customTools.push(buildPiAgentLoopTool(agentLoop));
 
@@ -680,6 +684,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         researchRun,
         shortcutWorkflow,
         workExecution,
+        goalMode: options.goalMode === true,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
         pendingError: null,
         workbenchRunId,
@@ -707,7 +712,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           : workExecution
             ? workExecution.buildInitialPrompt(options._piPromptOverride || prompt)
             : options._piPromptOverride || prompt;
-      if (workExecution) {
+      if (workExecution || shouldRunGoalLoop) {
         initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
       }
 
@@ -753,11 +758,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workspaceRoot: options.workspaceRoot ?? storedSession?.cwd,
         agentId: options.agentId ?? storedSession?.agentId,
         modelOverride: options.modelOverride ?? storedSession?.modelOverride,
+        goalMode: options.goalMode ?? active?.goalMode,
         _piPromptOverride: piPrompt,
       });
     }
 
-    active.autoApprove = Boolean(options.autoApprove);
+    if (options.autoApprove !== undefined) {
+      active.autoApprove = Boolean(options.autoApprove);
+    }
     active.isRunning = true;
     active.turnFailed = false;
 
@@ -778,6 +786,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
+        goalMode: options.goalMode ?? active.goalMode,
         _piPromptOverride: buildPiConversationPrompt(history, prompt),
       });
     }
@@ -793,6 +802,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         systemPrompt: nextSystemPrompt,
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
+        goalMode: options.goalMode ?? active.goalMode,
         _piPromptOverride: buildPiConversationPrompt(history, prompt),
       });
     }
@@ -872,11 +882,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     let nextPrompt = prompt;
     const completionWorkflow =
       active.researchRun || active.shortcutWorkflow || active.workExecution;
-    if (completionWorkflow && !active.agentLoop.getState().active) {
-      completionWorkflow.resumeForPrompt(prompt);
-      active.agentLoop.start({
+    if (options.goalMode !== undefined && !completionWorkflow) {
+      active.goalMode = options.goalMode;
+      if (!active.goalMode && active.agentLoop.getState().active) {
+        active.agentLoop.stop();
+      }
+    }
+    const shouldRunGoalLoop =
+      active.goalMode && active.workbenchContract.kind !== WorkbenchContractKind.Chat;
+    if ((completionWorkflow || shouldRunGoalLoop) && !active.agentLoop.getState().active) {
+      completionWorkflow?.resumeForPrompt(prompt);
+      const loopPrompt = active.agentLoop.start({
         mode: PiAgentLoopMode.Goal,
-        goal: completionWorkflow.goal,
+        goal: completionWorkflow?.goal || prompt,
         passes: 0,
         stages: [],
       });
@@ -884,7 +902,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? active.researchRun.buildInitialPrompt(prompt)
         : active.shortcutWorkflow
           ? active.shortcutWorkflow.buildInitialPrompt(prompt)
-          : active.workExecution!.buildInitialPrompt(prompt);
+          : active.workExecution
+            ? active.workExecution.buildInitialPrompt(prompt)
+            : prompt;
+      if (!completionWorkflow) {
+        nextPrompt = `${loopPrompt}\n\n${nextPrompt}`;
+      }
     }
 
     try {

@@ -73,6 +73,7 @@ export type PiStartOptions = {
   confirmationMode?: 'modal' | 'text';
   /** UI session mode, used to apply Work-only execution controls. */
   sessionMode?: 'work' | 'chat';
+  goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
   agentId?: string;
   expertIds?: string[];
@@ -90,6 +91,7 @@ export type PiContinueOptions = {
   skillIds?: string[];
   /** UI session mode, preserved when a skill change recreates the Pi session. */
   sessionMode?: 'work' | 'chat';
+  goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
