@@ -2,6 +2,8 @@ import * as fs from 'fs';
 import { createHash } from 'node:crypto';
 import path from 'path';
 
+import { HarnessActivationType, type HarnessActivationEvent } from '../../../shared/harness';
+
 import {
   collectShortcutCompletionFailures,
   expectedExtensions,
@@ -37,6 +39,7 @@ export interface PiShortcutWorkflowOptions {
     outputPath: string,
     kind: ShortcutWorkflowKind,
   ) => Promise<void>;
+  onActivation?: (event: HarnessActivationEvent) => void;
 }
 
 const now = (): string => new Date().toISOString();
@@ -286,7 +289,15 @@ export class PiShortcutWorkflowController {
     } catch (error) {
       return `Preview was not rendered: ${error instanceof Error ? error.message : String(error)}`;
     }
-    return this.recordFile(output, 'preview', deliverable);
+    const result = await this.recordFile(output, 'preview', deliverable);
+    if (result.startsWith('Verified preview file:')) {
+      this.options.onActivation?.({
+        activation: HarnessActivationType.PreviewRendered,
+        mechanism: 'shortcut_preview_renderer',
+        evidence: { outputPath: path.relative(this.workspaceRoot, output) },
+      });
+    }
+    return result;
   }
 
   setResearchPlan(angles: string[]): string {

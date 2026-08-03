@@ -1,4 +1,5 @@
 import { CoreSkillId } from '../../../shared/skills/constants';
+import type { HarnessActivationEvent } from '../../../shared/harness';
 
 export const PiResearchStateToolName = 'research_state';
 export const PiResearchStateAction = {
@@ -36,6 +37,7 @@ export interface PiResearchRunOptions {
   sessionId: string;
   workspaceRoot: string;
   task: string;
+  onActivation?: (event: HarnessActivationEvent) => void;
 }
 
 export interface ResearchSource {

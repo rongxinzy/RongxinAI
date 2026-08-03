@@ -9,9 +9,10 @@ export interface PiWorkLoopAssembly {
 export function createPiWorkLoop(options: {
   goal: string;
   completionWorkflow?: ConstructorParameters<typeof PiAgentLoopController>[0];
+  onActivation?: ConstructorParameters<typeof PiAgentLoopController>[1];
   start: boolean;
 }): PiWorkLoopAssembly {
-  const controller = new PiAgentLoopController(options.completionWorkflow);
+  const controller = new PiAgentLoopController(options.completionWorkflow, options.onActivation);
   return {
     controller,
     tool: buildPiAgentLoopTool(controller),

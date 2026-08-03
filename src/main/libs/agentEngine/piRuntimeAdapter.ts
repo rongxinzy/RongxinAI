@@ -30,12 +30,18 @@ import {
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import {
+  HarnessVersion,
+  type HarnessActivationEvent,
+  type HarnessModelProfileInput,
+} from '../../../shared/harness';
+import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
   type WorkbenchTaskContract,
 } from '../../../shared/workbenchTask';
 import {
   isLocalProviderName,
+  type ModelCapabilities,
   ModelCapabilityStatus,
   ProviderModelPiApi,
   ProviderName,
@@ -43,6 +49,7 @@ import {
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
+import { t } from '../../i18n';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -171,6 +178,7 @@ interface ActivePiSession {
   piSession: PiSession;
   abortController: AbortController;
   modelRuntime: PiModelRuntime | null;
+  harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
   requestedSkillIds: string[] | undefined;
@@ -293,6 +301,8 @@ type PiResolvedModel = {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   maxOutputTokens: number;
+  providerName: string;
+  capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
   };
@@ -519,6 +529,41 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // so override that loader per session to keep expert contexts isolated.
       // Resolve model early — needed by both MCP proxy and subagent tool
       const resolvedModel = await resolvePiModel(pi, options.modelOverride);
+      const modelId =
+        typeof resolvedModel.model.id === 'string'
+          ? resolvedModel.model.id
+          : options.modelOverride || 'unknown';
+      const reasoning = resolvedModel.model.reasoning;
+      const harnessModelProfile: HarnessModelProfileInput = {
+        provider: resolvedModel.providerName,
+        model: modelId,
+        reasoningProfile:
+          typeof reasoning === 'string' ? reasoning : reasoning === true ? 'enabled' : 'default',
+        workflowKind: workbenchContract.kind,
+        harnessVersion: HarnessVersion,
+      };
+      if (workbenchRunId && this.workbenchTaskService) {
+        this.workbenchTaskService.measurement?.recordModelProfile(
+          workbenchRunId,
+          harnessModelProfile,
+        );
+      }
+      const recordActivation = (event: HarnessActivationEvent): void => {
+        const currentRunId = this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
+        if (!currentRunId) return;
+        this.workbenchTaskService?.measurement?.recordActivation(currentRunId, event);
+      };
+      if (
+        options.sessionMode === 'work' &&
+        isLocalProviderName(resolvedModel.providerName) &&
+        resolvedModel.capabilities?.toolCalling !== ModelCapabilityStatus.Supported
+      ) {
+        throw new Error(
+          resolvedModel.capabilities?.toolCalling === ModelCapabilityStatus.Unsupported
+            ? t('coworkLocalModelToolCallingUnsupported')
+            : t('coworkLocalModelToolCallingUnknown'),
+        );
+      }
       resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
       sessionOptions.model = resolvedModel.model;
       if (resolvedModel.modelRuntime) {
@@ -559,7 +604,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // It owns durable state and completion gates for the lifetime of this
       // session (and reloads the same state directory after a session restart).
       const researchRun = isAcademicResearchSkillSet(resourceState.skillIds)
-        ? new PiResearchRunController({ sessionId, workspaceRoot, task: prompt })
+        ? new PiResearchRunController({
+            sessionId,
+            workspaceRoot,
+            task: prompt,
+            onActivation: recordActivation,
+          })
         : null;
       if (researchRun) {
         researchRun.resumeForPrompt(prompt);
@@ -574,6 +624,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             kind: shortcutKind,
             validateRasterPreview: isRasterPreviewDecodable,
             renderOfficePreview,
+            onActivation: recordActivation,
           })
         : null;
       if (shortcutWorkflow) {
@@ -668,6 +719,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const workLoop = createPiWorkLoop({
         goal: completionWorkflow?.goal || prompt,
         completionWorkflow: completionWorkflow || undefined,
+        onActivation: recordActivation,
         start: Boolean(completionWorkflow || shouldRunGoalLoop),
       });
       const agentLoop = workLoop.controller;
@@ -691,6 +743,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         piSession: session,
         abortController,
         modelRuntime: resolvedModel.modelRuntime,
+        harnessModelProfile,
         requestedSystemPrompt: basePrompt,
         requestedSkillIds: resourceState.skillIds,
         requestedExpertIds: normalizeExpertIds(options.expertIds),
@@ -874,6 +927,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
       active.workbenchRunId = workbench.run.id;
       active.workbenchContract = workbenchContract;
+      active.harnessModelProfile = {
+        ...active.harnessModelProfile,
+        workflowKind: workbenchContract.kind,
+      };
+      this.workbenchTaskService.measurement?.recordModelProfile(
+        workbench.run.id,
+        active.harnessModelProfile,
+      );
     }
 
     // Reset turn state
@@ -973,6 +1034,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const model = resolvedModel.model;
       await active.piSession.setModel(model);
       active.modelRuntime = resolvedModel.modelRuntime;
+      const reasoning = resolvedModel.model.reasoning;
+      active.harnessModelProfile = {
+        provider: resolvedModel.providerName,
+        model:
+          typeof resolvedModel.model.id === 'string' ? resolvedModel.model.id : patch.model.trim(),
+        reasoningProfile:
+          typeof reasoning === 'string' ? reasoning : reasoning === true ? 'enabled' : 'default',
+        workflowKind: active.workbenchContract.kind,
+        harnessVersion: HarnessVersion,
+      };
       active.writeTokenLimitRecovery = new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens);
       if (active.resourceState.maxOutputTokens !== resolvedModel.maxOutputTokens) {
         active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
@@ -2654,6 +2725,8 @@ async function resolvePiModel(
       (isLocalProviderName(resolution.providerMetadata.providerName)
         ? DEFAULT_PI_LOCAL_MAX_TOKENS
         : DEFAULT_PI_CLOUD_MAX_TOKENS),
+    providerName: resolution.providerMetadata.providerName,
+    capabilities: resolution.providerMetadata.capabilities,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
 }
