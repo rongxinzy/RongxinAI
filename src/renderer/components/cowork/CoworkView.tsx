@@ -190,6 +190,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   const isStreaming = useSelector(selectIsStreaming);
   const config = useSelector(selectCoworkConfig);
+  const sessionPermissionMode = currentSession
+    ? (config.permissionModeBySession?.[currentSession.id] ?? config.permissionMode)
+    : config.permissionMode;
 
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const skills = useSelector((state: RootState) => state.skill.skills);
@@ -1268,7 +1271,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
         activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
         expertIds,
-        permissionMode: config.permissionMode,
+        permissionMode: sessionPermissionMode,
         imageAttachments,
       });
     } finally {
@@ -1439,9 +1442,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           sessionId={displayedSessionId}
           onManageSkills={() => onShowSkills?.()}
           onManageConnectors={() => onShowConnectors?.()}
-          permissionMode={config.permissionMode}
+          permissionMode={sessionPermissionMode}
           onPermissionModeChange={(mode: CoworkPermissionMode) => {
-            void coworkService.updateConfig({ permissionMode: mode });
+            if (!currentSession) return;
+            void coworkService.updateConfig({
+              permissionModeBySession: {
+                ...(config.permissionModeBySession ?? {}),
+                [currentSession.id]: mode,
+              },
+            });
           }}
           onContinue={handleContinueSession}
           onStop={handleStopSession}
