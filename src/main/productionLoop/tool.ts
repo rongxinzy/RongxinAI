@@ -46,6 +46,16 @@ const expectedVerifiers = (value: unknown): ProductionExpectedVerifier[] =>
 export function buildProductionLoopTool(
   controller: ProductionLoopController,
 ): Record<string, unknown> {
+  const stateForModel = (): string => {
+    const state = controller.getState();
+    return JSON.stringify({
+      phase: state.phase,
+      status: state.status,
+      planItems: state.planItems,
+      critic: state.critic,
+      deliveryReason: state.deliveryReason,
+    });
+  };
   const result = (text: string): ProductionLoopToolResult => ({
     content: [{ type: 'text', text }],
     details: controller.getState() as unknown as Record<string, unknown>,
@@ -62,11 +72,47 @@ export function buildProductionLoopTool(
         action: { type: 'string', enum: Object.values(ProductionLoopAction) },
         reference: { type: 'string' },
         summary: { type: 'string' },
-        items: { type: 'array', items: { type: 'object' } },
+        items: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              detail: { type: 'string' },
+            },
+            required: ['title'],
+            additionalProperties: false,
+          },
+        },
         constraints: { type: 'array', items: { type: 'string' } },
         acceptanceCriteria: { type: 'array', items: { type: 'string' } },
-        expectedArtifacts: { type: 'array', items: { type: 'object' } },
-        expectedVerifiers: { type: 'array', items: { type: 'object' } },
+        expectedArtifacts: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string' },
+              description: { type: 'string' },
+              required: { type: 'boolean' },
+            },
+            required: ['kind', 'description'],
+            additionalProperties: false,
+          },
+        },
+        expectedVerifiers: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              deterministic: { type: 'boolean' },
+            },
+            required: ['name', 'deterministic'],
+            additionalProperties: false,
+          },
+        },
         selectedDirection: { type: 'string' },
         itemId: { type: 'string' },
         status: { type: 'string', enum: Object.values(ProductionPlanItemStatus) },
@@ -112,7 +158,9 @@ export function buildProductionLoopTool(
               selectedDirection:
                 typeof params.selectedDirection === 'string' ? params.selectedDirection : undefined,
             });
-            return result('Plan committed. Execute the persisted plan and update each item.');
+            return result(
+              `Plan committed. Use these generated item IDs with update_plan_item:\n${stateForModel()}`,
+            );
           case ProductionLoopAction.UpdatePlanItem:
             controller.updatePlanItem(
               String(params.itemId || ''),
@@ -139,7 +187,7 @@ export function buildProductionLoopTool(
               'Revision recorded. Inspect the revised result and request critique again.',
             );
           case ProductionLoopAction.GetState:
-            return result(`Current production phase: ${controller.getState().phase}.`);
+            return result(stateForModel());
           default:
             return result(`Unknown production_loop action: ${String(params.action || '')}`);
         }

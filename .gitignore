@@ -8,7 +8,7 @@ release/
 node_modules
 dist
 dist-electron
-dist-eval
+dist-eval/
 .DS_Store
 .env
 .env.*

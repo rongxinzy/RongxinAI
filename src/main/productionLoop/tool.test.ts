@@ -4,6 +4,7 @@ import {
   ProductionLoopAction,
   ProductionLoopPhase,
   ProductionLoopStatus,
+  ProductionPlanItemStatus,
 } from '../../shared/productionLoop';
 import type { ProductionLoopController } from './controller';
 import { buildProductionLoopTool } from './tool';
@@ -11,6 +12,9 @@ import { buildProductionLoopTool } from './tool';
 const state = {
   phase: ProductionLoopPhase.Plan,
   status: ProductionLoopStatus.Active,
+  planItems: [{ id: 'item-1', title: 'Build', status: ProductionPlanItemStatus.Pending }],
+  critic: { requested: false },
+  deliveryReason: null,
 };
 
 const createTool = () => {
@@ -27,6 +31,22 @@ const createTool = () => {
   };
   return { controller, tool };
 };
+
+test('publishes concrete nested schemas for model-generated plans', () => {
+  const { tool } = createTool();
+  const parameters = (
+    tool as unknown as {
+      parameters: { properties: Record<string, { items?: { required?: string[] } }> };
+    }
+  ).parameters;
+
+  expect(parameters.properties.items.items?.required).toEqual(['title']);
+  expect(parameters.properties.expectedArtifacts.items?.required).toEqual(['kind', 'description']);
+  expect(parameters.properties.expectedVerifiers.items?.required).toEqual([
+    'name',
+    'deterministic',
+  ]);
+});
 
 test('normalizes a plan payload before passing it to the controller', async () => {
   const { controller, tool } = createTool();
@@ -52,6 +72,15 @@ test('normalizes a plan payload before passing it to the controller', async () =
     selectedDirection: undefined,
   });
   expect(output.content[0].text).toContain('Plan committed');
+  expect(output.content[0].text).toContain('item-1');
+});
+
+test('returns model-visible state with generated plan item IDs', async () => {
+  const { tool } = createTool();
+
+  const output = await tool.execute('call', { action: ProductionLoopAction.GetState });
+
+  expect(JSON.parse(output.content[0].text)).toEqual(state);
 });
 
 test('returns controller validation errors without advancing the tool state', async () => {
