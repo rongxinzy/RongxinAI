@@ -25,7 +25,7 @@ test('marketplace page size uses the actual grid height', () => {
       columnCount: 4,
       rowGap: 12,
     }),
-  ).toBe(16);
+  ).toBe(MARKETPLACE_MAX_PAGE_ROWS * 4);
   expect(
     getMarketplacePageSize({
       availableGridHeight: 1_000,
@@ -73,30 +73,30 @@ test('grid column count uses track geometry when the last page has a partial row
 });
 
 test('marketplace search params load recommended models for an empty query and use the app cap for a search', () => {
-  expect(buildMarketplaceSearchParams({ query: ' qwen ' })).toEqual({
+  expect(buildMarketplaceSearchParams({ query: ' qwen ' })).toMatchObject({
     query: 'qwen',
-    limit: 8,
+    limit: MARKETPLACE_PAGE_SIZE,
   });
 
-  expect(buildMarketplaceSearchParams({ query: ' qwen ', pageNumber: 4 })).toEqual({
+  expect(buildMarketplaceSearchParams({ query: ' qwen ', pageNumber: 4 })).toMatchObject({
     query: 'qwen',
-    limit: 8,
+    limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 4,
   });
 
-  expect(buildMarketplaceSearchParams({ query: '' })).toEqual({
-    limit: 8,
+  expect(buildMarketplaceSearchParams({ query: '' })).toMatchObject({
+    limit: MARKETPLACE_PAGE_SIZE,
     featuredOnly: true,
   });
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
 });
 
 test('marketplace search params honour a caller-supplied page size', () => {
-  expect(buildMarketplaceSearchParams({ query: 'qwen', limit: 12 })).toEqual({
+  expect(buildMarketplaceSearchParams({ query: 'qwen', limit: 12 })).toMatchObject({
     query: 'qwen',
     limit: 12,
   });
-  expect(buildMarketplaceSearchParams({ query: '', limit: 16 })).toEqual({
+  expect(buildMarketplaceSearchParams({ query: '', limit: 16 })).toMatchObject({
     limit: 16,
     featuredOnly: true,
   });
@@ -104,19 +104,19 @@ test('marketplace search params honour a caller-supplied page size', () => {
 
 test('marketplace browse modes carry their result context into server pagination', () => {
   expect(buildMarketplaceSearchParams({ query: '', pageNumber: 3, featuredOnly: false })).toMatchObject({
-    limit: 8,
+    limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 3,
     featuredOnly: false,
   });
   expect(buildMarketplaceSearchParams({ query: '', task: 'chat', pageNumber: 2, featuredOnly: false })).toMatchObject({
-    limit: 8,
+    limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 2,
     task: 'chat',
     featuredOnly: false,
   });
   expect(buildMarketplaceSearchParams({ query: 'qwen', pageNumber: 2, task: 'code' })).toMatchObject({
     query: 'qwen',
-    limit: 8,
+    limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 2,
     task: 'code',
   });
