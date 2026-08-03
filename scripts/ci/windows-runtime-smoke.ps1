@@ -74,8 +74,10 @@ try {
   }
 
   Invoke-Checked $python @('--version') 'bundled application Python version probe'
-  Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print("xlsx-dependencies-ok")') 'bundled XLSX dependency probe'
-  Invoke-Checked $pdfPython @('-c', 'import reportlab, pypdfium2, PIL; print("pdf-dependencies-ok")') 'bundled PDF dependency probe'
+  # Windows PowerShell 5.1 strips nested quotes from native process arguments.
+  # Keep these probes quote-free so the Python code is identical on clean CI hosts.
+  Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'
+  Invoke-Checked $pdfPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
   Invoke-Checked $bash @('-lc', 'printf "portable-git-bash-ok\n"') 'bundled Bash probe'
   Invoke-Checked $pandoc @('--version') 'bundled Pandoc version probe'
 
