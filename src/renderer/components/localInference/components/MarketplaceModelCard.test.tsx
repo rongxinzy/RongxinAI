@@ -92,11 +92,20 @@ describe('MarketplaceModelCard', () => {
     expect(installButton).toBeEnabled();
   });
 
-  test('disables install while metadata is pending', () => {
-    renderCard(makeModel({ metadataStatus: 'pending' }));
+  test('pending models offer verify-and-install instead of a dead button', async () => {
+    // Listing-only catalogue records carry no file metadata yet; the button
+    // stays actionable so the install flow can hydrate the model on demand.
+    const user = userEvent.setup();
+    const onInstall = vi.fn();
+    const model = makeModel({ metadataStatus: 'pending', files: [] });
 
-    const pendingButton = screen.getByRole('button', { name: /等待校验/ });
-    expect(pendingButton).toBeDisabled();
+    renderCard(model, { onInstall });
+
+    const verifyButton = screen.getByRole('button', { name: /校验并安装/ });
+    expect(verifyButton).toBeEnabled();
+
+    await user.click(verifyButton);
+    expect(onInstall).toHaveBeenCalledWith(expect.objectContaining({ repoId: model.repoId }));
   });
 
   test('offers cancel while installing and calls the main-process canceller', async () => {
