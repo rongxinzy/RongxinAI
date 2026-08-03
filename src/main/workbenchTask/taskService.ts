@@ -23,7 +23,10 @@ import {
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { HarnessActivationType } from '../../shared/harness';
+import { ProductionLoopRecoveryReason } from '../../shared/productionLoop';
 import { HarnessMeasurementService } from '../harness/measurementService';
+import { ProductionLoopRepository } from '../productionLoop/repository';
+import { ProductionLoopService } from '../productionLoop/service';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchTaskRepository } from './repository';
 import { classifyWorkbenchToolRisk, createToolIdempotencyKey } from './riskClassifier';
@@ -52,12 +55,17 @@ const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
   readonly measurement: HarnessMeasurementService;
+  readonly productionLoop: ProductionLoopService;
   private readonly pendingApprovals = new Map<string, PendingApproval>();
 
   constructor(db: Database.Database) {
     super();
     this.repository = new WorkbenchTaskRepository(db);
     this.measurement = new HarnessMeasurementService(this.repository);
+    this.productionLoop = new ProductionLoopService(
+      new ProductionLoopRepository(db),
+      this.measurement,
+    );
   }
 
   getCurrent(sessionId: string): WorkbenchTaskDetail | null {
@@ -194,6 +202,7 @@ export class WorkbenchTaskService extends EventEmitter {
         outcome: result.outcome,
         checks: result.checks.map(check => ({ name: check.name, status: check.status })),
       });
+      this.productionLoop.recordVerificationResult(run.id, result.outcome, result.summary);
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
@@ -233,6 +242,11 @@ export class WorkbenchTaskService extends EventEmitter {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
       });
+      this.productionLoop.recordVerificationResult(
+        run.id,
+        WorkbenchVerificationOutcome.Passed,
+        acceptedResult.summary,
+      );
     });
     const accepted = this.repository.getDetail(taskId);
     if (!accepted) throw new Error('Workbench task not found after acceptance.');
@@ -298,6 +312,13 @@ export class WorkbenchTaskService extends EventEmitter {
         mechanism: 'tool_effect_idempotency',
         evidence: { toolCallId: input.toolCallId, toolName: input.toolName },
       });
+      if (this.productionLoop.repository.get(run.id)) {
+        this.productionLoop.recordRecovery(
+          run.id,
+          ProductionLoopRecoveryReason.RepeatedToolCall,
+          `Blocked duplicate side effect for ${input.toolName}.`,
+        );
+      }
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
     // "Allow all" means the user has explicitly disabled tool authorization
@@ -473,7 +494,10 @@ export class WorkbenchTaskService extends EventEmitter {
   }
 
   deleteSession(sessionId: string): void {
-    this.repository.deleteSessionDomainData(sessionId);
+    this.repository.transaction(() => {
+      this.productionLoop.deleteSession(sessionId);
+      this.repository.deleteSessionDomainData(sessionId);
+    });
   }
 
   private emitChanged(task: WorkbenchTask): void {

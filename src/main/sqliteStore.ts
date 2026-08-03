@@ -19,6 +19,7 @@ import {
   SqliteBackupManager,
 } from './libs/sqliteBackup/sqliteBackupManager';
 import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
+import { initializeProductionLoopSchema } from './productionLoop/schema';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 type ChangePayload<T = unknown> = {
@@ -158,6 +159,7 @@ export class SqliteStore {
     `);
 
     initializeWorkbenchTaskSchema(this.db);
+    initializeProductionLoopSchema(this.db);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS user_memories (

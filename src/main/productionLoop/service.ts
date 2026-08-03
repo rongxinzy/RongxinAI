@@ -1,0 +1,434 @@
+import { randomUUID } from 'crypto';
+
+import { HarnessActivationType } from '../../shared/harness';
+import {
+  ProductionCriticSeverity,
+  ProductionLoopPhase,
+  ProductionLoopRecoveryReason,
+  ProductionLoopStatus,
+  ProductionPlanItemStatus,
+  type ProductionCriticFinding,
+  type ProductionExpectedArtifact,
+  type ProductionExpectedVerifier,
+  type ProductionLoopState,
+  type ProductionPlanItem,
+} from '../../shared/productionLoop';
+import {
+  WorkbenchVerificationOutcome,
+  type WorkbenchContractKind,
+  type WorkbenchJsonObject,
+} from '../../shared/workbenchTask';
+import type { HarnessMeasurementService } from '../harness/measurementService';
+import { ProductionLoopRepository } from './repository';
+import { assertProductionLoopTransition } from './stateMachine';
+
+const MAX_CRITIC_OUTPUT_LENGTH = 8_000;
+
+interface CriticPayload {
+  verdict: 'pass' | 'revise';
+  findings: ProductionCriticFinding[];
+}
+
+const normalizeStrings = (values: string[]): string[] => [
+  ...new Set(values.map(value => value.trim()).filter(Boolean)),
+];
+
+const parseCriticPayload = (output: string, isError: boolean): CriticPayload => {
+  if (isError) {
+    return {
+      verdict: 'revise',
+      findings: [
+        {
+          severity: ProductionCriticSeverity.Major,
+          summary: 'The independent critic did not complete successfully.',
+          evidence: output.slice(0, MAX_CRITIC_OUTPUT_LENGTH),
+        },
+      ],
+    };
+  }
+  try {
+    const parsed = JSON.parse(output.trim()) as Record<string, unknown>;
+    const verdict = parsed.verdict === 'pass' ? 'pass' : 'revise';
+    const findings = Array.isArray(parsed.findings)
+      ? parsed.findings.flatMap(value => {
+          if (!value || typeof value !== 'object') return [];
+          const raw = value as Record<string, unknown>;
+          if (typeof raw.summary !== 'string' || !raw.summary.trim()) return [];
+          const severity = Object.values(ProductionCriticSeverity).includes(
+            raw.severity as ProductionCriticSeverity,
+          )
+            ? (raw.severity as ProductionCriticSeverity)
+            : ProductionCriticSeverity.Major;
+          return [
+            {
+              severity,
+              summary: raw.summary.trim(),
+              evidence: typeof raw.evidence === 'string' ? raw.evidence.trim() : undefined,
+            },
+          ];
+        })
+      : [];
+    if (verdict === 'pass' && findings.length > 0) return { verdict: 'revise', findings };
+    return { verdict, findings };
+  } catch {
+    return {
+      verdict: 'revise',
+      findings: [
+        {
+          severity: ProductionCriticSeverity.Major,
+          summary: 'The independent critic returned an invalid structured response.',
+          evidence: output.slice(0, MAX_CRITIC_OUTPUT_LENGTH),
+        },
+      ],
+    };
+  }
+};
+
+export class ProductionLoopService {
+  readonly repository: ProductionLoopRepository;
+
+  constructor(
+    repository: ProductionLoopRepository,
+    private readonly measurement: HarnessMeasurementService,
+  ) {
+    this.repository = repository;
+  }
+
+  beginRun(input: {
+    taskId: string;
+    runId: string;
+    workflowKind: WorkbenchContractKind;
+    goal: string;
+    prototypeRequired: boolean;
+  }): ProductionLoopState {
+    const existing = this.repository.get(input.runId);
+    if (existing) return existing;
+    const previous = this.repository.getLatestForTask(input.taskId, input.runId);
+    const now = Date.now();
+    return this.repository.create({
+      version: 1,
+      taskId: input.taskId,
+      runId: input.runId,
+      workflowKind: input.workflowKind,
+      goal: input.goal,
+      phase: input.prototypeRequired ? ProductionLoopPhase.Explore : ProductionLoopPhase.Plan,
+      status: ProductionLoopStatus.Active,
+      prototypeRequired: input.prototypeRequired,
+      prototypes: previous?.prototypes ?? [],
+      selectedDirection: previous?.selectedDirection ?? null,
+      constraints: previous?.constraints ?? [],
+      acceptanceCriteria: previous?.acceptanceCriteria ?? [],
+      expectedArtifacts: previous?.expectedArtifacts ?? [],
+      expectedVerifiers: previous?.expectedVerifiers ?? [],
+      planItems:
+        previous?.planItems.map(item => ({ ...item, status: ProductionPlanItemStatus.Pending })) ??
+        [],
+      critic: {
+        requested: false,
+        toolCallId: null,
+        passed: false,
+        findings: [],
+        outputSummary: null,
+      },
+      revisions: [],
+      recoveries: [],
+      deliveryReason: null,
+      progressVersion: 0,
+      lastObservedProgressVersion: 0,
+      staleCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  recordPrototype(runId: string, reference: string, summary: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.phase !== ProductionLoopPhase.Explore) {
+        throw new Error('Prototypes can only be recorded during the explore phase.');
+      }
+      const normalizedReference = reference.trim();
+      const normalizedSummary = summary.trim();
+      if (!normalizedReference || !normalizedSummary) {
+        throw new Error('A prototype requires a reference and summary.');
+      }
+      state.prototypes.push({
+        reference: normalizedReference,
+        summary: normalizedSummary,
+        createdAt: Date.now(),
+      });
+      state.progressVersion += 1;
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.PrototypeGenerated,
+        mechanism: 'production_loop',
+        evidence: { reference: normalizedReference },
+      });
+    });
+  }
+
+  commitPlan(
+    runId: string,
+    input: {
+      items: Array<{ title: string; detail?: string }>;
+      constraints: string[];
+      acceptanceCriteria: string[];
+      expectedArtifacts: ProductionExpectedArtifact[];
+      expectedVerifiers: ProductionExpectedVerifier[];
+      selectedDirection?: string;
+    },
+  ): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.phase === ProductionLoopPhase.Explore) {
+        if (state.prototypeRequired && state.prototypes.length === 0) {
+          throw new Error('At least one prototype is required before committing the plan.');
+        }
+        this.transition(state, ProductionLoopPhase.Plan);
+      }
+      if (state.phase !== ProductionLoopPhase.Plan) {
+        throw new Error('The execution plan can only be committed during the plan phase.');
+      }
+      const items = input.items
+        .map(item => ({ title: item.title.trim(), detail: item.detail?.trim() }))
+        .filter(item => item.title);
+      const acceptanceCriteria = normalizeStrings(input.acceptanceCriteria);
+      const expectedArtifacts = input.expectedArtifacts.flatMap(artifact => {
+        const kind = artifact.kind?.trim();
+        const description = artifact.description?.trim();
+        return kind && description
+          ? [{ kind, description, required: artifact.required !== false }]
+          : [];
+      });
+      const expectedVerifiers = input.expectedVerifiers.flatMap(verifier => {
+        const name = verifier.name?.trim();
+        return name ? [{ name, deterministic: verifier.deterministic === true }] : [];
+      });
+      const selectedDirection = input.selectedDirection?.trim() || null;
+      if (items.length === 0 || acceptanceCriteria.length === 0 || expectedVerifiers.length === 0) {
+        throw new Error(
+          'A plan requires at least one item, one acceptance criterion, and one expected verifier.',
+        );
+      }
+      if (state.prototypeRequired && !selectedDirection) {
+        throw new Error('A prototype-based plan must name the selected direction.');
+      }
+      state.planItems = items.map<ProductionPlanItem>(item => ({
+        id: randomUUID(),
+        title: item.title,
+        detail: item.detail || undefined,
+        status: ProductionPlanItemStatus.Pending,
+      }));
+      state.constraints = normalizeStrings(input.constraints);
+      state.acceptanceCriteria = acceptanceCriteria;
+      state.expectedArtifacts = expectedArtifacts;
+      state.expectedVerifiers = expectedVerifiers;
+      state.selectedDirection = selectedDirection;
+      state.progressVersion += 1;
+      this.transition(state, ProductionLoopPhase.Execute);
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.PlanCommitted,
+        mechanism: 'production_loop',
+        evidence: {
+          itemCount: state.planItems.length,
+          acceptanceCriterionCount: state.acceptanceCriteria.length,
+        },
+      });
+    });
+  }
+
+  updatePlanItem(
+    runId: string,
+    itemId: string,
+    status: ProductionPlanItemStatus,
+  ): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (
+        state.phase !== ProductionLoopPhase.Execute &&
+        state.phase !== ProductionLoopPhase.Revise
+      ) {
+        throw new Error('Plan items can only be updated while executing or revising.');
+      }
+      const item = state.planItems.find(candidate => candidate.id === itemId);
+      if (!item) throw new Error(`Production plan item not found: ${itemId}`);
+      if (!Object.values(ProductionPlanItemStatus).includes(status)) {
+        throw new Error(`Invalid production plan item status: ${String(status)}`);
+      }
+      if (item.status !== status) {
+        item.status = status;
+        state.progressVersion += 1;
+      }
+    });
+  }
+
+  startInspection(runId: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.planItems.some(item => item.status !== ProductionPlanItemStatus.Completed)) {
+        throw new Error('Every production plan item must be completed before inspection.');
+      }
+      this.transition(state, ProductionLoopPhase.Inspect);
+      state.progressVersion += 1;
+    });
+  }
+
+  requestCritique(runId: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      this.transition(state, ProductionLoopPhase.Critique);
+      state.status = ProductionLoopStatus.WaitingCritic;
+      state.critic = {
+        requested: true,
+        toolCallId: null,
+        passed: false,
+        findings: [],
+        outputSummary: null,
+      };
+      state.progressVersion += 1;
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.CriticRequested,
+        mechanism: 'production_loop_reviewer',
+      });
+    });
+  }
+
+  recordCriticStart(runId: string, toolCallId: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.phase !== ProductionLoopPhase.Critique || !state.critic.requested) {
+        throw new Error('The production loop is not waiting for a critic.');
+      }
+      state.critic.toolCallId = toolCallId;
+    });
+  }
+
+  recordCriticResult(
+    runId: string,
+    toolCallId: string,
+    output: string,
+    isError: boolean,
+  ): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.critic.toolCallId !== toolCallId) return;
+      const result = parseCriticPayload(output, isError);
+      state.critic.outputSummary = output.slice(0, MAX_CRITIC_OUTPUT_LENGTH);
+      state.critic.findings = result.findings;
+      state.critic.passed = result.verdict === 'pass';
+      state.progressVersion += 1;
+      if (result.verdict === 'pass') {
+        this.transition(state, ProductionLoopPhase.Deliver);
+        state.status = ProductionLoopStatus.ReadyToDeliver;
+        return;
+      }
+      this.transition(state, ProductionLoopPhase.Revise);
+      state.status = ProductionLoopStatus.NeedsRevision;
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.CriticRejected,
+        mechanism: 'production_loop_reviewer',
+        evidence: { findingCount: result.findings.length },
+      });
+    });
+  }
+
+  recordRevision(
+    runId: string,
+    summary: string,
+    evidence: WorkbenchJsonObject,
+  ): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.phase !== ProductionLoopPhase.Revise) {
+        throw new Error('Revisions can only be recorded after critic findings.');
+      }
+      const normalizedSummary = summary.trim();
+      if (!normalizedSummary) throw new Error('A revision requires a summary.');
+      state.revisions.push({ summary: normalizedSummary, evidence, createdAt: Date.now() });
+      state.status = ProductionLoopStatus.Active;
+      state.progressVersion += 1;
+      this.transition(state, ProductionLoopPhase.Inspect);
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.RevisionApplied,
+        mechanism: 'production_loop',
+        evidence: { revisionCount: state.revisions.length },
+      });
+    });
+  }
+
+  recordRecovery(
+    runId: string,
+    reason: ProductionLoopRecoveryReason,
+    detail: string,
+  ): ProductionLoopState {
+    return this.mutate(runId, state => {
+      state.recoveries.push({ reason, detail, createdAt: Date.now() });
+      if (state.progressVersion === state.lastObservedProgressVersion) state.staleCount += 1;
+      else state.staleCount = 0;
+      state.lastObservedProgressVersion = state.progressVersion;
+      this.measurement.recordActivation(runId, {
+        activation:
+          reason === ProductionLoopRecoveryReason.StaleProgress
+            ? HarnessActivationType.StaleIterationPivoted
+            : HarnessActivationType.RecoveryTriggered,
+        mechanism: 'production_loop',
+        evidence: { reason, staleCount: state.staleCount },
+      });
+    });
+  }
+
+  recordDeliveryRequest(runId: string, reason: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.status !== ProductionLoopStatus.ReadyToDeliver) {
+        throw new Error('The production loop is not ready to deliver.');
+      }
+      state.deliveryReason = reason.trim() || 'Production loop completed.';
+    });
+  }
+
+  recordVerificationResult(
+    runId: string,
+    outcome: WorkbenchVerificationOutcome,
+    summary: string,
+  ): ProductionLoopState | null {
+    if (!this.repository.get(runId)) return null;
+    return this.mutate(runId, state => {
+      if (state.status !== ProductionLoopStatus.ReadyToDeliver || !state.deliveryReason) {
+        throw new Error('The production loop cannot complete before delivery is requested.');
+      }
+      if (outcome === WorkbenchVerificationOutcome.Passed) {
+        state.status = ProductionLoopStatus.Completed;
+        return;
+      }
+      if (outcome === WorkbenchVerificationOutcome.AcceptanceRequired) return;
+      this.transition(state, ProductionLoopPhase.Revise);
+      state.status = ProductionLoopStatus.NeedsRevision;
+      state.critic = {
+        requested: false,
+        toolCallId: null,
+        passed: false,
+        findings: [
+          {
+            severity: ProductionCriticSeverity.Major,
+            summary: 'Deterministic completion verification failed.',
+            evidence: summary,
+          },
+        ],
+        outputSummary: null,
+      };
+      state.deliveryReason = null;
+    });
+  }
+
+  deleteSession(sessionId: string): void {
+    this.repository.deleteForSession(sessionId);
+  }
+
+  private mutate(
+    runId: string,
+    operation: (state: ProductionLoopState) => void,
+  ): ProductionLoopState {
+    return this.repository.transaction(() => {
+      const state = this.repository.get(runId);
+      if (!state) throw new Error(`Production loop not found: ${runId}`);
+      operation(state);
+      return this.repository.update(state);
+    });
+  }
+
+  private transition(state: ProductionLoopState, phase: ProductionLoopPhase): void {
+    assertProductionLoopTransition(state.phase, phase);
+    state.phase = phase;
+  }
+}

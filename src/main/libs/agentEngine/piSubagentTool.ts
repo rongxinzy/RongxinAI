@@ -249,6 +249,9 @@ async function runSubagent(
       // No customTools: subagents must not recursively spawn sub-subagents,
       // and AskUserQuestion is reserved for the parent session.
     };
+    if (profile.id === 'reviewer' || profile.id === 'planner' || profile.id === 'scout') {
+      subOptions.tools = ['read', 'grep', 'find', 'ls'];
+    }
     const researcherUsesWebSearch = profile.id === 'researcher' && Boolean(deps.webSearchSkillPath);
     const systemPrompt = researcherUsesWebSearch
       ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill with Bash:\n` +

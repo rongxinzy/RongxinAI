@@ -54,6 +54,8 @@ import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
+import { ProductionLoopController } from '../../productionLoop/controller';
+import { buildProductionLoopTool } from '../../productionLoop/tool';
 import {
   type ApiConfigResolution,
   resolveRawApiConfig,
@@ -214,6 +216,7 @@ interface ActivePiSession {
   shortcutWorkflow: PiShortcutWorkflowController | null;
   /** Present for arbitrary skills loaded in Work mode. */
   workExecution: PiWorkExecutionController | null;
+  productionLoop: ProductionLoopController | null;
   /** Whether this Work session was explicitly started in Goal mode. */
   goalMode: boolean;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
@@ -487,6 +490,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
     const abortController = new AbortController();
     let workbenchRunId: string | null = null;
+    let workbenchTaskId: string | null = null;
 
     try {
       const workspaceRoot = options.workspaceRoot || process.cwd();
@@ -522,6 +526,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           preparedRunId: options._workbenchRunId,
         });
         workbenchRunId = workbench.run.id;
+        workbenchTaskId = workbench.task?.id ?? null;
       }
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
@@ -714,13 +719,31 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // Agent loop tool: lets the LLM drive multi-iteration long-horizon
       // loops; the controller continues the session on agent_end.
       const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
+      const productionLoop =
+        options.sessionMode === CoworkSessionMode.Work &&
+        workbenchTaskId &&
+        workbenchRunId &&
+        this.workbenchTaskService?.productionLoop
+          ? new ProductionLoopController(
+              this.workbenchTaskService.productionLoop,
+              {
+                taskId: workbenchTaskId,
+                runId: workbenchRunId,
+                workflowKind: workbenchContract.kind,
+                goal: prompt,
+                prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
+              },
+              completionWorkflow || undefined,
+            )
+          : null;
+      if (productionLoop) customTools.push(buildProductionLoopTool(productionLoop));
       const shouldRunGoalLoop =
         options.goalMode === true && options.sessionMode === CoworkSessionMode.Work;
       const workLoop = createPiWorkLoop({
-        goal: completionWorkflow?.goal || prompt,
-        completionWorkflow: completionWorkflow || undefined,
+        goal: productionLoop?.goal || completionWorkflow?.goal || prompt,
+        completionWorkflow: productionLoop || completionWorkflow || undefined,
         onActivation: recordActivation,
-        start: Boolean(completionWorkflow || shouldRunGoalLoop),
+        start: Boolean(productionLoop || completionWorkflow || shouldRunGoalLoop),
       });
       const agentLoop = workLoop.controller;
       const workLoopPrompt = workExecution || shouldRunGoalLoop ? workLoop.initialPrompt : '';
@@ -765,6 +788,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         researchRun,
         shortcutWorkflow,
         workExecution,
+        productionLoop,
         goalMode: options.goalMode === true,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
         pendingError: null,
@@ -797,6 +821,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (workExecution || shouldRunGoalLoop) {
         initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
       }
+      if (productionLoop) {
+        initialPrompt = `${productionLoop.buildInitialPrompt()}\n\n${initialPrompt}`;
+      }
 
       // The user may stop the session while the execution-mode question is
       // open. Do not revive an aborted Pi turn when that question resolves.
@@ -810,7 +837,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
-      this.workbenchTaskService?.failRun(sessionId, { message });
+      this.workbenchTaskService?.failRun?.(sessionId, { message });
       this.emit('error', sessionId, classifyCoworkError(message));
       throw error;
     }
@@ -935,6 +962,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workbench.run.id,
         active.harnessModelProfile,
       );
+      if (workbench.task?.id) {
+        active.productionLoop?.startRun({
+          taskId: workbench.task.id,
+          runId: workbench.run.id,
+          workflowKind: workbenchContract.kind,
+          goal: prompt,
+          prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
+        });
+      }
     }
 
     // Reset turn state
@@ -973,8 +1009,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     let nextPrompt = prompt;
-    const completionWorkflow =
+    const domainCompletionWorkflow =
       active.researchRun || active.shortcutWorkflow || active.workExecution;
+    const completionWorkflow = active.productionLoop || domainCompletionWorkflow;
     if (options.goalMode !== undefined && !completionWorkflow) {
       active.goalMode = options.goalMode;
       if (!active.goalMode && active.agentLoop.getState().active) {
@@ -984,7 +1021,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const shouldRunGoalLoop =
       active.goalMode && active.workbenchContract.kind !== WorkbenchContractKind.Chat;
     if ((completionWorkflow || shouldRunGoalLoop) && !active.agentLoop.getState().active) {
-      completionWorkflow?.resumeForPrompt(prompt);
+      domainCompletionWorkflow?.resumeForPrompt(prompt);
       const loopPrompt = active.agentLoop.start({
         mode: PiAgentLoopMode.Goal,
         goal: completionWorkflow?.goal || prompt,
@@ -1655,6 +1692,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         );
         if (runningActivity) this.emit('toolActivity', sessionId, runningActivity);
         if (event.toolName === PiSubagentToolName) {
+          active.productionLoop?.recordSubagentStart(event.toolCallId, event.args);
           active.researchRun?.recordSubagentStart(event.toolCallId, event.args);
           active.shortcutWorkflow?.recordSubagentStart(event.toolCallId, event.args);
         }
@@ -1695,6 +1733,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           );
         }
         if (event.toolName === PiSubagentToolName) {
+          active.productionLoop?.recordSubagentResult(
+            event.toolCallId,
+            resultText,
+            Boolean(event.isError),
+          );
           active.researchRun?.recordSubagentResult(
             event.toolCallId,
             resultText,
@@ -1834,7 +1877,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.pendingError = null;
     active.turnFailed = true;
     active.isRunning = false;
-    this.workbenchTaskService?.failRun(sessionId, { message: pending.message });
+    this.workbenchTaskService?.failRun?.(sessionId, { message: pending.message });
     // Persist a system error message so the error survives session switching
     // and is visible in the message list. The classified kind lets the renderer
     // translate it into a user-friendly i18n message; the raw message is kept
