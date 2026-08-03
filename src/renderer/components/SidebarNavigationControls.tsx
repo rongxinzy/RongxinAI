@@ -1,7 +1,6 @@
-import { Button } from '@shared/components/ui/button';
+﻿import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
-import { Activity } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
 import { useSelector } from 'react-redux';
@@ -15,6 +14,10 @@ import {
   SidebarAnimatedAlarmClockIcon,
   type SidebarAnimatedAlarmClockIconHandle,
 } from './icons/SidebarAnimatedAlarmClockIcon';
+import {
+  SidebarAnimatedActivityIcon,
+  type SidebarAnimatedActivityIconHandle,
+} from './icons/SidebarAnimatedActivityIcon';
 import {
   SidebarAnimatedBotIcon,
   type SidebarAnimatedBotIconHandle,
@@ -70,6 +73,7 @@ export const SidebarNavigationControls = ({
 }: SidebarNavigationControlsProps) => {
   const hasActiveChannelRun = useSelector((state: RootState) => selectHasActiveChannelRun(state));
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
+  const activityIconRef = useRef<SidebarAnimatedActivityIconHandle>(null);
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
   const expertIconRef = useRef<SidebarAnimatedUsersIconHandle>(null);
@@ -180,14 +184,18 @@ export const SidebarNavigationControls = ({
           type="button"
           variant="ghost"
           onClick={onShowActivity}
-          onMouseEnter={() => onPrefetchView?.('activity')}
+          onMouseEnter={() => {
+            startIconAnimation(activityIconRef);
+            onPrefetchView?.('activity');
+          }}
           onFocus={() => onPrefetchView?.('activity')}
+          onMouseLeave={() => activityIconRef.current?.stopAnimation()}
           className={
             activeView === 'activity' ? activeSidebarNavItemClassName : sidebarNavItemClassName
           }
           aria-current={activeView === 'activity' ? 'page' : undefined}
         >
-          <Activity data-icon="inline-start" />
+          <SidebarAnimatedActivityIcon ref={activityIconRef} />
           {i18nService.t('activityTitle')}
           {hasActiveChannelRun && (
             <span
