@@ -45,6 +45,11 @@ import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { TriageIpcChannel } from '../shared/triage';
 import { WorkspaceIpc } from '../shared/workspace';
+import {
+  WorkbenchTaskIpc,
+  type WorkbenchApprovalResponseInput,
+  type WorkbenchTaskChangedEvent,
+} from '../shared/workbenchTask';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 
@@ -558,6 +563,18 @@ contextBridge.exposeInMainWorld('electron', {
       onPush(CoworkStreamIpc.Error, callback),
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) =>
       onPush(CoworkStreamIpc.SessionsChanged, callback),
+  },
+
+  workbenchTask: {
+    getCurrent: (sessionId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.GetCurrent, sessionId),
+    getDetail: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.GetDetail, taskId),
+    resume: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Resume, taskId),
+    retry: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Retry, taskId),
+    accept: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Accept, taskId),
+    respondToApproval: (input: WorkbenchApprovalResponseInput) =>
+      ipcRenderer.invoke(WorkbenchTaskIpc.RespondToApproval, input),
+    onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) =>
+      onPush(WorkbenchTaskIpc.Changed, callback),
   },
 
   dialog: {
