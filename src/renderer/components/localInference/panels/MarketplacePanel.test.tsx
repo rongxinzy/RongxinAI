@@ -250,7 +250,7 @@ describe('MarketplacePanel search and filters', () => {
   test('recommendations do not show a device fit selector', () => {
     renderPanel({ hasSearched: true, models: [makeModel('alpha')] });
 
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).not.toBeInTheDocument();
     expect(screen.queryByText(/\u4e0d\u9650\u9002\u914d/)).not.toBeInTheDocument();
   });
   test('switching the fit filter to "不限" re-searches the whole catalogue', async () => {
@@ -262,9 +262,10 @@ describe('MarketplacePanel search and filters', () => {
     renderPanel({ hasSearched: true, models: [makeModel('alpha')], onSearch });
 
     await user.click(screen.getByRole('button', { name: '\u5168\u90e8\u6a21\u578b' }));
-    await user.click(screen.getByRole('combobox'));
+    const fitSelector = screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' });
+    await user.click(fitSelector);
     await user.click(await screen.findByRole('option', { name: '\u53ef\u8fd0\u884c' }));
-    await user.click(screen.getByRole('combobox'));
+    await user.click(fitSelector);
     await user.click(await screen.findByRole('option', { name: '\u4e0d\u9650' }));
 
     expect(lastSearchCall(onSearch)).toEqual(

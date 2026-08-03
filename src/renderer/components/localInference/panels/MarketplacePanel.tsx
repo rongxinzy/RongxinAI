@@ -382,7 +382,7 @@ export function MarketplacePanel({
                   {i18nService.t('marketplaceFilterFit')}
                 </span>
                 <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-                  <SelectTrigger size="sm" className="min-w-32">
+                  <SelectTrigger size="sm" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32">
                     <SelectValue>{fitFilterLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
