@@ -1,5 +1,5 @@
 export { resolveCodingPlanBaseUrl } from './codingPlan';
-export type { ModelCapabilities, ProviderDef } from './constants';
+export type { ModelCapabilities, ProviderDef, ProviderModelDefinition } from './constants';
 export {
   ApiFormat,
   AuthType,
@@ -26,3 +26,20 @@ export {
 export type { ProviderModelPiRuntimeCompat, ProviderModelPiRuntimeConfig } from './piRuntime';
 export type { ProviderConfig } from './types';
 export { isProviderEnabled } from './types';
+export {
+  clampRuntimeContextWindow,
+  createLlamaCppRuntimeSnapshot,
+  createOllamaRuntimeSnapshot,
+  parseLlamaCppRuntimeCapabilities,
+  parseOllamaRuntimeCapabilities,
+  parseLlamaCppRuntimeSnapshot,
+  parseOllamaRuntimeSnapshot,
+  resolveModelEndpoint,
+} from './modelEndpoint';
+export type {
+  ResolveModelEndpointOptions,
+  ResolvedModelEndpoint,
+  RuntimeModelKind,
+  RuntimeModelSnapshot,
+  RuntimeModelStatus,
+} from './modelEndpoint';

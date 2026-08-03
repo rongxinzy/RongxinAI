@@ -3,6 +3,10 @@ import {
   ModelCapabilityStatus,
   ProviderName,
 } from '../../shared/providers';
+import {
+  parseLlamaCppRuntimeCapabilities,
+  parseOllamaRuntimeCapabilities,
+} from '../../shared/providers/modelEndpoint';
 
 type CapabilityProbeConfig = {
   apiKey: string;
@@ -56,44 +60,11 @@ export function parseOpenRouterModelCapabilities(
 }
 
 export function parseOllamaModelCapabilities(payload: unknown): Partial<ModelCapabilities> {
-  if (!isRecord(payload)) return {};
-  const declaredCapabilities = stringArray(payload.capabilities);
-  if (!declaredCapabilities) return {};
-
-  return {
-    toolCalling: capabilityStatus(declaredCapabilities.includes('tools')),
-    imageInput: capabilityStatus(declaredCapabilities.includes('vision')),
-    ...(declaredCapabilities.includes('thinking')
-      ? { reasoning: ModelCapabilityStatus.Supported }
-      : {}),
-  };
+  return parseOllamaRuntimeCapabilities(payload);
 }
 
 export function parseLlamaCppModelCapabilities(payload: unknown): Partial<ModelCapabilities> {
-  if (!isRecord(payload)) return {};
-  const capabilities: MutableModelCapabilities = {};
-  const templateCapabilities = isRecord(payload.chat_template_caps)
-    ? payload.chat_template_caps
-    : undefined;
-  const toolCapabilityKeys = ['supports_tools', 'supports_tool_calls', 'tools', 'tool_use'];
-  const declaredToolCapabilities = toolCapabilityKeys
-    .map(key => templateCapabilities?.[key])
-    .filter((value): value is boolean => typeof value === 'boolean');
-  const toolTemplate = payload.chat_template_tool_use;
-
-  if (typeof toolTemplate === 'string' && toolTemplate.trim()) {
-    capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  } else if (declaredToolCapabilities.some(Boolean)) {
-    capabilities.toolCalling = ModelCapabilityStatus.Supported;
-  } else if (declaredToolCapabilities.length > 0) {
-    capabilities.toolCalling = ModelCapabilityStatus.Unsupported;
-  }
-
-  const modalities = isRecord(payload.modalities) ? payload.modalities : undefined;
-  if (typeof modalities?.vision === 'boolean') {
-    capabilities.imageInput = capabilityStatus(modalities.vision);
-  }
-  return capabilities;
+  return parseLlamaCppRuntimeCapabilities(payload);
 }
 
 export function buildOpenRouterModelsUrl(baseUrl: string): string {
@@ -131,7 +102,7 @@ export async function probeRuntimeModelCapabilities(
       const declaredCapabilities = parseLlamaCppModelCapabilities(
         await window.electron.llamacpp.showModel(modelId),
       );
-      if (declaredCapabilities.toolCalling) return declaredCapabilities;
+      if (Object.keys(declaredCapabilities).length > 0) return declaredCapabilities;
 
       const [status, serviceConfig] = await Promise.all([
         window.electron.llamacpp.status(),

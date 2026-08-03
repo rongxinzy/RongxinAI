@@ -5,6 +5,8 @@ import {
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
+  resolveModelEndpoint,
+  type ResolvedModelEndpoint,
 } from '../../shared/providers';
 import { store } from '../store';
 import type { Model } from '../store/slices/modelSlice';
@@ -28,6 +30,7 @@ export interface ApiConfig {
   baseUrl: string;
   provider?: string;
   apiFormat?: 'anthropic' | 'openai' | 'gemini';
+  endpoint?: ResolvedModelEndpoint;
 }
 
 interface TokenUsage {
@@ -149,14 +152,45 @@ class ApiService {
     config: ApiConfig,
   ): Promise<ModelCapabilities> {
     const apiFormat = this.normalizeApiFormat(config.apiFormat);
-    const declared = ProviderRegistry.resolveModelCapabilities(
-      provider,
-      model.id,
-      apiFormat,
-      model,
-    );
+    const endpoint =
+      config.endpoint ??
+      resolveModelEndpoint(provider, model.id, {
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        apiFormat,
+        modelConfig: {
+          id: model.id,
+          name: model.name,
+          supportsImage:
+            model.supportsImage === true
+              ? true
+              : undefined,
+          capabilities: model.capabilities,
+          contextWindow: model.contextWindow,
+        },
+      });
+    const declared = { ...endpoint.capabilities };
+    if (
+      (provider === ProviderName.LlamaCpp || provider === ProviderName.Ollama) &&
+      model.supportsImage !== true &&
+      model.capabilities?.imageInput === undefined
+    ) {
+      declared.imageInput = ModelCapabilityStatus.Unknown;
+    }
     const detected = await this.getRuntimeModelCapabilities(provider, model.id, config);
-    return { ...declared, ...detected };
+    // Local model preferences are attached to the selected runtime model rather
+    // than to the provider-level config used to build the endpoint. Preserve
+    // those explicit values after applying runtime evidence.
+    const selectedModelCapabilities =
+      provider === ProviderName.LlamaCpp || provider === ProviderName.Ollama
+        ? model.capabilities
+        : undefined;
+    const capabilities = {
+      ...declared,
+      ...detected,
+      ...(selectedModelCapabilities ?? {}),
+    };
+    return capabilities;
   }
 
   private buildOpenAICompatibleChatCompletionsUrl(baseUrl: string): string {
@@ -372,6 +406,8 @@ class ApiService {
       return 'openai';
     } else if (normalizedModelId.startsWith('gemini')) {
       return 'gemini';
+    } else if (normalizedModelId.startsWith('grok')) {
+      return 'grok';
     } else if (normalizedModelId.startsWith('deepseek')) {
       return 'deepseek';
     } else if (normalizedModelId.startsWith('kimi-')) {
@@ -398,7 +434,7 @@ class ApiService {
   }
 
   // 获取指定 provider 的配置
-  private getProviderConfig(provider: string): ApiConfig | null {
+  private getProviderConfig(provider: string, modelId?: string): ApiConfig | null {
     const appConfig = configService.getConfig();
 
     if (appConfig?.providers?.[provider]) {
@@ -419,11 +455,27 @@ class ApiService {
           apiFormat = resolved.effectiveFormat;
         }
 
+        const endpoint = resolveModelEndpoint(
+          provider,
+          modelId ?? providerConfig.models?.[0]?.id ?? '',
+          {
+            providerConfig,
+            apiKey: providerConfig.apiKey,
+            baseUrl,
+            apiFormat,
+            modelConfig: modelId
+              ? providerConfig.models?.find(
+                  model => model.id.toLowerCase() === modelId.toLowerCase(),
+                )
+              : undefined,
+          },
+        );
         return {
           apiKey: providerConfig.apiKey,
           baseUrl,
           provider: provider,
           apiFormat,
+          endpoint,
         };
       }
     }
@@ -470,10 +522,11 @@ class ApiService {
 
     // 尝试获取模型对应 provider 的配置
     let effectiveConfig = this.config;
-    const providerConfig = this.getProviderConfig(provider);
+    const providerConfig = this.getProviderConfig(provider, selectedModel.id);
     if (providerConfig) {
       effectiveConfig = providerConfig;
     }
+    const effectiveModelId = effectiveConfig.endpoint?.modelId ?? selectedModel.id;
 
     if (this.providerRequiresApiKey(provider) && !effectiveConfig.apiKey) {
       throw new ApiError(
@@ -493,7 +546,7 @@ class ApiService {
     );
     const supportsImages = capabilities.imageInput === ModelCapabilityStatus.Supported;
     console.log(
-      `[api-chat] provider=${provider}, model=${selectedModel.id}, apiFormat=${normalizedApiFormat}, baseUrl=${effectiveConfig.baseUrl}`,
+      `[api-chat] provider=${provider}, model=${effectiveModelId}, apiFormat=${normalizedApiFormat}, baseUrl=${effectiveConfig.baseUrl}`,
     );
 
     if (normalizedApiFormat === 'gemini') {
@@ -501,7 +554,7 @@ class ApiService {
         userMessage,
         onProgress,
         history,
-        selectedModel.id,
+        effectiveModelId,
         effectiveConfig,
         supportsImages,
         streamRequestId,
@@ -513,7 +566,7 @@ class ApiService {
         userMessage,
         onProgress,
         history,
-        selectedModel.id,
+        effectiveModelId,
         effectiveConfig,
         supportsImages,
         streamRequestId,
@@ -525,7 +578,7 @@ class ApiService {
         userMessage,
         onProgress,
         history,
-        selectedModel.id,
+        effectiveModelId,
         effectiveConfig,
         supportsImages,
         provider,
@@ -546,7 +599,7 @@ class ApiService {
               userMessage,
               onProgress,
               history,
-              selectedModel.id,
+              effectiveModelId,
               effectiveConfig,
               supportsImages,
               provider,
@@ -635,7 +688,8 @@ class ApiService {
       selectedModel.id,
       selectedModel.providerKey ?? selectedModel.provider,
     );
-    const config = this.getProviderConfig(provider) ?? this.config;
+    const config = this.getProviderConfig(provider, selectedModel.id) ?? this.config;
+    const effectiveModelId = config.endpoint?.modelId ?? selectedModel.id;
     if (this.providerRequiresApiKey(provider) && !config.apiKey) {
       throw new ApiError(
         'API key is not configured. Please set your API key in the settings menu.',
@@ -675,7 +729,7 @@ class ApiService {
       return this.runAnthropicWebSearchLoop(
         messages,
         system,
-        selectedModel.id,
+        effectiveModelId,
         config,
         onProgress,
         requestId,
@@ -692,7 +746,7 @@ class ApiService {
       return this.runGeminiWebSearchLoop(
         contents,
         system,
-        selectedModel.id,
+        effectiveModelId,
         config,
         onProgress,
         requestId,
@@ -706,7 +760,7 @@ class ApiService {
       return this.runOpenAIResponsesWebSearchLoop(
         input,
         system,
-        selectedModel.id,
+        effectiveModelId,
         config,
         onProgress,
         requestId,
@@ -723,7 +777,7 @@ class ApiService {
     ];
     return this.runOpenAIWebSearchLoop(
       messages,
-      selectedModel.id,
+      effectiveModelId,
       config,
       provider,
       onProgress,

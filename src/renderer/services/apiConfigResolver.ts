@@ -1,4 +1,9 @@
-import { resolveCodingPlanBaseUrl } from '../../shared/providers';
+import {
+  isProviderEnabled,
+  resolveCodingPlanBaseUrl,
+  resolveModelEndpoint,
+  type ResolvedModelEndpoint,
+} from '../../shared/providers';
 import { configService } from './config';
 
 export interface ResolvedApiConfig {
@@ -6,6 +11,7 @@ export interface ResolvedApiConfig {
   baseUrl: string;
   provider: string;
   apiFormat: 'anthropic' | 'openai' | 'gemini';
+  endpoint?: ResolvedModelEndpoint;
 }
 
 export function normalizeApiFormat(apiFormat: unknown): 'anthropic' | 'openai' | 'gemini' {
@@ -35,7 +41,7 @@ export function shouldUseOpenAIResponsesApi(provider: string): boolean {
 }
 
 export function providerRequiresApiKey(provider: string): boolean {
-  return provider !== 'ollama' && provider !== 'github-copilot';
+  return provider !== 'ollama' && provider !== 'llamacpp' && provider !== 'github-copilot';
 }
 
 export function detectProvider(modelId: string, providerHint?: string): string {
@@ -50,6 +56,7 @@ export function detectProvider(modelId: string, providerHint?: string): string {
       'minimax',
       'qwen',
       'openrouter',
+      'grok',
       'gemini',
       'anthropic',
       'xiaomi',
@@ -57,6 +64,7 @@ export function detectProvider(modelId: string, providerHint?: string): string {
       'volcengine',
       'github-copilot',
       'ollama',
+      'llamacpp',
     ].includes(normalizedHint) ||
       normalizedHint.startsWith('custom_'))
   ) {
@@ -91,11 +99,14 @@ export function detectProvider(modelId: string, providerHint?: string): string {
   return 'openai';
 }
 
-export function getProviderConfig(provider: string): ResolvedApiConfig | null {
+export function getProviderConfig(provider: string, modelId?: string): ResolvedApiConfig | null {
   const appConfig = configService.getConfig();
   if (appConfig?.providers?.[provider]) {
     const providerConfig = appConfig.providers[provider];
-    if (providerConfig.enabled && (providerConfig.apiKey || !providerRequiresApiKey(provider))) {
+    if (
+      isProviderEnabled(provider, providerConfig) &&
+      (providerConfig.apiKey || !providerRequiresApiKey(provider))
+    ) {
       let baseUrl = providerConfig.baseUrl;
       let apiFormat = normalizeApiFormat(providerConfig.apiFormat);
 
@@ -113,6 +124,12 @@ export function getProviderConfig(provider: string): ResolvedApiConfig | null {
         baseUrl,
         provider,
         apiFormat,
+        endpoint: resolveModelEndpoint(provider, modelId ?? providerConfig.models?.[0]?.id ?? '', {
+          providerConfig,
+          apiKey: providerConfig.apiKey,
+          baseUrl,
+          apiFormat,
+        }),
       };
     }
   }

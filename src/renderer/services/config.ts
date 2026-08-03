@@ -63,20 +63,33 @@ const normalizeProviderModels = (
   models: ProviderConfig['models'],
   apiFormat: ApiFormat,
 ): ProviderConfig['models'] =>
-  models?.map(model => ({
-    ...model,
-    supportsImage: ProviderRegistry.resolveModelSupportsImage(
-      providerKey,
-      model.id,
-      model.supportsImage,
-    ),
-    capabilities: ProviderRegistry.resolveModelCapabilities(
-      providerKey,
-      model.id,
-      apiFormat,
-      model,
-    ),
-  }));
+  models?.map(model => {
+    const catalogModel = ProviderRegistry.getModel(providerKey, model.id);
+    const catalogCapacity = catalogModel
+      ? {
+          ...(typeof catalogModel.contextWindow === 'number' && catalogModel.contextWindow > 0
+            ? { contextWindow: catalogModel.contextWindow }
+            : {}),
+          ...(typeof catalogModel.maxTokens === 'number' && catalogModel.maxTokens > 0
+            ? { maxTokens: catalogModel.maxTokens }
+            : {}),
+        }
+      : {};
+    const supportsImage = model.supportsImage ?? catalogModel?.supportsImage;
+    return {
+      ...catalogCapacity,
+      ...model,
+      ...(supportsImage === undefined ? {} : { supportsImage }),
+      capabilities:
+        model.capabilities ??
+        (catalogModel
+          ? ProviderRegistry.resolveModelCapabilities(providerKey, model.id, apiFormat, {
+              ...model,
+              ...(supportsImage === undefined ? {} : { supportsImage }),
+            })
+          : undefined),
+    };
+  });
 
 const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig['providers'] => {
   if (!providers) {
@@ -175,7 +188,7 @@ const ADDED_PROVIDER_MODELS: Record<
         id: 'kimi-k3',
         name: 'Kimi K3',
         supportsImage: true,
-        contextWindow: 1_048_576,
+        contextWindow: 1_000_000,
         maxTokens: 131_072,
       },
       {
@@ -263,6 +276,27 @@ const ADDED_PROVIDER_MODELS: Record<
   },
   openai: {
     models: [
+      {
+        id: 'gpt-5.6-sol',
+        name: 'GPT-5.6 Sol',
+        supportsImage: true,
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'gpt-5.6-terra',
+        name: 'GPT-5.6 Terra',
+        supportsImage: true,
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+      },
+      {
+        id: 'gpt-5.6-luna',
+        name: 'GPT-5.6 Luna',
+        supportsImage: true,
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+      },
       { id: 'gpt-5.4', name: 'GPT-5.4', supportsImage: true },
       { id: 'gpt-5.2', name: 'GPT-5.2', supportsImage: true },
       { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex', supportsImage: true },

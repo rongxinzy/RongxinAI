@@ -51,7 +51,6 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
-import { PiRuntimeModelConfig } from './settings/PiRuntimeModelConfig';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -122,6 +121,7 @@ import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
 import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
 import { ModelCapabilitySettingsModal } from './localInference/components/ModelCapabilitySettingsModal';
 import { localInferenceCompactButtonClass } from './localInference/constants';
+import { ModelCapabilitiesFields, type ModelCapabilityKey } from './settings/ModelCapabilitiesFields';
 import type { EmailSettingsHandle } from './settings/email/types';
 
 type TabType =
@@ -202,23 +202,33 @@ const resolveModelSupportsImageForProvider = (
 ): boolean =>
   ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage);
 
-const CUSTOM_MODEL_CAPABILITY_FIELDS = [
-  { key: 'toolCalling', labelKey: 'capabilityToolCalling' },
-  { key: 'videoInput', labelKey: 'capabilityVideoInput' },
-  { key: 'audioInput', labelKey: 'capabilityAudioInput' },
-  { key: 'documentInput', labelKey: 'capabilityDocumentInput' },
-  { key: 'reasoning', labelKey: 'capabilityReasoning' },
-] as const satisfies ReadonlyArray<{
-  key: Exclude<keyof ModelCapabilities, 'imageInput'>;
-  labelKey: string;
-}>;
-
 const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
   toolCalling: ModelCapabilityStatus.Unknown,
   videoInput: ModelCapabilityStatus.Unknown,
   audioInput: ModelCapabilityStatus.Unknown,
   documentInput: ModelCapabilityStatus.Unknown,
   reasoning: ModelCapabilityStatus.Unknown,
+};
+
+const CUSTOM_MODEL_CAPABILITY_KEYS: readonly ModelCapabilityKey[] = [
+  'toolCalling',
+  'videoInput',
+  'audioInput',
+  'documentInput',
+  'reasoning',
+];
+
+const TOKENS_PER_K = 1024;
+
+const formatTokenK = (tokens?: number): string => {
+  if (!tokens || !Number.isFinite(tokens) || tokens <= 0) return '';
+  return String(Number((tokens / TOKENS_PER_K).toFixed(2)));
+};
+
+const parseTokenK = (value: string): number | undefined => {
+  const parsed = Number.parseFloat(value.trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+  return Math.round(parsed * TOKENS_PER_K);
 };
 
 interface ProviderExportEntry {
@@ -830,6 +840,8 @@ const Settings: React.FC<SettingsProps> = ({
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
   const [newModelSupportsImage, setNewModelSupportsImage] = useState(false);
+  const [newModelContextWindow, setNewModelContextWindow] = useState('');
+  const [newModelMaxTokens, setNewModelMaxTokens] = useState('');
   const [newModelCapabilities, setNewModelCapabilities] = useState<Partial<ModelCapabilities>>(
     DEFAULT_CUSTOM_MODEL_CAPABILITIES,
   );
@@ -840,6 +852,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [llamaCapabilityModel, setLlamaCapabilityModel] = useState<Model | null>(null);
   const [llamaCapabilityPreference, setLlamaCapabilityPreference] =
     useState<LlamaCppModelPreference>();
+  const [ollamaCapabilityModel, setOllamaCapabilityModel] = useState<Model | null>(null);
 
   // About tab
   const [appVersion, setAppVersion] = useState('');
@@ -1381,6 +1394,8 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelContextWindow('');
+    setNewModelMaxTokens('');
     setModelFormError(null);
   };
 
@@ -2237,6 +2252,8 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelContextWindow('');
+    setNewModelMaxTokens('');
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
     setModelFormError(null);
@@ -2248,6 +2265,8 @@ const Settings: React.FC<SettingsProps> = ({
     supportsImage?: boolean,
     capabilities?: Partial<ModelCapabilities>,
     piRuntime?: ProviderModelPiRuntimeConfig,
+    contextWindow?: number,
+    maxTokens?: number,
   ) => {
     setIsAddingModel(false);
     setIsEditingModel(true);
@@ -2255,6 +2274,8 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName(modelName);
     setNewModelId(modelId);
     setNewModelSupportsImage(!!supportsImage);
+    setNewModelContextWindow(formatTokenK(contextWindow));
+    setNewModelMaxTokens(formatTokenK(maxTokens));
     setNewModelCapabilities({ ...DEFAULT_CUSTOM_MODEL_CAPABILITIES, ...capabilities });
     setNewModelPiRuntime(piRuntime);
     setModelFormError(null);
@@ -2315,6 +2336,16 @@ const Settings: React.FC<SettingsProps> = ({
           : modelId
         : newModelName.trim();
 
+    const contextWindow = parseTokenK(newModelContextWindow);
+    const maxTokens = parseTokenK(newModelMaxTokens);
+    if (
+      (newModelContextWindow.trim() && contextWindow === undefined) ||
+      (newModelMaxTokens.trim() && maxTokens === undefined)
+    ) {
+      setModelFormError(i18nService.t('modelContextWindowInvalid'));
+      return;
+    }
+
     const currentModels = providers[activeProvider].models ?? [];
     const duplicateModel = currentModels.find(
       model => model.id === modelId && (!isEditingModel || model.id !== editingModelId),
@@ -2327,11 +2358,21 @@ const Settings: React.FC<SettingsProps> = ({
     const nextModel = {
       id: modelId,
       name: modelName,
-      supportsImage: ProviderRegistry.resolveModelSupportsImage(
-        activeProvider,
-        modelId,
-        newModelSupportsImage,
-      ),
+      ...(activeProvider === ProviderName.Ollama
+        ? {}
+        : isCustomProvider(activeProvider)
+          ? newModelSupportsImage
+            ? { supportsImage: true }
+            : {}
+          : {
+              supportsImage: ProviderRegistry.resolveModelSupportsImage(
+                activeProvider,
+                modelId,
+                newModelSupportsImage,
+              ),
+            }),
+      ...(contextWindow ? { contextWindow } : {}),
+      ...(maxTokens ? { maxTokens } : {}),
       ...(isCustomProvider(activeProvider) ? { capabilities: newModelCapabilities } : {}),
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
@@ -2356,6 +2397,8 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelContextWindow('');
+    setNewModelMaxTokens('');
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
     setModelFormError(null);
@@ -2368,6 +2411,8 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelName('');
     setNewModelId('');
     setNewModelSupportsImage(false);
+    setNewModelContextWindow('');
+    setNewModelMaxTokens('');
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
     setModelFormError(null);
@@ -2380,6 +2425,10 @@ const Settings: React.FC<SettingsProps> = ({
       return;
     }
     if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+        return;
+      }
       e.preventDefault();
       handleSaveNewModel();
     }
@@ -4830,17 +4879,27 @@ const Settings: React.FC<SettingsProps> = ({
                                   type="button"
                                   variant="ghost"
                                   size="icon-xs"
-                                  onClick={() =>
+                                  onClick={() => {
+                                    if (activeProvider === ProviderName.Ollama) {
+                                      setOllamaCapabilityModel(model);
+                                      return;
+                                    }
                                     handleEditModel(
                                       model.id,
                                       model.name,
                                       model.supportsImage,
                                       model.capabilities,
                                       model.piRuntime,
-                                    )
-                                  }
-                                  aria-label={`${i18nService.t('editModel')} ${model.name}`}
-                                  title={i18nService.t('editModel')}
+                                      model.contextWindow,
+                                      model.maxTokens,
+                                    );
+                                  }}
+                                  aria-label={`${i18nService.t(activeProvider === ProviderName.Ollama ? 'modelCapabilities' : 'editModel')} ${model.name}`}
+                                  title={i18nService.t(
+                                    activeProvider === ProviderName.Ollama
+                                      ? 'modelCapabilities'
+                                      : 'editModel',
+                                  )}
                                   className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground [&_svg]:size-3.5"
                                 >
                                   <Pencil />
@@ -5240,7 +5299,11 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   return (
-    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 ring-0! bg-transparent">
+    <Modal
+      onClose={onClose}
+      preventOutsideClose
+      className="w-auto sm:max-w-none p-0 ring-0! bg-transparent"
+    >
       <div
         className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content bg-surface shadow-modal border border-border"
         onClick={handleSettingsClick}
@@ -5470,13 +5533,12 @@ const Settings: React.FC<SettingsProps> = ({
               {modelFormError && <p className="mb-3 text-xs text-destructive">{modelFormError}</p>}
 
               <Tabs defaultValue="basic" className="gap-4">
-                {isCustomProvider(activeProvider) && (
-                  <TabsList className="grid w-full grid-cols-3">
+                {(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama) && (
+                  <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="basic">{i18nService.t('modelName')}</TabsTrigger>
                     <TabsTrigger value="capabilities">
                       {i18nService.t('modelCapabilities')}
                     </TabsTrigger>
-                    <TabsTrigger value="work">{i18nService.t('piRuntimeModelOptions')}</TabsTrigger>
                   </TabsList>
                 )}
                 <TabsContent value="basic" className="mt-0">
@@ -5574,6 +5636,7 @@ const Settings: React.FC<SettingsProps> = ({
                       <Checkbox
                         id={`${activeProvider}-supportsImage`}
                         checked={newModelSupportsImage}
+                        disabled={activeProvider === ProviderName.Ollama}
                         onCheckedChange={checked => setNewModelSupportsImage(checked === true)}
                       />
                       <label
@@ -5585,69 +5648,42 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                   </div>
                 </TabsContent>
-                {isCustomProvider(activeProvider) && (
+                {(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama) && (
                   <>
                     <TabsContent value="capabilities" className="mt-0">
-                      <div className="rounded-lg border border-border bg-surface-raised p-3">
-                        <p className="mb-2 text-xs font-medium text-foreground">
-                          {i18nService.t('modelCapabilities')}
-                        </p>
-                        <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
-                          {i18nService.t('modelCapabilitiesHint')}
-                        </p>
-                        <div className="grid grid-cols-2 gap-3">
-                          {CUSTOM_MODEL_CAPABILITY_FIELDS.map(field => (
-                            <label
-                              key={field.key}
-                              className="flex flex-col gap-1 text-sm text-foreground"
-                            >
-                              <span>{i18nService.t(field.labelKey)}</span>
-                              <Select
-                                value={
-                                  newModelCapabilities[field.key] ?? ModelCapabilityStatus.Unknown
-                                }
-                                onValueChange={value =>
-                                  setNewModelCapabilities(current => ({
-                                    ...current,
-                                    [field.key]: value as ModelCapabilityStatus,
-                                  }))
-                                }
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value={ModelCapabilityStatus.Supported}>
-                                    {i18nService.t('capabilitySupported')}
-                                  </SelectItem>
-                                  <SelectItem value={ModelCapabilityStatus.Unsupported}>
-                                    {i18nService.t('capabilityUnsupported')}
-                                  </SelectItem>
-                                  <SelectItem value={ModelCapabilityStatus.Unknown}>
-                                    {i18nService.t('capabilityUnknown')}
-                                  </SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="work" className="mt-0">
-                      <PiRuntimeModelConfig
-                        value={newModelPiRuntime}
-                        onChange={setNewModelPiRuntime}
+                      <ModelCapabilitiesFields
+                        capabilities={newModelCapabilities}
+                        contextWindow={newModelContextWindow}
+                        maxTokens={newModelMaxTokens}
+                        contextWindowDisabled={activeProvider === ProviderName.Ollama}
+                        maxTokensDisabled={activeProvider === ProviderName.Ollama}
+                        visibleCapabilities={CUSTOM_MODEL_CAPABILITY_KEYS}
+                        onContextWindowChange={setNewModelContextWindow}
+                        onMaxTokensChange={setNewModelMaxTokens}
+                        onCapabilityChange={(key, value) =>
+                          setNewModelCapabilities(current => ({ ...current, [key]: value }))
+                        }
                       />
                     </TabsContent>
                   </>
                 )}
               </Tabs>
 
-              <div className="flex justify-end space-x-2 mt-4">
-                <Button type="button" variant="outline" size="sm" onClick={handleCancelModelEdit}>
+              <div className="mt-4 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={localInferenceCompactButtonClass}
+                  onClick={handleCancelModelEdit}
+                >
                   {i18nService.t('cancel')}
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleSaveNewModel}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={localInferenceCompactButtonClass}
+                  onClick={handleSaveNewModel}
+                >
                   {i18nService.t('save')}
                 </Button>
               </div>
@@ -5657,7 +5693,8 @@ const Settings: React.FC<SettingsProps> = ({
 
         <ModelCapabilitySettingsModal
           isOpen={Boolean(llamaCapabilityModel)}
-          model={llamaCapabilityModel ? { name: llamaCapabilityModel.name } : null}
+          model={llamaCapabilityModel}
+          provider={ProviderName.LlamaCpp}
           preference={llamaCapabilityPreference}
           onClose={() => {
             setLlamaCapabilityModel(null);
@@ -5668,6 +5705,12 @@ const Settings: React.FC<SettingsProps> = ({
               void handleSaveLlamaCapability(llamaCapabilityModel, toolCalling);
             }
           }}
+        />
+        <ModelCapabilitySettingsModal
+          isOpen={Boolean(ollamaCapabilityModel)}
+          model={ollamaCapabilityModel}
+          provider={ProviderName.Ollama}
+          onClose={() => setOllamaCapabilityModel(null)}
         />
 
         {/* Memory Modal */}
