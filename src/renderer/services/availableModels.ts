@@ -135,13 +135,6 @@ export function mergeAvailableModels(
 
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
   const configuredModels = buildConfiguredAvailableModels(config);
-  const llamaCppEnabled = isProviderEnabled(
-    ProviderName.LlamaCpp,
-    config.providers?.[ProviderName.LlamaCpp],
-  );
-  if (!llamaCppEnabled) {
-    return configuredModels;
-  }
 
   try {
     const runningModels = await window.electron.llamacpp.listRunningModels();

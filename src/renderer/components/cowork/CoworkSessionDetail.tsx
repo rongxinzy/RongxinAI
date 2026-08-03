@@ -99,6 +99,7 @@ import {
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useInitialConversationPosition } from './hooks/useInitialConversationPosition';
+import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
@@ -928,6 +929,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     rootRef: detailRootRef,
   });
   useInitialConversationPosition({ sessionId, rootRef: detailRootRef });
+  useConversationRailScrollSync({
+    sessionId,
+    rootRef: detailRootRef,
+    scrollContainerRef,
+    currentRailIndexRef,
+    isNavigatingRef,
+    setCurrentRailIndex,
+  });
 
   // Sync rail index when turns change or rail first appears ((turns.length > 1) becomes true)
   useEffect(() => {

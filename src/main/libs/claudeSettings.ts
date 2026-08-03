@@ -396,6 +396,33 @@ function tryZhiyuanServerFallback(modelId?: string): MatchedProvider | null {
   };
 }
 
+function buildLlamaCppRunningProviderConfig(
+  appConfig: AppConfig,
+  modelId: string,
+): LocalProviderConfig | null {
+  if (!findLlamaCppRunningModel(modelId)) {
+    return null;
+  }
+
+  const storedProviderConfig = appConfig.providers?.[ProviderName.LlamaCpp];
+  const providerDefinition = ProviderRegistry.get(ProviderName.LlamaCpp);
+
+  return {
+    ...(storedProviderConfig ?? {}),
+    enabled: true,
+    userEnabled: true,
+    apiKey: storedProviderConfig?.apiKey ?? '',
+    baseUrl:
+      storedProviderConfig?.baseUrl?.trim() || providerDefinition?.defaultBaseUrl || '',
+    apiFormat:
+      storedProviderConfig?.apiFormat === 'native'
+        ? providerDefinition?.defaultApiFormat ?? 'openai'
+        : storedProviderConfig?.apiFormat ?? providerDefinition?.defaultApiFormat ?? 'openai',
+    models: storedProviderConfig?.models ?? [],
+    codingPlanEnabled: false,
+  };
+}
+
 function resolveMatchedProviderFromSelection(
   providerName: string,
   storedProviderConfig: LocalProviderConfig,
@@ -507,6 +534,13 @@ function resolveMatchedProviderForModelRef(
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
 
+  if (providerName === ProviderName.LlamaCpp) {
+    const runningProviderConfig = buildLlamaCppRunningProviderConfig(appConfig, modelId);
+    if (runningProviderConfig) {
+      return resolveMatchedProviderFromSelection(providerName, runningProviderConfig, modelId);
+    }
+  }
+
   const storedProviderConfig = appConfig.providers?.[providerName];
   if (!storedProviderConfig || !isProviderEnabled(providerName, storedProviderConfig)) {
     return { matched: null, error: `Provider ${providerName} is not enabled.` };
@@ -614,6 +648,13 @@ function resolveMatchedProvider(appConfig: AppConfig): {
     const serverMatch = tryZhiyuanServerFallback(modelId);
     if (serverMatch) {
       return { matched: serverMatch };
+    }
+  }
+
+  if (preferredProviderName === ProviderName.LlamaCpp) {
+    const runningProviderConfig = buildLlamaCppRunningProviderConfig(appConfig, modelId);
+    if (runningProviderConfig) {
+      return resolveMatchedProviderFromSelection(preferredProviderName, runningProviderConfig, modelId);
     }
   }
 

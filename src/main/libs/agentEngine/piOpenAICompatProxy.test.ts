@@ -1,11 +1,19 @@
-﻿import { describe, expect, it } from 'vitest';
+import http from 'http';
+
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  convertOpenAIChatCompletionTextToSSEForPi,
   normalizeOpenAISSETextForPi,
   openAIStreamPayloadHasFinishReason,
+  registerPiOpenAICompatUpstream,
+  stopPiOpenAICompatProxyForTests,
 } from './piOpenAICompatProxy';
 
 describe('piOpenAICompatProxy', () => {
+  afterEach(async () => {
+    await stopPiOpenAICompatProxyForTests();
+  });
   it('detects OpenAI stream finish reasons', () => {
     expect(
       openAIStreamPayloadHasFinishReason(
@@ -32,6 +40,41 @@ describe('piOpenAICompatProxy', () => {
     expect(normalized.trim().endsWith('data: [DONE]')).toBe(true);
   });
 
+  it('converts non-stream OpenAI chat completions into SSE when stream was requested', () => {
+    const converted = convertOpenAIChatCompletionTextToSSEForPi(
+      JSON.stringify({
+        id: 'chatcmpl-test',
+        model: 'agent-model',
+        created: 123,
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'hello',
+              tool_calls: [
+                {
+                  id: 'call_1',
+                  type: 'function',
+                  function: { name: 'AskUserQuestion', arguments: '{}' },
+                },
+              ],
+            },
+            finish_reason: null,
+          },
+        ],
+      }),
+      'fallback-model',
+    );
+
+    expect(converted).not.toBeNull();
+    expect(converted).toContain('data: {');
+    expect(converted).toContain('"content":"hello"');
+    expect(converted).toContain('"tool_calls"');
+    expect(converted).toContain('"finish_reason":"stop"');
+    expect(converted?.trim().endsWith('data: [DONE]')).toBe(true);
+  });
+
   it('does not inject another finish_reason when upstream already provides one', () => {
     const normalized = normalizeOpenAISSETextForPi(
       [
@@ -47,5 +90,48 @@ describe('piOpenAICompatProxy', () => {
 
     expect((normalized.match(/finish_reason/g) ?? []).length).toBe(1);
     expect(normalized).toContain('"finish_reason":"tool_calls"');
+  });
+
+  it('proxies upstream SSE and injects missing finish_reason through the local server', async () => {
+    const upstream = http.createServer((request, response) => {
+      expect(request.url).toBe('/v1/chat/completions');
+      expect(request.headers.authorization).toBe('Bearer sk-test');
+      response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });
+      response.write('data: {"choices":[{"index":0,"delta":{"content":"hello"}}]}\n\n');
+      response.end('data: [DONE]\n\n');
+    });
+
+    const upstreamBaseURL = await new Promise<string>((resolve, reject) => {
+      upstream.once('error', reject);
+      upstream.listen(0, '127.0.0.1', () => {
+        const address = upstream.address();
+        if (!address || typeof address === 'string') {
+          reject(new Error('upstream did not receive a TCP port'));
+          return;
+        }
+        resolve(`http://127.0.0.1:${address.port}`);
+      });
+    });
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream('custom_9', {
+        baseURL: upstreamBaseURL,
+        apiKey: 'sk-test',
+      });
+      const response = await fetch(`${proxyBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'agent-model', stream: true, messages: [] }),
+      });
+      const text = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/event-stream');
+      expect(text).toContain('"content":"hello"');
+      expect(text).toContain('"finish_reason":"stop"');
+      expect(text.trim().endsWith('data: [DONE]')).toBe(true);
+    } finally {
+      await new Promise<void>(resolve => upstream.close(() => resolve()));
+    }
   });
 });
