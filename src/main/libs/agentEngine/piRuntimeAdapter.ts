@@ -38,7 +38,10 @@ import {
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
-import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
+import type {
+  WorkbenchApprovalRequestedEvent,
+  WorkbenchTaskService,
+} from '../../workbenchTask/taskService';
 import {
   type ApiConfigResolution,
   resolveRawApiConfig,
@@ -204,6 +207,7 @@ interface ActivePiSession {
   pendingError: { message: string; classified: CoworkError } | null;
   workbenchRunId: string | null;
   workbenchContract: WorkbenchTaskContract;
+  autoApprove: boolean;
 }
 
 // ── Dynamic imports ──
@@ -225,6 +229,19 @@ interface PiModules {
 
 interface PiResourceLoader {
   reload(): Promise<void>;
+}
+
+interface PiToolCallEvent {
+  toolCallId: string;
+  toolName: string;
+  input?: unknown;
+}
+
+interface PiExtensionApi {
+  on(
+    event: 'tool_call',
+    handler: (event: PiToolCallEvent) => Promise<{ block: true; reason: string } | undefined>,
+  ): void;
 }
 
 interface PiResourceState {
@@ -334,12 +351,27 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
   private workbenchTaskService: WorkbenchTaskService | null = null;
+  private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
+    null;
 
   setCoworkStore(store: CoworkStore): void {
     this.store = store;
   }
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
+    if (this.workbenchTaskService && this.workbenchApprovalListener) {
+      this.workbenchTaskService.off('approvalRequested', this.workbenchApprovalListener);
+    }
     this.workbenchTaskService = service;
+    this.workbenchApprovalListener = ({ sessionId, approval }) => {
+      this.approvalSessionMap.set(approval.id, sessionId);
+      this.emit('permissionRequest', sessionId, {
+        requestId: approval.id,
+        toolName: approval.toolName,
+        toolInput: approval.request,
+        toolUseId: approval.toolCallId,
+      });
+    };
+    service.on('approvalRequested', this.workbenchApprovalListener);
   }
   setMcpServerManager(mgr: McpServerManager): void {
     this.mcpServerManager = mgr;
@@ -460,7 +492,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
 
-      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState);
+      const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
+        sessionId,
+        runId: workbenchRunId,
+        getAutoApprove: () =>
+          this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
+      });
       sessionOptions.resourceLoader = resourceLoader;
 
       // Build custom tools: MCP proxy + optional subagent for Team Leads.
@@ -554,12 +591,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             ? path.join(getSkillsRoot(), 'web-search')
             : undefined,
         createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens, skillIds) =>
-          this.createPiResourceLoader(pi, cwd, {
-            systemPrompt,
-            skillIds,
-            maxOutputTokens,
-            fileToolsEnabled: true,
-          }),
+          this.createPiResourceLoader(
+            pi,
+            cwd,
+            {
+              systemPrompt,
+              skillIds,
+              maxOutputTokens,
+              fileToolsEnabled: true,
+            },
+            {
+              sessionId,
+              runId: workbenchRunId,
+              getAutoApprove: () =>
+                this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
+            },
+          ),
       });
       if (subagentTool) {
         customTools.push(subagentTool);
@@ -623,6 +670,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         pendingError: null,
         workbenchRunId,
         workbenchContract,
+        autoApprove: Boolean(options.autoApprove),
       };
 
       // Subscribe to Pi events before sending the prompt
@@ -690,6 +738,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         _piPromptOverride: piPrompt,
       });
     }
+
+    active.autoApprove = Boolean(options.autoApprove);
 
     const requestedSystemPrompt = options.systemPrompt?.trim();
     const requestedSkillIds =
@@ -905,6 +955,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!sessionId) return;
     this.approvalSessionMap.delete(requestId);
 
+    if (this.workbenchTaskService?.repository.getApproval(requestId)) {
+      this.workbenchTaskService.respondToApproval({
+        approvalId: requestId,
+        approved: result.behavior === 'allow',
+        reason: result.behavior === 'deny' ? result.message : undefined,
+      });
+      return;
+    }
+
     // Pi has no built-in permission system.
     // For deny: abort the current turn so the model stops.
     if (result.behavior === 'deny') {
@@ -935,6 +994,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     pi: PiModules,
     cwd: string,
     resourceState: PiResourceState,
+    approvalContext?: {
+      sessionId: string;
+      runId: string | null;
+      getAutoApprove: () => boolean;
+    },
   ): Promise<PiResourceLoader> {
     const resourceLoader = new pi.DefaultResourceLoader({
       cwd,
@@ -967,6 +1031,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           ? [createPiLargeFileWriteSystemPrompt(resourceState.maxOutputTokens)]
           : []),
       ],
+      extensionFactories: approvalContext?.runId
+        ? [
+            (extensionApi: PiExtensionApi) => {
+              extensionApi.on('tool_call', async event => {
+                const toolInput =
+                  event.input && typeof event.input === 'object'
+                    ? (event.input as Record<string, unknown>)
+                    : {};
+                const authorization = await this.workbenchTaskService?.authorizeToolCall({
+                  sessionId: approvalContext.sessionId,
+                  runId: approvalContext.runId as string,
+                  toolCallId: event.toolCallId,
+                  toolName: event.toolName,
+                  toolInput,
+                  autoApprove: approvalContext.getAutoApprove(),
+                });
+                return authorization && !authorization.allow
+                  ? {
+                      block: true as const,
+                      reason: authorization.reason || 'The action was not approved.',
+                    }
+                  : undefined;
+              });
+            },
+          ]
+        : [],
     });
     await resourceLoader.reload();
     return resourceLoader;
@@ -1203,6 +1293,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // Avoid duplicate result for the same call.
         if (active.toolResultMessageIdByCallId.has(event.toolCallId)) break;
         const resultText = extractToolResultText(event.result);
+        if (active.workbenchRunId) {
+          this.workbenchTaskService?.recordToolResult(
+            active.workbenchRunId,
+            event.toolCallId,
+            event.result,
+            Boolean(event.isError),
+          );
+        }
         if (event.toolName === PiSubagentToolName) {
           active.researchRun?.recordSubagentResult(
             event.toolCallId,
