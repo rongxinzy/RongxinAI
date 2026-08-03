@@ -69,6 +69,7 @@ import { PlatformRegistry } from '../shared/platform';
 import { OpenClawEnginePhase } from '../shared/openclaw/constants';
 import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc } from '../shared/workspace';
+import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
 import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './libs/anysearchGatewayCredentials';
@@ -110,6 +111,7 @@ import {
   registerScheduledTaskHandlers,
 } from './ipcHandlers/scheduledTask';
 import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
+import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import {
   OpenClawChannelGateway,
@@ -7530,6 +7532,30 @@ if (!gotTheLock) {
         `[WorkbenchTask] marked ${recoveredWorkbenchTasks} interrupted task(s) for explicit recovery`,
       );
     }
+    registerWorkbenchTaskIpcHandlers({
+      getService: getWorkbenchTaskService,
+      startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun) => {
+        const session = getCoworkStore().getSession(task.sessionId);
+        if (!session) throw new Error('Cowork session not found.');
+        const config = getCoworkStore().getConfig();
+        await getPiRuntimeAdapter().continueSession(
+          session.id,
+          'Continue the current task from its persisted state and verify the result.',
+          {
+            systemPrompt: session.systemPrompt,
+            skillIds: session.activeSkillIds,
+            sessionMode: session.mode,
+            workspaceRoot: session.cwd,
+            agentId: session.agentId,
+            expertIds: session.experts.map(expert => expert.expertId),
+            modelOverride: session.modelOverride,
+            autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
+            _workbenchRunId: run.id,
+            _skipUserMessage: true,
+          },
+        );
+      },
+    });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
     registerLlamaCppIpcHandlers(getLlamaCppManager(), {

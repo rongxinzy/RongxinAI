@@ -41,6 +41,11 @@ import type {
 } from '../../shared/llamacpp';
 import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
 import type {
+  WorkbenchApprovalResponseInput,
+  WorkbenchTaskActionResult,
+  WorkbenchTaskChangedEvent,
+} from '../../shared/workbenchTask';
+import type {
   OllamaCancelPullResult,
   OllamaChatChunk,
   OllamaChatPayload,
@@ -889,6 +894,17 @@ interface IElectronAPI {
       callback: (data: { sessionId: string; error: CoworkError }) => void,
     ) => () => void;
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => () => void;
+  };
+  workbenchTask: {
+    getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
+    getDetail: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    resume: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    retry: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    accept: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    respondToApproval: (
+      input: WorkbenchApprovalResponseInput,
+    ) => Promise<WorkbenchTaskActionResult>;
+    onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) => () => void;
   };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
