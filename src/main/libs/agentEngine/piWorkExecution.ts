@@ -1,9 +1,7 @@
 import * as fs from 'fs';
 import path from 'path';
 
-import type {
-  PiAskUserQuestionRequester,
-} from './piAskUserQuestion';
+import type { PiAskUserQuestionRequester } from './piAskUserQuestion';
 
 export const PiWorkAcceptanceToolName = 'work_acceptance';
 
@@ -120,6 +118,10 @@ export class PiWorkExecutionController {
         `Continue concrete work and validation. When ready, call ${PiWorkAcceptanceToolName}; only after acceptance call agent_loop done.`,
       ].join('\n'),
     };
+  }
+
+  getSnapshot(): Record<string, unknown> {
+    return { ...this.state, runDirectory: this.runDirectory };
   }
 
   private loadOrCreate(): WorkExecutionState {

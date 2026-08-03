@@ -25,11 +25,16 @@ const chatContract = {
   requiresUserAcceptance: false,
 };
 
-test('creates a new task after the previous task reaches a terminal state', () => {
+test('reuses a nonterminal task and creates a new task after completion', () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({ sessionId: 'session', goal: 'first', contract: chatContract });
-    service.failRun('session', { message: 'terminal failure' });
+    service.completeRun({
+      sessionId: 'session',
+      runId: first.run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
     const second = service.beginRun({
       sessionId: 'session',
       goal: 'second',
@@ -42,11 +47,16 @@ test('creates a new task after the previous task reaches a terminal state', () =
   }
 });
 
-test('explicit retry creates an incremented run under the same task', () => {
+test('explicit retry creates an incremented run under the same completed task', () => {
   const { db, service } = createService();
   try {
     const first = service.beginRun({ sessionId: 'session', goal: 'first', contract: chatContract });
-    service.pauseRun('session', 'retry requested');
+    service.completeRun({
+      sessionId: 'session',
+      runId: first.run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
     const prepared = service.prepareRun(first.task.id, WorkbenchRunTrigger.Retry);
     const retried = service.beginRun({
       sessionId: 'session',
@@ -184,7 +194,12 @@ test('agent end does not verify a run paused by a denied approval', async () => 
     service.respondToApproval({ approvalId: approval!.id, approved: false });
     await authorization;
 
-    const detail = service.completeRun(run.id);
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
     expect(detail.task.status).toBe(WorkbenchTaskStatus.Paused);
     expect(detail.runs[0].status).toBe(WorkbenchRunStatus.Paused);
     expect(detail.runs[0].verificationResult).toBeNull();

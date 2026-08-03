@@ -1,5 +1,6 @@
 import { ArtifactRole, type Artifact, type ArtifactType } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
+import { discoverWorkbenchMessageArtifactBlocks } from '../../shared/workbenchTask';
 
 /**
  * Normalize file path for deduplication comparison.
@@ -94,15 +95,13 @@ export function parseCodeBlockArtifacts(
   if (!messageContent) return [];
 
   const artifacts: Artifact[] = [];
-  const re = /```(artifact:)?(\w+)(?:\s+title="([^"]*)")?\s*\n([\s\S]*?)```/g;
-  let match: RegExpExecArray | null;
   let index = 0;
 
-  while ((match = re.exec(messageContent)) !== null) {
-    const isExplicitArtifact = Boolean(match[1]);
-    const language = match[2];
-    const explicitTitle = match[3];
-    const content = match[4].trimEnd();
+  for (const block of discoverWorkbenchMessageArtifactBlocks(messageContent)) {
+    const isExplicitArtifact = block.explicit;
+    const language = block.language;
+    const explicitTitle = block.title;
+    const content = block.content;
 
     const artifactType = getArtifactTypeFromLanguage(language);
 

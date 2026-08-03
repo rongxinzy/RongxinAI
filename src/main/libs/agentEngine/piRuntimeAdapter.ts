@@ -207,6 +207,7 @@ interface ActivePiSession {
   pendingError: { message: string; classified: CoworkError } | null;
   workbenchRunId: string | null;
   workbenchContract: WorkbenchTaskContract;
+  workspaceRoot: string;
   autoApprove: boolean;
 }
 
@@ -670,6 +671,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         pendingError: null,
         workbenchRunId,
         workbenchContract,
+        workspaceRoot,
         autoApprove: Boolean(options.autoApprove),
       };
 
@@ -1369,7 +1371,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         }
         if (this.store) this.store.updateSession(sessionId, { status: 'idle' });
         if (active.workbenchRunId && this.workbenchTaskService) {
-          this.workbenchTaskService.completeRun(active.workbenchRunId);
+          const workflowSnapshot = active.researchRun
+            ? active.researchRun.getSnapshot()
+            : active.shortcutWorkflow
+              ? active.shortcutWorkflow.getSnapshot()
+              : active.workExecution?.getSnapshot() || null;
+          this.workbenchTaskService.completeRun({
+            sessionId,
+            runId: active.workbenchRunId,
+            workspaceRoot: active.workspaceRoot,
+            finalAnswer: active.lastCompletedAnswerText,
+            finalMessageId: active.lastCompletedAnswerMessageId,
+            workflowCompleted:
+              !active.researchRun && !active.shortcutWorkflow && !active.workExecution
+                ? undefined
+                : active.agentLoop.getState().done,
+            workflowSnapshot,
+          });
         }
         this.emit('complete', sessionId, null);
         break;

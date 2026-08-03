@@ -32,6 +32,8 @@ export interface Artifact {
   id: string;
   messageId: string;
   sessionId: string;
+  taskId?: string;
+  runId?: string;
   type: ArtifactType;
   title: string;
   content: string;
