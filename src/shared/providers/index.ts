@@ -26,3 +26,20 @@ export {
 export type { ProviderModelPiRuntimeCompat, ProviderModelPiRuntimeConfig } from './piRuntime';
 export type { ProviderConfig } from './types';
 export { isProviderEnabled } from './types';
+export {
+  clampRuntimeContextWindow,
+  createLlamaCppRuntimeSnapshot,
+  createOllamaRuntimeSnapshot,
+  parseLlamaCppRuntimeCapabilities,
+  parseOllamaRuntimeCapabilities,
+  parseLlamaCppRuntimeSnapshot,
+  parseOllamaRuntimeSnapshot,
+  resolveModelEndpoint,
+} from './modelEndpoint';
+export type {
+  ResolveModelEndpointOptions,
+  ResolvedModelEndpoint,
+  RuntimeModelKind,
+  RuntimeModelSnapshot,
+  RuntimeModelStatus,
+} from './modelEndpoint';

@@ -133,6 +133,7 @@ const UNKNOWN_MODEL_CAPABILITIES: ModelCapabilities = {
 const MODEL_CATALOG_VERIFIED_AT = '2026-08-03';
 
 const OfficialModelCatalogSourceUrl = {
+  OpenAI: 'https://developers.openai.com/api/docs/models',
   DeepSeek: 'https://api-docs.deepseek.com/quick_start/pricing',
   MoonshotK3: 'https://platform.kimi.com/docs/guide/kimi-k3-quickstart',
   MoonshotK26: 'https://platform.kimi.com/docs/guide/kimi-k2-6-quickstart',
@@ -869,6 +870,46 @@ const PROVIDER_DEFINITIONS = [
     enPriority: 1,
     defaultModels: [
       {
+        id: 'gpt-5.6-sol',
+        name: 'GPT-5.6 Sol',
+        supportsImage: true,
+        aliases: ['gpt-5.6'],
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.OpenAI,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'gpt-5.6-terra',
+        name: 'GPT-5.6 Terra',
+        supportsImage: true,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.OpenAI,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'gpt-5.6-luna',
+        name: 'GPT-5.6 Luna',
+        supportsImage: true,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+        contextWindow: 1_050_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.OpenAI,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
         id: 'gpt-5.4',
         name: 'GPT-5.4',
         supportsImage: true,
@@ -1119,7 +1160,15 @@ const CATALOG_PROVIDER_TOOL_CAPABILITIES: Readonly<
  * tables deliberately remain Unknown.
  */
 const CATALOG_TOOL_CALLING_MODEL_IDS: Readonly<Record<string, readonly string[]>> = {
-  [ProviderName.OpenAI]: ['gpt-5.4', 'gpt-5.2', 'gpt-5.3-codex', 'gpt-5.2-codex'],
+  [ProviderName.OpenAI]: [
+    'gpt-5.6-sol',
+    'gpt-5.6-terra',
+    'gpt-5.6-luna',
+    'gpt-5.4',
+    'gpt-5.2',
+    'gpt-5.3-codex',
+    'gpt-5.2-codex',
+  ],
   [ProviderName.Gemini]: ['gemini-3.1-pro-preview'],
   [ProviderName.Anthropic]: ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-6', 'claude-opus-4-6'],
   [ProviderName.DeepSeek]: ['deepseek-v4-flash', 'deepseek-v4-pro'],
@@ -1156,6 +1205,18 @@ const CATALOG_MODEL_CAPABILITIES: Readonly<
   Record<string, Readonly<Record<string, Partial<ModelCapabilities>>>>
 > = {
   [ProviderName.OpenAI]: {
+    'gpt-5.6-sol': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gpt-5.6-terra': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gpt-5.6-luna': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
     'gpt-5.4': {
       toolCalling: ModelCapabilityStatus.Supported,
       reasoning: ModelCapabilityStatus.Supported,
