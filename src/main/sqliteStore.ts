@@ -18,6 +18,7 @@ import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
 } from './libs/sqliteBackup/sqliteBackupManager';
+import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 type ChangePayload<T = unknown> = {
@@ -155,6 +156,8 @@ export class SqliteStore {
         updated_at INTEGER NOT NULL
       );
     `);
+
+    initializeWorkbenchTaskSchema(this.db);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS user_memories (
