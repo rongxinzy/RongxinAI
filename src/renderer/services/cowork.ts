@@ -575,6 +575,11 @@ class CoworkService {
     const result = await cowork.deleteSession(sessionId);
     if (result.success) {
       store.dispatch(deleteSessionAction(sessionId));
+      const permissionModeBySession = { ...store.getState().cowork.config.permissionModeBySession };
+      if (permissionModeBySession?.[sessionId]) {
+        delete permissionModeBySession[sessionId];
+        await this.updateConfig({ permissionModeBySession });
+      }
       return true;
     }
 
@@ -589,6 +594,15 @@ class CoworkService {
     const result = await cowork.deleteSessions(sessionIds);
     if (result.success) {
       store.dispatch(deleteSessionsAction(sessionIds));
+      const permissionModeBySession = { ...store.getState().cowork.config.permissionModeBySession };
+      let changed = false;
+      for (const sessionId of sessionIds) {
+        if (permissionModeBySession?.[sessionId]) {
+          delete permissionModeBySession[sessionId];
+          changed = true;
+        }
+      }
+      if (changed) await this.updateConfig({ permissionModeBySession });
       return true;
     }
 
