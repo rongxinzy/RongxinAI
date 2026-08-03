@@ -63,7 +63,7 @@ export function buildMarketplaceSearchParams(input: {
 
 export function formatMarketplaceScore(stars?: number, confidence?: string): string {
   if (!stars || stars <= 0) return i18nService.t('marketplaceScoreUnavailable');
-  return `${stars.toFixed(1)}★${confidence ? ` · ${confidence}` : ''}`;
+  return `${stars.toFixed(1)}${confidence ? ` · ${confidence}` : ''}`;
 }
 
 export function marketplaceFitLabel(status?: NonNullable<MarketplaceModel['fit']>['status']): string {

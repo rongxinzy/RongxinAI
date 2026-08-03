@@ -19,10 +19,9 @@ export function useMarketplaceRecommendations({
 }): void {
   useEffect(() => {
     if (activeTab !== 'marketplace' || hasSearched) return;
-    // fit: 'compatible' keeps the first paint consistent with the default
-    // "可运行" filter shown in the panel — an unrestricted first load would
-    // list models the device cannot run while the filter claims otherwise.
-    const params = buildMarketplaceSearchParams({ query, featuredOnly: true, fit: 'compatible' });
+    // Recommendations show the curated cloud list without applying a device-fit
+    // filter. Fit is displayed on each card and can be selected in all-models mode.
+    const params = buildMarketplaceSearchParams({ query, featuredOnly: true, fit: 'all' });
     if (!params) return;
     onHasSearchedChange(true);
     void onSearch(params);

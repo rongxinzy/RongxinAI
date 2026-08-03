@@ -6,7 +6,7 @@ import {
   getMarketplaceGridColumnCount,
   getMarketplacePageSize,
 } from './utils/marketplace';
-import { LOCAL_INFERENCE_PROGRESS_DISMISS_MS, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS } from './constants';
+import { LOCAL_INFERENCE_PROGRESS_DISMISS_MS, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS, MARKETPLACE_MAX_PAGE_ROWS, MARKETPLACE_PAGE_SIZE } from './constants';
 import { formatInstallProgressSummary, isInstallTerminalPhase } from './utils/progress';
 
 test('marketplace page size uses the actual grid height', () => {
@@ -17,7 +17,7 @@ test('marketplace page size uses the actual grid height', () => {
       columnCount: 4,
       rowGap: 12,
     }),
-  ).toBe(20);
+  ).toBe(MARKETPLACE_MAX_PAGE_ROWS * 4);
   expect(
     getMarketplacePageSize({
       availableGridHeight: 532,
@@ -33,7 +33,7 @@ test('marketplace page size uses the actual grid height', () => {
       columnCount: 4,
       rowGap: 12,
     }),
-  ).toBe(20);
+  ).toBe(MARKETPLACE_MAX_PAGE_ROWS * 4);
   expect(
     getMarketplacePageSize({
       availableGridHeight: 0,
@@ -41,7 +41,7 @@ test('marketplace page size uses the actual grid height', () => {
       columnCount: 4,
       rowGap: 12,
     }),
-  ).toBe(8);
+  ).toBe(MARKETPLACE_PAGE_SIZE);
 });
 
 test('marketplace page size remains a whole number of grid rows', () => {

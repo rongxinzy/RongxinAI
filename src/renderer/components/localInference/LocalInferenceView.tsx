@@ -797,9 +797,19 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           <div
             ref={contentViewportRef}
-            className="min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]"
+            className={
+              activeTab === 'marketplace'
+                ? 'min-w-0 flex-1 overflow-hidden [overflow-anchor:none]'
+                : 'min-w-0 flex-1 overflow-y-auto scrollbar-gutter-stable [overflow-anchor:none]'
+            }
           >
-            <div className="w-full space-y-4 px-6 py-4">
+            <div
+              className={
+                activeTab === 'marketplace'
+                  ? 'flex h-full min-h-0 w-full flex-col gap-4 px-6 py-4'
+                  : 'w-full space-y-4 px-6 py-4'
+              }
+            >
               {activeTab === 'models' ? (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button
@@ -862,8 +872,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 value="marketplace"
                 activeValue={activeTab}
                 direction={tabDirection}
-                className="min-h-0"
-                contentClassName="min-h-0"
+                className="flex min-h-0 flex-1 flex-col"
+                contentClassName="flex min-h-0 flex-1 flex-col"
               >
                 <MarketplacePanel
                   loading={loading}
@@ -878,7 +888,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   hardwareSummaryReady={marketplaceHardwareChecked}
                   totalCount={marketplaceTotalCount}
                   nextPageNumber={marketplaceNextPage}
-                  contentViewportRef={contentViewportRef}
                   onOpenInstalled={handleMarketplaceOpenInstalled}
                   onQueryChange={setMarketplaceQuery}
                   onSearch={handleMarketplaceSearch}

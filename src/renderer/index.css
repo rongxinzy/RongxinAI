@@ -843,6 +843,26 @@ select::-ms-expand {
   transform-origin: var(--transform-origin) !important;
 }
 
+/* Marketplace model selector: keep the five-row popup and scrollbar inside its rounded surface. */
+[data-slot='select-content'][data-marketplace-model-select='true'] {
+  max-height: 140px !important;
+  scrollbar-gutter: stable;
+}
+
+[data-slot='select-content'][data-marketplace-model-select='true']::-webkit-scrollbar {
+  width: 5px;
+}
+
+[data-slot='select-content'][data-marketplace-model-select='true']::-webkit-scrollbar-track {
+  margin-block: 4px;
+  background: transparent;
+}
+
+[data-slot='select-content'][data-marketplace-model-select='true']::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background-clip: padding-box;
+}
 /* Local inference log viewer theme adapter */
 [data-local-inference-log-viewer] .react-lazylog {
   background-color: var(--zy-surface) !important;
