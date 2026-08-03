@@ -21,6 +21,12 @@
 // ═══════════════════════════════════════════════════════
 
 // ─── Provider Name ──────────────────────────────────────────────────────
+import {
+  buildProviderModelIndex,
+  getIndexedProviderModels,
+  type ProviderModelIndex,
+} from './modelCatalog';
+
 // providerName identifies the ZhiYuanAgent internal provider (config key).
 export const ProviderName = {
   OpenAI: 'openai',
@@ -36,6 +42,7 @@ export const ProviderName = {
   StepFun: 'stepfun',
   Volcengine: 'volcengine',
   OpenRouter: 'openrouter',
+  Grok: 'grok',
   LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
   Custom: 'custom',
@@ -62,6 +69,7 @@ export const OpenClawProviderId = {
   StepFun: 'stepfun',
   Xiaomi: 'xiaomi',
   OpenRouter: 'openrouter',
+  Grok: 'grok',
   Copilot: 'github-copilot',
   ZhiyuanCopilot: 'zhiyuan-copilot',
   LlamaCpp: 'llamacpp',
@@ -122,9 +130,44 @@ const UNKNOWN_MODEL_CAPABILITIES: ModelCapabilities = {
   reasoning: ModelCapabilityStatus.Unknown,
 };
 
+const MODEL_CATALOG_VERIFIED_AT = '2026-08-03';
+
+const OfficialModelCatalogSourceUrl = {
+  DeepSeek: 'https://api-docs.deepseek.com/quick_start/pricing',
+  MoonshotK3: 'https://platform.kimi.com/docs/guide/kimi-k3-quickstart',
+  MoonshotK26: 'https://platform.kimi.com/docs/guide/kimi-k2-6-quickstart',
+  Qwen: 'https://www.alibabacloud.com/help/en/model-studio/vision-model/',
+  Zhipu: 'https://docs.bigmodel.cn/cn/guide/start/model-overview',
+  MiniMax: 'https://platform.minimaxi.com/docs/api-reference/text-openai-api',
+  Volcengine: 'https://ark.volcengine.com/region:cn-beijing/model',
+  StepFun: 'https://platform.stepfun.com/docs/zh/guides/models/overview',
+  Xiaomi: 'https://mimo.mi.com/docs/en-US/quick-start/summary/model',
+} as const;
+
 // ═══════════════════════════════════════════════════════
 // 2. Provider Definition Shape
 // ═══════════════════════════════════════════════════════
+
+/**
+ * A provider-owned model catalog entry.
+ *
+ * `id` is the identifier sent to the provider. Aliases are only lookup keys;
+ * callers must continue sending the canonical `id` to avoid changing the
+ * provider's request contract.
+ */
+export interface ProviderModelDefinition {
+  readonly id: string;
+  readonly name: string;
+  readonly supportsImage: boolean;
+  readonly aliases?: readonly string[];
+  readonly capabilities?: Partial<ModelCapabilities>;
+  readonly contextWindow?: number;
+  readonly maxTokens?: number;
+  /** Official documentation URL used when maintaining this catalog entry. */
+  readonly sourceUrl?: string;
+  /** Date on which the capacity/capability values were last checked. */
+  readonly verifiedAt?: string;
+}
 
 interface ProviderDefInput {
   /** Provider identifier (e.g. 'openai', 'moonshot') */
@@ -171,27 +214,13 @@ interface ProviderDefInput {
   /** Priority ordering for English locale display (lower = higher priority, 0 = no special priority) */
   readonly enPriority: number;
   /** Default model list */
-  readonly defaultModels: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly supportsImage: boolean;
-    readonly capabilities?: Partial<ModelCapabilities>;
-    readonly contextWindow?: number;
-    readonly maxTokens?: number;
-  }[];
+  readonly defaultModels: readonly ProviderModelDefinition[];
   /**
    * Coding Plan dedicated model list (only meaningful when codingPlanSupported=true).
    * When the user toggles codingPlanEnabled in Settings, the model list is replaced
    * with this list. When unset, coding plan mode keeps the same models as defaultModels.
    */
-  readonly codingPlanModels?: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly supportsImage: boolean;
-    readonly capabilities?: Partial<ModelCapabilities>;
-    readonly contextWindow?: number;
-    readonly maxTokens?: number;
-  }[];
+  readonly codingPlanModels?: readonly ProviderModelDefinition[];
   /**
    * The OpenClaw gateway provider ID used when building model refs (e.g. "provider/modelId").
    * Most providers share the same value as `id`, but some differ
@@ -232,6 +261,8 @@ const PROVIDER_DEFINITIONS = [
         supportsImage: false,
         contextWindow: 1_000_000,
         maxTokens: 384_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.DeepSeek,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'deepseek-v4-pro',
@@ -239,13 +270,13 @@ const PROVIDER_DEFINITIONS = [
         supportsImage: false,
         contextWindow: 1_000_000,
         maxTokens: 384_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.DeepSeek,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'deepseek-reasoner',
         name: 'DeepSeek Reasoner',
         supportsImage: false,
-        contextWindow: 1_000_000,
-        maxTokens: 384_000,
       },
     ],
   },
@@ -277,22 +308,26 @@ const PROVIDER_DEFINITIONS = [
         id: 'kimi-k3',
         name: 'Kimi K3',
         supportsImage: true,
-        contextWindow: 1_048_576,
+        contextWindow: 1_000_000,
         maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.MoonshotK3,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'kimi-k2.6',
         name: 'Kimi K2.6',
         supportsImage: true,
-        contextWindow: 262_144,
-        maxTokens: 262_144,
+        contextWindow: 256_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.MoonshotK26,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'kimi-k2.5',
         name: 'Kimi K2.5',
         supportsImage: true,
-        contextWindow: 262_144,
-        maxTokens: 262_144,
+        contextWindow: 256_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.MoonshotK26,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
     codingPlanModels: [
@@ -300,12 +335,12 @@ const PROVIDER_DEFINITIONS = [
         id: 'kimi-for-coding',
         name: 'Kimi for Coding',
         supportsImage: true,
+        contextWindow: 262_144,
+        maxTokens: 32_768,
         // The Kimi for Coding endpoints (api.kimi.com/coding) support tool
         // calling in both API formats — unlike the general Moonshot
         // /anthropic endpoint this provider maps to Unsupported below.
         capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-        contextWindow: 262_144,
-        maxTokens: 32_768,
       },
     ],
   },
@@ -335,7 +370,8 @@ const PROVIDER_DEFINITIONS = [
         name: 'Qwen3.7 Max',
         supportsImage: false,
         contextWindow: 1_000_000,
-        maxTokens: 65_536,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'qwen3.7-plus',
@@ -343,34 +379,71 @@ const PROVIDER_DEFINITIONS = [
         supportsImage: true,
         contextWindow: 1_000_000,
         maxTokens: 64_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'qwen3.6-plus',
         name: 'Qwen3.6 Plus',
         supportsImage: true,
         contextWindow: 1_000_000,
-        maxTokens: 65_536,
+        maxTokens: 64_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'qwen3.5-plus',
         name: 'Qwen3.5 Plus',
         supportsImage: true,
         contextWindow: 1_000_000,
-        maxTokens: 65_536,
+        maxTokens: 64_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'qwen3-coder-plus',
         name: 'Qwen3 Coder Plus',
         supportsImage: false,
-        contextWindow: 1_048_576,
-        maxTokens: 65_536,
+        contextWindow: 1_000_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
     codingPlanModels: [
-      { id: 'qwen3.7-plus', name: 'Qwen3.7 Plus', supportsImage: true },
-      { id: 'qwen3.6-plus', name: 'Qwen3.6 Plus', supportsImage: true },
-      { id: 'qwen3-coder-next', name: 'Qwen3 Coder Next', supportsImage: false },
-      { id: 'qwen3-coder-plus', name: 'Qwen3 Coder Plus', supportsImage: false },
+      {
+        id: 'qwen3.7-plus',
+        name: 'Qwen3.7 Plus',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 64_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'qwen3.6-plus',
+        name: 'Qwen3.6 Plus',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 64_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'qwen3-coder-next',
+        name: 'Qwen3 Coder Next',
+        supportsImage: false,
+        contextWindow: 256_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'qwen3-coder-plus',
+        name: 'Qwen3 Coder Plus',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Qwen,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
     ],
   },
   {
@@ -400,26 +473,56 @@ const PROVIDER_DEFINITIONS = [
         supportsImage: false,
         contextWindow: 1_000_000,
         maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.Zhipu,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'glm-5',
         name: 'GLM 5',
         supportsImage: false,
-        contextWindow: 204_800,
+        contextWindow: 200_000,
         maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.Zhipu,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'glm-4.7',
         name: 'GLM 4.7',
         supportsImage: false,
-        contextWindow: 204_800,
+        contextWindow: 200_000,
         maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.Zhipu,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
     codingPlanModels: [
-      { id: 'glm-5.2', name: 'GLM 5.2', supportsImage: false },
-      { id: 'glm-5-turbo', name: 'GLM 5 Turbo', supportsImage: false },
-      { id: 'glm-4.7', name: 'GLM 4.7', supportsImage: false },
+      {
+        id: 'glm-5.2',
+        name: 'GLM 5.2',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.Zhipu,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'glm-5-turbo',
+        name: 'GLM 5 Turbo',
+        supportsImage: false,
+        contextWindow: 200_000,
+        maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.Zhipu,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'glm-4.7',
+        name: 'GLM 4.7',
+        supportsImage: false,
+        contextWindow: 200_000,
+        maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.Zhipu,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
     ],
   },
   {
@@ -441,23 +544,26 @@ const PROVIDER_DEFINITIONS = [
       {
         id: 'MiniMax-M3',
         name: 'MiniMax M3',
-        supportsImage: false,
+        supportsImage: true,
         contextWindow: 1_000_000,
-        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.MiniMax,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'MiniMax-M2.7',
         name: 'MiniMax M2.7',
         supportsImage: false,
         contextWindow: 204_800,
-        maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.MiniMax,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'MiniMax-M2.5',
         name: 'MiniMax M2.5',
         supportsImage: false,
         contextWindow: 204_800,
-        maxTokens: 131_072,
+        sourceUrl: OfficialModelCatalogSourceUrl.MiniMax,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
   },
@@ -487,6 +593,8 @@ const PROVIDER_DEFINITIONS = [
         supportsImage: true,
         contextWindow: 256_000,
         maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Volcengine,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       { id: 'ark-code-latest', name: 'Auto', supportsImage: true },
       {
@@ -494,14 +602,18 @@ const PROVIDER_DEFINITIONS = [
         name: 'Doubao-Seed-2.0-lite',
         supportsImage: true,
         contextWindow: 256_000,
-        maxTokens: 32_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Volcengine,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'doubao-seed-2-0-mini-260215',
         name: 'Doubao-Seed-2.0-mini',
         supportsImage: true,
         contextWindow: 256_000,
-        maxTokens: 32_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Volcengine,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
     codingPlanModels: [{ id: 'ark-code-latest', name: 'Ark Coding', supportsImage: false }],
@@ -527,15 +639,11 @@ const PROVIDER_DEFINITIONS = [
         id: 'ernie-4.5-8k',
         name: 'ERNIE 4.5 8K',
         supportsImage: false,
-        contextWindow: 8_192,
-        maxTokens: 8_192,
       },
       {
         id: 'ernie-4.5-turbo-8k',
         name: 'ERNIE 4.5 Turbo',
         supportsImage: false,
-        contextWindow: 8_192,
-        maxTokens: 8_192,
       },
     ],
     codingPlanModels: [
@@ -559,16 +667,18 @@ const PROVIDER_DEFINITIONS = [
       {
         id: 'step-3.7-flash',
         name: 'Step 3.7 Flash',
-        supportsImage: false,
+        supportsImage: true,
         contextWindow: 256_000,
-        maxTokens: 256_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.StepFun,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'step-3.5-flash',
         name: 'Step 3.5 Flash',
         supportsImage: false,
         contextWindow: 256_000,
-        maxTokens: 256_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.StepFun,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
     ],
   },
@@ -596,41 +706,55 @@ const PROVIDER_DEFINITIONS = [
         id: 'mimo-v2.5-pro-ultraspeed',
         name: 'MiMo V2.5 Pro Ultraspeed',
         supportsImage: false,
-        contextWindow: 1_048_576,
-        maxTokens: 131_072,
       },
       {
         id: 'mimo-v2.5-pro',
         name: 'MiMo V2.5 Pro',
         supportsImage: false,
-        contextWindow: 1_048_576,
-        maxTokens: 131_072,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Xiaomi,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'mimo-v2.5',
         name: 'MiMo V2.5',
         supportsImage: true,
-        contextWindow: 1_048_576,
-        maxTokens: 131_072,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Xiaomi,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
       },
       {
         id: 'mimo-v2-pro',
         name: 'MiMo V2 Pro',
         supportsImage: false,
-        contextWindow: 1_048_576,
-        maxTokens: 131_072,
       },
       {
         id: 'mimo-v2-flash',
         name: 'MiMo V2 Flash',
         supportsImage: false,
-        contextWindow: 262_144,
-        maxTokens: 65_536,
       },
     ],
     codingPlanModels: [
-      { id: 'mimo-v2.5-pro', name: 'MiMo V2.5 Pro', supportsImage: false },
-      { id: 'mimo-v2.5', name: 'MiMo V2.5', supportsImage: true },
+      {
+        id: 'mimo-v2.5-pro',
+        name: 'MiMo V2.5 Pro',
+        supportsImage: false,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Xiaomi,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
+      {
+        id: 'mimo-v2.5',
+        name: 'MiMo V2.5',
+        supportsImage: true,
+        contextWindow: 1_000_000,
+        maxTokens: 128_000,
+        sourceUrl: OfficialModelCatalogSourceUrl.Xiaomi,
+        verifiedAt: MODEL_CATALOG_VERIFIED_AT,
+      },
     ],
   },
   {
@@ -703,6 +827,32 @@ const PROVIDER_DEFINITIONS = [
         supportsImage: true,
         contextWindow: 1_050_000,
         maxTokens: 128_000,
+      },
+    ],
+  },
+  {
+    id: ProviderName.Grok,
+    label: 'Grok',
+    website: 'https://x.ai',
+    apiKeyUrl: 'https://console.x.ai',
+    openClawProviderId: OpenClawProviderId.Grok,
+    defaultBaseUrl: 'https://api.x.ai/v1',
+    defaultApiFormat: ApiFormat.OpenAI,
+    codingPlanSupported: false,
+    region: 'global',
+    enPriority: 4,
+    defaultModels: [
+      {
+        id: 'grok-4.5',
+        name: 'Grok 4.5',
+        supportsImage: true,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+        contextWindow: 500_000,
+        sourceUrl: 'https://docs.x.ai/developers/models',
+        verifiedAt: '2026-08-03',
       },
     ],
   },
@@ -902,22 +1052,8 @@ export interface ProviderDef {
   /** Priority ordering for English locale display (lower = higher priority, 0 = no special priority) */
   readonly enPriority: number;
   /** Default model list */
-  readonly defaultModels: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly supportsImage: boolean;
-    readonly capabilities?: Partial<ModelCapabilities>;
-    readonly contextWindow?: number;
-    readonly maxTokens?: number;
-  }[];
-  readonly codingPlanModels?: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly supportsImage: boolean;
-    readonly capabilities?: Partial<ModelCapabilities>;
-    readonly contextWindow?: number;
-    readonly maxTokens?: number;
-  }[];
+  readonly defaultModels: readonly ProviderModelDefinition[];
+  readonly codingPlanModels?: readonly ProviderModelDefinition[];
   readonly openClawProviderId: OpenClawProviderId;
 }
 
@@ -987,6 +1123,7 @@ const CATALOG_TOOL_CALLING_MODEL_IDS: Readonly<Record<string, readonly string[]>
   [ProviderName.Gemini]: ['gemini-3.1-pro-preview'],
   [ProviderName.Anthropic]: ['claude-sonnet-4-5-20250929', 'claude-sonnet-4-6', 'claude-opus-4-6'],
   [ProviderName.DeepSeek]: ['deepseek-v4-flash', 'deepseek-v4-pro'],
+  [ProviderName.Moonshot]: ['kimi-k3', 'kimi-k2.6', 'kimi-k2.5'],
   [ProviderName.Qwen]: [
     'qwen3.7-max',
     'qwen3.7-plus',
@@ -998,13 +1135,178 @@ const CATALOG_TOOL_CALLING_MODEL_IDS: Readonly<Record<string, readonly string[]>
   [ProviderName.Zhipu]: ['glm-5.2', 'glm-5.1', 'glm-5', 'glm-5-turbo', 'glm-4.7'],
   [ProviderName.Minimax]: ['MiniMax-M3', 'MiniMax-M2.7', 'MiniMax-M2.5'],
   [ProviderName.Qianfan]: ['deepseek-v3.2'],
-  [ProviderName.StepFun]: ['step-3.5-flash'],
-  [ProviderName.Xiaomi]: ['mimo-v2-flash'],
+  [ProviderName.StepFun]: ['step-3.7-flash', 'step-3.5-flash'],
+  [ProviderName.Xiaomi]: ['mimo-v2.5-pro', 'mimo-v2.5'],
+  [ProviderName.Volcengine]: [
+    'doubao-seed-2-0-pro-260215',
+    'doubao-seed-2-0-lite-260215',
+    'doubao-seed-2-0-mini-260215',
+  ],
+  [ProviderName.Grok]: ['grok-4.5'],
+};
+
+/**
+ * Model-level capability facts that are not expressible by supportsImage alone.
+ * Keep these overrides close to the registry resolver so every consumer (Chat,
+ * Work, model selectors, and capability fallbacks) receives the same answer.
+ * Unknown media capabilities intentionally stay Unknown until the provider
+ * documents a stable request shape for them.
+ */
+const CATALOG_MODEL_CAPABILITIES: Readonly<
+  Record<string, Readonly<Record<string, Partial<ModelCapabilities>>>>
+> = {
+  [ProviderName.OpenAI]: {
+    'gpt-5.4': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gpt-5.2': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gpt-5.3-codex': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gpt-5.2-codex': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
+  [ProviderName.Anthropic]: {
+    'claude-sonnet-4-5-20250929': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'claude-sonnet-4-6': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'claude-opus-4-6': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
+  [ProviderName.Gemini]: {
+    'gemini-3-pro-preview': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gemini-3.1-pro-preview': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'gemini-3-flash-preview': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
+  [ProviderName.DeepSeek]: {
+    'deepseek-v4-flash': { reasoning: ModelCapabilityStatus.Supported },
+    'deepseek-v4-pro': { reasoning: ModelCapabilityStatus.Supported },
+  },
+  [ProviderName.Moonshot]: {
+    'kimi-k3': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'kimi-k2.6': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'kimi-k2.5': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
+  [ProviderName.Qwen]: {
+    'qwen3.7-max': { reasoning: ModelCapabilityStatus.Supported },
+    'qwen3.7-plus': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'qwen3.6-plus': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'qwen3.5-plus': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'qwen3-coder-plus': { reasoning: ModelCapabilityStatus.Supported },
+    'qwen3-coder-next': { reasoning: ModelCapabilityStatus.Supported },
+  },
+  [ProviderName.Zhipu]: {
+    'glm-5.2': { reasoning: ModelCapabilityStatus.Supported },
+    'glm-5': { reasoning: ModelCapabilityStatus.Supported },
+    'glm-5-turbo': { reasoning: ModelCapabilityStatus.Supported },
+    'glm-4.7': { reasoning: ModelCapabilityStatus.Supported },
+  },
+  [ProviderName.Minimax]: {
+    'MiniMax-M3': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'MiniMax-M2.7': { reasoning: ModelCapabilityStatus.Supported },
+    'MiniMax-M2.5': { reasoning: ModelCapabilityStatus.Supported },
+  },
+  [ProviderName.Volcengine]: {
+    'doubao-seed-2-0-pro-260215': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'doubao-seed-2-0-lite-260215': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'doubao-seed-2-0-mini-260215': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
+  [ProviderName.StepFun]: {
+    'step-3.7-flash': {
+      videoInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+    'step-3.5-flash': { reasoning: ModelCapabilityStatus.Supported },
+  },
+  [ProviderName.Xiaomi]: {
+    'mimo-v2.5-pro': { reasoning: ModelCapabilityStatus.Supported },
+    'mimo-v2.5': {
+      videoInput: ModelCapabilityStatus.Supported,
+      audioInput: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
+  [ProviderName.Grok]: {
+    'grok-4.5': {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  },
 };
 
 class ProviderRegistryImpl {
   private readonly defs: readonly ProviderDef[];
   private readonly idIndex: ReadonlyMap<string, ProviderDef>;
+  private readonly modelIndex: ProviderModelIndex;
 
   constructor(definitions: readonly ProviderDef[]) {
     this.defs = definitions;
@@ -1013,6 +1315,7 @@ class ProviderRegistryImpl {
       idx.set(def.id, def);
     }
     this.idIndex = idx;
+    this.modelIndex = buildProviderModelIndex(definitions);
   }
 
   /** All provider IDs in definition order. */
@@ -1054,12 +1357,34 @@ class ProviderRegistryImpl {
   }
 
   getProviderModelSupportsImage(providerName: string, modelId: string): boolean | undefined {
-    const def = this.idIndex.get(providerName);
-    if (!def) return undefined;
-    const model = [...def.defaultModels, ...(def.codingPlanModels ?? [])].find(
-      candidate => candidate.id === modelId,
-    );
+    const model = this.getModel(providerName, modelId);
     return model?.supportsImage;
+  }
+
+  /**
+   * Return all provider-owned entries matching a canonical ID or alias.
+   * Matching is case-insensitive, but the returned model keeps its canonical ID.
+   */
+  getModels(providerName: string, modelId: string | undefined): readonly ProviderModelDefinition[] {
+    return getIndexedProviderModels(this.modelIndex, providerName, modelId);
+  }
+
+  /** Find the first provider-owned catalog entry; IDs are never matched globally. */
+  getModel(providerName: string, modelId: string | undefined): ProviderModelDefinition | undefined {
+    return this.getModels(providerName, modelId)[0];
+  }
+
+  /** Find every catalog owner of a model ID; callers must keep the provider pair. */
+  findModelsById(
+    modelId: string | undefined,
+  ): Array<{ providerId: string; model: ProviderModelDefinition }> {
+    if (typeof modelId !== 'string' || !modelId.trim()) return [];
+    const matches: Array<{ providerId: string; model: ProviderModelDefinition }> = [];
+    for (const def of this.defs) {
+      const model = this.getModel(def.id, modelId);
+      if (model) matches.push({ providerId: def.id, model });
+    }
+    return matches;
   }
 
   resolveModelCapabilities(
@@ -1071,20 +1396,18 @@ class ProviderRegistryImpl {
       readonly capabilities?: Partial<ModelCapabilities>;
     },
   ): ModelCapabilities {
-    const providerModels = [
-      ...(this.get(providerName)?.defaultModels ?? []),
-      ...(this.get(providerName)?.codingPlanModels ?? []),
-    ];
+    const providerModels = this.getModels(providerName, modelId);
     const providerModel =
       providerModels.find(
         candidate =>
-          candidate.id === modelId &&
           configured?.supportsImage !== undefined &&
           candidate.supportsImage === configured.supportsImage,
-      ) ?? providerModels.find(candidate => candidate.id === modelId);
+      ) ?? providerModels[0];
     const isCatalogModel = providerModel !== undefined;
+    const catalogModelId = providerModel?.id ?? modelId;
+    const catalogCapabilities = CATALOG_MODEL_CAPABILITIES[providerName]?.[catalogModelId];
     const hasVerifiedCatalogToolCalling =
-      CATALOG_TOOL_CALLING_MODEL_IDS[providerName]?.includes(modelId) === true;
+      CATALOG_TOOL_CALLING_MODEL_IDS[providerName]?.includes(catalogModelId) === true;
     const endpointToolCalling = CATALOG_PROVIDER_TOOL_CAPABILITIES[providerName]?.[apiFormat];
     const configuredCapabilities = isCatalogModel ? undefined : configured?.capabilities;
     const imageSupport = this.resolveModelSupportsImage(
@@ -1103,10 +1426,12 @@ class ProviderRegistryImpl {
         : ModelCapabilityStatus.Unknown);
     return {
       ...UNKNOWN_MODEL_CAPABILITIES,
+      ...catalogCapabilities,
       ...providerModel?.capabilities,
       ...configuredCapabilities,
       imageInput: imageCapability,
       toolCalling:
+        catalogCapabilities?.toolCalling ??
         providerModel?.capabilities?.toolCalling ??
         (endpointToolCalling === ModelCapabilityStatus.Unsupported
           ? ModelCapabilityStatus.Unsupported
@@ -1122,10 +1447,7 @@ class ProviderRegistryImpl {
     modelId: string,
     configuredSupportsImage?: boolean,
   ): boolean {
-    const providerModels = [
-      ...(this.get(providerName)?.defaultModels ?? []),
-      ...(this.get(providerName)?.codingPlanModels ?? []),
-    ].filter(candidate => candidate.id === modelId);
+    const providerModels = this.getModels(providerName, modelId);
     if (
       providerModels.length > 1 &&
       new Set(providerModels.map(candidate => candidate.supportsImage)).size > 1 &&

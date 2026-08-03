@@ -1,5 +1,5 @@
 export { resolveCodingPlanBaseUrl } from './codingPlan';
-export type { ModelCapabilities, ProviderDef } from './constants';
+export type { ModelCapabilities, ProviderDef, ProviderModelDefinition } from './constants';
 export {
   ApiFormat,
   AuthType,
