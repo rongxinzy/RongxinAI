@@ -2,10 +2,8 @@
  * Guards the wiring between the sidebar quick-skill shortcuts and the core
  * skill registry.
  *
- * Regression covered: a new academic-research shortcut was added but
- * CoworkPromptInput's hardcoded chat allowlist was not updated, so the skill
- * was filtered out of the chat skill list and the shortcut toasted
- * "skill unavailable" even though the skill is core (always enabled).
+ * Regression covered: locally enabled skills were filtered out of Chat even
+ * though the same skills were available in Work.
  */
 import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skills/constants';
 import { readFileSync } from 'node:fs';
@@ -75,16 +73,12 @@ test('every sidebar shortcut is protected by a Pi completion controller', () => 
   }
 });
 
-test('the chat skill allowlist is derived from CoreSkillId, not hardcoded', () => {
+test('chat uses the complete local skill registry shared with Work', () => {
   const source = readFileSync(
     fileURLToPath(new URL('../cowork/CoworkPromptInput.tsx', import.meta.url)),
     'utf8',
   );
-  // The allowlist must track CoreSkillId so newly added core skills become
-  // available in chat mode automatically.
-  expect(source).toContain('new Set(Object.values(CoreSkillId))');
-  // No hardcoded skill-id array may come back.
-  for (const id of Object.values(CoreSkillId)) {
-    expect(source).not.toContain(`'${id}'`);
-  }
+  expect(source).toContain('dispatch(setSkills(loadedSkills));');
+  expect(source).not.toContain('CHAT_SKILL_IDS');
+  expect(source).not.toContain('loadedSkills.filter');
 });

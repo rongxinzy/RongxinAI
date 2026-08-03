@@ -11,7 +11,6 @@ import {
 } from '@shared/components/ai-elements/prompt-input';
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { CoreSkillId } from '@shared/skills/constants';
 import { ChevronDown, Folder, Target, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -89,14 +88,6 @@ const GoalModeChip: React.FC<{ onRemove: () => void }> = ({ onRemove }) => (
 // Stable empty array reference to avoid unnecessary re-renders from useSelector
 // returning a new [] on every call (when draftAttachments[draftKey] is undefined).
 const EMPTY_ATTACHMENTS: DraftAttachment[] = [];
-/**
- * Chat mode injects a skill's instructions into a direct LLM request but cannot run skill
- * scripts. The chat-capable skills are exactly the core skills backing the sidebar quick-skill
- * shortcuts, so derive the allowlist from CoreSkillId — a hardcoded list drifts whenever a
- * new core skill is added (the shortcut then reports the skill as unavailable).
- * Replace it with capability-based filtering once skills expose that metadata.
- */
-const CHAT_SKILL_IDS: ReadonlySet<string> = new Set(Object.values(CoreSkillId));
 const IMAGE_EXTENSIONS = new Set([
   '.png',
   '.jpg',
@@ -297,9 +288,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const dragDepthRef = useRef(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const modelPatchRequestIdRef = useRef(0);
-    const workModeRef = useRef(workMode);
-    workModeRef.current = workMode;
-
     // 暴露方法给父组件
     React.useImperativeHandle(ref, () => ({
       setValue: (newValue: string) => {
@@ -437,13 +425,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
     const syncSkills = useCallback(async () => {
       const loadedSkills = await skillService.loadSkills();
-      dispatch(
-        setSkills(
-          workModeRef.current === WorkMode.Chat
-            ? loadedSkills.filter(skill => CHAT_SKILL_IDS.has(skill.id))
-            : loadedSkills,
-        ),
-      );
+      // Chat and Work share the same local skill registry. Chat sessions with
+      // selected skills are routed through the agent execution path, so local
+      // skills must not be hidden behind a core-skill-only allowlist.
+      dispatch(setSkills(loadedSkills));
     }, [dispatch]);
 
     useEffect(() => {
