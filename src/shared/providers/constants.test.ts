@@ -37,6 +37,9 @@ describe('ProviderRegistry', () => {
       [ProviderName.Volcengine, 'doubao-seed-2-0-lite-260215', 256_000, 128_000],
       [ProviderName.Xiaomi, 'mimo-v2.5-pro', 1_000_000, 128_000],
       [ProviderName.OpenAI, 'gpt-5.4', 1_050_000, 128_000],
+      [ProviderName.OpenAI, 'gpt-5.6-sol', 1_050_000, 128_000],
+      [ProviderName.OpenAI, 'gpt-5.6-terra', 1_050_000, 128_000],
+      [ProviderName.OpenAI, 'gpt-5.6-luna', 1_050_000, 128_000],
       [ProviderName.Gemini, 'gemini-3-pro-preview', 1_048_576, 65_536],
       [ProviderName.Anthropic, 'claude-opus-4-6', 1_000_000, 128_000],
       [ProviderName.OpenRouter, 'openai/gpt-5.2-codex', 400_000, 128_000],
@@ -47,6 +50,19 @@ describe('ProviderRegistry', () => {
         candidate => candidate.id === modelId,
       );
       expect(model).toMatchObject({ contextWindow, maxTokens });
+    }
+  });
+
+  test('registers GPT-5.6 model IDs and the official Sol alias', () => {
+    expect(ProviderRegistry.getModel(ProviderName.OpenAI, 'gpt-5.6')?.id).toBe('gpt-5.6-sol');
+    for (const modelId of ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']) {
+      expect(
+        ProviderRegistry.resolveModelCapabilities(ProviderName.OpenAI, modelId, ApiFormat.OpenAI),
+      ).toMatchObject({
+        toolCalling: ModelCapabilityStatus.Supported,
+        imageInput: ModelCapabilityStatus.Supported,
+        reasoning: ModelCapabilityStatus.Supported,
+      });
     }
   });
 
