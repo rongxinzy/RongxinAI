@@ -1,6 +1,8 @@
 import type { CoworkError } from '../../../common/coworkError';
 import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivity';
 import type { CoworkMessage } from '../../coworkStore';
+import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
+import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -48,6 +50,7 @@ export interface PiRuntimeEvents {
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
   sessionStopped: (sessionId: string) => void;
+  queueUpdated: (sessionId: string, items: CoworkPendingMessage[]) => void;
 }
 
 export type PiImageAttachment = {
@@ -99,6 +102,10 @@ export type PiContinueOptions = {
   _workbenchRunId?: string;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
+  /** Internal: marks a queued follow-up in the persisted transcript. */
+  _queueDelivery?: CoworkQueueDelivery;
+  /** Internal: tells Pi how to queue a prompt while the agent is settling. */
+  _streamingBehavior?: 'steer' | 'followUp';
 };
 
 /** Workbench session patch; Pi only supports switching the model. */
@@ -116,6 +123,26 @@ export interface PiRuntime {
   stopAllSessions(): void;
   respondToPermission(requestId: string, result: PiPermissionResult): void;
   isSessionActive(sessionId: string): boolean;
+  isSessionRunning(sessionId: string): boolean;
+  listPendingMessages(sessionId: string): CoworkPendingMessage[];
+  enqueuePendingMessage(
+    sessionId: string,
+    text: string,
+  ): { success: boolean; item?: CoworkPendingMessage; error?: string };
+  updatePendingMessage(
+    sessionId: string,
+    itemId: string,
+    text: string,
+  ): { success: boolean; item?: CoworkPendingMessage; error?: string };
+  deletePendingMessage(sessionId: string, itemId: string): { success: boolean; error?: string };
+  steerPendingMessage(
+    sessionId: string,
+    itemId: string,
+  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
+  followUpPendingMessage(
+    sessionId: string,
+    itemId: string,
+  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null;
   onSessionDeleted?(sessionId: string): void;
 }

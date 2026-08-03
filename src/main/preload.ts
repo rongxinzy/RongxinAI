@@ -14,6 +14,7 @@ import {
   CoworkConfigIpc,
   CoworkMemoryIpc,
   CoworkPermissionIpc,
+  CoworkQueueIpc,
   CoworkSessionIpc,
   CoworkStreamIpc,
   DialogIpc,
@@ -39,6 +40,7 @@ import {
 } from '../shared/ipc/channels';
 import type { CoworkPermissionMode, CoworkSessionMode } from '../shared/cowork/constants';
 import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
+import type { CoworkPendingMessage } from '../shared/cowork/pendingMessageQueue';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
@@ -449,6 +451,19 @@ contextBridge.exposeInMainWorld('electron', {
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 
+    listPendingMessages: (sessionId: string) =>
+      ipcRenderer.invoke(CoworkQueueIpc.List, sessionId),
+    enqueuePendingMessage: (options: { sessionId: string; text: string }) =>
+      ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
+    updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
+      ipcRenderer.invoke(CoworkQueueIpc.Update, options),
+    deletePendingMessage: (options: { sessionId: string; itemId: string }) =>
+      ipcRenderer.invoke(CoworkQueueIpc.Delete, options),
+    steerPendingMessage: (options: { sessionId: string; itemId: string }) =>
+      ipcRenderer.invoke(CoworkQueueIpc.Steer, options),
+    followUpPendingMessage: (options: { sessionId: string; itemId: string }) =>
+      ipcRenderer.invoke(CoworkQueueIpc.FollowUp, options),
+
     stopSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Stop, sessionId),
     saveSession: (session: Record<string, unknown>) =>
       ipcRenderer.invoke(CoworkSessionIpc.Save, session),
@@ -561,6 +576,9 @@ contextBridge.exposeInMainWorld('electron', {
     ) => onPush(CoworkStreamIpc.Complete, callback),
     onStreamError: (callback: (data: { sessionId: string; error: CoworkError }) => void) =>
       onPush(CoworkStreamIpc.Error, callback),
+    onStreamQueueUpdated: (
+      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
+    ) => onPush(CoworkStreamIpc.QueueUpdated, callback),
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) =>
       onPush(CoworkStreamIpc.SessionsChanged, callback),
   },

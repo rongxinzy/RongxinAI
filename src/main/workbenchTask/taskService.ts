@@ -401,10 +401,17 @@ export class WorkbenchTaskService extends EventEmitter {
             interruptedApprovalIds.add(approval.id);
           }
           this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Paused);
-          this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Paused, run.id);
+          // A task may already require review because another interrupted run
+          // or approval effect was recovered first. Do not downgrade that
+          // stronger recovery state back to paused.
+          if (task.status === WorkbenchTaskStatus.Running) {
+            this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Paused, run.id);
+          }
         } else {
           this.repository.updateRunStatus(run.id, WorkbenchRunStatus.NeedsReview);
-          this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.NeedsReview, run.id);
+          if (task.status === WorkbenchTaskStatus.Running) {
+            this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.NeedsReview, run.id);
+          }
         }
         this.repository.appendRunEvent(run.id, WorkbenchRunEventType.RecoveryRequired, {
           previousStatus: run.status,

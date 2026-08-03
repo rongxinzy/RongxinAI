@@ -23,6 +23,11 @@ import path from 'path';
 
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import {
+  CoworkQueueDelivery,
+  type CoworkPendingMessage,
+} from '../../../shared/cowork/pendingMessageQueue';
+import { CoworkSessionMode } from '../../../shared/cowork/constants';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import {
   WorkbenchContractKind,
@@ -71,6 +76,7 @@ import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool'
 import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
+import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import {
@@ -91,7 +97,7 @@ import type {
 
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 interface PiSession {
-  prompt(text: string): Promise<void>;
+  prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
   steer(text: string): Promise<void>;
   abort(): Promise<void>;
   abortBash(): void;
@@ -209,6 +215,12 @@ interface ActivePiSession {
   workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
   autoApprove: boolean;
+  /** True while Pi is executing the current Work/Chat turn. */
+  isRunning: boolean;
+  /** True when the current turn settled with an unrecoverable Pi error. */
+  turnFailed: boolean;
+  /** Prevents duplicate queue drains when Pi emits multiple settled events. */
+  queueFlushInFlight: boolean;
 }
 
 // ── Dynamic imports ──
@@ -339,6 +351,7 @@ if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
+  private readonly pendingMessageQueue = new PiPendingMessageQueue();
   private readonly approvalSessionMap = new Map<string, string>();
   private readonly pendingAskUserQuestions = new Map<
     string,
@@ -673,6 +686,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workbenchContract,
         workspaceRoot,
         autoApprove: Boolean(options.autoApprove),
+        isRunning: true,
+        turnFailed: false,
+        queueFlushInFlight: false,
       };
 
       // Subscribe to Pi events before sending the prompt
@@ -742,6 +758,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     active.autoApprove = Boolean(options.autoApprove);
+    active.isRunning = true;
+    active.turnFailed = false;
 
     const requestedSystemPrompt = options.systemPrompt?.trim();
     const requestedSkillIds =
@@ -793,6 +811,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       } catch (error) {
         active.resourceState.systemPrompt = previousSystemPrompt;
         active.resourceState.skillIds = previousSkillIds;
+        active.isRunning = false;
         const message = error instanceof Error ? error.message : String(error);
         this.emit('error', sessionId, classifyCoworkError(message));
         throw error;
@@ -829,6 +848,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
     active.writeTokenLimitRecovery.reset();
     active.pendingError = null;
+    active.turnFailed = false;
 
     // Emit user message (persisted to SQLite, same as startSession).
     if (!options._skipUserMessage) {
@@ -837,7 +857,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         type: 'user',
         content: prompt,
         timestamp: Date.now(),
-        metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
+        metadata:
+          options.skillIds?.length || options._queueDelivery
+            ? {
+                ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
+                ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
+              }
+            : undefined,
       };
       const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
       this.emit('message', sessionId, persisted);
@@ -862,8 +888,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     try {
-      await active.piSession.prompt(nextPrompt);
+      const promptOptions = options._streamingBehavior
+        ? { streamingBehavior: options._streamingBehavior }
+        : undefined;
+      if (promptOptions) {
+        await active.piSession.prompt(nextPrompt, promptOptions);
+      } else {
+        await active.piSession.prompt(nextPrompt);
+      }
     } catch (error) {
+      active.isRunning = false;
       if (active.abortController.signal.aborted) {
         this.emit('sessionStopped', sessionId);
         return;
@@ -912,12 +946,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.dismissAskUserQuestionsBySession(sessionId);
     const active = this.activeSessions.get(sessionId);
     if (!active) return;
+    const wasRunning = active.isRunning;
 
     this.finalizeActiveThinking(sessionId, active);
 
     // Mark the session as aborted so continueSession knows not to reuse the Pi
     // session object, which may be in an inconsistent state after abort.
     active.aborted = true;
+    active.isRunning = false;
+    active.turnFailed = false;
     active.agentLoop.stop();
     // Drop any deferred error without surfacing it — the user stopped the turn.
     active.pendingError = null;
@@ -933,6 +970,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     void active.piSession.abort();
     this.workbenchTaskService?.pauseRun(sessionId, 'The user stopped this run.');
     this.emit('sessionStopped', sessionId);
+
+    // A user stop ends the current turn without cancelling messages already
+    // queued in Work. Start the next follow-up from a fresh Pi session; the
+    // internal stop used during that recreation is not running and will not
+    // recursively drain the queue.
+    if (
+      wasRunning &&
+      active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
+      this.pendingMessageQueue.hasPendingFollowUp(sessionId)
+    ) {
+      const next = this.pendingMessageQueue.findNextPending(
+        sessionId,
+        CoworkQueueDelivery.FollowUp,
+      );
+      if (next) void this.followUpPendingMessage(sessionId, next.id);
+    }
   }
 
   stopAllSessions(): void {
@@ -980,6 +1033,182 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return this.activeSessions.has(sessionId);
   }
 
+  isSessionRunning(sessionId: string): boolean {
+    const active = this.activeSessions.get(sessionId);
+    return Boolean(active && active.isRunning && !active.aborted);
+  }
+
+  listPendingMessages(sessionId: string): CoworkPendingMessage[] {
+    return this.pendingMessageQueue.list(sessionId);
+  }
+
+  enqueuePendingMessage(
+    sessionId: string,
+    text: string,
+  ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
+    const active = this.activeSessions.get(sessionId);
+    if (!this.isWorkSession(sessionId, active)) {
+      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
+    }
+    if (!active || !this.isSessionRunning(sessionId)) {
+      return { success: false, error: 'The Work session is not running.' };
+    }
+    const normalizedText = text.trim();
+    if (!normalizedText) return { success: false, error: 'Message text is required.' };
+    const item = this.pendingMessageQueue.enqueue(
+      sessionId,
+      normalizedText,
+      CoworkQueueDelivery.FollowUp,
+    );
+    this.emitQueueUpdated(sessionId);
+    return { success: true, item };
+  }
+
+  updatePendingMessage(
+    sessionId: string,
+    itemId: string,
+    text: string,
+  ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
+    if (!this.isWorkSession(sessionId, this.activeSessions.get(sessionId))) {
+      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
+    }
+    const normalizedText = text.trim();
+    if (!normalizedText) return { success: false, error: 'Message text is required.' };
+    const item = this.pendingMessageQueue.update(sessionId, itemId, normalizedText);
+    if (!item) return { success: false, error: 'Pending message was not found.' };
+    this.emitQueueUpdated(sessionId);
+    return { success: true, item };
+  }
+
+  deletePendingMessage(sessionId: string, itemId: string): { success: boolean; error?: string } {
+    if (!this.isWorkSession(sessionId, this.activeSessions.get(sessionId))) {
+      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
+    }
+    if (!this.pendingMessageQueue.remove(sessionId, itemId)) {
+      return { success: false, error: 'Pending message was not found.' };
+    }
+    this.emitQueueUpdated(sessionId);
+    return { success: true };
+  }
+
+  async steerPendingMessage(
+    sessionId: string,
+    itemId: string,
+  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }> {
+    const active = this.activeSessions.get(sessionId);
+    if (!this.isWorkSession(sessionId, active)) {
+      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
+    }
+    if (!active || !this.isSessionRunning(sessionId)) {
+      return { success: false, error: 'The Work session is not running.' };
+    }
+    // A queued message is initially classified as FollowUp, but the user can
+    // explicitly promote any pending item to an immediate Steer.
+    const item = this.pendingMessageQueue.take(sessionId, itemId);
+    if (!item) return { success: false, error: 'Pending message was not found.' };
+    this.emitQueueUpdated(sessionId);
+    try {
+      await active.piSession.steer(item.text);
+      this.persistQueuedUserMessage(sessionId, item.text, CoworkQueueDelivery.Steer);
+      active.isRunning = true;
+      this.pendingMessageQueue.finishDelivery(item.id);
+      return { success: true, item };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const restored = this.pendingMessageQueue.restore(sessionId, { ...item, error: message });
+      this.emitQueueUpdated(sessionId);
+      return { success: false, item: restored, error: message };
+    }
+  }
+
+  async followUpPendingMessage(
+    sessionId: string,
+    itemId: string,
+  ): Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }> {
+    const active = this.activeSessions.get(sessionId);
+    if (!this.isWorkSession(sessionId, active)) {
+      return { success: false, error: 'Pending message queue is only available in Work sessions.' };
+    }
+    if (!active) return { success: false, error: 'The Work session is not active.' };
+    if (this.isSessionRunning(sessionId)) {
+      return { success: false, error: 'The Work session is still running.' };
+    }
+    const item = this.pendingMessageQueue.take(sessionId, itemId, CoworkQueueDelivery.FollowUp);
+    if (!item) return { success: false, error: 'Pending message was not found.' };
+    this.emitQueueUpdated(sessionId);
+    try {
+      await this.continueSession(sessionId, item.text, {
+        sessionMode: CoworkSessionMode.Work,
+        _queueDelivery: CoworkQueueDelivery.FollowUp,
+        _streamingBehavior: 'followUp',
+      });
+      this.pendingMessageQueue.finishDelivery(item.id);
+      return { success: true, item };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const restored = this.pendingMessageQueue.restore(sessionId, { ...item, error: message });
+      this.emitQueueUpdated(sessionId);
+      return { success: false, item: restored, error: message };
+    }
+  }
+
+  private isWorkSession(sessionId: string, active: ActivePiSession | undefined): boolean {
+    if (active) return active.workbenchContract.kind !== WorkbenchContractKind.Chat;
+    return this.store?.getSession(sessionId)?.mode !== CoworkSessionMode.Chat;
+  }
+
+  private persistQueuedUserMessage(
+    sessionId: string,
+    text: string,
+    delivery: CoworkQueueDelivery,
+  ): CoworkMessage {
+    const message: CoworkMessage = {
+      id: randomUUID(),
+      type: 'user',
+      content: text,
+      timestamp: Date.now(),
+      metadata: { queueDelivery: delivery },
+    };
+    const persisted = this.store ? this.store.addMessage(sessionId, message) : message;
+    this.emit('message', sessionId, persisted);
+    if (this.store) this.store.updateSession(sessionId, { status: 'running' });
+    return persisted;
+  }
+
+  private emitQueueUpdated(sessionId: string): void {
+    this.emit('queueUpdated', sessionId, this.pendingMessageQueue.list(sessionId));
+  }
+
+  private async flushFollowUpQueue(sessionId: string, active: ActivePiSession): Promise<void> {
+    if (active.queueFlushInFlight || active.aborted || active.pendingError || active.turnFailed) return;
+    if (active.workbenchContract.kind === WorkbenchContractKind.Chat) return;
+    active.queueFlushInFlight = true;
+    let retryAfterFailure = false;
+    try {
+      if (active.aborted || active.isRunning) return;
+      const next = this.pendingMessageQueue.takeNext(sessionId, CoworkQueueDelivery.FollowUp);
+      if (!next) return;
+      this.emitQueueUpdated(sessionId);
+      try {
+        await this.continueSession(sessionId, next.text, {
+          sessionMode: CoworkSessionMode.Work,
+          _queueDelivery: CoworkQueueDelivery.FollowUp,
+          _streamingBehavior: 'followUp',
+        });
+        this.pendingMessageQueue.finishDelivery(next.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.pendingMessageQueue.restore(sessionId, { ...next, error: message });
+        this.emitQueueUpdated(sessionId);
+        console.error('[PiRuntime] queued follow-up failed:', error);
+        retryAfterFailure = true;
+      }
+    } finally {
+      active.queueFlushInFlight = false;
+      if (retryAfterFailure) void this.flushFollowUpQueue(sessionId, active);
+    }
+  }
+
   getSessionConfirmationMode(sessionId: string): 'modal' | 'text' | null {
     return this.activeSessions.get(sessionId)?.confirmationMode || null;
   }
@@ -987,6 +1216,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   onSessionDeleted(sessionId: string): void {
     this.stopSession(sessionId);
     this.activeSessions.delete(sessionId);
+    if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
   }
 
@@ -1118,9 +1348,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
     switch (event.type) {
       case 'agent_start':
+        active.isRunning = true;
         break;
 
       case 'turn_start':
+        active.isRunning = true;
         active.preparingToolCallIdByContentIndex.clear();
         {
           const clearActivity = active.toolActivityTracker.clear();
@@ -1205,12 +1437,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             // attempt — flushPendingError surfaces the error exactly once when
             // the run settles (auto_retry_end / agent_settled).
             active.pendingError = { message: errMsg, classified: classifyCoworkError(errMsg) };
+            active.turnFailed = true;
             return;
           }
 
           // A successful assistant message after failed attempts means the retry
           // recovered — drop the deferred error so it is never surfaced.
           active.pendingError = null;
+          active.turnFailed = false;
 
           const { text, thinking } = extractStreamingSnapshot(event.message);
           const finalThinking = thinking || active.thinkingText;
@@ -1369,6 +1603,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           });
           break;
         }
+        active.isRunning = false;
+        // Pi versions differ in whether they emit agent_settled after agent_end.
+        // Drain queued Work follow-ups here so completion never leaves them stuck.
+        if (
+          active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
+          this.pendingMessageQueue.hasPendingFollowUp(sessionId)
+        ) {
+          void this.flushFollowUpQueue(sessionId, active);
+          break;
+        }
         if (this.store) this.store.updateSession(sessionId, { status: 'idle' });
         if (active.workbenchRunId && this.workbenchTaskService) {
           const workflowSnapshot = active.researchRun
@@ -1405,7 +1649,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       case 'agent_settled':
         // Run settled (covers non-retryable errors with no auto-retry) —
         // surface the deferred error, if any. Idempotent after auto_retry_end.
+        active.isRunning = false;
         this.flushPendingError(sessionId, active);
+        void this.flushFollowUpQueue(sessionId, active);
         break;
 
       default:
@@ -1429,6 +1675,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const pending = active.pendingError;
     if (!pending) return;
     active.pendingError = null;
+    active.turnFailed = true;
+    active.isRunning = false;
     this.workbenchTaskService?.failRun(sessionId, { message: pending.message });
     // Persist a system error message so the error survives session switching
     // and is visible in the message list. The classified kind lets the renderer

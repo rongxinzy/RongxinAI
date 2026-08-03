@@ -8,6 +8,7 @@ import type {
   CoworkPermissionOrigin,
   CoworkSessionMode,
 } from '../../shared/cowork/constants';
+import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
@@ -772,6 +773,30 @@ interface IElectronAPI {
       error?: string;
       code?: string;
     }>;
+    listPendingMessages: (
+      sessionId: string,
+    ) => Promise<{ success: boolean; items?: CoworkPendingMessage[]; error?: string }>;
+    enqueuePendingMessage: (options: {
+      sessionId: string;
+      text: string;
+    }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
+    updatePendingMessage: (options: {
+      sessionId: string;
+      itemId: string;
+      text: string;
+    }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
+    deletePendingMessage: (options: {
+      sessionId: string;
+      itemId: string;
+    }) => Promise<{ success: boolean; error?: string }>;
+    steerPendingMessage: (options: {
+      sessionId: string;
+      itemId: string;
+    }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
+    followUpPendingMessage: (options: {
+      sessionId: string;
+      itemId: string;
+    }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     stopSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
     saveSession: (session: Record<string, unknown>) => Promise<CoworkSessionResult>;
     deleteSession: (sessionId: string) => Promise<{ success: boolean; error?: string }>;
@@ -892,6 +917,9 @@ interface IElectronAPI {
     ) => () => void;
     onStreamError: (
       callback: (data: { sessionId: string; error: CoworkError }) => void,
+    ) => () => void;
+    onStreamQueueUpdated: (
+      callback: (data: { sessionId: string; items: CoworkPendingMessage[] }) => void,
     ) => () => void;
     onSessionsChanged: (callback: (data: { sessionId?: string }) => void) => () => void;
   };
