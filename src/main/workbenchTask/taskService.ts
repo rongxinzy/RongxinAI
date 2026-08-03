@@ -10,6 +10,7 @@ import {
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
   WorkbenchTaskStatus,
+  WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
   type WorkbenchApproval,
   type WorkbenchApprovalResponseInput,
@@ -21,8 +22,10 @@ import {
   type WorkbenchTaskDetail,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
+import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchTaskRepository } from './repository';
 import { classifyWorkbenchToolRisk, createToolIdempotencyKey } from './riskClassifier';
+import { verifyWorkbenchRun, type WorkbenchVerificationContext } from './verification';
 
 export interface WorkbenchApprovalRequestedEvent {
   sessionId: string;
@@ -43,12 +46,6 @@ const MAX_RESULT_NODES = 500;
 const MAX_RESULT_COLLECTION_ENTRIES = 50;
 const MAX_RESULT_STRING_LENGTH = 4_000;
 const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
-const pendingVerification: WorkbenchVerificationResult = {
-  outcome: WorkbenchVerificationOutcome.AcceptanceRequired,
-  checks: [],
-  evidence: [],
-  summary: 'The run ended and is waiting for contract verification.',
-};
 
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
@@ -124,29 +121,114 @@ export class WorkbenchTaskService extends EventEmitter {
     return result;
   }
 
-  completeRun(runId: string): WorkbenchTaskDetail {
-    const run = this.requireRun(runId);
+  completeRun(input: {
+    sessionId: string;
+    runId: string;
+    workspaceRoot: string;
+    finalAnswer: string;
+    finalMessageId?: string | null;
+    workflowCompleted?: boolean;
+    workflowSnapshot?: Record<string, unknown> | null;
+    streamClosedCleanly?: boolean;
+  }): WorkbenchTaskDetail {
+    const run = this.requireRun(input.runId);
     const task = this.requireTask(run.taskId);
     if (run.status !== WorkbenchRunStatus.Running) {
       const current = this.repository.getDetail(task.id);
       if (!current) throw new Error('Workbench task detail disappeared before verification.');
       return current;
     }
+    const verificationContext: WorkbenchVerificationContext = {
+      contract: task.contract,
+      finalAnswer: input.finalAnswer,
+      streamClosedCleanly: input.streamClosedCleanly !== false,
+      workflowCompleted: input.workflowCompleted,
+      workflowSnapshot: input.workflowSnapshot,
+    };
+    const result = verifyWorkbenchRun(verificationContext);
+    const toolArtifacts = this.repository
+      .listApprovalsForRun(run.id)
+      .filter(approval => approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded)
+      .flatMap(approval => {
+        const pathValue =
+          approval.request.path ?? approval.request.file_path ?? approval.request.filePath;
+        return typeof pathValue === 'string'
+          ? [{ path: pathValue, toolName: approval.toolName, toolCallId: approval.toolCallId }]
+          : [];
+      });
     this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Verifying);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationStarted);
-      this.repository.updateRunStatus(run.id, WorkbenchRunStatus.NeedsReview, {
-        verificationResult: pendingVerification,
-      });
-      this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.NeedsReview, run.id);
+      for (const artifact of collectWorkbenchArtifacts({
+        taskId: task.id,
+        runId: run.id,
+        workspaceRoot: input.workspaceRoot,
+        finalAnswer: input.finalAnswer,
+        finalMessageId: input.finalMessageId,
+        workflowSnapshot: input.workflowSnapshot,
+        toolArtifacts,
+      })) {
+        this.repository.addArtifact(artifact);
+      }
+      if (result.outcome === WorkbenchVerificationOutcome.Passed) {
+        this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
+          verificationResult: result,
+        });
+        this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Completed, null);
+      } else {
+        this.repository.updateRunStatus(run.id, WorkbenchRunStatus.NeedsReview, {
+          verificationResult: result,
+        });
+        this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.NeedsReview, run.id);
+      }
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
-        outcome: pendingVerification.outcome,
+        outcome: result.outcome,
+        summary: result.summary,
       });
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
     this.emitChanged(detail.task);
     return detail;
+  }
+
+  acceptTask(taskId: string): WorkbenchTaskDetail {
+    const detail = this.repository.getDetail(taskId);
+    if (!detail) throw new Error('Workbench task not found.');
+    const run = detail.runs.find(candidate => candidate.id === detail.task.activeRunId);
+    if (
+      detail.task.status !== WorkbenchTaskStatus.NeedsReview ||
+      !run?.verificationResult ||
+      run.verificationResult.outcome !== WorkbenchVerificationOutcome.AcceptanceRequired
+    ) {
+      throw new Error('This task cannot be accepted because deterministic verification failed.');
+    }
+    const acceptedResult: WorkbenchVerificationResult = {
+      ...run.verificationResult,
+      outcome: WorkbenchVerificationOutcome.Passed,
+      checks: [
+        ...run.verificationResult.checks,
+        {
+          name: 'user_acceptance',
+          status: WorkbenchVerificationCheckStatus.Passed,
+        },
+      ],
+      summary: 'The user accepted the work result.',
+    };
+    this.repository.transaction(() => {
+      this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
+        verificationResult: acceptedResult,
+      });
+      this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
+      this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
+        outcome: acceptedResult.outcome,
+        acceptedByUser: true,
+      });
+    });
+    const accepted = this.repository.getDetail(taskId);
+    if (!accepted) throw new Error('Workbench task not found after acceptance.');
+    this.emitChanged(accepted.task);
+    return accepted;
   }
 
   pauseRun(sessionId: string, reason: string): void {

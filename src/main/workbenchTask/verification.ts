@@ -1,0 +1,119 @@
+import {
+  WorkbenchContractKind,
+  WorkbenchVerificationCheckStatus,
+  WorkbenchVerificationOutcome,
+  type WorkbenchTaskContract,
+  type WorkbenchVerificationResult,
+} from '../../shared/workbenchTask';
+
+export interface WorkbenchVerificationContext {
+  contract: WorkbenchTaskContract;
+  finalAnswer: string;
+  streamClosedCleanly: boolean;
+  workflowCompleted?: boolean;
+  workflowSnapshot?: Record<string, unknown> | null;
+}
+
+const completionFailures = (snapshot: Record<string, unknown> | null | undefined): string[] => {
+  const raw = snapshot?.completionFailures;
+  return Array.isArray(raw)
+    ? raw.filter((value): value is string => typeof value === 'string')
+    : [];
+};
+
+export function verifyWorkbenchRun(
+  context: WorkbenchVerificationContext,
+): WorkbenchVerificationResult {
+  const finalAnswerPresent = context.finalAnswer.trim().length > 0;
+  const baselinePassed = finalAnswerPresent && context.streamClosedCleanly;
+  const baselineChecks = [
+    {
+      name: 'final_response',
+      status: finalAnswerPresent
+        ? WorkbenchVerificationCheckStatus.Passed
+        : WorkbenchVerificationCheckStatus.Failed,
+      detail: finalAnswerPresent ? undefined : 'The final assistant response is empty.',
+    },
+    {
+      name: 'stream_closed_cleanly',
+      status: context.streamClosedCleanly
+        ? WorkbenchVerificationCheckStatus.Passed
+        : WorkbenchVerificationCheckStatus.Failed,
+    },
+  ];
+  if (context.contract.kind === WorkbenchContractKind.Chat) {
+    return {
+      outcome: baselinePassed
+        ? WorkbenchVerificationOutcome.Passed
+        : WorkbenchVerificationOutcome.Failed,
+      checks: baselineChecks,
+      evidence: [],
+      summary: baselinePassed
+        ? 'The chat response contract passed.'
+        : 'The chat response contract did not pass.',
+    };
+  }
+
+  if (
+    context.contract.kind === WorkbenchContractKind.Research ||
+    context.contract.kind === WorkbenchContractKind.Shortcut
+  ) {
+    const failures = completionFailures(context.workflowSnapshot);
+    const passed = baselinePassed && context.workflowCompleted === true && failures.length === 0;
+    return {
+      outcome: passed ? WorkbenchVerificationOutcome.Passed : WorkbenchVerificationOutcome.Failed,
+      checks: [
+        ...baselineChecks,
+        {
+          name: 'workflow_completion_gate',
+          status: passed
+            ? WorkbenchVerificationCheckStatus.Passed
+            : WorkbenchVerificationCheckStatus.Failed,
+          detail: failures.join('; ') || (passed ? undefined : 'The workflow did not complete.'),
+        },
+      ],
+      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      summary: passed
+        ? 'The deterministic workflow contract passed.'
+        : 'The deterministic workflow contract requires review.',
+    };
+  }
+
+  if (!baselinePassed) {
+    return {
+      outcome: WorkbenchVerificationOutcome.Failed,
+      checks: baselineChecks,
+      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      summary: 'The work result failed the baseline completeness checks.',
+    };
+  }
+
+  const accepted = context.workflowSnapshot?.accepted === true;
+  if (accepted && context.workflowCompleted) {
+    return {
+      outcome: WorkbenchVerificationOutcome.Passed,
+      checks: [
+        {
+          name: 'explicit_acceptance',
+          status: WorkbenchVerificationCheckStatus.Passed,
+        },
+      ],
+      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      summary: 'The work result was explicitly accepted.',
+    };
+  }
+
+  return {
+    outcome: WorkbenchVerificationOutcome.AcceptanceRequired,
+    checks: [
+      {
+        name: 'deterministic_contract',
+        status: WorkbenchVerificationCheckStatus.Skipped,
+        detail: 'No deterministic verifier is available for this work result.',
+      },
+      ...baselineChecks,
+    ],
+    evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+    summary: 'The result requires explicit user acceptance.',
+  };
+}
