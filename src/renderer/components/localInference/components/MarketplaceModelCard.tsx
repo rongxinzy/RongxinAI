@@ -272,9 +272,11 @@ export function MarketplaceModelCard({
                   {i18nService.t('marketplaceCancelInstall')}
                 </Button>
               ) : (
-                <Button type="button" disabled={loading || !installable} size="sm" onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}>
+                <Button type="button" disabled={loading} size="sm" onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}>
                   <Download data-icon="inline-start" />
-                  {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceMetadataPending')}
+                  {installable
+                    ? i18nService.t('marketplaceInstall')
+                    : i18nService.t('marketplaceVerifyAndInstall')}
                 </Button>
               )}
           </CardFooter>
