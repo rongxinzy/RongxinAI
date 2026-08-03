@@ -101,6 +101,7 @@ import { useInitialConversationPosition } from './hooks/useInitialConversationPo
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
+import { WorkbenchTaskStatusBar } from './WorkbenchTaskStatus';
 
 // The artifact panel only mounts when the user opens it, so keep its code
 // (and the whole renderers tree behind it) out of the cowork startup chunk.
@@ -1086,6 +1087,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </span>
             )}
           </h1>
+          {sessionId && <WorkbenchTaskStatusBar sessionId={sessionId} />}
         </div>
 
         {/* Right side: Folder + Artifact toggle */}
