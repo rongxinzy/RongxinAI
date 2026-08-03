@@ -293,9 +293,7 @@ export class WorkbenchTaskService extends EventEmitter {
       isSafeShellCommand(input.toolInput.command);
     const canAutoApprove =
       input.autoApprove &&
-      (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly ||
-        riskLevel === WorkbenchApprovalRiskLevel.Reversible ||
-        safeShell);
+      (riskLevel === WorkbenchApprovalRiskLevel.Reversible || safeShell);
     const approval = this.repository.transaction(() => {
       const created = this.repository.createApproval({
         taskId: task.id,
