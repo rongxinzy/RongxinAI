@@ -16,6 +16,7 @@ import type { CoworkSessionStatus, CoworkSessionSummary } from '../../types/cowo
 interface CoworkSessionItemProps {
   session: CoworkSessionSummary;
   hasUnread: boolean;
+  hasPendingPermission: boolean;
   isActive: boolean;
   isBatchMode: boolean;
   isSelected: boolean;
@@ -69,6 +70,7 @@ const formatRelativeTime = (timestamp: number): { compact: string; full: string 
 const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
   session,
   hasUnread,
+  hasPendingPermission,
   isActive,
   isBatchMode,
   isSelected,
@@ -179,8 +181,9 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
   const deleteLabel = i18nService.t('deleteSession');
   const relativeTime = formatRelativeTime(session.updatedAt);
   const showRunningIndicator = session.status === 'running';
+  const showPendingPermission = hasPendingPermission;
   const showUnreadIndicator = !showRunningIndicator && hasUnread;
-  const showStatusIndicator = showRunningIndicator || showUnreadIndicator;
+  const showStatusIndicator = showRunningIndicator || showUnreadIndicator || showPendingPermission;
   const showRelativeTime = !showStatusIndicator;
   const batchLabel = i18nService.t('batchOperations');
   const menuItems = useMemo(() => {
@@ -238,11 +241,17 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             {/* Status indicator */}
             {showStatusIndicator && (
               <span
-                className={`block w-2 h-2 rounded-full bg-ring shrink-0 ${
-                  showRunningIndicator ? 'shadow-[0_0_6px_var(--ring)] animate-pulse' : ''
+                className={`block w-2 h-2 rounded-full shrink-0 ${
+                  showPendingPermission
+                    ? 'bg-success animate-pulse'
+                    : 'bg-ring'
                 }`}
                 title={
-                  showRunningIndicator ? i18nService.t(statusLabels[session.status]) : undefined
+                  showPendingPermission
+                    ? i18nService.t('workbenchTaskStatusWaitingApproval')
+                    : showRunningIndicator
+                      ? i18nService.t(statusLabels[session.status])
+                      : undefined
                 }
               />
             )}
@@ -264,19 +273,30 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                 className="flex-1 min-w-0 rounded-lg border border-input bg-background px-2 py-1 text-sm font-medium text-foreground transition-colors outline-none hover:ring-1 hover:ring-ring/40 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40"
               />
             ) : (
-              <h3 className="text-sm font-medium text-foreground truncate">{session.title}</h3>
+              <div className="flex min-w-0 items-center gap-2">
+                <h3 className="min-w-0 truncate text-sm font-medium text-foreground">
+                  {session.title}
+                </h3>
+                {showPendingPermission && (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
+                    {i18nService.t('workbenchTaskStatusWaitingApproval')}
+                  </span>
+                )}
+              </div>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {showRelativeTime && (
-              <span className="whitespace-nowrap" title={relativeTime.full}>
-                {relativeTime.compact}
+          {!showPendingPermission && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {showRelativeTime && (
+                <span className="whitespace-nowrap" title={relativeTime.full}>
+                  {relativeTime.compact}
+                </span>
+              )}
+              <span className="text-[10px] uppercase tracking-wider whitespace-nowrap">
+                {i18nService.t(statusLabels[session.status])}
               </span>
-            )}
-            <span className="text-[10px] uppercase tracking-wider whitespace-nowrap">
-              {i18nService.t(statusLabels[session.status])}
-            </span>
-          </div>
+            </div>
+          )}
         </div>
       </div>
 

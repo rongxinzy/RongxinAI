@@ -72,6 +72,7 @@ function detectDangerLevelFromCommand(command: string): DangerLevel {
 interface CoworkPermissionModalProps {
   permission: CoworkPermissionRequest;
   onRespond: (result: CoworkPermissionResult) => void;
+  inline?: boolean;
 }
 
 type QuestionOption = {
@@ -117,7 +118,11 @@ const resolveConfirmModeButtons = (
   return { primary: firstOption, secondary: secondOption };
 };
 
-const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({ permission, onRespond }) => {
+const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
+  permission,
+  onRespond,
+  inline = false,
+}) => {
   const toolInput = useMemo(() => permission.toolInput ?? {}, [permission.toolInput]);
 
   const questions = useMemo<QuestionItem[]>(() => {
@@ -353,10 +358,16 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({ permissio
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
-      <div className="modal-content w-full max-w-lg mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+    <div className={inline ? 'w-full' : 'fixed inset-0 z-50 flex items-center justify-center modal-backdrop'}>
+      <div
+        className={
+          inline
+            ? 'w-full bg-surface-raised border border-border rounded-2xl shadow-sm overflow-hidden'
+            : 'modal-content w-full max-w-lg mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden'
+        }
+      >
+        {!inline && (
+          <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
           <div
             className={`p-2 rounded-full ${isQuestionTool && !isConfirmMode ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}
           >
@@ -376,13 +387,16 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({ permissio
                 : i18nService.t('coworkPermissionDescription')}
             </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={handleDeny} aria-label="Close">
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
+          {!inline && (
+            <Button variant="ghost" size="icon" onClick={handleDeny} aria-label="Close">
+              <X className="h-5 w-5" />
+            </Button>
+          )}
+          </div>
+        )}
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+        <div className={inline ? 'px-5 py-4 space-y-4 max-h-[42vh] overflow-y-auto' : 'px-6 py-4 space-y-4 max-h-[60vh] overflow-y-auto'}>
           {isConfirmMode ? (
             /* Simple confirm dialog — show question text + allow/deny buttons */
             <div className="px-3 py-2 rounded-lg bg-background">
@@ -454,6 +468,22 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({ permissio
                 );
               })}
             </>
+          ) : inline ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-background border border-border">
+                  <code className="text-[11px]">&gt;_</code>
+                </span>
+                <span>{permission.toolName}</span>
+              </div>
+              <div className="rounded-xl bg-background px-3 py-2.5">
+                <pre className="text-xs text-foreground whitespace-pre-wrap wrap-break-word font-mono max-h-24 overflow-y-auto">
+                  {typeof toolInput.command === 'string'
+                    ? toolInput.command
+                    : formatToolInput(permission.toolInput)}
+                </pre>
+              </div>
+            </div>
           ) : (
             <>
               {/* Tool name */}
@@ -512,7 +542,7 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({ permissio
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border">
+        <div className={inline ? 'flex items-center justify-end gap-3 px-5 py-3' : 'flex items-center justify-end gap-3 px-6 py-4 border-t border-border'}>
           <Button
             variant="ghost"
             onClick={

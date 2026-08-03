@@ -71,6 +71,8 @@ export interface CoworkViewProps {
   updateBadge?: React.ReactNode;
   inlineQuestionPermission?: CoworkPermissionRequest | null;
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
+  inlinePermission?: CoworkPermissionRequest | null;
+  onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
 }
 
 const DirectChatDataChunkType = {
@@ -133,6 +135,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   updateBadge,
   inlineQuestionPermission,
   onRespondToInlineQuestion,
+  inlinePermission,
+  onRespondToInlinePermission,
 }) => {
   const dispatch = useDispatch();
 
@@ -1451,6 +1455,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onLocalThinkingEnabledChange={setLocalThinkingEnabled}
           inlineQuestionPermission={inlineQuestionPermission}
           onRespondToInlineQuestion={onRespondToInlineQuestion}
+          inlinePermission={inlinePermission}
+          onRespondToInlinePermission={onRespondToInlinePermission}
         />
       </div>
     );

@@ -1,13 +1,11 @@
 import { Button } from '@shared/components/ui/button';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { MessageCircle } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate/constants';
 import { CoworkView } from './components/cowork';
-import CoworkPermissionModal from './components/cowork/CoworkPermissionModal';
-import CoworkQuestionWizard from './components/cowork/CoworkQuestionWizard';
 import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
@@ -37,7 +35,7 @@ import { themeService } from './services/theme';
 import { RootState, store } from './store';
 import {
   selectCurrentSessionId,
-  selectFirstPendingPermission,
+  selectPendingPermissions,
 } from './store/selectors/coworkSelectors';
 import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
@@ -120,7 +118,8 @@ const App: React.FC = () => {
   const dispatch = useDispatch();
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const currentSessionId = useSelector(selectCurrentSessionId);
-  const pendingPermission = useSelector(selectFirstPendingPermission);
+  const pendingPermissions = useSelector(selectPendingPermissions);
+  const pendingPermission = pendingPermissions.find(permission => permission.sessionId === currentSessionId) ?? null;
   const isWindows = window.electron.platform === 'win32';
 
   const waitWithTimeout = useCallback(
@@ -637,33 +636,7 @@ const App: React.FC = () => {
 
   // Update system is permanently disabled
 
-  // 根据场景选择使用哪个权限组件
-  const permissionModal = useMemo(() => {
-    if (!pendingPermission || isInlineAskUserQuestion) return null;
-
-    // 检查是否为 AskUserQuestion 且有多个问题 -> 使用向导式组件
-    const isQuestionTool = isAskUserQuestionPermission(pendingPermission);
-    if (isQuestionTool && pendingPermission.toolInput) {
-      const rawQuestions = (pendingPermission.toolInput as Record<string, unknown>).questions;
-      const hasMultipleQuestions = Array.isArray(rawQuestions) && rawQuestions.length > 1;
-
-      if (hasMultipleQuestions) {
-        return (
-          <CoworkQuestionWizard
-            permission={pendingPermission}
-            onRespond={handlePermissionResponse}
-          />
-        );
-      }
-    }
-
-    // 其他情况使用原有的权限模态框
-    return (
-      <CoworkPermissionModal permission={pendingPermission} onRespond={handlePermissionResponse} />
-    );
-  }, [pendingPermission, handlePermissionResponse, isInlineAskUserQuestion]);
-
-  const isOverlayActive = showSettings || permissionModal !== null;
+  const isOverlayActive = showSettings;
   const shouldShowUpdateBadge =
     updateInfo &&
     (appUpdateState.status === AppUpdateStatus.Ready ||
@@ -842,6 +815,15 @@ const App: React.FC = () => {
                       updateBadge={null}
                       inlineQuestionPermission={isInlineAskUserQuestion ? pendingPermission : null}
                       onRespondToInlineQuestion={handlePermissionResponse}
+                      inlinePermission={
+                        pendingPermission &&
+                        mainView === 'cowork' &&
+                        pendingPermission.sessionId === currentSessionId &&
+                        !isInlineAskUserQuestion
+                          ? pendingPermission
+                          : null
+                      }
+                      onRespondToInlinePermission={handlePermissionResponse}
                     />
                   )}
                 </React.Suspense>
@@ -863,7 +845,6 @@ const App: React.FC = () => {
             </React.Suspense>
           </LazyChunkErrorBoundary>
         )}
-        {permissionModal}
       </div>
     </TooltipProvider>
   );
