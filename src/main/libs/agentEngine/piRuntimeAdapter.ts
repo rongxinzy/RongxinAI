@@ -763,7 +763,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
     }
 
-    active.autoApprove = Boolean(options.autoApprove);
+    if (options.autoApprove !== undefined) {
+      active.autoApprove = Boolean(options.autoApprove);
+    }
     active.isRunning = true;
     active.turnFailed = false;
 

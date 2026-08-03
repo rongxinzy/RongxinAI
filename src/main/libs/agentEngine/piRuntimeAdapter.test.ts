@@ -1861,6 +1861,24 @@ describe('PiRuntimeAdapter', () => {
       expect(adapter.listPendingMessages('queue-session')).toEqual([]);
     });
 
+    it('preserves Allow All across internal follow-up continuations', async () => {
+      await adapter.startSession('allow-all-session', 'Start work', {
+        sessionMode: 'work',
+        autoApprove: true,
+      });
+
+      await adapter.continueSession('allow-all-session', 'Continue work', {
+        sessionMode: 'work',
+      });
+
+      const activeSessions = (
+        adapter as unknown as {
+          activeSessions: Map<string, { autoApprove: boolean }>;
+        }
+      ).activeSessions;
+      expect(activeSessions.get('allow-all-session')?.autoApprove).toBe(true);
+    });
+
     it('delivers queued follow-ups in order after Pi settles', async () => {
       let listener: ((event: { type: string }) => void) | null = null;
       mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {

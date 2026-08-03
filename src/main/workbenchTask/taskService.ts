@@ -27,7 +27,6 @@ import { WorkbenchTaskRepository } from './repository';
 import {
   classifyWorkbenchToolRisk,
   createToolIdempotencyKey,
-  isSafeShellCommand,
 } from './riskClassifier';
 import { verifyWorkbenchRun, type WorkbenchVerificationContext } from './verification';
 
@@ -284,16 +283,9 @@ export class WorkbenchTaskService extends EventEmitter {
     if (existing) {
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
-    // "Allow all" skips routine and unknown tool prompts, while irreversible
-    // effects still require an explicit confirmation as a safety boundary.
-    const normalizedToolName = input.toolName.trim().toLowerCase();
-    const safeShell =
-      (normalizedToolName === 'bash' || normalizedToolName === 'shell') &&
-      typeof input.toolInput.command === 'string' &&
-      isSafeShellCommand(input.toolInput.command);
-    const canAutoApprove =
-      input.autoApprove &&
-      (riskLevel === WorkbenchApprovalRiskLevel.Reversible || safeShell);
+    // "Allow all" means the user has explicitly disabled tool authorization
+    // prompts for this run, including irreversible effects.
+    const canAutoApprove = input.autoApprove;
     const approval = this.repository.transaction(() => {
       const created = this.repository.createApproval({
         taskId: task.id,
