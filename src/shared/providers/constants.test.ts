@@ -13,9 +13,9 @@ describe('ProviderName constants', () => {
 });
 
 describe('ProviderRegistry', () => {
-  test('providerIds returns 16 providers (no custom)', () => {
+  test('providerIds returns 17 providers (no custom)', () => {
     const ids = ProviderRegistry.providerIds;
-    expect(ids.length).toBe(16);
+    expect(ids.length).toBe(17);
     expect(ids).not.toContain(ProviderName.Custom);
     expect(ids).not.toContain(ProviderName.ZhiyuanServer);
   });
@@ -28,15 +28,14 @@ describe('ProviderRegistry', () => {
     expect(def!.region).toBe('global');
   });
 
-  test('stores verified cloud model capacity metadata', () => {
+  test('stores official model capacity metadata', () => {
     const expectations = [
       [ProviderName.DeepSeek, 'deepseek-v4-flash', 1_000_000, 384_000],
-      [ProviderName.Moonshot, 'kimi-k3', 1_048_576, 131_072],
+      [ProviderName.Moonshot, 'kimi-k3', 1_000_000, 131_072],
       [ProviderName.Qwen, 'qwen3.7-plus', 1_000_000, 64_000],
       [ProviderName.Zhipu, 'glm-5.2', 1_000_000, 131_072],
-      [ProviderName.Minimax, 'MiniMax-M3', 1_000_000, 128_000],
-      [ProviderName.StepFun, 'step-3.7-flash', 256_000, 256_000],
-      [ProviderName.Xiaomi, 'mimo-v2.5-pro', 1_048_576, 131_072],
+      [ProviderName.Volcengine, 'doubao-seed-2-0-lite-260215', 256_000, 128_000],
+      [ProviderName.Xiaomi, 'mimo-v2.5-pro', 1_000_000, 128_000],
       [ProviderName.OpenAI, 'gpt-5.4', 1_050_000, 128_000],
       [ProviderName.Gemini, 'gemini-3-pro-preview', 1_048_576, 65_536],
       [ProviderName.Anthropic, 'claude-opus-4-6', 1_000_000, 128_000],
@@ -49,6 +48,32 @@ describe('ProviderRegistry', () => {
       );
       expect(model).toMatchObject({ contextWindow, maxTokens });
     }
+  });
+
+  test('does not invent a fixed output limit when the official API does not publish one', () => {
+    expect(ProviderRegistry.getModel(ProviderName.Minimax, 'MiniMax-M3')).toMatchObject({
+      contextWindow: 1_000_000,
+    });
+    expect(ProviderRegistry.getModel(ProviderName.Minimax, 'MiniMax-M3')?.maxTokens).toBeUndefined();
+    expect(ProviderRegistry.getModel(ProviderName.StepFun, 'step-3.7-flash')).toMatchObject({
+      contextWindow: 256_000,
+    });
+    expect(ProviderRegistry.getModel(ProviderName.StepFun, 'step-3.7-flash')?.maxTokens).toBeUndefined();
+    expect(ProviderRegistry.getModel(ProviderName.Moonshot, 'kimi-k2.6')).toMatchObject({
+      contextWindow: 256_000,
+    });
+    expect(ProviderRegistry.getModel(ProviderName.Moonshot, 'kimi-k2.6')?.maxTokens).toBeUndefined();
+  });
+
+  test('stores coding-plan capacity for Kimi for Coding', () => {
+    expect(ProviderRegistry.getModel(ProviderName.Moonshot, 'kimi-for-coding')).toMatchObject({
+      contextWindow: 262_144,
+      maxTokens: 32_768,
+    });
+  });
+
+  test('returns no matches for an undefined model ID', () => {
+    expect(ProviderRegistry.findModelsById(undefined)).toEqual([]);
   });
 
   test('registers complete capability metadata and gates catalog tools by endpoint', () => {
@@ -90,7 +115,7 @@ describe('ProviderRegistry', () => {
     expect(
       ProviderRegistry.resolveModelCapabilities(ProviderName.Moonshot, 'kimi-k3', ApiFormat.OpenAI)
         .toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.Moonshot,
@@ -128,11 +153,7 @@ describe('ProviderRegistry', () => {
         ProviderRegistry.get(provider)!.defaultModels[0].id,
         ApiFormat.Anthropic,
       ).toolCalling;
-      expect(capability).toBe(
-        provider === ProviderName.Zhipu
-          ? ModelCapabilityStatus.Supported
-          : ModelCapabilityStatus.Unknown,
-      );
+      expect(capability).toBe(ModelCapabilityStatus.Supported);
     }
     expect(
       ProviderRegistry.resolveModelCapabilities(
@@ -154,7 +175,7 @@ describe('ProviderRegistry', () => {
         'step-3.7-flash',
         ApiFormat.OpenAI,
       ).toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.DeepSeek,
@@ -252,14 +273,53 @@ describe('ProviderRegistry', () => {
     expect(china).not.toContain(ProviderName.OpenAI);
   });
 
-  test('idsByRegion global returns 5 providers', () => {
+  test('idsByRegion global returns 6 providers', () => {
     const global = ProviderRegistry.idsByRegion('global');
-    expect(global.length).toBe(5);
+    expect(global.length).toBe(6);
     expect(global).toContain(ProviderName.OpenAI);
     expect(global).toContain(ProviderName.Gemini);
     expect(global).toContain(ProviderName.Anthropic);
     expect(global).toContain(ProviderName.OpenRouter);
+    expect(global).toContain(ProviderName.Grok);
     expect(global).toContain(ProviderName.Copilot);
+  });
+
+  test('resolves catalog models by provider and model ID', () => {
+    expect(ProviderRegistry.getModel(ProviderName.Grok, 'grok-4.5')).toMatchObject({
+      id: 'grok-4.5',
+      contextWindow: 500_000,
+      capabilities: {
+        toolCalling: ModelCapabilityStatus.Supported,
+        reasoning: ModelCapabilityStatus.Supported,
+      },
+    });
+    expect(ProviderRegistry.getModel(ProviderName.OpenAI, 'grok-4.5')).toBeUndefined();
+    expect(ProviderRegistry.findModelsById('gpt-5.4').map(match => match.providerId)).toContain(
+      ProviderName.OpenAI,
+    );
+    expect(ProviderRegistry.findModelsById('not-in-catalog')).toEqual([]);
+  });
+
+  test('normalizes catalog lookups without changing the canonical model ID', () => {
+    expect(ProviderRegistry.getModel(ProviderName.Grok, '  GROK-4.5 ')).toMatchObject({
+      id: 'grok-4.5',
+    });
+    expect(ProviderRegistry.findModelsById(' GPT-5.4 ').map(match => match.providerId)).toContain(
+      ProviderName.OpenAI,
+    );
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.OpenAI,
+        ' GPT-5.4 ',
+        ApiFormat.OpenAI,
+      ).reasoning,
+    ).toBe(ModelCapabilityStatus.Supported);
+  });
+
+  test('keeps duplicate default and coding-plan entries addressable', () => {
+    const models = ProviderRegistry.getModels(ProviderName.Qwen, 'qwen3.7-plus');
+    expect(models).toHaveLength(2);
+    expect(models.every(model => model.id === 'qwen3.7-plus')).toBe(true);
   });
 
   test('idsForEnLocale starts with EN_PRIORITY providers in order', () => {

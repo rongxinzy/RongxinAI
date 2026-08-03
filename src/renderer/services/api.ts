@@ -372,6 +372,8 @@ class ApiService {
       return 'openai';
     } else if (normalizedModelId.startsWith('gemini')) {
       return 'gemini';
+    } else if (normalizedModelId.startsWith('grok')) {
+      return 'grok';
     } else if (normalizedModelId.startsWith('deepseek')) {
       return 'deepseek';
     } else if (normalizedModelId.startsWith('kimi-')) {

@@ -63,20 +63,34 @@ const normalizeProviderModels = (
   models: ProviderConfig['models'],
   apiFormat: ApiFormat,
 ): ProviderConfig['models'] =>
-  models?.map(model => ({
-    ...model,
-    supportsImage: ProviderRegistry.resolveModelSupportsImage(
-      providerKey,
-      model.id,
-      model.supportsImage,
-    ),
-    capabilities: ProviderRegistry.resolveModelCapabilities(
-      providerKey,
-      model.id,
-      apiFormat,
-      model,
-    ),
-  }));
+  models?.map(model => {
+    const catalogModel = ProviderRegistry.getModel(providerKey, model.id);
+    const catalogCapacity = catalogModel
+      ? {
+          ...(typeof catalogModel.contextWindow === 'number' && catalogModel.contextWindow > 0
+            ? { contextWindow: catalogModel.contextWindow }
+            : {}),
+          ...(typeof catalogModel.maxTokens === 'number' && catalogModel.maxTokens > 0
+            ? { maxTokens: catalogModel.maxTokens }
+            : {}),
+        }
+      : {};
+    return {
+      ...model,
+      ...catalogCapacity,
+      supportsImage: ProviderRegistry.resolveModelSupportsImage(
+        providerKey,
+        model.id,
+        model.supportsImage,
+      ),
+      capabilities: ProviderRegistry.resolveModelCapabilities(
+        providerKey,
+        model.id,
+        apiFormat,
+        model,
+      ),
+    };
+  });
 
 const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig['providers'] => {
   if (!providers) {
@@ -175,7 +189,7 @@ const ADDED_PROVIDER_MODELS: Record<
         id: 'kimi-k3',
         name: 'Kimi K3',
         supportsImage: true,
-        contextWindow: 1_048_576,
+        contextWindow: 1_000_000,
         maxTokens: 131_072,
       },
       {

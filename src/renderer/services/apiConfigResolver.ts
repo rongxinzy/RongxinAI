@@ -50,6 +50,7 @@ export function detectProvider(modelId: string, providerHint?: string): string {
       'minimax',
       'qwen',
       'openrouter',
+      'grok',
       'gemini',
       'anthropic',
       'xiaomi',
