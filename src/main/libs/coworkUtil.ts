@@ -674,6 +674,14 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
  * Priority: env var override > bundled PortableGit > installed Git > PATH lookup.
  * Every candidate must pass a health check (`cygpath -u`) before use.
  */
+export function resolveGitBashPathForPi(): string | null {
+  return resolveWindowsGitBashPath();
+}
+
+export function getGitBashResolutionErrorForPi(): string | null {
+  return cachedGitBashResolutionError;
+}
+
 function resolveWindowsGitBashPath(): string | null {
   if (cachedGitBashPath !== undefined) return cachedGitBashPath;
 

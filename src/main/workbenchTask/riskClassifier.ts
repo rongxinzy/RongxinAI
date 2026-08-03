@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
 
-const readOnlyTools = new Set(['read', 'grep', 'find', 'ls']);
+const readOnlyTools = new Set(['read', 'grep', 'find', 'ls', 'skill_runtime_capabilities']);
 const internalControlTools = new Set([
   'askuserquestion',
   'agent_loop',

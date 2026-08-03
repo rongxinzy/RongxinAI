@@ -137,6 +137,11 @@
         "filter": ["**/*"]
       },
       {
+        "from": "resources/skill-python",
+        "to": "skill-python",
+        "filter": ["**/*"]
+      },
+      {
         "from": "vendor/openclaw-runtime/current",
         "to": "cfmind",
         "filter": [
@@ -204,6 +209,11 @@
       {
         "from": "resources/python-linux",
         "to": "python-linux",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/skill-python",
+        "to": "skill-python",
         "filter": ["**/*"]
       },
       {

@@ -54,7 +54,7 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
-import { getSkillsRoot } from '../coworkUtil';
+import { getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import {
@@ -77,6 +77,8 @@ import {
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
 import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
+import { buildPiSkillScriptTool } from './piSkillScriptTool';
+import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
@@ -218,6 +220,7 @@ interface ActivePiSession {
   workbenchRunId: string | null;
   workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
+  settingsManager: PiSettingsManager | null;
   autoApprove: boolean;
   /** True while Pi is executing the current Work/Chat turn. */
   isRunning: boolean;
@@ -232,6 +235,9 @@ interface ActivePiSession {
 interface PiModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
   DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
+  SettingsManager?: {
+    create(cwd: string, agentDir?: string): PiSettingsManager;
+  };
   getAgentDir: () => string;
   getModel: (provider: string, modelId: string) => unknown;
   ModelRuntime: {
@@ -246,6 +252,12 @@ interface PiModules {
 
 interface PiResourceLoader {
   reload(): Promise<void>;
+  settingsManager?: PiSettingsManager | null;
+}
+
+interface PiSettingsManager {
+  applyOverrides(overrides: { shellPath?: string }): void;
+  getShellPath?(): string | undefined;
 }
 
 interface PiToolCallEvent {
@@ -303,6 +315,10 @@ async function getPiModules(): Promise<PiModules> {
         createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
         DefaultResourceLoader:
           codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
+        SettingsManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SettingsManager')
+          ? ((codingAgent as typeof codingAgent & { SettingsManager?: unknown })
+              .SettingsManager as PiModules['SettingsManager'])
+          : undefined,
         getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
         ModelRuntime: codingAgent.ModelRuntime as PiModules['ModelRuntime'],
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
@@ -523,13 +539,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
 
+      const settingsManager = this.createPiSettingsManager(pi, workspaceRoot);
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
         runId: workbenchRunId,
+        settingsManager,
         getAutoApprove: () =>
           this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
       });
       sessionOptions.resourceLoader = resourceLoader;
+      if (settingsManager) {
+        sessionOptions.settingsManager = settingsManager;
+      }
 
       // Build custom tools: MCP proxy + optional subagent for Team Leads.
       // Each call creates a distinct tool instance for this Pi session, so its
@@ -572,6 +593,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (shortcutWorkflow) {
         shortcutWorkflow.resumeForPrompt(prompt);
         customTools.push(buildPiShortcutWorkflowStateTool(shortcutWorkflow));
+      }
+
+      if (options.sessionMode === 'work' && resourceState.skillIds?.length) {
+        customTools.push(buildPiSkillRuntimeCapabilitiesTool());
+        customTools.push(
+          buildPiSkillScriptTool({
+            workspaceRoot,
+            allowedSkillIds: resourceState.skillIds,
+          }),
+        );
       }
       // A selected skill in Work mode is an execution request, not a one-turn
       // chat hint. Run it through Pi's durable loop by default; completion
@@ -705,6 +736,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workbenchRunId,
         workbenchContract,
         workspaceRoot,
+        settingsManager,
         autoApprove: Boolean(options.autoApprove),
         isRunning: true,
         turnFailed: false,
@@ -830,6 +862,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // Pi reloads the existing ResourceLoader without replacing transcript
         // state, model, MCP tools, or custom expert tools.
         await active.piSession.reload();
+        // AgentSession.reload() reloads SettingsManager from disk, so restore
+        // the per-process bundled PortableGit override after every reload.
+        this.applyPiShellOverride(active.settingsManager);
         active.requestedSystemPrompt = nextSystemPrompt;
         active.requestedSkillIds = requestedSkillIds;
         console.debug('[PiRuntime] reloaded session resources after prompt change');
@@ -960,6 +995,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (active.resourceState.maxOutputTokens !== resolvedModel.maxOutputTokens) {
         active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
         await active.piSession.reload();
+        this.applyPiShellOverride(active.settingsManager);
       }
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
     } catch (err) {
@@ -1224,7 +1260,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   private async flushFollowUpQueue(sessionId: string, active: ActivePiSession): Promise<void> {
-    if (active.queueFlushInFlight || active.aborted || active.pendingError || active.turnFailed) return;
+    if (active.queueFlushInFlight || active.aborted || active.pendingError || active.turnFailed)
+      return;
     if (active.workbenchContract.kind === WorkbenchContractKind.Chat) return;
     active.queueFlushInFlight = true;
     let retryAfterFailure = false;
@@ -1266,6 +1303,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   // ── Chat mode: direct LLM without agent loop ──
 
+  private createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsManager | null {
+    if (!pi.SettingsManager) return null;
+    return pi.SettingsManager.create(cwd, pi.getAgentDir());
+  }
+
+  private applyPiShellOverride(settingsManager: PiSettingsManager | null): void {
+    if (!settingsManager || process.platform !== 'win32') return;
+    const bashPath = resolveGitBashPathForPi();
+    if (bashPath) {
+      settingsManager.applyOverrides({ shellPath: bashPath });
+    }
+  }
+
   private async createPiResourceLoader(
     pi: PiModules,
     cwd: string,
@@ -1273,12 +1323,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     approvalContext?: {
       sessionId: string;
       runId: string | null;
+      settingsManager?: PiSettingsManager | null;
       getAutoApprove: () => boolean;
     },
   ): Promise<PiResourceLoader> {
+    const settingsManager =
+      approvalContext?.settingsManager ?? this.createPiSettingsManager(pi, cwd);
     const resourceLoader = new pi.DefaultResourceLoader({
       cwd,
       agentDir: pi.getAgentDir(),
+      ...(settingsManager ? { settingsManager } : {}),
       // ZhiYuanAgent skills come exclusively from the app-managed SKILLs dirs —
       // never from the developer's global ~/.agents/skills (which would leak
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
@@ -1335,6 +1389,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         : [],
     });
     await resourceLoader.reload();
+    // Pi's resource reload refreshes settings from disk, so apply the resolved
+    // per-process shell override after reload and share the same manager with
+    // createAgentSession. This makes bundled PortableGit usable by every Pi
+    // session without changing the user's global Pi settings file.
+    this.applyPiShellOverride(settingsManager);
+    resourceLoader.settingsManager = settingsManager;
     return resourceLoader;
   }
 

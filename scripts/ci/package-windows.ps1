@@ -208,6 +208,16 @@ if ($builderExit -ne 0) {
   Write-Error "electron-builder/npm run $distWinCommand exited with code $builderExit"
 }
 
+if ($builderExit -eq 0) {
+  Write-Host '=== Verifying bundled runtimes with a clean PATH ==='
+  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'windows-runtime-smoke.ps1') -ProjectRoot (Get-Location).Path
+  $smokeExit = $LASTEXITCODE
+  if ($smokeExit -ne 0) {
+    Write-Error "Windows runtime smoke gate failed with exit code $smokeExit"
+    exit $smokeExit
+  }
+}
+
 # 无论上传是否成功，都打印 release 目录内容，方便排查 CI 构建问题。
 Write-Host '=== Release directory contents ==='
 if (Test-Path 'release') {

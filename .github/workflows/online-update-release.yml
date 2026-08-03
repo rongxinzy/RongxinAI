@@ -78,6 +78,12 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify Windows package runtimes with a clean PATH
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-runtime-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}
       - uses: actions/upload-artifact@v4
         with: { name: win32-x64-lite, path: "release/*.exe" }
 

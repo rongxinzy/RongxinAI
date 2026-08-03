@@ -28,7 +28,10 @@
 
 set -euo pipefail
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PY="${ZHIYUAN_PYTHON_BIN:-python3}"
+# ZhiYuan supplies a prebuilt, Skill-specific environment when available. Keep
+# the base runtime as the CLI fallback, and only use uv for legacy standalone
+# runs where that private environment has not been prepared.
+PY="${ZHIYUAN_SKILL_PYTHON_BIN:-${ZHIYUAN_PYTHON_BIN:-python3}}"
 NODE="node"
 UV="${ZHIYUAN_UV_BIN:-$(command -v uv || true)}"
 PYTHON_DEPS=(reportlab pypdf matplotlib pypdfium2 pillow)
@@ -42,7 +45,9 @@ bold()   { printf '\033[1m%s\033[0m\n' "$*"; }
 # Packaged builds provide uv plus an externally-managed CPython. Run all PDF
 # helpers in an isolated uv environment instead of mutating that base runtime.
 run_python() {
-  if [[ -n "$UV" ]]; then
+  if [[ -n "${ZHIYUAN_SKILL_PYTHON_BIN:-}" ]]; then
+    "$PY" "$@"
+  elif [[ -n "$UV" ]]; then
     # Do not discover a caller's project/.venv: a Skill must use its own
     # isolated dependency context and never delete or mutate project state.
     local uv_args=(run --quiet --no-project --python "$PY")

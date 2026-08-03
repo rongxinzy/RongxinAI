@@ -43,22 +43,34 @@ Create an isolated project directory:
 
 ## Tooling
 
+Inside ZhiYuan/Pi, use `run_skill_script` for the validator and compiler so PowerPoint export
+does not depend on a user-installed Node.js. The skill's local `node_modules` remains the
+dependency boundary; the app supplies the Node-compatible runtime.
+
 Install the compiler dependency once per bundled skill copy:
 
 ```bash
-npm install --prefix "<SKILL_DIR>"
+npm install --prefix "<SKILL_DIR>" # packaging/runtime setup only
 ```
 
 Validate before every export:
 
-```bash
-node "<SKILL_DIR>/scripts/validate-deck.mjs" "<deck-dir>/deck.json" --strict --json "<deck-dir>/output/validation.json"
+```json
+{
+  "skillId": "presentation-studio",
+  "script": "scripts/validate-deck.mjs",
+  "args": ["<deck-dir>/deck.json", "--strict", "--json", "<deck-dir>/output/validation.json"]
+}
 ```
 
 Compile only after a clean validation:
 
-```bash
-node "<SKILL_DIR>/scripts/compile-deck.mjs" "<deck-dir>/deck.json" "<deck-dir>/output/presentation.pptx"
+```json
+{
+  "skillId": "presentation-studio",
+  "script": "scripts/compile-deck.mjs",
+  "args": ["<deck-dir>/deck.json", "<deck-dir>/output/presentation.pptx"]
+}
 ```
 
 ## DeckSpec minimum schema
