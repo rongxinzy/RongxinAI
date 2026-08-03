@@ -39,7 +39,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-test('collectAvailableModels does not expose running llama.cpp models when provider is disabled', async () => {
+test('collectAvailableModels exposes running llama.cpp models when provider is disabled', async () => {
   const listRunningModels = vi.fn(async () => [
     { name: 'qwen-local', runtime_context_length: 8192 },
   ]);
@@ -53,12 +53,12 @@ test('collectAvailableModels does not expose running llama.cpp models when provi
 
   const models = await collectAvailableModels(createConfig());
 
-  expect(listRunningModels).not.toHaveBeenCalled();
-  expect(models.some(model => model.providerKey === ProviderName.LlamaCpp)).toBe(false);
+  expect(listRunningModels).toHaveBeenCalledTimes(1);
+  expect(models.some(model => model.providerKey === ProviderName.LlamaCpp)).toBe(true);
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
 });
 
-test('collectAvailableModels merges running llama.cpp models only when provider is user-enabled', async () => {
+test('collectAvailableModels merges running llama.cpp model metadata', async () => {
   const listRunningModels = vi.fn(async () => [
     {
       name: 'qwen-local',

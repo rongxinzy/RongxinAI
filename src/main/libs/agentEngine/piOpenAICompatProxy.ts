@@ -132,6 +132,82 @@ function formatOpenAISSEData(data: unknown): string {
   return `data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`;
 }
 
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function toArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function toNonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+export function convertOpenAIChatCompletionTextToSSEForPi(
+  text: string,
+  fallbackModel?: string,
+): string | null {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = toRecord(JSON.parse(text));
+  } catch {
+    return null;
+  }
+
+  const choices = toArray(parsed.choices);
+  if (choices.length === 0) {
+    return `${formatOpenAISSEData(
+      createOpenAIMissingFinishReasonChunk(toNonEmptyString(parsed.model) ?? fallbackModel),
+    )}${formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER)}`;
+  }
+
+  const id = toNonEmptyString(parsed.id) ?? `chatcmpl-${Date.now().toString(36)}`;
+  const model = toNonEmptyString(parsed.model) ?? fallbackModel;
+  const created =
+    typeof parsed.created === 'number' ? parsed.created : Math.floor(Date.now() / 1000);
+  let output = '';
+
+  choices.forEach((choiceValue, fallbackIndex) => {
+    const choice = toRecord(choiceValue);
+    const message = toRecord(choice.message);
+    const delta: Record<string, unknown> = {};
+    const content = toNonEmptyString(message.content);
+    const reasoning =
+      toNonEmptyString(message.reasoning) ?? toNonEmptyString(message.reasoning_content);
+    const toolCalls = toArray(message.tool_calls);
+
+    if (content) {
+      delta.content = content;
+    }
+    if (reasoning) {
+      delta.reasoning_content = reasoning;
+    }
+    if (toolCalls.length > 0) {
+      delta.tool_calls = toolCalls;
+    }
+
+    output += formatOpenAISSEData({
+      id,
+      object: 'chat.completion.chunk',
+      created,
+      ...(model ? { model } : {}),
+      choices: [
+        {
+          index: typeof choice.index === 'number' ? choice.index : fallbackIndex,
+          delta,
+          finish_reason: toNonEmptyString(choice.finish_reason) ?? FALLBACK_FINISH_REASON,
+        },
+      ],
+    });
+  });
+
+  output += formatOpenAISSEData(OPENAI_STREAM_DONE_MARKER);
+  return output;
+}
+
 function normalizeOpenAISSEPacketForPi(
   packet: string,
   state: OpenAIStreamNormalizeState,
@@ -291,10 +367,15 @@ async function handleProxyRequest(
   });
 
   const contentType = upstreamResponse.headers.get('content-type') ?? '';
-  const shouldNormalizeStream =
-    contentType.includes('text/event-stream') || requestWantsStream(body);
+  const upstreamTextShouldPassThrough = !upstreamResponse.ok;
 
-  if (shouldNormalizeStream && upstreamResponse.body) {
+  if (upstreamTextShouldPassThrough) {
+    copyResponseHeaders(upstreamResponse, response);
+    response.end(await upstreamResponse.text());
+    return;
+  }
+
+  if (contentType.includes('text/event-stream') && upstreamResponse.body) {
     response.writeHead(upstreamResponse.status, {
       'content-type': 'text/event-stream; charset=utf-8',
       'cache-control': 'no-cache',
@@ -304,8 +385,21 @@ async function handleProxyRequest(
     return;
   }
 
-  copyResponseHeaders(upstreamResponse, response);
   const text = await upstreamResponse.text();
+  if (requestWantsStream(body)) {
+    const converted = convertOpenAIChatCompletionTextToSSEForPi(text, model);
+    if (converted) {
+      response.writeHead(upstreamResponse.status, {
+        'content-type': 'text/event-stream; charset=utf-8',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+      });
+      response.end(converted);
+      return;
+    }
+  }
+
+  copyResponseHeaders(upstreamResponse, response);
   response.end(normalizeNonStreamOpenAIResponse(text));
 }
 

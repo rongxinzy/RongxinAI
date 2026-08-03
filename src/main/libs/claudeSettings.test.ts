@@ -83,6 +83,45 @@ test('resolveRawApiConfig forwards llama.cpp runtime metadata for the selected r
   });
 });
 
+test('resolveRawApiConfig resolves a selected running llama.cpp model when provider is disabled', () => {
+  const runningModel = buildLlamaCppRunningModelBinding({
+    name: 'qwen-disabled-provider',
+    trained_context_length: 32768,
+    runtime_context_length: 32768,
+  });
+  expect(runningModel).not.toBeNull();
+  updateLlamaCppRunningModels([runningModel!]);
+
+  const appConfig = createAppConfig('qwen-disabled-provider');
+  appConfig.providers[ProviderName.LlamaCpp] = {
+    ...appConfig.providers[ProviderName.LlamaCpp],
+    enabled: false,
+    userEnabled: false,
+  };
+
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) => (key === 'app_config' ? appConfig : undefined),
+      }) as never,
+  );
+
+  const result = resolveRawApiConfig();
+  expect(result.config).toEqual({
+    apiKey: 'sk-zhiyuan-local',
+    baseURL: 'http://127.0.0.1:8080/v1',
+    model: 'qwen-disabled-provider',
+    apiType: 'openai',
+  });
+  expect(result.providerMetadata).toMatchObject({
+    providerName: ProviderName.LlamaCpp,
+    modelName: 'qwen-disabled-provider',
+    contextWindow: 32768,
+    contextTokens: 32768,
+    maxTokens: 4096,
+  });
+});
+
 test('resolveRawApiConfig uses registered DeepSeek V4 capacity when saved metadata is absent', () => {
   setStoreGetter(
     () =>
@@ -356,6 +395,45 @@ test('resolveRawApiConfigForModelRef resolves an explicit llama.cpp model ref', 
     codingPlanEnabled: false,
     supportsImage: false,
     modelName: 'qwen-explicit',
+    contextWindow: 32768,
+    contextTokens: 32768,
+    maxTokens: 4096,
+  });
+});
+
+test('resolveRawApiConfigForModelRef resolves explicit llama.cpp model when provider is disabled', () => {
+  const runningModel = buildLlamaCppRunningModelBinding({
+    name: 'qwen-explicit-disabled',
+    trained_context_length: 32768,
+    runtime_context_length: 32768,
+  });
+  expect(runningModel).not.toBeNull();
+  updateLlamaCppRunningModels([runningModel!]);
+
+  const appConfig = createAppConfig('qwen-local');
+  appConfig.providers[ProviderName.LlamaCpp] = {
+    ...appConfig.providers[ProviderName.LlamaCpp],
+    enabled: false,
+    userEnabled: false,
+  };
+
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) => (key === 'app_config' ? appConfig : undefined),
+      }) as never,
+  );
+
+  const result = resolveRawApiConfigForModelRef('llamacpp/qwen-explicit-disabled');
+  expect(result.config).toEqual({
+    apiKey: 'sk-zhiyuan-local',
+    baseURL: 'http://127.0.0.1:8080/v1',
+    model: 'qwen-explicit-disabled',
+    apiType: 'openai',
+  });
+  expect(result.providerMetadata).toMatchObject({
+    providerName: ProviderName.LlamaCpp,
+    modelName: 'qwen-explicit-disabled',
     contextWindow: 32768,
     contextTokens: 32768,
     maxTokens: 4096,

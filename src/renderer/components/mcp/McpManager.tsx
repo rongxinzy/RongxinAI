@@ -181,19 +181,22 @@ const McpManager: React.FC<McpManagerProps> = ({
   const [bridgeSyncing, setBridgeSyncing] = useState(false);
   const currentLanguage = i18nService.getLanguage();
   const activeTab = controlledActiveTab ?? uncontrolledActiveTab;
-  const setActiveTab = (tab: McpTabType) => {
-    if (controlledActiveTab === undefined) {
-      setUncontrolledActiveTab(tab);
-    }
-    onTabChange?.(tab);
-  };
+  const setActiveTab = useCallback(
+    (tab: McpTabType) => {
+      if (controlledActiveTab === undefined) {
+        setUncontrolledActiveTab(tab);
+      }
+      onTabChange?.(tab);
+    },
+    [controlledActiveTab, onTabChange],
+  );
 
   useEffect(() => {
     if (!openRegistryId && !openMarketplace) return;
     setActiveTab(McpTabValue.Marketplace);
     setActiveCategory('all');
     setSearchQuery('');
-  }, [openMarketplace, openRegistryId]);
+  }, [openMarketplace, openRegistryId, setActiveTab, setSearchQuery]);
 
   useEffect(() => {
     let isActive = true;

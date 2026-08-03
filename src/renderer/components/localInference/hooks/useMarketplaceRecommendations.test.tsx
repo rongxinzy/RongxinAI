@@ -2,6 +2,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
+import { MARKETPLACE_PAGE_SIZE } from '../constants';
 import type { LocalInferenceTab } from '../types';
 import { useMarketplaceRecommendations } from './useMarketplaceRecommendations';
 
@@ -25,7 +26,7 @@ describe('useMarketplaceRecommendations', () => {
 
     expect(onSearch).toHaveBeenCalledTimes(1);
     expect(onSearch).toHaveBeenCalledWith(
-      expect.objectContaining({ featuredOnly: true, fit: 'compatible' }),
+      expect.objectContaining({ featuredOnly: true, fit: 'all', limit: MARKETPLACE_PAGE_SIZE }),
     );
     expect(onHasSearchedChange).toHaveBeenCalledWith(true);
 

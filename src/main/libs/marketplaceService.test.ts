@@ -137,6 +137,27 @@ test('MarketplaceService uses the cloud catalogue without sending a local ModelS
   expect(result.nextPageNumber).toBe(2);
 });
 
+test('MarketplaceService sends unrestricted browse requests to the cloud catalogue', async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&page=1');
+    return Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({
+    limit: 8,
+    pageNumber: 1,
+    featuredOnly: false,
+  });
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.source).toBe('cloud-catalog');
+  expect(result.models).toHaveLength(1);
+});
+
 test('MarketplaceService keeps live device fit local instead of adding it to the cloud query', async () => {
   const fetchMock = vi.fn(async () => Response.json({ models: [verifiedModel()] }));
   vi.stubGlobal('fetch', fetchMock);

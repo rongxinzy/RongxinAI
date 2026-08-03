@@ -81,6 +81,7 @@ describe('MarketplaceModelCard', () => {
   beforeEach(() => {
     (window as unknown as { electron?: unknown }).electron = {
       llamacpp: { cancelInstall: vi.fn() },
+      shell: { openExternal: vi.fn().mockResolvedValue({ success: true }) },
     };
   });
 
@@ -92,6 +93,23 @@ describe('MarketplaceModelCard', () => {
     expect(installButton).toBeEnabled();
   });
 
+  test('moves the ModelScope link to the model title', async () => {
+    const user = userEvent.setup();
+    const detailUrl = 'https://modelscope.cn/models/acme/Alpha-Model';
+    renderCard(makeModel({ name: 'Alpha Model', repoId: 'acme/Alpha Model-GGUF', detailUrl }));
+
+    const titleLink = screen.getByRole('link', { name: 'Alpha Model' });
+    expect(titleLink).toHaveAttribute('href', detailUrl);
+    expect(titleLink).toHaveClass('cursor-pointer', 'hover:underline');
+    expect(screen.queryByRole('button', { name: /魔搭链接/ })).not.toBeInTheDocument();
+
+    await user.click(titleLink);
+    expect(
+      (window as unknown as { electron: { shell: { openExternal: ReturnType<typeof vi.fn> } } })
+        .electron.shell.openExternal,
+    ).toHaveBeenCalledWith(detailUrl);
+  });
+
   test('pending models offer verify-and-install instead of a dead button', async () => {
     // Listing-only catalogue records carry no file metadata yet; the button
     // stays actionable so the install flow can hydrate the model on demand.
@@ -101,13 +119,12 @@ describe('MarketplaceModelCard', () => {
 
     renderCard(model, { onInstall });
 
-    const verifyButton = screen.getByRole('button', { name: /校验并安装/ });
+    const verifyButton = screen.getByRole('button', { name: /校验并安装|Verify & install/ });
     expect(verifyButton).toBeEnabled();
 
     await user.click(verifyButton);
     expect(onInstall).toHaveBeenCalledWith(expect.objectContaining({ repoId: model.repoId }));
   });
-
   test('offers cancel while installing and calls the main-process canceller', async () => {
     const user = userEvent.setup();
     renderCard(makeModel(), {
@@ -176,9 +193,11 @@ describe('MarketplaceModelCard', () => {
     );
   });
 
-  test('hides the quantization selector for single-file repos', () => {
+  test('shows the quantization selector for single-file repos', () => {
     renderCard(makeModel());
-    expect(screen.queryByRole('combobox', { name: '选择量化版本' })).not.toBeInTheDocument();
+    const selector = screen.getByRole('combobox', { name: '选择量化版本' });
+    expect(selector).toBeInTheDocument();
+    expect(selector).toHaveClass('pl-2');
   });
 
   test('split-only repos are installable and install the first part', async () => {
@@ -207,7 +226,9 @@ describe('MarketplaceModelCard', () => {
 
     // A single split variant has nothing to choose, but it must be installable
     // (previously such repos were dropped entirely as "pending").
-    expect(screen.queryByRole('combobox', { name: '选择量化版本' })).not.toBeInTheDocument();
+    const selector = screen.getByRole('combobox', { name: '选择量化版本' });
+    expect(selector).toBeInTheDocument();
+    expect(selector).toHaveClass('pl-2');
     const installButton = screen.getByRole('button', { name: /安装/ });
     expect(installButton).toBeEnabled();
 

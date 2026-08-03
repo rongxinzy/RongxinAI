@@ -6,8 +6,7 @@ import {
   InputGroupInput,
 } from '@shared/components/ui/input-group';
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from 'lucide-react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Skeleton } from '@shared/components/ui/skeleton';
 
@@ -31,13 +30,13 @@ import {
 import {
   localInferenceCompactButtonClass,
   MARKETPLACE_PAGE_SIZE,
+  MARKETPLACE_MAX_PAGE_ROWS,
+  MARKETPLACE_GRID_COLUMN_COUNT,
 } from '../constants';
 import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
-  getMarketplaceGridColumnCount,
   getMarketplaceInstallProgress,
-  getMarketplacePageSize,
 } from '../utils/marketplace';
 import { isPullInProgress } from '../utils/progress';
 
@@ -61,7 +60,6 @@ export function MarketplacePanel({
   hardwareSummaryReady,
   totalCount,
   nextPageNumber,
-  contentViewportRef,
 }: {
   loading: boolean;
   models: MarketplaceModel[];
@@ -79,24 +77,16 @@ export function MarketplacePanel({
   totalCount?: number;
   nextPageNumber?: number;
   onInstall: (model: MarketplaceModel) => Promise<void>;
-  contentViewportRef: RefObject<HTMLDivElement | null>;
 }) {
   const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [taskFilter, setTaskFilter] = useState<MarketplaceTaskFilter>('all');
-  const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('compatible');
+  const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('all');
   const [browseMode, setBrowseMode] = useState<MarketplaceBrowseMode>('recommended');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [resultContext, setResultContext] = useState<MarketplaceResultContext>('recommended');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(MARKETPLACE_PAGE_SIZE);
-  const [gridColumnCount, setGridColumnCount] = useState(3);
+  const gridColumnCount = MARKETPLACE_GRID_COLUMN_COUNT;
   const pageRef = useRef(page);
-  const pageSizeRef = useRef(pageSize);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const paginationRef = useRef<HTMLDivElement>(null);
-  const resizeFrameRef = useRef<number | null>(null);
-  const layoutSignatureRef = useRef<string | null>(null);
   const appliedFilterSignatureRef = useRef<string | null>(null);
   const hasObservedSearchRef = useRef(false);
 
@@ -115,13 +105,15 @@ export function MarketplacePanel({
   const pageCount = Math.max(
     1,
     totalCount
-      ? Math.ceil(totalCount / pageSize)
+      ? Math.ceil(totalCount / MARKETPLACE_PAGE_SIZE)
       : nextPageNumber
         ? nextPageNumber
-        : Math.ceil(installableModels.length / pageSize),
+        : Math.ceil(installableModels.length / MARKETPLACE_PAGE_SIZE),
   );
   const currentPage = Math.min(page, pageCount);
-  const visibleModels = installableModels;
+  // The cloud endpoint owns pagination, but cap the rendered page as a guard
+  // against stale responses or an endpoint that returns more than requested.
+  const visibleModels = installableModels.slice(0, MARKETPLACE_PAGE_SIZE);
 
   useEffect(() => {
     pageRef.current = 1;
@@ -148,71 +140,6 @@ export function MarketplacePanel({
     }
   };
 
-  // Measure the grid geometry and derive the column count and page size from
-  // the actual viewport, keeping every page a whole number of grid rows.
-  useLayoutEffect(() => {
-    const contentViewport = contentViewportRef.current;
-    const panel = panelRef.current;
-    const grid = gridRef.current;
-    if (!contentViewport || !panel || !grid) return;
-    if (marketplaceLoading || installableModels.length === 0) return;
-
-    const updateLayout = () => {
-      const gridStyle = window.getComputedStyle(grid);
-      const viewportRect = contentViewport.getBoundingClientRect();
-      const gridRect = grid.getBoundingClientRect();
-      const paginationHeight = paginationRef.current
-        ? paginationRef.current.getBoundingClientRect().height
-        : 0;
-      const content = contentViewport.firstElementChild as HTMLElement | null;
-      const contentPaddingBottom = content
-        ? Number.parseFloat(window.getComputedStyle(content).paddingBottom) || 0
-        : 0;
-      const cards = Array.from(grid.children) as HTMLElement[];
-      if (cards.length === 0) return;
-      const cardRects = cards.map(card => card.getBoundingClientRect());
-      const cardHeight = Math.max(...cardRects.map(rect => rect.height));
-      const cardWidth = Math.max(...cardRects.map(rect => rect.width));
-      const rowGap = Number.parseFloat(gridStyle.rowGap) || 0;
-      const columnGap = Number.parseFloat(gridStyle.columnGap) || 0;
-      const nextColumnCount = getMarketplaceGridColumnCount({
-        gridWidth: grid.clientWidth,
-        cardWidth,
-        columnGap,
-      });
-      const gridTop = gridRect.top - viewportRect.top;
-      const availableGridHeight =
-        contentViewport.clientHeight - gridTop - paginationHeight - contentPaddingBottom;
-      const nextPageSize = getMarketplacePageSize({
-        availableGridHeight,
-        cardHeight,
-        columnCount: nextColumnCount,
-        rowGap,
-      });
-      const signature = [nextColumnCount, nextPageSize, contentViewport.clientHeight].join(':');
-      if (layoutSignatureRef.current === signature) return;
-      layoutSignatureRef.current = signature;
-      setGridColumnCount(nextColumnCount);
-      setPageSize(nextPageSize);
-    };
-    const scheduleUpdate = () => {
-      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-      resizeFrameRef.current = requestAnimationFrame(updateLayout);
-    };
-    const resizeObserver = new ResizeObserver(scheduleUpdate);
-    resizeObserver.observe(contentViewport);
-    resizeObserver.observe(panel);
-    resizeObserver.observe(grid);
-    if (paginationRef.current) resizeObserver.observe(paginationRef.current);
-    scheduleUpdate();
-    window.addEventListener('resize', scheduleUpdate);
-    return () => {
-      resizeObserver.disconnect();
-      window.removeEventListener('resize', scheduleUpdate);
-      if (resizeFrameRef.current !== null) cancelAnimationFrame(resizeFrameRef.current);
-    };
-  }, [contentViewportRef, installableModels.length, marketplaceLoading]);
-
   const hasQuery = Boolean(submittedQuery.trim());
   const taskLabel = {
     chat: i18nService.t('marketplaceFilterTaskChat'),
@@ -234,26 +161,23 @@ export function MarketplacePanel({
     : resultContext === 'category'
       ? `${i18nService.t('marketplaceResultCategory')} · ${taskLabel ?? taskFilter}`
       : i18nService.t(resultContext === 'recommended' ? 'marketplaceResultRecommended' : 'marketplaceResultAll');
-  // The server total keeps the count consistent with pagination ("共 11222 个
-  // 结果" next to "第 1 / 1403 页"); it is hidden when local filtering leaves
-  // zero cards so a non-empty server total is never shown over an empty grid.
-  const resultCount = totalCount ?? installableModels.length;
+  // The count reflects models that remain after local device and install-state filtering.
+  const resultCount = visibleModels.length;
   const searchParamsForPage = useCallback(
     (pageNumber?: number, queryValue = submittedQuery): MarketplaceSearchParams => ({
       query: queryValue,
       pageNumber,
-      limit: pageSize,
+      limit: MARKETPLACE_PAGE_SIZE,
       task: taskFilter,
       fit: fitFilter,
+      // Recommendations stay pinned to the curated cloud list. Device fit is
+      // shown on cards but is not a recommendation-page filter.
       featuredOnly:
         !queryValue.trim() &&
         taskFilter === 'all' &&
-        browseMode === 'recommended' &&
-        // "不限" browses the whole catalogue; only the recommended default is
-        // pinned to the curated featured list.
-        fitFilter !== 'all',
+        browseMode === 'recommended',
     }),
-    [browseMode, fitFilter, pageSize, submittedQuery, taskFilter],
+    [browseMode, fitFilter, submittedQuery, taskFilter],
   );
   const handlePageChange = useCallback(
     (nextPage: number) => {
@@ -264,15 +188,6 @@ export function MarketplacePanel({
     },
     [onSearch, pageCount, searchParamsForPage],
   );
-  // When the measured page size changes, restart from page 1 with the new
-  // server-side limit so every page holds whole rows of cards.
-  useEffect(() => {
-    if (pageSize === pageSizeRef.current) return;
-    pageSizeRef.current = pageSize;
-    pageRef.current = 1;
-    setPage(1);
-    onSearch(searchParamsForPage(1));
-  }, [onSearch, pageSize, searchParamsForPage]);
   const filterSignature = `${browseMode}:${taskFilter}:${fitFilter}`;
   const submitSearch = () => {
     const nextQuery = query.trim();
@@ -323,13 +238,13 @@ export function MarketplacePanel({
     onQueryChange('');
     setSubmittedQuery('');
     setTaskFilter('all');
-    setFitFilter('compatible');
+    setFitFilter('all');
     setBrowseMode('recommended');
     pageRef.current = 1;
     setPage(1);
     setResultContext('recommended');
-    onSearch({ query: '', pageNumber: 1, limit: pageSize, task: 'all', fit: 'compatible', featuredOnly: true });
-  }, [onQueryChange, onSearch, pageSize]);
+    onSearch({ query: '', pageNumber: 1, limit: MARKETPLACE_PAGE_SIZE, task: 'all', fit: 'all', featuredOnly: true });
+  }, [onQueryChange, onSearch]);
 
   const installedModelActions = installedModels.length > 0 ? (
     <div className="mx-auto mb-4 flex w-full max-w-6xl flex-wrap items-center gap-2 rounded-xl border border-success/20 bg-success/5 px-3 py-2">
@@ -344,10 +259,7 @@ export function MarketplacePanel({
   ) : null;
 
   return (
-    <div
-      ref={panelRef}
-      className="flex flex-col gap-4"
-    >
+    <div className="flex h-full min-h-0 flex-col gap-4">
       <div
         className={
           hasSearched
@@ -421,10 +333,7 @@ export function MarketplacePanel({
             ) : null}
           </div>
           {!hasQuery ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                {i18nService.t('marketplaceBrowse')}
-              </span>
+            <div className="flex items-center">
               <div className="flex items-center gap-0.5">
                 {(['recommended', 'all'] as const).map(mode => (
                   <Button
@@ -437,7 +346,10 @@ export function MarketplacePanel({
                         ? 'font-semibold text-foreground'
                         : 'font-normal text-muted-foreground hover:text-foreground'
                     }
-                    onClick={() => setBrowseMode(mode)}
+                    onClick={() => {
+                      setBrowseMode(mode);
+                      setFitFilter('all');
+                    }}
                   >
                     {i18nService.t(
                       mode === 'recommended' ? 'marketplaceBrowseRecommended' : 'marketplaceBrowseAll',
@@ -450,10 +362,7 @@ export function MarketplacePanel({
         </div>
         <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border/40 pt-2.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="flex min-w-0 items-center gap-3">
-              <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                {i18nService.t('marketplaceFilterTask')}
-              </span>
+            <div className="flex min-w-0 items-center">
               <FluidTabs
                 aria-label={i18nService.t('marketplaceFilterTask')}
                 value={taskFilter}
@@ -467,23 +376,25 @@ export function MarketplacePanel({
                 ]}
               />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                {i18nService.t('marketplaceFilterFit')}
-              </span>
-              <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-                <SelectTrigger size="sm" className="min-w-32">
-                  <SelectValue>{fitFilterLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
-                    <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
-                    <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+            {browseMode === 'all' ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  {i18nService.t('marketplaceFilterFit')}
+                </span>
+                <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
+                  <SelectTrigger size="sm" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32">
+                    <SelectValue>{fitFilterLabel}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
+                      <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
+                      <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
           </div>
           <span className="shrink-0 text-xs text-muted-foreground">
             {hardwareSummaryReady ? formatMarketplaceHardwareSummary(hardwareSummary) : i18nService.t('marketplaceHardwareDetecting')}
@@ -525,10 +436,9 @@ export function MarketplacePanel({
           )}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           {installedModelActions}
           <div
-            ref={gridRef}
             className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
             style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
           >
@@ -549,8 +459,7 @@ export function MarketplacePanel({
           </div>
           {hasSearched && installableModels.length > 0 && (
             <div
-              ref={paginationRef}
-              className="sticky bottom-0 z-20 mt-6 flex items-center justify-center gap-5 border-t border-border-subtle bg-background px-3 py-3"
+              className="mt-auto flex items-center justify-center gap-5 border-t border-border-subtle bg-background px-3 py-3"
             >
               <Button
                 type="button"
@@ -599,7 +508,7 @@ function MarketplaceGridSkeleton({ columnCount }: { columnCount: number }) {
       className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
       style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
     >
-      {Array.from({ length: columnCount * 2 }, (_, index) => (
+      {Array.from({ length: columnCount * MARKETPLACE_MAX_PAGE_ROWS }, (_, index) => (
         <div
           key={index}
           className="flex h-full flex-col gap-3 rounded-lg border border-border/70 bg-card p-4 shadow-sm"

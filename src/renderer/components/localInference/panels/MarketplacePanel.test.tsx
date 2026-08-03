@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
+import { MARKETPLACE_PAGE_SIZE } from '../constants';
+
 import type {
   MarketplaceModel,
   MarketplaceSearchParams,
@@ -84,7 +86,6 @@ function renderPanel(overrides: Partial<Parameters<typeof MarketplacePanel>[0]> 
     onInstall: vi.fn(),
     totalCount: undefined,
     nextPageNumber: undefined,
-    contentViewportRef: { current: null },
     ...overrides,
   };
   return { ...render(<MarketplacePanel {...props} />), props };
@@ -113,14 +114,21 @@ describe('MarketplacePanel result grid and count consistency', () => {
     expect(screen.getAllByText('安装')).toHaveLength(3);
   });
 
-  test('shows the server total so the count stays consistent with pagination', () => {
-    // Pagination spans ceil(total/pageSize) pages, so the count must be the
-    // server total, not the current page's card count — otherwise "共 2 个
-    // 结果" would sit next to "第 1 / 1403 页".
+  test('caps an oversized cloud page at the configured page size', () => {
+    const models = Array.from({ length: MARKETPLACE_PAGE_SIZE + 2 }, (_, index) =>
+      makeModel(`model-${index}`),
+    );
+    renderPanel({ hasSearched: true, models, totalCount: models.length });
+
+    expect(screen.getAllByText('安装')).toHaveLength(MARKETPLACE_PAGE_SIZE);
+  });
+
+  test('shows the rendered card count instead of the unfiltered server total', () => {
+    // The visible count must match the cards that remain after local filtering.
     const models = [makeModel('alpha'), makeModel('beta')];
     renderPanel({ hasSearched: true, models, totalCount: 7 });
 
-    expect(screen.getByText('共 7 个结果')).toBeInTheDocument();
+    expect(screen.getByText('共 2 个结果')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(2);
   });
 
@@ -134,15 +142,15 @@ describe('MarketplacePanel result grid and count consistency', () => {
     expect(screen.getByText('没有找到匹配的模型')).toBeInTheDocument();
   });
 
-  test('installed models are excluded from the grid while the total stays intact', () => {
+  test('installed models are excluded from the grid and visible count', () => {
     const models = [
       makeModel('alpha'),
       makeModel('beta', { installed: true, installedPath: '/models/beta.gguf' }),
     ];
     renderPanel({ hasSearched: true, models, totalCount: 2 });
 
-    // The server reported 2 matches; one is installed, so only one card shows.
-    expect(screen.getByText('共 2 个结果')).toBeInTheDocument();
+    // One installed model is excluded, so the visible count is one.
+    expect(screen.getByText('共 1 个结果')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(1);
   });
 
@@ -178,8 +186,8 @@ describe('MarketplacePanel result grid and count consistency', () => {
       onSearch,
     });
 
-    // pageSize is 8, so 24 models span 3 pages.
-    expect(screen.getByText('第 1 / 3 页')).toBeInTheDocument();
+    // pageSize is 6, so 24 models span 4 pages.
+    expect(screen.getByText('第 1 / 4 页')).toBeInTheDocument();
 
     const nextButton = screen.getByRole('button', { name: '下一页' });
     expect(nextButton).toBeEnabled();
@@ -212,7 +220,6 @@ describe('MarketplacePanel search and filters', () => {
           onQueryChange={setQuery}
           onSearch={onSearch}
           onInstall={vi.fn()}
-          contentViewportRef={{ current: null }}
         />
       );
     };
@@ -240,20 +247,12 @@ describe('MarketplacePanel search and filters', () => {
     );
   });
 
-  test('empty state offers an unrestricted view instead of a dead end', async () => {
-    // When "可运行" yields no cards, the empty state must offer browsing the
-    // whole catalogue rather than leaving the user stuck.
-    const user = userEvent.setup();
-    const onSearch = vi.fn();
-    renderPanel({ hasSearched: true, models: [], onSearch });
+  test('recommendations do not show a device fit selector', () => {
+    renderPanel({ hasSearched: true, models: [makeModel('alpha')] });
 
-    await user.click(screen.getByRole('button', { name: /不限适配/ }));
-
-    expect(lastSearchCall(onSearch)).toEqual(
-      expect.objectContaining({ fit: 'all', featuredOnly: false }),
-    );
+    expect(screen.queryByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/\u4e0d\u9650\u9002\u914d/)).not.toBeInTheDocument();
   });
-
   test('switching the fit filter to "不限" re-searches the whole catalogue', async () => {
     // The reported regression: choosing the unrestricted fit ("不限") stayed on
     // the curated featured list (7 models, one page) instead of browsing the
@@ -262,14 +261,29 @@ describe('MarketplacePanel search and filters', () => {
     const onSearch = vi.fn();
     renderPanel({ hasSearched: true, models: [makeModel('alpha')], onSearch });
 
-    await user.click(screen.getByRole('combobox'));
-    await user.click(await screen.findByRole('option', { name: '不限' }));
+    await user.click(screen.getByRole('button', { name: '\u5168\u90e8\u6a21\u578b' }));
+    const fitSelector = screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' });
+    await user.click(fitSelector);
+    await user.click(await screen.findByRole('option', { name: '\u53ef\u8fd0\u884c' }));
+    await user.click(fitSelector);
+    await user.click(await screen.findByRole('option', { name: '\u4e0d\u9650' }));
 
     expect(lastSearchCall(onSearch)).toEqual(
       expect.objectContaining({ fit: 'all', featuredOnly: false }),
     );
   });
 
+  test('switching to all models disables the local fit filter', async () => {
+    const user = userEvent.setup();
+    const onSearch = vi.fn();
+    renderPanel({ hasSearched: true, models: [makeModel('alpha')], onSearch });
+
+    await user.click(screen.getByRole('button', { name: '\u5168\u90e8\u6a21\u578b' }));
+
+    expect(lastSearchCall(onSearch)).toEqual(
+      expect.objectContaining({ fit: 'all', featuredOnly: false }),
+    );
+  });
   test('hides the stale result count while a new search is loading', () => {
     // The reported flicker: while the skeleton is showing, the count still
     // displayed the previous page's 7 models, then the fresh result rendered.
