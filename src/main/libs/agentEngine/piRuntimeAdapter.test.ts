@@ -1841,7 +1841,9 @@ describe('PiRuntimeAdapter', () => {
       listener!({ type: 'agent_end' });
       listener!({ type: 'agent_settled' });
       await vi.waitFor(() => {
-        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up');
+        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
+          streamingBehavior: 'followUp',
+        });
       });
       expect(adapter.listPendingMessages('queue-session').map(item => item.text)).toEqual([
         'Second follow-up',

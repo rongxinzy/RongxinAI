@@ -888,12 +888,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     try {
-      await active.piSession.prompt(
-        nextPrompt,
-        options._streamingBehavior
-          ? { streamingBehavior: options._streamingBehavior }
-          : undefined,
-      );
+      const promptOptions = options._streamingBehavior
+        ? { streamingBehavior: options._streamingBehavior }
+        : undefined;
+      if (promptOptions) {
+        await active.piSession.prompt(nextPrompt, promptOptions);
+      } else {
+        await active.piSession.prompt(nextPrompt);
+      }
     } catch (error) {
       active.isRunning = false;
       if (active.abortController.signal.aborted) {
