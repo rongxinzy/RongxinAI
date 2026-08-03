@@ -22,6 +22,7 @@ const baseModels: Model[] = [
     name: 'qwen-local-ok',
     providerKey: ProviderName.LlamaCpp,
     openClawProviderId: ProviderName.LlamaCpp,
+    capabilities: { toolCalling: 'supported' },
     llamaCppOpenClawEligibility: {
       eligible: true,
       reason: LlamaCppOpenClawEligibilityReason.Eligible,
@@ -108,6 +109,28 @@ describe('resolveOpenClawModelSupport', () => {
   test('distinguishes unknown runtime context', () => {
     expect(resolveOpenClawModelSupport('llamacpp/qwen-local-context-unknown', baseModels)).toBe(
       OpenClawModelSupportReason.LocalModelRuntimeContextUnknown,
+    );
+  });
+
+  test('rejects local models without confirmed tool calling support', () => {
+    const model = {
+      ...baseModels[0],
+      id: 'qwen-local-unknown-tools',
+      capabilities: {},
+    };
+    expect(resolveOpenClawModelSupport('llamacpp/qwen-local-unknown-tools', [model])).toBe(
+      OpenClawModelSupportReason.LocalModelToolCallingUnknown,
+    );
+  });
+
+  test('rejects local models explicitly marked without tool calling', () => {
+    const model = {
+      ...baseModels[0],
+      id: 'qwen-local-no-tools',
+      capabilities: { toolCalling: 'unsupported' as const },
+    };
+    expect(resolveOpenClawModelSupport('llamacpp/qwen-local-no-tools', [model])).toBe(
+      OpenClawModelSupportReason.LocalModelToolCallingUnsupported,
     );
   });
 });

@@ -41,8 +41,10 @@ import {
   ProviderName,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
+import type { ModelCapabilities } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
+import { t } from '../../i18n';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -280,6 +282,8 @@ type PiResolvedModel = {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   maxOutputTokens: number;
+  providerName: string;
+  capabilities?: Partial<ModelCapabilities>;
   requestOptions?: {
     apiKey?: string;
   };
@@ -502,6 +506,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // so override that loader per session to keep expert contexts isolated.
       // Resolve model early — needed by both MCP proxy and subagent tool
       const resolvedModel = await resolvePiModel(pi, options.modelOverride);
+      if (
+        options.sessionMode === 'work' &&
+        isLocalProviderName(resolvedModel.providerName) &&
+        resolvedModel.capabilities?.toolCalling !== ModelCapabilityStatus.Supported
+      ) {
+        throw new Error(
+          resolvedModel.capabilities?.toolCalling === ModelCapabilityStatus.Unsupported
+            ? t('coworkLocalModelToolCallingUnsupported')
+            : t('coworkLocalModelToolCallingUnknown'),
+        );
+      }
       resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
       sessionOptions.model = resolvedModel.model;
       if (resolvedModel.modelRuntime) {
@@ -2403,24 +2418,25 @@ function buildPiCustomModel(
   }
 
   const isLocalModel = isLocalProviderName(providerMetadata.providerName);
+  const endpoint = resolution.endpoint;
   const fallbackContextWindow = isLocalModel
     ? DEFAULT_PI_LOCAL_CONTEXT_WINDOW
     : DEFAULT_PI_CLOUD_CONTEXT_WINDOW;
   const fallbackMaxTokens = isLocalModel
     ? DEFAULT_PI_LOCAL_MAX_TOKENS
     : DEFAULT_PI_CLOUD_MAX_TOKENS;
-  const capabilities = providerMetadata.capabilities;
+  const capabilities = endpoint?.capabilities ?? providerMetadata.capabilities;
   const piRuntime = providerMetadata.piRuntime;
   const compat = piRuntime?.compat;
   const supportsImage =
     providerMetadata.supportsImage || capabilities?.imageInput === ModelCapabilityStatus.Supported;
 
   return {
-    id: config.model,
-    name: providerMetadata.modelName || config.model,
+    id: endpoint?.modelId ?? config.model,
+    name: endpoint?.displayName || providerMetadata.modelName || config.model,
     api: resolvePiCustomModelApi(resolution),
     provider: providerMetadata.providerName,
-    baseUrl: baseUrlOverride || config.baseURL,
+    baseUrl: baseUrlOverride || endpoint?.baseUrl || config.baseURL,
     reasoning: resolveProviderModelPiReasoning(piRuntime, capabilities),
     input: supportsImage ? ['text', 'image'] : ['text'],
     ...(hasRecordEntries(compat) ? { compat } : {}),
@@ -2431,8 +2447,11 @@ function buildPiCustomModel(
       cacheWrite: 0,
     },
     contextWindow:
-      providerMetadata.contextWindow || providerMetadata.contextTokens || fallbackContextWindow,
-    maxTokens: providerMetadata.maxTokens || fallbackMaxTokens,
+      endpoint?.contextWindow ||
+      providerMetadata.contextWindow ||
+      providerMetadata.contextTokens ||
+      fallbackContextWindow,
+    maxTokens: endpoint?.maxTokens || providerMetadata.maxTokens || fallbackMaxTokens,
   };
 }
 
@@ -2593,10 +2612,13 @@ async function resolvePiModel(
         : customModel),
     modelRuntime,
     maxOutputTokens:
+      resolution.endpoint?.maxTokens ||
       resolution.providerMetadata.maxTokens ||
       (isLocalProviderName(resolution.providerMetadata.providerName)
         ? DEFAULT_PI_LOCAL_MAX_TOKENS
         : DEFAULT_PI_CLOUD_MAX_TOKENS),
+    providerName: resolution.providerMetadata.providerName,
+    capabilities: resolution.endpoint?.capabilities ?? resolution.providerMetadata.capabilities,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
 }

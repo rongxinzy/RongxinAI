@@ -1,4 +1,4 @@
-import { isLocalModelRef } from '@shared/providers';
+import { isLocalModelRef, isLocalProviderName, ModelCapabilityStatus } from '@shared/providers';
 import type { AgentTriageOverride } from '@shared/triage';
 
 import { LlamaCppOpenClawEligibilityReason } from '../../shared/llamacpp';
@@ -12,6 +12,8 @@ export const OpenClawModelSupportReason = {
   LocalModelRuntimeContextUnknown: 'local_model_runtime_context_unknown',
   LocalModelRuntimeContextTooSmall: 'local_model_runtime_context_too_small',
   LocalModelTrainedContextTooSmall: 'local_model_trained_context_too_small',
+  LocalModelToolCallingUnsupported: 'local_model_tool_calling_unsupported',
+  LocalModelToolCallingUnknown: 'local_model_tool_calling_unknown',
 } as const;
 
 export type OpenClawModelSupportReason =
@@ -70,6 +72,21 @@ export function resolveOpenClawModelSupportResult(
   if (resolvedModel) {
     const eligibility = getModelOpenClawEligibility(resolvedModel);
     if (!eligibility || eligibility.eligible) {
+      if (isLocalProviderName(resolvedModel.providerKey ?? '')) {
+        const toolCalling = resolvedModel.capabilities?.toolCalling;
+        if (toolCalling === ModelCapabilityStatus.Unsupported) {
+          return {
+            reason: OpenClawModelSupportReason.LocalModelToolCallingUnsupported,
+            modelRef: normalizedModelRef,
+          };
+        }
+        if (toolCalling !== ModelCapabilityStatus.Supported) {
+          return {
+            reason: OpenClawModelSupportReason.LocalModelToolCallingUnknown,
+            modelRef: normalizedModelRef,
+          };
+        }
+      }
       return {
         reason: OpenClawModelSupportReason.Supported,
         modelRef: normalizedModelRef,
@@ -183,6 +200,10 @@ export function resolveOpenClawModelSupportMessageKey(reason: OpenClawModelSuppo
       return 'agentLlamaCppContextTooSmallHint';
     case OpenClawModelSupportReason.LocalModelTrainedContextTooSmall:
       return 'agentLlamaCppTrainedContextTooSmallHint';
+    case OpenClawModelSupportReason.LocalModelToolCallingUnsupported:
+      return 'agentLocalModelToolCallingUnsupportedHint';
+    case OpenClawModelSupportReason.LocalModelToolCallingUnknown:
+      return 'agentLocalModelToolCallingUnknownHint';
     case OpenClawModelSupportReason.Supported:
     default:
       return '';
