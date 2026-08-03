@@ -181,6 +181,7 @@ import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
+import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
@@ -771,6 +772,22 @@ describe('PiRuntimeAdapter', () => {
           diagnostics: [],
         }).skills,
       ).toEqual([{ id: 'skill-b' }]);
+    });
+
+    it('creates only one workbench run when skill topology changes', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+
+      await adapter.startSession('test', 'First', { skillIds: ['skill-a'] });
+      await adapter.continueSession('test', 'Second', { skillIds: ['skill-b'] });
+
+      expect(beginRun).toHaveBeenCalledTimes(2);
     });
 
     it('uses the durable acceptance loop when an arbitrary skill is added to a Work session', async () => {
@@ -1734,7 +1751,7 @@ describe('PiRuntimeAdapter', () => {
         expect.objectContaining({ status: 'error' }),
       );
       expect(completes).toEqual(['test']);
-      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'completed' });
+      expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'idle' });
     });
 
     it('surfaces the error exactly once when auto-retries are exhausted', async () => {

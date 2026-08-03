@@ -110,6 +110,7 @@ import {
   registerScheduledTaskHandlers,
 } from './ipcHandlers/scheduledTask';
 import { getTriageConfig, registerTriageIpcHandlers } from './ipcHandlers/triage';
+import { WorkbenchTaskService } from './workbenchTask/taskService';
 import {
   OpenClawChannelGateway,
   type PermissionResult,
@@ -956,6 +957,14 @@ let store: SqliteStore | null = null;
 let coworkStore: CoworkStore | null = null;
 let openClawChannelGateway: OpenClawChannelGateway | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
+let workbenchTaskService: WorkbenchTaskService | null = null;
+
+const getWorkbenchTaskService = (): WorkbenchTaskService => {
+  if (!workbenchTaskService) {
+    workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase());
+  }
+  return workbenchTaskService;
+};
 
 const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
   if (!piRuntimeAdapter) {
@@ -980,6 +989,7 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     );
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
+    piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     // mcpServerManager is created async later (ensureOpenClawRunningForCowork),
     // so it is always null here. Late-injection happens on every subsequent call.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
@@ -7513,6 +7523,12 @@ if (!gotTheLock) {
     console.log('[Main] initApp: resetRunningSessions done, count:', resetCount);
     if (resetCount > 0) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
+    }
+    const recoveredWorkbenchTasks = getWorkbenchTaskService().recoverInterruptedState();
+    if (recoveredWorkbenchTasks > 0) {
+      console.log(
+        `[WorkbenchTask] marked ${recoveredWorkbenchTasks} interrupted task(s) for explicit recovery`,
+      );
     }
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);

@@ -78,6 +78,8 @@ export type PiStartOptions = {
   conversationHistory?: PiConversationHistoryMessage[];
   /** Internal: override prompt text sent to PI, while UI shows original prompt */
   _piPromptOverride?: string;
+  /** Internal: run already created by an explicit Resume/Retry action. */
+  _workbenchRunId?: string;
 };
 
 export type PiContinueOptions = {
@@ -93,6 +95,10 @@ export type PiContinueOptions = {
   modelOverride?: string;
   /** Forwarded to startSession when the runtime has to recreate the session. */
   autoApprove?: boolean;
+  /** Internal: run already created by an explicit Resume/Retry action. */
+  _workbenchRunId?: string;
+  /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
+  _skipUserMessage?: boolean;
 };
 
 /** Workbench session patch; Pi only supports switching the model. */

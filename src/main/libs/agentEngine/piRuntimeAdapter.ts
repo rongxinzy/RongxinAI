@@ -25,6 +25,11 @@ import { classifyCoworkError, type CoworkError } from '../../../common/coworkErr
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import {
+  WorkbenchContractKind,
+  WorkbenchRunTrigger,
+  type WorkbenchTaskContract,
+} from '../../../shared/workbenchTask';
+import {
   isLocalProviderName,
   ModelCapabilityStatus,
   ProviderModelPiApi,
@@ -33,6 +38,7 @@ import {
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
+import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import {
   type ApiConfigResolution,
   resolveRawApiConfig,
@@ -196,6 +202,8 @@ interface ActivePiSession {
    * agent_settled). Cleared when a retry succeeds or the turn is reset.
    */
   pendingError: { message: string; classified: CoworkError } | null;
+  workbenchRunId: string | null;
+  workbenchContract: WorkbenchTaskContract;
 }
 
 // ── Dynamic imports ──
@@ -325,9 +333,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   >();
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
+  private workbenchTaskService: WorkbenchTaskService | null = null;
 
   setCoworkStore(store: CoworkStore): void {
     this.store = store;
+  }
+  setWorkbenchTaskService(service: WorkbenchTaskService): void {
+    this.workbenchTaskService = service;
   }
   setMcpServerManager(mgr: McpServerManager): void {
     this.mcpServerManager = mgr;
@@ -399,6 +411,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     const abortController = new AbortController();
+    let workbenchRunId: string | null = null;
 
     try {
       const workspaceRoot = options.workspaceRoot || process.cwd();
@@ -415,6 +428,26 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
         fileToolsEnabled: options.confirmationMode !== 'text',
       };
+
+      const shortcutKindForContract = isAcademicResearchSkillSet(resourceState.skillIds)
+        ? null
+        : resolveShortcutWorkflowKind(resourceState.skillIds);
+      const workbenchContract = this.createWorkbenchContract(
+        options.sessionMode,
+        resourceState.skillIds,
+      );
+      if (this.workbenchTaskService) {
+        const workbench = this.workbenchTaskService.beginRun({
+          sessionId,
+          goal: prompt,
+          contract: workbenchContract,
+          trigger: options._workbenchRunId
+            ? WorkbenchRunTrigger.Resume
+            : WorkbenchRunTrigger.Message,
+          preparedRunId: options._workbenchRunId,
+        });
+        workbenchRunId = workbench.run.id;
+      }
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
       // default resource loader supplies the Pi Coding Assistant identity,
@@ -457,7 +490,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         researchRun.resumeForPrompt(prompt);
         customTools.push(buildPiResearchStateTool(researchRun));
       }
-      const shortcutKind = researchRun ? null : resolveShortcutWorkflowKind(resourceState.skillIds);
+      const shortcutKind = researchRun ? null : shortcutKindForContract;
       const shortcutWorkflow = shortcutKind
         ? new PiShortcutWorkflowController({
             sessionId,
@@ -588,6 +621,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workExecution,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
         pendingError: null,
+        workbenchRunId,
+        workbenchContract,
       };
 
       // Subscribe to Pi events before sending the prompt
@@ -622,6 +657,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
+      this.workbenchTaskService?.failRun(sessionId, { message });
       this.emit('error', sessionId, classifyCoworkError(message));
       throw error;
     }
@@ -645,6 +681,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const piPrompt = buildPiConversationPrompt(history, prompt);
       return this.startSession(sessionId, prompt, {
         ...options,
+        skipInitialUserMessage: options._skipUserMessage,
         systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
         expertIds: options.expertIds ?? storedSession?.experts.map(expert => expert.expertId),
         workspaceRoot: options.workspaceRoot ?? storedSession?.cwd,
@@ -710,6 +747,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     }
 
+    if (this.workbenchTaskService) {
+      const sessionMode =
+        options.sessionMode ??
+        (active.workbenchContract.kind === WorkbenchContractKind.Chat ? 'chat' : 'work');
+      const workbenchContract = this.createWorkbenchContract(sessionMode, requestedSkillIds);
+      const workbench = this.workbenchTaskService.beginRun({
+        sessionId,
+        goal: prompt,
+        contract: workbenchContract,
+        trigger: options._workbenchRunId ? WorkbenchRunTrigger.Resume : WorkbenchRunTrigger.Message,
+        preparedRunId: options._workbenchRunId,
+      });
+      active.workbenchRunId = workbench.run.id;
+      active.workbenchContract = workbenchContract;
+    }
+
     // Reset turn state
     active.answerText = '';
     active.thinkingText = '';
@@ -726,15 +779,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.pendingError = null;
 
     // Emit user message (persisted to SQLite, same as startSession).
-    const userMsg: CoworkMessage = {
-      id: randomUUID(),
-      type: 'user',
-      content: prompt,
-      timestamp: Date.now(),
-      metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
-    };
-    const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
-    this.emit('message', sessionId, persisted);
+    if (!options._skipUserMessage) {
+      const userMsg: CoworkMessage = {
+        id: randomUUID(),
+        type: 'user',
+        content: prompt,
+        timestamp: Date.now(),
+        metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
+      };
+      const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
+      this.emit('message', sessionId, persisted);
+    }
 
     let nextPrompt = prompt;
     const completionWorkflow =
@@ -824,6 +879,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.abortController.abort();
     active.unsubscribe();
     void active.piSession.abort();
+    this.workbenchTaskService?.pauseRun(sessionId, 'The user stopped this run.');
     this.emit('sessionStopped', sessionId);
   }
 
@@ -870,6 +926,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   onSessionDeleted(sessionId: string): void {
     this.stopSession(sessionId);
     this.activeSessions.delete(sessionId);
+    this.workbenchTaskService?.deleteSession(sessionId);
   }
 
   // ── Chat mode: direct LLM without agent loop ──
@@ -1212,10 +1269,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           });
           break;
         }
-        // Persist completed status to SQLite so the session shows as "completed"
-        // after switching away and back (mirrors OpenClaw adapter pattern).
-        if (this.store) {
-          this.store.updateSession(sessionId, { status: 'completed' });
+        if (this.store) this.store.updateSession(sessionId, { status: 'idle' });
+        if (active.workbenchRunId && this.workbenchTaskService) {
+          this.workbenchTaskService.completeRun(active.workbenchRunId);
         }
         this.emit('complete', sessionId, null);
         break;
@@ -1257,6 +1313,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const pending = active.pendingError;
     if (!pending) return;
     active.pendingError = null;
+    this.workbenchTaskService?.failRun(sessionId, { message: pending.message });
     // Persist a system error message so the error survives session switching
     // and is visible in the message list. The classified kind lets the renderer
     // translate it into a user-friendly i18n message; the raw message is kept
@@ -1874,6 +1931,26 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const homedir = os.homedir();
     const configDir = process.env.PI_CODING_AGENT_DIR || path.join(homedir, '.pi', 'agent');
     return path.join(configDir, 'agents');
+  }
+
+  private createWorkbenchContract(
+    sessionMode: PiStartOptions['sessionMode'],
+    skillIds: string[] | undefined,
+  ): WorkbenchTaskContract {
+    const research = isAcademicResearchSkillSet(skillIds);
+    const shortcut = research ? null : resolveShortcutWorkflowKind(skillIds);
+    return {
+      kind:
+        sessionMode === 'chat'
+          ? WorkbenchContractKind.Chat
+          : research
+            ? WorkbenchContractKind.Research
+            : shortcut
+              ? WorkbenchContractKind.Shortcut
+              : WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: sessionMode !== 'chat' && !research && !shortcut,
+      metadata: skillIds?.length ? { skillIds } : undefined,
+    };
   }
 }
 
