@@ -280,7 +280,10 @@ export class WorkbenchTaskService extends EventEmitter {
     if (existing) {
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
-    const canAutoApprove = input.autoApprove && riskLevel === WorkbenchApprovalRiskLevel.Reversible;
+    // "Allow all" skips routine and unknown tool prompts, while irreversible
+    // effects still require an explicit confirmation as a safety boundary.
+    const canAutoApprove =
+      input.autoApprove && riskLevel !== WorkbenchApprovalRiskLevel.Irreversible;
     const approval = this.repository.transaction(() => {
       const created = this.repository.createApproval({
         taskId: task.id,
