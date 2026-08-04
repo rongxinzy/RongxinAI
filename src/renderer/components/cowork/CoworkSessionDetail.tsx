@@ -484,14 +484,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     };
   }, []);
 
-  // Reset nav state when session changes
-  useEffect(() => {
+  // Reset all rail measurements before the next session paints. This component
+  // stays mounted so artifact renderers can be reused across session switches.
+  useLayoutEffect(() => {
     setCurrentRailIndex(-1);
     currentRailIndexRef.current = -1;
+    railItemCountRef.current = 0;
+    turnToRailRangeRef.current = [];
     isNavigatingRef.current = false;
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
+    railLinesRef.current?.scrollTo({ top: 0 });
     setHoveredRailIndex(null);
-  }, [currentSession?.id]);
+    setIsRailHovered(false);
+    setRailTooltip(null);
+  }, [sessionId]);
 
   useEffect(() => {
     const handleOpenShareOptions = (event: Event) => {
@@ -808,15 +814,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       })();
     });
   };
-
-  // scroll + loadMore handled by Conversation (StickToBottom); rail state reset on session change
-  useEffect(() => {
-    setCurrentRailIndex(-1);
-    currentRailIndexRef.current = -1;
-    isNavigatingRef.current = false;
-    if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
-    setHoveredRailIndex(null);
-  }, [currentSession?.id]);
 
   const navigateToRailItem = useCallback((railIndex: number) => {
     if (railIndex < 0 || railIndex >= railItemCountRef.current) return;
