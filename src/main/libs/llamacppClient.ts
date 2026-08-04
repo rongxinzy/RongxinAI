@@ -23,6 +23,7 @@ const LLAMACPP_MODEL_LOAD_TIMEOUT_MS = 300_000;
 const LLAMACPP_MODEL_READY_POLL_INTERVAL_MS = 250;
 const LLAMACPP_MODEL_READY_POLL_REQUEST_TIMEOUT_MS = 10_000;
 const LLAMACPP_MODEL_INFERENCE_PROBE_TIMEOUT_MS = 30_000;
+const LLAMACPP_MODEL_PROPERTIES_TIMEOUT_MS = 2_000;
 const LlamaCppInferenceProbeMessage = {
   Role: 'user',
   Content: 'ping',
@@ -89,7 +90,10 @@ export class LlamaCppClient {
   }
 
   async showModel(name: string): Promise<unknown> {
-    return await this.requestJson(`/props?model=${encodeURIComponent(name)}`, { method: 'GET' });
+    return await this.requestJson(`/props?model=${encodeURIComponent(name)}`, {
+      method: 'GET',
+      timeoutMs: LLAMACPP_MODEL_PROPERTIES_TIMEOUT_MS,
+    });
   }
 
   async deleteModel(_name: string): Promise<void> {

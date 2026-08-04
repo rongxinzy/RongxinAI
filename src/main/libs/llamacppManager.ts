@@ -1030,7 +1030,16 @@ export class LlamaCppManager extends EventEmitter {
     this.cacheThinkingToggleSupport(scannedModels);
     let routerModels: LlamaCppModel[] = [];
     try {
-      routerModels = await (await this.client()).listModels();
+      // Listing local models is a read-only UI refresh. Do not trigger the
+      // router's reload endpoint or wait for the full 30s request timeout when
+      // the optional backend is stopped or still starting.
+      const client = await this.client();
+      // Keep compatibility with lightweight test/integration clients that
+      // predate the snapshot method; the production client always exposes it.
+      routerModels =
+        typeof client.listModelsSnapshot === 'function'
+          ? await client.listModelsSnapshot(2_000)
+          : await client.listModels();
     } catch (error) {
       console.warn('[LlamaCpp] failed to list router models, using local GGUF scan:', error);
     }
