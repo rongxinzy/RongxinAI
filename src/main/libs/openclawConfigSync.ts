@@ -6,7 +6,6 @@ import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt
 import { AgentId, DefaultAgentProfile } from '../../shared/agent';
 import {
   AuthType,
-  ModelCapabilityStatus,
   OpenClawApi as OpenClawApiConst,
   OpenClawProviderId,
   ProviderName,
@@ -33,10 +32,7 @@ import {
   getCoworkOpenAICompatProxyBaseURL,
   getCoworkOpenAICompatProxyToken,
 } from './coworkOpenAICompatProxy';
-import {
-  resolveAnySearchGatewayToken,
-  resolveAnySearchGatewayUrl,
-} from './anysearchGatewayCredentials';
+import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './anysearchGatewayCredentials';
 import type { McpToolManifestEntry } from './mcpServerManager';
 import { readOpenAICodexAuthFile } from './openaiCodexAuth';
 import {
@@ -762,14 +758,11 @@ export const buildProviderSelection = (options: {
     : options.modelId;
 
   const providerModelName = resolveModelDisplayName(sessionModelId, options.modelName);
-  const supportsImage = providerName.startsWith('custom_')
-    ? (options.supportsImage ??
-      ProviderRegistry.getModel(providerName, options.modelId)?.supportsImage)
-    : ProviderRegistry.resolveModelSupportsImage(
-        providerName,
-        options.modelId,
-        options.supportsImage,
-      );
+  const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+    providerName,
+    options.modelId,
+    options.supportsImage,
+  );
   const modelInput: string[] = supportsImage ? ['text', 'image'] : ['text'];
   const auth =
     (options.providerName === ProviderName.Minimax ||
@@ -1060,8 +1053,7 @@ export class OpenClawConfigSync {
 
     if (apiResolution.config) {
       const { baseURL, apiKey, model, apiType } = apiResolution.config;
-      const endpoint = apiResolution.endpoint;
-      const modelId = (endpoint?.modelId ?? model).trim();
+      const modelId = model.trim();
       if (!modelId) {
         return {
           ok: false,
@@ -1073,25 +1065,17 @@ export class OpenClawConfigSync {
 
       providerSelection = buildProviderSelection({
         apiKey,
-        baseURL: endpoint?.baseUrl ?? baseURL,
+        baseURL,
         modelId,
-        apiType:
-          endpoint?.protocol === 'anthropic'
-            ? 'anthropic'
-            : endpoint?.protocol === 'openai'
-              ? 'openai'
-              : apiType,
+        apiType,
         providerName: apiResolution.providerMetadata?.providerName,
         authType: apiResolution.providerMetadata?.authType,
         codingPlanEnabled: apiResolution.providerMetadata?.codingPlanEnabled,
-        supportsImage:
-          endpoint?.capabilities.imageInput === ModelCapabilityStatus.Supported
-            ? true
-            : apiResolution.providerMetadata?.supportsImage,
-        modelName: endpoint?.displayName ?? apiResolution.providerMetadata?.modelName,
-        contextWindow: endpoint?.contextWindow ?? apiResolution.providerMetadata?.contextWindow,
-        contextTokens: endpoint?.contextWindow ?? apiResolution.providerMetadata?.contextTokens,
-        maxTokens: endpoint?.maxTokens ?? apiResolution.providerMetadata?.maxTokens,
+        supportsImage: apiResolution.providerMetadata?.supportsImage,
+        modelName: apiResolution.providerMetadata?.modelName,
+        contextWindow: apiResolution.providerMetadata?.contextWindow,
+        contextTokens: apiResolution.providerMetadata?.contextTokens,
+        maxTokens: apiResolution.providerMetadata?.maxTokens,
       });
       primaryModel = providerSelection.primaryModel;
 

@@ -95,7 +95,7 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
           provider,
           apiFormat: normalizeApiFormat(this.options.apiFormat),
         }
-      : getProviderConfig(provider, modelId);
+      : getProviderConfig(provider);
 
     if (!config) {
       throw new Error(`Provider ${provider} is not configured or enabled.`);
@@ -105,18 +105,16 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
       throw new Error(`API key is required for provider ${provider}.`);
     }
 
-    const endpoint = config.endpoint;
-    const effectiveModelId = endpoint?.modelId ?? modelId;
     const apiFormat = this.options.apiFormat
       ? normalizeApiFormat(this.options.apiFormat)
-      : (endpoint?.protocol ?? config.apiFormat);
+      : config.apiFormat;
 
     const { url, headers, body } = this.buildRequest(
       messages,
       provider,
       config.apiKey,
       config.baseUrl,
-      effectiveModelId,
+      modelId,
       apiFormat,
     );
     return this.streamOverIpc(chatId, url, headers, body, abortSignal, apiFormat);

@@ -7,10 +7,6 @@ import {
   type ProviderModelPiRuntimeConfig,
   ProviderName,
   ProviderRegistry,
-  parseOllamaRuntimeCapabilities,
-  resolveModelEndpoint,
-  type ResolvedModelEndpoint,
-  type RuntimeModelSnapshot,
   resolveCodingPlanBaseUrl,
 } from '../../shared/providers';
 import type { SqliteStore } from '../sqliteStore';
@@ -71,7 +67,6 @@ type ProviderModelInputConfig = {
 export type ApiConfigResolution = {
   config: CoworkApiConfig | null;
   error?: string;
-  endpoint?: ResolvedModelEndpoint;
   providerMetadata?: {
     providerName: string;
     authType?: ProviderConfig['authType'];
@@ -113,13 +108,6 @@ export function setServerBaseUrlGetter(getter: () => string): void {
 // Keyed by modelId → { supportsImage }
 let serverModelMetadataCache: Map<string, { supportsImage?: boolean }> = new Map();
 let llamaCppRunningModelCache: ProviderModelConfig[] = [];
-type OllamaRuntimeModelState = {
-  runtimeModelId: string;
-  status: RuntimeModelSnapshot['status'];
-  runtimeContextWindow?: number;
-  detectedCapabilities?: Partial<ModelCapabilities>;
-};
-let ollamaRuntimeModelCache = new Map<string, OllamaRuntimeModelState>();
 
 const serializeServerModelMetadata = (
   models: Array<{ modelId: string; supportsImage?: boolean }>,
@@ -192,55 +180,6 @@ export function getLlamaCppRunningModels(): ProviderModelConfig[] {
   }));
 }
 
-export function updateOllamaRuntimeModels(
-  models: Array<{
-    name?: string;
-    model?: string;
-    context_length?: number;
-  }>,
-): void {
-  const next = new Map<string, OllamaRuntimeModelState>();
-  models.forEach(model => {
-    const modelId = (model.name || model.model || '').trim();
-    if (!modelId) return;
-    next.set(modelId.toLowerCase(), {
-      runtimeModelId: modelId,
-      status: 'loaded',
-      ...(model.context_length && model.context_length > 0
-        ? { runtimeContextWindow: model.context_length }
-        : {}),
-      ...(ollamaRuntimeModelCache.get(modelId.toLowerCase())?.detectedCapabilities
-        ? { detectedCapabilities: ollamaRuntimeModelCache.get(modelId.toLowerCase())?.detectedCapabilities }
-        : {}),
-    });
-  });
-  ollamaRuntimeModelCache.forEach((state, key) => {
-    if (!next.has(key)) next.set(key, { ...state, status: 'stopped' });
-  });
-  ollamaRuntimeModelCache = next;
-}
-
-export function updateOllamaRuntimeModelCapabilities(
-  modelId: string,
-  payload: unknown,
-): void {
-  const normalizedId = modelId.trim().toLowerCase();
-  if (!normalizedId) return;
-  const previous = ollamaRuntimeModelCache.get(normalizedId);
-  ollamaRuntimeModelCache.set(normalizedId, {
-    runtimeModelId: previous?.runtimeModelId ?? modelId.trim(),
-    status: previous?.status ?? 'unknown',
-    ...(previous?.runtimeContextWindow
-      ? { runtimeContextWindow: previous.runtimeContextWindow }
-      : {}),
-    detectedCapabilities: parseOllamaRuntimeCapabilities(payload),
-  });
-}
-
-export function clearOllamaRuntimeModels(): void {
-  ollamaRuntimeModelCache.clear();
-}
-
 function findLlamaCppRunningModel(modelId: string): ProviderModelConfig | undefined {
   const normalized = modelId.trim();
   if (!normalized) return undefined;
@@ -291,18 +230,25 @@ function normalizeProviderModels(
   return (models ?? [])
     .filter(model => model.id?.trim())
     .map(model => {
-      const registeredModel = ProviderRegistry.getModel(providerName, model.id);
-      const supportsImage = model.supportsImage ?? registeredModel?.supportsImage;
+      const providerDefinition = ProviderRegistry.get(providerName);
+      const registeredModel = [
+        ...(providerDefinition?.defaultModels ?? []),
+        ...(providerDefinition?.codingPlanModels ?? []),
+      ].find(candidate => candidate.id === model.id);
+      const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+        providerName,
+        model.id,
+        model.supportsImage,
+      );
       const capabilities =
         registeredModel || model.capabilities
           ? ProviderRegistry.resolveModelCapabilities(providerName, model.id, apiFormat, {
               ...model,
-              ...(supportsImage === undefined ? {} : { supportsImage }),
+              supportsImage,
             })
           : undefined;
       return {
         ...model,
-        id: registeredModel?.id ?? model.id,
         name: model.name || model.id,
         supportsImage,
         capabilities,
@@ -346,40 +292,7 @@ type MatchedProvider = {
   maxTokens?: number;
   capabilities?: Partial<ModelCapabilities>;
   piRuntime?: ProviderModelPiRuntimeConfig;
-  userModelConfig?: ProviderModelConfig;
-  openClawEligibility?: LlamaCppOpenClawEligibility;
 };
-
-function getMatchedRuntimeSnapshot(matched: MatchedProvider): RuntimeModelSnapshot | undefined {
-  if (matched.providerName === ProviderName.Ollama) {
-    const runtime = ollamaRuntimeModelCache.get(matched.modelId.trim().toLowerCase());
-    if (!runtime) return undefined;
-    return {
-      kind: 'ollama',
-      status: runtime.status,
-      runtimeModelId: runtime.runtimeModelId,
-      ...(runtime.runtimeContextWindow
-        ? { runtimeContextWindow: runtime.runtimeContextWindow }
-        : {}),
-      ...(runtime.detectedCapabilities
-        ? { detectedCapabilities: runtime.detectedCapabilities }
-        : {}),
-    };
-  }
-  if (matched.providerName !== ProviderName.LlamaCpp) return undefined;
-  const trainedContextWindow =
-    matched.userModelConfig?.openClawEligibility?.trainedContextWindow ??
-    matched.openClawEligibility?.trainedContextWindow;
-  const detectedCapabilities = matched.capabilities;
-  return {
-    kind: 'llamacpp',
-    status: isLlamaCppModelRunning(matched.modelId) ? 'loaded' : 'unknown',
-    ...(matched.contextWindow ? { runtimeContextWindow: matched.contextWindow } : {}),
-    ...(trainedContextWindow ? { trainedContextWindow } : {}),
-    ...(detectedCapabilities ? { detectedCapabilities } : {}),
-    runtimeModelId: matched.modelId,
-  };
-}
 
 function getEffectiveProviderApiFormat(
   providerName: string,
@@ -568,9 +481,7 @@ function resolveMatchedProviderFromSelection(
     };
   }
 
-  const matchedModel = normalizedProviderModels.find(
-    model => model.id.toLowerCase() === modelId.toLowerCase(),
-  );
+  const matchedModel = normalizedProviderModels.find(m => m.id === modelId);
   if (!matchedModel) {
     const serverFallback = tryZhiyuanServerFallback(modelId);
     if (serverFallback) return { matched: serverFallback };
@@ -587,21 +498,13 @@ function resolveMatchedProviderFromSelection(
       modelId,
       apiFormat,
       baseURL,
-      supportsImage: ProviderRegistry.resolveModelSupportsImage(
-        providerName,
-        matchedModel.id,
-        matchedModel.supportsImage,
-      ),
+      supportsImage: matchedModel.supportsImage,
       modelName: matchedModel.name,
       contextWindow: matchedModel.contextWindow,
       contextTokens: matchedModel.contextTokens,
       maxTokens: matchedModel.maxTokens,
       capabilities: matchedModel.capabilities,
       piRuntime: matchedModel.piRuntime,
-      userModelConfig: storedProviderConfig.models?.find(
-        model => model.id.toLowerCase() === modelId.toLowerCase(),
-      ),
-      openClawEligibility: matchedModel.openClawEligibility,
     },
   };
 }
@@ -674,16 +577,7 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
   );
   const effectiveApiKey =
     apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
-  const endpoint = resolveModelEndpoint(matched.providerName, matched.modelId, {
-    providerConfig: matched.providerConfig,
-    modelConfig: matched.userModelConfig,
-    apiKey: effectiveApiKey,
-    baseUrl: effectiveBaseURL,
-    apiFormat: effectiveApiFormat,
-    runtime: getMatchedRuntimeSnapshot(matched),
-  });
   return {
-    endpoint,
     config: {
       apiKey: effectiveApiKey,
       baseURL: effectiveBaseURL,
@@ -840,16 +734,7 @@ export function resolveCurrentApiConfig(
     resolvedApiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
 
   if (matched.apiFormat === 'anthropic') {
-    const endpoint = resolveModelEndpoint(matched.providerName, matched.modelId, {
-      providerConfig: matched.providerConfig,
-      modelConfig: matched.userModelConfig,
-      apiKey: effectiveApiKey,
-      baseUrl: resolvedBaseURL,
-      apiFormat: matched.apiFormat,
-      runtime: getMatchedRuntimeSnapshot(matched),
-    });
     return {
-      endpoint,
       config: {
         apiKey: effectiveApiKey,
         baseURL: resolvedBaseURL,
@@ -894,14 +779,6 @@ export function resolveCurrentApiConfig(
   }
 
   return {
-    endpoint: resolveModelEndpoint(matched.providerName, matched.modelId, {
-      providerConfig: matched.providerConfig,
-      modelConfig: matched.userModelConfig,
-      apiKey: effectiveApiKey,
-      baseUrl: resolvedBaseURL,
-      apiFormat: matched.apiFormat,
-      runtime: getMatchedRuntimeSnapshot(matched),
-    }),
     config: {
       apiKey: resolvedApiKey || 'zhiyuan-openai-compat',
       baseURL: proxyBaseURL,
@@ -985,16 +862,7 @@ export function resolveRawApiConfig(): ApiConfigResolution {
   // the request with "No API key found for provider".
   const effectiveApiKey =
     apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
-  const endpoint = resolveModelEndpoint(matched.providerName, matched.modelId, {
-    providerConfig: matched.providerConfig,
-    modelConfig: matched.userModelConfig,
-    apiKey: effectiveApiKey,
-    baseUrl: effectiveBaseURL,
-    apiFormat: effectiveApiFormat,
-    runtime: getMatchedRuntimeSnapshot(matched),
-  });
   return {
-    endpoint,
     config: {
       apiKey: effectiveApiKey,
       baseURL: effectiveBaseURL,

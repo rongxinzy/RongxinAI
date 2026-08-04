@@ -53,26 +53,26 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
         : configuredApiFormat;
 
     configuredModels.forEach(model => {
-      const catalogModel = ProviderRegistry.getModel(providerName, model.id);
-      const supportsImage = catalogModel
-        ? ProviderRegistry.resolveModelSupportsImage(providerName, model.id, model.supportsImage)
-        : model.supportsImage;
+      const supportsImage = ProviderRegistry.resolveModelSupportsImage(
+        providerName,
+        model.id,
+        model.supportsImage,
+      );
       models.push({
         id: model.id,
         name: model.name,
         provider: getProviderDisplayName(providerName, providerConfig),
         providerKey: providerName,
         openClawProviderId: ProviderRegistry.getOpenClawProviderId(providerName),
-        ...(supportsImage === undefined ? {} : { supportsImage }),
+        supportsImage,
         capabilities: ProviderRegistry.resolveModelCapabilities(
           providerName,
           model.id,
           effectiveApiFormat,
-          { ...model, ...(supportsImage === undefined ? {} : { supportsImage }) },
+          { ...model, supportsImage },
         ),
         contextWindow:
           model.contextWindow ?? ('contextTokens' in model ? model.contextTokens : undefined),
-        maxTokens: model.maxTokens,
       });
     });
   });
