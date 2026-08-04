@@ -18,6 +18,9 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
   setStoreGetter,
+  clearOllamaRuntimeModels,
+  updateOllamaRuntimeModelCapabilities,
+  updateOllamaRuntimeModels,
   updateLlamaCppRunningModels,
 } from './claudeSettings';
 import { buildLlamaCppRunningModelBinding } from './llamacppOpenClawBinding';
@@ -41,11 +44,56 @@ const createAppConfig = (defaultModel: string) => ({
 
 beforeEach(() => {
   updateLlamaCppRunningModels([]);
+  clearOllamaRuntimeModels();
 });
 
 afterEach(() => {
   updateLlamaCppRunningModels([]);
+  clearOllamaRuntimeModels();
   setStoreGetter(() => null);
+});
+
+test('resolveRawApiConfig forwards Ollama runtime context and capabilities', () => {
+  updateOllamaRuntimeModels([{ name: 'qwen-local', context_length: 65536 }]);
+  updateOllamaRuntimeModelCapabilities('qwen-local', {
+    capabilities: ['completion', 'tools', 'thinking'],
+  });
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config'
+            ? {
+                model: {
+                  defaultModel: 'qwen-local',
+                  defaultModelProvider: ProviderName.Ollama,
+                },
+                providers: {
+                  [ProviderName.Ollama]: {
+                    enabled: true,
+                    userEnabled: true,
+                    apiKey: '',
+                    baseUrl: 'http://127.0.0.1:11434',
+                    apiFormat: 'openai' as const,
+                    models: [{ id: 'qwen-local', name: 'qwen-local' }],
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  const result = resolveRawApiConfig();
+  expect(result.endpoint?.runtime).toMatchObject({
+    kind: 'ollama',
+    status: 'loaded',
+    runtimeModelId: 'qwen-local',
+    runtimeContextWindow: 65536,
+    detectedCapabilities: {
+      toolCalling: ModelCapabilityStatus.Supported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  });
 });
 
 test('resolveRawApiConfig forwards llama.cpp runtime metadata for the selected running model', () => {
