@@ -7,7 +7,6 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const projectRoot = path.resolve(__dirname, '..');
@@ -32,22 +31,41 @@ function drawDots(context, width, height, opacity = 0.1) {
 }
 
 function writeBmp(canvas, filename) {
-  const temporaryPpm = path.join(assetDir, `.${filename}.ppm`);
   const output = path.join(assetDir, filename);
   const context = canvas.getContext('2d');
   const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
-  const rgb = Buffer.alloc(width * height * 3);
-  for (let source = 0, target = 0; source < data.length; source += 4, target += 3) {
-    rgb[target] = data[source];
-    rgb[target + 1] = data[source + 1];
-    rgb[target + 2] = data[source + 2];
+  const rowSize = Math.ceil((width * 3) / 4) * 4;
+  const pixelDataSize = rowSize * height;
+  const headerSize = 54;
+  const bmp = Buffer.alloc(headerSize + pixelDataSize);
+
+  // BITMAPFILEHEADER
+  bmp.write('BM', 0, 'ascii');
+  bmp.writeUInt32LE(bmp.length, 2);
+  bmp.writeUInt32LE(headerSize, 10);
+
+  // BITMAPINFOHEADER. A positive height stores rows bottom-up, as expected by
+  // NSIS' classic bitmap loader. Pixels are opaque 24-bit BGR with padded rows.
+  bmp.writeUInt32LE(40, 14);
+  bmp.writeInt32LE(width, 18);
+  bmp.writeInt32LE(height, 22);
+  bmp.writeUInt16LE(1, 26);
+  bmp.writeUInt16LE(24, 28);
+  bmp.writeUInt32LE(pixelDataSize, 34);
+  bmp.writeInt32LE(2835, 38);
+  bmp.writeInt32LE(2835, 42);
+
+  for (let outputRow = 0; outputRow < height; outputRow += 1) {
+    const sourceRow = height - 1 - outputRow;
+    for (let x = 0; x < width; x += 1) {
+      const source = (sourceRow * width + x) * 4;
+      const target = headerSize + outputRow * rowSize + x * 3;
+      bmp[target] = data[source + 2];
+      bmp[target + 1] = data[source + 1];
+      bmp[target + 2] = data[source];
+    }
   }
-  fs.writeFileSync(
-    temporaryPpm,
-    Buffer.concat([Buffer.from(`P6\n${width} ${height}\n255\n`), rgb]),
-  );
-  execFileSync('sips', ['-s', 'format', 'bmp', temporaryPpm, '--out', output], { stdio: 'ignore' });
-  fs.unlinkSync(temporaryPpm);
+  fs.writeFileSync(output, bmp);
 }
 
 async function build() {
