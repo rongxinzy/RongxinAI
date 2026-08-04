@@ -509,11 +509,9 @@ export function registerLlamaCppIpcHandlers(
   });
   ipcMain.handle(LlamaCppIpcChannel.ListRunningModels, async () => {
     try {
-      const runningModels = await manager.listRunningModels();
-      if (!bindingRefreshSuppressed) {
-        await updateRunningModelBindings(runningModels, 'llamacpp-model-visibility-refresh');
-      }
-      return runningModels;
+      // Keep model listing read-only. Binding persistence and Gateway sync are
+      // performed by explicit model lifecycle transitions below.
+      return await manager.listRunningModels();
     } catch (error) {
       if (manager.getStatus().status !== 'running') return [];
       throw error;
