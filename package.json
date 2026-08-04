@@ -64,6 +64,7 @@
     "build": "npm run build:tsc && npm run build:vite",
     "build:tsc": "tsc",
     "build:vite": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
+    "build:eval-policy": "node scripts/build-zhiyuan-evaluation-policy.mjs",
     "lint": "oxlint src/",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",

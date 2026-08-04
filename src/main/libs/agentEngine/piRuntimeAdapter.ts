@@ -63,7 +63,7 @@ import {
   type PiAskUserQuestionInput,
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
-import { buildPiAgentLoopTool, PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
+import { PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
 import { buildPiConversationPrompt } from './piConversationContext';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
 import { buildPiResearchStateTool } from './piResearchStateTool';
@@ -80,6 +80,7 @@ import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitie
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
+import { createPiWorkLoop } from './piWorkLoop';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import {
   getPiPreparingToolActivity,
@@ -664,18 +665,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
       const shouldRunGoalLoop =
         options.goalMode === true && options.sessionMode === CoworkSessionMode.Work;
-      const agentLoop = new PiAgentLoopController(completionWorkflow || undefined);
-      let workLoopPrompt = '';
-      if (completionWorkflow || shouldRunGoalLoop) {
-        const loopPrompt = agentLoop.start({
-          mode: PiAgentLoopMode.Goal,
-          goal: completionWorkflow?.goal || prompt,
-          passes: 0,
-          stages: [],
-        });
-        if (workExecution || shouldRunGoalLoop) workLoopPrompt = loopPrompt;
-      }
-      customTools.push(buildPiAgentLoopTool(agentLoop));
+      const workLoop = createPiWorkLoop({
+        goal: completionWorkflow?.goal || prompt,
+        completionWorkflow: completionWorkflow || undefined,
+        start: Boolean(completionWorkflow || shouldRunGoalLoop),
+      });
+      const agentLoop = workLoop.controller;
+      const workLoopPrompt = workExecution || shouldRunGoalLoop ? workLoop.initialPrompt : '';
+      customTools.push(workLoop.tool);
 
       if (customTools.length > 0) {
         sessionOptions.customTools = customTools;
