@@ -8,6 +8,13 @@ import {
 
 import { apiService } from './api';
 import type { DirectChatRequestOptions } from './localThinkingRequest';
+import {
+  createToolInputAvailableChunk,
+  createToolInputStartChunk,
+  createToolOutputAvailableChunk,
+  createToolOutputErrorChunk,
+} from './toolChunkAdapter';
+import { WebSearchToolEventType, type WebSearchToolEvent } from './webSearchToolEvents';
 
 /** Extract text from a UIMessage's text parts. */
 function extractText(message: UIMessage): string {
@@ -15,6 +22,14 @@ function extractText(message: UIMessage): string {
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
     .map(p => p.text)
     .join('');
+}
+
+function logDirectChat(message: string): void {
+  try {
+    window.electron?.log?.fromRenderer?.('debug', 'DirectChat', message);
+  } catch {
+    // Logging is best-effort and must never affect the response stream.
+  }
 }
 
 /**
@@ -60,7 +75,6 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         let closed = false;
         let textId: string | null = null;
         let reasoningId: string | null = null;
-        let reasoningClosed = false;
         let lastContent = '';
         let lastReasoning = '';
 
@@ -70,11 +84,15 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
 
         const close = (error?: string) => {
           if (closed) return;
+          if (reasoningId) {
+            enqueue({ type: 'reasoning-end', id: reasoningId });
+            reasoningId = null;
+          }
+          if (textId) {
+            enqueue({ type: 'text-end', id: textId });
+            textId = null;
+          }
           closed = true;
-          // Enqueue the terminal chunks directly; helper enqueue() skips when
-          // closed is true, which would suppress these required end markers.
-          if (textId) controller.enqueue({ type: 'text-end', id: textId });
-          if (reasoningId) controller.enqueue({ type: 'reasoning-end', id: reasoningId });
           controller.enqueue({
             type: 'finish',
             finishReason: error ? ('error' as const) : ('stop' as const),
@@ -86,7 +104,6 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
           if (reasoningId) {
             enqueue({ type: 'reasoning-end', id: reasoningId });
             reasoningId = null;
-            reasoningClosed = true;
           }
         };
 
@@ -98,68 +115,88 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
           }
         };
 
+        const emitProgress = (content?: string, reasoning?: string) => {
+          if (abortSignal?.aborted) {
+            close('aborted');
+            return;
+          }
+
+          const fullContent = content ?? '';
+          const fullReasoning = reasoning ?? '';
+
+          // Provider callbacks contain full text, so only forward the suffix
+          // that has not already been emitted to the AI SDK stream.
+          const reasoningDelta = fullReasoning.startsWith(lastReasoning)
+            ? fullReasoning.slice(lastReasoning.length)
+            : fullReasoning;
+          const contentDelta = fullContent.startsWith(lastContent)
+            ? fullContent.slice(lastContent.length)
+            : fullContent;
+
+          if (reasoningDelta) {
+            if (contentDelta && !textId) {
+              emitReasoningEnd();
+            }
+            if (!reasoningId) {
+              reasoningId = generateId();
+              enqueue({ type: 'reasoning-start', id: reasoningId });
+            }
+            enqueue({ type: 'reasoning-delta', id: reasoningId, delta: reasoningDelta });
+            lastReasoning = fullReasoning;
+          } else if (fullReasoning.length < lastReasoning.length) {
+            emitReasoningEnd();
+          }
+
+          if (contentDelta) {
+            if (!textId) {
+              emitReasoningEnd();
+              textId = generateId();
+              enqueue({ type: 'text-start', id: textId });
+            }
+            enqueue({ type: 'text-delta', id: textId, delta: contentDelta });
+            lastContent = fullContent;
+          } else if (fullContent.length < lastContent.length) {
+            emitTextEnd();
+          }
+        };
+
         if (abortSignal?.aborted) {
           close('aborted');
           return;
         }
 
+        logDirectChat(`request ${requestId} started`);
         void apiService
           .chatWithWebSearch(
             prompt,
-            (content, reasoning) => {
-              if (abortSignal?.aborted) {
-                close('aborted');
-                return;
-              }
-
-              const fullContent = content ?? '';
-              const fullReasoning = reasoning ?? '';
-
-              // Compute deltas independently so a reasoning-to-answer transition
-              // (where fullReasoning is non-empty but no longer growing) still
-              // emits the new answer text. Prior code gated content emission on
-              // `!reasoning`, which suppressed the answer after any reasoning.
-              const reasoningDelta = fullReasoning.startsWith(lastReasoning)
-                ? fullReasoning.slice(lastReasoning.length)
-                : fullReasoning;
-              const contentDelta = fullContent.startsWith(lastContent)
-                ? fullContent.slice(lastContent.length)
-                : fullContent;
-
-              if (reasoningDelta && !reasoningClosed) {
-                // Once answer text starts, close the reasoning block first.
-                if (contentDelta && !textId) {
-                  emitReasoningEnd();
-                }
-                if (!reasoningId) {
-                  reasoningId = generateId();
-                  enqueue({ type: 'reasoning-start', id: reasoningId });
-                }
-                enqueue({ type: 'reasoning-delta', id: reasoningId, delta: reasoningDelta });
-                lastReasoning = fullReasoning;
-              } else if (fullReasoning.length < lastReasoning.length && !reasoningClosed) {
-                // Guard against non-monotonic resets.
-                emitReasoningEnd();
-              }
-
-              if (contentDelta) {
-                if (!textId) {
-                  emitReasoningEnd();
-                  textId = generateId();
-                  enqueue({ type: 'text-start', id: textId });
-                }
-                enqueue({ type: 'text-delta', id: textId, delta: contentDelta });
-                lastContent = fullContent;
-              } else if (fullContent.length < lastContent.length) {
-                emitTextEnd();
-              }
-            },
+            emitProgress,
             history,
             directChatOptions,
             requestId,
             abortSignal,
+            (event: WebSearchToolEvent) => {
+              if (abortSignal?.aborted || closed) return;
+              if (event.type === WebSearchToolEventType.Start) {
+                emitReasoningEnd();
+                emitTextEnd();
+                enqueue(createToolInputStartChunk(event.toolCallId, 'web_search'));
+                enqueue(createToolInputAvailableChunk(event.toolCallId, 'web_search', event.input));
+                lastContent = '';
+                lastReasoning = '';
+                return;
+              }
+              if (event.type === WebSearchToolEventType.Complete) {
+                enqueue(createToolOutputAvailableChunk(event.toolCallId, event.output));
+                return;
+              }
+              enqueue(createToolOutputErrorChunk(event.toolCallId, event.error));
+            },
           )
           .then(result => {
+            // Some compatible providers buffer the response and never invoke
+            // the progress callback. Reconcile the final result so the UI does
+            // not remain on an empty "thinking" state.
+            emitProgress(result.content, result.reasoning);
             const contextWindowTokens = directChatOptions.contextWindowTokens;
             if (result.usage && contextWindowTokens && contextWindowTokens > 0) {
               const cacheReadTokens = result.usage.cacheReadTokens ?? 0;
@@ -180,9 +217,11 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
                 },
               } as UIMessageChunk);
             }
+            logDirectChat(`request ${requestId} completed`);
             close();
           })
           .catch((error: Error) => {
+            logDirectChat(`request ${requestId} failed: ${error.message || 'unknown error'}`);
             enqueue({ type: 'error', errorText: error.message || 'Chat API error' });
             close('error');
           });

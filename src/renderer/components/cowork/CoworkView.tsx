@@ -18,10 +18,10 @@ import { resolveSkillPlaceholderKey } from '../chat/constants';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
+import { DirectChatTurnState } from '../../services/directChatTurnState';
 import { i18nService } from '../../services/i18n';
 import { quickActionService } from '../../services/quickAction';
 import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
-import { ThinkingMessageLifecycle } from '../../services/thinkingMessageLifecycle';
 import { workspaceService } from '../../services/workspace';
 import { RootState, store } from '../../store';
 import {
@@ -412,60 +412,35 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         directChatAbortControllersRef.current.set(tempSessionId, abortController);
         const assistantMsgId = `msg-${now}-assistant`;
         const thinkingMsgId = `msg-${now}-thinking`;
+        const turnState = new DirectChatTurnState(assistantMsgId, thinkingMsgId);
         let assistantContent = '';
-        let thinkingContent = '';
         let assistantMessageAdded = false;
-        let thinkingMessageAdded = false;
-        let thinkingDurationMs: number | undefined;
         let directContextData: DirectChatContextData | undefined;
-        const thinkingLifecycle = new ThinkingMessageLifecycle(
-          tempSessionId,
-          thinkingMsgId,
-          contentBatcher,
-          update => dispatch(updateMessageContent(update)),
-        );
+        const finishThinking = () => {
+          const finished = turnState.finishReasoning();
+          if (!finished) return;
+          contentBatcher.discard(tempSessionId, finished.message.id);
+          if (finished.messageWasAdded) {
+            dispatch(
+              updateMessageContent({
+                sessionId: tempSessionId,
+                messageId: finished.message.id,
+                content: finished.message.content,
+                metadata: finished.message.metadata,
+              }),
+            );
+          }
+        };
         let persistTimer: ReturnType<typeof setTimeout> | null = null;
         const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
           const snapshot = store.getState().cowork.currentSession;
           const streamingSnapshot = store.getState().cowork.streamingSessions[tempSessionId];
           const baseSession =
             snapshot?.id === tempSessionId ? snapshot : (streamingSnapshot ?? tempSession);
-          const isStreamActive = status === CoworkSessionStatusValue.Running;
-          const isCompleted = status === CoworkSessionStatusValue.Completed;
-          const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
-          const messages = mergeDirectChatSnapshotMessages(baseSession.messages, [
-            ...(thinkingContent
-              ? [
-                  {
-                    id: thinkingMsgId,
-                    type: 'assistant' as const,
-                    content: thinkingContent,
-                    timestamp: Date.now(),
-                    metadata: {
-                      isStreaming: isThinkingActive,
-                      isFinal: !isThinkingActive,
-                      isThinking: true,
-                      ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-                    },
-                  },
-                ]
-              : []),
-            ...(assistantContent
-              ? [
-                  {
-                    id: assistantMsgId,
-                    type: 'assistant' as const,
-                    content: assistantContent,
-                    timestamp: Date.now(),
-                    metadata: {
-                      isStreaming: isStreamActive,
-                      isFinal: !isStreamActive,
-                      ...(isCompleted && { isFinalAnswer: true }),
-                    },
-                  },
-                ]
-              : []),
-          ]);
+          const messages = mergeDirectChatSnapshotMessages(
+            baseSession.messages,
+            turnState.messagesSnapshot,
+          );
           return {
             ...baseSession,
             status,
@@ -519,118 +494,115 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }
                 break;
               case 'text-start':
-                if (!assistantMessageAdded) {
-                  dispatch(
-                    addMessage({
-                      sessionId: tempSessionId,
-                      message: {
-                        id: assistantMsgId,
-                        type: 'assistant',
-                        content: '',
-                        timestamp: Date.now(),
-                        metadata: { isStreaming: true, isFinal: false },
-                      },
-                    }),
-                  );
-                  assistantMessageAdded = true;
-                  persistChatSnapshot();
+                {
+                  const result = turnState.startAssistant();
+                  if (!assistantMessageAdded && result.isNew) {
+                    dispatch(
+                      addMessage({
+                        sessionId: tempSessionId,
+                        message: result.message,
+                      }),
+                    );
+                    assistantMessageAdded = true;
+                    persistChatSnapshot();
+                  }
                 }
                 break;
               case 'text-delta':
+                finishThinking();
                 assistantContent += chunk.delta;
-                thinkingDurationMs = thinkingLifecycle.completeBeforeAnswer(
-                  thinkingContent,
-                  thinkingMessageAdded,
-                );
-                if (!assistantMessageAdded) {
-                  dispatch(
-                    addMessage({
+                {
+                  const result = turnState.appendAssistant(chunk.delta);
+                  if (!assistantMessageAdded && result.isNew) {
+                    dispatch(
+                      addMessage({
+                        sessionId: tempSessionId,
+                        message: result.message,
+                      }),
+                    );
+                    assistantMessageAdded = true;
+                  } else {
+                    contentBatcher.enqueue({
                       sessionId: tempSessionId,
-                      message: {
-                        id: assistantMsgId,
-                        type: 'assistant',
-                        content: chunk.delta,
-                        timestamp: Date.now(),
-                        metadata: { isStreaming: true, isFinal: false },
-                      },
-                    }),
-                  );
-                  assistantMessageAdded = true;
-                } else {
-                  contentBatcher.enqueue({
-                    sessionId: tempSessionId,
-                    messageId: assistantMsgId,
-                    content: assistantContent,
-                    metadata: { isStreaming: true, isFinal: false },
-                  });
+                      messageId: assistantMsgId,
+                      content: result.message.content,
+                      metadata: result.message.metadata,
+                    });
+                  }
                 }
                 persistChatSnapshot();
                 break;
               case 'reasoning-start':
-                thinkingLifecycle.start();
-                if (!thinkingMessageAdded) {
-                  dispatch(
-                    addMessage({
-                      sessionId: tempSessionId,
-                      message: {
-                        id: thinkingMsgId,
-                        type: 'assistant',
-                        content: '',
-                        timestamp: Date.now(),
-                        metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                      },
-                    }),
-                  );
-                  thinkingMessageAdded = true;
-                  persistChatSnapshot();
+                {
+                  const result = turnState.startReasoning();
+                  if (result.isNew) {
+                    dispatch(
+                      addMessage({
+                        sessionId: tempSessionId,
+                        message: result.message,
+                      }),
+                    );
+                    turnState.markReasoningMessageAdded();
+                    persistChatSnapshot();
+                  }
                 }
                 break;
               case 'reasoning-delta':
-                thinkingLifecycle.start();
-                thinkingContent += chunk.delta;
-                if (!thinkingMessageAdded) {
-                  dispatch(
-                    addMessage({
+                {
+                  const result = turnState.appendReasoning(chunk.delta);
+                  if (result.isNew) {
+                    dispatch(
+                      addMessage({
+                        sessionId: tempSessionId,
+                        message: result.message,
+                      }),
+                    );
+                    turnState.markReasoningMessageAdded();
+                  } else {
+                    contentBatcher.enqueue({
                       sessionId: tempSessionId,
-                      message: {
-                        id: thinkingMsgId,
-                        type: 'assistant',
-                        content: chunk.delta,
-                        timestamp: Date.now(),
-                        metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                      },
-                    }),
-                  );
-                  thinkingMessageAdded = true;
-                } else {
-                  contentBatcher.enqueue({
-                    sessionId: tempSessionId,
-                    messageId: thinkingMsgId,
-                    content: thinkingContent,
-                    metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                  });
+                      messageId: result.message.id,
+                      content: result.message.content,
+                      metadata: result.message.metadata,
+                    });
+                  }
                 }
                 break;
               case 'reasoning-end':
-                thinkingDurationMs = thinkingLifecycle.complete({
-                  content: thinkingContent,
-                  messageExists: thinkingMessageAdded,
-                });
-                if (assistantContent && !assistantMessageAdded) {
-                  dispatch(
-                    addMessage({
-                      sessionId: tempSessionId,
-                      message: {
-                        id: assistantMsgId,
-                        type: 'assistant',
-                        content: assistantContent,
-                        timestamp: Date.now(),
-                        metadata: { isStreaming: true, isFinal: false },
-                      },
-                    }),
-                  );
-                  assistantMessageAdded = true;
-                }
+                finishThinking();
+                persistChatSnapshot();
+                break;
+              case 'tool-input-available':
+                finishThinking();
+                dispatch(
+                  addMessage({
+                    sessionId: tempSessionId,
+                    message: turnState.addToolUse(
+                      chunk.toolCallId,
+                      chunk.input && typeof chunk.input === 'object'
+                        ? (chunk.input as Record<string, unknown>)
+                        : {},
+                    ),
+                  }),
+                );
+                persistChatSnapshot();
+                break;
+              case 'tool-output-available':
+                dispatch(
+                  addMessage({
+                    sessionId: tempSessionId,
+                    message: turnState.addToolResult(chunk.toolCallId, chunk.output),
+                  }),
+                );
+                persistChatSnapshot();
+                break;
+              case 'tool-output-error':
+                dispatch(
+                  addMessage({
+                    sessionId: tempSessionId,
+                    message: turnState.addToolResult(chunk.toolCallId, undefined, chunk.errorText),
+                  }),
+                );
                 persistChatSnapshot();
                 break;
               case 'error':
@@ -639,11 +611,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
           if (abortController.signal.aborted || isPendingStartCancelled()) {
             contentBatcher.discard(tempSessionId, assistantMsgId);
-            thinkingDurationMs = thinkingLifecycle.complete({
-              content: thinkingContent,
-              messageExists: thinkingMessageAdded,
-            });
+            finishThinking();
             if (assistantMessageAdded) {
+              turnState.updateAssistantMetadata({ isStreaming: false, isFinal: true });
               dispatch(
                 updateMessageContent({
                   sessionId: tempSessionId,
@@ -659,44 +629,43 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             return;
           }
           contentBatcher.discard(tempSessionId, assistantMsgId);
-          thinkingDurationMs = thinkingLifecycle.complete({
-            content: thinkingContent,
-            messageExists: thinkingMessageAdded,
-          });
+          finishThinking();
           // Finalize message metadata to prevent streaming replay on reload
           if (assistantMessageAdded) {
+            const finalMetadata = {
+              isStreaming: false,
+              isFinal: true,
+              isFinalAnswer: true,
+              ...(directContextData
+                ? {
+                    contextUsage: {
+                      contextWindowTokens: directContextData.contextWindowTokens,
+                      updatedAt: Date.now(),
+                      usedTokens: directContextData.usedTokens,
+                    },
+                    model: directChatModelId,
+                    modelProviderKey: directChatModel.providerKey,
+                    usage: {
+                      inputTokens: directContextData.inputTokens,
+                      outputTokens: directContextData.outputTokens,
+                      ...(directContextData.cacheReadTokens !== undefined
+                        ? { cacheReadTokens: directContextData.cacheReadTokens }
+                        : {}),
+                      ...(directContextData.cacheWriteTokens !== undefined
+                        ? { cacheWriteTokens: directContextData.cacheWriteTokens }
+                        : {}),
+                      totalTokens: directContextData.usedTokens,
+                    },
+                  }
+                : {}),
+            };
+            turnState.updateAssistantMetadata(finalMetadata);
             dispatch(
               updateMessageContent({
                 sessionId: tempSessionId,
                 messageId: assistantMsgId,
                 content: assistantContent,
-                metadata: {
-                  isStreaming: false,
-                  isFinal: true,
-                  isFinalAnswer: true,
-                  ...(directContextData
-                    ? {
-                        contextUsage: {
-                          contextWindowTokens: directContextData.contextWindowTokens,
-                          updatedAt: Date.now(),
-                          usedTokens: directContextData.usedTokens,
-                        },
-                        model: directChatModelId,
-                        modelProviderKey: directChatModel.providerKey,
-                        usage: {
-                          inputTokens: directContextData.inputTokens,
-                          outputTokens: directContextData.outputTokens,
-                          ...(directContextData.cacheReadTokens !== undefined
-                            ? { cacheReadTokens: directContextData.cacheReadTokens }
-                            : {}),
-                          ...(directContextData.cacheWriteTokens !== undefined
-                            ? { cacheWriteTokens: directContextData.cacheWriteTokens }
-                            : {}),
-                          totalTokens: directContextData.usedTokens,
-                        },
-                      }
-                    : {}),
-                },
+                metadata: finalMetadata,
               }),
             );
           }
@@ -709,13 +678,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           await coworkService.saveChatSession(savedSession);
         } catch (error) {
           contentBatcher.discard(tempSessionId, assistantMsgId);
-          thinkingDurationMs = thinkingLifecycle.complete({
-            content: thinkingContent,
-            messageExists: thinkingMessageAdded,
-          });
+          finishThinking();
           // Finalize the partial answer so the turn does not render as still
           // streaming after the failure.
           if (assistantMessageAdded) {
+            turnState.updateAssistantMetadata({ isStreaming: false, isFinal: true });
             dispatch(
               updateMessageContent({
                 sessionId: tempSessionId,
@@ -754,7 +721,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         }
         return;
       }
-
       // Engine path: work sessions, and chat sessions with skills attached
       // (agent-backed chat). The engine loads skills natively via
       // skills.load.extraDirs, so skip the auto-routing prompt to avoid
@@ -880,7 +846,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       return true;
     }
 
-
     // Direct chat: stream from the configured LLM via apiService. Chat
     // sessions that are agent-backed (skills attached now or persisted on the
     // session) fall through to the engine continue path below.
@@ -893,6 +858,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       directChatAbortControllersRef.current.set(currentSession.id, abortController);
       const assistantMsgId = `msg-${Date.now()}-assistant`;
       const thinkingMsgId = `msg-${Date.now()}-thinking`;
+      const turnState = new DirectChatTurnState(assistantMsgId, thinkingMsgId);
       const userMsgId = `msg-${Date.now()}`;
       const userMessage = {
         id: userMsgId,
@@ -901,59 +867,33 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         timestamp: Date.now(),
       };
       let assistantContent = '';
-      let thinkingContent = '';
       let assistantMessageAdded = false;
-      let thinkingMessageAdded = false;
-      let thinkingDurationMs: number | undefined;
       let directContextData: DirectChatContextData | undefined;
-      const thinkingLifecycle = new ThinkingMessageLifecycle(
-        currentSession.id,
-        thinkingMsgId,
-        contentBatcher,
-        update => dispatch(updateMessageContent(update)),
-      );
+      const finishThinking = () => {
+        const finished = turnState.finishReasoning();
+        if (!finished) return;
+        contentBatcher.discard(currentSession.id, finished.message.id);
+        if (finished.messageWasAdded) {
+          dispatch(
+            updateMessageContent({
+              sessionId: currentSession.id,
+              messageId: finished.message.id,
+              content: finished.message.content,
+              metadata: finished.message.metadata,
+            }),
+          );
+        }
+      };
       let persistTimer: ReturnType<typeof setTimeout> | null = null;
       const buildChatSnapshot = (status: CoworkSession['status']): CoworkSession => {
         const snapshot = store.getState().cowork.currentSession;
         const streamingSnapshot = store.getState().cowork.streamingSessions[currentSession.id];
         const baseSession =
           snapshot?.id === currentSession.id ? snapshot : (streamingSnapshot ?? currentSession);
-        const isStreamActive = status === CoworkSessionStatusValue.Running;
-        const isCompleted = status === CoworkSessionStatusValue.Completed;
-        const isThinkingActive = isStreamActive && !thinkingLifecycle.isComplete;
-        const messages = mergeDirectChatSnapshotMessages(baseSession.messages, [
-          ...(thinkingContent
-            ? [
-                {
-                  id: thinkingMsgId,
-                  type: 'assistant' as const,
-                  content: thinkingContent,
-                  timestamp: Date.now(),
-                  metadata: {
-                    isStreaming: isThinkingActive,
-                    isFinal: !isThinkingActive,
-                    isThinking: true,
-                    ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
-                  },
-                },
-              ]
-            : []),
-          ...(assistantContent
-            ? [
-                {
-                  id: assistantMsgId,
-                  type: 'assistant' as const,
-                  content: assistantContent,
-                  timestamp: Date.now(),
-                  metadata: {
-                    isStreaming: isStreamActive,
-                    isFinal: !isStreamActive,
-                    ...(isCompleted && { isFinalAnswer: true }),
-                  },
-                },
-              ]
-            : []),
-        ]);
+        const messages = mergeDirectChatSnapshotMessages(
+          baseSession.messages,
+          turnState.messagesSnapshot,
+        );
         return {
           ...baseSession,
           status,
@@ -1038,118 +978,115 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               }
               break;
             case 'text-start':
-              if (!assistantMessageAdded) {
-                dispatch(
-                  addMessage({
-                    sessionId: currentSession.id,
-                    message: {
-                      id: assistantMsgId,
-                      type: 'assistant',
-                      content: '',
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false },
-                    },
-                  }),
-                );
-                assistantMessageAdded = true;
-                persistChatSnapshot();
+              {
+                const result = turnState.startAssistant();
+                if (!assistantMessageAdded && result.isNew) {
+                  dispatch(
+                    addMessage({
+                      sessionId: currentSession.id,
+                      message: result.message,
+                    }),
+                  );
+                  assistantMessageAdded = true;
+                  persistChatSnapshot();
+                }
               }
               break;
             case 'text-delta':
+              finishThinking();
               assistantContent += chunk.delta;
-              thinkingDurationMs = thinkingLifecycle.completeBeforeAnswer(
-                thinkingContent,
-                thinkingMessageAdded,
-              );
-              if (!assistantMessageAdded) {
-                dispatch(
-                  addMessage({
+              {
+                const result = turnState.appendAssistant(chunk.delta);
+                if (!assistantMessageAdded && result.isNew) {
+                  dispatch(
+                    addMessage({
+                      sessionId: currentSession.id,
+                      message: result.message,
+                    }),
+                  );
+                  assistantMessageAdded = true;
+                } else {
+                  contentBatcher.enqueue({
                     sessionId: currentSession.id,
-                    message: {
-                      id: assistantMsgId,
-                      type: 'assistant',
-                      content: chunk.delta,
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false },
-                    },
-                  }),
-                );
-                assistantMessageAdded = true;
-              } else {
-                contentBatcher.enqueue({
-                  sessionId: currentSession.id,
-                  messageId: assistantMsgId,
-                  content: assistantContent,
-                  metadata: { isStreaming: true, isFinal: false },
-                });
+                    messageId: assistantMsgId,
+                    content: result.message.content,
+                    metadata: result.message.metadata,
+                  });
+                }
               }
               persistChatSnapshot();
               break;
             case 'reasoning-start':
-              thinkingLifecycle.start();
-              if (!thinkingMessageAdded) {
-                dispatch(
-                  addMessage({
-                    sessionId: currentSession.id,
-                    message: {
-                      id: thinkingMsgId,
-                      type: 'assistant',
-                      content: '',
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                    },
-                  }),
-                );
-                thinkingMessageAdded = true;
-                persistChatSnapshot();
+              {
+                const result = turnState.startReasoning();
+                if (result.isNew) {
+                  dispatch(
+                    addMessage({
+                      sessionId: currentSession.id,
+                      message: result.message,
+                    }),
+                  );
+                  turnState.markReasoningMessageAdded();
+                  persistChatSnapshot();
+                }
               }
               break;
             case 'reasoning-delta':
-              thinkingLifecycle.start();
-              thinkingContent += chunk.delta;
-              if (!thinkingMessageAdded) {
-                dispatch(
-                  addMessage({
+              {
+                const result = turnState.appendReasoning(chunk.delta);
+                if (result.isNew) {
+                  dispatch(
+                    addMessage({
+                      sessionId: currentSession.id,
+                      message: result.message,
+                    }),
+                  );
+                  turnState.markReasoningMessageAdded();
+                } else {
+                  contentBatcher.enqueue({
                     sessionId: currentSession.id,
-                    message: {
-                      id: thinkingMsgId,
-                      type: 'assistant',
-                      content: chunk.delta,
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                    },
-                  }),
-                );
-                thinkingMessageAdded = true;
-              } else {
-                contentBatcher.enqueue({
-                  sessionId: currentSession.id,
-                  messageId: thinkingMsgId,
-                  content: thinkingContent,
-                  metadata: { isStreaming: true, isFinal: false, isThinking: true },
-                });
+                    messageId: result.message.id,
+                    content: result.message.content,
+                    metadata: result.message.metadata,
+                  });
+                }
               }
               break;
             case 'reasoning-end':
-              thinkingDurationMs = thinkingLifecycle.complete({
-                content: thinkingContent,
-                messageExists: thinkingMessageAdded,
-              });
-              if (assistantContent && !assistantMessageAdded) {
-                dispatch(
-                  addMessage({
-                    sessionId: currentSession.id,
-                    message: {
-                      id: assistantMsgId,
-                      type: 'assistant',
-                      content: assistantContent,
-                      timestamp: Date.now(),
-                      metadata: { isStreaming: true, isFinal: false },
-                    },
-                  }),
-                );
-                assistantMessageAdded = true;
-              }
+              finishThinking();
+              persistChatSnapshot();
+              break;
+            case 'tool-input-available':
+              finishThinking();
+              dispatch(
+                addMessage({
+                  sessionId: currentSession.id,
+                  message: turnState.addToolUse(
+                    chunk.toolCallId,
+                    chunk.input && typeof chunk.input === 'object'
+                      ? (chunk.input as Record<string, unknown>)
+                      : {},
+                  ),
+                }),
+              );
+              persistChatSnapshot();
+              break;
+            case 'tool-output-available':
+              dispatch(
+                addMessage({
+                  sessionId: currentSession.id,
+                  message: turnState.addToolResult(chunk.toolCallId, chunk.output),
+                }),
+              );
+              persistChatSnapshot();
+              break;
+            case 'tool-output-error':
+              dispatch(
+                addMessage({
+                  sessionId: currentSession.id,
+                  message: turnState.addToolResult(chunk.toolCallId, undefined, chunk.errorText),
+                }),
+              );
               persistChatSnapshot();
               break;
             case 'error':
@@ -1157,47 +1094,46 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           }
         }
         contentBatcher.discard(currentSession.id, assistantMsgId);
-        thinkingDurationMs = thinkingLifecycle.complete({
-          content: thinkingContent,
-          messageExists: thinkingMessageAdded,
-        });
+        finishThinking();
         const finalStatus = abortController.signal.aborted
           ? CoworkSessionStatusValue.Idle
           : CoworkSessionStatusValue.Completed;
         // Finalize message metadata to prevent streaming replay on reload
         if (assistantMessageAdded) {
+          const finalMetadata = {
+            isStreaming: false,
+            isFinal: true,
+            ...(finalStatus === CoworkSessionStatusValue.Completed && { isFinalAnswer: true }),
+            ...(directContextData
+              ? {
+                  contextUsage: {
+                    contextWindowTokens: directContextData.contextWindowTokens,
+                    updatedAt: Date.now(),
+                    usedTokens: directContextData.usedTokens,
+                  },
+                  model: directChatModelId,
+                  modelProviderKey: directChatModel.providerKey,
+                  usage: {
+                    inputTokens: directContextData.inputTokens,
+                    outputTokens: directContextData.outputTokens,
+                    ...(directContextData.cacheReadTokens !== undefined
+                      ? { cacheReadTokens: directContextData.cacheReadTokens }
+                      : {}),
+                    ...(directContextData.cacheWriteTokens !== undefined
+                      ? { cacheWriteTokens: directContextData.cacheWriteTokens }
+                      : {}),
+                    totalTokens: directContextData.usedTokens,
+                  },
+                }
+              : {}),
+          };
+          turnState.updateAssistantMetadata(finalMetadata);
           dispatch(
             updateMessageContent({
               sessionId: currentSession.id,
               messageId: assistantMsgId,
               content: assistantContent,
-              metadata: {
-                isStreaming: false,
-                isFinal: true,
-                ...(finalStatus === CoworkSessionStatusValue.Completed && { isFinalAnswer: true }),
-                ...(directContextData
-                  ? {
-                      contextUsage: {
-                        contextWindowTokens: directContextData.contextWindowTokens,
-                        updatedAt: Date.now(),
-                        usedTokens: directContextData.usedTokens,
-                      },
-                      model: directChatModelId,
-                      modelProviderKey: directChatModel.providerKey,
-                      usage: {
-                        inputTokens: directContextData.inputTokens,
-                        outputTokens: directContextData.outputTokens,
-                        ...(directContextData.cacheReadTokens !== undefined
-                          ? { cacheReadTokens: directContextData.cacheReadTokens }
-                          : {}),
-                        ...(directContextData.cacheWriteTokens !== undefined
-                          ? { cacheWriteTokens: directContextData.cacheWriteTokens }
-                          : {}),
-                        totalTokens: directContextData.usedTokens,
-                      },
-                    }
-                  : {}),
-              },
+              metadata: finalMetadata,
             }),
           );
         }
@@ -1211,13 +1147,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         await coworkService.saveChatSession(buildChatSnapshot(finalStatus));
       } catch (error) {
         contentBatcher.discard(currentSession.id, assistantMsgId);
-        thinkingDurationMs = thinkingLifecycle.complete({
-          content: thinkingContent,
-          messageExists: thinkingMessageAdded,
-        });
+        finishThinking();
         // Finalize the partial answer so the turn does not render as still
         // streaming after the failure.
         if (assistantMessageAdded) {
+          turnState.updateAssistantMetadata({ isStreaming: false, isFinal: true });
           dispatch(
             updateMessageContent({
               sessionId: currentSession.id,

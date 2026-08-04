@@ -76,6 +76,8 @@ export const getToolDisplayName = (toolName: string | undefined): string => {
       return 'MCP';
     case 'process':
       return 'Process';
+    case 'websearch':
+      return i18nService.t('coworkToolWebSearch');
     default:
       return toolName;
   }

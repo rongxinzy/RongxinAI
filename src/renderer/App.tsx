@@ -20,7 +20,6 @@ import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig } from './config';
-import type { ApiConfig } from './services/api';
 import { apiService } from './services/api';
 import { authService } from './services/auth';
 import {
@@ -177,6 +176,12 @@ const App: React.FC = () => {
         await waitWithTimeout(configService.init(), initTimeoutMs, 'configService.init');
         mark('configService.init done');
 
+        const config = configService.getConfig();
+        apiService.setConfig({
+          apiKey: config.api.key,
+          baseUrl: config.api.baseUrl,
+        });
+
         themeService.initialize();
         mark('themeService done');
 
@@ -195,13 +200,7 @@ const App: React.FC = () => {
         setEnterpriseConfig(entConfig);
         mark('enterprise/i18n/auth init done');
 
-        const config = configService.getConfig();
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
-        const apiConfig: ApiConfig = {
-          apiKey: config.api.key,
-          baseUrl: config.api.baseUrl,
-        };
-        apiService.setConfig(apiConfig);
 
         const resolvedModels = await collectAvailableModels(config);
         if (resolvedModels.length > 0) {
@@ -252,6 +251,11 @@ const App: React.FC = () => {
     };
 
     const handleConfigUpdated = () => {
+      const config = configService.getConfig();
+      apiService.setConfig({
+        apiKey: config.api.key,
+        baseUrl: config.api.baseUrl,
+      });
       void refreshAvailableModels().catch(() => undefined);
     };
     const handleLlamaCppRunningModelsChanged = () => {
