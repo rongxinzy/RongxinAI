@@ -5260,10 +5260,10 @@ const Settings: React.FC<SettingsProps> = ({
                 onMouseEnter={() => startSettingsIconAnimation(tab.key)}
                 onMouseLeave={() => stopSettingsIconAnimation(tab.key)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium justify-start w-full',
+                  'flex w-full items-center justify-start gap-3 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-medium !transition-colors !duration-200 ease-out',
                   activeTab === tab.key
-                    ? 'bg-surface shadow-elevated text-foreground hover:bg-surface'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-surface-raised',
+                    ? 'border-border bg-card text-foreground hover:border-border hover:!bg-card hover:!text-foreground'
+                    : 'text-muted-foreground hover:border-border hover:!bg-card hover:!text-foreground',
                 )}
               >
                 {tab.icon}

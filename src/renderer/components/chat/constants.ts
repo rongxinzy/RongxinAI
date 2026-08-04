@@ -71,6 +71,20 @@ export const CHAT_SKILL_SHORTCUTS: readonly ChatSkillShortcut[] = [
 export const findChatSkillShortcut = (skillId: string): ChatSkillShortcut | undefined =>
   CHAT_SKILL_SHORTCUTS.find(entry => entry.skillId === skillId);
 
+export const getChatSkillShortcutIds = (entry: ChatSkillShortcut): readonly string[] =>
+  entry.skillIds ?? [entry.skillId];
+
+export const isChatSkillShortcutActive = (
+  entry: ChatSkillShortcut,
+  activeSkillIds: readonly string[],
+): boolean => {
+  const shortcutSkillIds = getChatSkillShortcutIds(entry);
+  return (
+    shortcutSkillIds.length === activeSkillIds.length &&
+    shortcutSkillIds.every(skillId => activeSkillIds.includes(skillId))
+  );
+};
+
 /**
  * Returns the placeholder i18n key of the first active shortcut skill, so
  * the chat input can hint at the task the attached skill performs.

@@ -3,11 +3,12 @@ import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../services/i18n';
 import type { RootState } from '../store';
 import { selectHasActiveChannelRun } from '../store/selectors/activitySelectors';
+import { clearActiveSkills } from '../store/slices/skillSlice';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import {
@@ -53,11 +54,17 @@ interface SidebarNavigationControlsProps {
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
 
-const sidebarNavItemClassName =
-  'w-full inline-flex items-center justify-start gap-2 rounded-lg px-3 py-1.5 text-left text-sm font-normal text-muted-foreground transition-[background-color,color,box-shadow] duration-150 hover:bg-card hover:text-foreground';
-const activeSidebarNavItemClassName = cn(
-  sidebarNavItemClassName,
-  'bg-card font-medium text-foreground shadow-sm ring-1 ring-inset ring-border hover:bg-card',
+const sidebarViewNavItemClassName =
+  'w-full inline-flex items-center justify-start gap-2 rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-left text-sm font-normal text-muted-foreground !transition-colors !duration-200 ease-out hover:border-border hover:!bg-card hover:!text-foreground';
+const activeSidebarViewNavItemClassName = cn(
+  sidebarViewNavItemClassName,
+  'border-border bg-card font-medium text-foreground hover:border-border hover:!bg-card hover:!text-foreground',
+);
+const sidebarActionNavItemClassName =
+  'w-full inline-flex items-center justify-start gap-2 rounded-lg border border-transparent bg-transparent px-3 py-1.5 text-left text-sm font-normal text-muted-foreground !transition-colors !duration-200 ease-out hover:border-border hover:!bg-card hover:!text-foreground';
+const activeSidebarActionNavItemClassName = cn(
+  sidebarActionNavItemClassName,
+  'border-border bg-card font-medium text-foreground hover:border-border hover:!bg-card hover:!text-foreground',
 );
 
 export const SidebarNavigationControls = ({
@@ -71,16 +78,24 @@ export const SidebarNavigationControls = ({
   workMode,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
+  const dispatch = useDispatch();
   const hasActiveChannelRun = useSelector((state: RootState) => selectHasActiveChannelRun(state));
+  const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
   const activityIconRef = useRef<SidebarAnimatedActivityIconHandle>(null);
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
   const expertIconRef = useRef<SidebarAnimatedUsersIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
+  const isNewConversationActive =
+    activeView === 'cowork' && (workMode !== WorkMode.Chat || activeSkillIds.length === 0);
 
   const startIconAnimation = (iconRef: RefObject<{ startAnimation: () => void } | null>) => {
     if (!prefersReducedMotion) iconRef.current?.startAnimation();
+  };
+  const handleNewConversation = () => {
+    if (workMode === WorkMode.Chat) dispatch(clearActiveSkills());
+    onNewChat();
   };
 
   return (
@@ -126,10 +141,14 @@ export const SidebarNavigationControls = ({
         <Button
           type="button"
           variant="ghost"
-          onClick={onNewChat}
+          onClick={handleNewConversation}
           onMouseEnter={() => startIconAnimation(newConversationIconRef)}
           onMouseLeave={() => newConversationIconRef.current?.stopAnimation()}
-          className={sidebarNavItemClassName}
+          className={
+            isNewConversationActive
+              ? activeSidebarActionNavItemClassName
+              : sidebarActionNavItemClassName
+          }
         >
           <SidebarAnimatedMessageCirclePlusIcon ref={newConversationIconRef} />
           {workMode === WorkMode.Chat ? i18nService.t('newChat') : i18nService.t('newTask')}
@@ -148,8 +167,8 @@ export const SidebarNavigationControls = ({
           onMouseLeave={() => localInferenceIconRef.current?.stopAnimation()}
           className={
             activeView === 'localInference'
-              ? activeSidebarNavItemClassName
-              : sidebarNavItemClassName
+              ? activeSidebarViewNavItemClassName
+              : sidebarViewNavItemClassName
           }
           aria-current={activeView === 'localInference' ? 'page' : undefined}
         >
@@ -170,8 +189,8 @@ export const SidebarNavigationControls = ({
           onMouseLeave={() => scheduledTasksIconRef.current?.stopAnimation()}
           className={
             activeView === 'scheduledTasks'
-              ? activeSidebarNavItemClassName
-              : sidebarNavItemClassName
+              ? activeSidebarViewNavItemClassName
+              : sidebarViewNavItemClassName
           }
           aria-current={activeView === 'scheduledTasks' ? 'page' : undefined}
         >
@@ -191,7 +210,9 @@ export const SidebarNavigationControls = ({
           onFocus={() => onPrefetchView?.('activity')}
           onMouseLeave={() => activityIconRef.current?.stopAnimation()}
           className={
-            activeView === 'activity' ? activeSidebarNavItemClassName : sidebarNavItemClassName
+            activeView === 'activity'
+              ? activeSidebarViewNavItemClassName
+              : sidebarViewNavItemClassName
           }
           aria-current={activeView === 'activity' ? 'page' : undefined}
         >
@@ -217,7 +238,9 @@ export const SidebarNavigationControls = ({
           onFocus={() => onPrefetchView?.('expert')}
           onMouseLeave={() => expertIconRef.current?.stopAnimation()}
           className={
-            activeView === 'expert' ? activeSidebarNavItemClassName : sidebarNavItemClassName
+            activeView === 'expert'
+              ? activeSidebarViewNavItemClassName
+              : sidebarViewNavItemClassName
           }
           aria-current={activeView === 'expert' ? 'page' : undefined}
         >

@@ -14,7 +14,7 @@ import { resolveShortcutWorkflowKind } from '../../../main/libs/agentEngine/piSh
 
 import { expect, test } from 'vitest';
 
-import { CHAT_SKILL_SHORTCUTS } from './constants';
+import { CHAT_SKILL_SHORTCUTS, isChatSkillShortcutActive } from './constants';
 
 test('every chat quick-skill shortcut points at a core skill', () => {
   // Core skills are always enabled (skillManager forces enabled=true), so a
@@ -59,6 +59,29 @@ test('academic research keeps a valid internal Skill name and Zhiyuan-facing met
 test('deep research selects explicit web search with its research protocol', () => {
   const deepResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'deep-research');
   expect(deepResearch?.skillIds).toEqual(['deep-research', 'web-search']);
+});
+
+test('quick skill selection requires an exact skill set', () => {
+  const deepResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'deep-research');
+  const academicResearch = CHAT_SKILL_SHORTCUTS.find(entry => entry.id === 'academic-research');
+
+  expect(deepResearch).toBeDefined();
+  expect(academicResearch).toBeDefined();
+  expect(isChatSkillShortcutActive(deepResearch!, ['deep-research', 'web-search'])).toBe(true);
+  expect(
+    isChatSkillShortcutActive(academicResearch!, [
+      'deli-autoresearch',
+      'deep-research',
+      'web-search',
+    ]),
+  ).toBe(true);
+  expect(
+    isChatSkillShortcutActive(deepResearch!, [
+      'deli-autoresearch',
+      'deep-research',
+      'web-search',
+    ]),
+  ).toBe(false);
 });
 
 test('every sidebar shortcut is protected by a Pi completion controller', () => {
