@@ -18,8 +18,7 @@ import {
   type WorkbenchContractKind,
   type WorkbenchJsonObject,
 } from '../../shared/workbenchTask';
-import type { HarnessMeasurementService } from '../harness/measurementService';
-import { ProductionLoopRepository } from './repository';
+import type { ProductionLoopMeasurement, ProductionLoopStore } from './ports';
 import { assertProductionLoopTransition } from './stateMachine';
 
 const MAX_CRITIC_OUTPUT_LENGTH = 8_000;
@@ -32,6 +31,30 @@ interface CriticPayload {
 const normalizeStrings = (values: string[]): string[] => [
   ...new Set(values.map(value => value.trim()).filter(Boolean)),
 ];
+
+const parseJsonRecord = (output: string): Record<string, unknown> => {
+  const trimmed = output.trim();
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  const objectStart = trimmed.indexOf('{');
+  const objectEnd = trimmed.lastIndexOf('}');
+  const embedded =
+    objectStart >= 0 && objectEnd > objectStart
+      ? trimmed.slice(objectStart, objectEnd + 1)
+      : undefined;
+
+  for (const candidate of [trimmed, fenced, embedded]) {
+    if (!candidate) continue;
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // Try the next bounded representation.
+    }
+  }
+  throw new Error('No JSON object found in critic output.');
+};
 
 const parseCriticPayload = (output: string, isError: boolean): CriticPayload => {
   if (isError) {
@@ -47,7 +70,7 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
     };
   }
   try {
-    const parsed = JSON.parse(output.trim()) as Record<string, unknown>;
+    const parsed = parseJsonRecord(output);
     const verdict = parsed.verdict === 'pass' ? 'pass' : 'revise';
     const findings = Array.isArray(parsed.findings)
       ? parsed.findings.flatMap(value => {
@@ -85,11 +108,11 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
 };
 
 export class ProductionLoopService {
-  readonly repository: ProductionLoopRepository;
+  readonly repository: ProductionLoopStore;
 
   constructor(
-    repository: ProductionLoopRepository,
-    private readonly measurement: HarnessMeasurementService,
+    repository: ProductionLoopStore,
+    private readonly measurement: ProductionLoopMeasurement,
   ) {
     this.repository = repository;
   }

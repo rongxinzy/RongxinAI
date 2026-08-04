@@ -75,6 +75,7 @@ export class ProductionLoopController {
       `Persistent phase: ${this.state.phase}`,
       phaseInstruction,
       'The plan must include acceptance criteria, expected artifacts, and deterministic verifiers.',
+      'After commit_plan, read the returned state and use each generated plan item ID with update_plan_item.',
       'After execution, call start_inspection, then request_critique and delegate a read-only review to the reviewer subagent.',
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',

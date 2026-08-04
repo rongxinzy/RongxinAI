@@ -113,6 +113,27 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   ).toBe(ProductionLoopStatus.Completed);
 });
 
+test('accepts a critic verdict wrapped in a Markdown JSON fence', () => {
+  const { run } = begin();
+  const planned = commitPlan(run.id);
+  for (const item of planned.planItems) {
+    service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
+  }
+  service.startInspection(run.id);
+  service.requestCritique(run.id);
+  service.recordCriticStart(run.id, 'review');
+
+  const accepted = service.recordCriticResult(
+    run.id,
+    'review',
+    'Review complete.\n```json\n{"verdict":"pass","findings":[]}\n```',
+    false,
+  );
+
+  expect(accepted.phase).toBe(ProductionLoopPhase.Deliver);
+  expect(accepted.status).toBe(ProductionLoopStatus.ReadyToDeliver);
+});
+
 test('deterministic verification failure overrides critic PASS and returns to revision', () => {
   const { run } = begin();
   const planned = commitPlan(run.id);
