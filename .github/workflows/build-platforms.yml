@@ -26,26 +26,43 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  plan-platforms:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          BUILD_MACOS: ${{ inputs.build_macos }}
+          BUILD_WINDOWS: ${{ inputs.build_windows }}
+          BUILD_LINUX: ${{ inputs.build_linux }}
+        shell: bash
+        run: |
+          matrix='{"include":['
+          separator=''
+
+          if [[ "$BUILD_MACOS" == "true" ]]; then
+            matrix+='{"platform":"macos","runner":"macos-latest","artifact":"macos-build"}'
+            separator=','
+          fi
+          if [[ "$BUILD_WINDOWS" == "true" ]]; then
+            matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"windows-latest\",\"artifact\":\"windows-build\"}"
+            separator=','
+          fi
+          if [[ "$BUILD_LINUX" == "true" ]]; then
+            matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-build\"}"
+          fi
+
+          matrix+=']}'
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   build-platforms:
+    needs: plan-platforms
     strategy:
       # A manual platform build is a single release unit; cancel sibling builds
       # as soon as one selected platform fails.
       fail-fast: true
-      matrix:
-        include:
-          - platform: macos
-            enabled: ${{ inputs.build_macos }}
-            runner: macos-latest
-            artifact: macos-build
-          - platform: windows
-            enabled: ${{ inputs.build_windows }}
-            runner: windows-latest
-            artifact: windows-build
-          - platform: linux
-            enabled: ${{ inputs.build_linux }}
-            runner: ubuntu-latest
-            artifact: linux-build
-    if: ${{ matrix.enabled }}
+      matrix: ${{ fromJSON(needs.plan-platforms.outputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     environment: release
     # A release build may download upstream runtimes, but it must never consume
