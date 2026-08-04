@@ -20,6 +20,7 @@ import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/co
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
+  detectArtifactsFromMessages,
   getArtifactTypeFromExtension,
   normalizeFilePathForDedup,
 } from '../../services/artifactParser';
@@ -398,6 +399,25 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       setPreviewSessionId(sessionId);
     }
   }, [isPanelOpen, sessionId]);
+
+  // Synchronous artifact detection on session mount so artifact cards
+  // appear in the first-paint frame instead of popping in after the async
+  // Web Worker pass completes (which would change turn heights and jank).
+  useLayoutEffect(() => {
+    if (!sessionId || !currentSession?.messages?.length) return;
+    if (isStreaming) return;
+
+    const detected = detectArtifactsFromMessages(currentSession.messages, sessionId);
+    if (detected.length > 0) {
+      for (const { artifact } of detected) {
+        dispatch(addArtifact({ sessionId, artifact }));
+      }
+      // The async useEffect pass below will also call processMessages.
+      // addArtifact is idempotent (merges by id / filePath), so the only
+      // side-effect of the second pass is loadFiles — which fills in the
+      // content of already-painted artifact cards.
+    }
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!sessionId || !currentSession?.messages?.length) return;
