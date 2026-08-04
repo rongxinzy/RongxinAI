@@ -94,7 +94,7 @@ describe('skillRuntimeRunner', () => {
     fs.mkdirSync(path.join(root, 'xlsx', 'scripts'), { recursive: true });
     fs.writeFileSync(
       path.join(root, 'xlsx', 'scripts', 'noisy.mjs'),
-      'process.stdout.write("x".repeat(2 * 1024 * 1024));\n',
+      'process.stdout.write("😀".repeat(400_000));\n',
     );
 
     const result = await runManagedSkillScript({
@@ -107,6 +107,7 @@ describe('skillRuntimeRunner', () => {
     expect(result.ok).toBe(true);
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(1024 * 1024);
     expect(result.stdoutTruncated).toBe(true);
+    expect(result.stdout).not.toContain('\uFFFD');
   });
 
   it('reads an XLSX file through the packaged Skill Python environment', async () => {

@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { StringDecoder } from 'string_decoder';
 
 import {
   getElectronNodeRuntimePath,
@@ -65,20 +66,50 @@ const MAX_CAPTURED_OUTPUT_BYTES = 1 * 1024 * 1024;
 
 const trimOutput = (value: string): string => value.trim();
 
-const appendCapturedOutput = (
-  current: string,
-  chunk: Buffer | string,
-): { value: string; truncated: boolean } => {
-  const remaining = MAX_CAPTURED_OUTPUT_BYTES - Buffer.byteLength(current, 'utf8');
-  if (remaining <= 0) return { value: current, truncated: true };
-  const bytes = Buffer.from(chunk);
-  if (bytes.byteLength <= remaining) {
-    return { value: current + bytes.toString('utf8'), truncated: false };
+type CapturedOutput = {
+  decoder: StringDecoder;
+  parts: string[];
+  capturedBytes: number;
+  truncated: boolean;
+  finalized: boolean;
+  value: string;
+};
+
+const createCapturedOutput = (): CapturedOutput => ({
+  decoder: new StringDecoder('utf8'),
+  parts: [],
+  capturedBytes: 0,
+  truncated: false,
+  finalized: false,
+  value: '',
+});
+
+const appendCapturedOutput = (current: CapturedOutput, chunk: Buffer | string): void => {
+  if (current.truncated) return;
+  const remaining = MAX_CAPTURED_OUTPUT_BYTES - current.capturedBytes;
+  if (remaining <= 0) {
+    current.truncated = true;
+    return;
   }
-  return {
-    value: current + bytes.subarray(0, remaining).toString('utf8'),
-    truncated: true,
-  };
+  const bytes = Buffer.from(chunk);
+  const captured = bytes.byteLength <= remaining ? bytes : bytes.subarray(0, remaining);
+  current.parts.push(current.decoder.write(captured));
+  current.capturedBytes += captured.byteLength;
+  if (captured.byteLength < bytes.byteLength) current.truncated = true;
+  if (current.capturedBytes >= MAX_CAPTURED_OUTPUT_BYTES) current.truncated = true;
+};
+
+const finalizeCapturedOutput = (current: CapturedOutput): string => {
+  if (current.finalized) return current.value;
+  if (!current.truncated) {
+    current.parts.push(current.decoder.end());
+  } else {
+    // The byte cap may have ended in the middle of a UTF-8 sequence. Do not
+    // flush the decoder because that would return a replacement character.
+  }
+  current.value = current.parts.join('');
+  current.finalized = true;
+  return current.value;
 };
 
 const isWithin = (root: string, candidate: string): boolean => {
@@ -388,10 +419,8 @@ export async function runManagedSkillScript(
   }
 
   return await new Promise<SkillScriptRunResult>(resolve => {
-    let stdout = '';
-    let stderr = '';
-    let stdoutTruncated = false;
-    let stderrTruncated = false;
+    const stdout = createCapturedOutput();
+    const stderr = createCapturedOutput();
     let settled = false;
     let timedOut = false;
     let aborted = false;
@@ -429,15 +458,26 @@ export async function runManagedSkillScript(
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
     child.stdout.on('data', chunk => {
-      const captured = appendCapturedOutput(stdout, chunk);
-      stdout = captured.value;
-      stdoutTruncated ||= captured.truncated;
+      appendCapturedOutput(stdout, chunk);
     });
     child.stderr.on('data', chunk => {
-      const captured = appendCapturedOutput(stderr, chunk);
-      stderr = captured.value;
-      stderrTruncated ||= captured.truncated;
+      appendCapturedOutput(stderr, chunk);
     });
+    const capturedResult = (): {
+      stdout: string;
+      stderr: string;
+      stdoutTruncated: boolean;
+      stderrTruncated: boolean;
+    } => {
+      const stdoutText = finalizeCapturedOutput(stdout);
+      const stderrText = finalizeCapturedOutput(stderr);
+      return {
+        stdout: trimOutput(stdoutText),
+        stderr: trimOutput(stderrText),
+        stdoutTruncated: stdout.truncated,
+        stderrTruncated: stderr.truncated,
+      };
+    };
     child.on('error', (error: NodeJS.ErrnoException) => {
       clearTimeout(timeoutTimer);
       if (forceKillTimer) clearTimeout(forceKillTimer);
@@ -449,6 +489,7 @@ export async function runManagedSkillScript(
           : error.code === 'ENOENT'
             ? 'SKILL_RUNTIME_UNAVAILABLE'
             : 'SKILL_SCRIPT_FAILED';
+      const output = capturedResult();
       finish({
         ok: false,
         status: timedOut ? 'timed-out' : aborted ? 'aborted' : 'failed',
@@ -459,12 +500,12 @@ export async function runManagedSkillScript(
         args: commandArgs,
         scriptPath: resolved.scriptPath,
         exitCode: null,
-        stdout: trimOutput(stdout),
-        stderr: trimOutput(stderr),
+        stdout: output.stdout,
+        stderr: output.stderr,
         durationMs: Date.now() - startedAt,
         timedOut,
-        stdoutTruncated,
-        stderrTruncated,
+        stdoutTruncated: output.stdoutTruncated,
+        stderrTruncated: output.stderrTruncated,
       });
     });
     child.on('close', exitCode => {
@@ -472,6 +513,7 @@ export async function runManagedSkillScript(
       if (forceKillTimer) clearTimeout(forceKillTimer);
       options.signal?.removeEventListener('abort', onAbort);
       const failed = timedOut || aborted || exitCode !== 0;
+      const output = capturedResult();
       finish({
         ok: !failed,
         status: timedOut ? 'timed-out' : aborted ? 'aborted' : failed ? 'failed' : 'completed',
@@ -494,12 +536,12 @@ export async function runManagedSkillScript(
         args: commandArgs,
         scriptPath: resolved.scriptPath,
         exitCode,
-        stdout: trimOutput(stdout),
-        stderr: trimOutput(stderr),
+        stdout: output.stdout,
+        stderr: output.stderr,
         durationMs: Date.now() - startedAt,
         timedOut,
-        stdoutTruncated,
-        stderrTruncated,
+        stdoutTruncated: output.stdoutTruncated,
+        stderrTruncated: output.stderrTruncated,
       });
     });
   });
