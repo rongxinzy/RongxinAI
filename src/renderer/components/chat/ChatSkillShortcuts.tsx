@@ -30,7 +30,12 @@ import {
   AnimatedTelescopeIcon,
   type AnimatedTelescopeIconHandle,
 } from '../icons/AnimatedTelescopeIcon';
-import { CHAT_SKILL_SHORTCUTS, ChatSkillShortcut } from './constants';
+import {
+  CHAT_SKILL_SHORTCUTS,
+  ChatSkillShortcut,
+  getChatSkillShortcutIds,
+  isChatSkillShortcutActive,
+} from './constants';
 
 type AnimatedIconHandle = {
   startAnimation: () => void;
@@ -71,7 +76,7 @@ const ChatSkillShortcuts: React.FC = () => {
 
   const handleSelect = (entry: ChatSkillShortcut) => {
     if (isStreaming) return;
-    const selectedSkillIds = entry.skillIds || [entry.skillId];
+    const selectedSkillIds = getChatSkillShortcutIds(entry);
     // Require the skill to be enabled — disabled skills must not be
     // re-activated through the shortcut (matches SkillsPopover filtering).
     const allSkillsAvailable = selectedSkillIds.every(skillId =>
@@ -102,8 +107,7 @@ const ChatSkillShortcuts: React.FC = () => {
           {CHAT_SKILL_SHORTCUTS.map(entry => {
             const Icon = entry.icon;
             const animatedIcon = animatedShortcutIcons[entry.id];
-            const selectedSkillIds = entry.skillIds || [entry.skillId];
-            const isActive = selectedSkillIds.every(skillId => activeSkillIds.includes(skillId));
+            const isActive = isChatSkillShortcutActive(entry, activeSkillIds);
             return (
               <Button
                 key={entry.id}
@@ -119,10 +123,10 @@ const ChatSkillShortcuts: React.FC = () => {
                 }}
                 onClick={() => handleSelect(entry)}
                 className={cn(
-                  'chat-skill-shortcut w-full justify-start gap-2 px-3 text-left',
+                  'chat-skill-shortcut w-full justify-start gap-2 border border-transparent bg-transparent px-3 text-left !transition-colors !duration-200 ease-out hover:border-border hover:!bg-card hover:!text-foreground',
                   isActive
-                    ? 'bg-surface-raised font-medium text-foreground'
-                    : 'text-muted-foreground hover:bg-surface-raised hover:text-foreground',
+                    ? 'border-border bg-card font-medium text-foreground hover:border-border hover:!bg-card hover:!text-foreground'
+                    : 'text-muted-foreground',
                 )}
               >
                 {animatedIcon?.icon ?? (
