@@ -63,10 +63,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '该本地推理模型当前运行上下文过小（当前 {current}，Agent 引擎至少需要 {required}）。请调大 ctx-size 后重新加载模型。',
     coworkLlamaCppTrainingContextTooSmall:
       '该本地推理模型的训练上下文上限只有 {trained}，低于Agent 引擎所需的至少 {required}，无法用于当前 agent / 定时任务能力。请改用更大上下文模型。',
-    coworkLocalModelToolCallingUnsupported:
-      '该本地模型不支持工具调用，无法运行 Work 模式，请改用支持工具调用的模型。',
-    coworkLocalModelToolCallingUnknown:
-      '该本地模型的工具调用能力未知，请先完成探测或配置后再运行 Work。',
     coworkLlamaCppContextLimitReached:
       '该本地推理会话当前已接近上下文上限（约 {used} / {limit} tokens）。请先新建会话（/new）或切换更大上下文模型。',
     llamacppUnloadVramRecoveryPending:
@@ -370,10 +366,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'This local inference model is currently running with too small a context window ({current}); Agent engine requires at least {required}. Increase ctx-size and reload the model.',
     coworkLlamaCppTrainingContextTooSmall:
       "This local inference model was trained for only {trained} context tokens, below Agent engine's minimum requirement of {required}. Choose a larger-context model for agent and scheduled-task use.",
-    coworkLocalModelToolCallingUnsupported:
-      'The selected local model does not support tool calling and cannot run Work mode. Choose a model with tool-calling support.',
-    coworkLocalModelToolCallingUnknown:
-      'The selected local model has unknown tool-calling support. Detect or configure it before running Work mode.',
     coworkLlamaCppContextLimitReached:
       'This local inference session is already near its context limit ({used} / {limit} tokens). Start a new session (/new) or switch to a larger-context model.',
     llamacppUnloadVramRecoveryPending:

@@ -30,13 +30,8 @@ import {
   LlamaCppRuntimeCudaMajor,
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
-import {
-  isProviderEnabled,
-  ModelCapabilityStatus,
-  parseLlamaCppRuntimeCapabilities,
-  ProviderName,
-  type ModelCapabilities,
-} from '../../shared/providers';
+import { isProviderEnabled, ProviderName } from '../../shared/providers';
+import { ModelCapabilityStatus } from '../../shared/providers';
 import { t } from '../i18n';
 import { updateLlamaCppRunningModels } from '../libs/claudeSettings';
 import {
@@ -262,32 +257,13 @@ export function registerLlamaCppIpcHandlers(
   ): Promise<void> => {
     const store = options.getStore();
     const modelPreferences = getLlamaCppModelPreferences(store);
-    const client = await manager.client();
-    const bindingModels = (
-      await Promise.all(
-        runningModels.map(async runningModel => {
-          const model = buildLlamaCppRunningModelBinding(runningModel);
-          if (!model) return null;
-          let detectedCapabilities: Partial<ModelCapabilities> = {};
-          try {
-            detectedCapabilities = parseLlamaCppRuntimeCapabilities(
-              await client.showModel(model.id),
-            );
-          } catch {
-            // Runtime metadata is optional; context and loaded state remain usable.
-          }
-          const preferenceCapabilities = modelPreferences[model.id]?.capabilities;
-          const capabilities = {
-            ...detectedCapabilities,
-            ...(runningModel.supportsThinkingToggle === true
-              ? { reasoning: ModelCapabilityStatus.Supported }
-              : {}),
-            ...(preferenceCapabilities ?? {}),
-          };
-          return Object.keys(capabilities).length ? { ...model, capabilities } : model;
-        }),
-      )
-    ).filter((model): model is NonNullable<typeof model> => Boolean(model));
+    const bindingModels = runningModels
+      .map(model => buildLlamaCppRunningModelBinding(model))
+      .filter((model): model is NonNullable<typeof model> => Boolean(model))
+      .map(model => {
+        const capabilities = modelPreferences[model.id]?.capabilities;
+        return capabilities ? { ...model, capabilities } : model;
+      });
     const runningModelsChanged = updateLlamaCppRunningModels(bindingModels);
     const current = store.get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
     const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
