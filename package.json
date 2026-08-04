@@ -102,6 +102,7 @@
     "clean:release": "rimraf release",
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
     "generate:app-icons": "python3 scripts/generate-app-icons.py",
+    "generate:nsis-assets": "node scripts/generate-nsis-brand-assets.cjs",
     "setup:mingit": "node scripts/setup-mingit.js",
     "setup:python-runtime": "node scripts/setup-python-runtime.js",
     "setup:uv-runtime": "node scripts/setup-uv-runtime.js",
@@ -248,6 +249,7 @@
   },
   "devDependencies": {
     "7zip-bin": "^5.2.0",
+    "@napi-rs/canvas": "^0.1.100",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@tailwindcss/typography": "^0.5.16",
