@@ -18,6 +18,14 @@
   ShowInstDetails nevershow
 !macroend
 
+; Keep the maintained electron-builder installer flow, while adding a concise
+; Chinese welcome page before its standard installation-mode and directory pages.
+!macro customWelcomePage
+  !define MUI_WELCOMEPAGE_TITLE "欢迎使用知远智能体"
+  !define MUI_WELCOMEPAGE_TEXT "知远智能体是面向真实工作的 AI 工作台。安装程序将为你准备本地运行环境和内置智能体能力。$\r$\n$\r$\n点击“下一步”继续。"
+  !insertmacro MUI_PAGE_WELCOME
+!macroend
+
 !macro customInit
   ; Route DetailPrint output to the status bar (always visible, unlike the
   ; details pane which electron-builder hides at compile time).

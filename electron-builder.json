@@ -285,6 +285,9 @@
     "allowToChangeInstallationDirectory": true,
     "runAfterFinish": true,
     "deleteAppDataOnUninstall": true,
+    "installerHeader": "build/installer-assets/installerHeader.bmp",
+    "installerSidebar": "build/installer-assets/installerSidebar.bmp",
+    "uninstallerSidebar": "build/installer-assets/uninstallerSidebar.bmp",
     "include": "scripts/nsis-installer.nsh",
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
