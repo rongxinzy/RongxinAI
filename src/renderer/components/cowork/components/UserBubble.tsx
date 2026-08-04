@@ -13,6 +13,7 @@ import type { Skill } from '../../../types/skill';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
+import { CopyButton, ReEditButton } from './CopyButton';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -27,7 +28,7 @@ export const UserBubble: React.FC<{
   message: CoworkMessage;
   skills: Skill[];
   onReEdit?: (message: CoworkMessage) => void;
-}> = React.memo(({ message, skills, onReEdit: _onReEdit }) => {
+}> = React.memo(({ message, skills, onReEdit }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const modelLabel = getMessageModelLabel(message.metadata);
@@ -108,6 +109,10 @@ export const UserBubble: React.FC<{
         >
           <span>{formatMessageDateTime(message.timestamp)}</span>
           {modelLabel && <span className="opacity-70">{modelLabel}</span>}
+          <CopyButton content={message.content} visible={isHovered} />
+          {onReEdit && (
+            <ReEditButton visible={isHovered} onClick={() => onReEdit(message)} />
+          )}
         </div>
       </div>
       {expandedImage &&
