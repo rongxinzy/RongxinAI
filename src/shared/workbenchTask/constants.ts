@@ -128,6 +128,10 @@ export const WorkbenchRunEventType = {
   RunPaused: 'run_paused',
   RunFailed: 'run_failed',
   RecoveryRequired: 'recovery_required',
+  HarnessProfiled: 'harness_profiled',
+  HarnessActivation: 'harness_activation',
+  HarnessFailure: 'harness_failure',
+  HarnessQualityMeasured: 'harness_quality_measured',
 } as const;
 export type WorkbenchRunEventType =
   (typeof WorkbenchRunEventType)[keyof typeof WorkbenchRunEventType];

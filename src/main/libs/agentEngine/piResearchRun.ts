@@ -10,6 +10,8 @@
 import * as fs from 'fs';
 import path from 'path';
 
+import { HarnessActivationType } from '../../../shared/harness';
+
 import {
   addResearchClaim,
   addResearchDirection,
@@ -58,9 +60,11 @@ export class PiResearchRunController {
   private reviewerRanThisRequest = false;
   private readonly reviewerToolCallIds = new Set<string>();
   private readonly workspaceRoot: string;
+  private readonly onActivation: PiResearchRunOptions['onActivation'];
 
   constructor(options: PiResearchRunOptions) {
     this.workspaceRoot = path.resolve(options.workspaceRoot);
+    this.onActivation = options.onActivation;
     this.store = new PiResearchRunStore(options);
     this.runDirectory = this.store.runDirectory;
     this.state = this.store.loadOrCreate();
@@ -112,6 +116,11 @@ export class PiResearchRunController {
       );
     }
     if (this.state.review.requested && roles.includes('reviewer')) {
+      this.onActivation?.({
+        activation: HarnessActivationType.CriticRequested,
+        iteration: this.state.iteration,
+        mechanism: 'research_reviewer',
+      });
       this.reviewerRanThisRequest = true;
       this.reviewerToolCallIds.add(toolCallId);
       this.store.log(
@@ -145,6 +154,12 @@ export class PiResearchRunController {
       return;
     }
     this.state.review = { requested: true, passed: false, output };
+    this.onActivation?.({
+      activation: HarnessActivationType.CriticRejected,
+      iteration: this.state.iteration,
+      mechanism: 'research_reviewer',
+      evidence: { toolCallId },
+    });
     this.store.writeState(this.state);
     this.store.log(
       'orchestrator',

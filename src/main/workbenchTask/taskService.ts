@@ -22,12 +22,11 @@ import {
   type WorkbenchTaskDetail,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
+import { HarnessActivationType } from '../../shared/harness';
+import { HarnessMeasurementService } from '../harness/measurementService';
 import { collectWorkbenchArtifacts } from './artifactCollector';
 import { WorkbenchTaskRepository } from './repository';
-import {
-  classifyWorkbenchToolRisk,
-  createToolIdempotencyKey,
-} from './riskClassifier';
+import { classifyWorkbenchToolRisk, createToolIdempotencyKey } from './riskClassifier';
 import { verifyWorkbenchRun, type WorkbenchVerificationContext } from './verification';
 
 export interface WorkbenchApprovalRequestedEvent {
@@ -52,11 +51,13 @@ const MAX_RESULT_SERIALIZED_LENGTH = 64_000;
 
 export class WorkbenchTaskService extends EventEmitter {
   readonly repository: WorkbenchTaskRepository;
+  readonly measurement: HarnessMeasurementService;
   private readonly pendingApprovals = new Map<string, PendingApproval>();
 
   constructor(db: Database.Database) {
     super();
     this.repository = new WorkbenchTaskRepository(db);
+    this.measurement = new HarnessMeasurementService(this.repository);
   }
 
   getCurrent(sessionId: string): WorkbenchTaskDetail | null {
@@ -188,6 +189,11 @@ export class WorkbenchTaskService extends EventEmitter {
         outcome: result.outcome,
         summary: result.summary,
       });
+      this.measurement.recordVerification(run.id, {
+        passed: result.outcome === WorkbenchVerificationOutcome.Passed,
+        outcome: result.outcome,
+        checks: result.checks.map(check => ({ name: check.name, status: check.status })),
+      });
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
@@ -256,6 +262,12 @@ export class WorkbenchTaskService extends EventEmitter {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Failed, { failure });
       this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Failed, null);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.RunFailed, failure);
+      this.measurement.recordFailure(run.id, {
+        message: typeof failure.message === 'string' ? failure.message : 'Unknown runtime failure',
+        code: typeof failure.code === 'string' ? failure.code : undefined,
+        stage: typeof failure.stage === 'string' ? failure.stage : 'runtime',
+        evidence: failure,
+      });
     });
     this.emitChanged(this.requireTask(task.id));
   }
@@ -281,6 +293,11 @@ export class WorkbenchTaskService extends EventEmitter {
     const idempotencyKey = createToolIdempotencyKey(run.id, input.toolCallId, input.toolInput);
     const existing = this.repository.getApprovalByIdempotencyKey(idempotencyKey);
     if (existing) {
+      this.measurement.recordActivation(run.id, {
+        activation: HarnessActivationType.RepeatToolBreakerFired,
+        mechanism: 'tool_effect_idempotency',
+        evidence: { toolCallId: input.toolCallId, toolName: input.toolName },
+      });
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
     // "Allow all" means the user has explicitly disabled tool authorization

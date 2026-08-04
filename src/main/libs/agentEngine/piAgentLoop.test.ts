@@ -8,6 +8,8 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { HarnessActivationType, type HarnessActivationEvent } from '../../../shared/harness';
+
 import {
   AGENT_LOOP_MAX_ITERATIONS,
   buildPiAgentLoopTool,
@@ -112,7 +114,9 @@ describe('buildPiAgentLoopTool', () => {
 
   describe('goal mode', () => {
     it('continues after next and stops after done', async () => {
-      const { controller, tool } = buildHarness();
+      const activations: HarnessActivationEvent[] = [];
+      const controller = new PiAgentLoopController(undefined, event => activations.push(event));
+      const tool = buildPiAgentLoopTool(controller) as unknown as AgentLoopTool;
 
       // Before any loop: no continuation.
       expect(controller.handleAgentEnd()).toEqual({ shouldContinue: false });
@@ -124,6 +128,11 @@ describe('buildPiAgentLoopTool', () => {
       const omission = controller.handleAgentEnd();
       expect(omission.shouldContinue).toBe(true);
       expect(omission.nextPrompt).toContain('protocol omission');
+      expect(activations).toContainEqual({
+        activation: HarnessActivationType.PrematureFinalizeBlocked,
+        iteration: 1,
+        mechanism: 'agent_loop_protocol',
+      });
 
       await callTool(tool, { action: 'next', summary: 'drafted outline' });
       const decision = controller.handleAgentEnd();

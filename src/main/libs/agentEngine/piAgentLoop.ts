@@ -26,6 +26,8 @@
  * gates before a model may finish.
  */
 
+import { HarnessActivationType, type HarnessActivationEvent } from '../../../shared/harness';
+
 // ── Constants ──
 
 export const PiAgentLoopToolName = 'agent_loop';
@@ -115,6 +117,7 @@ export class PiAgentLoopController {
       onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
       requestCompletion(reason: string): string;
     },
+    private readonly onActivation?: (event: HarnessActivationEvent) => void,
   ) {}
 
   /** Read-only snapshot of the current loop state. */
@@ -227,9 +230,19 @@ export class PiAgentLoopController {
     // prompt instead of silently emitting a completed session.
     if (!this.pendingNext) {
       const nextStep = this.state.currentStep + 1;
+      this.onActivation?.({
+        activation: HarnessActivationType.PrematureFinalizeBlocked,
+        iteration: nextStep,
+        mechanism: 'agent_loop_protocol',
+      });
       this.state.currentStep = nextStep;
       if (nextStep >= AGENT_LOOP_MAX_ITERATIONS - 1) {
         this.wrapUpPending = true;
+        this.onActivation?.({
+          activation: HarnessActivationType.RecoveryTriggered,
+          iteration: nextStep + 1,
+          mechanism: 'iteration_limit_wrap_up',
+        });
         return { shouldContinue: true, nextPrompt: this.buildWrapUpPrompt() };
       }
       return {
@@ -260,6 +273,11 @@ export class PiAgentLoopController {
     // force-closed when it ends.
     if (nextStep >= AGENT_LOOP_MAX_ITERATIONS - 1) {
       this.wrapUpPending = true;
+      this.onActivation?.({
+        activation: HarnessActivationType.RecoveryTriggered,
+        iteration: nextStep + 1,
+        mechanism: 'iteration_limit_wrap_up',
+      });
       console.warn(
         `[PiAgentLoop] reached the ${AGENT_LOOP_MAX_ITERATIONS}-iteration limit, issuing wrap-up iteration`,
       );

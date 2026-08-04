@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import type { HarnessActivationEvent } from '../../shared/harness';
 import { createPiWorkLoop } from '../libs/agentEngine/piWorkLoop';
 import {
   ZhiyuanEvaluationActivation,
@@ -15,6 +16,12 @@ const identity = (): Pick<ZhiyuanEvaluationPolicy, 'protocolVersion' | 'id' | 'v
   protocolVersion: ZhiyuanEvaluationPolicyProtocolVersion,
   id: ZhiyuanEvaluationPolicyId,
   version: ZhiyuanEvaluationPolicyVersion,
+});
+
+const activationEvidence = (event: HarnessActivationEvent): Record<string, unknown> => ({
+  ...(event.iteration === undefined ? {} : { iteration: event.iteration }),
+  ...(event.mechanism === undefined ? {} : { mechanism: event.mechanism }),
+  ...(event.evidence === undefined ? {} : { evidence: event.evidence }),
 });
 
 export function createZhiyuanEvaluationPolicy(
@@ -35,7 +42,11 @@ export function createZhiyuanEvaluationPolicy(
     path.join(context.candidateRoot, 'resources', 'SYSTEM_PROMPT.md'),
     'utf8',
   );
-  const workLoop = createPiWorkLoop({ goal: context.prompt, start: true });
+  const workLoop = createPiWorkLoop({
+    goal: context.prompt,
+    onActivation: event => context.emitActivation(event.activation, activationEvidence(event)),
+    start: true,
+  });
   context.emitActivation(ZhiyuanEvaluationActivation.PolicyLoaded, {
     policyVersion: ZhiyuanEvaluationPolicyVersion,
     modelProfile: context.modelProfile,
