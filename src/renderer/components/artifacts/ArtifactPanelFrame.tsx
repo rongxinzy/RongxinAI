@@ -18,6 +18,7 @@ import {
 } from './artifactPanelResize';
 
 interface ArtifactPanelFrameProps {
+  sessionId: string | null;
   artifacts: Artifact[];
   isOpen: boolean;
   isVisible: boolean;
@@ -28,6 +29,7 @@ interface ArtifactPanelFrameProps {
 }
 
 const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
+  sessionId,
   artifacts,
   isOpen,
   isVisible,
@@ -91,6 +93,7 @@ const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
     >
       <div className="flex h-full w-full">
         <ArtifactPanel
+          sessionId={sessionId}
           artifacts={artifacts}
           panelWidth={panelWidth}
           minPanelWidth={minPanelWidth}

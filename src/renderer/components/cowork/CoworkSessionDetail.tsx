@@ -12,7 +12,7 @@ import {
   Image as ImageIcon,
   PanelLeft,
 } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -36,14 +36,15 @@ import {
 } from '../../store/selectors/coworkSelectors';
 import {
   addArtifact,
+  activateSessionArtifactView,
   ArtifactLayoutMode,
   closePanel,
   DEFAULT_PANEL_WIDTH,
   MIN_PANEL_WIDTH,
   EMPTY_ARTIFACTS,
   selectArtifact,
-  selectArtifactLayoutMode,
-  selectIsPanelOpen,
+  selectIsSessionArtifactPanelOpen,
+  selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
   togglePanel,
 } from '../../store/slices/artifactSlice';
@@ -248,21 +249,33 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const [showExportOptions, setShowExportOptions] = useState(false);
 
   // ─── Artifact detection ─────────────────────────────────────────────
-  const isPanelOpen = useSelector(selectIsPanelOpen);
-  const artifactLayoutMode = useSelector(selectArtifactLayoutMode);
+  const isPanelOpen = useSelector((state: RootState) =>
+    selectIsSessionArtifactPanelOpen(state, sessionId),
+  );
+  const artifactLayoutMode = useSelector((state: RootState) =>
+    selectSessionArtifactLayoutMode(state, sessionId),
+  );
   const isArtifactWorkspace = artifactLayoutMode === ArtifactLayoutMode.Workspace;
   const [shouldRenderArtifactPanel, setShouldRenderArtifactPanel] = useState(isPanelOpen);
   const [isArtifactPanelVisible, setIsArtifactPanelVisible] = useState(isPanelOpen);
   const [isArtifactPanelTransitioning, setIsArtifactPanelTransitioning] = useState(false);
+  const [previewSessionId, setPreviewSessionId] = useState<string | null>(() =>
+    isPanelOpen ? (sessionId ?? null) : null,
+  );
   const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
     typeof window === 'undefined'
       ? DEFAULT_PANEL_WIDTH
       : Math.max(MIN_PANEL_WIDTH, window.innerWidth),
   );
   const previousArtifactPanelOpenRef = useRef(isPanelOpen);
+  const previousArtifactSessionIdRef = useRef(sessionId);
+  const skipArtifactPanelTransitionRef = useRef(false);
   const contentRowRef = useRef<HTMLDivElement>(null);
   const sessionArtifacts = useSelector((state: RootState) =>
     sessionId ? selectSessionArtifacts(state, sessionId) : EMPTY_ARTIFACTS,
+  );
+  const previewArtifacts = useSelector((state: RootState) =>
+    previewSessionId ? selectSessionArtifacts(state, previewSessionId) : EMPTY_ARTIFACTS,
   );
 
   const artifactDetectionServiceRef = useRef<ArtifactDetectionService | null>(null);
@@ -302,6 +315,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     previousArtifactPanelOpenRef.current = isPanelOpen;
 
+    if (skipArtifactPanelTransitionRef.current) {
+      skipArtifactPanelTransitionRef.current = false;
+      setShouldRenderArtifactPanel(isPanelOpen);
+      setIsArtifactPanelVisible(isPanelOpen);
+      setIsArtifactPanelTransitioning(false);
+      return undefined;
+    }
+
     if (wasOpen === isPanelOpen) {
       return undefined;
     }
@@ -322,7 +343,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       setIsArtifactPanelTransitioning(true);
       setIsArtifactPanelVisible(false);
       transitionTimeout = window.setTimeout(() => {
-        setShouldRenderArtifactPanel(false);
         setIsArtifactPanelTransitioning(false);
       }, ARTIFACT_PANEL_TRANSITION_MS);
     }
@@ -365,10 +385,19 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     };
   }, [currentSession?.id, updateArtifactPanelMaxWidth]);
 
-  useEffect(() => {
-    dispatch(selectArtifact(null));
-    dispatch(closePanel());
+  useLayoutEffect(() => {
+    if (previousArtifactSessionIdRef.current && previousArtifactSessionIdRef.current !== sessionId) {
+      skipArtifactPanelTransitionRef.current = true;
+    }
+    previousArtifactSessionIdRef.current = sessionId;
+    dispatch(activateSessionArtifactView(sessionId ?? null));
   }, [sessionId, dispatch]);
+
+  useLayoutEffect(() => {
+    if (isPanelOpen && sessionId) {
+      setPreviewSessionId(sessionId);
+    }
+  }, [isPanelOpen, sessionId]);
 
   useEffect(() => {
     if (!sessionId || !currentSession?.messages?.length) return;
@@ -455,14 +484,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     };
   }, []);
 
-  // Reset nav state when session changes
-  useEffect(() => {
+  // Reset all rail measurements before the next session paints. This component
+  // stays mounted so artifact renderers can be reused across session switches.
+  useLayoutEffect(() => {
     setCurrentRailIndex(-1);
     currentRailIndexRef.current = -1;
+    railItemCountRef.current = 0;
+    turnToRailRangeRef.current = [];
     isNavigatingRef.current = false;
     if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
+    railLinesRef.current?.scrollTo({ top: 0 });
     setHoveredRailIndex(null);
-  }, [currentSession?.id]);
+    setIsRailHovered(false);
+    setRailTooltip(null);
+  }, [sessionId]);
 
   useEffect(() => {
     const handleOpenShareOptions = (event: Event) => {
@@ -779,15 +814,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       })();
     });
   };
-
-  // scroll + loadMore handled by Conversation (StickToBottom); rail state reset on session change
-  useEffect(() => {
-    setCurrentRailIndex(-1);
-    currentRailIndexRef.current = -1;
-    isNavigatingRef.current = false;
-    if (navigatingTimerRef.current) clearTimeout(navigatingTimerRef.current);
-    setHoveredRailIndex(null);
-  }, [currentSession?.id]);
 
   const navigateToRailItem = useCallback((railIndex: number) => {
     if (railIndex < 0 || railIndex >= railItemCountRef.current) return;
@@ -1550,7 +1576,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               }
             >
               <ArtifactPanelFrame
-                artifacts={sessionArtifacts}
+                sessionId={previewSessionId}
+                artifacts={previewArtifacts}
                 isOpen={isPanelOpen}
                 isVisible={isArtifactPanelVisible}
                 isTransitioning={isArtifactPanelTransitioning}
