@@ -7266,7 +7266,9 @@ if (!gotTheLock) {
 
     // 设置 macOS Dock 图标（开发模式下 Electron 默认图标不是应用 Logo）
     if (isMac && isDev) {
-      const iconPath = path.join(__dirname, '../build/icons/png/512x512.png');
+      // Use the same asset as the packaged macOS app so the Dock icon has
+      // identical visual padding in development and production.
+      const iconPath = path.join(__dirname, '../build/icons/mac/icon.icns');
       if (fs.existsSync(iconPath)) {
         app.dock.setIcon(nativeImage.createFromPath(iconPath));
       }
