@@ -14,7 +14,7 @@ import {
   selectActiveTab,
   selectArtifactLayoutMode,
   selectArtifact,
-  selectSelectedArtifact,
+  selectSessionSelectedArtifact,
   setActiveTab,
   setArtifactLayoutMode,
 } from '@/store/slices/artifactSlice';
@@ -55,6 +55,7 @@ function escapeHtml(str: string): string {
 }
 
 interface ArtifactPanelProps {
+  sessionId: string | null;
   artifacts: Artifact[];
   panelWidth: number;
   minPanelWidth?: number;
@@ -64,6 +65,7 @@ interface ArtifactPanelProps {
 }
 
 const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
+  sessionId,
   artifacts,
   panelWidth,
   minPanelWidth = MIN_PANEL_WIDTH,
@@ -72,7 +74,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   onResizeComplete,
 }) => {
   const dispatch = useDispatch();
-  const selectedArtifact = useSelector(selectSelectedArtifact);
+  const selectedArtifact = useSelector((state: RootState) =>
+    selectSessionSelectedArtifact(state, sessionId),
+  );
   const activeTab = useSelector(selectActiveTab);
   const layoutMode = useSelector(selectArtifactLayoutMode);
   const selectedArtifactId = useSelector((state: RootState) => state.artifact.selectedArtifactId);
@@ -82,6 +86,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const isMac = window.electron.platform === 'darwin';
+  const isTopLevelPanel = layoutMode === ArtifactLayoutMode.Workspace || isFullscreen;
 
   const visibleArtifacts = artifacts.filter(
     artifact => showIntermediateArtifacts || artifact.role === ArtifactRole.Deliverable,
@@ -280,7 +286,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           maxWidth:
             layoutMode === ArtifactLayoutMode.Workspace || isFullscreen ? 'none' : undefined,
         }}
-        className={`bg-background flex flex-col h-full overflow-hidden ${
+        className={`non-draggable bg-background flex flex-col h-full overflow-hidden ${
           layoutMode === ArtifactLayoutMode.Workspace || isFullscreen
             ? 'fixed inset-0 z-200 w-screen border-0'
             : 'relative min-w-0 flex-1 border-l border-border'
@@ -309,7 +315,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         {selectedArtifact ? (
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Header: file list toggle + filename + type + actions */}
-            <div className="h-10 flex items-center gap-2 px-3 border-b border-border shrink-0">
+            <div
+              className={`h-10 flex items-center gap-2 border-b border-border shrink-0 ${
+                isMac && isTopLevelPanel ? 'pl-20 pr-3' : 'px-3'
+              }`}
+            >
               <span className="text-sm font-medium truncate">
                 {selectedArtifact.fileName || selectedArtifact.title}
               </span>
@@ -461,7 +471,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         ) : (
           /* No artifact selected: show full-width file list */
           <div className="flex-1 flex flex-col h-full overflow-hidden">
-            <div className="h-10 flex items-center px-3 border-b border-border shrink-0">
+            <div
+              className={`h-10 flex items-center border-b border-border shrink-0 ${
+                isMac && isTopLevelPanel ? 'pl-20 pr-3' : 'px-3'
+              }`}
+            >
               <span className="text-xs font-medium text-muted-foreground">
                 {t('artifactFiles')}
               </span>

@@ -15,9 +15,19 @@ export const ArtifactLayoutMode = {
 } as const;
 export type ArtifactLayoutMode = (typeof ArtifactLayoutMode)[keyof typeof ArtifactLayoutMode];
 
+interface ArtifactSessionViewState {
+  selectedArtifactId: string | null;
+  isPanelOpen: boolean;
+  activeTab: ArtifactActiveTab;
+  panelView: ArtifactPanelView;
+  layoutMode: ArtifactLayoutMode;
+}
+
 interface ArtifactState {
   artifactsBySession: Record<string, Artifact[]>;
   activeProjectionBySession: Record<string, { taskId: string; runId: string | null } | undefined>;
+  activeSessionId: string | null;
+  viewStateBySession: Record<string, ArtifactSessionViewState>;
   selectedArtifactId: string | null;
   isPanelOpen: boolean;
   activeTab: ArtifactActiveTab;
@@ -29,6 +39,8 @@ interface ArtifactState {
 const initialState: ArtifactState = {
   artifactsBySession: {},
   activeProjectionBySession: {},
+  activeSessionId: null,
+  viewStateBySession: {},
   selectedArtifactId: null,
   isPanelOpen: false,
   activeTab: 'preview',
@@ -36,6 +48,38 @@ const initialState: ArtifactState = {
   panelWidth: DEFAULT_PANEL_WIDTH,
   layoutMode: ArtifactLayoutMode.Split,
 };
+
+const DEFAULT_SESSION_VIEW_STATE: ArtifactSessionViewState = {
+  selectedArtifactId: null,
+  isPanelOpen: false,
+  activeTab: 'preview',
+  panelView: 'files',
+  layoutMode: ArtifactLayoutMode.Split,
+};
+
+function getDefaultSessionViewState(): ArtifactSessionViewState {
+  return { ...DEFAULT_SESSION_VIEW_STATE };
+}
+
+function saveActiveSessionView(state: ArtifactState) {
+  if (!state.activeSessionId) return;
+
+  state.viewStateBySession[state.activeSessionId] = {
+    selectedArtifactId: state.selectedArtifactId,
+    isPanelOpen: state.isPanelOpen,
+    activeTab: state.activeTab,
+    panelView: state.panelView,
+    layoutMode: state.layoutMode,
+  };
+}
+
+function restoreSessionView(state: ArtifactState, viewState: ArtifactSessionViewState) {
+  state.selectedArtifactId = viewState.selectedArtifactId;
+  state.isPanelOpen = viewState.isPanelOpen;
+  state.activeTab = viewState.activeTab;
+  state.panelView = viewState.panelView;
+  state.layoutMode = viewState.layoutMode;
+}
 
 function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
   return {
@@ -53,6 +97,18 @@ const artifactSlice = createSlice({
   name: 'artifact',
   initialState,
   reducers: {
+    activateSessionArtifactView(state, action: PayloadAction<string | null>) {
+      const sessionId = action.payload;
+      if (state.activeSessionId === sessionId) return;
+
+      saveActiveSessionView(state);
+      state.activeSessionId = sessionId;
+      restoreSessionView(
+        state,
+        sessionId ? (state.viewStateBySession[sessionId] ?? getDefaultSessionViewState()) : getDefaultSessionViewState(),
+      );
+    },
+
     setSessionArtifacts(
       state,
       action: PayloadAction<{ sessionId: string; artifacts: Artifact[] }>,
@@ -143,15 +199,19 @@ const artifactSlice = createSlice({
     },
 
     clearSessionArtifacts(state, action: PayloadAction<string>) {
-      delete state.artifactsBySession[action.payload];
-      delete state.activeProjectionBySession[action.payload];
-      state.selectedArtifactId = null;
-      state.layoutMode = ArtifactLayoutMode.Split;
+      const sessionId = action.payload;
+      delete state.artifactsBySession[sessionId];
+      delete state.activeProjectionBySession[sessionId];
+      delete state.viewStateBySession[sessionId];
+      if (state.activeSessionId === sessionId) {
+        restoreSessionView(state, getDefaultSessionViewState());
+      }
     },
   },
 });
 
 export const {
+  activateSessionArtifactView,
   setSessionArtifacts,
   addArtifact,
   setActiveArtifactProjection,
@@ -183,6 +243,12 @@ export const selectTaskRunArtifacts = (
 export const selectSelectedArtifact = (state: RootState): Artifact | null => {
   const id = state.artifact.selectedArtifactId;
   if (!id) return null;
+  const activeSessionId = state.artifact.activeSessionId;
+  if (activeSessionId) {
+    return (
+      state.artifact.artifactsBySession[activeSessionId]?.find(artifact => artifact.id === id) ?? null
+    );
+  }
   for (const artifacts of Object.values(state.artifact.artifactsBySession)) {
     const found = artifacts.find(a => a.id === id);
     if (found) return found;
@@ -190,7 +256,35 @@ export const selectSelectedArtifact = (state: RootState): Artifact | null => {
   return null;
 };
 
+export const selectSessionSelectedArtifact = (
+  state: RootState,
+  sessionId: string | null,
+): Artifact | null => {
+  if (!sessionId) return null;
+  const selectedArtifactId =
+    state.artifact.activeSessionId === sessionId
+      ? state.artifact.selectedArtifactId
+      : state.artifact.viewStateBySession[sessionId]?.selectedArtifactId;
+  if (!selectedArtifactId) return null;
+  return (
+    state.artifact.artifactsBySession[sessionId]?.find(
+      artifact => artifact.id === selectedArtifactId,
+    ) ?? null
+  );
+};
+
 export const selectIsPanelOpen = (state: RootState): boolean => state.artifact.isPanelOpen;
+const selectSessionViewState = (state: RootState, sessionId: string | undefined) => {
+  if (!sessionId) return DEFAULT_SESSION_VIEW_STATE;
+  if (state.artifact.activeSessionId === sessionId) {
+    return state.artifact;
+  }
+  return state.artifact.viewStateBySession[sessionId] ?? DEFAULT_SESSION_VIEW_STATE;
+};
+export const selectIsSessionArtifactPanelOpen = (state: RootState, sessionId: string | undefined) =>
+  selectSessionViewState(state, sessionId).isPanelOpen;
+export const selectSessionArtifactLayoutMode = (state: RootState, sessionId: string | undefined) =>
+  selectSessionViewState(state, sessionId).layoutMode;
 export const selectPanelWidth = (state: RootState): number => state.artifact.panelWidth;
 export const selectPanelView = (state: RootState): ArtifactPanelView => state.artifact.panelView;
 export const selectActiveTab = (state: RootState): ArtifactActiveTab => state.artifact.activeTab;

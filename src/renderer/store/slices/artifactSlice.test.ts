@@ -3,9 +3,12 @@ import { describe, expect, test } from 'vitest';
 import { ArtifactRole, type Artifact } from '../../types/artifact';
 import {
   addArtifact,
+  activateSessionArtifactView,
   ArtifactLayoutMode,
   closePanel,
   selectArtifact,
+  selectSessionSelectedArtifact,
+  selectSelectedArtifact,
   setActiveArtifactProjection,
   setArtifactLayoutMode,
   setPanelWidth,
@@ -91,5 +94,44 @@ describe('artifact reducer', () => {
       taskId: 'task-1',
       runId: 'run-1',
     });
+  });
+
+  test('restores the preview belonging to the active session after switching back', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: makeArtifact({ id: 'session-1-artifact' }) }),
+    );
+    state = artifactReducer(state, selectArtifact('session-1-artifact'));
+    state = artifactReducer(state, setArtifactLayoutMode(ArtifactLayoutMode.Workspace));
+
+    state = artifactReducer(state, activateSessionArtifactView('session-2'));
+    expect(state.isPanelOpen).toBe(false);
+    expect(state.selectedArtifactId).toBeNull();
+
+    state = artifactReducer(state, activateSessionArtifactView('session-1'));
+    expect(state.isPanelOpen).toBe(true);
+    expect(state.selectedArtifactId).toBe('session-1-artifact');
+    expect(state.layoutMode).toBe(ArtifactLayoutMode.Workspace);
+  });
+
+  test('selects the preview from the active session when artifact ids overlap', () => {
+    let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: makeArtifact({ id: 'shared-id', title: 'first.pptx' }) }),
+    );
+    state = artifactReducer(state, selectArtifact('shared-id'));
+    state = artifactReducer(state, activateSessionArtifactView('session-2'));
+    state = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-2', artifact: makeArtifact({ id: 'shared-id', title: 'second.pptx' }) }),
+    );
+    state = artifactReducer(state, selectArtifact('shared-id'));
+
+    expect(selectSelectedArtifact({ artifact: state } as never)?.title).toBe('second.pptx');
+    expect(selectSessionSelectedArtifact({ artifact: state } as never, 'session-1')?.title).toBe(
+      'first.pptx',
+    );
   });
 });

@@ -27,7 +27,10 @@ const CoworkSessionViewport = ({ sessionId, ...props }: CoworkSessionViewportPro
     );
   }
 
-  return <CoworkSessionDetail key={sessionId} {...props} />;
+  // Keep the detail tree mounted while switching sessions. In particular, this
+  // preserves expensive document and PPT preview renderers instead of rebuilding
+  // them whenever the selected session changes.
+  return <CoworkSessionDetail {...props} />;
 };
 
 export default CoworkSessionViewport;
