@@ -11,9 +11,9 @@ vi.mock('./api', () => ({
   },
 }));
 
-async function collectChunks(stream: ReadableStream<Record<string, unknown>>): Promise<
-  Record<string, unknown>[]
-> {
+async function collectChunks(
+  stream: ReadableStream<Record<string, unknown>>,
+): Promise<Record<string, unknown>[]> {
   const reader = stream.getReader();
   const chunks: Record<string, unknown>[] = [];
   while (true) {
@@ -28,7 +28,10 @@ test('emits reasoning-end when reasoning stream finishes before content', async 
   let onProgress: ((content: string, reasoning?: string) => void) | undefined;
   let resolveChat: (() => void) | undefined;
   vi.mocked(apiService.chatWithWebSearch).mockImplementation(
-    async (_message: string | unknown, progress?: (content: string, reasoning?: string) => void) => {
+    async (
+      _message: string | unknown,
+      progress?: (content: string, reasoning?: string) => void,
+    ) => {
       onProgress = progress;
       return new Promise<{ content: string; reasoning?: string }>(resolve => {
         resolveChat = () => resolve({ content: 'Hello world' });
@@ -65,6 +68,102 @@ test('emits reasoning-end when reasoning stream finishes before content', async 
     'text-end',
     'finish',
   ]);
+});
+
+test('emits the final result when the provider never reports streaming progress', async () => {
+  vi.mocked(apiService.chatWithWebSearch).mockResolvedValue({
+    content: 'Buffered answer',
+    reasoning: 'Buffered reasoning',
+  });
+
+  const transport = new ChatChatTransport({});
+  const stream = await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+    abortSignal: undefined,
+  });
+
+  const chunks = await collectChunks(stream);
+  expect(chunks.map(chunk => chunk.type)).toEqual([
+    'reasoning-start',
+    'reasoning-delta',
+    'reasoning-end',
+    'text-start',
+    'text-delta',
+    'text-end',
+    'finish',
+  ]);
+  expect(chunks).toContainEqual(
+    expect.objectContaining({ type: 'reasoning-delta', delta: 'Buffered reasoning' }),
+  );
+  expect(chunks).toContainEqual(
+    expect.objectContaining({ type: 'text-delta', delta: 'Buffered answer' }),
+  );
+});
+
+test('keeps web search chunks outside reasoning and starts a new reasoning block after search', async () => {
+  let onProgress: ((content: string, reasoning?: string) => void) | undefined;
+  let onToolEvent:
+    | ((event: {
+        type: 'start' | 'complete';
+        toolCallId: string;
+        input?: Record<string, unknown>;
+        output?: unknown;
+      }) => void)
+    | undefined;
+  vi.mocked(apiService.chatWithWebSearch).mockImplementation(async (...args: unknown[]) => {
+    onProgress = args[1] as typeof onProgress;
+    onToolEvent = args[6] as typeof onToolEvent;
+    onProgress?.('', 'before search');
+    onToolEvent?.({
+      type: 'start',
+      toolCallId: 'tool-1',
+      input: { query: 'latest news' },
+    });
+    onToolEvent?.({
+      type: 'complete',
+      toolCallId: 'tool-1',
+      output: { results: [] },
+    });
+    onProgress?.('', 'after search');
+    onProgress?.('answer', 'after search');
+    return { content: 'answer' };
+  });
+
+  const transport = new ChatChatTransport({});
+  const stream = await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [{ id: 'u1', role: 'user', parts: [{ type: 'text', text: 'hi' }] }],
+    abortSignal: undefined,
+  });
+
+  const chunks = await collectChunks(stream);
+  expect(chunks.map(chunk => chunk.type)).toEqual([
+    'reasoning-start',
+    'reasoning-delta',
+    'reasoning-end',
+    'tool-input-start',
+    'tool-input-available',
+    'tool-output-available',
+    'reasoning-start',
+    'reasoning-delta',
+    'reasoning-end',
+    'text-start',
+    'text-delta',
+    'text-end',
+    'finish',
+  ]);
+  expect(chunks).toContainEqual({
+    type: 'tool-input-available',
+    toolCallId: 'tool-1',
+    toolName: 'web_search',
+    input: { query: 'latest news' },
+    providerExecuted: true,
+  });
 });
 
 test('only uses messages before the latest user turn as history', async () => {

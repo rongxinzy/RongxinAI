@@ -22,6 +22,7 @@ import {
 } from './localInferenceSlotRetry';
 import { probeRuntimeModelCapabilities } from './modelCapabilityProbe';
 import { StreamRequestRegistry } from './streamRequestRegistry';
+import { WebSearchToolEventType, type WebSearchToolEventHandler } from './webSearchToolEvents';
 
 export interface ApiConfig {
   apiKey: string;
@@ -69,6 +70,24 @@ class ApiService {
     this.runtimeCapabilityCache.clear();
     this.runtimeCapabilityRequests.clear();
     this.runtimeCapabilityGeneration += 1;
+  }
+
+  private getConfiguredApi(): ApiConfig {
+    if (!this.config) {
+      const appConfig = configService.getConfig();
+      this.setConfig({
+        apiKey: appConfig.api.key,
+        baseUrl: appConfig.api.baseUrl,
+      });
+    }
+
+    if (!this.config) {
+      throw new ApiError(
+        'API configuration not set. Please configure your API settings in the settings menu.',
+      );
+    }
+
+    return this.config;
   }
 
   cancelOngoingRequest(requestId?: string) {
@@ -444,11 +463,7 @@ class ApiService {
     reasoning?: string;
     usage?: TokenUsage;
   }> {
-    if (!this.config) {
-      throw new ApiError(
-        'API configuration not set. Please configure your API settings in the settings menu.',
-      );
-    }
+    const configuredApi = this.getConfiguredApi();
 
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
@@ -471,7 +486,7 @@ class ApiService {
         : { content: message.content || '', images: message.images };
 
     // 尝试获取模型对应 provider 的配置
-    let effectiveConfig = this.config;
+    let effectiveConfig = configuredApi;
     const providerConfig = this.getProviderConfig(provider);
     if (providerConfig) {
       effectiveConfig = providerConfig;
@@ -612,16 +627,13 @@ class ApiService {
     options: DirectChatRequestOptions = {},
     requestId: string = generateRequestId(),
     abortSignal?: AbortSignal,
+    onToolEvent?: WebSearchToolEventHandler,
   ): Promise<{
     content: string;
     reasoning?: string;
     usage?: TokenUsage;
   }> {
-    if (!this.config) {
-      throw new ApiError(
-        'API configuration not set. Please configure your API settings in the settings menu.',
-      );
-    }
+    const configuredApi = this.getConfiguredApi();
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
     const requestedProviderKey = options.modelProviderKey?.trim();
@@ -637,7 +649,7 @@ class ApiService {
       selectedModel.id,
       selectedModel.providerKey ?? selectedModel.provider,
     );
-    const config = this.getProviderConfig(provider) ?? this.config;
+    const config = this.getProviderConfig(provider) ?? configuredApi;
     if (this.providerRequiresApiKey(provider) && !config.apiKey) {
       throw new ApiError(
         'API key is not configured. Please set your API key in the settings menu.',
@@ -682,6 +694,7 @@ class ApiService {
         onProgress,
         requestId,
         abortSignal,
+        onToolEvent,
       );
     }
     if (apiFormat === 'gemini') {
@@ -699,6 +712,7 @@ class ApiService {
         onProgress,
         requestId,
         abortSignal,
+        onToolEvent,
       );
     }
     if (this.shouldUseOpenAIResponsesApi(provider)) {
@@ -713,6 +727,7 @@ class ApiService {
         onProgress,
         requestId,
         abortSignal,
+        onToolEvent,
       );
     }
     const messages = [
@@ -731,6 +746,7 @@ class ApiService {
       onProgress,
       requestId,
       abortSignal,
+      onToolEvent,
     );
   }
 
@@ -1142,17 +1158,50 @@ class ApiService {
   }
 
   private async executeSearchCalls(
-    calls: Array<{ args: { query?: unknown; max_results?: unknown } }>,
+    calls: Array<{
+      toolCallId: string;
+      args: { query?: unknown; max_results?: unknown };
+    }>,
     requestId: string,
     abortSignal?: AbortSignal,
+    onToolEvent?: WebSearchToolEventHandler,
   ): Promise<unknown[]> {
     const results: unknown[] = [];
     for (let index = 0; index < calls.length; index += 1) {
-      results.push(
-        index < 3
-          ? await this.executeWebSearch(calls[index].args, requestId, abortSignal)
-          : { error: 'Only three web_search calls are allowed per model turn.' },
-      );
+      const call = calls[index];
+      const input = call.args as Record<string, unknown>;
+      onToolEvent?.({ type: WebSearchToolEventType.Start, toolCallId: call.toolCallId, input });
+      try {
+        const result =
+          index < 3
+            ? await this.executeWebSearch(call.args, requestId, abortSignal)
+            : { error: 'Only three web_search calls are allowed per model turn.' };
+        results.push(result);
+        if (
+          result &&
+          typeof result === 'object' &&
+          typeof (result as { error?: unknown }).error === 'string'
+        ) {
+          onToolEvent?.({
+            type: WebSearchToolEventType.Error,
+            toolCallId: call.toolCallId,
+            error: (result as { error: string }).error,
+          });
+        } else {
+          onToolEvent?.({
+            type: WebSearchToolEventType.Complete,
+            toolCallId: call.toolCallId,
+            output: result,
+          });
+        }
+      } catch (error) {
+        onToolEvent?.({
+          type: WebSearchToolEventType.Error,
+          toolCallId: call.toolCallId,
+          error: error instanceof Error ? error.message : 'Web search failed.',
+        });
+        throw error;
+      }
     }
     return results;
   }
@@ -1165,6 +1214,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
+    onToolEvent?: WebSearchToolEventHandler,
   ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const headers = {
       'Content-Type': 'application/json',
@@ -1202,20 +1252,28 @@ class ApiService {
         };
       }
       input.push(...output);
-      const parsedCalls = functionCalls.map((call: any) => {
+      const parsedCalls = functionCalls.map((call: any, index: number) => {
         let args = {};
         try {
           args = JSON.parse(call.arguments || '{}');
         } catch {
           args = {};
         }
-        return { args };
+        return {
+          toolCallId: call.call_id || `${requestId}-web-search-${turn}-${index}`,
+          args,
+        };
       });
-      const results = await this.executeSearchCalls(parsedCalls, requestId, abortSignal);
-      functionCalls.forEach((call: any, index: number) => {
+      const results = await this.executeSearchCalls(
+        parsedCalls,
+        requestId,
+        abortSignal,
+        onToolEvent,
+      );
+      functionCalls.forEach((_call: any, index: number) => {
         input.push({
           type: 'function_call_output',
-          call_id: call.call_id,
+          call_id: parsedCalls[index].toolCallId,
           output: JSON.stringify(results[index]),
         });
       });
@@ -1231,6 +1289,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
+    onToolEvent?: WebSearchToolEventHandler,
   ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -1302,20 +1361,28 @@ class ApiService {
             : {}),
         };
       }
-      const parsedCalls = calls.map((call: any) => {
+      const parsedCalls = calls.map((call: any, index: number) => {
         let args = {};
         try {
           args = JSON.parse(call.function.arguments || '{}');
         } catch {
           args = {};
         }
-        return { args };
+        return {
+          toolCallId: call.id || `${requestId}-web-search-${turn}-${index}`,
+          args,
+        };
       });
-      const results = await this.executeSearchCalls(parsedCalls, requestId, abortSignal);
-      calls.forEach((call: any, index: number) => {
+      const results = await this.executeSearchCalls(
+        parsedCalls,
+        requestId,
+        abortSignal,
+        onToolEvent,
+      );
+      calls.forEach((_call: any, index: number) => {
         messages.push({
           role: 'tool',
-          tool_call_id: call.id,
+          tool_call_id: parsedCalls[index].toolCallId,
           content: JSON.stringify(results[index]),
         });
       });
@@ -1331,6 +1398,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
+    onToolEvent?: WebSearchToolEventHandler,
   ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const headers = {
       'Content-Type': 'application/json',
@@ -1388,16 +1456,21 @@ class ApiService {
         };
       }
       messages.push({ role: 'assistant', content });
+      const parsedCalls = calls.map((call: any, index: number) => ({
+        toolCallId: call.id || `${requestId}-web-search-${turn}-${index}`,
+        args: call.input || {},
+      }));
       const results = await this.executeSearchCalls(
-        calls.map((call: any) => ({ args: call.input || {} })),
+        parsedCalls,
         requestId,
         abortSignal,
+        onToolEvent,
       );
       messages.push({
         role: 'user',
-        content: calls.map((call: any, index: number) => ({
+        content: calls.map((_call: any, index: number) => ({
           type: 'tool_result',
-          tool_use_id: call.id,
+          tool_use_id: parsedCalls[index].toolCallId,
           content: JSON.stringify(results[index]),
         })),
       });
@@ -1413,6 +1486,7 @@ class ApiService {
     onProgress: ((content: string) => void) | undefined,
     requestId: string,
     abortSignal?: AbortSignal,
+    onToolEvent?: WebSearchToolEventHandler,
   ): Promise<{ content: string; usage?: { inputTokens: number; outputTokens: number } }> {
     const baseUrl =
       config.baseUrl.trim().replace(/\/+$/, '') ||
@@ -1466,9 +1540,13 @@ class ApiService {
       }
       contents.push(content);
       const results = await this.executeSearchCalls(
-        calls.map((part: any) => ({ args: part.functionCall.args || {} })),
+        calls.map((part: any, index: number) => ({
+          toolCallId: `${requestId}-web-search-${turn}-${index}`,
+          args: part.functionCall.args || {},
+        })),
         requestId,
         abortSignal,
+        onToolEvent,
       );
       contents.push({
         role: 'user',

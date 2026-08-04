@@ -7,6 +7,7 @@ import {
 } from 'ai';
 
 import type { CoworkPermissionResult } from '../types/cowork';
+import { createToolInputAvailableChunk, createToolOutputAvailableChunk } from './toolChunkAdapter';
 
 export interface CoworkChatTransportOptions {
   /** Session to send messages to. If omitted, a new session is created. */
@@ -223,13 +224,13 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
 
             if (toolUseId) toolUseIdMap.set(toolUseId, toolCallId);
 
-            enqueue({
-              type: 'tool-input-available',
-              toolCallId,
-              toolName,
-              input: (meta?.toolInput as Record<string, unknown>) ?? {},
-              providerExecuted: true,
-            });
+            enqueue(
+              createToolInputAvailableChunk(
+                toolCallId,
+                toolName,
+                (meta?.toolInput as Record<string, unknown>) ?? {},
+              ),
+            );
             return;
           }
 
@@ -238,12 +239,12 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
             const toolUseId = (meta?.toolUseId as string) || '';
             const toolCallId = toolUseIdMap.get(toolUseId) || message.id;
 
-            enqueue({
-              type: 'tool-output-available',
-              toolCallId,
-              output: (meta?.toolResult as string) || message.content || '',
-              providerExecuted: true,
-            });
+            enqueue(
+              createToolOutputAvailableChunk(
+                toolCallId,
+                (meta?.toolResult as string) || message.content || '',
+              ),
+            );
             return;
           }
 

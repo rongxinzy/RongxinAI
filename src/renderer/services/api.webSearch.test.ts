@@ -4,12 +4,36 @@ import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
 import { store } from '../store';
 import { setAvailableModels, setDefaultSelectedModel } from '../store/slices/modelSlice';
 import { apiService } from './api';
+import { configService } from './config';
 import { i18nService } from './i18n';
+import { WebSearchToolEventType, type WebSearchToolEvent } from './webSearchToolEvents';
 
 afterEach(() => {
   i18nService.setLanguage('zh', { persist: false });
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+test('restores the legacy API config when app bootstrap has not synced it yet', async () => {
+  const model = {
+    id: 'custom-bootstrap-race',
+    name: 'Custom Bootstrap Race',
+    providerKey: 'custom_0',
+    supportsImage: false,
+  };
+  store.dispatch(setAvailableModels([model]));
+  store.dispatch(setDefaultSelectedModel(model));
+  const appConfig = configService.getConfig();
+  vi.spyOn(configService, 'getConfig').mockReturnValue({
+    ...appConfig,
+    api: { key: 'key', baseUrl: 'https://example.test/v1' },
+  });
+  (apiService as any).config = null;
+  vi.spyOn(apiService, 'chat').mockResolvedValue({ content: 'plain answer' });
+
+  await expect(apiService.chatWithWebSearch('latest news')).resolves.toEqual({
+    content: 'plain answer',
+  });
 });
 
 test('unknown tool capability falls back to regular chat without a tool payload', async () => {
@@ -221,6 +245,7 @@ test('OpenAI Responses returns an output for every parallel tool call', async ()
     ok: true,
     data: { query: 'test', results: [] },
   });
+  const toolEvents: Array<{ type: WebSearchToolEvent['type']; toolCallId: string }> = [];
   vi.stubGlobal('window', { electron: { api: { webSearch } } });
 
   const result = await (apiService as any).runOpenAIResponsesWebSearchLoop(
@@ -230,6 +255,9 @@ test('OpenAI Responses returns an output for every parallel tool call', async ()
     { apiKey: 'model-key', baseUrl: 'https://api.openai.com/v1' },
     undefined,
     'request-1',
+    undefined,
+    (event: WebSearchToolEvent) =>
+      toolEvents.push({ type: event.type, toolCallId: event.toolCallId }),
   );
 
   expect(result.content).toBe('final answer');
@@ -242,6 +270,16 @@ test('OpenAI Responses returns an output for every parallel tool call', async ()
   expect(JSON.parse(outputs[3].output)).toEqual({
     error: 'Only three web_search calls are allowed per model turn.',
   });
+  expect(toolEvents).toEqual([
+    { type: WebSearchToolEventType.Start, toolCallId: 'call-0' },
+    { type: WebSearchToolEventType.Complete, toolCallId: 'call-0' },
+    { type: WebSearchToolEventType.Start, toolCallId: 'call-1' },
+    { type: WebSearchToolEventType.Complete, toolCallId: 'call-1' },
+    { type: WebSearchToolEventType.Start, toolCallId: 'call-2' },
+    { type: WebSearchToolEventType.Complete, toolCallId: 'call-2' },
+    { type: WebSearchToolEventType.Start, toolCallId: 'call-3' },
+    { type: WebSearchToolEventType.Error, toolCallId: 'call-3' },
+  ]);
   expect(streamResponse.mock.calls[0][0]).toBe('https://api.openai.com/v1/responses');
 });
 
