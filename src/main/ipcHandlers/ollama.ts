@@ -10,10 +10,6 @@ import type {
 } from '../../shared/ollama';
 import { OllamaIpcChannel } from '../../shared/ollama';
 import { OllamaManager } from '../libs/ollamaManager';
-import {
-  updateOllamaRuntimeModelCapabilities,
-  updateOllamaRuntimeModels,
-} from '../libs/claudeSettings';
 import type { SqliteStore } from '../sqliteStore';
 
 const OLLAMA_SERVICE_CONFIG_KEY = 'ollama_service_config';
@@ -72,9 +68,7 @@ export function registerOllamaIpcHandlers(
   });
   ipcMain.handle(OllamaIpcChannel.ListRunningModels, async () => {
     const client = await manager.client();
-    const runningModels = await client.runningModels();
-    updateOllamaRuntimeModels(runningModels);
-    return runningModels;
+    return await client.runningModels();
   });
   ipcMain.handle(OllamaIpcChannel.DeleteModel, async (_event, name: string) => {
     const client = await manager.client();
@@ -83,9 +77,7 @@ export function registerOllamaIpcHandlers(
   });
   ipcMain.handle(OllamaIpcChannel.ShowModel, async (_event, name: string) => {
     const client = await manager.client();
-    const payload = await client.showModel(name);
-    updateOllamaRuntimeModelCapabilities(name, payload);
-    return payload;
+    return await client.showModel(name);
   });
   ipcMain.handle(OllamaIpcChannel.CreateModel, async (_event, name: string, modelfile: string) => {
     const client = await manager.client();
