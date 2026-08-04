@@ -5,6 +5,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import type { CoworkMessage } from '../../../types/cowork';
 import { i18nService } from '../../../services/i18n';
+import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { UserBubble } from './UserBubble';
 
 const message: CoworkMessage = {
@@ -18,7 +19,7 @@ describe('UserBubble', () => {
   test('places the timestamp before copy and re-edit actions', () => {
     render(<UserBubble message={message} skills={[]} onReEdit={vi.fn()} />);
 
-    const timestamp = screen.getByText('2025/08/01 15:46');
+    const timestamp = screen.getByText(formatMessageDateTime(message.timestamp));
     const copyButton = screen.getByLabelText(i18nService.t('copyToClipboard'));
     const reEditButton = screen.getByLabelText(i18nService.t('coworkReEdit'));
 
