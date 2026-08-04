@@ -32,6 +32,11 @@ const {
   ensurePortablePandocRuntime,
   checkRuntimeHealth: checkPandocRuntimeHealth,
 } = require('./setup-pandoc-runtime.js');
+const { ensurePortableGit } = require('./setup-mingit.js');
+const {
+  ensureSkillPythonRuntimes,
+  checkSkillPythonRuntimeHealth,
+} = require('./setup-skill-python-runtime.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const {
@@ -914,6 +919,19 @@ async function beforePack(context) {
 
   if (isWindowsTarget(context)) {
     console.log(
+      '[electron-builder-hooks] Windows target detected, ensuring bundled PortableGit...',
+    );
+    await ensurePortableGit({ required: true });
+    const portableGitRoot = path.join(__dirname, '..', 'resources', 'mingit');
+    const portableGitBash = [
+      path.join(portableGitRoot, 'bin', 'bash.exe'),
+      path.join(portableGitRoot, 'usr', 'bin', 'bash.exe'),
+    ].find(candidate => existsSync(candidate));
+    if (!portableGitBash) {
+      throw new Error('Bundled PortableGit health check failed before pack: bash.exe is missing.');
+    }
+
+    console.log(
       '[electron-builder-hooks] Windows target detected, ensuring portable uv runtime is prepared...',
     );
     await ensurePortableUvRuntime({ required: true });
@@ -944,22 +962,72 @@ async function beforePack(context) {
     const targetArch = resolveTargetArch(context);
     const targetPlatform = context.electronPlatformName;
     const resourceSuffix = targetPlatform === 'darwin' ? 'mac' : 'linux';
-    console.log(`[electron-builder-hooks] ${targetPlatform} target detected, ensuring bundled uv and uv-managed Python 3.14.6...`);
+    console.log(
+      `[electron-builder-hooks] ${targetPlatform} target detected, ensuring bundled uv and uv-managed Python 3.14.6...`,
+    );
     await ensurePosixUvRuntime({ required: true, platform: targetPlatform, arch: targetArch });
-    const uvHealth = checkMacUvRuntimeHealth(path.join(__dirname, '..', 'resources', `uv-${resourceSuffix}`), targetArch, targetPlatform);
-    if (!uvHealth.ok) throw new Error(`Bundled ${targetPlatform} uv health check failed: ${uvHealth.missing.join(', ')}`);
+    const uvHealth = checkMacUvRuntimeHealth(
+      path.join(__dirname, '..', 'resources', `uv-${resourceSuffix}`),
+      targetArch,
+      targetPlatform,
+    );
+    if (!uvHealth.ok)
+      throw new Error(
+        `Bundled ${targetPlatform} uv health check failed: ${uvHealth.missing.join(', ')}`,
+      );
     await ensurePosixPythonRuntime({ required: true, platform: targetPlatform, arch: targetArch });
-    const pythonHealth = checkMacPythonRuntimeHealth(path.join(__dirname, '..', 'resources', `python-${resourceSuffix}`), targetArch, targetPlatform);
-    if (!pythonHealth.ok) throw new Error(`Bundled ${targetPlatform} Python health check failed: ${pythonHealth.missing.join(', ')}`);
+    const pythonHealth = checkMacPythonRuntimeHealth(
+      path.join(__dirname, '..', 'resources', `python-${resourceSuffix}`),
+      targetArch,
+      targetPlatform,
+    );
+    if (!pythonHealth.ok)
+      throw new Error(
+        `Bundled ${targetPlatform} Python health check failed: ${pythonHealth.missing.join(', ')}`,
+      );
+  }
+
+  if (isWindowsTarget(context) || isMacTarget(context) || isLinuxTarget(context)) {
+    const targetPlatform = context.electronPlatformName;
+    const targetArch = resolveTargetArch(context);
+    console.log(
+      `[electron-builder-hooks] Preparing bundled Python environments for Skills (${targetPlatform}-${targetArch})...`,
+    );
+    const skillPythonResult = await ensureSkillPythonRuntimes({
+      platform: targetPlatform,
+      arch: targetArch,
+      required: true,
+    });
+    const skillPythonHealth = checkSkillPythonRuntimeHealth({
+      platform: targetPlatform,
+      arch: targetArch,
+    });
+    if (!skillPythonHealth.ok) {
+      throw new Error(
+        'Bundled Skill Python runtime health check failed before pack. Missing: ' +
+          skillPythonHealth.missing.join(', '),
+      );
+    }
+    console.log(
+      `[electron-builder-hooks] Bundled Python environments ready: ${skillPythonResult.environments.length}`,
+    );
   }
 
   if (isWindowsTarget(context) || isMacTarget(context) || isLinuxTarget(context)) {
     console.log('[electron-builder-hooks] Ensuring bundled Pandoc runtime is prepared...');
     const targetPlatform = context.electronPlatformName;
     const targetArch = resolveTargetArch(context);
-    await ensurePortablePandocRuntime({ required: true, platform: targetPlatform, arch: targetArch });
+    await ensurePortablePandocRuntime({
+      required: true,
+      platform: targetPlatform,
+      arch: targetArch,
+    });
     const pandocRuntimeRoot = path.join(__dirname, '..', 'resources', 'pandoc');
-    const pandocRuntimeHealth = checkPandocRuntimeHealth(pandocRuntimeRoot, targetPlatform, targetArch);
+    const pandocRuntimeHealth = checkPandocRuntimeHealth(
+      pandocRuntimeRoot,
+      targetPlatform,
+      targetArch,
+    );
     if (!pandocRuntimeHealth.ok) {
       throw new Error(
         'Bundled Pandoc runtime health check failed before pack. Missing files: ' +
@@ -1004,9 +1072,19 @@ async function beforePack(context) {
         prefix: 'MCPs',
       },
       {
+        label: 'PortableGit runtime',
+        dir: path.join(__dirname, '..', 'resources', 'mingit'),
+        prefix: 'mingit',
+      },
+      {
         label: 'Python runtime',
         dir: path.join(__dirname, '..', 'resources', 'python-win'),
         prefix: 'python-win',
+      },
+      {
+        label: 'Skill Python runtimes',
+        dir: path.join(__dirname, '..', 'resources', 'skill-python'),
+        prefix: 'skill-python',
       },
       {
         label: 'uv runtime',

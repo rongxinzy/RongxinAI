@@ -18,6 +18,12 @@ declare module '@earendil-works/pi-coding-agent' {
     reload(): Promise<void>;
   }
 
+  export class SettingsManager {
+    static create(cwd: string, agentDir?: string): SettingsManager;
+    applyOverrides(overrides: { shellPath?: string }): void;
+    getShellPath(): string | undefined;
+  }
+
   export function getAgentDir(): string;
 
   export const ModelRuntime: {

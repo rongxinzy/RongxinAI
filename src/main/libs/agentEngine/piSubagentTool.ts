@@ -255,11 +255,20 @@ async function runSubagent(
         `bash "${path.join(deps.webSearchSkillPath || '', 'scripts/search.sh')}" "<query>" 10\n` +
         'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
       : profile.systemPrompt;
-    subOptions.resourceLoader = researcherUsesWebSearch
+    const resourceLoader = researcherUsesWebSearch
       ? await deps.createPiResourceLoader(cwd, systemPrompt, deps.resolvedModel.maxOutputTokens, [
           CoreSkillId.WebSearch,
         ])
       : await deps.createPiResourceLoader(cwd, systemPrompt, deps.resolvedModel.maxOutputTokens);
+    subOptions.resourceLoader = resourceLoader;
+    if (
+      resourceLoader &&
+      typeof resourceLoader === 'object' &&
+      'settingsManager' in resourceLoader &&
+      (resourceLoader as { settingsManager?: unknown }).settingsManager
+    ) {
+      subOptions.settingsManager = (resourceLoader as { settingsManager: unknown }).settingsManager;
+    }
     if (deps.resolvedModel.modelRuntime) {
       subOptions.modelRuntime = deps.resolvedModel.modelRuntime;
     }

@@ -2,7 +2,7 @@
 name: minimax-docx
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
   category: document-processing
   author: MiniMaxAI
   sources:
@@ -27,7 +27,26 @@ Create, edit, and format DOCX documents via CLI tools or direct C# scripts built
 
 ## Setup
 
-**First time:** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps).
+## ZhiYuan/Pi execution
+
+When this skill is run inside ZhiYuan, use the `run_skill_script` tool for every bundled
+`.sh`, `.py`, `.mjs`, or `.ps1` script. Do not invoke `bash`, `python3`, `node`, or `pandoc`
+through a hand-built shell command. The application resolves the packaged Git Bash,
+Pandoc, Python, and Node runtimes and reports the exact unavailable runtime when one is missing.
+Markdown remains the source/intermediate format: create or edit the `.md` with Pi's file tools,
+then run the conversion script through the same tool.
+
+Example:
+
+```json
+{
+  "skillId": "docx",
+  "script": "scripts/markdown_to_docx.sh",
+  "args": ["content.md", "output.docx"]
+}
+```
+
+**First time (CLI reference):** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps). Inside ZhiYuan, run the corresponding setup script with `run_skill_script`.
 
 **First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. Packaged Windows and macOS builds provide a private Pandoc binary through `PANDOC_BIN`; never ask an end user to install it. `LIMITED` means that bundled Pandoc can create a simple DOCX from Markdown, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
 

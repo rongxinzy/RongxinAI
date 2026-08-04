@@ -1,8 +1,39 @@
-import { expect, test } from 'vitest';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+
+import { afterEach, expect, test } from 'vitest';
 
 import { __skillManagerTestUtils } from './skillManager';
 
-const { parseFrontmatter, isTruthy, extractDescription } = __skillManagerTestUtils;
+const { parseFrontmatter, isTruthy, extractDescription, hasMatchingBundledRequirements } =
+  __skillManagerTestUtils;
+
+const tempRoots: string[] = [];
+
+afterEach(() => {
+  for (const root of tempRoots.splice(0)) {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('bundled Skill requirements trigger repair for an older userData copy', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-manager-runtime-sync-'));
+  tempRoots.push(root);
+  const bundledDir = path.join(root, 'bundled', 'xlsx');
+  const targetDir = path.join(root, 'userData', 'xlsx');
+  fs.mkdirSync(bundledDir, { recursive: true });
+  fs.mkdirSync(targetDir, { recursive: true });
+  fs.writeFileSync(path.join(bundledDir, 'requirements.txt'), 'pandas>=2.2,<3\n');
+
+  expect(hasMatchingBundledRequirements(targetDir, bundledDir)).toBe(false);
+
+  fs.writeFileSync(path.join(targetDir, 'requirements.txt'), 'pandas>=2.2,<3\n');
+  expect(hasMatchingBundledRequirements(targetDir, bundledDir)).toBe(true);
+
+  fs.writeFileSync(path.join(targetDir, 'requirements.txt'), 'pandas>=2.1,<3\n');
+  expect(hasMatchingBundledRequirements(targetDir, bundledDir)).toBe(false);
+});
 
 // ==================== parseFrontmatter ====================
 

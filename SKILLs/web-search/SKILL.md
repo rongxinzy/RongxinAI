@@ -2,7 +2,7 @@
 name: web-search
 description: Real-time web search using Playwright-controlled browser. Use this skill when you need current information, latest documentation, recent news, or any data beyond your knowledge cutoff (January 2025).
 metadata:
-  version: 1.0.2
+  version: 1.0.3
 ---
 
 # Web Search Skill
@@ -46,6 +46,20 @@ Use the web-search skill when you need:
 3. **Playwright Manager** - Browser connection and session management
 4. **Search Engine Layer** - Google primary, Bing fallback
 5. **Chrome Browser** - Headless by default; automatically retries once with a visible browser when headless search appears blocked
+
+## ZhiYuan/Pi execution
+
+Inside ZhiYuan, invoke the bundled search script with `run_skill_script` and pass the query as
+an argv item. Do not build a Bash command string. The app starts the service through the managed
+runtime and reports Git Bash/runtime failures separately from search failures.
+
+```json
+{
+  "skillId": "web-search",
+  "script": "scripts/search.sh",
+  "args": ["React Server Components guide", "5"]
+}
+```
 
 ## Basic Usage
 

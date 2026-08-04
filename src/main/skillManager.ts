@@ -480,6 +480,25 @@ const compareVersions = (a: string, b: string): number => {
   return 0;
 };
 
+/**
+ * Requirements are part of a bundled Skill's runtime contract. Existing
+ * userData copies must be repaired when a newly bundled requirements file is
+ * added or changed, even if an older Skill used the same metadata version.
+ */
+const hasMatchingBundledRequirements = (targetDir: string, bundledDir: string): boolean => {
+  const bundledRequirements = path.join(bundledDir, 'requirements.txt');
+  if (!fs.existsSync(bundledRequirements)) return true;
+
+  const targetRequirements = path.join(targetDir, 'requirements.txt');
+  if (!fs.existsSync(targetRequirements)) return false;
+
+  try {
+    return fs.readFileSync(targetRequirements).equals(fs.readFileSync(bundledRequirements));
+  } catch {
+    return false;
+  }
+};
+
 const resolveWithin = (root: string, target: string): string => {
   const resolvedRoot = path.resolve(root);
   const resolvedTarget = path.resolve(root, target);
@@ -1564,6 +1583,10 @@ export class SkillManager {
    * Returns false if bundled has dependencies but target doesn't.
    */
   private isSkillRuntimeHealthy(targetDir: string, bundledDir: string): boolean {
+    if (!hasMatchingBundledRequirements(targetDir, bundledDir)) {
+      return false;
+    }
+
     const bundledNodeModules = path.join(bundledDir, 'node_modules');
     const targetNodeModules = path.join(targetDir, 'node_modules');
     const targetPackageJson = path.join(targetDir, 'package.json');
@@ -3359,4 +3382,5 @@ export const __skillManagerTestUtils = {
   isTruthy,
   extractDescription,
   isWindowsDeletePermissionError,
+  hasMatchingBundledRequirements,
 };
