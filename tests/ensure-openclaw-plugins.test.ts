@@ -6,6 +6,7 @@ const {
   isGitSpec,
   isLocalPathSpec,
   parseGitSpec,
+  retryPluginInstall,
   resolveGitPackSpec,
   resolvePluginInstallSource,
 } = require('../scripts/ensure-openclaw-plugins.cjs');
@@ -88,6 +89,41 @@ describe('ensure-openclaw-plugins', () => {
     expect(buildGitEnv()).toMatchObject({
       GIT_TERMINAL_PROMPT: '0',
     });
+  });
+
+  test('retries a failed plugin install with exponential backoff', () => {
+    let calls = 0;
+    const delays: number[] = [];
+
+    const result = retryPluginInstall(
+      () => {
+        calls += 1;
+        if (calls < 3) throw new Error('ClawHub returned 503');
+        return 'installed';
+      },
+      {
+        attempts: 3,
+        retryDelayMs: 10,
+        sleep: (delayMs: number) => delays.push(delayMs),
+      },
+    );
+
+    expect(result).toBe('installed');
+    expect(calls).toBe(3);
+    expect(delays).toEqual([10, 20]);
+  });
+
+  test('keeps the final plugin install error after retries are exhausted', () => {
+    const failure = new Error('ClawHub returned 503');
+
+    expect(() =>
+      retryPluginInstall(
+        () => {
+          throw failure;
+        },
+        { attempts: 2, retryDelayMs: 1, sleep: () => {} },
+      ),
+    ).toThrow(failure);
   });
 
   test('preserves existing registry and local path behavior', () => {

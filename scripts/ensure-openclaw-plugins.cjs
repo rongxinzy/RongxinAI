@@ -28,6 +28,8 @@ const path = require('path');
 // ---------------------------------------------------------------------------
 
 const rootDir = path.resolve(__dirname, '..');
+const DEFAULT_PLUGIN_INSTALL_ATTEMPTS = 3;
+const PLUGIN_INSTALL_RETRY_DELAY_MS = 2_000;
 
 function log(msg) {
   console.log(`[openclaw-plugins] ${msg}`);
@@ -36,6 +38,33 @@ function log(msg) {
 function die(msg) {
   console.error(`[openclaw-plugins] ERROR: ${msg}`);
   process.exit(1);
+}
+
+function sleepSync(delayMs) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+}
+
+function retryPluginInstall(operation, options = {}) {
+  const attempts = options.attempts || DEFAULT_PLUGIN_INSTALL_ATTEMPTS;
+  const retryDelayMs = options.retryDelayMs || PLUGIN_INSTALL_RETRY_DELAY_MS;
+  const sleep = options.sleep || sleepSync;
+  const label = options.label || 'plugin install';
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+
+      const delayMs = retryDelayMs * 2 ** (attempt - 1);
+      log(`${label} failed (attempt ${attempt}/${attempts}); retrying in ${delayMs}ms.`);
+      sleep(delayMs);
+    }
+  }
+
+  throw lastError;
 }
 
 function copyDirRecursive(src, dest) {
@@ -494,20 +523,24 @@ function main() {
           installSpec = source.installSpec;
         }
 
-        runOpenClawCli(
-          ['plugins', 'install', installSpec, '--force', '--dangerously-force-unsafe-install'],
-          {
-            env: {
-              OPENCLAW_STATE_DIR: stagingDir,
-              // Prevent npm from auto-installing peerDependencies (npm v7+).
-              // Channel plugins declare openclaw as a peerDep, but the host
-              // gateway already provides the SDK at runtime.  Without this,
-              // npm installs the full openclaw SDK + transitive deps (~738 MB)
-              // into each plugin's node_modules.
-              npm_config_legacy_peer_deps: 'true',
-            },
-            stdio: 'inherit',
-          },
+        retryPluginInstall(
+          () =>
+            runOpenClawCli(
+              ['plugins', 'install', installSpec, '--force', '--dangerously-force-unsafe-install'],
+              {
+                env: {
+                  OPENCLAW_STATE_DIR: stagingDir,
+                  // Prevent npm from auto-installing peerDependencies (npm v7+).
+                  // Channel plugins declare openclaw as a peerDep, but the host
+                  // gateway already provides the SDK at runtime.  Without this,
+                  // npm installs the full openclaw SDK + transitive deps (~738 MB)
+                  // into each plugin's node_modules.
+                  npm_config_legacy_peer_deps: 'true',
+                },
+                stdio: 'inherit',
+              },
+            ),
+          { label: `Plugin ${id}` },
         );
 
         // The CLI installs to {OPENCLAW_STATE_DIR}/extensions/{pluginId}/
@@ -858,6 +891,7 @@ module.exports = {
   main,
   npmPack,
   parseGitSpec,
+  retryPluginInstall,
   resolveGitPackSpec,
   resolvePluginInstallSource,
 };
