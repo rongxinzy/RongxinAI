@@ -8,6 +8,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
+import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CoworkToolActivityEventType,
@@ -194,6 +195,9 @@ import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAge
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
+import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
+import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
+import { initializeProductionLoopSchema } from '../../productionLoop/schema';
 import {
   PiAssistantStopReason,
   PiBuiltinFileToolName,
@@ -363,6 +367,37 @@ describe('PiRuntimeAdapter', () => {
       });
       listener({ type: 'agent_end' });
       expect(onComplete).toHaveBeenCalledOnce();
+    });
+
+    it('registers the production loop for Work sessions but not Chat sessions', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
+
+      try {
+        await adapter.startSession('production-work', 'Build', {
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        await adapter.startSession('production-chat', 'Chat', {
+          sessionMode: 'chat',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+
+        const workOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        const chatOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        expect(workOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
+      } finally {
+        db.close();
+      }
     });
 
     it('reactivates a completed academic loop when the same session receives a follow-up', async () => {

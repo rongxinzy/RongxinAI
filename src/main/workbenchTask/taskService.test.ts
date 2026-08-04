@@ -10,13 +10,21 @@ import {
   WorkbenchRunTrigger,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
+  WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
+import {
+  ProductionLoopPhase,
+  ProductionLoopStatus,
+  ProductionPlanItemStatus,
+} from '../../shared/productionLoop';
 import { initializeWorkbenchTaskSchema } from './schema';
+import { initializeProductionLoopSchema } from '../productionLoop/schema';
 import { WorkbenchTaskService } from './taskService';
 
 const createService = () => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
+  initializeProductionLoopSchema(db);
   return { db, service: new WorkbenchTaskService(db) };
 };
 
@@ -24,6 +32,146 @@ const chatContract = {
   kind: WorkbenchContractKind.Chat,
   requiresUserAcceptance: false,
 };
+
+const prepareProductionDelivery = (
+  service: WorkbenchTaskService,
+  taskId: string,
+  runId: string,
+  workflowKind: WorkbenchContractKind,
+) => {
+  const task = service.repository.getTask(taskId);
+  if (!task) throw new Error('Task missing in test setup.');
+  service.productionLoop.beginRun({
+    taskId,
+    runId,
+    workflowKind,
+    goal: task.goal,
+    prototypeRequired: false,
+  });
+  const planned = service.productionLoop.commitPlan(runId, {
+    items: [{ title: 'Produce the result' }],
+    constraints: ['Keep the result complete'],
+    acceptanceCriteria: ['The result passes its completion contract'],
+    expectedArtifacts: [{ kind: 'result', description: 'Final result', required: true }],
+    expectedVerifiers: [{ name: 'completion_contract', deterministic: true }],
+  });
+  service.productionLoop.updatePlanItem(
+    runId,
+    planned.planItems[0].id,
+    ProductionPlanItemStatus.Completed,
+  );
+  service.productionLoop.startInspection(runId);
+  service.productionLoop.requestCritique(runId);
+  service.productionLoop.recordCriticStart(runId, 'critic');
+  service.productionLoop.recordCriticResult(
+    runId,
+    'critic',
+    JSON.stringify({ verdict: 'pass', findings: [] }),
+    false,
+  );
+  service.productionLoop.recordDeliveryRequest(runId, 'Critic approved delivery.');
+};
+
+test('completes the production loop only after deterministic verification passes', () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'answer',
+      contract: chatContract,
+    });
+    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Chat);
+
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
+
+    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(service.productionLoop.repository.get(run.id)?.status).toBe(
+      ProductionLoopStatus.Completed,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test('returns critic-approved work to revision when deterministic verification fails', () => {
+  const { db, service } = createService();
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.Shortcut,
+      requiresUserAcceptance: false,
+    };
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'build a document',
+      contract,
+    });
+    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Shortcut);
+
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+      workflowCompleted: false,
+      workflowSnapshot: { completionFailures: ['Deliverable missing'] },
+    });
+    const loop = service.productionLoop.repository.get(run.id);
+
+    expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
+    expect(detail.runs[0].verificationResult?.outcome).toBe(WorkbenchVerificationOutcome.Failed);
+    expect(loop).toMatchObject({
+      phase: ProductionLoopPhase.Revise,
+      status: ProductionLoopStatus.NeedsRevision,
+      deliveryReason: null,
+    });
+  } finally {
+    db.close();
+  }
+});
+
+test('keeps acceptance-required production work ready until explicit user acceptance', () => {
+  const { db, service } = createService();
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    };
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'complete generic work',
+      contract,
+    });
+    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
+
+    const pending = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
+
+    expect(pending.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
+    expect(pending.runs[0].verificationResult?.outcome).toBe(
+      WorkbenchVerificationOutcome.AcceptanceRequired,
+    );
+    expect(service.productionLoop.repository.get(run.id)?.status).toBe(
+      ProductionLoopStatus.ReadyToDeliver,
+    );
+
+    const accepted = service.acceptTask(task.id);
+    expect(accepted.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(service.productionLoop.repository.get(run.id)?.status).toBe(
+      ProductionLoopStatus.Completed,
+    );
+  } finally {
+    db.close();
+  }
+});
 
 test('reuses a nonterminal task and creates a new task after completion', () => {
   const { db, service } = createService();

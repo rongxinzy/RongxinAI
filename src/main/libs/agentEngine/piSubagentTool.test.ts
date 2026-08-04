@@ -215,7 +215,7 @@ describe('buildPiSubagentTool', () => {
       await tool.execute('call-1', { agent: 'researcher', task: 'find primary sources' });
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
-        expect.stringContaining('/tmp/web-search/scripts/search.sh'),
+        expect.stringContaining(path.join('/tmp/web-search', 'scripts', 'search.sh')),
         4096,
         [CoreSkillId.WebSearch],
       );
@@ -274,6 +274,14 @@ describe('buildPiSubagentTool', () => {
       expect(hoisted.mockCreateAgentSession).toHaveBeenCalledTimes(1);
       const options = hoisted.mockCreateAgentSession.mock.calls[0]?.[0] as Record<string, unknown>;
       expect(options).not.toHaveProperty('customTools');
+      expect(options.tools).toEqual(['read', 'grep', 'find', 'ls']);
+    });
+
+    it('enforces a read-only tool allowlist for the independent reviewer', async () => {
+      const { tool } = buildTool();
+      await tool.execute('call-1', { agent: 'reviewer', task: 'review the implementation' });
+      const options = hoisted.mockCreateAgentSession.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(options.tools).toEqual(['read', 'grep', 'find', 'ls']);
     });
 
     it('surfaces a sub-session error as the tool output', async () => {
