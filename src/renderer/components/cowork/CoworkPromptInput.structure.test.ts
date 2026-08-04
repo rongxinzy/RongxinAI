@@ -44,3 +44,14 @@ test('does not reintroduce the PR #184 textarea-token implementation', () => {
   // The broken version cleared the textarea placeholder while skills were active.
   expect(source).not.toContain("? '' : placeholder");
 });
+
+test('keeps the session permission selector available during an active run', () => {
+  const permissionMenuStart = source.indexOf('<PermissionModeMenu');
+  const permissionMenuEnd = source.indexOf('/>', permissionMenuStart);
+  const permissionMenu = source.slice(permissionMenuStart, permissionMenuEnd);
+
+  expect(permissionMenuStart).toBeGreaterThanOrEqual(0);
+  expect(permissionMenu).toContain('onChange={mode => onPermissionModeChange?.(mode)}');
+  expect(permissionMenu).toContain('disabled={disabled}');
+  expect(permissionMenu).not.toContain('disabled={disabled || isStreaming}');
+});

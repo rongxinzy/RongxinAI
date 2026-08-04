@@ -35,7 +35,7 @@ import { themeService } from './services/theme';
 import { RootState, store } from './store';
 import {
   selectCurrentSessionId,
-  selectPendingPermissions,
+  selectPendingPermissionForSession,
 } from './store/selectors/coworkSelectors';
 import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
@@ -118,8 +118,9 @@ const App: React.FC = () => {
   const dispatch = useDispatch();
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const currentSessionId = useSelector(selectCurrentSessionId);
-  const pendingPermissions = useSelector(selectPendingPermissions);
-  const pendingPermission = pendingPermissions.find(permission => permission.sessionId === currentSessionId) ?? null;
+  const pendingPermission = useSelector((state: RootState) =>
+    selectPendingPermissionForSession(state, currentSessionId),
+  );
   const isWindows = window.electron.platform === 'win32';
 
   const waitWithTimeout = useCallback(

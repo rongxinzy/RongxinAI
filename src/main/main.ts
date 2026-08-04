@@ -82,8 +82,10 @@ import { searchAnySearchGateway } from './libs/anysearchGateway';
 import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './libs/anysearchGatewayCredentials';
 import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
+import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
 import type { CoworkPromptLanguage } from './coworkLanguagePrompt';
 import { composeCoworkSystemPrompt } from './coworkPrompt/composer';
+import { reconcileWorkSessionRuntimeState } from './coworkSessionRuntimeState';
 import {
   type CoworkExecutionMode,
   type CoworkMessageType,
@@ -4728,10 +4730,20 @@ if (!gotTheLock) {
     },
   );
 
-  ipcMain.handle('cowork:session:get', async (_event, sessionId: string) => {
+  ipcMain.handle(CoworkSessionIpc.Get, async (_event, sessionId: string) => {
     try {
-      const session = getCoworkStore().getSession(sessionId);
-      return { success: true, session };
+      const store = getCoworkStore();
+      const session = store.getSession(sessionId);
+      if (!session) return { success: true, session: null };
+
+      const reconciledSession = reconcileWorkSessionRuntimeState(
+        session,
+        getPiRuntimeAdapter().isSessionRunning(sessionId),
+      );
+      if (reconciledSession.status !== session.status) {
+        store.updateSession(sessionId, { status: reconciledSession.status });
+      }
+      return { success: true, session: reconciledSession };
     } catch (error) {
       return {
         success: false,
@@ -4770,7 +4782,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(
-    'cowork:session:list',
+    CoworkSessionIpc.List,
     async (
       _event,
       options?: {
@@ -4788,7 +4800,16 @@ if (!gotTheLock) {
         const workspaceId = options?.workspaceId;
         const mode = options?.mode;
         const store = getCoworkStore();
-        const sessions = store.listSessions(limit, offset, agentId, workspaceId, mode);
+        const sessions = store.listSessions(limit, offset, agentId, workspaceId, mode).map(session => {
+          const reconciledSession = reconcileWorkSessionRuntimeState(
+            session,
+            getPiRuntimeAdapter().isSessionRunning(session.id),
+          );
+          if (reconciledSession.status !== session.status) {
+            store.updateSession(session.id, { status: reconciledSession.status });
+          }
+          return reconciledSession;
+        });
         const total = store.countSessions(agentId, workspaceId, mode);
         return { success: true, sessions, hasMore: offset + sessions.length < total };
       } catch (error) {
@@ -5626,7 +5647,11 @@ if (!gotTheLock) {
         const previousWorkingDir = previousConfig.workingDirectory;
         getCoworkStore().setConfig(normalizedConfig);
         if (normalizedPermissionModeBySession !== undefined) {
-          for (const [sessionId, mode] of Object.entries(normalizedPermissionModeBySession)) {
+          for (const [sessionId, mode] of getChangedSessionPermissionModes(
+            previousConfig.permissionModeBySession ?? {},
+            normalizedPermissionModeBySession,
+            normalizedPermissionMode ?? previousConfig.permissionMode,
+          )) {
             getPiRuntimeAdapter().setAutoApproveForSession(
               sessionId,
               mode === CoworkPermissionMode.AllowAll,

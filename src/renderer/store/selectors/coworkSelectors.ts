@@ -27,6 +27,12 @@ export const selectRemoteManaged = (state: RootState) => state.cowork.remoteMana
 export const selectCoworkConfig = (state: RootState) => state.cowork.config;
 export const selectDraftPrompts = (state: RootState) => state.cowork.draftPrompts;
 export const selectPendingPermissions = (state: RootState) => state.cowork.pendingPermissions;
+export const selectPendingPermissionForSession = (state: RootState, sessionId: string | null) => {
+  if (!sessionId) return null;
+  return state.cowork.pendingPermissions.find(permission => permission.sessionId === sessionId) ?? null;
+};
+export const selectHasPendingPermissionForSession = (state: RootState, sessionId: string) =>
+  selectPendingPermissionForSession(state, sessionId) !== null;
 export const selectUnreadSessionIds = (state: RootState) => state.cowork.unreadSessionIds;
 
 // --- Derived (memoized) selectors ---

@@ -8,8 +8,12 @@ const normalizeAgentId = (agentId?: string) => agentId?.trim() || 'main';
 export const deriveAgentSidebarIndicator = (
   session: CoworkSessionSummary,
   unreadSessionIds: Set<string>,
+  streamingSessionIds: Set<string> = new Set(),
 ) => {
-  if (session.status === CoworkSessionStatusValue.Running) {
+  if (
+    session.status === CoworkSessionStatusValue.Running ||
+    streamingSessionIds.has(session.id)
+  ) {
     return AgentSidebarIndicator.Running;
   }
   if (session.status === CoworkSessionStatusValue.Completed && unreadSessionIds.has(session.id)) {
@@ -51,6 +55,7 @@ export const toAgentSidebarTaskNode = (
   session: CoworkSessionSummary,
   currentSessionId: string | null,
   unreadSessionIds: Set<string>,
+  streamingSessionIds?: Set<string>,
 ): AgentSidebarTaskNode => {
   return {
     id: session.id,
@@ -61,7 +66,7 @@ export const toAgentSidebarTaskNode = (
     pinOrder: session.pinOrder ?? null,
     updatedAt: session.updatedAt,
     createdAt: session.createdAt,
-    indicator: deriveAgentSidebarIndicator(session, unreadSessionIds),
+    indicator: deriveAgentSidebarIndicator(session, unreadSessionIds, streamingSessionIds),
     isSelected: session.id === currentSessionId,
   };
 };

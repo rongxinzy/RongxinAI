@@ -1,7 +1,12 @@
 import { expect, test } from 'vitest';
 
 import { CoworkSessionStatusValue } from '../../types/cowork';
-import { resolveDisplayedSessionId, selectIsStreaming } from './coworkSelectors';
+import {
+  resolveDisplayedSessionId,
+  selectHasPendingPermissionForSession,
+  selectIsStreaming,
+  selectPendingPermissionForSession,
+} from './coworkSelectors';
 
 test('selectIsStreaming follows the active session stream registry', () => {
   const state = {
@@ -43,6 +48,22 @@ test('shows the loading target instead of the previous session', () => {
 
 test('keeps the current session visible when it is also the loading target', () => {
   expect(resolveDisplayedSessionId('session-b', 'session-b')).toBe('session-b');
+});
+
+test('selects pending permissions only for the requested session', () => {
+  const state = {
+    cowork: {
+      pendingPermissions: [
+        { sessionId: 'session-a', requestId: 'request-a' },
+        { sessionId: 'session-b', requestId: 'request-b' },
+      ],
+    },
+  };
+
+  expect(selectPendingPermissionForSession(state as never, 'session-a')?.requestId).toBe('request-a');
+  expect(selectPendingPermissionForSession(state as never, 'session-c')).toBeNull();
+  expect(selectHasPendingPermissionForSession(state as never, 'session-b')).toBe(true);
+  expect(selectHasPendingPermissionForSession(state as never, 'session-c')).toBe(false);
 });
 
 test('shows the current session when no session is loading', () => {

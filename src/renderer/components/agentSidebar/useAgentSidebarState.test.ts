@@ -5,7 +5,11 @@ import {
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import { sortAgentSidebarTasks } from './useAgentSidebarState';
+import {
+  deriveAgentSidebarIndicator,
+  sortAgentSidebarTasks,
+} from './useAgentSidebarState';
+import { AgentSidebarIndicator } from './constants';
 
 const makeSession = (
   id: string,
@@ -37,6 +41,14 @@ test('sortAgentSidebarTasks keeps unpinned tasks ordered by last update time', (
     'middle',
     'newer-created-older-update',
   ]);
+});
+
+test('deriveAgentSidebarIndicator uses the live stream registry for an active session', () => {
+  const session = makeSession('active-session', 100, 100, CoworkSessionStatusValue.Idle);
+
+  expect(deriveAgentSidebarIndicator(session, new Set(), new Set(['active-session']))).toBe(
+    AgentSidebarIndicator.Running,
+  );
 });
 
 test('sortAgentSidebarTasks orders two concurrent streaming sessions by creation time', () => {
