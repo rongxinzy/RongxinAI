@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 
 import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
 import { ProviderName } from '../../shared/providers/constants';
+import type { LlamaCppManager } from '../libs/llamacppManager';
 import {
   enforceLlamaCppParallelTwo,
   getLlamaCppLoadedModelLimitViolation,
@@ -13,7 +14,23 @@ import {
   shouldSyncOpenClawAfterRunningModelRefresh,
   shouldSyncOpenClawForRunningModelRefresh,
   waitForLlamaCppModelUnloadConfirmation,
+  registerLlamaCppIpcHandlers,
 } from './llamacpp';
+
+const electronMocks = vi.hoisted(() => ({
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
+}));
+
+vi.mock('electron', () => ({
+  app: { getPath: () => 'test-user-data' },
+  BrowserWindow: { getAllWindows: () => [] },
+  dialog: { showOpenDialog: vi.fn() },
+  ipcMain: {
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+      electronMocks.handlers.set(channel, handler);
+    }),
+  },
+}));
 
 test('enforceLlamaCppParallelTwo updates an existing saved service config without changing ctxSize', () => {
   const set = vi.fn();
@@ -366,6 +383,36 @@ test('shouldSyncOpenClawForRunningModelRefresh requires the llama.cpp provider t
       },
     }),
   ).toBe(true);
+});
+
+test('does not refresh model capabilities for manager status events', async () => {
+  let statusListener: ((status: unknown) => void) | undefined;
+  const listRunningModels = vi.fn(async () => []);
+  const client = vi.fn(async () => ({ showModel: vi.fn() }));
+  const manager = {
+    on: vi.fn((event: string, listener: (value: unknown) => void) => {
+      if (event === 'status') statusListener = listener;
+      return manager;
+    }),
+    listRunningModels,
+    client,
+  } as unknown as LlamaCppManager;
+  const store = {
+    get: vi.fn(() => undefined),
+    set: vi.fn(),
+  };
+
+  registerLlamaCppIpcHandlers(manager, {
+    getStore: () => store as never,
+    syncOpenClawConfig: vi.fn(async () => ({ success: true })),
+  });
+
+  expect(statusListener).toBeDefined();
+  statusListener?.({ status: 'running' });
+  await Promise.resolve();
+
+  expect(listRunningModels).not.toHaveBeenCalled();
+  expect(client).not.toHaveBeenCalled();
 });
 
 test('computes total free VRAM from nvidia-smi snapshots', () => {
