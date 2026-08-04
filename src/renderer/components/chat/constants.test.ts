@@ -5,7 +5,7 @@
  * Regression covered: locally enabled skills were filtered out of Chat even
  * though the same skills were available in Work.
  */
-import { AcademicResearchSkillIds, CoreSkillId, isCoreSkill } from '@shared/skills/constants';
+import { AcademicResearchSkillIds, isCoreSkill } from '@shared/skills/constants';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
