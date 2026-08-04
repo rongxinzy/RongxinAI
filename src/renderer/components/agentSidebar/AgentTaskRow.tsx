@@ -21,7 +21,8 @@ import {
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import { selectPendingPermissions } from '../../store/selectors/coworkSelectors';
+import type { RootState } from '../../store';
+import { selectHasPendingPermissionForSession } from '../../store/selectors/coworkSelectors';
 import { useSelector } from 'react-redux';
 import { BatchSelectionCheckbox } from './BatchSelectionCheckbox';
 import { AgentSidebarIndicator } from './constants';
@@ -105,8 +106,8 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
   const pinLabel = task.pinned
     ? i18nService.t('coworkUnpinSession')
     : i18nService.t('coworkPinSession');
-  const hasPendingPermission = useSelector(selectPendingPermissions).some(
-    permission => permission.sessionId === task.id,
+  const hasPendingPermission = useSelector((state: RootState) =>
+    selectHasPendingPermissionForSession(state, task.id),
   );
   const showRelativeTime = !isRunning && !hasPendingPermission;
 

@@ -1227,7 +1227,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     <PermissionModeMenu
                       value={permissionMode ?? CoworkPermissionMode.Ask}
                       onChange={mode => onPermissionModeChange?.(mode)}
-                      disabled={disabled || isStreaming}
+                      disabled={disabled}
                     />
                   )}
                   {isWorkVariant && goalMode && <GoalModeChip onRemove={() => setGoalMode(false)} />}

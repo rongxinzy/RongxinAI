@@ -152,7 +152,10 @@ const Sidebar: React.FC<SidebarProps> = ({
       ? sessions.filter(s => s.title.toLowerCase().includes(searchQueryTrimmed))
       : sessions;
     const sorted = sortAgentSidebarTasks(scoped, streamingSessionIds);
-    return sorted.map(s => toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet));
+    const streamingSessionIdSet = new Set(streamingSessionIds);
+    return sorted.map(s =>
+      toAgentSidebarTaskNode(s, currentSessionId, unreadSessionIdSet, streamingSessionIdSet),
+    );
   }, [
     workMode,
     sessions,

@@ -9,6 +9,7 @@ import { RootState } from '../../store';
 import {
   selectCoworkSessions,
   selectCurrentSessionId,
+  selectStreamingSessionIds,
   selectUnreadSessionIds,
 } from '../../store/selectors/coworkSelectors';
 import { WorkMode, type WorkMode as WorkModeType } from '../../store/workMode/constants';
@@ -38,6 +39,7 @@ const toTaskNode = (
   session: CoworkSessionSummary,
   currentSessionId: string | null,
   unread: Set<string>,
+  streamingSessionIds: Set<string>,
 ): AgentSidebarTaskNode => ({
   id: session.id,
   agentId: session.agentId?.trim() || 'main',
@@ -49,7 +51,7 @@ const toTaskNode = (
   updatedAt: session.updatedAt,
   createdAt: session.createdAt,
   indicator:
-    session.status === CoworkSessionStatusValue.Running
+    session.status === CoworkSessionStatusValue.Running || streamingSessionIds.has(session.id)
       ? AgentSidebarIndicator.Running
       : session.status === CoworkSessionStatusValue.Completed && unread.has(session.id)
         ? AgentSidebarIndicator.CompletedUnread
@@ -76,8 +78,13 @@ export const useWorkspaceSidebarState = (
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const currentSessionId = useSelector(selectCurrentSessionId);
   const sessions = useSelector(selectCoworkSessions);
+  const streamingSessionIds = useSelector(selectStreamingSessionIds);
   const unreadSessionIds = useDeferredValue(useSelector(selectUnreadSessionIds));
   const unreadSet = useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
+  const streamingSessionIdSet = useMemo(
+    () => new Set(streamingSessionIds),
+    [streamingSessionIds],
+  );
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [scheduledExpandedIds, setScheduledExpandedIds] = useState<string[]>([]);
@@ -301,10 +308,22 @@ export const useWorkspaceSidebarState = (
           canCollapseTasks: taskExpanded && filtered.length > AgentSidebarPageSize.Preview,
           isLoadingTasks: loadingIds.includes(workspace.id),
           hasLoadError: failedIds.includes(workspace.id),
-          tasks: visible.map(session => toTaskNode(session, currentSessionId, unreadSet)),
+          tasks: visible.map(session =>
+            toTaskNode(session, currentSessionId, unreadSet, streamingSessionIdSet),
+          ),
         } satisfies WorkspaceSidebarNode;
       }),
-    [currentSessionId, failedIds, hasMore, loadingIds, previews, unreadSet, workMode, workspaces],
+    [
+      currentSessionId,
+      failedIds,
+      hasMore,
+      loadingIds,
+      previews,
+      streamingSessionIdSet,
+      unreadSet,
+      workMode,
+      workspaces,
+    ],
   );
 
   const workspaceNodes = useMemo<WorkspaceSidebarNode[]>(
@@ -354,7 +373,9 @@ export const useWorkspaceSidebarState = (
             isTaskListExpanded: true,
             canExpandTasks: false,
             canCollapseTasks: false,
-            tasks: tasks.map(session => toTaskNode(session, currentSessionId, unreadSet)),
+            tasks: tasks.map(session =>
+              toTaskNode(session, currentSessionId, unreadSet, streamingSessionIdSet),
+            ),
           },
         ];
       });
@@ -367,6 +388,7 @@ export const useWorkspaceSidebarState = (
     searchQuery,
     searchSource,
     searching,
+    streamingSessionIdSet,
     unreadSet,
     workspaceNodes,
     scheduledWorkspaceNodes,

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { CoworkPermissionMode } from '../../../shared/cowork/constants';
+import { CoworkPermissionMode, CoworkPermissionOrigin } from '../../../shared/cowork/constants';
 import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
@@ -11,6 +11,7 @@ import coworkReducer, {
   addSession,
   clearCurrentSessionForWorkspaceChange,
   clearLoadingSessionId,
+  enqueuePendingPermission,
   setConfig,
   setCurrentSession,
   setCurrentSessionId,
@@ -18,6 +19,7 @@ import coworkReducer, {
   setChatSessions,
   setSessions,
   updateCurrentSessionModelOverride,
+  updateConfig,
   updateMessageContents,
   updateToolActivity,
   updateSessionStatus,
@@ -107,6 +109,44 @@ test('updateCurrentSessionModelOverride only patches the active session', () => 
   );
 
   expect(ignoredState.currentSession?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
+});
+
+test('changing a session permission mode preserves pending approvals from every session', () => {
+  const withPermissions = coworkReducer(
+    coworkReducer(
+      undefined,
+      enqueuePendingPermission({
+        origin: CoworkPermissionOrigin.PiWorkbench,
+        sessionId: 'session-a',
+        requestId: 'request-a',
+        toolName: 'write',
+        toolInput: {},
+        toolUseId: null,
+      }),
+    ),
+    enqueuePendingPermission({
+      origin: CoworkPermissionOrigin.PiWorkbench,
+      sessionId: 'session-b',
+      requestId: 'request-b',
+      toolName: 'bash',
+      toolInput: {},
+      toolUseId: null,
+    }),
+  );
+
+  const next = coworkReducer(
+    withPermissions,
+    updateConfig({
+      permissionModeBySession: {
+        'session-a': CoworkPermissionMode.AllowAll,
+      },
+    }),
+  );
+
+  expect(next.pendingPermissions.map(permission => permission.requestId)).toEqual([
+    'request-a',
+    'request-b',
+  ]);
 });
 
 test('addSession preserves the agent id in session summaries', () => {
