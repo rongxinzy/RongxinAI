@@ -20,10 +20,11 @@ MASTER_ICON = PROJECT_ROOT / "build" / "icons" / "app-icon-master.png"
 CANVAS_SIZE = 1024
 ICON_BOUNDS = (64, 64, 960, 960)
 ICON_RADIUS = 220
-# Windows applies its own taskbar icon padding. Keep this inset minimal so the
-# visible brand mark occupies the same visual scale as neighboring applications.
-WINDOWS_ICON_BOUNDS = (12, 12, 1012, 1012)
-WINDOWS_ICON_RADIUS = 246
+# Windows desktop and shortcut icons do not add reliable padding themselves.
+# Keep the same inset as the shared master icon so the visible mark is not
+# oversized next to other Windows applications.
+WINDOWS_ICON_BOUNDS = ICON_BOUNDS
+WINDOWS_ICON_RADIUS = ICON_RADIUS
 PNG_SIZES = (16, 24, 32, 48, 64, 128, 256, 512, 1024)
 ICO_SIZES = ((16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256))
 
