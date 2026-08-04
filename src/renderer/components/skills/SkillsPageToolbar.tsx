@@ -66,11 +66,13 @@ export function SkillsPageToolbar({
 }: SkillsPageToolbarProps) {
   return (
     <header className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <PlusMenuSkillsIcon className="size-8 shrink-0 text-muted-foreground" />
+      <div className="flex items-center gap-4">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+          <PlusMenuSkillsIcon className="size-6 text-primary" />
+        </div>
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-foreground">{i18nService.t('skills')}</h2>
-          <p className="text-sm text-muted-foreground">{i18nService.t('skillsDescription')}</p>
+          <h2 className="text-xxl font-semibold text-foreground">{i18nService.t('skills')}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{i18nService.t('skillsDescription')}</p>
         </div>
       </div>
 

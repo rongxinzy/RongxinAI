@@ -56,11 +56,13 @@ export function McpManagerToolbar({
 }: McpManagerToolbarProps) {
   return (
     <header className="flex flex-col gap-4 border-b border-border">
-      <div className="flex items-center gap-3">
-        <Cable className="size-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <div className="flex items-center gap-4">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+          <Cable className="size-6 text-primary" aria-hidden="true" />
+        </div>
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-foreground">{i18nService.t('connectors')}</h2>
-          <p className="text-sm text-muted-foreground">{i18nService.t('connectorsDescription')}</p>
+          <h2 className="text-xxl font-semibold text-foreground">{i18nService.t('connectors')}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{i18nService.t('connectorsDescription')}</p>
         </div>
       </div>
 
