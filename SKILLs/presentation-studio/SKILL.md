@@ -3,7 +3,7 @@ name: presentation-studio
 description: "The only skill for creating a new PowerPoint deck. Builds a source-backed story and visual system, writes a native editable DeckSpec, blocks export on layout warnings, and compiles a verified PPTX. Triggers: create, generate, design, or lay out a new PPT, PPTX, PowerPoint, presentation, slide deck, pitch deck, report deck, training deck, or slides. Do not use to read or modify an existing PPTX."
 license: MIT
 metadata:
-  version: "1.0"
+  version: "1.0.1"
   category: productivity
 ---
 

@@ -11,13 +11,20 @@ const text = (value: unknown): string => (typeof value === 'string' ? value.trim
 
 const resultText = (result: SkillScriptRunResult): string => {
   const output = [result.stdout, result.stderr].filter(Boolean).join('\n');
+  const truncationWarning =
+    result.stdoutTruncated || result.stderrTruncated
+      ? 'Skill script output was truncated at 1 MiB per stream.'
+      : '';
   if (result.ok) {
-    return output || `Skill script completed successfully (${result.runtime}).`;
+    return [output || `Skill script completed successfully (${result.runtime}).`, truncationWarning]
+      .filter(Boolean)
+      .join('\n');
   }
   return [
     `Skill script failed [${result.errorCode || 'SKILL_SCRIPT_FAILED'}].`,
     result.error,
     output,
+    truncationWarning,
   ]
     .filter(Boolean)
     .join('\n');

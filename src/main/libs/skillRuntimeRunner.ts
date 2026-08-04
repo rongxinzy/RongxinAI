@@ -42,6 +42,8 @@ export type SkillScriptRunResult = {
   stderr: string;
   durationMs: number;
   timedOut: boolean;
+  stdoutTruncated?: boolean;
+  stderrTruncated?: boolean;
 };
 
 export type RunSkillScriptOptions = {
@@ -59,8 +61,25 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 const MAX_TIMEOUT_MS = 15 * 60_000;
 const MAX_ARGUMENTS = 128;
 const MAX_ARGUMENT_LENGTH = 16_384;
+const MAX_CAPTURED_OUTPUT_BYTES = 1 * 1024 * 1024;
 
 const trimOutput = (value: string): string => value.trim();
+
+const appendCapturedOutput = (
+  current: string,
+  chunk: Buffer | string,
+): { value: string; truncated: boolean } => {
+  const remaining = MAX_CAPTURED_OUTPUT_BYTES - Buffer.byteLength(current, 'utf8');
+  if (remaining <= 0) return { value: current, truncated: true };
+  const bytes = Buffer.from(chunk);
+  if (bytes.byteLength <= remaining) {
+    return { value: current + bytes.toString('utf8'), truncated: false };
+  }
+  return {
+    value: current + bytes.subarray(0, remaining).toString('utf8'),
+    truncated: true,
+  };
+};
 
 const isWithin = (root: string, candidate: string): boolean => {
   const relative = path.relative(root, candidate);
@@ -371,6 +390,8 @@ export async function runManagedSkillScript(
   return await new Promise<SkillScriptRunResult>(resolve => {
     let stdout = '';
     let stderr = '';
+    let stdoutTruncated = false;
+    let stderrTruncated = false;
     let settled = false;
     let timedOut = false;
     let aborted = false;
@@ -408,10 +429,14 @@ export async function runManagedSkillScript(
     options.signal?.addEventListener('abort', onAbort, { once: true });
 
     child.stdout.on('data', chunk => {
-      stdout += chunk.toString();
+      const captured = appendCapturedOutput(stdout, chunk);
+      stdout = captured.value;
+      stdoutTruncated ||= captured.truncated;
     });
     child.stderr.on('data', chunk => {
-      stderr += chunk.toString();
+      const captured = appendCapturedOutput(stderr, chunk);
+      stderr = captured.value;
+      stderrTruncated ||= captured.truncated;
     });
     child.on('error', (error: NodeJS.ErrnoException) => {
       clearTimeout(timeoutTimer);
@@ -438,6 +463,8 @@ export async function runManagedSkillScript(
         stderr: trimOutput(stderr),
         durationMs: Date.now() - startedAt,
         timedOut,
+        stdoutTruncated,
+        stderrTruncated,
       });
     });
     child.on('close', exitCode => {
@@ -471,6 +498,8 @@ export async function runManagedSkillScript(
         stderr: trimOutput(stderr),
         durationMs: Date.now() - startedAt,
         timedOut,
+        stdoutTruncated,
+        stderrTruncated,
       });
     });
   });

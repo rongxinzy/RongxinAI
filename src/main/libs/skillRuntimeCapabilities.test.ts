@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { probeSkillRuntimeCapabilities } from './skillRuntimeCapabilities';
 
 describe('skill runtime capabilities', () => {
-  it('returns a structured report for every application-managed runtime', () => {
-    const report = probeSkillRuntimeCapabilities();
+  it('returns a structured report for every application-managed runtime', async () => {
+    const report = await probeSkillRuntimeCapabilities();
 
     expect(report.platform).toBe(process.platform);
     expect(report.arch).toBe(process.arch);

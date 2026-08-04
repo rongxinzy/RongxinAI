@@ -22,7 +22,7 @@ export function buildPiSkillRuntimeCapabilitiesTool(): Record<string, unknown> {
       additionalProperties: false,
     },
     execute: async (): Promise<SkillRuntimeCapabilitiesToolResult> => {
-      const details = probeSkillRuntimeCapabilities();
+      const details = await probeSkillRuntimeCapabilities();
       return {
         content: [{ type: 'text', text: JSON.stringify(details, null, 2) }],
         details,

@@ -2,7 +2,7 @@
 name: minimax-docx
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
   category: document-processing
   author: MiniMaxAI
   sources:

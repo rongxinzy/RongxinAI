@@ -14,7 +14,7 @@ description: >
   Prefer this skill when appearance matters, not just when any PDF output is needed.
 license: MIT
 metadata:
-  version: "1.0"
+  version: "1.0.1"
   category: document-generation
 ---
 
