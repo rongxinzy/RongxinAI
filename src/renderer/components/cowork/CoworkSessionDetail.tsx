@@ -98,7 +98,7 @@ import {
   toAbsolutePathFromCwd,
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
-import { useInitialConversationPosition } from './hooks/useInitialConversationPosition';
+import { useScrollStabilization } from './hooks/useScrollStabilization';
 import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
@@ -927,13 +927,13 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // keep correct rail numbering.
   const turnRailIndices = useMemo(() => buildTurnRailIndices(turns), [turns]);
 
+  useScrollStabilization({ sessionId, isStreaming, rootRef: detailRootRef });
   useSessionHistoryPagination({
     sessionId,
     messagesOffset: currentSession?.messagesOffset ?? 0,
     messageCount: messagesLength,
     rootRef: detailRootRef,
   });
-  useInitialConversationPosition({ sessionId, rootRef: detailRootRef });
   useConversationRailScrollSync({
     sessionId,
     rootRef: detailRootRef,
