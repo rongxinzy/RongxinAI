@@ -1,13 +1,7 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@shared/components/ui/dropdown-menu';
 import { Input } from '@shared/components/ui/input';
 import { cn } from '@shared/lib/utils';
-import { Check, Compass, Ellipsis, ListTodo, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
+import { Check, Compass, ListTodo, Pencil, RotateCcw, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -221,6 +215,17 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
                       <Button
                         type="button"
                         variant="ghost"
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-xs"
+                        disabled={isSending}
+                        onClick={() => beginEdit(item)}
+                      >
+                        <Pencil />
+                        {i18nService.t('edit')}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
                         size="icon-xs"
                         title={i18nService.t('delete')}
                         aria-label={i18nService.t('delete')}
@@ -229,28 +234,6 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
                       >
                         <Trash2 />
                       </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              title={i18nService.t('coworkQueueMore')}
-                              aria-label={i18nService.t('coworkQueueMore')}
-                              disabled={isSending}
-                            >
-                              <Ellipsis />
-                            </Button>
-                          }
-                        />
-                        <DropdownMenuContent align="end" className="min-w-28">
-                          <DropdownMenuItem onClick={() => beginEdit(item)}>
-                            <Pencil />
-                            {i18nService.t('edit')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </>
                   )}
                 </div>
