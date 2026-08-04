@@ -110,6 +110,27 @@ describe('skillRuntimeRunner', () => {
     expect(result.stdout).not.toContain('\uFFFD');
   });
 
+  it('does not report truncation when stdout exactly reaches the capture limit', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-output-limit-'));
+    roots.push(root);
+    fs.mkdirSync(path.join(root, 'xlsx', 'scripts'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'xlsx', 'scripts', 'exact-limit.mjs'),
+      'process.stdout.write("x".repeat(1024 * 1024));\n',
+    );
+
+    const result = await runManagedSkillScript({
+      skillsRoot: root,
+      skillId: 'xlsx',
+      script: 'scripts/exact-limit.mjs',
+      workspaceRoot: root,
+      timeoutMs: 10_000,
+    });
+    expect(result.ok).toBe(true);
+    expect(Buffer.byteLength(result.stdout, 'utf8')).toBe(1024 * 1024);
+    expect(result.stdoutTruncated).toBe(false);
+  });
+
   it('reads an XLSX file through the packaged Skill Python environment', async () => {
     const skillsRoot = path.resolve(process.cwd(), 'SKILLs');
     const packagedEnvironment = path.resolve(process.cwd(), 'resources', 'skill-python', 'xlsx');

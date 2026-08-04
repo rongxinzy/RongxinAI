@@ -96,7 +96,6 @@ const appendCapturedOutput = (current: CapturedOutput, chunk: Buffer | string): 
   current.parts.push(current.decoder.write(captured));
   current.capturedBytes += captured.byteLength;
   if (captured.byteLength < bytes.byteLength) current.truncated = true;
-  if (current.capturedBytes >= MAX_CAPTURED_OUTPUT_BYTES) current.truncated = true;
 };
 
 const finalizeCapturedOutput = (current: CapturedOutput): string => {
