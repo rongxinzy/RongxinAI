@@ -1264,10 +1264,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               />
             </Conversation>
 
-            {/* Turn Navigation Rail — to the left of scrollbar */}
+            {/* Turn navigation rail removed: message content remains scrollable in the conversation. */}
             {turns.length > 1 && (
               <div
-                className="absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
+                className="hidden absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
                 style={{ maxHeight: 'calc(100% - 40px)' }}
                 onMouseEnter={() => setIsRailHovered(true)}
                 onMouseLeave={() => {
