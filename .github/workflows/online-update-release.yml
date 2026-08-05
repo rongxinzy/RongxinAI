@@ -170,11 +170,13 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: "release/*.exe"
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.platform == 'macos' }}
         with:
           name: ${{ matrix.artifact }}
           path: "release/*.dmg"
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: ${{ always() && matrix.platform == 'linux' }}
         with:
@@ -183,6 +185,7 @@ jobs:
             release/*.deb
             release/*.AppImage
             release/linux-render-smoke.png
+          retention-days: 7
 
   publish:
     needs: [prepare-release, build-platforms]
