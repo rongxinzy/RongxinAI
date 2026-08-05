@@ -437,6 +437,18 @@ export class WorkbenchTaskRepository {
     return rows.map(row => this.mapApproval(row));
   }
 
+  listPendingApprovalsForSession(sessionId: string): WorkbenchApproval[] {
+    const rows = this.db
+      .prepare(
+        `SELECT a.* FROM workbench_approvals a
+         JOIN workbench_tasks t ON t.id = a.task_id
+         WHERE t.session_id = ? AND a.decision = ?
+         ORDER BY a.created_at`,
+      )
+      .all(sessionId, WorkbenchApprovalDecision.Pending) as ApprovalRow[];
+    return rows.map(row => this.mapApproval(row));
+  }
+
   updateApproval(
     approvalId: string,
     patch: Partial<

@@ -1107,13 +1107,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.abortController.abort();
     active.unsubscribe();
     void active.piSession.abort();
+    this.workbenchTaskService?.pauseRun?.(
+      sessionId,
+      'The session resources changed before the approval was resolved.',
+    );
+    this.clearApprovalsBySession(sessionId);
     this.activeSessions.delete(sessionId);
   }
 
   stopSession(sessionId: string): void {
     this.dismissAskUserQuestionsBySession(sessionId);
     const active = this.activeSessions.get(sessionId);
-    if (!active) return;
+    if (!active) {
+      this.workbenchTaskService?.pauseRun?.(sessionId, 'The user stopped this run.');
+      this.clearApprovalsBySession(sessionId);
+      return;
+    }
     const wasRunning = active.isRunning;
 
     this.finalizeActiveThinking(sessionId, active);
@@ -1136,7 +1145,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.abortController.abort();
     active.unsubscribe();
     void active.piSession.abort();
-    this.workbenchTaskService?.pauseRun(sessionId, 'The user stopped this run.');
+    this.workbenchTaskService?.pauseRun?.(sessionId, 'The user stopped this run.');
+    this.clearApprovalsBySession(sessionId);
     this.emit('sessionStopped', sessionId);
 
     // A user stop ends the current turn without cancelling messages already
@@ -1390,6 +1400,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   onSessionDeleted(sessionId: string): void {
     this.stopSession(sessionId);
+    this.clearApprovalsBySession(sessionId);
     this.activeSessions.delete(sessionId);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
     this.workbenchTaskService?.deleteSession(sessionId);
@@ -2190,7 +2201,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   private clearApprovalsBySession(sessionId: string): void {
     for (const [requestId, sid] of this.approvalSessionMap.entries()) {
-      if (sid === sessionId) this.approvalSessionMap.delete(requestId);
+      if (sid !== sessionId) continue;
+      this.approvalSessionMap.delete(requestId);
+      this.emit('permissionDismiss', requestId);
     }
   }
 

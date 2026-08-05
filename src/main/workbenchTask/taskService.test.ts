@@ -355,6 +355,68 @@ test('agent end does not verify a run paused by a denied approval', async () => 
   }
 });
 
+test('pausing a run expires and resolves its pending approval', async () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'write',
+      contract: chatContract,
+    });
+    const authorization = service.authorizeToolCall({
+      sessionId: 'session',
+      runId: run.id,
+      toolCallId: 'call',
+      toolName: 'write',
+      toolInput: { path: 'result.txt', content: 'ok' },
+      autoApprove: false,
+    });
+
+    service.pauseRun('session', 'The user stopped this run.');
+
+    await expect(authorization).resolves.toEqual({
+      allow: false,
+      reason: 'The user stopped this run.',
+    });
+    const detail = service.getDetail(task.id);
+    expect(detail?.task.status).toBe(WorkbenchTaskStatus.Paused);
+    expect(detail?.runs[0].status).toBe(WorkbenchRunStatus.Paused);
+    expect(detail?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Expired);
+    expect(detail?.approvals[0].decisionSource).toBe(WorkbenchApprovalDecisionSource.Recovery);
+  } finally {
+    db.close();
+  }
+});
+
+test('deleting a session resolves pending approvals before removing their records', async () => {
+  const { db, service } = createService();
+  try {
+    const { run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'write',
+      contract: chatContract,
+    });
+    const authorization = service.authorizeToolCall({
+      sessionId: 'session',
+      runId: run.id,
+      toolCallId: 'call',
+      toolName: 'write',
+      toolInput: { path: 'result.txt', content: 'ok' },
+      autoApprove: false,
+    });
+
+    service.deleteSession('session');
+
+    await expect(authorization).resolves.toEqual({
+      allow: false,
+      reason: 'The session was deleted.',
+    });
+    expect(service.getCurrent('session')).toBeNull();
+  } finally {
+    db.close();
+  }
+});
+
 test('startup recovery preserves pending approval projection until resume', async () => {
   const { db, service } = createService();
   try {

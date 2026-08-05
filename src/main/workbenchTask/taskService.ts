@@ -256,14 +256,22 @@ export class WorkbenchTaskService extends EventEmitter {
 
   pauseRun(sessionId: string, reason: string): void {
     const task = this.repository.getActiveTaskForSession(sessionId);
-    if (!task?.activeRunId) return;
+    if (!task?.activeRunId) {
+      this.cancelPendingApprovalsForSession(sessionId, reason);
+      return;
+    }
     const run = this.repository.getRun(task.activeRunId);
-    if (!run || !this.isRunActive(run.status)) return;
-    this.repository.transaction(() => {
+    if (!run || !this.isRunActive(run.status)) {
+      this.cancelPendingApprovalsForSession(sessionId, reason);
+      return;
+    }
+    const expiredApprovals = this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Paused);
       this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Paused, run.id);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.RunPaused, { reason });
+      return this.expirePendingApprovalsForSession(sessionId, reason);
     });
+    this.resolvePendingApprovals(expiredApprovals, reason);
     this.emitChanged(this.requireTask(task.id));
   }
 
@@ -494,10 +502,48 @@ export class WorkbenchTaskService extends EventEmitter {
   }
 
   deleteSession(sessionId: string): void {
+    const pendingApprovals = this.repository.listPendingApprovalsForSession(sessionId);
     this.repository.transaction(() => {
       this.productionLoop.deleteSession(sessionId);
       this.repository.deleteSessionDomainData(sessionId);
     });
+    this.resolvePendingApprovals(pendingApprovals, 'The session was deleted.');
+  }
+
+  private cancelPendingApprovalsForSession(sessionId: string, reason: string): void {
+    const expiredApprovals = this.repository.transaction(() =>
+      this.expirePendingApprovalsForSession(sessionId, reason),
+    );
+    this.resolvePendingApprovals(expiredApprovals, reason);
+    for (const taskId of new Set(expiredApprovals.map(approval => approval.taskId))) {
+      const task = this.repository.getTask(taskId);
+      if (task) this.emitChanged(task);
+    }
+  }
+
+  private expirePendingApprovalsForSession(sessionId: string, reason: string): WorkbenchApproval[] {
+    const approvals = this.repository.listPendingApprovalsForSession(sessionId);
+    for (const approval of approvals) {
+      this.repository.updateApproval(approval.id, {
+        decision: WorkbenchApprovalDecision.Expired,
+        decisionSource: WorkbenchApprovalDecisionSource.Recovery,
+        result: { reason },
+      });
+      this.repository.appendRunEvent(approval.runId, WorkbenchRunEventType.ApprovalResolved, {
+        approvalId: approval.id,
+        approved: false,
+        expired: true,
+      });
+    }
+    return approvals;
+  }
+
+  private resolvePendingApprovals(approvals: WorkbenchApproval[], reason: string): void {
+    for (const approval of approvals) {
+      const pending = this.pendingApprovals.get(approval.id);
+      this.pendingApprovals.delete(approval.id);
+      pending?.resolve({ allow: false, reason });
+    }
   }
 
   private emitChanged(task: WorkbenchTask): void {
