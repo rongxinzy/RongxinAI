@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import path from 'path';
 
+import JSZip from 'jszip';
 import { afterEach, expect, test } from 'vitest';
 
 import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
@@ -14,17 +15,41 @@ const createRoot = (): string => {
   return root;
 };
 
+const writeDocxFixture = async (filePath: string, paragraph: string): Promise<void> => {
+  const archive = new JSZip();
+  archive.file(
+    '[Content_Types].xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`,
+  );
+  archive.file(
+    '_rels/.rels',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`,
+  );
+  archive.file(
+    'word/document.xml',
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:r><w:t>${paragraph}</w:t></w:r></w:p></w:body>
+</w:document>`,
+  );
+  fs.writeFileSync(filePath, await archive.generateAsync({ type: 'nodebuffer' }));
+};
+
 afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true });
 });
 
 test('converts a workspace DOCX fixture to Markdown locally', async () => {
   const root = createRoot();
-  const fixture = path.resolve(
-    process.cwd(),
-    'vendor/openclaw-plugins/dingtalk-connector/node_modules/mammoth/test/test-data/single-paragraph.docx',
-  );
-  fs.copyFileSync(fixture, path.join(root, 'example.docx'));
+  await writeDocxFixture(path.join(root, 'example.docx'), 'Walking on imported air');
   const tool = buildPiDocumentReaderTool({ workspaceRoot: root }) as {
     execute: (
       id: string,
@@ -40,11 +65,7 @@ test('converts a workspace DOCX fixture to Markdown locally', async () => {
 test('does not allow symlinks or junctions that leave the workspace', async () => {
   const root = createRoot();
   const outside = createRoot();
-  const fixture = path.resolve(
-    process.cwd(),
-    'vendor/openclaw-plugins/dingtalk-connector/node_modules/mammoth/test/test-data/single-paragraph.docx',
-  );
-  fs.copyFileSync(fixture, path.join(outside, 'outside.docx'));
+  await writeDocxFixture(path.join(outside, 'outside.docx'), 'Outside the workspace');
   fs.symlinkSync(
     outside,
     path.join(root, 'linked'),
