@@ -254,38 +254,18 @@ export function MarketplacePanel({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <div
-        className={
-          hasSearched
-            ? 'flex flex-col gap-3'
-            : 'flex min-h-[420px] flex-col items-center justify-center gap-8'
-        }
-      >
-        {!hasSearched ? (
-          <div className="w-full max-w-3xl space-y-3 text-center">
-            <div className="flex items-center justify-center gap-3">
-              <h2 className="text-xl font-semibold text-foreground">
-              {i18nService.t('marketplaceTitle')}
-              </h2>
-            </div>
-          </div>
-        ) : null}
-        <div
-          className={
-            hasSearched ? 'mx-auto flex w-full max-w-6xl items-center gap-3' : 'w-full'
-          }
-        >
+      <div className="flex flex-col gap-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3">
           <form
-            className={`min-w-0 ${hasSearched ? 'flex-1' : 'mx-auto w-full max-w-4xl'}`}
+            className="min-w-0 flex-1"
             onSubmit={event => {
               event.preventDefault();
+              if (marketplaceLoading) return;
               submitSearch();
             }}
           >
             <div className="flex gap-2">
-              <InputGroup
-                className={hasSearched ? 'h-9 min-w-0 flex-1' : 'h-12 flex-1 rounded-xl'}
-              >
+              <InputGroup className="h-9 min-w-0 flex-1">
                 <InputGroupAddon>
                   <Search />
                 </InputGroupAddon>
@@ -293,22 +273,18 @@ export function MarketplacePanel({
                   value={query}
                   onChange={event => onQueryChange(event.target.value)}
                   placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-                  className={hasSearched ? 'text-xs' : 'h-12 text-base'}
+                  className="text-xs"
                 />
               </InputGroup>
               <Button
                 type="submit"
-                disabled={marketplaceLoading}
-                className={
-                  hasSearched
-                    ? `${localInferenceCompactButtonClass} self-center`
-                    : 'h-12 shrink-0 cursor-pointer self-center px-6'
-                }
+                aria-disabled={marketplaceLoading}
+                className={`${localInferenceCompactButtonClass} self-center`}
                 variant="outline"
               >
-                {marketplaceLoading && (
-                  <RefreshCw data-icon="inline-start" className="animate-spin" />
-                )}
+                <RefreshCw
+                  data-icon="inline-start"
+                />
                 {i18nService.t('marketplaceSearch')}
               </Button>
             </div>
@@ -321,7 +297,9 @@ export function MarketplacePanel({
         <div className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-sm font-semibold text-foreground">{resultTitle}</span>
-            {hasSearched && !marketplaceLoading && visibleModels.length > 0 ? (
+            {hasSearched &&
+            visibleModels.length > 0 &&
+            (!marketplaceLoading || totalCount !== undefined) ? (
               <span className="text-xs text-muted-foreground">
                 {i18nService.t('marketplaceResultCount').replace('{count}', String(resultCount))}
               </span>
@@ -383,7 +361,7 @@ export function MarketplacePanel({
         </Alert>
       ) : null}
 
-      {marketplaceLoading ? (
+      {marketplaceLoading && models.length === 0 ? (
         <div ref={marketplaceGridViewportRef} className="relative min-h-0 flex-1 overflow-visible">
           <MarketplaceGridSkeleton columnCount={gridColumnCount} pageSize={MARKETPLACE_PAGE_SIZE} />
         </div>

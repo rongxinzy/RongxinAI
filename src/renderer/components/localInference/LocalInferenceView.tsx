@@ -13,7 +13,11 @@ import type {
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
 import { ModelCapabilityStatus } from '../../../shared/providers';
-import type { MarketplaceModel, MarketplaceSearchParams } from '../../../shared/marketplace';
+import type {
+  MarketplaceModel,
+  MarketplaceSearchParams,
+  MarketplaceSearchResult,
+} from '../../../shared/marketplace';
 import { createMarketplaceHardwareProfile, withMarketplaceScore, type MarketplaceHardwareProfile } from '../../../shared/marketplace/scoring';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
@@ -75,6 +79,35 @@ interface LocalInferenceViewProps {
 
 const LOCAL_INFERENCE_TAB_ORDER: LocalInferenceTab[] = ['models', 'marketplace'];
 
+type MarketplacePageCache = {
+  key: string;
+  pages: Map<number, MarketplaceSearchResult>;
+};
+
+function marketplacePageCacheKey(params: MarketplaceSearchParams): string {
+  return JSON.stringify({
+    query: params.query ?? '',
+    tags: params.tags ?? [],
+    task: params.task ?? 'all',
+    size: params.size ?? 'all',
+    limit: params.limit ?? 0,
+    sortby: params.sortby ?? 'asc',
+    featuredOnly: params.featuredOnly ?? false,
+    fit: params.fit ?? 'all',
+    quantization: params.quantization ?? '',
+    minStars: params.minStars ?? null,
+  });
+}
+
+function getMarketplaceNextPageNumber(params: MarketplaceSearchParams, result: MarketplaceSearchResult): number | undefined {
+  const currentPage = params.pageNumber ?? 1;
+  if (result.nextPageNumber && result.nextPageNumber > currentPage) return result.nextPageNumber;
+  const limit = params.limit ?? 0;
+  return result.totalCount && limit > 0 && currentPage * limit < result.totalCount
+    ? currentPage + 1
+    : undefined;
+}
+
 let cachedStatus: OllamaStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
@@ -129,6 +162,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [launchLogFullscreen, setLaunchLogFullscreen] = useState(false);
   const marketplaceSearchRef = useRef<number>(0);
   const marketplaceRequestIdRef = useRef<string | null>(null);
+  const marketplacePrefetchRequestIdsRef = useRef<Set<string>>(new Set());
+  const marketplacePageCacheRef = useRef<MarketplacePageCache | null>(null);
   const loadingModelNameRef = useRef<string | null>(null);
   const marketplaceQueryRef = useRef(marketplaceQuery);
   const marketplaceHasSearchedRef = useRef(marketplaceHasSearched);
@@ -231,8 +266,75 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [clearInstallProgressDismissTimer],
   );
 
+  const cancelMarketplacePrefetches = useCallback(() => {
+    const requestIds = Array.from(marketplacePrefetchRequestIdsRef.current);
+    marketplacePrefetchRequestIdsRef.current.clear();
+    requestIds.forEach(requestId => {
+      void window.electron.marketplace.cancelSearch(requestId).catch(() => undefined);
+    });
+  }, []);
+
+  const preloadMarketplacePage = useCallback(
+    async (
+      cacheKey: string,
+      params: MarketplaceSearchParams,
+      currentResult: MarketplaceSearchResult,
+      searchId: number,
+    ) => {
+      const currentPage = params.pageNumber ?? 1;
+      const nextPage = getMarketplaceNextPageNumber(params, currentResult);
+      if (!nextPage) return;
+      const cache = marketplacePageCacheRef.current;
+      if (!cache || cache.key !== cacheKey || cache.pages.has(nextPage)) return;
+      const requestId =
+        globalThis.crypto?.randomUUID?.() ??
+        `marketplace-prefetch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      marketplacePrefetchRequestIdsRef.current.add(requestId);
+      try {
+        const nextResult = await window.electron.marketplace.search({
+          requestId,
+          params: { ...params, pageNumber: nextPage },
+        });
+        if (searchId !== marketplaceSearchRef.current) return;
+        const currentCache = marketplacePageCacheRef.current;
+        if (!currentCache || currentCache.key !== cacheKey) return;
+        currentCache.pages.set(nextPage, nextResult);
+        for (const pageNumber of currentCache.pages.keys()) {
+          if (pageNumber !== currentPage && pageNumber !== nextPage) {
+            currentCache.pages.delete(pageNumber);
+          }
+        }
+      } catch {
+        // Prefetch is best effort. The page will be fetched when requested.
+      } finally {
+        marketplacePrefetchRequestIdsRef.current.delete(requestId);
+      }
+    },
+    [],
+  );
+
   const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
     const id = ++marketplaceSearchRef.current;
+    const cacheKey = marketplacePageCacheKey(params);
+    cancelMarketplacePrefetches();
+    if (!marketplacePageCacheRef.current || marketplacePageCacheRef.current.key !== cacheKey) {
+      marketplacePageCacheRef.current = { key: cacheKey, pages: new Map() };
+    }
+    const pageNumber = params.pageNumber ?? 1;
+    const cache = marketplacePageCacheRef.current;
+    const cachedResult = pageNumber > 1 ? cache?.pages.get(pageNumber) : undefined;
+    if (cachedResult) {
+      setMarketplaceSearchParams(params);
+      setMarketplaceModels(cachedResult.models);
+      if (pageNumber <= 1) {
+        setMarketplaceTotalCount(cachedResult.totalCount);
+      }
+      setMarketplaceNextPage(cachedResult.nextPageNumber);
+      setMarketplaceError(cachedResult.warning ?? null);
+      setMarketplaceLoading(false);
+      void preloadMarketplacePage(cacheKey, params, cachedResult, id);
+      return;
+    }
     const requestId =
       globalThis.crypto?.randomUUID?.() ??
       `marketplace-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -242,11 +344,23 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     try {
       const result = await window.electron.marketplace.search({ requestId, params });
       if (id === marketplaceSearchRef.current) {
+        cache?.pages.set(pageNumber, result);
+        const nextPage = getMarketplaceNextPageNumber(params, result);
+        if (cache && nextPage) {
+          for (const cachedPage of cache.pages.keys()) {
+            if (cachedPage !== pageNumber && cachedPage !== nextPage) {
+              cache.pages.delete(cachedPage);
+            }
+          }
+        }
         setMarketplaceSearchParams(params);
         setMarketplaceModels(result.models);
-        setMarketplaceTotalCount(result.totalCount);
+        if (pageNumber <= 1) {
+          setMarketplaceTotalCount(result.totalCount);
+        }
         setMarketplaceNextPage(result.nextPageNumber);
         setMarketplaceError(result.warning ?? null);
+        void preloadMarketplacePage(cacheKey, params, result, id);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
@@ -260,10 +374,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         marketplaceRequestIdRef.current = null;
       }
     }
-  }, []);
-
+  }, [cancelMarketplacePrefetches, preloadMarketplacePage]);
   const clearMarketplaceState = useCallback(() => {
     marketplaceSearchRef.current += 1;
+    cancelMarketplacePrefetches();
+    marketplacePageCacheRef.current = null;
     const requestId = marketplaceRequestIdRef.current;
     marketplaceRequestIdRef.current = null;
     if (requestId) {
@@ -276,15 +391,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setMarketplaceTotalCount(undefined);
     setMarketplaceNextPage(undefined);
     setMarketplaceSearchParams({});
-  }, []);
+  }, [cancelMarketplacePrefetches]);
   useEffect(() => {
     return () => {
+      cancelMarketplacePrefetches();
       const requestId = marketplaceRequestIdRef.current;
       if (requestId) {
         void window.electron.marketplace.cancelSearch(requestId).catch(() => undefined);
       }
     };
-  }, []);
+  }, [cancelMarketplacePrefetches]);
 
   useEffect(() => {
     if (activeTab === 'marketplace') return;

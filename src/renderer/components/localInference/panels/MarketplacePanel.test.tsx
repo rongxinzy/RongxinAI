@@ -170,6 +170,16 @@ describe('MarketplacePanel result grid and count consistency', () => {
     expect(screen.queryByText('加载中')).not.toBeInTheDocument();
   });
 
+  test('keeps existing model cards visible while changing pages', () => {
+    const { container } = renderPanel({
+      hasSearched: true,
+      marketplaceLoading: true,
+      models: [makeModel('alpha')],
+    });
+
+    expect(container.querySelectorAll('[data-marketplace-model-card="true"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(0);
+  });
   test('clicking next page fetches the next cloud page', async () => {
     const user = userEvent.setup();
     const onSearch = vi.fn();
