@@ -40,7 +40,11 @@ import type {
   LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import type { MarketplaceSearchParams, MarketplaceSearchResult } from '../../shared/marketplace';
+import type {
+  MarketplaceSearchRequest,
+  MarketplaceSearchParams,
+  MarketplaceSearchResult,
+} from '../../shared/marketplace';
 import type {
   WorkbenchApprovalResponseInput,
   WorkbenchTaskActionResult,
@@ -561,7 +565,8 @@ interface IElectronAPI {
     ) => () => void;
   };
   marketplace: {
-    search: (params?: MarketplaceSearchParams) => Promise<MarketplaceSearchResult>;
+    search: (request: MarketplaceSearchRequest) => Promise<MarketplaceSearchResult>;
+    cancelSearch: (requestId: string) => Promise<{ cancelled: boolean }>;
   };
   triage: {
     getConfig: () => Promise<TriageConfig>;

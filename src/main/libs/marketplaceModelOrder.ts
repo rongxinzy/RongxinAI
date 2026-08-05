@@ -1,5 +1,6 @@
 import {
   MarketplaceCapability,
+  MarketplaceSortOrder,
   type MarketplaceModel,
   type MarketplaceSearchParams,
 } from '../../shared/marketplace';
@@ -24,6 +25,15 @@ export function sortMarketplaceModels(
 ): MarketplaceModel[] {
   const emptyQuery = !params.query?.trim();
   return [...models].sort((a, b) => {
+    if (params.sortby) {
+      const leftParameters = resolveMarketplaceParameterCount(a) ?? Number.MAX_SAFE_INTEGER;
+      const rightParameters = resolveMarketplaceParameterCount(b) ?? Number.MAX_SAFE_INTEGER;
+      const parameterDiff = leftParameters - rightParameters;
+      if (parameterDiff !== 0) {
+        return params.sortby === MarketplaceSortOrder.Desc ? -parameterDiff : parameterDiff;
+      }
+    }
+
     if (emptyQuery) {
       const featuredRankDiff = getFeaturedRank(a) - getFeaturedRank(b);
       if (featuredRankDiff !== 0) return featuredRankDiff;

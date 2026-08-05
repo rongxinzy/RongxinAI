@@ -113,10 +113,43 @@ test('MarketplaceService returns an empty result with a warning when the catalog
   expect(result.warning).toMatch(/CATALOG_ERROR/);
 });
 
-test('MarketplaceService uses the cloud catalogue without sending a local ModelScope token', async () => {
-  const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+test('MarketplaceService propagates external cancellation to the catalogue request', async () => {
+  const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+    await new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener(
+        'abort',
+        () => reject(new DOMException('Aborted', 'AbortError')),
+        { once: true },
+      );
+    }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+  const controller = new AbortController();
+  const pending = service.search({ query: 'qwen3' }, controller.signal);
+
+  controller.abort();
+
+  await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  expect(fetchMock).toHaveBeenCalledOnce();
+});
+
+test('MarketplaceService returns one cloud page with continuation metadata', async () => {
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).not.toHaveProperty('Authorization');
-    return Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 });
+    const page = new URL(url).searchParams.get('page');
+    return page === '1'
+      ? Response.json({
+          models: [verifiedModel('Qwen/Qwen3-8B-GGUF')],
+          totalCount: 2,
+          next: 2,
+        })
+      : Response.json({
+          models: [verifiedModel('Qwen/Qwen3-14B-GGUF')],
+          totalCount: 2,
+        });
   });
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => createTempDir(), {
@@ -126,21 +159,99 @@ test('MarketplaceService uses the cloud catalogue without sending a local ModelS
   const result = await service.search({ query: 'qwen3', limit: 20, pageNumber: 1 });
 
   expect(fetchMock).toHaveBeenCalledOnce();
-  expect(result.models).toHaveLength(1);
-  expect(result.models[0]).toMatchObject({
-    repoId: 'Qwen/Qwen3-8B-GGUF',
-    capability: 'chat',
-    capabilities: ['chat', 'reasoning'],
-    metadataStatus: 'verified',
-  });
-  expect(result.totalCount).toBe(593);
+  expect(result.models.map(model => model.repoId)).toEqual(['Qwen/Qwen3-8B-GGUF']);
+  expect(result.totalCount).toBe(2);
   expect(result.nextPageNumber).toBe(2);
 });
-
-test('MarketplaceService sends unrestricted browse requests to the cloud catalogue', async () => {
+test('MarketplaceService returns the current page when later pages remain', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&page=1');
-    return Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 });
+    const page = new URL(url).searchParams.get('page');
+    if (page === '1') {
+      return Response.json({
+        models: [verifiedModel('Qwen/Qwen3-8B-GGUF')],
+        totalCount: 3,
+        next: 2,
+      });
+    }
+    if (page === '2') {
+      return Response.json({
+        models: [{ ...verifiedModel('Qwen/Pending-GGUF'), metadataStatus: 'pending', files: [] }],
+        totalCount: 3,
+        next: 3,
+      });
+    }
+    return Response.json({
+      models: [verifiedModel('Qwen/Qwen3-14B-GGUF')],
+      totalCount: 3,
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({ query: 'qwen3', limit: 20 });
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.models.map(model => model.repoId)).toEqual(['Qwen/Qwen3-8B-GGUF']);
+  expect(result.totalCount).toBe(3);
+  expect(result.nextPageNumber).toBe(2);
+});
+test('MarketplaceService keeps the all-model cache separate from recommendations', async () => {
+  const fetchMock = vi.fn(async (_url: string) => {
+    return Response.json({
+      models: [
+        verifiedModel('Qwen/All-8B-GGUF'),
+        verifiedModel('Qwen/All-14B-GGUF'),
+      ],
+      totalCount: 2,
+    });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+    cacheDir: createTempDir(),
+  });
+
+  await service.search({ fit: 'recommended' });
+  const allModels = await service.search({ fit: 'all' });
+
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(allModels.models.map(model => model.repoId).sort()).toEqual([
+    'Qwen/All-14B-GGUF',
+    'Qwen/All-8B-GGUF',
+  ]);
+});
+test('MarketplaceService uses the search API for default recommendations', async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&page=1&sortby=asc');
+    return Response.json({ models: [verifiedModel()], totalCount: 1 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({ fit: 'recommended', limit: 8 });
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.models).toHaveLength(1);
+});
+
+test('MarketplaceService uses the search API for recommendation task tabs', async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?task=vision&limit=120&page=1&sortby=asc');
+    return Response.json({
+      models: [
+        verifiedModel('Qwen/Chat-GGUF'),
+        {
+          ...verifiedModel('Qwen/Vision-GGUF'),
+          tags: ['vision', 'gguf'],
+          capability: ['vision'],
+        },
+      ],
+      totalCount: 2,
+    });
   });
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => createTempDir(), {
@@ -148,6 +259,28 @@ test('MarketplaceService sends unrestricted browse requests to the cloud catalog
   });
 
   const result = await service.search({
+    task: 'vision',
+    fit: 'recommended',
+    featuredOnly: false,
+  });
+
+  expect(fetchMock).toHaveBeenCalledOnce();
+  expect(result.models.map(model => model.repoId)).toEqual(['Qwen/Vision-GGUF']);
+});
+
+test('MarketplaceService uses the search API for the recommended all-model view', async () => {
+  const fetchMock = vi.fn(async (url: string) => {
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&page=1&sortby=asc');
+    return Response.json({ models: [verifiedModel()], totalCount: 1 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({
+    task: 'all',
+    fit: 'recommended',
     limit: 8,
     pageNumber: 1,
     featuredOnly: false,
@@ -186,6 +319,24 @@ test('MarketplaceService rejects cloud records without checksum-backed GGUF meta
   const result = await service.search({ query: 'unverified' });
 
   expect(result.models).toEqual([]);
+});
+
+test('MarketplaceService keeps the raw cloud page when fit is unrestricted', async () => {
+  const invalid = {
+    ...verifiedModel('owner/unverified-GGUF'),
+    metadataStatus: 'pending',
+    files: [],
+  };
+  const fetchMock = vi.fn(async () => Response.json({ models: [invalid], totalCount: 1 }));
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({ query: 'unverified', fit: 'all' });
+
+  expect(result.models).toHaveLength(1);
+  expect(result.models[0]?.repoId).toBe('owner/unverified-GGUF');
 });
 
 test('MarketplaceService filters embedding records even if a malformed cloud response marks them verified', async () => {
@@ -241,7 +392,7 @@ test('MarketplaceService resolves install metadata only through the cloud catalo
 
 test('MarketplaceService serves repeated searches from the disk cache', async () => {
   const fetchMock = vi.fn(async () =>
-    Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 }),
+    Response.json({ models: [verifiedModel()], totalCount: 593 }),
   );
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => createTempDir(), {
@@ -262,7 +413,7 @@ test('MarketplaceService falls back to a stale cached search when the catalogue 
   const fetchMock = vi
     .fn()
     .mockResolvedValueOnce(
-      Response.json({ models: [verifiedModel()], totalCount: 593, nextPageNumber: 2 }),
+      Response.json({ models: [verifiedModel()], totalCount: 593 }),
     )
     .mockRejectedValueOnce(new Error('network unreachable'));
   vi.stubGlobal('fetch', fetchMock);

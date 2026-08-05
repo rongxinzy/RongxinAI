@@ -82,6 +82,11 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
           if (!closed) controller.enqueue(chunk);
         };
 
+        const handleAbort = () => {
+          apiService.cancelOngoingRequest(requestId);
+          close('aborted');
+        };
+
         const close = (error?: string) => {
           if (closed) return;
           if (reasoningId) {
@@ -93,6 +98,11 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             textId = null;
           }
           closed = true;
+          abortSignal?.removeEventListener('abort', handleAbort);
+          // Enqueue the terminal chunks directly; helper enqueue() skips when
+          // closed is true, which would suppress these required end markers.
+          if (textId) controller.enqueue({ type: 'text-end', id: textId });
+          if (reasoningId) controller.enqueue({ type: 'reasoning-end', id: reasoningId });
           controller.enqueue({
             type: 'finish',
             finishReason: error ? ('error' as const) : ('stop' as const),
@@ -226,10 +236,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
             close('error');
           });
 
-        abortSignal?.addEventListener('abort', () => {
-          apiService.cancelOngoingRequest(requestId);
-          close('aborted');
-        });
+        abortSignal?.addEventListener('abort', handleAbort, { once: true });
       },
     });
   }

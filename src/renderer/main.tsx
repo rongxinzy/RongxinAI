@@ -21,6 +21,7 @@ const isModelLaunchLogWindow =
   LlamaCppModelLaunchLogWindowView.ModelLaunchLog;
 
 const root = ReactDOM.createRoot(rootElement);
+let channelRunUnsubscribe: (() => void) | null = null;
 
 async function renderRoot(): Promise<void> {
   if (isModelLaunchLogWindow) {
@@ -41,7 +42,8 @@ async function renderRoot(): Promise<void> {
   // Channel/Cron runs are projected into a read-only activity list; they
   // never become cowork sessions (issue #225).
   const { recordChannelRun } = await import('./store/slices/activitySlice');
-  window.electron.channelRun.onRunEvent(summary => {
+  channelRunUnsubscribe?.();
+  channelRunUnsubscribe = window.electron.channelRun.onRunEvent(summary => {
     store.dispatch(recordChannelRun(summary));
   });
 
@@ -52,6 +54,13 @@ async function renderRoot(): Promise<void> {
       </Provider>
     </React.StrictMode>,
   );
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    channelRunUnsubscribe?.();
+    channelRunUnsubscribe = null;
+  });
 }
 
 void renderRoot().catch(error => {

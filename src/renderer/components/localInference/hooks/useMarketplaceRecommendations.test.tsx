@@ -9,7 +9,7 @@ import { useMarketplaceRecommendations } from './useMarketplaceRecommendations';
 const tab: LocalInferenceTab = 'marketplace';
 
 describe('useMarketplaceRecommendations', () => {
-  test('loads featured recommendations once when the marketplace tab opens', () => {
+  test('loads all models once when the marketplace tab opens', () => {
     const onSearch = vi.fn().mockResolvedValue(undefined);
     const onHasSearchedChange = vi.fn();
     const { rerender } = renderHook(
@@ -26,7 +26,7 @@ describe('useMarketplaceRecommendations', () => {
 
     expect(onSearch).toHaveBeenCalledTimes(1);
     expect(onSearch).toHaveBeenCalledWith(
-      expect.objectContaining({ featuredOnly: true, fit: 'recommended', limit: MARKETPLACE_PAGE_SIZE }),
+      expect.objectContaining({ featuredOnly: false, fit: 'all', limit: MARKETPLACE_PAGE_SIZE }),
     );
     expect(onHasSearchedChange).toHaveBeenCalledWith(true);
 

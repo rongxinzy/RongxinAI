@@ -43,6 +43,7 @@ import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
 import type { CoworkPendingMessage } from '../shared/cowork/pendingMessageQueue';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
 import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
+import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { TriageIpcChannel } from '../shared/triage';
@@ -236,7 +237,8 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   marketplace: {
-    search: (params?: unknown) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, params),
+    search: (request: MarketplaceSearchRequest) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, request),
+    cancelSearch: (requestId: string) => ipcRenderer.invoke(MarketplaceIpcChannel.CancelSearch, requestId),
   },
 
   triage: {

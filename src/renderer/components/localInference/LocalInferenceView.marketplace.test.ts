@@ -86,7 +86,7 @@ test('marketplace search params load recommended models for an empty query and u
 
   expect(buildMarketplaceSearchParams({ query: '' })).toMatchObject({
     limit: MARKETPLACE_PAGE_SIZE,
-    featuredOnly: true,
+    featuredOnly: false,
   });
   expect(buildMarketplaceSearchParams({ query: ' / ' })).toBeNull();
 });
@@ -98,7 +98,7 @@ test('marketplace search params honour a caller-supplied page size', () => {
   });
   expect(buildMarketplaceSearchParams({ query: '', limit: 16 })).toMatchObject({
     limit: 16,
-    featuredOnly: true,
+    featuredOnly: false,
   });
 });
 
@@ -145,6 +145,7 @@ test('device-fit filters are applied locally after scoring', () => {
 
   expect(filterMarketplaceModelsForDevice(models, 'recommended').map(model => model.id)).toEqual([
     'excellent',
+    'limited',
   ]);
   expect(filterMarketplaceModelsForDevice(models, 'compatible').map(model => model.id)).toEqual([
     'excellent',

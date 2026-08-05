@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 
 import {
   MarketplaceCapability,
+  MarketplaceSortOrder,
   type MarketplaceModel,
   type MarketplaceSearchParams,
   type MarketplaceSearchResult,
@@ -37,6 +38,7 @@ type InstalledModelRecord = {
 };
 
 const DEFAULT_LIMIT = 120;
+const SEARCH_CACHE_VERSION = 'v3';
 const CATALOG_ERROR_PREFIX = 'CATALOG_ERROR:';
 const NON_GENERATIVE_GGUF_PATTERN =
   /\b(?:embedding|embed|bge(?:[-_]|\b)|e5(?:[-_]|\b)|gte(?:[-_]|\b)|rerank(?:er)?|sentence[-_ ]transformers?|clip|siglip|colbert|vector(?:izer)?|text[-_ ]embedding)\b/i;
@@ -61,7 +63,10 @@ export class MarketplaceService {
       : null;
   }
 
-  async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
+  async search(
+    params: MarketplaceSearchParams = {},
+    signal?: AbortSignal,
+  ): Promise<MarketplaceSearchResult> {
     const catalogUrl = this.resolveCatalogUrl();
     if (!catalogUrl) {
       return {
@@ -73,20 +78,23 @@ export class MarketplaceService {
     }
 
     try {
+      if (signal?.aborted) throw signal.reason;
       const client = new ModelCatalogClient(catalogUrl, this.options.fetchImpl);
-      const cacheKey = searchCacheKey(params);
+      const searchParams = { ...params, sortby: params.sortby ?? MarketplaceSortOrder.Asc };
+      const cacheKey = searchCacheKey(searchParams);
       const cached = this.cache?.read<MarketplaceSearchResult>(cacheKey);
       if (cached && Date.now() - cached.cachedAt < SEARCH_CACHE_TTL_MS) {
-        const models = this.processCatalog(cached.response, params);
+        const models = this.processCatalog(cached.response, searchParams);
         return { ...cached.response, models, totalCount: cached.response.totalCount ?? models.length };
       }
       let catalog: MarketplaceSearchResult;
       try {
-        catalog = await client.search(params);
+        catalog = await this.fetchCatalog(client, searchParams, signal);
       } catch (error) {
+        if (signal?.aborted) throw error;
         if (cached) {
           console.warn('[Marketplace] catalogue unreachable; serving cached search:', error);
-          const models = this.processCatalog(cached.response, params);
+          const models = this.processCatalog(cached.response, searchParams);
           return {
             ...cached.response,
             models,
@@ -97,9 +105,10 @@ export class MarketplaceService {
         throw error;
       }
       this.cache?.write(cacheKey, catalog);
-      const models = this.processCatalog(catalog, params);
+      const models = this.processCatalog(catalog, searchParams);
       return { ...catalog, models, totalCount: catalog.totalCount ?? models.length };
     } catch (error) {
+      if (signal?.aborted) throw error;
       console.warn('[Marketplace] cloud catalogue unavailable:', error);
       return {
         models: [],
@@ -115,14 +124,33 @@ export class MarketplaceService {
     params: MarketplaceSearchParams,
   ): MarketplaceModel[] {
     const installed = scanInstalledModels(this.getModelsDir());
+    const models = params.fit === 'all'
+      ? catalog.models
+      : filterMarketplaceModels(catalog.models, { ...params, fit: undefined });
     return sortMarketplaceModels(
       annotateInstalledModels(
-        filterMarketplaceModels(catalog.models, { ...params, fit: undefined }),
+        models,
         installed,
       ),
       params,
-    ).slice(0, resolveLimit(params.limit, DEFAULT_LIMIT));
+    );
   }
+
+  private async fetchCatalog(
+    client: ModelCatalogClient,
+    params: MarketplaceSearchParams,
+    signal?: AbortSignal,
+  ): Promise<MarketplaceSearchResult> {
+    return client.search(
+      {
+        ...params,
+        limit: params.limit ?? DEFAULT_LIMIT,
+        pageNumber: params.pageNumber ?? 1,
+      },
+      signal,
+    );
+  }
+
 
   async resolveModel(repoId: string): Promise<MarketplaceModel | null> {
     const normalizedRepoId = repoId.trim();
@@ -280,9 +308,6 @@ function tagsForTask(task?: MarketplaceSearchParams['task']): MarketplaceCapabil
   return task && task !== 'all' ? [task] : [];
 }
 
-function resolveLimit(limit: number | undefined, fallback: number): number {
-  return limit && limit > 0 ? limit : fallback;
-}
 
 function toMarketplaceWarning(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -352,13 +377,16 @@ class MarketplaceDiskCache {
 
 function searchCacheKey(params: MarketplaceSearchParams): string {
   const parts = [
+    SEARCH_CACHE_VERSION,
     params.query?.trim().toLowerCase() ?? '',
     params.task ?? '',
     params.size ?? '',
     (params.tags ?? []).slice().sort().join(','),
     params.limit ?? '',
     params.pageNumber ?? '',
+    params.sortby ?? '',
     params.featuredOnly ? 'featured' : '',
+    params.fit ?? '',
   ];
   return `search:${parts.join('|')}`;
 }

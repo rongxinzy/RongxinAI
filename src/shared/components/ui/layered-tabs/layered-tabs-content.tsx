@@ -23,6 +23,7 @@ interface LayeredTabsContentProps<Value extends string> {
   direction: number;
   className?: string;
   contentClassName?: string;
+  keepMounted?: boolean;
   children: React.ReactNode;
 }
 
@@ -32,12 +33,13 @@ export function LayeredTabsContent<Value extends string>({
   direction,
   className,
   contentClassName,
+  keepMounted = true,
   children,
 }: LayeredTabsContentProps<Value>) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <TabsContent value={value} keepMounted className={className}>
+    <TabsContent value={value} keepMounted={keepMounted} className={className}>
       <AnimatePresence initial={false} custom={direction} mode="wait">
         {activeValue === value && (
           <motion.div
