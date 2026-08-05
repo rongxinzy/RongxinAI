@@ -193,7 +193,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
         render={
           <PromptInputButton
             disabled={disabled}
-            className="hover:bg-surface-raised"
+            className="sidebar-interactive-surface hover:shadow-subtle data-popup-open:shadow-subtle"
             aria-label={i18nService.t('filesAndImages')}
           >
             <Plus className="h-4 w-4" />

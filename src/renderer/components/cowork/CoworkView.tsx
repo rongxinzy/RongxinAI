@@ -51,6 +51,7 @@ import {
   type CoworkSession,
 } from '../../types/cowork';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { isScratchWorkspacePath } from '../../utils/path';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
 import WindowTitleBar from '../window/WindowTitleBar';
@@ -60,6 +61,7 @@ import CoworkSessionViewport from './CoworkSessionViewport';
 import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
+import { useUnmanagedWorkingDirectory } from './useUnmanagedWorkingDirectory';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -204,7 +206,32 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
   const currentWorkspace = workspaces.find(workspace => workspace.id === currentWorkspaceId);
-  const currentWorkspacePath = currentWorkspace?.path || config.workingDirectory || '';
+  const defaultConversationWorkspace = workspaces.find(
+    workspace => !workspace.isHidden && isScratchWorkspacePath(workspace.path),
+  );
+  const {
+    clearUnmanagedWorkingDirectory,
+    selectUnmanagedWorkingDirectory,
+    unmanagedWorkingDirectory,
+  } = useUnmanagedWorkingDirectory({ currentWorkspaceId });
+  const currentSessionWorkingDirectory =
+    currentSession?.workspaceId === currentWorkspaceId ? currentSession.cwd : '';
+  const activeWorkspacePath =
+    currentSessionWorkingDirectory || unmanagedWorkingDirectory || currentWorkspace?.path || '';
+  const currentWorkspacePath =
+    activeWorkspacePath ||
+    (workMode === WorkMode.Work
+      ? defaultConversationWorkspace?.path
+      : config.workingDirectory) ||
+    '';
+  const currentWorkspaceDisplayName =
+    currentWorkspace && !currentWorkspace.isHidden && isScratchWorkspacePath(currentWorkspace.path)
+      ? i18nService.t('defaultConversation')
+      : currentWorkspace && !currentWorkspace.isHidden
+        ? currentWorkspace.name
+        : currentWorkspacePath === defaultConversationWorkspace?.path
+          ? i18nService.t('defaultConversation')
+          : undefined;
 
   const currentAgentSelectedModel = useAgentSelectedModel(
     currentAgentId,
@@ -800,6 +827,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         dispatch(updateSessionStatus({ sessionId: tempSessionId, status: 'error' }));
         return;
       }
+
+      if (startedSession) clearUnmanagedWorkingDirectory();
 
       // Stop immediately if user cancelled while startup request was in flight.
       if (isPendingStartCancelled() && startedSession) {
@@ -1460,11 +1489,24 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                 }
                 size="large"
                 workingDirectory={currentWorkspacePath}
+                workingDirectoryName={currentWorkspaceDisplayName}
                 onWorkingDirectoryChange={async (dir: string) => {
+                  clearUnmanagedWorkingDirectory();
                   const workspace = await workspaceService.ensureWorkspace(dir);
                   if (workspace) await workspaceService.selectWorkspace(workspace.id);
                 }}
-                showFolderSelector={workMode !== WorkMode.Chat}
+                onUseNoFolder={async dir => {
+                  const selected = await selectUnmanagedWorkingDirectory(dir);
+                  if (!selected) {
+                    window.dispatchEvent(
+                      new CustomEvent('app:showToast', {
+                        detail: i18nService.t('projectCreateFailed'),
+                      }),
+                    );
+                  }
+                }}
+                showFolderSelector={workMode !== WorkMode.Chat && !currentWorkspace?.isHidden}
+                showNoFolderAction={!currentWorkspaceId}
                 showModelSelector
                 isDirectChat={workMode === WorkMode.Chat && !isAgentBackedChat}
                 showLocalThinkingToggle={workMode === WorkMode.Chat && !isAgentBackedChat}

@@ -24,7 +24,7 @@ const workspaceSlice = createSlice({
         state.currentWorkspaceId &&
         !action.payload.some(workspace => workspace.id === state.currentWorkspaceId)
       ) {
-        state.currentWorkspaceId = action.payload[0]?.id ?? null;
+        state.currentWorkspaceId = action.payload.find(workspace => !workspace.isHidden)?.id ?? null;
       }
     },
     setCurrentWorkspaceId(state, action: PayloadAction<string | null>) {

@@ -280,7 +280,7 @@ export const useWorkspaceSidebarState = (
 
   const buildWorkspaceNodes = useCallback(
     (scheduled: boolean, expandedWorkspaceIds: string[], expandedTaskListIds: string[]) =>
-      workspaces.map(workspace => {
+      workspaces.filter(workspace => !workspace.isHidden).map(workspace => {
         const filtered = sortTasks(
           (previews[workspace.id] ?? []).filter(
             session =>
@@ -294,10 +294,10 @@ export const useWorkspaceSidebarState = (
         const visible = taskExpanded ? filtered : filtered.slice(0, AgentSidebarPageSize.Preview);
         return {
           id: workspace.id,
-          // The scratch workspace (「不使用文件夹」) displays as 无项目 instead
+          // The scratch workspace (「不使用文件夹」) displays as 默认对话 instead
           // of its folder basename.
           name: isScratchWorkspacePath(workspace.path)
-            ? i18nService.t('noProject')
+            ? i18nService.t('defaultConversation')
             : workspace.name,
           path: workspace.path,
           isExpanded: expanded,

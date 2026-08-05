@@ -1,5 +1,13 @@
 import { Button } from '@shared/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@shared/components/ui/dropdown-menu';
+import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
+import { Ellipsis, Pencil, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -10,7 +18,6 @@ import {
   AnimatedFolderOpenIcon,
   type AnimatedFolderOpenIconHandle,
 } from '../icons/AnimatedFolderOpenIcon';
-import { AnimatedDeleteIcon, type AnimatedDeleteIconHandle } from '../icons/AnimatedDeleteIcon';
 import {
   SidebarAnimatedMessageCirclePlusIcon,
   type SidebarAnimatedMessageCirclePlusIconHandle,
@@ -23,6 +30,7 @@ interface WorkspaceTreeNodeProps {
   selectedIds: Set<string>;
   onToggleExpanded: (workspaceId: string) => void;
   onCreateTask: (workspace: WorkspaceSidebarNode) => void;
+  onRenameWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onRemoveWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onRetryLoadTasks: (workspaceId: string) => void;
   onLoadMoreTasks: (workspaceId: string) => void;
@@ -45,6 +53,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   selectedIds,
   onToggleExpanded,
   onCreateTask,
+  onRenameWorkspace,
   onRemoveWorkspace,
   onRetryLoadTasks,
   onLoadMoreTasks,
@@ -60,14 +69,15 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
 }) => {
   const [shouldRenderTasks, setShouldRenderTasks] = useState(workspace.isExpanded);
   const [isTaskGroupVisible, setIsTaskGroupVisible] = useState(workspace.isExpanded);
+  const [menuOpen, setMenuOpen] = useState(false);
   const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
   const createTaskIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
-  const deleteIconRef = useRef<AnimatedDeleteIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(workspace.isExpanded);
-  // The scratch workspace (「无项目」) is not removable — it always exists.
-  const canRemove =
-    typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
+  const canRemove = typeof onRemoveWorkspace === 'function';
+  const canRename =
+    typeof onRenameWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
+  const canManage = canRemove || canRename;
 
   useEffect(() => {
     let frame = 0;
@@ -93,10 +103,13 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
 
   return (
     <div className="space-y-0.5">
-      <div className="group sticky top-0 z-20 ml-[-6px] h-7 w-[calc(100%+12px)] bg-surface-raised">
+      <div
+        data-slot="workspace-tree-row"
+        className="sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors hover:shadow-subtle"
+      >
         <Button
           variant="ghost"
-          className="flex h-full w-full items-center justify-start gap-2 rounded-md py-0 pl-3 pr-12 text-left text-sm font-normal text-foreground"
+          className="h-full min-w-0 flex-1 justify-start gap-2 rounded-md py-0 pl-3 pr-2 text-left text-sm font-normal text-foreground hover:bg-transparent aria-expanded:bg-transparent"
           onClick={() => onToggleExpanded(workspace.id)}
           onMouseEnter={() => {
             if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
@@ -113,40 +126,63 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
             {workspace.name}
           </span>
         </Button>
-        {showCreateTask && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => onCreateTask(workspace)}
-            onMouseEnter={() => {
-              if (!prefersReducedMotion) createTaskIconRef.current?.startAnimation();
-            }}
-            onMouseLeave={() => createTaskIconRef.current?.stopAnimation()}
-            className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground ${canRemove ? 'right-7' : 'right-1.5'}`}
-            aria-label={i18nService.t('myAgentSidebarNewTask')}
-          >
-            <SidebarAnimatedMessageCirclePlusIcon
-              ref={createTaskIconRef}
-              size={14}
-              className="size-3.5"
-            />
-          </Button>
-        )}
-        {canRemove && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            onClick={() => onRemoveWorkspace?.(workspace)}
-            onMouseEnter={() => {
-              if (!prefersReducedMotion) deleteIconRef.current?.startAnimation();
-            }}
-            onMouseLeave={() => deleteIconRef.current?.stopAnimation()}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 transition-colors group-hover:opacity-100 hover:bg-surface-raised hover:text-destructive"
-            aria-label={i18nService.t('removeProject')}
-          >
-            <AnimatedDeleteIcon ref={deleteIconRef} />
-          </Button>
-        )}
+        <div className="flex h-7 shrink-0 items-center gap-0.5 pr-1.5">
+          {showCreateTask && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={() => onCreateTask(workspace)}
+              onMouseEnter={() => {
+                if (!prefersReducedMotion) createTaskIconRef.current?.startAnimation();
+              }}
+              onMouseLeave={() => createTaskIconRef.current?.stopAnimation()}
+              className="text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
+              aria-label={i18nService.t('myAgentSidebarNewTask')}
+            >
+              <SidebarAnimatedMessageCirclePlusIcon
+                ref={createTaskIconRef}
+                size={14}
+                className="size-3.5"
+              />
+            </Button>
+          )}
+          {canManage && (
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    className={cn(
+                      'pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]',
+                      menuOpen && 'pointer-events-auto opacity-[0.46]',
+                    )}
+                    aria-label={i18nService.t('workspaceActions')}
+                  >
+                    <Ellipsis />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="min-w-[124px]">
+                {canRename && (
+                  <DropdownMenuItem onClick={() => onRenameWorkspace(workspace)}>
+                    <Pencil className="h-3.5 w-3.5" />
+                    {i18nService.t('renameProject')}
+                  </DropdownMenuItem>
+                )}
+                {canRemove && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => onRemoveWorkspace?.(workspace)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    {i18nService.t('removeProject')}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {shouldRenderTasks && (

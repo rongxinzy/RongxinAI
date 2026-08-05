@@ -31,6 +31,7 @@ import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
 import { matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
+import { workspaceService } from './services/workspace';
 import { RootState, store } from './store';
 import {
   selectCurrentSessionId,
@@ -117,6 +118,12 @@ const App: React.FC = () => {
   const dispatch = useDispatch();
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const currentSessionId = useSelector(selectCurrentSessionId);
+  const currentWorkspaceIsHidden = useSelector((state: RootState) => {
+    const currentWorkspaceId = state.workspace.currentWorkspaceId;
+    return state.workspace.workspaces.some(
+      workspace => workspace.id === currentWorkspaceId && workspace.isHidden,
+    );
+  });
   const pendingPermission = useSelector((state: RootState) =>
     selectPendingPermissionForSession(state, currentSessionId),
   );
@@ -402,6 +409,7 @@ const App: React.FC = () => {
   const handleNewChat = useCallback(() => {
     // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
     const shouldClearInput = mainView === 'cowork' && !currentSessionId;
+    if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
     coworkService.clearSession();
     dispatch(clearSelection());
     setMainView('cowork');
@@ -412,7 +420,7 @@ const App: React.FC = () => {
         }),
       );
     }, 0);
-  }, [dispatch, mainView, currentSessionId]);
+  }, [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView]);
 
   const handleTryMcp = useCallback(
     (prompt?: string) => {

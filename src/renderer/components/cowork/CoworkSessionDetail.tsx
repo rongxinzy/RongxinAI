@@ -8,7 +8,6 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
-  Folder,
   Image as ImageIcon,
   PanelLeft,
 } from 'lucide-react';
@@ -58,7 +57,6 @@ import type {
   CoworkPermissionRequest,
   CoworkPermissionResult,
 } from '../../types/cowork';
-import { getCompactFolderName } from '../../utils/path';
 import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
 import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
@@ -514,22 +512,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       window.removeEventListener(CoworkUiEvent.OpenShareOptions, handleOpenShareOptions);
     };
   }, [currentSession?.id]);
-
-  // Helper: truncate path for display
-  const truncatePath = (path: string, maxLength = 20): string => {
-    if (!path) return i18nService.t('noFolderSelected');
-    return getCompactFolderName(path, maxLength) || i18nService.t('noFolderSelected');
-  };
-
-  // Open folder in Finder/Explorer
-  const handleOpenFolder = useCallback(async () => {
-    if (!currentSession?.cwd) return;
-    try {
-      await window.electron.shell.openPath(currentSession.cwd);
-    } catch (error) {
-      console.error('Failed to open folder:', error);
-    }
-  }, [currentSession?.cwd]);
 
   const sessionToMarkdown = useCallback((): string => {
     if (!currentSession) return '';
@@ -1134,22 +1116,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {sessionId && <WorkbenchTaskStatusBar sessionId={sessionId} />}
         </div>
 
-        {/* Right side: Folder + Artifact toggle */}
+        {/* Right side: Artifact toggle */}
         <div className="non-draggable flex items-center gap-1">
-          {/* Folder button */}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleOpenFolder}
-            className="flex items-center gap-1.5"
-            aria-label={i18nService.t('coworkOpenFolder')}
-          >
-            <Folder className="h-4 w-4" />
-            <span className="max-w-[120px] truncate text-xs">
-              {truncatePath(currentSession.cwd)}
-            </span>
-          </Button>
-
           {/* Artifact panel toggle */}
           <Button
             variant="ghost"
