@@ -266,7 +266,13 @@ function resolveRuntime(
       runtime: 'bash',
       command,
       prefixArgs: [],
-      env: skillPythonExecutable ? { ZHIYUAN_SKILL_PYTHON_BIN: skillPythonExecutable } : {},
+      env: {
+        ...(skillPythonExecutable ? { ZHIYUAN_SKILL_PYTHON_BIN: skillPythonExecutable } : {}),
+        // DOCX preview uses the same managed Electron Node runtime as .mjs
+        // Skills. This keeps preview self-contained on packaged POSIX builds,
+        // where a user-installed `node` is not guaranteed to exist.
+        ZHIYUAN_ELECTRON_PATH: getElectronNodeRuntimePath(),
+      },
     };
   }
 

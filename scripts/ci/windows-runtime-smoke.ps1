@@ -51,12 +51,14 @@ try {
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\xlsx\Scripts\python.exe'
   $pdfPython = Join-Path $resourcesRoot 'skill-python\pdf\Scripts\python.exe'
+  $electron = Join-Path $ProjectRoot 'node_modules\electron\dist\electron.exe'
   $skillsRoot = Join-Path $resourcesRoot 'SKILLs'
 
   Assert-Path $bash 'bundled PortableGit Bash'
   Assert-Path $python 'bundled application Python'
   Assert-Path $skillPython 'bundled XLSX Skill Python'
   Assert-Path $pdfPython 'bundled PDF Skill Python'
+  Assert-Path $electron 'Electron Node runtime'
   Assert-Path (Join-Path $resourcesRoot 'uv-win\uv.exe') 'bundled uv'
   Assert-Path (Join-Path $skillsRoot 'xlsx\scripts\xlsx_reader.py') 'XLSX Skill reader'
   Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs') 'DOCX Markdown converter'
@@ -65,6 +67,7 @@ try {
   # The smoke test invokes only explicit package paths below.
   $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
   $env:UV_OFFLINE = '1'
+  $env:ELECTRON_RUN_AS_NODE = '1'
   foreach ($externalCommand in @('git.exe', 'python.exe', 'python3.exe', 'node.exe')) {
     if (Get-Command $externalCommand -ErrorAction SilentlyContinue) {
       throw "External command unexpectedly remains discoverable on the clean PATH: $externalCommand"
@@ -77,6 +80,13 @@ try {
   Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'
   Invoke-Checked $pdfPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
   Invoke-Checked $bash @('-lc', 'printf "portable-git-bash-ok\n"') 'bundled Bash probe'
+  $markdown = Join-Path $smokeRoot 'smoke.md'
+  $docx = Join-Path $smokeRoot 'smoke.docx'
+  $converter = Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs'
+  Set-Content -LiteralPath $markdown -Value "# Windows runtime smoke`n`nManaged DOCX conversion works.`n" -Encoding UTF8
+  Invoke-Checked $electron @($converter, $markdown, $docx) 'DOCX Markdown conversion'
+  Assert-Path $docx 'generated DOCX'
+  Invoke-Checked $electron @('-e', "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.readUInt32LE(0) -ne 0x04034b50) { process.exit(1) }", $docx) 'generated DOCX ZIP validation'
   $fixture = Join-Path $smokeRoot 'smoke.xlsx'
   $createFixture = "from openpyxl import Workbook; w=Workbook(); s=w.active; s.title='Smoke'; s.append(['Name','Score']); s.append(['Windows',100]); w.save(r'$fixture')"
   Invoke-Checked $skillPython @('-c', $createFixture) 'XLSX fixture creation'

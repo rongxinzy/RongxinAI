@@ -184,6 +184,18 @@ describe('skillRuntimeRunner', () => {
     expect(result.ok).toBe(true);
     expect(result.runtime).toBe('node');
     expect(fs.statSync(outputPath).size).toBeGreaterThan(0);
+
+    const preview = await runManagedSkillScript({
+      skillsRoot,
+      skillId: 'docx',
+      script: 'scripts/docx_preview.sh',
+      args: [outputPath],
+      workspaceRoot: root,
+      timeoutMs: 30_000,
+    });
+    expect(preview.ok).toBe(true);
+    expect(preview.stdout).toContain('Managed DOCX');
+    expect(preview.stdout).not.toContain('DOCX .');
   });
 
   it('runs the PDF inspection pipeline with the packaged PDF Skill environment', async () => {

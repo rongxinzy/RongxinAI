@@ -73,6 +73,10 @@ test('Windows release workflow runs the clean-path bundled runtime gate', () => 
   assert.match(smoke, /skill-python\\xlsx/);
   assert.match(smoke, /skill-python\\pdf/);
   assert.match(smoke, /markdown_to_docx\.mjs/);
+  assert.match(smoke, /docx\\scripts\\markdown_to_docx\.mjs/);
+  assert.match(smoke, /electron\\dist\\electron\.exe/);
+  assert.match(smoke, /ELECTRON_RUN_AS_NODE/);
+  assert.match(smoke, /DOCX Markdown conversion/);
   assert.match(smoke, /External command unexpectedly remains discoverable/);
   assert.match(smoke, /mingit\\usr\\bin\\bash\.exe/);
   assert.match(smoke, /PATH = "\$env:SystemRoot\\System32;\$env:SystemRoot"/);

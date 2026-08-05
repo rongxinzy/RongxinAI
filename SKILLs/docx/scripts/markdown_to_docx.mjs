@@ -97,7 +97,7 @@ function runs(text) {
     const italic = !bold && (token.startsWith('*') || token.startsWith('_'));
     const code = token.startsWith('`');
     const value = token.slice(bold ? 2 : 1, bold ? -2 : -1);
-    const properties = `${bold ? '<w:b/>' : ''}${italic ? '<w:i/>' : ''}${code ? '<w:rStyle w:val="Code"/>' : ''}`;
+    const properties = `${bold ? '<w:b/>' : ''}${italic ? '<w:i/>' : ''}${code ? '<w:rStyle w:val="CodeChar"/>' : ''}`;
     parts.push(`<w:r><w:rPr>${properties}</w:rPr>${literal(value)}</w:r>`);
     cursor = match.index + token.length;
   }
@@ -117,6 +117,17 @@ function documentXml(markdown) {
   const lines = markdown.replaceAll('\r\n', '\n').split('\n');
   const body = [];
   let codeLines = null;
+  const isBlockBoundary = candidateIndex => {
+    const candidate = lines[candidateIndex];
+    if (!candidate || !candidate.trim()) return true;
+    if (/^```/.test(candidate) || /^(#{1,6})\s+/.test(candidate)) return true;
+    if (/^\s*[-*_]{3,}\s*$/.test(candidate)) return true;
+    if (/^\s*[-*+]\s+/.test(candidate) || /^\s*\d+[.)]\s+/.test(candidate)) return true;
+    if (/^>\s?/.test(candidate)) return true;
+    return candidate.includes('|') &&
+      candidateIndex + 1 < lines.length &&
+      /^\s*\|?\s*:?-{3,}/.test(lines[candidateIndex + 1]);
+  };
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     if (line.startsWith('```')) {
@@ -149,13 +160,20 @@ function documentXml(markdown) {
       index = nextLine - 1;
       continue;
     }
-    body.push(paragraph(line));
+    const paragraphLines = [line];
+    let nextLine = index + 1;
+    while (nextLine < lines.length && !isBlockBoundary(nextLine)) {
+      paragraphLines.push(lines[nextLine]);
+      nextLine += 1;
+    }
+    body.push(paragraph(paragraphLines.join(' ')));
+    index = nextLine - 1;
   }
   if (codeLines) body.push(paragraph(codeLines.join('\n'), 'Code'));
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr></w:body></w:document>`;
 }
 
-const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="Microsoft YaHei"/><w:sz w:val="22"/></w:rPr></w:style>${[1,2,3,4,5,6].map(level => `<w:style w:type="paragraph" w:styleId="Heading${level}"><w:name w:val="heading ${level}"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:sz w:val="${40 - level * 3}"/></w:rPr></w:style>`).join('')}<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720"/></w:pPr><w:rPr><w:i/><w:color w:val="666666"/></w:rPr></w:style><w:style w:type="character" w:styleId="Code"><w:name w:val="Code"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
+const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:rPr><w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="Microsoft YaHei"/><w:sz w:val="22"/></w:rPr></w:style>${[1,2,3,4,5,6].map(level => `<w:style w:type="paragraph" w:styleId="Heading${level}"><w:name w:val="heading ${level}"/><w:basedOn w:val="Normal"/><w:rPr><w:b/><w:sz w:val="${40 - level * 3}"/></w:rPr></w:style>`).join('')}<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="720"/></w:pPr><w:rPr><w:i/><w:color w:val="666666"/></w:rPr></w:style><w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="F3F4F6"/><w:ind w:left="360" w:right="360"/></w:pPr><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style><w:style w:type="character" w:styleId="CodeChar"><w:name w:val="CodeChar"/><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="20"/></w:rPr></w:style></w:styles>`;
 const numberingXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/><w:lvlText w:val="%1."/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>`;
 
 async function main() {
