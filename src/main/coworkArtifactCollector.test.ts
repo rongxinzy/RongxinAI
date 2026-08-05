@@ -45,8 +45,47 @@ describe('collectSessionArtifactCandidates', () => {
     });
     expect(candidates[1]).toMatchObject({
       artifactKey: 'path:d:/output/report.html',
-      artifact: { content: '', declared: false },
+      artifact: {
+        content: '',
+        declared: false,
+        role: CoworkArtifactRole.Intermediate,
+      },
     });
+  });
+
+  test('keeps undeclared verification scripts out of deliverables', () => {
+    const candidates = collectSessionArtifactCandidates([
+      message('write-verification-script', 1, 'tool_use', '', {
+        toolName: 'write',
+        toolInput: { path: 'D:/output/_verify_tetris.js', content: 'runTests();' },
+      }),
+      message('declare-html', 2, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolInput: {
+          filePath: 'D:/output/tetris.html',
+          role: CoworkArtifactRole.Deliverable,
+        },
+      }),
+    ]);
+
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          artifact: expect.objectContaining({
+            fileName: '_verify_tetris.js',
+            role: CoworkArtifactRole.Intermediate,
+            declared: false,
+          }),
+        }),
+        expect.objectContaining({
+          artifact: expect.objectContaining({
+            fileName: 'tetris.html',
+            role: CoworkArtifactRole.Deliverable,
+            declared: true,
+          }),
+        }),
+      ]),
+    );
   });
 
   test('collects supported assistant code blocks with stable keys and content', () => {

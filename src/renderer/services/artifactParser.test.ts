@@ -292,7 +292,7 @@ describe('detectArtifactsFromMessages', () => {
     expect(artifacts).toHaveLength(0);
   });
 
-  test('keeps explicit write-tool outputs as artifacts', () => {
+  test('keeps write-tool outputs intermediate until explicitly declared', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
@@ -322,8 +322,73 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.filePath).toBe('D:/workspace/output.ts');
-    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Intermediate);
     expect(artifacts[0].needsFileLoad).toBe(true);
+  });
+
+  test('does not show an undeclared verification script with declared deliverables', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'write-verification-script',
+          type: 'tool_use',
+          content: 'Using tool: Write',
+          timestamp: Date.now(),
+          metadata: {
+            toolName: 'write',
+            toolInput: { path: 'D:/workspace/_verify_tetris.js', content: 'runTests();' },
+          },
+        },
+        ...['tetris.html', 'tetris-preview.png', 'validation.md'].map((filePath, index) => ({
+          id: `declare-${index}`,
+          type: 'tool_use' as const,
+          content: '',
+          timestamp: Date.now(),
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: `D:/workspace/${filePath}`,
+              role: ArtifactRole.Deliverable,
+            },
+          },
+        })),
+      ],
+      'sess1',
+    );
+
+    expect(
+      artifacts
+        .filter(({ artifact }) => artifact.role === ArtifactRole.Deliverable)
+        .map(({ artifact }) => artifact.fileName),
+    ).toEqual(['tetris.html', 'tetris-preview.png', 'validation.md']);
+    expect(
+      artifacts.find(({ artifact }) => artifact.fileName === '_verify_tetris.js'),
+    ).toMatchObject({
+      artifact: {
+        role: ArtifactRole.Intermediate,
+        declared: false,
+      },
+    });
+  });
+
+  test('uses the declare_artifact default deliverable role when role is omitted', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'declare-output',
+          type: 'tool_use',
+          content: '',
+          timestamp: Date.now(),
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: { filePath: 'D:/workspace/output.html' },
+          },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
   });
 
   test('marks only the final answer artifact as deliverable via declare_artifact', () => {
