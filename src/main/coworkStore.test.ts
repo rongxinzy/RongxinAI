@@ -27,6 +27,7 @@ import {
 } from '../shared/agent/avatar';
 import { CoworkSessionMode } from '../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
+import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import { CoworkStore } from './coworkStore';
 
 // ---------------------------------------------------------------------------
@@ -107,6 +108,8 @@ function setupDb(): void {
       value TEXT
     );
   `);
+
+  initializeCoworkArtifactIndexSchema(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS agents (
@@ -205,6 +208,43 @@ test('getSession returns all messages when one has corrupt metadata', () => {
   // Null metadata → undefined
   const nullMsg = session!.messages.find(m => m.id === 'msg-null')!;
   expect(nullMsg.metadata).toBeUndefined();
+});
+
+test('getSession lazily backfills artifacts from messages outside the loaded page', () => {
+  const sid = 'artifact-session';
+  insertSession(sid);
+  insertMessage(
+    'artifact-message',
+    sid,
+    'assistant',
+    '```artifact:html title="History preview"\n<h1>old</h1>\n```',
+    null,
+    1,
+    1,
+  );
+  for (let sequence = 2; sequence <= 35; sequence += 1) {
+    insertMessage(
+      `message-${sequence}`,
+      sid,
+      'user',
+      `message ${sequence}`,
+      null,
+      sequence,
+      sequence,
+    );
+  }
+
+  const session = store.getSession(sid);
+
+  expect(session?.messagesOffset).toBe(5);
+  expect(session?.messages.some(message => message.id === 'artifact-message')).toBe(false);
+  expect(session?.artifacts).toEqual([
+    expect.objectContaining({
+      messageId: 'artifact-message',
+      title: 'History preview',
+      content: '<h1>old</h1>',
+    }),
+  ]);
 });
 
 test('sessions are grouped by workspace independently of their agent snapshot', () => {

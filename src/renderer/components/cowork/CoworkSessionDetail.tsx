@@ -410,22 +410,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const persisted = currentSession?.artifacts;
     if (!persisted || persisted.length === 0) return;
 
-    const existingIds = new Set(
-      (previewArtifacts || []).map(a => a.id),
-    );
+    const existingIds = new Set((previewArtifacts || []).map(a => a.id));
     for (const artifact of persisted) {
-      // Only add if not already present (renderer-detected artifacts take
-      // precedence because they have content for code blocks).
+      // Only add if not already present. Path-level deduplication in the
+      // artifact slice reconciles persisted declarations with loaded files.
       if (!existingIds.has(artifact.id)) {
         dispatch(
           addArtifact({
             sessionId,
             artifact: {
               ...artifact,
-              messageId: artifact.id,
               sessionId,
-              content: '',
-            } as import('../../types/artifact').Artifact,
+            },
           }),
         );
       }

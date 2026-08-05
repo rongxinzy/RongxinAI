@@ -4,6 +4,7 @@ import type {
   CoworkPermissionOrigin,
   CoworkSessionMode,
 } from '../../shared/cowork/constants';
+import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
@@ -117,7 +118,7 @@ export interface CoworkSession {
   /** Total number of messages stored for this session. */
   totalMessages: number;
   /** Persisted artifacts collected from the full message history on the main process. */
-  artifacts?: import('../../main/coworkStore').CoworkPersistedArtifact[];
+  artifacts?: CoworkPersistedArtifact[];
   createdAt: number;
   updatedAt: number;
 }

@@ -14,6 +14,7 @@ import {
   normalizeAgentAvatarIcon,
 } from '../shared/agent';
 import { DB_FILENAME } from './appConstants';
+import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
@@ -276,11 +277,6 @@ export class SqliteStore {
         this.didRunMigration = true;
       }
 
-      if (!colNames.includes('artifacts')) {
-        this.db.exec('ALTER TABLE cowork_sessions ADD COLUMN artifacts TEXT;');
-        this.didRunMigration = true;
-      }
-
       // Migration: Add sequence column to cowork_messages
       const msgColumns = this.db.pragma('table_info(cowork_messages)') as Array<{ name: string }>;
       const msgColNames = msgColumns.map(c => c.name);
@@ -305,6 +301,7 @@ export class SqliteStore {
     } catch {
       // Column already exists or migration not needed.
     }
+    initializeCoworkArtifactIndexSchema(this.db);
 
     try {
       const pinnedResult = this.db

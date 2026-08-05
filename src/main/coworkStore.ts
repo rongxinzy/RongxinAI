@@ -15,11 +15,13 @@ import {
   type CoworkPermissionMode as CoworkPermissionModeType,
   type CoworkSessionMode as CoworkSessionModeType,
 } from '../shared/cowork/constants';
+import type { CoworkPersistedArtifact } from '../shared/cowork/artifacts';
 import type {
   CoworkSessionExpertInput,
   CoworkSessionExpertSnapshot,
 } from '../shared/cowork/sessionExperts';
 import type { Workspace } from '../shared/workspace';
+import { CoworkArtifactIndex } from './coworkArtifactIndex';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 // Default working directory for new users
@@ -422,17 +424,6 @@ export interface CoworkConversationReplacementEntry {
   timestamp?: number;
 }
 
-export interface CoworkPersistedArtifact {
-  id: string;
-  type: string;
-  title: string;
-  fileName?: string;
-  filePath?: string;
-  source: 'codeblock' | 'tool';
-  role: 'intermediate' | 'deliverable';
-  createdAt: number;
-}
-
 export interface CoworkSession {
   id: string;
   title: string;
@@ -604,9 +595,11 @@ interface CoworkUserMemoryRow {
 
 export class CoworkStore {
   private db: Database.Database;
+  private artifactIndex: CoworkArtifactIndex;
 
   constructor(db: Database.Database) {
     this.db = db;
+    this.artifactIndex = new CoworkArtifactIndex(db);
   }
 
   private getOne<T>(sql: string, params: (string | number | null)[] = []): T | undefined {
@@ -826,9 +819,9 @@ export class CoworkStore {
       updated_at: number;
     }
 
-    const row = this.getOne<SessionRow & { artifacts: string | null }>(
+    const row = this.getOne<SessionRow>(
       `
-      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at, artifacts
+      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at
       FROM cowork_sessions
       WHERE id = ?
     `,
@@ -906,15 +899,13 @@ export class CoworkStore {
     });
 
     let artifacts: CoworkPersistedArtifact[] = [];
-    if ((row as unknown as Record<string, unknown>).artifacts) {
-      try {
-        const parsed = JSON.parse(
-          (row as unknown as Record<string, unknown>).artifacts as string,
-        );
-        if (Array.isArray(parsed)) artifacts = parsed;
-      } catch {
-        artifacts = [];
-      }
+    try {
+      artifacts =
+        row.status === 'running'
+          ? this.artifactIndex.listSession(id)
+          : this.artifactIndex.refreshSession(id);
+    } catch (error) {
+      console.error(`[CoworkStore] Failed to index artifacts for session ${id}:`, error);
     }
 
     return {
@@ -942,14 +933,8 @@ export class CoworkStore {
     };
   }
 
-  saveSessionArtifacts(
-    sessionId: string,
-    artifacts: CoworkPersistedArtifact[],
-  ): void {
-    const now = Date.now();
-    this.db
-      .prepare('UPDATE cowork_sessions SET artifacts = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(artifacts), now, sessionId);
+  refreshSessionArtifacts(sessionId: string): CoworkPersistedArtifact[] {
+    return this.artifactIndex.refreshSession(sessionId);
   }
 
   updateSession(
@@ -1279,7 +1264,7 @@ export class CoworkStore {
     }));
   }
 
-  getSessionMessages(sessionId: string): CoworkMessage[] {
+  private getSessionMessages(sessionId: string): CoworkMessage[] {
     const rows = this.getAll<CoworkMessageRow>(
       `
       SELECT id, type, content, metadata, created_at, sequence
@@ -1718,7 +1703,11 @@ export class CoworkStore {
       this.upsertConfig('permissionMode', normalizePermissionMode(config.permissionMode), now);
     }
     if (config.permissionModeBySession !== undefined) {
-      this.upsertConfig('permissionModeBySession', JSON.stringify(config.permissionModeBySession), now);
+      this.upsertConfig(
+        'permissionModeBySession',
+        JSON.stringify(config.permissionModeBySession),
+        now,
+      );
     }
     if (config.embeddingEnabled !== undefined) {
       this.upsertConfig('embeddingEnabled', config.embeddingEnabled ? '1' : '0', now);
