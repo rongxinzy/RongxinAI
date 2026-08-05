@@ -50,7 +50,6 @@ import {
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
-import { ArtifactRole, type Artifact } from '../../types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
@@ -471,27 +470,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       );
       if (existing) {
         dispatch(selectArtifact(existing.id));
-      } else {
-        const type = getArtifactTypeFromExtension(ext)!;
-        const fileName = filePath.slice(
-          Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\')) + 1,
-        );
-        const newArtifact: Artifact = {
-          id: `artifact-click-${Date.now()}`,
-          messageId: '',
-          sessionId,
-          type,
-          title: fileName,
-          content: '',
-          fileName,
-          filePath,
-          source: 'tool',
-          role: ArtifactRole.Deliverable,
-          createdAt: Date.now(),
-        };
-        dispatch(addArtifact({ sessionId, artifact: newArtifact }));
-        dispatch(selectArtifact(newArtifact.id));
       }
+      // No fallback creation — artifacts are now declared via declare_artifact tool,
+      // not created from ad-hoc link clicks or regex parsing.
     };
 
     container.addEventListener('click', handleLinkClick, true);
