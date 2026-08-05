@@ -301,9 +301,18 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       const updatedSkills = await skillService.setSkillsEnabled(ids, enabled);
       dispatch(setSkills(updatedSkills));
       setSkillActionError('');
+      showToast(
+        enabled
+          ? i18nService.t('skillEnableSuccess')
+          : i18nService.t('skillDisableSuccess'),
+      );
     } catch (error) {
-      setSkillActionError(
-        error instanceof Error ? error.message : i18nService.t('skillUpdateFailed'),
+      const message = error instanceof Error ? error.message : i18nService.t('skillUpdateFailed');
+      setSkillActionError(message);
+      showToast(
+        enabled
+          ? i18nService.t('skillEnableFailed')
+          : i18nService.t('skillDisableFailed'),
       );
     } finally {
       setIsBatchUpdating(false);
