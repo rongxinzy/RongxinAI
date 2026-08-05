@@ -1,8 +1,8 @@
-import { Sparkles } from 'lucide-react';
+import { X } from 'lucide-react';
 import React from 'react';
 
 const GrokIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <Sparkles className={className} aria-label="Grok" />
+  <X className={className} aria-label="Grok / xAI" />
 );
 
 export default GrokIcon;
