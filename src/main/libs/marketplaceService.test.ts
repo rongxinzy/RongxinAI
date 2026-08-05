@@ -373,10 +373,15 @@ test('MarketplaceService reports catalogue failures without leaking token detail
   expect(result.warning).not.toMatch(/token|api key/i);
 });
 
-test('MarketplaceService resolves install metadata only through the cloud catalogue', async () => {
-  const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/models/Qwen/Qwen3-8B-GGUF');
-    return Response.json(verifiedModel());
+test('MarketplaceService resolves install metadata through the catalogue search endpoint', async () => {
+  const fetchMock = vi.fn(async (urlValue: string) => {
+    const url = new URL(urlValue);
+    expect(url.pathname).toBe('/v1/catalog/search');
+    expect(url.searchParams.get('q')).toBe('Qwen/Qwen3-8B-GGUF');
+    expect(url.searchParams.get('limit')).toBe('8');
+    expect(url.searchParams.get('page')).toBe('1');
+    expect(url.searchParams.has('featured')).toBe(false);
+    return Response.json({ models: [verifiedModel()], totalCount: 1 });
   });
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => createTempDir(), {
@@ -436,7 +441,7 @@ test('MarketplaceService falls back to a stale cached search when the catalogue 
 test('MarketplaceService caches resolved model details and serves them offline', async () => {
   const fetchMock = vi
     .fn()
-    .mockResolvedValueOnce(Response.json({ model: verifiedModel() }))
+    .mockResolvedValueOnce(Response.json({ models: [verifiedModel()], totalCount: 1 }))
     .mockRejectedValueOnce(new Error('network unreachable'));
   vi.stubGlobal('fetch', fetchMock);
   const cacheDir = createTempDir();

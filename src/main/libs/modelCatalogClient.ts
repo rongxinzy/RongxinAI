@@ -98,7 +98,6 @@ export class ModelCatalogClient {
     if (params.limit) url.searchParams.set('limit', String(params.limit));
     if (params.pageNumber) url.searchParams.set('page', String(params.pageNumber));
     if (params.sortby) url.searchParams.set('sortby', params.sortby);
-    if (params.featuredOnly) url.searchParams.set('featured', '1');
     const payload = await this.fetchJson(url.toString(), signal) as CatalogSearchPayload;
     const normalizedModels = (payload.models ?? []).map(normalizeModel);
     return {
@@ -113,25 +112,21 @@ export class ModelCatalogClient {
     };
   }
 
-  async bootstrap(): Promise<MarketplaceSearchResult> {
-    const payload = await this.fetchJson(`${this.baseUrl}/v1/catalog/bootstrap`) as { models?: CatalogModelPayload[]; totalCount?: number; warning?: string; source?: MarketplaceSearchResult['source']; catalogUpdatedAt?: string; scoreVersion?: string };
-    return {
-      models: (payload.models ?? []).map(normalizeModel).filter(isGenerativeLanguageModel).filter(isVerifiedGgufCatalogModel), totalCount: payload.totalCount, warning: payload.warning,
-      source: payload.source ?? 'cloud-catalog', catalogUpdatedAt: payload.catalogUpdatedAt, scoreVersion: payload.scoreVersion,
-    };
-  }
-
   async resolveModel(repoId: string): Promise<MarketplaceModel | null> {
-    const [owner, repo] = repoId.trim().split('/');
-    if (!owner || !repo) return null;
-    const payload = await this.fetchJson(
-      `${this.baseUrl}/v1/catalog/models/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
-    ) as CatalogModelPayload | { model?: CatalogModelPayload };
-    const value: CatalogModelPayload | undefined =
-      (payload as { model?: CatalogModelPayload }).model ?? (payload as CatalogModelPayload);
-    if (!value || !value.repoId) return null;
-    const model = normalizeModel(value);
-    return isGenerativeLanguageModel(model) && isVerifiedGgufCatalogModel(model) ? model : null;
+    const normalizedRepoId = repoId.trim();
+    if (!normalizedRepoId) return null;
+    const result = await this.search({
+      query: normalizedRepoId,
+      limit: 8,
+      pageNumber: 1,
+      fit: 'all',
+    });
+    const model = result.models.find(candidate =>
+      candidate.repoId === normalizedRepoId || candidate.id === normalizedRepoId,
+    );
+    return model && isGenerativeLanguageModel(model) && isVerifiedGgufCatalogModel(model)
+      ? model
+      : null;
   }
 
   private async fetchJson(url: string, externalSignal?: AbortSignal): Promise<unknown> {
