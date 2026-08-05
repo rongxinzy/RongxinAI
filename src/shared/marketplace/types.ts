@@ -15,6 +15,13 @@ export const MarketplaceCapability = {
 export type MarketplaceCapability =
   (typeof MarketplaceCapability)[keyof typeof MarketplaceCapability];
 
+export const MarketplaceSortOrder = {
+  Asc: 'asc',
+  Desc: 'desc',
+} as const;
+
+export type MarketplaceSortOrder = (typeof MarketplaceSortOrder)[keyof typeof MarketplaceSortOrder];
+
 export type MarketplaceModel = {
   source: MarketplaceSource;
   id: string;
@@ -115,11 +122,17 @@ export type MarketplaceSearchParams = {
   size?: MarketplaceSizeFilter;
   limit?: number;
   pageNumber?: number;
+  sortby?: MarketplaceSortOrder;
   featuredOnly?: boolean;
   fit?: 'all' | 'recommended' | 'excellent' | 'compatible' | 'unsupported';
   quantization?: string;
   minStars?: number;
   language?: string;
+};
+
+export type MarketplaceSearchRequest = {
+  requestId: string;
+  params: MarketplaceSearchParams;
 };
 
 export type MarketplaceSearchResult = {

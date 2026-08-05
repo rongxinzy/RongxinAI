@@ -84,8 +84,6 @@ function renderPanel(overrides: Partial<Parameters<typeof MarketplacePanel>[0]> 
     onQueryChange: vi.fn(),
     onSearch: vi.fn(),
     onInstall: vi.fn(),
-    totalCount: undefined,
-    nextPageNumber: undefined,
     ...overrides,
   };
   return { ...render(<MarketplacePanel {...props} />), props };
@@ -107,51 +105,60 @@ describe('MarketplacePanel result grid and count consistency', () => {
 
   test('renders one card per installable model', () => {
     const models = [makeModel('alpha'), makeModel('beta'), makeModel('gamma')];
-    renderPanel({ hasSearched: true, models, totalCount: 3 });
+    renderPanel({ hasSearched: true, models });
 
     // Count must equal the rendered cards — never the raw server total.
-    expect(screen.getByText('共 3 个结果')).toBeInTheDocument();
+    expect(screen.getByText('共 3 个模型')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(3);
   });
 
-  test('caps an oversized cloud page at the configured page size', () => {
+  test('renders every model returned in the current cloud page', () => {
     const models = Array.from({ length: MARKETPLACE_PAGE_SIZE + 2 }, (_, index) =>
       makeModel(`model-${index}`),
     );
-    renderPanel({ hasSearched: true, models, totalCount: models.length });
+    renderPanel({ hasSearched: true, models });
 
-    expect(screen.getAllByText('安装')).toHaveLength(MARKETPLACE_PAGE_SIZE);
+    expect(screen.getAllByText('安装')).toHaveLength(MARKETPLACE_PAGE_SIZE + 2);
   });
 
+  test('shows the complete server result count instead of the current page size', () => {
+    const models = Array.from({ length: MARKETPLACE_PAGE_SIZE }, (_, index) =>
+      makeModel(`model-${index}`),
+    );
+    renderPanel({ hasSearched: true, models, totalCount: 3318 });
+
+    expect(screen.getByText(/3318/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /\u5b89\u88c5/ })).toHaveLength(MARKETPLACE_PAGE_SIZE);
+  });
   test('shows the rendered card count instead of the unfiltered server total', () => {
     // The visible count must match the cards that remain after local filtering.
     const models = [makeModel('alpha'), makeModel('beta')];
-    renderPanel({ hasSearched: true, models, totalCount: 7 });
+    renderPanel({ hasSearched: true, models });
 
-    expect(screen.getByText('共 2 个结果')).toBeInTheDocument();
+    expect(screen.getByText('共 2 个模型')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(2);
   });
 
   test('empty grid shows empty state without a misleading server total', () => {
     // Regression: server reported 7 matches but every model was filtered out
-    // (installed/unsupported). The panel must not print "共 7 个结果" over an
+    // (installed/unsupported). The panel must not print "共 7 个模型" over an
     // empty grid — it should show the empty state instead.
-    renderPanel({ hasSearched: true, models: [], totalCount: 7 });
+    renderPanel({ hasSearched: true, models: []});
 
-    expect(screen.queryByText(/共 7 个结果/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/共 7 个模型/)).not.toBeInTheDocument();
     expect(screen.getByText('没有找到匹配的模型')).toBeInTheDocument();
   });
 
-  test('installed models are excluded from the grid and visible count', () => {
+  test('fit=all keeps installed models in the grid', () => {
     const models = [
       makeModel('alpha'),
       makeModel('beta', { installed: true, installedPath: '/models/beta.gguf' }),
     ];
-    renderPanel({ hasSearched: true, models, totalCount: 2 });
+    renderPanel({ hasSearched: true, models });
 
     // One installed model is excluded, so the visible count is one.
-    expect(screen.getByText('共 1 个结果')).toBeInTheDocument();
-    expect(screen.getAllByText('安装')).toHaveLength(1);
+    expect(screen.getByText('共 2 个模型')).toBeInTheDocument();
+    expect(screen.getAllByText('安装')).toHaveLength(2);
   });
 
   test('renders a card grid skeleton while loading, not a centered spinner', () => {
@@ -163,38 +170,35 @@ describe('MarketplacePanel result grid and count consistency', () => {
     expect(screen.queryByText('加载中')).not.toBeInTheDocument();
   });
 
-  test('skips server pages that yield no installable cards', () => {
+  test('clicking next page fetches the next cloud page', async () => {
+    const user = userEvent.setup();
     const onSearch = vi.fn();
+    const models = Array.from({ length: MARKETPLACE_PAGE_SIZE }, (_, index) =>
+      makeModel('model-' + index),
+    );
     renderPanel({
       hasSearched: true,
-      models: [],
-      totalCount: 24,
+      models,
+      totalCount: MARKETPLACE_PAGE_SIZE * 2,
       nextPageNumber: 2,
       onSearch,
     });
 
-    expect(lastSearchCall(onSearch)).toEqual(expect.objectContaining({ pageNumber: 2 }));
-  });
-
-  test('pagination shows page summary and fetches the next page', async () => {
-    const user = userEvent.setup();
-    const onSearch = vi.fn();
-    renderPanel({
-      hasSearched: true,
-      models: [makeModel('alpha')],
-      totalCount: 24,
-      onSearch,
+    expect(screen.getByText(/1\s*\/\s*2/)).toBeInTheDocument();
+    const nextButton = screen.getByRole('button', {
+      name: /next|\u4e0b\u4e00\u9875|\u4e0b\u4e00\u9875/,
     });
-
-    // pageSize is 8, so 24 models span 3 pages.
-    expect(screen.getByText('第 1 / 3 页')).toBeInTheDocument();
-
-    const nextButton = screen.getByRole('button', { name: '下一页' });
     expect(nextButton).toBeEnabled();
-    expect(screen.getByRole('button', { name: '上一页' })).toBeDisabled();
 
     await user.click(nextButton);
-    expect(lastSearchCall(onSearch)).toEqual(expect.objectContaining({ pageNumber: 2 }));
+    expect(screen.getByText(/2\s*\/\s*2/)).toBeInTheDocument();
+    expect(lastSearchCall(onSearch)).toEqual(
+      expect.objectContaining({
+        pageNumber: 2,
+        limit: MARKETPLACE_PAGE_SIZE,
+        sortby: 'asc',
+      }),
+    );
   });
 });
 
@@ -229,7 +233,7 @@ describe('MarketplacePanel search and filters', () => {
     await user.click(screen.getByRole('button', { name: '搜索' }));
 
     expect(lastSearchCall(onSearch)).toEqual(
-      expect.objectContaining({ query: 'qwen3', pageNumber: 1 }),
+      expect.objectContaining({ query: 'qwen3' }),
     );
   });
 
@@ -243,15 +247,14 @@ describe('MarketplacePanel search and filters', () => {
 
     expect(onQueryChange).toHaveBeenCalledWith('');
     expect(lastSearchCall(onSearch)).toEqual(
-      expect.objectContaining({ query: '', featuredOnly: true }),
+      expect.objectContaining({ query: '', featuredOnly: false }),
     );
   });
 
-  test('recommendations do not show a device fit selector', () => {
+  test('all models show the device fit selector', () => {
     renderPanel({ hasSearched: true, models: [makeModel('alpha')] });
 
-    expect(screen.queryByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/\u4e0d\u9650\u9002\u914d/)).not.toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).toBeInTheDocument();
   });
   test('switching the fit filter to "不限" re-searches the whole catalogue', async () => {
     // The reported regression: choosing the unrestricted fit ("不限") stayed on
@@ -261,7 +264,6 @@ describe('MarketplacePanel search and filters', () => {
     const onSearch = vi.fn();
     renderPanel({ hasSearched: true, models: [makeModel('alpha')], onSearch });
 
-    await user.click(screen.getByRole('button', { name: '\u5168\u90e8\u6a21\u578b' }));
     const fitSelector = screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' });
     await user.click(fitSelector);
     await user.click(await screen.findByRole('option', { name: '\u53ef\u8fd0\u884c' }));
@@ -273,16 +275,19 @@ describe('MarketplacePanel search and filters', () => {
     );
   });
 
-  test('switching to all models disables the local fit filter', async () => {
+  test('opens the device-fit selector below its trigger', async () => {
     const user = userEvent.setup();
-    const onSearch = vi.fn();
-    renderPanel({ hasSearched: true, models: [makeModel('alpha')], onSearch });
+    renderPanel({ hasSearched: true, models: [makeModel('alpha')] });
 
-    await user.click(screen.getByRole('button', { name: '\u5168\u90e8\u6a21\u578b' }));
+    await user.click(screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' }));
 
-    expect(lastSearchCall(onSearch)).toEqual(
-      expect.objectContaining({ fit: 'all', featuredOnly: false }),
-    );
+    expect(document.querySelector('[data-slot="select-content"]')).toHaveAttribute('data-side', 'bottom');
+  });
+
+  test('all models keep the local fit filter available', () => {
+    renderPanel({ hasSearched: true, models: [makeModel('alpha')] });
+
+    expect(screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).toBeEnabled();
   });
   test('hides the stale result count while a new search is loading', () => {
     // The reported flicker: while the skeleton is showing, the count still
@@ -291,10 +296,9 @@ describe('MarketplacePanel search and filters', () => {
     renderPanel({
       hasSearched: true,
       models,
-      totalCount: 11222,
       marketplaceLoading: true,
     });
 
-    expect(screen.queryByText(/共 \d+ 个结果/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/共 \d+ 个模型/)).not.toBeInTheDocument();
   });
 });

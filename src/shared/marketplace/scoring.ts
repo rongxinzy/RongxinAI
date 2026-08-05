@@ -68,8 +68,11 @@ function fitModel(model: MarketplaceModel, hardware: MarketplaceHardwareProfile 
   const required = modelRequiredMemory(model, contextSize);
   if (!hardware) return { fit: { status: 'unknown', reason: '检测设备后可给出更准确的适配建议。' }, score: 55 };
   if (!required.vramMiB && !required.systemMiB) return { fit: { status: 'unknown', reason: '目录尚未提供 GGUF 文件大小，暂不猜测是否适配。' }, score: 48 };
-  const availableVram = hardware.freeVramMiB || hardware.totalVramMiB;
-  const availableSystem = hardware.freeSystemMemoryMiB || hardware.systemMemoryMiB;
+  // Fit is based on the machine's maximum GPU and system-memory capacity.
+  // Current free memory fluctuates with unrelated applications and must not
+  // change the catalogue recommendation for the same device.
+  const availableVram = hardware.totalVramMiB;
+  const availableSystem = hardware.systemMemoryMiB;
   if (hardware.gpuCount === 0) {
     const cpuRequiredMiB = (modelFileSizeMiB(model) ?? 0) * 1.15 + (required.systemMiB ?? 0);
     const cpuRatio = cpuRequiredMiB > 0 ? availableSystem / cpuRequiredMiB : 0;

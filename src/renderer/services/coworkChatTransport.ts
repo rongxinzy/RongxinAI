@@ -191,6 +191,8 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
           });
           controller.close();
           cleanup.forEach(fn => fn());
+          lastContentByCoworkId.clear();
+          toolUseIdMap.clear();
         };
 
         const cleanup: Array<() => void> = [];
@@ -312,9 +314,11 @@ export class CoworkChatTransport implements ChatTransport<UIMessage> {
         cleanup.push(unsubErr);
 
         // -- abort --
-        abortSignal?.addEventListener('abort', () => {
+        const handleAbort = () => {
           void cowork.stopSession(sessionId);
-        });
+        };
+        abortSignal?.addEventListener('abort', handleAbort, { once: true });
+        cleanup.push(() => abortSignal?.removeEventListener('abort', handleAbort));
       },
     });
   }

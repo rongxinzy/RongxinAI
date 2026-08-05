@@ -109,7 +109,7 @@ test('recommendations prioritize runnable models and then score', () => {
     'good-low',
     'limited-high',
   ]);
-  expect(filterMarketplaceModelsForRecommendation(models, true).map(model => model.id)).toEqual([
+  expect(filterMarketplaceModelsForRecommendation(models).map(model => model.id)).toEqual([
     'limited-high',
     'good-low',
     'excellent-high',
@@ -131,6 +131,7 @@ test('filters models by device fit, restricting the default but opening up with 
   expect(filterMarketplaceModelsForDevice(models, 'recommended').map(m => m.id)).toEqual([
     'excellent',
     'good',
+    'limited',
   ]);
   expect(filterMarketplaceModelsForDevice(models, 'compatible').map(m => m.id)).toEqual([
     'excellent',
@@ -176,16 +177,17 @@ test('excludes duplicates and installed models from the installable set', () => 
   expect(result.map(m => m.id)).toEqual(['a']);
 });
 
-test('empty query searches featured recommendations by default', () => {
+test('empty query browses all models by default', () => {
   const params = buildMarketplaceSearchParams({ query: '   ' });
   expect(params).not.toBeNull();
   expect(params).toEqual({
     limit: MARKETPLACE_INITIAL_MODEL_COUNT,
     pageNumber: undefined,
-    featuredOnly: true,
+    sortby: 'asc',
+    featuredOnly: false,
     task: undefined,
     size: undefined,
-    fit: undefined,
+    fit: 'all',
     minStars: undefined,
   });
 });

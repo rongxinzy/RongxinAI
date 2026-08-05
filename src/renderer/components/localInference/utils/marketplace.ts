@@ -1,6 +1,7 @@
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import {
   MarketplaceCapability,
+  MarketplaceSortOrder,
   type MarketplaceModel,
   type MarketplaceModelFile,
   type MarketplaceSearchParams,
@@ -30,6 +31,7 @@ export function buildMarketplaceSearchParams(input: {
   task?: MarketplaceSearchParams['task'];
   size?: MarketplaceSearchParams['size'];
   fit?: MarketplaceSearchParams['fit'];
+  sortby?: MarketplaceSearchParams['sortby'];
   minStars?: number;
   featuredOnly?: boolean;
   limit?: number;
@@ -42,11 +44,13 @@ export function buildMarketplaceSearchParams(input: {
     return {
       limit,
       pageNumber: input.pageNumber,
-      // Task categories always browse the full catalogue.\r\n      // Only the unfiltered empty view defaults to recommendations.
-      featuredOnly: input.featuredOnly ?? (input.task && input.task !== 'all' ? false : true),
+      // Empty marketplace browsing uses the full catalogue and local fit scoring.
+      // Task categories add their own catalogue filter.
+      featuredOnly: input.featuredOnly ?? false,
       task: input.task,
       size: input.size,
-      fit: input.fit,
+      fit: input.fit ?? 'all',
+      sortby: input.sortby ?? MarketplaceSortOrder.Asc,
       minStars: input.minStars,
     };
   }
@@ -58,6 +62,7 @@ export function buildMarketplaceSearchParams(input: {
     task: input.task,
     size: input.size,
     fit: input.fit,
+    sortby: input.sortby ?? MarketplaceSortOrder.Asc,
     minStars: input.minStars,
   };
 }
@@ -112,9 +117,7 @@ const MARKETPLACE_RECOMMENDATION_FIT_PRIORITY = {
 
 export function filterMarketplaceModelsForRecommendation(
   models: MarketplaceModel[],
-  hasHardwareProfile: boolean,
 ): MarketplaceModel[] {
-  if (!hasHardwareProfile) return models;
   return models.filter(model => {
     const status = model.fit?.status ?? 'unknown';
     return status === 'excellent' || status === 'good' || status === 'limited';
@@ -150,7 +153,7 @@ export function filterMarketplaceModelsForDevice(
       const status = model.fit?.status ?? 'unknown';
       switch (fit) {
         case 'recommended':
-          return status === 'excellent' || status === 'good';
+          return status === 'excellent' || status === 'good' || status === 'limited';
         case 'excellent':
           return status === 'excellent';
         case 'compatible':

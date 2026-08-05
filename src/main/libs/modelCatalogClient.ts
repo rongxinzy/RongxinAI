@@ -22,6 +22,8 @@ type CatalogModelPayload = Omit<MarketplaceModel, 'capability' | 'sizes'> & {
   sizes?: string[];
 };
 
+type CatalogSearchPayload = { models?: CatalogModelPayload[]; totalCount?: number; nextPageNumber?: number; next?: number | string | null; warning?: string; source?: MarketplaceSearchResult['source']; catalogUpdatedAt?: string; scoreVersion?: string };
+
 const MARKETPLACE_CAPABILITIES = ['chat', 'reasoning', 'embedding', 'code', 'vision'] as const;
 
 function isVerifiedGgufCatalogModel(model: MarketplaceModel): boolean {
@@ -65,6 +67,11 @@ function isGenerativeLanguageModel(model: MarketplaceModel): boolean {
   );
 }
 
+function normalizeNextPageNumber(value: number | string | null | undefined): number | undefined {
+  const pageNumber = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : undefined;
+}
+
 export class ModelCatalogClient {
   readonly baseUrl: string;
   private readonly fetchImpl: CatalogFetchLike;
@@ -77,7 +84,10 @@ export class ModelCatalogClient {
     this.fetchImpl = fetchImpl;
   }
 
-  async search(params: MarketplaceSearchParams = {}): Promise<MarketplaceSearchResult> {
+  async search(
+    params: MarketplaceSearchParams = {},
+    signal?: AbortSignal,
+  ): Promise<MarketplaceSearchResult> {
     const url = new URL(`${this.baseUrl}/v1/catalog/search`);
     if (params.query?.trim()) url.searchParams.set('q', params.query.trim());
     if (params.task && params.task !== 'all') url.searchParams.set('task', params.task);
@@ -87,12 +97,15 @@ export class ModelCatalogClient {
     // the cloud catalogue as if it were a server-side model property.
     if (params.limit) url.searchParams.set('limit', String(params.limit));
     if (params.pageNumber) url.searchParams.set('page', String(params.pageNumber));
+    if (params.sortby) url.searchParams.set('sortby', params.sortby);
     if (params.featuredOnly) url.searchParams.set('featured', '1');
-    const payload = await this.fetchJson(url.toString()) as { models?: CatalogModelPayload[]; totalCount?: number; nextPageNumber?: number; warning?: string; source?: MarketplaceSearchResult['source']; catalogUpdatedAt?: string; scoreVersion?: string };
+    const payload = await this.fetchJson(url.toString(), signal) as CatalogSearchPayload;
+    const normalizedModels = (payload.models ?? []).map(normalizeModel);
     return {
-      models: (payload.models ?? []).map(normalizeModel).filter(isGenerativeLanguageModel).filter(isVerifiedGgufCatalogModel),
+      models:
+        params.fit === 'all' ? normalizedModels : normalizedModels.filter(isVerifiedGgufCatalogModel),
       totalCount: payload.totalCount,
-      nextPageNumber: payload.nextPageNumber,
+      nextPageNumber: normalizeNextPageNumber(payload.nextPageNumber ?? payload.next),
       warning: payload.warning,
       source: payload.source ?? 'cloud-catalog',
       catalogUpdatedAt: payload.catalogUpdatedAt,
@@ -121,8 +134,14 @@ export class ModelCatalogClient {
     return isGenerativeLanguageModel(model) && isVerifiedGgufCatalogModel(model) ? model : null;
   }
 
-  private async fetchJson(url: string): Promise<unknown> {
+  private async fetchJson(url: string, externalSignal?: AbortSignal): Promise<unknown> {
     const controller = new AbortController();
+    const abortFromExternal = () => controller.abort(externalSignal?.reason);
+    if (externalSignal?.aborted) {
+      abortFromExternal();
+    } else {
+      externalSignal?.addEventListener('abort', abortFromExternal, { once: true });
+    }
     const timeout = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
     try {
       const response = await this.fetchImpl(url, {
@@ -135,12 +154,14 @@ export class ModelCatalogClient {
       if (!response.ok) throw new Error(`Model catalog failed: HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
+      if (externalSignal?.aborted) throw error;
       if (controller.signal.aborted) {
         throw new Error('模型目录响应超时，请稍后重试。', { cause: error });
       }
       throw error;
     } finally {
       clearTimeout(timeout);
+      externalSignal?.removeEventListener('abort', abortFromExternal);
     }
   }
 }

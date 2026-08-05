@@ -19,9 +19,9 @@ export function useMarketplaceRecommendations({
 }): void {
   useEffect(() => {
     if (activeTab !== 'marketplace' || hasSearched) return;
-    // Recommendations show curated models that are runnable on the current device.
-    // The renderer applies the final fit filter after local hardware scoring.
-    const params = buildMarketplaceSearchParams({ query, featuredOnly: true, fit: 'recommended' });
+    // Load the complete model catalogue when the marketplace tab opens.
+    // The renderer applies the selected fit filter after local hardware scoring.
+    const params = buildMarketplaceSearchParams({ query, featuredOnly: false, fit: 'all' });
     if (!params) return;
     onHasSearchedChange(true);
     void onSearch(params);

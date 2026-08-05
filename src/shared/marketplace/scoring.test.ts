@@ -84,6 +84,21 @@ describe('marketplace device scoring', () => {
     expect(['excellent', 'good', 'limited']).toContain(result.fit.status);
   });
 
+  it('uses maximum GPU and system-memory capacity instead of current free memory', () => {
+    const constrainedSnapshot: NvidiaSmiSnapshot = {
+      ...gpuSnapshot,
+      gpus: gpuSnapshot.gpus.map(gpu => ({ ...gpu, memoryFreeMiB: 1_024 })),
+    };
+    const constrainedMemory: SystemMemorySnapshot = {
+      ...memorySnapshot,
+      freeMemoryMiB: 2_048,
+    };
+    const profile = createMarketplaceHardwareProfile(constrainedSnapshot, constrainedMemory);
+    const result = scoreMarketplaceModel(model, { hardware: profile, task: 'chat' });
+
+    expect(result.fit.status).toBe('excellent');
+  });
+
   it('does not guess fit when catalog file size is unknown', () => {
     const profile = createMarketplaceHardwareProfile(gpuSnapshot, memorySnapshot);
     const result = scoreMarketplaceModel({ ...model, files: [], filePath: undefined }, { hardware: profile });

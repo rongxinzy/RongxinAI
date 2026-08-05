@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import type { MarketplaceModel } from '../../shared/marketplace';
+import { MarketplaceSortOrder, type MarketplaceModel } from '../../shared/marketplace';
 import { sortMarketplaceModels } from './marketplaceModelOrder';
 
 function createModel(repoId: string, parameterCount: number, downloads: number): MarketplaceModel {
@@ -35,6 +35,34 @@ test('Marketplace model ordering prioritizes compact and dual 8GB-friendly model
     'Qwen/8B-GGUF',
     'Qwen/32B-GGUF',
     'Qwen/20B-GGUF',
+  ]);
+});
+
+test('Marketplace model ordering sorts by parameter count ascending when requested', () => {
+  const models = [
+    createModel('Qwen/20B-GGUF', 20_000_000_000, 1),
+    createModel('Qwen/2B-GGUF', 2_000_000_000, 1),
+    createModel('Qwen/8B-GGUF', 8_000_000_000, 1),
+  ];
+
+  expect(sortMarketplaceModels(models, { sortby: MarketplaceSortOrder.Asc }).map(model => model.repoId)).toEqual([
+    'Qwen/2B-GGUF',
+    'Qwen/8B-GGUF',
+    'Qwen/20B-GGUF',
+  ]);
+});
+
+test('Marketplace model ordering sorts by parameter count descending when requested', () => {
+  const models = [
+    createModel('Qwen/2B-GGUF', 2_000_000_000, 1),
+    createModel('Qwen/20B-GGUF', 20_000_000_000, 1),
+    createModel('Qwen/8B-GGUF', 8_000_000_000, 1),
+  ];
+
+  expect(sortMarketplaceModels(models, { sortby: MarketplaceSortOrder.Desc }).map(model => model.repoId)).toEqual([
+    'Qwen/20B-GGUF',
+    'Qwen/8B-GGUF',
+    'Qwen/2B-GGUF',
   ]);
 });
 

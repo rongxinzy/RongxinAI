@@ -128,6 +128,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const launchLogs = useModelLaunchLogs();
   const [launchLogFullscreen, setLaunchLogFullscreen] = useState(false);
   const marketplaceSearchRef = useRef<number>(0);
+  const marketplaceRequestIdRef = useRef<string | null>(null);
   const loadingModelNameRef = useRef<string | null>(null);
   const marketplaceQueryRef = useRef(marketplaceQuery);
   const marketplaceHasSearchedRef = useRef(marketplaceHasSearched);
@@ -164,16 +165,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         task: marketplaceSearchParams.task,
       }),
     );
-    const filtered = marketplaceSearchParams.featuredOnly
-      ? filterMarketplaceModelsForRecommendation(scored, Boolean(marketplaceHardware))
-      : filterMarketplaceModelsForDevice(
-          scored,
-          marketplaceSearchParams.fit,
-          marketplaceSearchParams.minStars,
-        );
-    return marketplaceSearchParams.featuredOnly
-      ? sortMarketplaceModelsForRecommendation(filtered)
-      : filtered;
+    const isRecommendationBrowse =
+      marketplaceSearchParams.featuredOnly || marketplaceSearchParams.fit === 'recommended';
+    const filtered = marketplaceSearchParams.fit === 'all'
+      ? scored
+      : isRecommendationBrowse
+        ? filterMarketplaceModelsForRecommendation(scored)
+        : filterMarketplaceModelsForDevice(
+            scored,
+            marketplaceSearchParams.fit,
+            marketplaceSearchParams.minStars,
+          );
+    return isRecommendationBrowse ? sortMarketplaceModelsForRecommendation(filtered) : filtered;
   }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
   const dismissToast = useCallback(() => {
@@ -230,10 +233,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
   const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
     const id = ++marketplaceSearchRef.current;
+    const requestId =
+      globalThis.crypto?.randomUUID?.() ??
+      `marketplace-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    marketplaceRequestIdRef.current = requestId;
     setMarketplaceLoading(true);
     setMarketplaceError(null);
     try {
-      const result = await window.electron.marketplace.search(params);
+      const result = await window.electron.marketplace.search({ requestId, params });
       if (id === marketplaceSearchRef.current) {
         setMarketplaceSearchParams(params);
         setMarketplaceModels(result.models);
@@ -249,8 +256,40 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (id === marketplaceSearchRef.current) {
         setMarketplaceLoading(false);
       }
+      if (marketplaceRequestIdRef.current === requestId) {
+        marketplaceRequestIdRef.current = null;
+      }
     }
   }, []);
+
+  const clearMarketplaceState = useCallback(() => {
+    marketplaceSearchRef.current += 1;
+    const requestId = marketplaceRequestIdRef.current;
+    marketplaceRequestIdRef.current = null;
+    if (requestId) {
+      void window.electron.marketplace.cancelSearch(requestId).catch(() => undefined);
+    }
+    setMarketplaceLoading(false);
+    setMarketplaceError(null);
+    setMarketplaceModels([]);
+    setMarketplaceHasSearched(false);
+    setMarketplaceTotalCount(undefined);
+    setMarketplaceNextPage(undefined);
+    setMarketplaceSearchParams({});
+  }, []);
+  useEffect(() => {
+    return () => {
+      const requestId = marketplaceRequestIdRef.current;
+      if (requestId) {
+        void window.electron.marketplace.cancelSearch(requestId).catch(() => undefined);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'marketplace') return;
+    clearMarketplaceState();
+  }, [activeTab, clearMarketplaceState]);
 
   const handleMarketplaceSearch = useCallback((overrides: MarketplaceSearchParams = {}) => {
     const params = buildMarketplaceSearchParams({
@@ -258,16 +297,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       query: overrides.query ?? marketplaceQuery,
     });
     if (!params) {
-      setMarketplaceHasSearched(false);
-      setMarketplaceModels([]);
-      setMarketplaceTotalCount(undefined);
-      setMarketplaceNextPage(undefined);
-      setMarketplaceError(null);
+      clearMarketplaceState();
       return;
     }
     setMarketplaceHasSearched(true);
     void searchMarketplace(params);
-  }, [marketplaceQuery, searchMarketplace]);
+  }, [clearMarketplaceState, marketplaceQuery, searchMarketplace]);
 
   const refreshStatus = useCallback(async () => {
     const nextStatus = await window.electron.llamacpp.status();
@@ -876,6 +911,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 />
               </LayeredTabsContent>
               <LayeredTabsContent
+                keepMounted={false}
                 value="marketplace"
                 activeValue={activeTab}
                 direction={tabDirection}
@@ -888,13 +924,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   hasSearched={marketplaceHasSearched}
                   marketplaceLoading={marketplaceLoading}
                   marketplaceError={marketplaceError}
+                  totalCount={marketplaceTotalCount}
+                  nextPageNumber={marketplaceNextPage}
                   query={marketplaceQuery}
                   installedModelPathMap={installedModelPathMap}
                   installProgress={pullProgress}
                   hardwareSummary={marketplaceHardware}
                   hardwareSummaryReady={marketplaceHardwareChecked}
-                  totalCount={marketplaceTotalCount}
-                  nextPageNumber={marketplaceNextPage}
                   onOpenInstalled={handleMarketplaceOpenInstalled}
                   onQueryChange={setMarketplaceQuery}
                   onSearch={handleMarketplaceSearch}

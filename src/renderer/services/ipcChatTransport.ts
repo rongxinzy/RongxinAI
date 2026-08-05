@@ -336,9 +336,11 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
             close();
           });
 
-        abortSignal?.addEventListener('abort', () => {
-          window.electron.api.cancelStream(requestId);
-        });
+        const handleAbort = () => {
+          void window.electron.api.cancelStream(requestId);
+        };
+        abortSignal?.addEventListener('abort', handleAbort, { once: true });
+        cleanup.push(() => abortSignal?.removeEventListener('abort', handleAbort));
       },
     });
   }
