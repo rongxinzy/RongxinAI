@@ -321,6 +321,53 @@ test('allow-all auto-approves irreversible effects', async () => {
   }
 });
 
+test('rejects tool calls from another session or an inactive run', async () => {
+  const { db, service } = createService();
+  try {
+    const first = service.beginRun({
+      sessionId: 'session',
+      goal: 'first',
+      contract: chatContract,
+    });
+    service.completeRun({
+      sessionId: 'session',
+      runId: first.run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
+    const second = service.beginRun({
+      sessionId: 'session',
+      goal: 'second',
+      contract: chatContract,
+    });
+
+    await expect(
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: first.run.id,
+        toolCallId: 'stale-call',
+        toolName: 'write',
+        toolInput: { path: 'stale.txt' },
+        autoApprove: true,
+      }),
+    ).resolves.toMatchObject({ allow: false, reason: expect.stringContaining('active run') });
+    await expect(
+      service.authorizeToolCall({
+        sessionId: 'another-session',
+        runId: second.run.id,
+        toolCallId: 'foreign-call',
+        toolName: 'write',
+        toolInput: { path: 'foreign.txt' },
+        autoApprove: true,
+      }),
+    ).resolves.toMatchObject({ allow: false, reason: expect.stringContaining('session') });
+    expect(service.repository.listApprovalsForRun(first.run.id)).toHaveLength(0);
+    expect(service.repository.listApprovalsForRun(second.run.id)).toHaveLength(0);
+  } finally {
+    db.close();
+  }
+});
+
 test('agent end does not verify a run paused by a denied approval', async () => {
   const { db, service } = createService();
   try {

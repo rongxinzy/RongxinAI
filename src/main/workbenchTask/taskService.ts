@@ -296,6 +296,12 @@ export class WorkbenchTaskService extends EventEmitter {
   }): Promise<WorkbenchToolAuthorizationResult> {
     const run = this.requireRun(input.runId);
     const task = this.requireTask(run.taskId);
+    if (task.sessionId !== input.sessionId) {
+      return { allow: false, reason: 'The tool call does not belong to this session.' };
+    }
+    if (task.activeRunId !== run.id || run.status !== WorkbenchRunStatus.Running) {
+      return { allow: false, reason: 'The tool call does not belong to the active run.' };
+    }
     const riskLevel = classifyWorkbenchToolRisk(input.toolName, input.toolInput);
     if (riskLevel === WorkbenchApprovalRiskLevel.ReadOnly) {
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ToolRead, {
