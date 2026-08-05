@@ -38,8 +38,7 @@ function resolveArtifactFormat(platform, variant) {
   throw new Error(`Unsupported release target: ${platform}:${variant}`);
 }
 
-const artifacts = await Promise.all(
-  specs.map(async spec => {
+async function localArtifact(spec) {
     const [file, platform, arch, variant] = spec.split(':');
     if (!file || !platform || !arch || !variant) {
       throw new Error(`Invalid artifact spec: ${spec}`);
@@ -53,6 +52,57 @@ const artifacts = await Promise.all(
     }
 
     const filename = path.basename(file);
+    return { platform, arch, variant, filename, size: content.length, sha256: crypto.createHash('sha256').update(content).digest('hex') };
+}
+
+async function metadataArtifacts(metadataPath) {
+  const metadata = JSON.parse(await fs.readFile(metadataPath, 'utf8'));
+  if (
+    !metadata ||
+    metadata.schemaVersion !== 1 ||
+    metadata.releaseVersion !== releaseVersion ||
+    !Array.isArray(metadata.artifacts)
+  ) {
+    throw new Error(`Invalid uploaded artifact metadata: ${metadataPath}`);
+  }
+  return metadata.artifacts.map(artifact => {
+    const { platform, arch, variant, filename, key, size, sha256 } = artifact ?? {};
+    const format = resolveArtifactFormat(platform, variant);
+    const expectedKey = `releases/${releaseVersion}/${platform}-${arch}-${variant}/${filename}`;
+    if (
+      typeof arch !== 'string' ||
+      typeof filename !== 'string' ||
+      filename !== path.basename(filename) ||
+      path.extname(filename).toLowerCase() !== format.extension ||
+      key !== expectedKey ||
+      !Number.isSafeInteger(size) ||
+      size <= 0 ||
+      typeof sha256 !== 'string' ||
+      !/^[a-f0-9]{64}$/.test(sha256)
+    ) {
+      throw new Error(`Invalid uploaded artifact metadata entry: ${metadataPath}`);
+    }
+    return { platform, arch, variant, filename, size, sha256 };
+  });
+}
+
+const metadataFlag = specs.indexOf('--metadata');
+const localSpecs = metadataFlag === -1 ? specs : specs.slice(0, metadataFlag);
+const metadataPaths = metadataFlag === -1 ? [] : specs.slice(metadataFlag + 1);
+if (metadataFlag !== -1 && metadataPaths.length === 0) {
+  throw new Error('Expected at least one metadata file after --metadata');
+}
+
+const artifacts = [
+  ...(await Promise.all(localSpecs.map(localArtifact))),
+  ...(await Promise.all(metadataPaths.map(metadataArtifacts))).flat(),
+];
+const targets = new Set();
+const manifests = artifacts.map(({ platform, arch, variant, filename, size, sha256 }) => {
+    const format = resolveArtifactFormat(platform, variant);
+    const target = `${platform}:${arch}:${variant}`;
+    if (targets.has(target)) throw new Error(`Duplicate release target: ${target}`);
+    targets.add(target);
     const payload = {
       channel: 'stable',
       version: releaseVersion,
@@ -68,8 +118,8 @@ const artifacts = await Promise.all(
         arch,
         variant,
         url: `https://downloads.rongxzyai.com/releases/${releaseVersion}/${platform}-${arch}-${variant}/${filename}`,
-        size: content.length,
-        sha256: crypto.createHash('sha256').update(content).digest('hex'),
+        size,
+        sha256,
         contentType: format.contentType,
       },
       source: {
@@ -85,8 +135,7 @@ const artifacts = await Promise.all(
       payload: payloadBytes.toString('base64url'),
       signature: crypto.sign(null, payloadBytes, privateKey).toString('base64url'),
     };
-  }),
-);
+  });
 
 await fs.mkdir(path.dirname(outputPath), { recursive: true });
-await fs.writeFile(outputPath, JSON.stringify({ schemaVersion: 1, manifests: artifacts }));
+await fs.writeFile(outputPath, JSON.stringify({ schemaVersion: 1, manifests }));

@@ -93,6 +93,48 @@ describe('online update release tools', () => {
     );
   });
 
+  test('publishes a signed manifest from verified uploaded-artifact metadata', () => {
+    const metadataPath = path.join(temporaryDirectory, 'uploaded-artifacts.json');
+    const manifestPath = path.join(temporaryDirectory, 'metadata-manifest.json');
+    const version = '2026.7.5';
+    const artifacts = [
+      ['win32', 'x64', 'lite', 'installer.exe'],
+      ['darwin', 'arm64', 'default', 'installer.dmg'],
+      ['linux', 'x64', 'deb', 'installer.deb'],
+      ['linux', 'x64', 'appimage', 'installer.AppImage'],
+    ].map(([platform, arch, variant, filename], index) => ({
+      platform,
+      arch,
+      variant,
+      filename,
+      key: `releases/${version}/${platform}-${arch}-${variant}/${filename}`,
+      size: index + 1,
+      sha256: `${index}`.repeat(64),
+    }));
+    fs.writeFileSync(
+      metadataPath,
+      JSON.stringify({ schemaVersion: 1, releaseVersion: version, artifacts }),
+    );
+
+    const result = runScript(
+      'publish-update-manifest.mjs',
+      [manifestPath, version, 'b'.repeat(40), '--metadata', metadataPath],
+      releaseEnvironment,
+    );
+    expect(result.stderr).toBe('');
+    expect(result.status).toBe(0);
+
+    const collection = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
+      manifests: Array<{ payload: string }>;
+    };
+    const payloads = collection.manifests.map(envelope =>
+      JSON.parse(Buffer.from(envelope.payload, 'base64url').toString('utf8')),
+    );
+    expect(payloads.map(payload => payload.artifact.sha256)).toEqual(
+      artifacts.map(artifact => artifact.sha256),
+    );
+  });
+
   test('enforces monotonic versions and same-version artifact idempotency', () => {
     const currentManifest = createManifest('2026.7.3', 'current');
     const outputPath = path.join(temporaryDirectory, 'github-output.txt');

@@ -192,26 +192,62 @@ jobs:
           node scripts/verify-linux-renderer.mjs
           release/linux-unpacked
           release/linux-render-smoke.png
-      - uses: actions/upload-artifact@v4
+      # Uploading installers directly from their platform runner avoids the
+      # GitHub artifact upload -> download -> R2 upload relay. The signed
+      # stable manifest is still withheld until every matrix job succeeds.
+      - name: Upload Windows immutable artifact to R2
         if: ${{ matrix.platform == 'windows' }}
-        with:
-          name: ${{ matrix.artifact }}
-          path: "release/*.exe"
-          retention-days: 7
-      - uses: actions/upload-artifact@v4
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(release/*.exe)
+          [[ ${#files[@]} -eq 1 ]] || { echo 'Expected exactly one Windows installer' >&2; exit 1; }
+          node scripts/release/upload-update-artifacts.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            update-artifacts.json \
+            "${files[0]}:win32:x64:lite"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Upload macOS immutable artifact to R2
         if: ${{ matrix.platform == 'macos' }}
+        run: |
+          shopt -s nullglob
+          files=(release/*.dmg)
+          [[ ${#files[@]} -eq 1 ]] || { echo 'Expected exactly one macOS installer' >&2; exit 1; }
+          node scripts/release/upload-update-artifacts.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            update-artifacts.json \
+            "${files[0]}:darwin:arm64:default"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Upload Linux immutable artifacts to R2
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          shopt -s nullglob
+          debs=(release/*.deb)
+          appimages=(release/*.AppImage)
+          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected exactly one deb and AppImage installer' >&2; exit 1; }
+          node scripts/release/upload-update-artifacts.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            update-artifacts.json \
+            "${debs[0]}:linux:x64:deb" \
+            "${appimages[0]}:linux:x64:appimage"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Upload immutable artifact metadata
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: "release/*.dmg"
-          retention-days: 7
-      - uses: actions/upload-artifact@v4
-        if: ${{ always() && matrix.platform == 'linux' }}
-        with:
-          name: ${{ matrix.artifact }}
-          path: |
-            release/*.deb
-            release/*.AppImage
-            release/linux-render-smoke.png
+          name: ${{ matrix.artifact }}-metadata
+          path: update-artifacts.json
           retention-days: 7
 
   publish:
@@ -230,34 +266,22 @@ jobs:
         run: |
           pipx install 'awscli>=1.45.10,<2'
           npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
-      - name: Resolve artifacts
-        id: artifacts
+      - name: Resolve uploaded artifact metadata
         run: |
-          mapfile -t windows_artifacts < <(find artifacts/win32-x64-lite -type f -name '*.exe')
-          mapfile -t macos_artifacts < <(find artifacts/darwin-arm64-default -type f -name '*.dmg')
-          mapfile -t linux_deb_artifacts < <(find artifacts/linux-x64-default -type f -name '*.deb')
-          mapfile -t linux_appimage_artifacts < <(find artifacts/linux-x64-default -type f -name '*.AppImage')
-          if [[ ${#windows_artifacts[@]} -ne 1 ||
-                ${#macos_artifacts[@]} -ne 1 ||
-                ${#linux_deb_artifacts[@]} -ne 1 ||
-                ${#linux_appimage_artifacts[@]} -ne 1 ]]; then
-            echo 'Expected exactly one Windows, macOS, Ubuntu deb, and AppImage installer' >&2
+          mapfile -t metadata < <(find artifacts -type f -name update-artifacts.json | sort)
+          if [[ ${#metadata[@]} -ne 3 ]]; then
+            echo 'Expected exactly three platform artifact metadata files' >&2
             exit 1
           fi
-          echo "windows=${windows_artifacts[0]}" >> "$GITHUB_OUTPUT"
-          echo "macos=${macos_artifacts[0]}" >> "$GITHUB_OUTPUT"
-          echo "linux_deb=${linux_deb_artifacts[0]}" >> "$GITHUB_OUTPUT"
-          echo "linux_appimage=${linux_appimage_artifacts[0]}" >> "$GITHUB_OUTPUT"
+          jq -e 'all(.artifacts[]; .key and .size and .sha256)' "${metadata[@]}" > /dev/null
       - name: Create and verify signed manifest
         run: |
           node scripts/release/publish-update-manifest.mjs \
             manifest/stable.json \
             '${{ needs.prepare-release.outputs.version }}' \
             '${{ needs.prepare-release.outputs.commit }}' \
-            '${{ steps.artifacts.outputs.windows }}:win32:x64:lite' \
-            '${{ steps.artifacts.outputs.macos }}:darwin:arm64:default' \
-            '${{ steps.artifacts.outputs.linux_deb }}:linux:x64:deb' \
-            '${{ steps.artifacts.outputs.linux_appimage }}:linux:x64:appimage'
+            --metadata \
+            $(find artifacts -type f -name update-artifacts.json | sort)
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
@@ -303,56 +327,20 @@ jobs:
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-      - name: Upload immutable artifacts and verify remote sizes
+      - name: Verify parallel uploaded immutable artifacts
         if: steps.version_check.outputs.idempotent != 'true'
         run: |
-          upload_artifact() {
-            local file_path="$1"
-            local object_key="$2"
-            local attempt
-
-            # R2 multipart completion can transiently return InvalidPart for
-            # large installers. Retry the whole immutable-object upload with a
-            # fresh multipart session; the following head-object checks still
-            # verify the exact remote byte count before manifest publication.
-            for attempt in 1 2 3; do
-              if aws s3 cp "$file_path" "s3://$R2_BUCKET/$object_key" \
-                --cache-control 'public, max-age=31536000, immutable' \
-                --no-progress; then
-                return 0
-              fi
-              if [[ "$attempt" -eq 3 ]]; then
-                echo "Upload failed after ${attempt} attempts: $object_key" >&2
-                return 1
-              fi
-              echo "Upload attempt ${attempt} failed for $object_key; retrying in $((attempt * 10))s..." >&2
-              sleep $((attempt * 10))
-            done
-          }
-
-          version='${{ needs.prepare-release.outputs.version }}'
-          windows_path='${{ steps.artifacts.outputs.windows }}'
-          macos_path='${{ steps.artifacts.outputs.macos }}'
-          linux_deb_path='${{ steps.artifacts.outputs.linux_deb }}'
-          linux_appimage_path='${{ steps.artifacts.outputs.linux_appimage }}'
-          windows_key="releases/$version/win32-x64-lite/$(basename "$windows_path")"
-          macos_key="releases/$version/darwin-arm64-default/$(basename "$macos_path")"
-          linux_deb_key="releases/$version/linux-x64-deb/$(basename "$linux_deb_path")"
-          linux_appimage_key="releases/$version/linux-x64-appimage/$(basename "$linux_appimage_path")"
-
-          upload_artifact "$windows_path" "$windows_key"
-          upload_artifact "$macos_path" "$macos_key"
-          upload_artifact "$linux_deb_path" "$linux_deb_key"
-          upload_artifact "$linux_appimage_path" "$linux_appimage_key"
-
-          windows_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$windows_key" --query ContentLength --output text)
-          macos_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$macos_key" --query ContentLength --output text)
-          linux_deb_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$linux_deb_key" --query ContentLength --output text)
-          linux_appimage_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$linux_appimage_key" --query ContentLength --output text)
-          [[ "$windows_remote_size" == "$(stat --format='%s' "$windows_path")" ]]
-          [[ "$macos_remote_size" == "$(stat --format='%s' "$macos_path")" ]]
-          [[ "$linux_deb_remote_size" == "$(stat --format='%s' "$linux_deb_path")" ]]
-          [[ "$linux_appimage_remote_size" == "$(stat --format='%s' "$linux_appimage_path")" ]]
+          mapfile -t metadata < <(find artifacts -type f -name update-artifacts.json | sort)
+          for metadata_path in "${metadata[@]}"; do
+            while IFS=$'\t' read -r key size; do
+              remote_size=$(aws s3api head-object \
+                --bucket "$R2_BUCKET" \
+                --key "$key" \
+                --query ContentLength \
+                --output text)
+              [[ "$remote_size" == "$size" ]]
+            done < <(jq -r '.artifacts[] | [.key, .size] | @tsv' "$metadata_path")
+          done
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
