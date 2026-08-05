@@ -23,7 +23,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       commit: ${{ steps.source.outputs.commit }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Derive and validate the release version from the tag
@@ -81,10 +81,10 @@ jobs:
       # exposing its name or value in the build command line.
       CLAWHUB_TOKEN: ${{ secrets.CLAW_HUB }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with: { node-version: "24.x" }
       - uses: oven-sh/setup-bun@v2
         with: { bun-version: "1.3.14" }
@@ -96,7 +96,7 @@ jobs:
       # boundary here so changing an unrelated build script does not require
       # re-downloading Python, uv, or Pandoc for every release platform.
       - name: Restore bundled runtime cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             resources/python-win
@@ -114,12 +114,12 @@ jobs:
       # contract changes instead of being tied to every file under scripts/.
       - name: Restore Windows llama.cpp backend cache
         if: ${{ matrix.platform == 'windows' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/win-lite
           key: windows-llamacpp-lite-${{ hashFiles('package.json', 'electron-builder.json', 'scripts/electron-builder-hooks.cjs', 'scripts/download-llamacpp-runtime.cjs', 'scripts/ci/package-windows.ps1') }}
       - name: Restore packaging caches
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.bun/install/cache
@@ -244,7 +244,7 @@ jobs:
           AWS_DEFAULT_REGION: auto
           AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
       - name: Upload immutable artifact metadata
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact }}-metadata
           path: update-artifacts.json
@@ -255,12 +255,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { path: artifacts }
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with: { node-version: "24.x" }
       - name: Install release tools
         run: |
