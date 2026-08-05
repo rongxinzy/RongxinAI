@@ -1,0 +1,66 @@
+import { afterEach, expect, test, vi } from 'vitest';
+
+import { EngramMemoryScope, EngramObservationType } from './constants';
+import { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+test('keeps candidates local until they are explicitly confirmed', async () => {
+  const manager = {
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  };
+  const requests: Array<{ pathname: string; init?: RequestInit }> = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL, init?: RequestInit) => {
+      requests.push({ pathname: new URL(url).pathname, init });
+      const payload = new URL(url).pathname === '/observations' ? { id: 17 } : { id: 'session' };
+      return new Response(JSON.stringify(payload), {
+        status: new URL(url).pathname === '/observations' ? 201 : 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }),
+  );
+  const adapter = new ZhiYuanEngramAdapter(manager as never);
+
+  const candidate = adapter.saveCandidate({
+    sessionId: 'session-1',
+    project: 'project-a',
+    scope: EngramMemoryScope.Project,
+    type: EngramObservationType.Decision,
+    title: 'Use SQLite',
+    content: 'Keep local state in SQLite.',
+  });
+  expect(requests).toHaveLength(0);
+
+  await expect(adapter.confirmMemory(candidate.id, '/workspace/project-a')).resolves.toBe(17);
+  expect(requests.map(request => request.pathname)).toEqual(['/sessions', '/observations']);
+  expect(requests[1].init?.headers).toMatchObject({ Authorization: 'Bearer token' });
+});
+
+test('recall degrades to an empty result when the runtime is unavailable', async () => {
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => null,
+    start: async () => null,
+  } as never);
+
+  await expect(adapter.recall({ query: 'decision', project: 'project-a' })).resolves.toEqual([]);
+});
+
+test('normalizes the runtime null search response after the last memory is forgotten', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      new Response('null', { status: 200, headers: { 'content-type': 'application/json' } }),
+    ),
+  );
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+
+  await expect(adapter.recall({ query: 'decision', project: 'project-a' })).resolves.toEqual([]);
+});

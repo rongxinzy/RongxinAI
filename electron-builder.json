@@ -65,6 +65,11 @@
       "from": "MCPs",
       "to": "MCPs",
       "filter": ["**/*"]
+    },
+    {
+      "from": "vendor/engram-runtime/current",
+      "to": "memory",
+      "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
     }
   ],
   "protocols": [
