@@ -15,11 +15,13 @@ import {
   type CoworkPermissionMode as CoworkPermissionModeType,
   type CoworkSessionMode as CoworkSessionModeType,
 } from '../shared/cowork/constants';
+import type { CoworkPersistedArtifact } from '../shared/cowork/artifacts';
 import type {
   CoworkSessionExpertInput,
   CoworkSessionExpertSnapshot,
 } from '../shared/cowork/sessionExperts';
 import type { Workspace } from '../shared/workspace';
+import { CoworkArtifactIndex } from './coworkArtifactIndex';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 // Default working directory for new users
@@ -443,6 +445,8 @@ export interface CoworkSession {
   messagesOffset: number;
   /** Total number of messages stored for this session. */
   totalMessages: number;
+  /** Persisted artifacts aggregated across all turns (survives pagination). */
+  artifacts: CoworkPersistedArtifact[];
   createdAt: number;
   updatedAt: number;
 }
@@ -591,9 +595,11 @@ interface CoworkUserMemoryRow {
 
 export class CoworkStore {
   private db: Database.Database;
+  private artifactIndex: CoworkArtifactIndex;
 
   constructor(db: Database.Database) {
     this.db = db;
+    this.artifactIndex = new CoworkArtifactIndex(db);
   }
 
   private getOne<T>(sql: string, params: (string | number | null)[] = []): T | undefined {
@@ -829,6 +835,7 @@ export class CoworkStore {
       messages: [],
       messagesOffset: 0,
       totalMessages: 0,
+      artifacts: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -933,6 +940,16 @@ export class CoworkStore {
       };
     });
 
+    let artifacts: CoworkPersistedArtifact[] = [];
+    try {
+      artifacts =
+        row.status === 'running'
+          ? this.artifactIndex.listSession(id)
+          : this.artifactIndex.refreshSession(id);
+    } catch (error) {
+      console.error(`[CoworkStore] Failed to index artifacts for session ${id}:`, error);
+    }
+
     return {
       id: row.id,
       title: row.title,
@@ -952,9 +969,14 @@ export class CoworkStore {
       messages,
       messagesOffset: messageOffset,
       totalMessages,
+      artifacts,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  refreshSessionArtifacts(sessionId: string): CoworkPersistedArtifact[] {
+    return this.artifactIndex.refreshSession(sessionId);
   }
 
   updateSession(
@@ -1723,7 +1745,11 @@ export class CoworkStore {
       this.upsertConfig('permissionMode', normalizePermissionMode(config.permissionMode), now);
     }
     if (config.permissionModeBySession !== undefined) {
-      this.upsertConfig('permissionModeBySession', JSON.stringify(config.permissionModeBySession), now);
+      this.upsertConfig(
+        'permissionModeBySession',
+        JSON.stringify(config.permissionModeBySession),
+        now,
+      );
     }
     if (config.embeddingEnabled !== undefined) {
       this.upsertConfig('embeddingEnabled', config.embeddingEnabled ? '1' : '0', now);

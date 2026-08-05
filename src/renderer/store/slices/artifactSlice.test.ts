@@ -55,6 +55,43 @@ describe('artifact reducer', () => {
     });
   });
 
+  test('keeps explicit declaration metadata while merging inferred file content', () => {
+    const declared = makeArtifact({
+      id: 'declared-artifact',
+      messageId: 'declare-message',
+      title: 'Explicit title',
+      type: 'html',
+      role: ArtifactRole.Intermediate,
+      declared: true,
+    });
+    const inferred = makeArtifact({
+      id: 'write-artifact',
+      messageId: 'write-message',
+      title: 'presentation.pptx',
+      content: '<h1>loaded</h1>',
+      role: ArtifactRole.Deliverable,
+      declared: false,
+    });
+
+    let state = artifactReducer(
+      undefined,
+      addArtifact({ sessionId: 'session-1', artifact: declared }),
+    );
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: inferred }));
+
+    expect(state.artifactsBySession['session-1']).toEqual([
+      expect.objectContaining({
+        id: 'declared-artifact',
+        messageId: 'declare-message',
+        title: 'Explicit title',
+        type: 'html',
+        role: ArtifactRole.Intermediate,
+        declared: true,
+        content: '<h1>loaded</h1>',
+      }),
+    ]);
+  });
+
   test('keeps artifact focus mode explicit and resets it when the panel closes', () => {
     const selected = artifactReducer(undefined, selectArtifact('artifact-1'));
     const focused = artifactReducer(selected, setArtifactLayoutMode(ArtifactLayoutMode.Workspace));
@@ -119,13 +156,19 @@ describe('artifact reducer', () => {
     let state = artifactReducer(undefined, activateSessionArtifactView('session-1'));
     state = artifactReducer(
       state,
-      addArtifact({ sessionId: 'session-1', artifact: makeArtifact({ id: 'shared-id', title: 'first.pptx' }) }),
+      addArtifact({
+        sessionId: 'session-1',
+        artifact: makeArtifact({ id: 'shared-id', title: 'first.pptx' }),
+      }),
     );
     state = artifactReducer(state, selectArtifact('shared-id'));
     state = artifactReducer(state, activateSessionArtifactView('session-2'));
     state = artifactReducer(
       state,
-      addArtifact({ sessionId: 'session-2', artifact: makeArtifact({ id: 'shared-id', title: 'second.pptx' }) }),
+      addArtifact({
+        sessionId: 'session-2',
+        artifact: makeArtifact({ id: 'shared-id', title: 'second.pptx' }),
+      }),
     );
     state = artifactReducer(state, selectArtifact('shared-id'));
 

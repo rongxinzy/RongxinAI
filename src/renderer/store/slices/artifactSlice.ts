@@ -82,14 +82,30 @@ function restoreSessionView(state: ArtifactState, viewState: ArtifactSessionView
 }
 
 function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
+  const declaredArtifact = incoming.declared ? incoming : existing.declared ? existing : null;
   return {
     ...existing,
     ...incoming,
+    ...(declaredArtifact
+      ? {
+          id: declaredArtifact.id,
+          messageId: declaredArtifact.messageId,
+          type: declaredArtifact.type,
+          title: declaredArtifact.title,
+          fileName: declaredArtifact.fileName,
+          filePath: declaredArtifact.filePath,
+          source: declaredArtifact.source,
+          role: declaredArtifact.role,
+          declared: true,
+          createdAt: declaredArtifact.createdAt,
+        }
+      : {}),
     content: incoming.content || existing.content,
     role:
-      existing.role === ArtifactRole.Deliverable || incoming.role === ArtifactRole.Deliverable
+      declaredArtifact?.role ??
+      (existing.role === ArtifactRole.Deliverable || incoming.role === ArtifactRole.Deliverable
         ? ArtifactRole.Deliverable
-        : ArtifactRole.Intermediate,
+        : ArtifactRole.Intermediate),
   };
 }
 
@@ -105,7 +121,9 @@ const artifactSlice = createSlice({
       state.activeSessionId = sessionId;
       restoreSessionView(
         state,
-        sessionId ? (state.viewStateBySession[sessionId] ?? getDefaultSessionViewState()) : getDefaultSessionViewState(),
+        sessionId
+          ? (state.viewStateBySession[sessionId] ?? getDefaultSessionViewState())
+          : getDefaultSessionViewState(),
       );
     },
 
@@ -246,7 +264,8 @@ export const selectSelectedArtifact = (state: RootState): Artifact | null => {
   const activeSessionId = state.artifact.activeSessionId;
   if (activeSessionId) {
     return (
-      state.artifact.artifactsBySession[activeSessionId]?.find(artifact => artifact.id === id) ?? null
+      state.artifact.artifactsBySession[activeSessionId]?.find(artifact => artifact.id === id) ??
+      null
     );
   }
   for (const artifacts of Object.values(state.artifact.artifactsBySession)) {

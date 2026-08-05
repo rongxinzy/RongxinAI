@@ -179,6 +179,7 @@ export function parseDeclareArtifactFromMessages(
       filePath,
       source: 'tool',
       role: declaredRole,
+      declared: true,
       createdAt: msg.timestamp || Date.now(),
     });
     index++;
@@ -278,6 +279,7 @@ export function parseToolArtifact(
     filePath,
     source: 'tool',
     role: ArtifactRole.Intermediate,
+    declared: false,
     createdAt: toolUseMsg.timestamp || Date.now(),
   };
 }
@@ -305,11 +307,7 @@ export function detectArtifactsFromMessages(
   const detectedFilePathIndexes = new Map<string, number>();
   const finalAnswerMessageId = findFinalAnswerMessageId(messages);
 
-  const addPathArtifact = (
-    artifact: Artifact,
-    needsFileLoad: boolean,
-    roleIsExplicit = false,
-  ) => {
+  const addPathArtifact = (artifact: Artifact, needsFileLoad: boolean, roleIsExplicit = false) => {
     if (!artifact.filePath) return;
 
     const normalized = normalizeFilePathForDedup(artifact.filePath);

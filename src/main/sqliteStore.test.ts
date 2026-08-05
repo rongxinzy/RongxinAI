@@ -200,3 +200,65 @@ test('adds agent pin columns during migration', async () => {
 
   store.close();
 });
+
+test('creates the artifact index after adding sequence to legacy messages', async () => {
+  const userDataPath = createTempUserDataPath();
+  createLegacyDatabase(userDataPath);
+  const db = new Database(path.join(userDataPath, DB_FILENAME));
+  const now = Date.now();
+  db.exec(`
+    CREATE TABLE cowork_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      claude_session_id TEXT,
+      status TEXT NOT NULL DEFAULT 'idle',
+      mode TEXT NOT NULL DEFAULT 'work',
+      cwd TEXT NOT NULL,
+      system_prompt TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE cowork_messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at INTEGER NOT NULL
+    );
+  `);
+  db.prepare(
+    `INSERT INTO cowork_sessions
+       (id, title, status, mode, cwd, system_prompt, created_at, updated_at)
+     VALUES ('session-1', 'legacy', 'idle', 'work', '/repo', '', ?, ?)`,
+  ).run(now, now);
+  db.prepare(
+    `INSERT INTO cowork_messages
+       (id, session_id, type, content, metadata, created_at)
+     VALUES ('message-1', 'session-1', 'assistant', 'hello', NULL, ?)`,
+  ).run(now);
+  db.close();
+
+  const store = await SqliteStore.create(userDataPath);
+  const migratedDb = store.getDatabase();
+  const messageColumns = migratedDb.pragma('table_info(cowork_messages)') as Array<{
+    name: string;
+  }>;
+  const artifactTables = migratedDb
+    .prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'table' AND name IN (
+         'cowork_session_artifacts', 'cowork_artifact_index_state'
+       )
+       ORDER BY name`,
+    )
+    .all() as Array<{ name: string }>;
+
+  expect(messageColumns.map(column => column.name)).toContain('sequence');
+  expect(artifactTables.map(table => table.name)).toEqual([
+    'cowork_artifact_index_state',
+    'cowork_session_artifacts',
+  ]);
+
+  store.close();
+});

@@ -14,6 +14,7 @@ import {
   normalizeAgentAvatarIcon,
 } from '../shared/agent';
 import { DB_FILENAME } from './appConstants';
+import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import {
   openSqliteDatabaseWithRecovery,
   SqliteBackupManager,
@@ -301,6 +302,7 @@ export class SqliteStore {
     } catch {
       // Column already exists or migration not needed.
     }
+    initializeCoworkArtifactIndexSchema(this.db);
 
     try {
       const pinnedResult = this.db

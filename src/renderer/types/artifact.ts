@@ -1,12 +1,11 @@
-export type ArtifactType =
-  | 'html'
-  | 'svg'
-  | 'image'
-  | 'mermaid'
-  | 'code'
-  | 'markdown'
-  | 'text'
-  | 'document';
+import {
+  CoworkArtifactRole,
+  type CoworkArtifactRole as CoworkArtifactRoleValue,
+  type CoworkArtifactSource,
+  type CoworkArtifactType,
+} from '../../shared/cowork/artifacts';
+
+export type ArtifactType = CoworkArtifactType;
 
 export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([
   'html',
@@ -19,14 +18,11 @@ export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([
   'document',
 ]);
 
-export type ArtifactSource = 'codeblock' | 'tool';
+export type ArtifactSource = CoworkArtifactSource;
 
-export const ArtifactRole = {
-  Intermediate: 'intermediate',
-  Deliverable: 'deliverable',
-} as const;
+export const ArtifactRole = CoworkArtifactRole;
 
-export type ArtifactRole = (typeof ArtifactRole)[keyof typeof ArtifactRole];
+export type ArtifactRole = CoworkArtifactRoleValue;
 
 export interface Artifact {
   id: string;
@@ -42,6 +38,7 @@ export interface Artifact {
   filePath?: string;
   source: ArtifactSource;
   role: ArtifactRole;
+  declared?: boolean;
   createdAt: number;
 }
 

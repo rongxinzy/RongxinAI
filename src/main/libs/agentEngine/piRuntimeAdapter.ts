@@ -1839,7 +1839,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           void this.flushFollowUpQueue(sessionId, active);
           break;
         }
-        if (this.store) this.store.updateSession(sessionId, { status: 'idle' });
+        if (this.store) {
+          this.store.updateSession(sessionId, { status: 'idle' });
+          try {
+            this.store.refreshSessionArtifacts(sessionId);
+          } catch (error) {
+            console.error(
+              `[PiRuntimeAdapter] Failed to refresh artifacts for session ${sessionId}:`,
+              error,
+            );
+          }
+        }
         if (active.workbenchRunId && this.workbenchTaskService) {
           const workflowSnapshot = active.researchRun
             ? active.researchRun.getSnapshot()
