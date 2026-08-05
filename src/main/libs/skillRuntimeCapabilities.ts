@@ -7,7 +7,6 @@ import {
   getSkillsRoot,
   resolveGitBashPathForPi,
 } from './coworkUtil';
-import { findBundledPandocExecutable } from './pandocRuntime';
 import { getManagedPythonExecutable } from './pythonRuntime';
 import { findSkillPythonExecutable } from './skillPythonRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
@@ -27,7 +26,6 @@ export type SkillRuntimeCapabilities = {
   node: SkillRuntimeCapability;
   bash: SkillRuntimeCapability;
   powershell: SkillRuntimeCapability;
-  pandoc: SkillRuntimeCapability;
   skillPython: Record<string, SkillRuntimeCapability>;
 };
 
@@ -178,7 +176,6 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
   const bash =
     process.platform === 'win32' ? resolveOptional(() => resolveGitBashPathForPi()) : '/bin/bash';
   const powershell = process.platform === 'win32' ? 'powershell.exe' : null;
-  const pandoc = resolveOptional(() => findBundledPandocExecutable());
 
   const [
     bashCapability,
@@ -186,7 +183,6 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
     uvCapability,
     nodeCapability,
     powershellCapability,
-    pandocCapability,
     skillPython,
   ] = await Promise.all([
     probe(bash, ['--version']),
@@ -194,7 +190,6 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
     probe(uv, ['--version']),
     probe(node, ['--version'], ['--version']),
     probe(powershell, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()']),
-    probe(pandoc, ['--version']),
     skillPythonCapabilities(),
   ]);
   if (!bashCapability.available && process.platform === 'win32') {
@@ -210,7 +205,6 @@ export async function probeSkillRuntimeCapabilities(): Promise<SkillRuntimeCapab
     node: nodeCapability,
     bash: bashCapability,
     powershell: powershellCapability,
-    pandoc: pandocCapability,
     skillPython,
   };
 }

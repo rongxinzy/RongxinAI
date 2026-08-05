@@ -15,7 +15,7 @@ export function buildPiSkillRuntimeCapabilitiesTool(): Record<string, unknown> {
     name: PiSkillRuntimeCapabilitiesToolName,
     label: 'Inspect Skill Runtimes',
     description:
-      'Read-only probe of application-managed Python, uv, Node, Bash, PowerShell, Pandoc, and prebuilt Skill Python environments.',
+      'Read-only probe of application-managed Python, uv, Node, Bash, PowerShell, and prebuilt Skill Python environments.',
     parameters: {
       type: 'object',
       properties: {},

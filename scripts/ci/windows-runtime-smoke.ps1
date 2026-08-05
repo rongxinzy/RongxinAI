@@ -51,7 +51,6 @@ try {
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\xlsx\Scripts\python.exe'
   $pdfPython = Join-Path $resourcesRoot 'skill-python\pdf\Scripts\python.exe'
-  $pandoc = Join-Path $resourcesRoot 'pandoc\pandoc.exe'
   $skillsRoot = Join-Path $resourcesRoot 'SKILLs'
 
   Assert-Path $bash 'bundled PortableGit Bash'
@@ -59,9 +58,8 @@ try {
   Assert-Path $skillPython 'bundled XLSX Skill Python'
   Assert-Path $pdfPython 'bundled PDF Skill Python'
   Assert-Path (Join-Path $resourcesRoot 'uv-win\uv.exe') 'bundled uv'
-  Assert-Path $pandoc 'bundled Pandoc'
   Assert-Path (Join-Path $skillsRoot 'xlsx\scripts\xlsx_reader.py') 'XLSX Skill reader'
-  Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.sh') 'DOCX Markdown converter'
+  Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs') 'DOCX Markdown converter'
 
   # Remove Git, Python, Node, and user-installed tool directories from PATH.
   # The smoke test invokes only explicit package paths below.
@@ -79,14 +77,6 @@ try {
   Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'
   Invoke-Checked $pdfPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
   Invoke-Checked $bash @('-lc', 'printf "portable-git-bash-ok\n"') 'bundled Bash probe'
-  Invoke-Checked $pandoc @('--version') 'bundled Pandoc version probe'
-
-  $markdown = Join-Path $smokeRoot 'smoke.md'
-  $docx = Join-Path $smokeRoot 'smoke.docx'
-  Set-Content -LiteralPath $markdown -Value "# Windows runtime smoke`n`nManaged DOCX conversion works.`n" -Encoding UTF8
-  Invoke-Checked $pandoc @('--from', 'markdown', '--to', 'docx', '--output', $docx, $markdown) 'DOCX Markdown conversion'
-  Assert-Path $docx 'generated DOCX'
-
   $fixture = Join-Path $smokeRoot 'smoke.xlsx'
   $createFixture = "from openpyxl import Workbook; w=Workbook(); s=w.active; s.title='Smoke'; s.append(['Name','Score']); s.append(['Windows',100]); w.save(r'$fixture')"
   Invoke-Checked $skillPython @('-c', $createFixture) 'XLSX fixture creation'

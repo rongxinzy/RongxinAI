@@ -30,9 +30,9 @@ Create, edit, and format DOCX documents via CLI tools or direct C# scripts built
 ## ZhiYuan/Pi execution
 
 When this skill is run inside ZhiYuan, use the `run_skill_script` tool for every bundled
-`.sh`, `.py`, `.mjs`, or `.ps1` script. Do not invoke `bash`, `python3`, `node`, or `pandoc`
+`.sh`, `.py`, `.mjs`, or `.ps1` script. Do not invoke `bash`, `python3`, or `node`
 through a hand-built shell command. The application resolves the packaged Git Bash,
-Pandoc, Python, and Node runtimes and reports the exact unavailable runtime when one is missing.
+Python, and Node runtimes and reports the exact unavailable runtime when one is missing.
 Markdown remains the source/intermediate format: create or edit the `.md` with Pi's file tools,
 then run the conversion script through the same tool.
 
@@ -41,19 +41,19 @@ Example:
 ```json
 {
   "skillId": "docx",
-  "script": "scripts/markdown_to_docx.sh",
+  "script": "scripts/markdown_to_docx.mjs",
   "args": ["content.md", "output.docx"]
 }
 ```
 
 **First time (CLI reference):** `bash scripts/setup.sh` (or `powershell scripts/setup.ps1` on Windows, `--minimal` to skip optional deps). Inside ZhiYuan, run the corresponding setup script with `run_skill_script`.
 
-**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. Packaged Windows and macOS builds provide a private Pandoc binary through `PANDOC_BIN`; never ask an end user to install it. `LIMITED` means that bundled Pandoc can create a simple DOCX from Markdown, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
+**First operation in session:** `bash scripts/env_check.sh`. Do not proceed if `NOT READY`. `LIMITED` means that the bundled local Markdown converter can create a simple DOCX without downloads, but structural editing, template operations, and OpenXML validation still require .NET 8+. (Skip on subsequent operations within the same session.)
 
 ## Capability routing
 
 - **Full OpenXML path:** use the pipelines below when .NET 8+ is available; it supports structural editing, templates, and XSD/business-rule validation.
-- **Pandoc fallback:** when the environment check reports `LIMITED`, use only for a new, simple document. Write the content to Markdown, then run `bash scripts/markdown_to_docx.sh content.md output.docx`. Do not use it for preserving an existing document's formatting, filling templates, tracked changes, or template validation. Render and inspect the result before delivery.
+- **Bundled Markdown fallback:** when the environment check reports `LIMITED`, use only for a new, simple document. Write the content to Markdown, then run `scripts/markdown_to_docx.mjs content.md output.docx` through `run_skill_script`. It supports headings, paragraphs, basic inline emphasis, lists, quotes, code blocks, and simple tables. Do not use it for preserving an existing document's formatting, filling templates, tracked changes, images, or template validation. Render and inspect the result before delivery.
 
 ## Quick Start: Direct C# Path
 
@@ -131,10 +131,10 @@ CLI options: `--type` (report|letter|memo|academic), `--title`, `--author`, `--p
 
 Then run the **validation pipeline** (below).
 
-If only the Pandoc fallback is available, create the content as Markdown and run:
+If only the bundled Markdown fallback is available, create the content as Markdown and run:
 
 ```bash
-bash scripts/markdown_to_docx.sh content.md out.docx
+node scripts/markdown_to_docx.mjs content.md out.docx
 ```
 
 Then run the rendered-preview and controlled-shortcut delivery gate below. Record in the validation report that the fallback was used and that OpenXML XSD/business-rule validation was unavailable.

@@ -10,7 +10,6 @@ import {
   getGitBashResolutionErrorForPi,
   resolveGitBashPathForPi,
 } from './coworkUtil';
-import { appendPandocRuntimeToEnv } from './pandocRuntime';
 import { appendPythonRuntimeToEnv, getManagedPythonExecutable } from './pythonRuntime';
 import { findSkillPythonExecutable } from './skillPythonRuntime';
 import {
@@ -372,14 +371,6 @@ export async function runManagedSkillScript(
   } catch (error) {
     console.warn(
       '[skill-runtime] Managed Python environment was not appended:',
-      error instanceof Error ? error.message : String(error),
-    );
-  }
-  try {
-    appendPandocRuntimeToEnv(env);
-  } catch (error) {
-    console.warn(
-      '[skill-runtime] Managed Pandoc environment was not appended:',
       error instanceof Error ? error.message : String(error),
     );
   }

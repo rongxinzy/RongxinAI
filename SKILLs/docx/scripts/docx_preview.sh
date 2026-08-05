@@ -22,16 +22,12 @@ FILE_SIZE=$(du -h "$INPUT" | cut -f1)
 echo "=== DOCX Preview: $(basename "$INPUT") ==="
 echo "File size: $FILE_SIZE"
 
-if command -v pandoc &>/dev/null; then
-  CONTENT=$(pandoc -f docx -t plain "$INPUT" 2>/dev/null)
-  WORD_COUNT=$(echo "$CONTENT" | wc -w | tr -d ' ')
-  EST_PAGES=$(( (WORD_COUNT + 249) / 250 ))
-  echo "Word count: $WORD_COUNT"
-  echo "Estimated pages: $EST_PAGES"
-  echo "---"
-  echo "$CONTENT"
-else
-  echo "(pandoc not available, falling back to raw XML extract)"
-  echo "---"
-  unzip -p "$INPUT" word/document.xml 2>/dev/null | head -100
-fi
+CONTENT=$(unzip -p "$INPUT" word/document.xml 2>/dev/null | \
+  sed -E 's/<w:tab[^>]*>/\t/g; s#</w:p>#\n#g; s/<[^>]+>/ /g; s/&amp;/\&/g; s/&lt;/</g; s/&gt;/>/g; s/&quot;/"/g; s/&apos;/'"'"'/g' | \
+  tr -s ' ' | sed '/^[[:space:]]*$/d')
+WORD_COUNT=$(echo "$CONTENT" | wc -w | tr -d ' ')
+EST_PAGES=$(( (WORD_COUNT + 249) / 250 ))
+echo "Word count: $WORD_COUNT"
+echo "Estimated pages: $EST_PAGES"
+echo "---"
+echo "$CONTENT"

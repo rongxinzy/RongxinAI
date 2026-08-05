@@ -115,7 +115,6 @@ jobs:
         run: |
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
-          bun run setup:pandoc-runtime
       - name: Build macOS
         if: ${{ matrix.platform == 'macos' }}
         run: bun run dist:mac

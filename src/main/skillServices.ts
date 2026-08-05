@@ -10,7 +10,6 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
-import { appendPandocRuntimeToEnv } from './libs/pandocRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
 /**
@@ -72,7 +71,6 @@ function buildSkillServiceEnv(): Record<string, string | undefined> {
   // even when system Node.js is not installed.
   env.ZHIYUAN_ELECTRON_PATH = electronNodeRuntimePath;
   appendPythonRuntimeToEnv(env);
-  appendPandocRuntimeToEnv(env);
   appendUvRuntimeToEnv(env);
   configureUvForManagedPython(env);
 

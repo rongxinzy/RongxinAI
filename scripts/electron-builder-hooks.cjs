@@ -28,10 +28,6 @@ const {
   ensurePosixPythonRuntime,
   checkRuntimeHealth: checkMacPythonRuntimeHealth,
 } = require('./setup-mac-python-runtime.js');
-const {
-  ensurePortablePandocRuntime,
-  checkRuntimeHealth: checkPandocRuntimeHealth,
-} = require('./setup-pandoc-runtime.js');
 const { ensurePortableGit } = require('./setup-mingit.js');
 const {
   ensureSkillPythonRuntimes,
@@ -1013,29 +1009,6 @@ async function beforePack(context) {
     );
   }
 
-  if (isWindowsTarget(context) || isMacTarget(context) || isLinuxTarget(context)) {
-    console.log('[electron-builder-hooks] Ensuring bundled Pandoc runtime is prepared...');
-    const targetPlatform = context.electronPlatformName;
-    const targetArch = resolveTargetArch(context);
-    await ensurePortablePandocRuntime({
-      required: true,
-      platform: targetPlatform,
-      arch: targetArch,
-    });
-    const pandocRuntimeRoot = path.join(__dirname, '..', 'resources', 'pandoc');
-    const pandocRuntimeHealth = checkPandocRuntimeHealth(
-      pandocRuntimeRoot,
-      targetPlatform,
-      targetArch,
-    );
-    if (!pandocRuntimeHealth.ok) {
-      throw new Error(
-        'Bundled Pandoc runtime health check failed before pack. Missing files: ' +
-          pandocRuntimeHealth.missing.join(', '),
-      );
-    }
-  }
-
   if (isWindowsTarget(context)) {
     // Pack all large resource directories into a single tar for faster NSIS
     // installation.  NSIS extracts thousands of small files very slowly on NTFS;
@@ -1090,11 +1063,6 @@ async function beforePack(context) {
         label: 'uv runtime',
         dir: path.join(__dirname, '..', 'resources', 'uv-win'),
         prefix: 'uv-win',
-      },
-      {
-        label: 'Pandoc runtime',
-        dir: path.join(__dirname, '..', 'resources', 'pandoc'),
-        prefix: 'pandoc',
       },
     ].concat(
       llamaCppBackendResources ? [llamaCppBackendResources] : [],

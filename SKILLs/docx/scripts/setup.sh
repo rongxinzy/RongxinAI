@@ -155,36 +155,6 @@ install_dotnet() {
     fi
 }
 
-# --- Pandoc Installation (Optional) ---
-install_pandoc() {
-    step "Checking pandoc (optional: content preview)"
-
-    if command -v pandoc &>/dev/null; then
-        log "pandoc $(pandoc --version | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?') already installed"
-        return 0
-    fi
-
-    info "Installing pandoc..."
-    case "$PKG_MGR" in
-        brew)   brew install pandoc ;;
-        apt)    sudo apt-get install -y -qq pandoc ;;
-        dnf)    sudo dnf install -y pandoc ;;
-        pacman) sudo pacman -S --noconfirm pandoc ;;
-        zypper) sudo zypper install -y pandoc ;;
-        apk)    apk add --no-cache pandoc ;;
-        *)
-            warn "Cannot auto-install pandoc. Install manually: https://pandoc.org/installing.html"
-            return 0
-            ;;
-    esac
-
-    if command -v pandoc &>/dev/null; then
-        log "pandoc installed"
-    else
-        warn "pandoc installation failed (optional, will degrade gracefully)"
-    fi
-}
-
 # --- LibreOffice Installation (Optional) ---
 install_soffice() {
     step "Checking LibreOffice/soffice (optional: .doc conversion)"
@@ -414,15 +384,6 @@ verify_installation() {
         --type report --output "$test_output" --title "Setup Test" 2>>"$LOG_FILE"; then
         log "Test document created: $test_output"
 
-        # Try preview
-        if command -v pandoc &>/dev/null; then
-            local preview
-            preview=$(pandoc -f docx -t plain "$test_output" 2>/dev/null | head -5)
-            if [ -n "$preview" ]; then
-                log "Preview working: \"$preview\""
-            fi
-        fi
-
         # Cleanup
         rm -f "$test_output"
         log "Test passed — minimax-docx is ready to use!"
@@ -441,7 +402,6 @@ print_summary() {
     echo ""
     echo "  Environment: $OS ($ARCH)"
     echo "  .NET SDK:    $(dotnet --version 2>/dev/null || echo 'NOT FOUND')"
-    echo "  pandoc:      $(pandoc --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo 'not installed (optional)')"
     echo "  soffice:     $(soffice --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' || echo 'not installed (optional)')"
     echo "  Project:     $DOTNET_DIR"
     echo ""
@@ -472,7 +432,7 @@ main() {
             --skip-verify)  SKIP_VERIFY=true ;;
             --help|-h)
                 echo "Usage: setup.sh [options]"
-                echo "  --minimal       Only install critical dependencies (skip pandoc, soffice, fonts)"
+                echo "  --minimal       Only install critical dependencies (skip soffice and fonts)"
                 echo "  --skip-verify   Skip the verification test at the end"
                 echo "  --help          Show this help"
                 exit 0
@@ -484,7 +444,6 @@ main() {
     install_zip_tools
 
     if ! $SKIP_OPTIONAL; then
-        install_pandoc
         install_soffice
         check_fonts
     fi

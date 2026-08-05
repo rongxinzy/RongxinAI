@@ -164,10 +164,8 @@ describe('skillRuntimeRunner', () => {
     expect(result.stdout).toContain('Alice');
   });
 
-  it('creates a simple DOCX through the managed Bash and Pandoc path', async () => {
+  it('creates a simple DOCX through the managed Node fallback', async () => {
     const skillsRoot = path.resolve(process.cwd(), 'SKILLs');
-    const pandocPath = path.resolve(process.cwd(), 'resources', 'pandoc', 'pandoc');
-    if (!fs.existsSync(pandocPath)) return;
 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-docx-'));
     roots.push(root);
@@ -178,13 +176,13 @@ describe('skillRuntimeRunner', () => {
     const result = await runManagedSkillScript({
       skillsRoot,
       skillId: 'docx',
-      script: 'scripts/markdown_to_docx.sh',
+      script: 'scripts/markdown_to_docx.mjs',
       args: [inputPath, outputPath],
       workspaceRoot: root,
       timeoutMs: 30_000,
     });
     expect(result.ok).toBe(true);
-    expect(result.runtime).toBe('bash');
+    expect(result.runtime).toBe('node');
     expect(fs.statSync(outputPath).size).toBeGreaterThan(0);
   });
 
