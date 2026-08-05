@@ -203,8 +203,8 @@ const App: React.FC = () => {
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
 
         const resolvedModels = await collectAvailableModels(config);
+        dispatch(setAvailableModels(resolvedModels));
         if (resolvedModels.length > 0) {
-          dispatch(setAvailableModels(resolvedModels));
           const allModels = store.getState().model.availableModels;
           const preferredModel =
             allModels.find(
@@ -245,9 +245,7 @@ const App: React.FC = () => {
     const refreshAvailableModels = async () => {
       const config = configService.getConfig();
       const allModels = await collectAvailableModels(config);
-      if (allModels.length > 0) {
-        dispatch(setAvailableModels(allModels));
-      }
+      dispatch(setAvailableModels(allModels));
     };
 
     const handleConfigUpdated = () => {
@@ -528,9 +526,7 @@ const App: React.FC = () => {
     });
     void collectAvailableModels(config)
       .then(allModels => {
-        if (allModels.length > 0) {
-          dispatch(setAvailableModels(allModels));
-        }
+        dispatch(setAvailableModels(allModels));
       })
       .catch(() => undefined);
   };

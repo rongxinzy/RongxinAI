@@ -20,11 +20,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   const models: Model[] = [];
 
   if (!config.providers) {
-    return config.model.availableModels.map(model => ({
-      id: model.id,
-      name: model.name,
-      supportsImage: model.supportsImage ?? false,
-    }));
+    return [];
   }
 
   Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
@@ -81,11 +77,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
     return models;
   }
 
-  return config.model.availableModels.map(model => ({
-    id: model.id,
-    name: model.name,
-    supportsImage: model.supportsImage ?? false,
-  }));
+  return [];
 }
 
 export function buildLlamaCppRunningModels(

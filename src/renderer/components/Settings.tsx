@@ -508,6 +508,12 @@ const shouldUseMaxCompletionTokensForOpenAI = (provider: string, modelId?: strin
 };
 const CONNECTIVITY_TEST_TOKEN_BUDGET = 64;
 
+const shouldShowProviderModels = (providerKey: string, providerConfig: ProviderConfig): boolean => {
+  if (providerKey === ProviderName.Ollama || providerKey === ProviderName.LlamaCpp) return true;
+  if (isCustomProvider(providerKey)) return Boolean(providerConfig.baseUrl?.trim());
+  return Boolean(providerConfig.apiKey?.trim());
+};
+
 const getDefaultProviders = (): ProvidersConfig => {
   const providers = (defaultConfig.providers ?? {}) as ProvidersConfig;
   const entries = Object.entries(providers) as Array<[string, ProviderConfig]>;
@@ -517,11 +523,13 @@ const getDefaultProviders = (): ProvidersConfig => {
       providerKey,
       {
         ...providerConfig,
-        models: providerConfig.models?.map(model => ({
-          ...model,
-          name: model.name.replace('(Secure)', secureSuffix),
-          supportsImage: resolveModelSupportsImageForProvider(providerKey, model),
-        })),
+        models: providerConfig.enabled
+          ? providerConfig.models?.map(model => ({
+              ...model,
+              name: model.name.replace('(Secure)', secureSuffix),
+              supportsImage: resolveModelSupportsImageForProvider(providerKey, model),
+            }))
+          : [],
       },
     ]),
   ) as ProvidersConfig;
@@ -1217,10 +1225,12 @@ const Settings: React.FC<SettingsProps> = ({
 
             return Object.fromEntries(
               Object.entries(merged).map(([providerKey, providerConfig]) => {
-                const models = normalizeProviderModelsForSettings(
-                  providerKey,
-                  providerConfig.models,
-                );
+                const models = shouldShowProviderModels(providerKey, providerConfig)
+                  ? normalizeProviderModelsForSettings(
+                      providerKey,
+                      providerConfig.models,
+                    )
+                  : [];
                 return [
                   providerKey,
                   {
@@ -1352,7 +1362,16 @@ const Settings: React.FC<SettingsProps> = ({
     // Keep the selected provider available while switching locales. Provider visibility
     // is region-based, so otherwise switching languages could unexpectedly change tabs.
     if (providers[activeProvider] && !filtered[activeProvider]) {
-      filtered[activeProvider] = providers[activeProvider];
+      const activeConfig = providers[activeProvider];
+      // Keep a provider across locale changes only when the user has actually
+      // enabled or configured it. Disabled preset providers must not appear
+      // as a lone entry in the provider list.
+      if (
+        isProviderEnabled(activeProvider, activeConfig) ||
+        hasProviderAuthConfigured(activeProvider, activeConfig)
+      ) {
+        filtered[activeProvider] = activeConfig;
+      }
     }
     return filtered as ProvidersConfig;
   }, [activeProvider, language, providers]);

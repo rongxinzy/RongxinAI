@@ -37,6 +37,7 @@ export function CoworkModelPicker({
   onOpenChange,
   onSelect,
 }: CoworkModelPickerProps) {
+  const displayedSelectedModel = models.length > 0 ? selectedModel : null;
   const [searchQuery, setSearchQuery] = useState('');
   const matchingModels = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase();
@@ -64,12 +65,14 @@ export function CoworkModelPicker({
         nativeButton={false}
         render={
           <PromptInputButton className="max-w-[200px] gap-1 px-2 text-sm hover:bg-surface-raised">
-            {selectedModel ? (
+            {displayedSelectedModel ? (
               <>
                 <ModelProviderIcon
-                  provider={selectedModel.providerKey || selectedModel.provider || 'openai'}
+                  provider={
+                    displayedSelectedModel.providerKey || displayedSelectedModel.provider || 'openai'
+                  }
                 />
-                <ModelSelectorName>{selectedModel.name}</ModelSelectorName>
+                <ModelSelectorName>{displayedSelectedModel.name}</ModelSelectorName>
               </>
             ) : (
               <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>

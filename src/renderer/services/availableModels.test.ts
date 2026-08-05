@@ -58,6 +58,23 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
 });
 
+test('does not expose the legacy default model when no provider is configured', async () => {
+  const config = createConfig();
+  config.providers = Object.fromEntries(
+    Object.entries(config.providers ?? {}).map(([provider, providerConfig]) => [
+      provider,
+      { ...providerConfig, enabled: false, apiKey: '', models: [] },
+    ]),
+  );
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  await expect(collectAvailableModels(config)).resolves.toEqual([]);
+});
+
 test('collectAvailableModels merges running llama.cpp model metadata', async () => {
   const listRunningModels = vi.fn(async () => [
     {
