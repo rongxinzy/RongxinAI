@@ -522,6 +522,7 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     `$logPath = '${psEscape(logPath)}'`,
     `$appPid = ${process.pid}`,
     `$installerPath = '${psEscape(exePath)}'`,
+    `$appPath = '${psEscape(process.execPath)}'`,
     '',
     'function Log($msg) {',
     "    $ts = Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff'",
@@ -552,6 +553,12 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     '    Log "Installer completed; NSIS finish page controls app launch"',
     '} catch {',
     '    Log "ERROR: $($_.Exception.Message)"',
+    '    # A visible installer can be cancelled. Restore the still-installed',
+    '    # version so cancellation does not strand the user outside the app.',
+    '    if (Test-Path $appPath) {',
+    '        Start-Process -FilePath $appPath',
+    '        Log "Existing app relaunched after installer cancellation or failure"',
+    '    }',
     '}',
   ].join('\r\n');
 

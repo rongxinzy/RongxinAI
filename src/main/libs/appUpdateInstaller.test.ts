@@ -100,6 +100,9 @@ describe('unattended installation handoff', () => {
     expect(updaterSource).toContain('Launching interactive installer: $installerPath');
     expect(updaterSource).toContain('Start-Process -FilePath $installerPath -Wait -PassThru');
     expect(updaterSource).not.toContain("-ArgumentList '/S'");
+    expect(updaterSource).toContain(
+      'Existing app relaunched after installer cancellation or failure',
+    );
   });
 
   test('NSIS silent mode bypasses the local-signing confirmation dialog', async () => {
