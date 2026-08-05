@@ -64,6 +64,7 @@ export default defineConfig(async () => ({
                   rollupOptions: {
                     external: id => {
                       const staticExternals = [
+                        '@firecrawl/anydoc',
                         'better-sqlite3',
                         'discord.js',
                         'zlib-sync',

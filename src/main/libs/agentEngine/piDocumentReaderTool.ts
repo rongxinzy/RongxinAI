@@ -1,7 +1,8 @@
 import * as fs from 'fs';
-import path from 'path';
 
 import { formatFromPath, toMarkdown } from '@firecrawl/anydoc';
+
+import { resolveWorkspaceFile } from '../../workbenchTask/artifactCollector';
 
 export const PiDocumentReaderToolName = 'read_document';
 export const PiDocumentReaderSystemPrompt = [
@@ -21,15 +22,6 @@ type DocumentReaderToolResult = {
 };
 
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
-
-function resolveWorkspaceDocument(workspaceRoot: string, candidate: string): string | null {
-  if (!candidate) return null;
-  const root = path.resolve(workspaceRoot);
-  const resolved = path.resolve(root, candidate);
-  const relative = path.relative(root, resolved);
-  if (relative === '' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return null;
-  return resolved;
-}
 
 export function buildPiDocumentReaderTool(options: {
   workspaceRoot: string;
@@ -56,10 +48,15 @@ export function buildPiDocumentReaderTool(options: {
       params: Record<string, unknown>,
     ): Promise<DocumentReaderToolResult> => {
       const requestedPath = text(params.path);
-      const filePath = resolveWorkspaceDocument(options.workspaceRoot, requestedPath);
+      const filePath = resolveWorkspaceFile(options.workspaceRoot, requestedPath);
       if (!filePath) {
         return {
-          content: [{ type: 'text', text: 'Document read denied: path must be a file inside the workspace.' }],
+          content: [
+            {
+              type: 'text',
+              text: 'Document read denied: path must be a file inside the workspace.',
+            },
+          ],
           details: { errorCode: 'DOCUMENT_PATH_DENIED', path: requestedPath },
         };
       }
@@ -75,7 +72,9 @@ export function buildPiDocumentReaderTool(options: {
       }
       if (!stat.isFile()) {
         return {
-          content: [{ type: 'text', text: `Document read denied: ${requestedPath} is not a file.` }],
+          content: [
+            { type: 'text', text: `Document read denied: ${requestedPath} is not a file.` },
+          ],
           details: { errorCode: 'DOCUMENT_NOT_A_FILE', path: requestedPath },
         };
       }
@@ -109,7 +108,7 @@ export function buildPiDocumentReaderTool(options: {
           .filter(Boolean)
           .join('\n');
         return {
-          content: [{ type: 'text', text: `${header}${output}` }],
+          content: [{ type: 'text', text: `${header}\n\n${output}` }],
           details: {
             path: requestedPath,
             format,
@@ -127,7 +126,11 @@ export function buildPiDocumentReaderTool(options: {
               text: `Unable to read ${requestedPath} as ${format ?? 'an auto-detected format'}: ${message}`,
             },
           ],
-          details: { errorCode: 'DOCUMENT_CONVERSION_FAILED', path: requestedPath, format: format ?? null },
+          details: {
+            errorCode: 'DOCUMENT_CONVERSION_FAILED',
+            path: requestedPath,
+            format: format ?? null,
+          },
         };
       }
     },

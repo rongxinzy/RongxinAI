@@ -86,10 +86,7 @@ import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
-import {
-  buildPiDocumentReaderTool,
-  PiDocumentReaderSystemPrompt,
-} from './piDocumentReaderTool';
+import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';

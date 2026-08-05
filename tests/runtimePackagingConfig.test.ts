@@ -52,6 +52,9 @@ test('unpacks AnyDoc native bindings from the application archive', () => {
     asarUnpack?: string[];
   };
   assert.ok(config.asarUnpack?.includes('node_modules/@firecrawl/**'));
+
+  const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
+  assert.match(viteConfig, /staticExternals\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/);
 });
 
 test('release workflows explicitly provision the private POSIX toolchain', () => {
