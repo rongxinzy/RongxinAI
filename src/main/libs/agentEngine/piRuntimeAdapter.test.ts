@@ -1197,6 +1197,20 @@ describe('PiRuntimeAdapter', () => {
 
   // ── Cleanup ──
 
+  it('dismisses pending workbench approvals when a session stops', async () => {
+    const dismissals: string[] = [];
+    adapter.on('permissionDismiss', requestId => dismissals.push(requestId));
+    await adapter.startSession('test', 'Hello');
+    const approvalSessionMap = (adapter as unknown as { approvalSessionMap: Map<string, string> })
+      .approvalSessionMap;
+    approvalSessionMap.set('approval-1', 'test');
+
+    adapter.stopSession('test');
+
+    expect(approvalSessionMap.has('approval-1')).toBe(false);
+    expect(dismissals).toEqual(['approval-1']);
+  });
+
   describe('onSessionDeleted', () => {
     it('should stop the session', async () => {
       await adapter.startSession('test', 'Hello');
