@@ -86,6 +86,10 @@ import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
+import {
+  buildPiDocumentReaderTool,
+  PiDocumentReaderSystemPrompt,
+} from './piDocumentReaderTool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
@@ -598,6 +602,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
         ),
       );
+      if (resourceState.fileToolsEnabled) {
+        customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
+      }
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
       const mcpProxyTool = this.buildMcpProxyTool();
@@ -1447,6 +1454,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // Append this policy so it remains present for both default and custom prompts.
       appendSystemPromptOverride: (): string[] => [
         PiAskUserQuestionSystemPrompt,
+        ...(resourceState.fileToolsEnabled ? [PiDocumentReaderSystemPrompt] : []),
         ...(resourceState.fileToolsEnabled
           ? [createPiLargeFileWriteSystemPrompt(resourceState.maxOutputTokens)]
           : []),

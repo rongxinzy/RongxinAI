@@ -47,6 +47,13 @@ test('each desktop target keeps the private document and Python toolchain resour
   }
 });
 
+test('unpacks AnyDoc native bindings from the application archive', () => {
+  const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
+    asarUnpack?: string[];
+  };
+  assert.ok(config.asarUnpack?.includes('node_modules/@firecrawl/**'));
+});
+
 test('release workflows explicitly provision the private POSIX toolchain', () => {
   for (const workflow of ['build-platforms.yml', 'online-update-release.yml']) {
     const content = readFileSync(path.join(root, '.github', 'workflows', workflow), 'utf8');

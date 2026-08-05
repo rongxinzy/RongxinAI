@@ -991,7 +991,7 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         appendSystemPromptOverride: () => string[];
       };
-      expect(loaderOptions.appendSystemPromptOverride()[1]).toContain('8000 characters');
+      expect(loaderOptions.appendSystemPromptOverride()[2]).toContain('8000 characters');
     });
 
     it('should not call setModel when no model in patch', async () => {
@@ -1023,6 +1023,7 @@ describe('PiRuntimeAdapter', () => {
       };
       expect(loaderOptions.appendSystemPromptOverride()).toEqual([
         PiAskUserQuestionSystemPrompt,
+        expect.stringContaining('## Local document reading'),
         expect.stringContaining('## Large File Writes'),
       ]);
     });
