@@ -292,6 +292,11 @@
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
   "electronVersion": "40.2.1",
-  "asarUnpack": ["node_modules/@img/**", "node_modules/better-sqlite3/**", "node_modules/npm/**"],
+  "asarUnpack": [
+    "node_modules/@img/**",
+    "node_modules/@firecrawl/**",
+    "node_modules/better-sqlite3/**",
+    "node_modules/npm/**"
+  ],
   "asar": true
 }
