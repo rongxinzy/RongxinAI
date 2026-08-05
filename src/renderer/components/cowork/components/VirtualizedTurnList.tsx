@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import React, { useImperativeHandle, useRef } from 'react';
+import React, { useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 
 import type { ConversationTurn } from '../helpers/messageGrouping';
@@ -9,6 +9,7 @@ export interface VirtualizedTurnListHandle {
 }
 
 interface VirtualizedTurnListProps {
+  isStreaming: boolean;
   turns: ConversationTurn[];
   /** Renders one turn row, including its wrapper element. */
   renderTurn: (turn: ConversationTurn, index: number) => React.ReactNode;
@@ -18,6 +19,8 @@ interface VirtualizedTurnListProps {
 
 /** Fallback height estimate for turns that were never measured. */
 const TURN_HEIGHT_ESTIMATE_PX = 300;
+const INITIAL_VIEWPORT_HEIGHT_PX = 1200;
+const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
 
 /**
  * Renders only the visible window of conversation turns (issue #141
@@ -29,9 +32,11 @@ const TURN_HEIGHT_ESTIMATE_PX = 300;
 export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
->(({ turns, renderTurn, renderAll }, ref) => {
+>(({ isStreaming, turns, renderTurn, renderAll }, ref) => {
   const { scrollRef } = useStickToBottomContext();
   const measuredSizesRef = useRef(new Map<React.Key, number>());
+  const hasPositionedInitialTailRef = useRef(false);
+  const initialOffset = turns.length * TURN_HEIGHT_ESTIMATE_PX;
   const virtualizer = useVirtualizer({
     count: turns.length,
     getScrollElement: () => scrollRef.current,
@@ -39,7 +44,31 @@ export const VirtualizedTurnList = React.forwardRef<
     estimateSize: index =>
       measuredSizesRef.current.get(turns[index]?.id ?? index) ?? TURN_HEIGHT_ESTIMATE_PX,
     overscan: 4,
+    initialOffset,
+    initialRect: INITIAL_VIEWPORT_RECT,
+    anchorTo: 'end',
+    followOnAppend: isStreaming ? 'auto' : false,
   });
+
+  useLayoutEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) return;
+
+    const previousOverflowAnchor = scrollElement.style.overflowAnchor;
+    scrollElement.style.overflowAnchor = 'none';
+
+    return () => {
+      scrollElement.style.overflowAnchor = previousOverflowAnchor;
+    };
+  }, [scrollRef]);
+
+  useLayoutEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (!scrollElement || renderAll || hasPositionedInitialTailRef.current) return;
+
+    hasPositionedInitialTailRef.current = true;
+    virtualizer.scrollToEnd({ behavior: 'auto' });
+  }, [renderAll, scrollRef, virtualizer]);
 
   useImperativeHandle(
     ref,

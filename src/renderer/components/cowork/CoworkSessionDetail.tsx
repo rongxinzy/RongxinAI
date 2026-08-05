@@ -99,7 +99,6 @@ import {
   toAbsolutePathFromCwd,
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
-import { useScrollStabilization } from './hooks/useScrollStabilization';
 import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
@@ -386,7 +385,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   }, [currentSession?.id, updateArtifactPanelMaxWidth]);
 
   useLayoutEffect(() => {
-    if (previousArtifactSessionIdRef.current && previousArtifactSessionIdRef.current !== sessionId) {
+    if (
+      previousArtifactSessionIdRef.current &&
+      previousArtifactSessionIdRef.current !== sessionId
+    ) {
       skipArtifactPanelTransitionRef.current = true;
     }
     previousArtifactSessionIdRef.current = sessionId;
@@ -953,11 +955,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // keep correct rail numbering.
   const turnRailIndices = useMemo(() => buildTurnRailIndices(turns), [turns]);
 
-  useScrollStabilization({ sessionId, isStreaming, rootRef: detailRootRef });
   useSessionHistoryPagination({
     sessionId,
     messagesOffset: currentSession?.messagesOffset ?? 0,
-    messageCount: messagesLength,
     rootRef: detailRootRef,
   });
   useConversationRailScrollSync({
@@ -1082,7 +1082,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
     return (
       <VirtualizedTurnList
+        key={sessionId}
         ref={virtualizedTurnListRef}
+        isStreaming={isStreaming}
         turns={turns}
         renderTurn={renderTurn}
         renderAll={isExportingImage}
@@ -1241,9 +1243,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           aria-hidden={isArtifactWorkspace}
         >
           <div className="relative flex-1 min-h-0">
-            <Conversation className="h-full" initial="instant">
+            <Conversation
+              className="h-full"
+              initial="instant"
+              resize={isStreaming ? 'smooth' : 'instant'}
+            >
               <ConversationContent
                 className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
+                observeContentResize={false}
                 scrollClassName="cowork-conversation-scroll"
               >
                 <div ref={scrollContainerRef}>

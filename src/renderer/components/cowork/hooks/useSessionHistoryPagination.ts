@@ -1,20 +1,12 @@
-import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 
 import { coworkService } from '../../../services/cowork';
 
 const HISTORY_SCROLL_THRESHOLD_PX = 64;
 
-type ScrollSnapshot = {
-  element: HTMLElement;
-  previousHeight: number;
-  previousOffset: number;
-  previousTop: number;
-};
-
 type UseSessionHistoryPaginationOptions = {
   sessionId: string | undefined;
   messagesOffset: number;
-  messageCount: number;
   rootRef: RefObject<HTMLElement | null>;
 };
 
@@ -22,32 +14,22 @@ type UseSessionHistoryPaginationOptions = {
 export function useSessionHistoryPagination({
   sessionId,
   messagesOffset,
-  messageCount,
   rootRef,
 }: UseSessionHistoryPaginationOptions): void {
   const isLoadingRef = useRef(false);
-  const snapshotRef = useRef<ScrollSnapshot | null>(null);
+  const loadingOffsetRef = useRef<number | null>(null);
 
   useEffect(() => {
     isLoadingRef.current = false;
-    snapshotRef.current = null;
+    loadingOffsetRef.current = null;
   }, [sessionId]);
 
-  useLayoutEffect(() => {
-    const snapshot = snapshotRef.current;
-    if (!snapshot || messagesOffset >= snapshot.previousOffset) return;
+  useEffect(() => {
+    if (loadingOffsetRef.current === null || messagesOffset >= loadingOffsetRef.current) return;
 
-    snapshotRef.current = null;
-    const frameId = window.requestAnimationFrame(() => {
-      if (snapshot.element.isConnected) {
-        const heightDelta = snapshot.element.scrollHeight - snapshot.previousHeight;
-        snapshot.element.scrollTop = snapshot.previousTop + heightDelta;
-      }
-      isLoadingRef.current = false;
-    });
-
-    return () => window.cancelAnimationFrame(frameId);
-  }, [messageCount, messagesOffset]);
+    isLoadingRef.current = false;
+    loadingOffsetRef.current = null;
+  }, [messagesOffset]);
 
   useEffect(() => {
     if (!sessionId || messagesOffset <= 0) return;
@@ -60,24 +42,19 @@ export function useSessionHistoryPagination({
       if (isLoadingRef.current || messagesOffset <= 0) return;
 
       isLoadingRef.current = true;
-      snapshotRef.current = {
-        element,
-        previousHeight: element.scrollHeight,
-        previousOffset: messagesOffset,
-        previousTop: element.scrollTop,
-      };
+      loadingOffsetRef.current = messagesOffset;
 
       void coworkService
         .loadMoreMessages(sessionId)
         .then(loaded => {
           if (!loaded) {
-            snapshotRef.current = null;
             isLoadingRef.current = false;
+            loadingOffsetRef.current = null;
           }
         })
         .catch(error => {
-          snapshotRef.current = null;
           isLoadingRef.current = false;
+          loadingOffsetRef.current = null;
           console.error('[CoworkHistory] failed to load older messages:', error);
         });
     };
