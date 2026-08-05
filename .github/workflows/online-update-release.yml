@@ -65,12 +65,15 @@ jobs:
           - platform: windows
             runner: windows-latest
             artifact: win32-x64-lite
+            runtime_target: win-x64
           - platform: macos
             runner: macos-latest
             artifact: darwin-arm64-default
+            runtime_target: mac-arm64
           - platform: linux
             runner: ubuntu-latest
             artifact: linux-x64-default
+            runtime_target: linux-x64
     runs-on: ${{ matrix.runner }}
     environment: release
     env:
@@ -88,6 +91,23 @@ jobs:
       # OpenClaw is built with pnpm upstream; Bun remains this repository's installer.
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
+      - name: Restore packaging caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/.local/share/pnpm/store
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            ~/AppData/Local/pnpm/store
+            vendor/openclaw-runtime/${{ matrix.runtime_target }}
+            vendor/openclaw-plugins
+          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
       - name: Install Electron and virtual desktop dependencies
         if: ${{ matrix.platform == 'linux' }}
         run: |

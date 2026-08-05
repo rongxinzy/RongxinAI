@@ -42,15 +42,15 @@ jobs:
           separator=''
 
           if [[ "$BUILD_MACOS" == "true" ]]; then
-            matrix+='{"platform":"macos","runner":"macos-latest","artifact":"macos-build"}'
+            matrix+='{"platform":"macos","runner":"macos-latest","artifact":"macos-build","runtime_target":"mac-arm64"}'
             separator=','
           fi
           if [[ "$BUILD_WINDOWS" == "true" ]]; then
-            matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"windows-latest\",\"artifact\":\"windows-build\"}"
+            matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"windows-latest\",\"artifact\":\"windows-build\",\"runtime_target\":\"win-x64\"}"
             separator=','
           fi
           if [[ "$BUILD_LINUX" == "true" ]]; then
-            matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-build\"}"
+            matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-build\",\"runtime_target\":\"linux-x64\"}"
           fi
 
           matrix+=']}'
@@ -80,6 +80,23 @@ jobs:
       - uses: pnpm/action-setup@v4
         with:
           version: 10
+      - name: Restore packaging caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/.local/share/pnpm/store
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            ~/AppData/Local/pnpm/store
+            vendor/openclaw-runtime/${{ matrix.runtime_target }}
+            vendor/openclaw-plugins
+          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
       - name: Install Electron system dependencies
         if: ${{ matrix.platform == 'linux' }}
         run: |
