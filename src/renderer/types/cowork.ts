@@ -116,6 +116,8 @@ export interface CoworkSession {
   messagesOffset: number;
   /** Total number of messages stored for this session. */
   totalMessages: number;
+  /** Persisted artifacts collected from the full message history on the main process. */
+  artifacts?: import('../../main/coworkStore').CoworkPersistedArtifact[];
   createdAt: number;
   updatedAt: number;
 }

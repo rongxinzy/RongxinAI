@@ -88,6 +88,7 @@ import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import { collectSessionArtifacts } from '../../coworkArtifactCollector';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
@@ -1839,7 +1840,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           void this.flushFollowUpQueue(sessionId, active);
           break;
         }
-        if (this.store) this.store.updateSession(sessionId, { status: 'idle' });
+        if (this.store) {
+          this.store.updateSession(sessionId, { status: 'idle' });
+          // Persist artifacts from the full message history so they survive
+          // renderer-side pagination across page reloads.
+          const sessionMessages = this.store.getSessionMessages(sessionId);
+          const persistedArtifacts = collectSessionArtifacts(sessionMessages);
+          this.store.saveSessionArtifacts(sessionId, persistedArtifacts);
+        }
         if (active.workbenchRunId && this.workbenchTaskService) {
           const workflowSnapshot = active.researchRun
             ? active.researchRun.getSnapshot()

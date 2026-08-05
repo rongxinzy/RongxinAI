@@ -422,6 +422,17 @@ export interface CoworkConversationReplacementEntry {
   timestamp?: number;
 }
 
+export interface CoworkPersistedArtifact {
+  id: string;
+  type: string;
+  title: string;
+  fileName?: string;
+  filePath?: string;
+  source: 'codeblock' | 'tool';
+  role: 'intermediate' | 'deliverable';
+  createdAt: number;
+}
+
 export interface CoworkSession {
   id: string;
   title: string;
@@ -443,6 +454,8 @@ export interface CoworkSession {
   messagesOffset: number;
   /** Total number of messages stored for this session. */
   totalMessages: number;
+  /** Persisted artifacts aggregated across all turns (survives pagination). */
+  artifacts: CoworkPersistedArtifact[];
   createdAt: number;
   updatedAt: number;
 }
@@ -787,6 +800,7 @@ export class CoworkStore {
       messages: [],
       messagesOffset: 0,
       totalMessages: 0,
+      artifacts: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -812,9 +826,9 @@ export class CoworkStore {
       updated_at: number;
     }
 
-    const row = this.getOne<SessionRow>(
+    const row = this.getOne<SessionRow & { artifacts: string | null }>(
       `
-      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at
+      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at, artifacts
       FROM cowork_sessions
       WHERE id = ?
     `,
@@ -891,6 +905,18 @@ export class CoworkStore {
       };
     });
 
+    let artifacts: CoworkPersistedArtifact[] = [];
+    if ((row as unknown as Record<string, unknown>).artifacts) {
+      try {
+        const parsed = JSON.parse(
+          (row as unknown as Record<string, unknown>).artifacts as string,
+        );
+        if (Array.isArray(parsed)) artifacts = parsed;
+      } catch {
+        artifacts = [];
+      }
+    }
+
     return {
       id: row.id,
       title: row.title,
@@ -910,9 +936,20 @@ export class CoworkStore {
       messages,
       messagesOffset: messageOffset,
       totalMessages,
+      artifacts,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  saveSessionArtifacts(
+    sessionId: string,
+    artifacts: CoworkPersistedArtifact[],
+  ): void {
+    const now = Date.now();
+    this.db
+      .prepare('UPDATE cowork_sessions SET artifacts = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(artifacts), now, sessionId);
   }
 
   updateSession(
@@ -1242,7 +1279,7 @@ export class CoworkStore {
     }));
   }
 
-  private getSessionMessages(sessionId: string): CoworkMessage[] {
+  getSessionMessages(sessionId: string): CoworkMessage[] {
     const rows = this.getAll<CoworkMessageRow>(
       `
       SELECT id, type, content, metadata, created_at, sequence

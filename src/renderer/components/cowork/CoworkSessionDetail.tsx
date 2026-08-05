@@ -401,6 +401,37 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     }
   }, [isPanelOpen, sessionId]);
 
+  // Seed the artifact store with server-persisted artifacts collected from
+  // the full (non-paginated) message history. Without this, artifacts
+  // declared in earlier turns are invisible after a page reload because
+  // the renderer only sees the most recent page of messages.
+  useEffect(() => {
+    if (!sessionId) return;
+    const persisted = currentSession?.artifacts;
+    if (!persisted || persisted.length === 0) return;
+
+    const existingIds = new Set(
+      (previewArtifacts || []).map(a => a.id),
+    );
+    for (const artifact of persisted) {
+      // Only add if not already present (renderer-detected artifacts take
+      // precedence because they have content for code blocks).
+      if (!existingIds.has(artifact.id)) {
+        dispatch(
+          addArtifact({
+            sessionId,
+            artifact: {
+              ...artifact,
+              messageId: artifact.id,
+              sessionId,
+              content: '',
+            } as import('../../types/artifact').Artifact,
+          }),
+        );
+      }
+    }
+  }, [sessionId, currentSession?.artifacts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Synchronous artifact detection on session mount so artifact cards
   // appear in the first-paint frame instead of popping in after the async
   // Web Worker pass completes (which would change turn heights and jank).
