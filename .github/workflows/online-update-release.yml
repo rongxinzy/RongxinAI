@@ -91,6 +91,33 @@ jobs:
       # OpenClaw is built with pnpm upstream; Bun remains this repository's installer.
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
+      # These are application-bundled runtimes, not package-manager caches.
+      # GitLab's release runners retain them independently; keep the same
+      # boundary here so changing an unrelated build script does not require
+      # re-downloading Python, uv, or Pandoc for every release platform.
+      - name: Restore bundled runtime cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            resources/python-win
+            resources/uv-win
+            resources/python-mac
+            resources/uv-mac
+            resources/python-linux
+            resources/uv-linux
+            resources/pandoc
+            resources/pandoc-archives
+            resources/uv-archives
+          key: bundled-runtimes-${{ runner.os }}-${{ matrix.runtime_target }}-${{ hashFiles('scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js', 'scripts/setup-pandoc-runtime.js', 'electron-builder.json') }}
+      # The Windows backend is an immutable downloaded bundle. It is expensive
+      # to prepare, but is invalidated whenever its download or packaging
+      # contract changes instead of being tied to every file under scripts/.
+      - name: Restore Windows llama.cpp backend cache
+        if: ${{ matrix.platform == 'windows' }}
+        uses: actions/cache@v4
+        with:
+          path: build/win-lite
+          key: windows-llamacpp-lite-${{ hashFiles('package.json', 'electron-builder.json', 'scripts/electron-builder-hooks.cjs', 'scripts/download-llamacpp-runtime.cjs', 'scripts/ci/package-windows.ps1') }}
       - name: Restore packaging caches
         uses: actions/cache@v4
         with:
