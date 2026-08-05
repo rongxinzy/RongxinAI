@@ -2,6 +2,7 @@ export { default as AnthropicIcon } from './AnthropicIcon';
 export { default as CustomProviderIcon } from './CustomProviderIcon';
 export { default as DeepSeekIcon } from './DeepSeekIcon';
 export { default as GeminiIcon } from './GeminiIcon';
+export { default as GrokIcon } from './GrokIcon';
 export { default as GitHubCopilotIcon } from './GitHubCopilotIcon';
 export { default as LlamaCppIcon } from './LlamaCppIcon';
 export { default as MiniMaxIcon } from './MiniMaxIcon';
