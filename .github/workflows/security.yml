@@ -36,11 +36,11 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: npm-${{ runner.os }}-
 
-      # npm install ????? package-lock.json ? audit ??
-      - run: npm install
+      # Keep the audited dependency graph identical to the checked-in lockfile.
+      - run: npm ci --ignore-scripts
 
       # npm audit
       - name: Run npm audit

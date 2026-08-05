@@ -91,3 +91,4 @@ generate-ppt.mjs
 ppt-assets/
 *.pptx
 documents.md
+reasonix.toml
