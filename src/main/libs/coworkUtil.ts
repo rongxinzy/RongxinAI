@@ -27,7 +27,6 @@ import {
 } from './coworkModelApi';
 import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
-import { appendPandocRuntimeToEnv } from './pandocRuntime';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 
@@ -1229,7 +1228,6 @@ function applyPackagedEnvOverrides(
     }
 
     appendPythonRuntimeToEnv(env);
-    appendPandocRuntimeToEnv(env);
     appendUvRuntimeToEnv(env);
     configureUvForManagedPython(env);
 
@@ -1412,7 +1410,6 @@ function applyPackagedEnvOverrides(
   }
 
   appendUvRuntimeToEnv(env);
-  appendPandocRuntimeToEnv(env);
   configureUvForManagedPython(env);
 
   // Verify node/npx resolution in the constructed environment

@@ -223,7 +223,7 @@ try {
   }
 
   // Verify key directories exist
-  const expectedDirs = ['cfmind', 'SKILLs', 'python-win', 'uv-win', 'pandoc'];
+  const expectedDirs = ['cfmind', 'SKILLs', 'python-win', 'uv-win'];
   for (const dir of expectedDirs) {
     const dirPath = path.join(destDir, dir);
     if (fs.existsSync(dirPath)) {

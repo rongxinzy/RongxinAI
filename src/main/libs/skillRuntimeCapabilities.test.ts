@@ -14,7 +14,6 @@ describe('skill runtime capabilities', () => {
       report.node,
       report.bash,
       report.powershell,
-      report.pandoc,
     ]) {
       expect(typeof capability.available).toBe('boolean');
       expect(capability.executable === null || typeof capability.executable === 'string').toBe(

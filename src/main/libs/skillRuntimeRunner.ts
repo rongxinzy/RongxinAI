@@ -10,7 +10,6 @@ import {
   getGitBashResolutionErrorForPi,
   resolveGitBashPathForPi,
 } from './coworkUtil';
-import { appendPandocRuntimeToEnv } from './pandocRuntime';
 import { appendPythonRuntimeToEnv, getManagedPythonExecutable } from './pythonRuntime';
 import { findSkillPythonExecutable } from './skillPythonRuntime';
 import {
@@ -267,7 +266,13 @@ function resolveRuntime(
       runtime: 'bash',
       command,
       prefixArgs: [],
-      env: skillPythonExecutable ? { ZHIYUAN_SKILL_PYTHON_BIN: skillPythonExecutable } : {},
+      env: {
+        ...(skillPythonExecutable ? { ZHIYUAN_SKILL_PYTHON_BIN: skillPythonExecutable } : {}),
+        // DOCX preview uses the same managed Electron Node runtime as .mjs
+        // Skills. This keeps preview self-contained on packaged POSIX builds,
+        // where a user-installed `node` is not guaranteed to exist.
+        ZHIYUAN_ELECTRON_PATH: getElectronNodeRuntimePath(),
+      },
     };
   }
 
@@ -372,14 +377,6 @@ export async function runManagedSkillScript(
   } catch (error) {
     console.warn(
       '[skill-runtime] Managed Python environment was not appended:',
-      error instanceof Error ? error.message : String(error),
-    );
-  }
-  try {
-    appendPandocRuntimeToEnv(env);
-  } catch (error) {
-    console.warn(
-      '[skill-runtime] Managed Pandoc environment was not appended:',
       error instanceof Error ? error.message : String(error),
     );
   }

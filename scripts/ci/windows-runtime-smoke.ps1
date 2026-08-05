@@ -51,22 +51,23 @@ try {
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\xlsx\Scripts\python.exe'
   $pdfPython = Join-Path $resourcesRoot 'skill-python\pdf\Scripts\python.exe'
-  $pandoc = Join-Path $resourcesRoot 'pandoc\pandoc.exe'
+  $electron = Join-Path $ProjectRoot 'node_modules\electron\dist\electron.exe'
   $skillsRoot = Join-Path $resourcesRoot 'SKILLs'
 
   Assert-Path $bash 'bundled PortableGit Bash'
   Assert-Path $python 'bundled application Python'
   Assert-Path $skillPython 'bundled XLSX Skill Python'
   Assert-Path $pdfPython 'bundled PDF Skill Python'
+  Assert-Path $electron 'Electron Node runtime'
   Assert-Path (Join-Path $resourcesRoot 'uv-win\uv.exe') 'bundled uv'
-  Assert-Path $pandoc 'bundled Pandoc'
   Assert-Path (Join-Path $skillsRoot 'xlsx\scripts\xlsx_reader.py') 'XLSX Skill reader'
-  Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.sh') 'DOCX Markdown converter'
+  Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs') 'DOCX Markdown converter'
 
   # Remove Git, Python, Node, and user-installed tool directories from PATH.
   # The smoke test invokes only explicit package paths below.
   $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot"
   $env:UV_OFFLINE = '1'
+  $env:ELECTRON_RUN_AS_NODE = '1'
   foreach ($externalCommand in @('git.exe', 'python.exe', 'python3.exe', 'node.exe')) {
     if (Get-Command $externalCommand -ErrorAction SilentlyContinue) {
       throw "External command unexpectedly remains discoverable on the clean PATH: $externalCommand"
@@ -79,14 +80,14 @@ try {
   Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'
   Invoke-Checked $pdfPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
   Invoke-Checked $bash @('-lc', 'printf "portable-git-bash-ok\n"') 'bundled Bash probe'
-  Invoke-Checked $pandoc @('--version') 'bundled Pandoc version probe'
-
   $markdown = Join-Path $smokeRoot 'smoke.md'
   $docx = Join-Path $smokeRoot 'smoke.docx'
+  $converter = Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs'
   Set-Content -LiteralPath $markdown -Value "# Windows runtime smoke`n`nManaged DOCX conversion works.`n" -Encoding UTF8
-  Invoke-Checked $pandoc @('--from', 'markdown', '--to', 'docx', '--output', $docx, $markdown) 'DOCX Markdown conversion'
+  Invoke-Checked $electron @($converter, $markdown, $docx) 'DOCX Markdown conversion'
   Assert-Path $docx 'generated DOCX'
-
+  Invoke-Checked $electron @('-e', "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.readUInt32LE(0) !== 0x04034b50) { process.exit(1) }", $docx) 'generated DOCX ZIP validation'
+  Invoke-Checked $electron @('-e', "const fs=require('fs'),z=require('zlib'); const b=fs.readFileSync(process.argv[1]); let o=0,x=''; while(o+30<=b.length&&b.readUInt32LE(o)===0x04034b50){const m=b.readUInt16LE(o+8),n=b.readUInt32LE(o+18),l=b.readUInt16LE(o+26),e=b.readUInt16LE(o+28),s=o+30+l+e,k=b.subarray(o+30,o+30+l).toString(); if(k==='word/document.xml'){x=(m===8?z.inflateRawSync(b.subarray(s,s+n)):b.subarray(s,s+n)).toString();break} o=s+n} if(!x.includes('Heading1'))process.exit(1)", $docx) 'generated DOCX heading validation'
   $fixture = Join-Path $smokeRoot 'smoke.xlsx'
   $createFixture = "from openpyxl import Workbook; w=Workbook(); s=w.active; s.title='Smoke'; s.append(['Name','Score']); s.append(['Windows',100]); w.save(r'$fixture')"
   Invoke-Checked $skillPython @('-c', $createFixture) 'XLSX fixture creation'

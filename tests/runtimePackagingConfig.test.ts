@@ -23,7 +23,6 @@ test('each desktop target keeps the private document and Python toolchain resour
 
   assert.deepEqual(
     [
-      'resources/pandoc',
       'resources/uv-mac',
       'resources/python-mac',
       'resources/skill-python',
@@ -32,7 +31,6 @@ test('each desktop target keeps the private document and Python toolchain resour
   );
   assert.deepEqual(
     [
-      'resources/pandoc',
       'resources/uv-linux',
       'resources/python-linux',
       'resources/skill-python',
@@ -42,7 +40,7 @@ test('each desktop target keeps the private document and Python toolchain resour
 
   // Windows puts large resources in a tar consumed by the NSIS installer.
   const hooks = readFileSync(path.join(root, 'scripts', 'electron-builder-hooks.cjs'), 'utf8');
-  for (const resource of ['mingit', 'python-win', 'skill-python', 'uv-win', 'pandoc']) {
+  for (const resource of ['mingit', 'python-win', 'skill-python', 'uv-win']) {
     assert.match(hooks, new RegExp(`prefix: '${resource}'`));
   }
 });
@@ -62,7 +60,7 @@ test('release workflows explicitly provision the private POSIX toolchain', () =>
     const content = readFileSync(path.join(root, '.github', 'workflows', workflow), 'utf8');
     assert.match(content, /bun run setup:posix-uv-runtime/);
     assert.match(content, /bun run setup:posix-python-runtime/);
-    assert.match(content, /bun run setup:pandoc-runtime/);
+    assert.doesNotMatch(content, /setup:pandoc-runtime/);
   }
 });
 
@@ -74,7 +72,13 @@ test('Windows release workflow runs the clean-path bundled runtime gate', () => 
   const smoke = readFileSync(path.join(root, 'scripts', 'ci', 'windows-runtime-smoke.ps1'), 'utf8');
   assert.match(smoke, /skill-python\\xlsx/);
   assert.match(smoke, /skill-python\\pdf/);
+  assert.match(smoke, /markdown_to_docx\.mjs/);
+  assert.match(smoke, /docx\\scripts\\markdown_to_docx\.mjs/);
+  assert.match(smoke, /electron\\dist\\electron\.exe/);
+  assert.match(smoke, /ELECTRON_RUN_AS_NODE/);
   assert.match(smoke, /DOCX Markdown conversion/);
+  assert.match(smoke, /DOCX heading validation/);
+  assert.doesNotMatch(smoke, /readUInt32LE\(0\) -ne/);
   assert.match(smoke, /External command unexpectedly remains discoverable/);
   assert.match(smoke, /mingit\\usr\\bin\\bash\.exe/);
   assert.match(smoke, /PATH = "\$env:SystemRoot\\System32;\$env:SystemRoot"/);

@@ -94,7 +94,7 @@ jobs:
       # These are application-bundled runtimes, not package-manager caches.
       # GitLab's release runners retain them independently; keep the same
       # boundary here so changing an unrelated build script does not require
-      # re-downloading Python, uv, or Pandoc for every release platform.
+      # re-downloading Python or uv for every release platform.
       - name: Restore bundled runtime cache
         uses: actions/cache@v5
         with:
@@ -105,10 +105,8 @@ jobs:
             resources/uv-mac
             resources/python-linux
             resources/uv-linux
-            resources/pandoc
-            resources/pandoc-archives
             resources/uv-archives
-          key: bundled-runtimes-${{ runner.os }}-${{ matrix.runtime_target }}-${{ hashFiles('scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js', 'scripts/setup-pandoc-runtime.js', 'electron-builder.json') }}
+          key: bundled-runtimes-${{ runner.os }}-${{ matrix.runtime_target }}-${{ hashFiles('scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js', 'electron-builder.json') }}
       # The Windows backend is an immutable downloaded bundle. It is expensive
       # to prepare, but is invalidated whenever its download or packaging
       # contract changes instead of being tied to every file under scripts/.
@@ -153,7 +151,6 @@ jobs:
         run: |
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
-          bun run setup:pandoc-runtime
       - name: Build Windows package
         if: ${{ matrix.platform == 'windows' }}
         run: bun run dist:win:lite

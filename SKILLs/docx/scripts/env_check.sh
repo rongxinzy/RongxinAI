@@ -17,8 +17,6 @@ echo ""
 STATUS="READY"
 WARNINGS=0
 DOTNET_AVAILABLE=true
-PANDOC_AVAILABLE=false
-
 # --- Detect platform ---
 OS="unknown"
 case "$(uname -s)" in
@@ -32,7 +30,7 @@ esac
 
 # --- Full pipeline: .NET SDK ---
 if ! command -v dotnet &>/dev/null; then
-    printf "[WARN]    %-14s not found (Pandoc fallback may still create simple DOCX files)\n" "dotnet"
+    printf "[WARN]    %-14s not found (bundled Markdown fallback can still create simple DOCX files)\n" "dotnet"
     echo ""
     echo "  .NET SDK is REQUIRED. Install it:"
     case "$OS" in
@@ -66,7 +64,7 @@ fi
 # --- Critical: NuGet packages ---
 if [ -d "$DOTNET_DIR" ]; then
     if ! $DOTNET_AVAILABLE; then
-        printf "[SKIP]    %-14s requires .NET 8+ (Pandoc fallback remains available)\n" "OpenXML project"
+        printf "[SKIP]    %-14s requires .NET 8+ (bundled Markdown fallback remains available)\n" "OpenXML project"
     elif [ -f "$DOTNET_DIR/MiniMaxAIDocx.Cli/bin/Debug/net10.0/MiniMaxAIDocx.Cli.dll" ] || \
        [ -f "$DOTNET_DIR/MiniMaxAIDocx.Cli/bin/Debug/net8.0/MiniMaxAIDocx.Cli.dll" ]; then
         printf "[OK]      %-14s built\n" "project"
@@ -94,25 +92,6 @@ if [ -d "$DOTNET_DIR" ]; then
 else
     printf "[FAIL]    %-14s directory not found: %s\n" "project" "$DOTNET_DIR"
     STATUS="NOT READY"
-fi
-
-# --- Optional: pandoc ---
-PANDOC_BIN="${PANDOC_BIN:-$(command -v pandoc || true)}"
-if [ -n "$PANDOC_BIN" ] && [ -x "$PANDOC_BIN" ]; then
-    pandoc_ver=$("$PANDOC_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 || echo "?")
-    printf "[OK]      %-14s %s (content preview; %s)\n" "pandoc" "$pandoc_ver" "$PANDOC_BIN"
-    PANDOC_AVAILABLE=true
-else
-    printf "[WARN]    %-14s not found — bundled desktop builds should provide PANDOC_BIN\n" "pandoc"
-    WARNINGS=$((WARNINGS + 1))
-    if ! $DOTNET_AVAILABLE; then
-        STATUS="NOT READY"
-    fi
-    case "$OS" in
-        macos)        echo "           Install: brew install pandoc" ;;
-        linux|wsl)    echo "           Install: sudo apt-get install pandoc  # or dnf/pacman" ;;
-        windows-shell) echo "           Install: winget install JohnMacFarlane.Pandoc" ;;
-    esac
 fi
 
 # --- Optional: LibreOffice ---
@@ -197,8 +176,8 @@ if [ "$STATUS" = "READY" ]; then
     else
         echo "Status: READY"
     fi
-elif [ "$STATUS" = "LIMITED" ] && $PANDOC_AVAILABLE; then
-    echo "Status: LIMITED (Pandoc fallback is available for simple document creation; OpenXML editing/template validation requires .NET 8+)"
+elif [ "$STATUS" = "LIMITED" ]; then
+    echo "Status: LIMITED (bundled Markdown fallback is available for simple document creation; OpenXML editing/template validation requires .NET 8+)"
 else
     echo "Status: NOT READY"
     echo ""

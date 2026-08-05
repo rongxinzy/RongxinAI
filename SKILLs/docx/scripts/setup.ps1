@@ -25,7 +25,7 @@ function Step  { Write-Host "`n=== $args ===" -ForegroundColor Blue }
 if ($Help) {
     Write-Host @"
 Usage: setup.ps1 [options]
-  -Minimal       Only install critical dependencies (skip pandoc, soffice, fonts)
+  -Minimal       Only install critical dependencies (skip soffice and fonts)
   -SkipVerify    Skip the verification test at the end
   -Help          Show this help
 "@
@@ -86,30 +86,6 @@ if (-not $dotnetCmd -or $majorVer -lt 8) {
     } else {
         Fail "dotnet installation failed. Restart PowerShell and retry, or install manually."
         exit 1
-    }
-}
-
-# --- Pandoc (Optional) ---
-if (-not $Minimal) {
-    Step "Checking pandoc (optional: content preview)"
-
-    if (Get-Command pandoc -ErrorAction SilentlyContinue) {
-        $pandocVer = (pandoc --version | Select-Object -First 1) -replace '.*?(\d+\.\d+(\.\d+)?)', '$1'
-        Log "pandoc $pandocVer already installed"
-    } else {
-        Info "Installing pandoc..."
-        if ($HasWinget)    { winget install JohnMacFarlane.Pandoc --accept-source-agreements 2>>$LogFile }
-        elseif ($HasChoco) { choco install pandoc -y 2>>$LogFile }
-        elseif ($HasScoop) { scoop install pandoc 2>>$LogFile }
-        else               { Warn "Install pandoc manually: https://pandoc.org/installing.html" }
-
-        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-
-        if (Get-Command pandoc -ErrorAction SilentlyContinue) {
-            Log "pandoc installed"
-        } else {
-            Warn "pandoc not found after install (optional, will degrade gracefully)"
-        }
     }
 }
 
@@ -245,11 +221,6 @@ if (-not $SkipVerify) {
     if ($testExitCode -eq 0 -and (Test-Path $testOutput)) {
         Log "Test document created: $testOutput"
 
-        if (Get-Command pandoc -ErrorAction SilentlyContinue) {
-            $preview = & pandoc -f docx -t plain $testOutput 2>$null | Select-Object -First 3
-            if ($preview) { Log "Preview working: `"$($preview -join ' ')`"" }
-        }
-
         Remove-Item $testOutput -Force
         Log "Test passed - minimax-docx is ready to use!"
     } else {
@@ -264,8 +235,6 @@ Step "Setup Complete"
 Write-Host ""
 Write-Host "  Environment: Windows $([System.Environment]::OSVersion.Version)"
 Write-Host "  .NET SDK:    $(dotnet --version 2>$null)"
-$pandocInfo = if (Get-Command pandoc -ErrorAction SilentlyContinue) { pandoc --version | Select-Object -First 1 } else { "not installed (optional)" }
-Write-Host "  pandoc:      $pandocInfo"
 Write-Host "  Project:     $DotnetDir"
 Write-Host ""
 Write-Host "  Usage:"

@@ -164,28 +164,41 @@ describe('skillRuntimeRunner', () => {
     expect(result.stdout).toContain('Alice');
   });
 
-  it('creates a simple DOCX through the managed Bash and Pandoc path', async () => {
+  it('creates a simple DOCX through the managed Node fallback', async () => {
     const skillsRoot = path.resolve(process.cwd(), 'SKILLs');
-    const pandocPath = path.resolve(process.cwd(), 'resources', 'pandoc', 'pandoc');
-    if (!fs.existsSync(pandocPath)) return;
 
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-runtime-docx-'));
     roots.push(root);
     const inputPath = path.join(root, 'content.md');
     const outputPath = path.join(root, 'content.docx');
-    fs.writeFileSync(inputPath, '# Managed DOCX\n\nCreated through the Pi Skill runner.\n');
+    fs.writeFileSync(
+      inputPath,
+      '\uFEFF# Managed DOCX\n\nCreated through the Pi Skill runner.\n',
+    );
 
     const result = await runManagedSkillScript({
       skillsRoot,
       skillId: 'docx',
-      script: 'scripts/markdown_to_docx.sh',
+      script: 'scripts/markdown_to_docx.mjs',
       args: [inputPath, outputPath],
       workspaceRoot: root,
       timeoutMs: 30_000,
     });
     expect(result.ok).toBe(true);
-    expect(result.runtime).toBe('bash');
+    expect(result.runtime).toBe('node');
     expect(fs.statSync(outputPath).size).toBeGreaterThan(0);
+
+    const preview = await runManagedSkillScript({
+      skillsRoot,
+      skillId: 'docx',
+      script: 'scripts/docx_preview.sh',
+      args: [outputPath],
+      workspaceRoot: root,
+      timeoutMs: 30_000,
+    });
+    expect(preview.ok).toBe(true);
+    expect(preview.stdout).toContain('Managed DOCX');
+    expect(preview.stdout).not.toContain('DOCX .');
   });
 
   it('runs the PDF inspection pipeline with the packaged PDF Skill environment', async () => {

@@ -122,11 +122,6 @@
         ]
       },
       {
-        "from": "resources/pandoc",
-        "to": "pandoc",
-        "filter": ["**/*"]
-      },
-      {
         "from": "resources/uv-mac",
         "to": "uv-mac",
         "filter": ["**/*"]
@@ -196,11 +191,6 @@
     "category": "Utility",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "extraResources": [
-      {
-        "from": "resources/pandoc",
-        "to": "pandoc",
-        "filter": ["**/*"]
-      },
       {
         "from": "resources/uv-linux",
         "to": "uv-linux",
