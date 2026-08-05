@@ -79,6 +79,9 @@ import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
 import { EngramManager } from './memory/engramManager';
+import { ProjectMemoryService } from './memory/projectMemoryService';
+import { MemoryRepository } from './memory/repository';
+import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
 import {
   resolveAnySearchGatewayToken,
@@ -973,6 +976,9 @@ let openClawChannelGateway: OpenClawChannelGateway | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
 let workbenchTaskService: WorkbenchTaskService | null = null;
 let engramManager: EngramManager | null = null;
+let engramAdapter: ZhiYuanEngramAdapter | null = null;
+let memoryRepository: MemoryRepository | null = null;
+let projectMemoryService: ProjectMemoryService | null = null;
 
 const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!workbenchTaskService) {
@@ -990,6 +996,15 @@ const getEngramManager = (): EngramManager => {
     });
   }
   return engramManager;
+};
+
+const getProjectMemoryService = (): ProjectMemoryService => {
+  if (!engramAdapter) engramAdapter = new ZhiYuanEngramAdapter(getEngramManager());
+  if (!memoryRepository) memoryRepository = new MemoryRepository(getStore().getDatabase());
+  if (!projectMemoryService) {
+    projectMemoryService = new ProjectMemoryService(memoryRepository, engramAdapter);
+  }
+  return projectMemoryService;
 };
 
 const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
@@ -1016,6 +1031,7 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
     piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
+    piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
     // mcpServerManager is created async later (ensureOpenClawRunningForCowork),
     // so it is always null here. Late-injection happens on every subsequent call.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
@@ -7773,6 +7789,14 @@ if (!gotTheLock) {
 
     void getEngramManager()
       .start()
+      .then(connection => {
+        if (!connection || !store) return;
+        void getProjectMemoryService()
+          .drainOutbox()
+          .catch(error =>
+            console.warn('[ProjectMemory] Failed to drain pending operations:', error),
+          );
+      })
       .catch(error => console.warn('[MemoryRuntime] Failed to start local memory service:', error));
 
     // Note: Calendar permission is checked on-demand when calendar operations are requested
@@ -7829,6 +7853,9 @@ if (!gotTheLock) {
         `[WorkbenchTask] marked ${recoveredWorkbenchTasks} interrupted task(s) for explicit recovery`,
       );
     }
+    void getProjectMemoryService()
+      .drainOutbox()
+      .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
       startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun) => {

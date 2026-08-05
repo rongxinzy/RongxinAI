@@ -50,10 +50,16 @@ export class ZhiYuanEngramAdapter {
     const candidate: MemoryCandidate = {
       id: randomUUID(),
       ...input,
+      title: redactPrivateBlocks(input.title),
+      content: redactPrivateBlocks(input.content),
       createdAt: new Date().toISOString(),
     };
     this.candidates.set(candidate.id, candidate);
     return candidate;
+  }
+
+  discardCandidate(candidateId: string): void {
+    this.candidates.delete(candidateId);
   }
 
   async confirmMemory(candidateId: string, workingDirectory: string): Promise<number | null> {
@@ -156,4 +162,8 @@ export class ZhiYuanEngramAdapter {
     }
     return (await response.json()) as T;
   }
+}
+
+export function redactPrivateBlocks(value: string): string {
+  return value.replace(/<private>[\s\S]*?<\/private>/gi, '[REDACTED]');
 }

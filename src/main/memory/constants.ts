@@ -37,6 +37,47 @@ export const EngramObservationType = {
 export type EngramObservationType =
   (typeof EngramObservationType)[keyof typeof EngramObservationType];
 
+export const MemoryLinkStatus = {
+  Active: 'active',
+  Deleted: 'deleted',
+} as const;
+
+export type MemoryLinkStatus = (typeof MemoryLinkStatus)[keyof typeof MemoryLinkStatus];
+
+export const MemoryOutboxStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Failed: 'failed',
+} as const;
+
+export type MemoryOutboxStatus = (typeof MemoryOutboxStatus)[keyof typeof MemoryOutboxStatus];
+
+export const MemoryOutboxOperation = {
+  Confirm: 'confirm',
+  SessionSummary: 'session_summary',
+  Supersede: 'supersede',
+  Forget: 'forget',
+} as const;
+
+export type MemoryOutboxOperation =
+  (typeof MemoryOutboxOperation)[keyof typeof MemoryOutboxOperation];
+
+export const MemorySourceKind = {
+  Explicit: 'explicit',
+  SessionSummary: 'session_summary',
+  TaskVerifier: 'task_verifier',
+} as const;
+
+export type MemorySourceKind = (typeof MemorySourceKind)[keyof typeof MemorySourceKind];
+
+export const PiMemoryAction = {
+  Recall: 'recall',
+  Save: 'save',
+  SessionSummary: 'session_summary',
+} as const;
+
+export type PiMemoryAction = (typeof PiMemoryAction)[keyof typeof PiMemoryAction];
+
 export const EngramEnvironment = {
   BinaryPath: 'ZHIYUAN_ENGRAM_BIN',
   DataDirectory: 'ENGRAM_DATA_DIR',

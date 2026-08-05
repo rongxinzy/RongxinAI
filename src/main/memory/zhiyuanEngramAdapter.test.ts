@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { EngramMemoryScope, EngramObservationType } from './constants';
-import { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
+import { redactPrivateBlocks, ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -53,8 +53,9 @@ test('recall degrades to an empty result when the runtime is unavailable', async
 test('normalizes the runtime null search response after the last memory is forgotten', async () => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () =>
-      new Response('null', { status: 200, headers: { 'content-type': 'application/json' } }),
+    vi.fn(
+      async () =>
+        new Response('null', { status: 200, headers: { 'content-type': 'application/json' } }),
     ),
   );
   const adapter = new ZhiYuanEngramAdapter({
@@ -63,4 +64,10 @@ test('normalizes the runtime null search response after the last memory is forgo
   } as never);
 
   await expect(adapter.recall({ query: 'decision', project: 'project-a' })).resolves.toEqual([]);
+});
+
+test('redacts explicit private blocks before a candidate can be persisted', () => {
+  expect(redactPrivateBlocks('keep <private>secret-token</private> this')).toBe(
+    'keep [REDACTED] this',
+  );
 });
