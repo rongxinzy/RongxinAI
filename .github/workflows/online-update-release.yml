@@ -276,6 +276,30 @@ jobs:
       - name: Upload immutable artifacts and verify remote sizes
         if: steps.version_check.outputs.idempotent != 'true'
         run: |
+          upload_artifact() {
+            local file_path="$1"
+            local object_key="$2"
+            local attempt
+
+            # R2 multipart completion can transiently return InvalidPart for
+            # large installers. Retry the whole immutable-object upload with a
+            # fresh multipart session; the following head-object checks still
+            # verify the exact remote byte count before manifest publication.
+            for attempt in 1 2 3; do
+              if aws s3 cp "$file_path" "s3://$R2_BUCKET/$object_key" \
+                --cache-control 'public, max-age=31536000, immutable' \
+                --no-progress; then
+                return 0
+              fi
+              if [[ "$attempt" -eq 3 ]]; then
+                echo "Upload failed after ${attempt} attempts: $object_key" >&2
+                return 1
+              fi
+              echo "Upload attempt ${attempt} failed for $object_key; retrying in $((attempt * 10))s..." >&2
+              sleep $((attempt * 10))
+            done
+          }
+
           version='${{ needs.prepare-release.outputs.version }}'
           windows_path='${{ steps.artifacts.outputs.windows }}'
           macos_path='${{ steps.artifacts.outputs.macos }}'
@@ -286,14 +310,10 @@ jobs:
           linux_deb_key="releases/$version/linux-x64-deb/$(basename "$linux_deb_path")"
           linux_appimage_key="releases/$version/linux-x64-appimage/$(basename "$linux_appimage_path")"
 
-          aws s3 cp "$windows_path" "s3://$R2_BUCKET/$windows_key" \
-            --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp "$macos_path" "s3://$R2_BUCKET/$macos_key" \
-            --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp "$linux_deb_path" "s3://$R2_BUCKET/$linux_deb_key" \
-            --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp "$linux_appimage_path" "s3://$R2_BUCKET/$linux_appimage_key" \
-            --cache-control 'public, max-age=31536000, immutable'
+          upload_artifact "$windows_path" "$windows_key"
+          upload_artifact "$macos_path" "$macos_key"
+          upload_artifact "$linux_deb_path" "$linux_deb_key"
+          upload_artifact "$linux_appimage_path" "$linux_appimage_key"
 
           windows_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$windows_key" --query ContentLength --output text)
           macos_remote_size=$(aws s3api head-object --bucket "$R2_BUCKET" --key "$macos_key" --query ContentLength --output text)
