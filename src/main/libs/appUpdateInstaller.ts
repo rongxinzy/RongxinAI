@@ -496,7 +496,7 @@ async function installMacDmg(dmgPath: string): Promise<void> {
 }
 
 async function installWindowsNsis(exePath: string): Promise<void> {
-  console.log(`[AppUpdate] Windows NSIS install (silent mode)`);
+  console.log(`[AppUpdate] Windows NSIS install (interactive mode)`);
   console.log(`[AppUpdate]   installer: ${exePath}`);
   console.log(`[AppUpdate]   appPid: ${process.pid}`);
 
@@ -505,8 +505,9 @@ async function installWindowsNsis(exePath: string): Promise<void> {
   // which kills the entire process tree — including child processes.
   //
   // Strategy: use a tiny PowerShell script (launched via hidden VBS) that
-  // waits for the app to fully exit, then runs the installer without its
-  // wizard. The installer can still request Windows UAC when required.
+  // waits for the app to fully exit, then launches the branded NSIS wizard.
+  // The PowerShell host stays hidden, while the installer itself is visible
+  // so users can see that the update is in progress and choose its options.
   const ts = Date.now();
   const tempDir = app.getPath('temp');
   const logPath = path.join(tempDir, `zhiyuan-update-${ts}.log`);
@@ -544,16 +545,20 @@ async function installWindowsNsis(exePath: string): Promise<void> {
     '    }',
     '    Log "App exited after $waited seconds"',
     '',
-    '    # Install without showing the NSIS wizard, then start the updated app.',
-    '    Log "Launching silent installer: $installerPath"',
-    "    $installer = Start-Process -FilePath $installerPath -ArgumentList '/S' -Wait -PassThru",
+    '    # Show the NSIS wizard so the update has an explicit, visible handoff.',
+    '    Log "Launching interactive installer: $installerPath"',
+    '    $installer = Start-Process -FilePath $installerPath -Wait -PassThru',
     '    Log "Installer exited with code $($installer.ExitCode)"',
     '    if ($installer.ExitCode -ne 0) { throw "Installer exited with code $($installer.ExitCode)" }',
-    '    if (-not (Test-Path $appPath)) { throw "Updated app executable was not found: $appPath" }',
-    '    Start-Process -FilePath $appPath',
-    '    Log "Updated app relaunched"',
+    '    Log "Installer completed; NSIS finish page controls app launch"',
     '} catch {',
     '    Log "ERROR: $($_.Exception.Message)"',
+    '    # A visible installer can be cancelled. Restore the still-installed',
+    '    # version so cancellation does not strand the user outside the app.',
+    '    if (Test-Path $appPath) {',
+    '        Start-Process -FilePath $appPath',
+    '        Log "Existing app relaunched after installer cancellation or failure"',
+    '    }',
     '}',
   ].join('\r\n');
 
