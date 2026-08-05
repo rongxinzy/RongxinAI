@@ -55,3 +55,8 @@ test('keeps the session permission selector available during an active run', () 
   expect(permissionMenu).toContain('disabled={disabled}');
   expect(permissionMenu).not.toContain('disabled={disabled || isStreaming}');
 });
+
+test('keeps the active-run mask visible while a permission request disables the prompt', () => {
+  expect(source).toContain('{isStreaming && !canQueueWhileStreaming && (');
+  expect(source).not.toContain('isStreaming && !disabled && !canQueueWhileStreaming');
+});
