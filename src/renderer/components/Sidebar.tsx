@@ -190,7 +190,13 @@ const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     if (!searchActive) return;
     const handlePointerDown = (event: MouseEvent) => {
-      if (searchControlRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node;
+      if (
+        searchControlRef.current?.contains(target) ||
+        agentScrollContainerRef.current?.contains(target)
+      ) {
+        return;
+      }
       setSearchActive(false);
       setSearchQuery('');
     };
