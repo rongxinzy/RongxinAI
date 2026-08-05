@@ -20,14 +20,50 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
   />
 );
 
-export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>;
+export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content> & {
+  observeContentResize?: boolean;
+};
 
-export const ConversationContent = ({ className, ...props }: ConversationContentProps) => (
-  <StickToBottom.Content
-    className={cn('flex flex-col-reverse gap-8 p-4', className)}
-    {...props}
-  />
-);
+export const ConversationContent = ({
+  children,
+  className,
+  observeContentResize = true,
+  scrollClassName,
+  ...props
+}: ConversationContentProps) => {
+  const context = useStickToBottomContext();
+  const contentClassName = cn('flex flex-col-reverse gap-8 p-4', className);
+  const passiveContentRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      context.contentRef.current = element;
+    },
+    [context.contentRef],
+  );
+
+  if (observeContentResize) {
+    return (
+      <StickToBottom.Content
+        className={contentClassName}
+        scrollClassName={scrollClassName}
+        {...props}
+      >
+        {children}
+      </StickToBottom.Content>
+    );
+  }
+
+  return (
+    <div
+      ref={context.scrollRef}
+      className={scrollClassName}
+      style={{ height: '100%', width: '100%', scrollbarGutter: 'stable both-edges' }}
+    >
+      <div {...props} ref={passiveContentRef} className={contentClassName}>
+        {typeof children === 'function' ? children(context) : children}
+      </div>
+    </div>
+  );
+};
 
 export type ConversationEmptyStateProps = ComponentProps<'div'> & {
   title?: string;
