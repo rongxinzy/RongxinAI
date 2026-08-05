@@ -44,6 +44,8 @@ interface ConfirmPayload {
   sensitivity?: MemorySensitivityValue;
   expiresAt?: string;
   supersededObservationId?: number;
+  candidateBacked?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 interface ForgetPayload {
@@ -162,6 +164,9 @@ export class ProjectMemoryService {
         : undefined);
     return this.repository.createPersonalCandidate({
       ...input,
+      projectId: PERSONAL_MEMORY_PROJECT_ID,
+      projectRoot: this.personalDirectory,
+      scope: MemoryScope.Personal,
       kind: input.type,
       title: redactPrivateBlocks(input.title),
       content: redactPrivateBlocks(input.content),
@@ -171,7 +176,40 @@ export class ProjectMemoryService {
     });
   }
 
+  proposeProjectMemoryCandidate(input: {
+    sessionId: string;
+    workingDirectory: string;
+    type: MemoryKindValue;
+    title: string;
+    content: string;
+    topicKey?: string;
+    importance?: number;
+    confidence?: number;
+    sensitivity?: MemorySensitivityValue;
+    taskId: string;
+    runId: string;
+    artifactId?: string;
+    approvalId?: string;
+    metadata?: Record<string, unknown>;
+  }): string {
+    const project = this.resolveIdentity(input.workingDirectory);
+    return this.repository.createPersonalCandidate({
+      ...input,
+      projectId: project.id,
+      projectRoot: project.root,
+      scope: MemoryScope.Project,
+      kind: input.type,
+      title: redactPrivateBlocks(input.title),
+      content: redactPrivateBlocks(input.content),
+      sourceKind: MemorySourceKind.TaskVerifier,
+    });
+  }
+
   async confirmPersonalCandidate(id: string): Promise<number | null> {
+    return await this.confirmMemoryCandidate(id);
+  }
+
+  async confirmMemoryCandidate(id: string): Promise<number | null> {
     const candidate = this.repository.getCandidate(id);
     if (!candidate || candidate.status !== MemoryLifecycleStatus.NeedsReview) {
       throw new Error('Personal memory candidate is not available for review.');
@@ -187,15 +225,18 @@ export class ProjectMemoryService {
     const outboxId = this.repository.enqueue(
       operation,
       {
-        sessionId: `personal:${candidate.sessionId}`,
-        projectId: PERSONAL_MEMORY_PROJECT_ID,
-        projectRoot: this.personalDirectory,
+        sessionId:
+          candidate.scope === MemoryScope.Personal
+            ? `personal:${candidate.sessionId}`
+            : candidate.sessionId,
+        projectId: candidate.projectId,
+        projectRoot: rawCandidate?.projectRoot || this.personalDirectory,
         type: candidate.kind,
         title: candidate.title,
         content: candidate.content,
         topicKey: candidate.topicKey ?? undefined,
         sourceKind: candidate.sourceKind,
-        scope: MemoryScope.Personal,
+        scope: candidate.scope,
         linkId: candidate.id,
         taskId: candidate.taskId ?? undefined,
         runId: candidate.runId ?? undefined,
@@ -206,6 +247,8 @@ export class ProjectMemoryService {
         sensitivity: candidate.sensitivity,
         expiresAt: candidate.expiresAt ?? undefined,
         supersededObservationId: superseded?.memoryId ?? undefined,
+        candidateBacked: true,
+        metadata: rawCandidate?.metadata,
       },
       candidate.id,
     );
@@ -350,6 +393,7 @@ export class ProjectMemoryService {
         confidence: payload.confidence,
         sensitivity: payload.sensitivity,
         expiresAt: payload.expiresAt,
+        metadata: payload.metadata,
       });
       if (payload.topicKey) {
         this.repository.supersedeActiveTopic(
@@ -359,7 +403,7 @@ export class ProjectMemoryService {
           payload.linkId,
         );
       }
-      if (payload.scope === MemoryScope.Personal) this.repository.deleteCandidate(payload.linkId);
+      if (payload.candidateBacked) this.repository.deleteCandidate(payload.linkId);
       this.repository.markCompleted(item.id);
       return memoryId;
     } catch (error) {

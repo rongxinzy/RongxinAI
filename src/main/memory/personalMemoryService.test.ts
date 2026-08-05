@@ -18,11 +18,13 @@ import type { MemoryOutboxItem, PersonalMemoryCandidateInput } from './repositor
 class PersonalRepositoryFake {
   items: MemoryOutboxItem[] = [];
   candidates = new Map<string, ManagedMemoryRecord>();
+  candidateInputs = new Map<string, PersonalMemoryCandidateInput>();
   links = new Map<string, ManagedMemoryRecord>();
   events: string[] = [];
 
   createPersonalCandidate(input: PersonalMemoryCandidateInput) {
     const id = input.id ?? 'candidate-1';
+    this.candidateInputs.set(id, input);
     this.candidates.set(id, recordFor(id, input));
     return id;
   }
@@ -31,8 +33,13 @@ class PersonalRepositoryFake {
     return this.candidates.get(id) ?? null;
   }
 
-  getCandidateDetails() {
-    return { supersedesLinkId: null };
+  getCandidateDetails(id: string) {
+    const input = this.candidateInputs.get(id);
+    return {
+      supersedesLinkId: input?.supersedesLinkId ?? null,
+      projectRoot: input?.projectRoot ?? '',
+      metadata: input?.metadata ?? {},
+    };
   }
 
   getLink(id: string) {
@@ -111,14 +118,14 @@ function recordFor(id: string, input: PersonalMemoryCandidateInput): ManagedMemo
   return {
     id,
     memoryId: null,
-    projectId: PERSONAL_MEMORY_PROJECT_ID,
-    scope: MemoryScope.Personal,
+    projectId: input.projectId ?? PERSONAL_MEMORY_PROJECT_ID,
+    scope: input.scope ?? MemoryScope.Personal,
     sessionId: input.sessionId,
     sourceKind: input.sourceKind,
-    taskId: null,
-    runId: null,
-    artifactId: null,
-    approvalId: null,
+    taskId: input.taskId ?? null,
+    runId: input.runId ?? null,
+    artifactId: input.artifactId ?? null,
+    approvalId: input.approvalId ?? null,
     status: MemoryLifecycleStatus.NeedsReview,
     title: input.title,
     content: input.content,
@@ -193,4 +200,38 @@ test('marks a memory deleted before attempting remote propagation', async () => 
     status: MemoryDeliveryStatus.Pending,
     lastError: 'Memory runtime unavailable.',
   });
+});
+
+test('keeps verified Task and Run provenance on a project review candidate', async () => {
+  const repository = new PersonalRepositoryFake();
+  const adapter = {
+    saveCandidate: vi.fn(input => ({ id: 'adapter-candidate', ...input })),
+    confirmMemory: vi.fn(async () => 92),
+    discardCandidate: vi.fn(),
+  };
+  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+  const id = service.proposeProjectMemoryCandidate({
+    sessionId: 'session-1',
+    workingDirectory: 'project-alpha',
+    type: MemoryKind.Decision,
+    title: 'Verified decision',
+    content: 'The deterministic verifier accepted the durable project decision.',
+    taskId: 'task-1',
+    runId: 'run-1',
+    artifactId: 'artifact-1',
+    approvalId: 'approval-1',
+    metadata: { artifactIds: ['artifact-1'] },
+  });
+
+  expect(repository.candidates.get(id)).toMatchObject({
+    projectId: 'project-alpha',
+    scope: MemoryScope.Project,
+    taskId: 'task-1',
+    runId: 'run-1',
+  });
+  await expect(service.confirmMemoryCandidate(id)).resolves.toBe(92);
+  expect(adapter.saveCandidate).toHaveBeenCalledWith(
+    expect.objectContaining({ project: 'project-alpha', scope: MemoryScope.Project }),
+  );
+  expect(repository.links.get(id)).toMatchObject({ memoryId: 92 });
 });

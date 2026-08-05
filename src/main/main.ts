@@ -83,6 +83,7 @@ import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { registerMemoryIpcHandlers } from './memory/ipc';
+import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
 import {
   resolveAnySearchGatewayToken,
@@ -983,7 +984,11 @@ let projectMemoryService: ProjectMemoryService | null = null;
 
 const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!workbenchTaskService) {
-    workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase());
+    workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
+      onVerifiedRun: event => {
+        promoteVerifiedWorkbenchRun(getProjectMemoryService(), event);
+      },
+    });
   }
   return workbenchTaskService;
 };

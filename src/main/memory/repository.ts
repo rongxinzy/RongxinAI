@@ -4,9 +4,10 @@ import { randomUUID } from 'crypto';
 import type { ManagedMemoryListInput, ManagedMemoryRecord } from '../../shared/memory';
 import {
   MemoryLifecycleStatus,
+  MemoryScope,
   MemorySensitivity,
+  PERSONAL_MEMORY_PROJECT_ID,
   type MemoryKind,
-  type MemoryScope,
 } from '../../shared/memory';
 import { MemoryOutboxStatus, type MemoryOutboxOperation, type MemorySourceKind } from './constants';
 
@@ -37,6 +38,9 @@ export interface MemoryLinkInput extends MemoryProjectionInput {
 
 export interface PersonalMemoryCandidateInput extends MemoryProjectionInput {
   id?: string;
+  projectId?: string;
+  projectRoot?: string;
+  scope?: MemoryScope;
   sessionId: string;
   sourceKind: MemorySourceKind;
   taskId?: string;
@@ -128,13 +132,17 @@ export class MemoryRepository {
     this.db
       .prepare(
         `INSERT INTO memory_candidates (
-          id, session_id, source_kind, task_id, run_id, artifact_id, approval_id,
+          id, project_id, project_root, scope, session_id, source_kind,
+          task_id, run_id, artifact_id, approval_id,
           status, title, content, kind, topic_key, importance, confidence,
           sensitivity, expires_at, supersedes_link_id, metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
+        input.projectId ?? PERSONAL_MEMORY_PROJECT_ID,
+        input.projectRoot ?? '',
+        input.scope ?? MemoryScope.Personal,
         input.sessionId,
         input.sourceKind,
         input.taskId ?? null,
@@ -163,11 +171,25 @@ export class MemoryRepository {
     return row ? mapCandidate(row, this.getDelivery(id)) : null;
   }
 
-  getCandidateDetails(id: string): { supersedesLinkId: string | null } | null {
+  getCandidateDetails(id: string): {
+    supersedesLinkId: string | null;
+    projectRoot: string;
+    metadata: Record<string, unknown>;
+  } | null {
     const row = this.db
-      .prepare('SELECT supersedes_link_id FROM memory_candidates WHERE id = ?')
-      .get(id) as { supersedes_link_id: string | null } | undefined;
-    return row ? { supersedesLinkId: row.supersedes_link_id } : null;
+      .prepare(
+        'SELECT supersedes_link_id, project_root, metadata_json FROM memory_candidates WHERE id = ?',
+      )
+      .get(id) as
+      | { supersedes_link_id: string | null; project_root: string; metadata_json: string }
+      | undefined;
+    return row
+      ? {
+          supersedesLinkId: row.supersedes_link_id,
+          projectRoot: row.project_root,
+          metadata: JSON.parse(row.metadata_json) as Record<string, unknown>,
+        }
+      : null;
   }
 
   getLink(id: string): ManagedMemoryRecord | null {
@@ -408,6 +430,9 @@ export class MemoryRepository {
 
       CREATE TABLE IF NOT EXISTS memory_candidates (
         id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL DEFAULT 'personal://zhiyuan-agent/user',
+        project_root TEXT NOT NULL DEFAULT '',
+        scope TEXT NOT NULL DEFAULT 'personal',
         session_id TEXT NOT NULL,
         source_kind TEXT NOT NULL,
         task_id TEXT,
@@ -475,6 +500,22 @@ export class MemoryRepository {
     if (!outboxColumns.some(column => column.name === 'link_id')) {
       this.db.exec('ALTER TABLE memory_outbox ADD COLUMN link_id TEXT');
     }
+    const candidateAdditions: Record<string, string> = {
+      project_id: "TEXT NOT NULL DEFAULT 'personal://zhiyuan-agent/user'",
+      project_root: "TEXT NOT NULL DEFAULT ''",
+      scope: "TEXT NOT NULL DEFAULT 'personal'",
+    };
+    const candidateColumns = this.db
+      .prepare('PRAGMA table_info(memory_candidates)')
+      .all() as Array<{
+      name: string;
+    }>;
+    const existingCandidateColumns = new Set(candidateColumns.map(column => column.name));
+    for (const [name, definition] of Object.entries(candidateAdditions)) {
+      if (!existingCandidateColumns.has(name)) {
+        this.db.exec(`ALTER TABLE memory_candidates ADD COLUMN ${name} ${definition}`);
+      }
+    }
   }
 }
 
@@ -502,7 +543,7 @@ function mapCandidate(
   row: SqlRow,
   delivery: { status: string; error: string | null } | null,
 ): ManagedMemoryRecord {
-  return mapRecord(row, delivery, null, 'personal://zhiyuan-agent/user', 'personal');
+  return mapRecord(row, delivery, null, String(row.project_id), String(row.scope));
 }
 
 function mapRecord(
