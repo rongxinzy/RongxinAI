@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const version = process.env.APP_BUILD_VERSION;
-const variant = process.env.RONGXINAI_WIN_LLAMACPP_BACKEND_BUNDLE;
+const variant = process.env.ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE;
 if (!version && !variant) process.exit(0);
 
 const pkgPath = path.join(__dirname, '..', 'package.json');
@@ -26,9 +26,14 @@ if (variant === 'lite' || variant === 'full') {
   if (/"zhiyuanUpdateVariant"\s*:/.test(content)) {
     content = content.replace(/("zhiyuanUpdateVariant"\s*:\s*)"[^"]+"/, `$1"${variant}"`);
   } else {
-    content = content.replace(/("version"\s*:\s*"[^"]+",\n)/, `$1  "zhiyuanUpdateVariant": "${variant}",\n`);
+    content = content.replace(
+      /("version"\s*:\s*"[^"]+",\n)/,
+      `$1  "zhiyuanUpdateVariant": "${variant}",\n`,
+    );
   }
 }
 fs.writeFileSync(pkgPath, content, 'utf8');
 
-console.log(`[ensure-build-version] Patched version=${version || 'unchanged'}, variant=${variant || 'unchanged'}`);
+console.log(
+  `[ensure-build-version] Patched version=${version || 'unchanged'}, variant=${variant || 'unchanged'}`,
+);
