@@ -91,6 +91,17 @@ describe('unattended installation handoff', () => {
     expect(script).not.toContain('rm -rf "$TARGET"');
   });
 
+  test('Windows update launches the branded NSIS wizard instead of a silent installer', async () => {
+    const updaterSource = await fs.promises.readFile(
+      path.resolve(process.cwd(), 'src/main/libs/appUpdateInstaller.ts'),
+      'utf8',
+    );
+
+    expect(updaterSource).toContain('Launching interactive installer: $installerPath');
+    expect(updaterSource).toContain('Start-Process -FilePath $installerPath -Wait -PassThru');
+    expect(updaterSource).not.toContain("-ArgumentList '/S'");
+  });
+
   test('NSIS silent mode bypasses the local-signing confirmation dialog', async () => {
     const nsisSource = await fs.promises.readFile(
       path.resolve(process.cwd(), 'scripts/nsis-installer.nsh'),
