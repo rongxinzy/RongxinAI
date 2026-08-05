@@ -286,6 +286,8 @@ export interface DetectedArtifact {
   artifact: Artifact;
   /** If true, the artifact references a file that should be loaded from disk. */
   needsFileLoad: boolean;
+  /** If true, the role was explicitly set by a declare_artifact call and should not be auto-promoted. */
+  roleIsExplicit?: boolean;
 }
 
 /**
@@ -303,14 +305,18 @@ export function detectArtifactsFromMessages(
   const detectedFilePathIndexes = new Map<string, number>();
   const finalAnswerMessageId = findFinalAnswerMessageId(messages);
 
-  const addPathArtifact = (artifact: Artifact, needsFileLoad: boolean) => {
+  const addPathArtifact = (
+    artifact: Artifact,
+    needsFileLoad: boolean,
+    roleIsExplicit = false,
+  ) => {
     if (!artifact.filePath) return;
 
     const normalized = normalizeFilePathForDedup(artifact.filePath);
     const existingIndex = detectedFilePathIndexes.get(normalized);
     if (existingIndex === undefined) {
       detectedFilePathIndexes.set(normalized, detected.length);
-      detected.push({ artifact, needsFileLoad });
+      detected.push({ artifact, needsFileLoad, roleIsExplicit });
       return;
     }
 
@@ -322,6 +328,7 @@ export function detectArtifactsFromMessages(
       detected[existingIndex] = {
         artifact,
         needsFileLoad: existing.needsFileLoad || needsFileLoad,
+        roleIsExplicit: existing.roleIsExplicit || roleIsExplicit,
       };
     }
   };
@@ -341,7 +348,7 @@ export function detectArtifactsFromMessages(
     return msg.id === finalAnswerMessageId ? ArtifactRole.Deliverable : ArtifactRole.Intermediate;
   });
   for (const artifact of declaredArtifacts) {
-    addPathArtifact(artifact, true);
+    addPathArtifact(artifact, true, /* roleIsExplicit */ true);
   }
 
   for (let i = 0; i < messages.length; i++) {
@@ -359,6 +366,20 @@ export function detectArtifactsFromMessages(
       } else if (toolArtifact && !toolArtifact.filePath) {
         detected.push({ artifact: toolArtifact, needsFileLoad: false });
       }
+    }
+  }
+
+  // Auto-promotion safety net: intermediate file-backed artifacts (from
+  // write tools) that were not explicitly declared via declare_artifact
+  // are promoted so they remain visible by default.
+  // Explicit declare_artifact role:intermediate calls are preserved.
+  for (const entry of detected) {
+    if (
+      entry.artifact.filePath &&
+      entry.artifact.role === ArtifactRole.Intermediate &&
+      !entry.roleIsExplicit
+    ) {
+      entry.artifact = { ...entry.artifact, role: ArtifactRole.Deliverable };
     }
   }
 

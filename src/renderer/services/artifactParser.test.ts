@@ -322,7 +322,7 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.filePath).toBe('D:/workspace/output.ts');
-    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Intermediate);
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
     expect(artifacts[0].needsFileLoad).toBe(true);
   });
 
