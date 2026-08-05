@@ -48,6 +48,13 @@ export interface AppConfig {
   };
 }
 
+export const DEFAULT_SHORTCUTS = {
+  newChat: 'CmdOrCtrl+N',
+  search: 'CmdOrCtrl+F',
+  settings: 'CmdOrCtrl+,',
+  sendMessage: 'Enter',
+} as const;
+
 const buildDefaultProviders = (): AppConfig['providers'] => {
   const providers: Record<string, ProviderConfig> = {};
 
@@ -91,10 +98,7 @@ export const defaultConfig: AppConfig = {
     isDevelopment: process.env.NODE_ENV === 'development',
   },
   shortcuts: {
-    newChat: 'Ctrl+N',
-    search: 'Ctrl+F',
-    settings: 'Ctrl+,',
-    sendMessage: 'Enter',
+    ...DEFAULT_SHORTCUTS,
   },
 };
 

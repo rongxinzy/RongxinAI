@@ -395,6 +395,14 @@ class ConfigService {
         } as AppConfig['shortcuts'],
         providers: mergedProviders as AppConfig['providers'],
       });
+      const shortcuts = this.config.shortcuts!;
+      this.config.shortcuts = {
+        ...shortcuts,
+        newChat: shortcuts.newChat === 'Ctrl+N' ? defaultConfig.shortcuts!.newChat : shortcuts.newChat,
+        search: shortcuts.search === 'Ctrl+F' ? defaultConfig.shortcuts!.search : shortcuts.search,
+        settings:
+          shortcuts.settings === 'Ctrl+,' ? defaultConfig.shortcuts!.settings : shortcuts.settings,
+      };
     } else {
       this.config = defaultConfig;
     }
