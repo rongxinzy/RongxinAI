@@ -51,7 +51,10 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
-import { ModelCapabilitiesFields, type ModelCapabilityKey } from './settings/ModelCapabilitiesFields';
+import {
+  ModelCapabilitiesFields,
+  type ModelCapabilityKey,
+} from './settings/ModelCapabilitiesFields';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -119,6 +122,7 @@ import {
 } from './icons/SettingsAnimatedBoxIcon';
 import IMSettings from './im/IMSettings';
 import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
+import { ManagedMemorySettings } from './settings/memory/ManagedMemorySettings';
 import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
 import { ModelCapabilitySettingsModal } from './localInference/components/ModelCapabilitySettingsModal';
 import { localInferenceCompactButtonClass } from './localInference/constants';
@@ -1226,10 +1230,7 @@ const Settings: React.FC<SettingsProps> = ({
             return Object.fromEntries(
               Object.entries(merged).map(([providerKey, providerConfig]) => {
                 const models = shouldShowProviderModels(providerKey, providerConfig)
-                  ? normalizeProviderModelsForSettings(
-                      providerKey,
-                      providerConfig.models,
-                    )
+                  ? normalizeProviderModelsForSettings(providerKey, providerConfig.models)
                   : [];
                 return [
                   providerKey,
@@ -3392,6 +3393,7 @@ const Settings: React.FC<SettingsProps> = ({
       case 'coworkMemory':
         return (
           <div className="space-y-6">
+            <ManagedMemorySettings />
             <div className="space-y-4 rounded-xl border px-4 py-4 border-border">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">

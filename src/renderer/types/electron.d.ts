@@ -723,6 +723,25 @@ interface IElectronAPI {
     showSystemMenu: (position: { x: number; y: number }) => void;
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
+  memory: {
+    list: (
+      input?: import('../../shared/memory').ManagedMemoryListInput,
+    ) => Promise<
+      import('../../shared/memory').MemoryIpcResult<
+        import('../../shared/memory').ManagedMemoryRecord[]
+      >
+    >;
+    confirmCandidate: (
+      id: string,
+    ) => Promise<import('../../shared/memory').MemoryIpcResult<number | null>>;
+    archive: (id: string) => Promise<import('../../shared/memory').MemoryIpcResult<void>>;
+    restore: (id: string) => Promise<import('../../shared/memory').MemoryIpcResult<void>>;
+    forget: (
+      id: string,
+      hardDelete: boolean,
+    ) => Promise<import('../../shared/memory').MemoryIpcResult<boolean>>;
+    drainOutbox: () => Promise<import('../../shared/memory').MemoryIpcResult<number>>;
+  };
   cowork: {
     listWorkspaces: () => Promise<{
       success: boolean;

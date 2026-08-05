@@ -8,13 +8,23 @@ export const EngramManagerPhase = {
 
 export type EngramManagerPhase = (typeof EngramManagerPhase)[keyof typeof EngramManagerPhase];
 
-export const EngramMemoryScope = {
-  Project: 'project',
-  Personal: 'personal',
-  Session: 'session',
-} as const;
+import {
+  MemoryDeliveryStatus,
+  MemoryKind,
+  MemoryLifecycleStatus,
+  MemoryOutboxOperation as SharedMemoryOutboxOperation,
+  MemoryScope,
+  MemorySourceKind as SharedMemorySourceKind,
+  type MemoryDeliveryStatus as MemoryDeliveryStatusValue,
+  type MemoryKind as MemoryKindValue,
+  type MemoryLifecycleStatus as MemoryLifecycleStatusValue,
+  type MemoryOutboxOperation as MemoryOutboxOperationValue,
+  type MemoryScope as MemoryScopeValue,
+  type MemorySourceKind as MemorySourceKindValue,
+} from '../../shared/memory';
 
-export type EngramMemoryScope = (typeof EngramMemoryScope)[keyof typeof EngramMemoryScope];
+export const EngramMemoryScope = MemoryScope;
+export type EngramMemoryScope = MemoryScopeValue;
 
 export const EngramMemoryCapability = {
   Recall: 'recall',
@@ -28,51 +38,25 @@ export const EngramMemoryCapability = {
 export type EngramMemoryCapability =
   (typeof EngramMemoryCapability)[keyof typeof EngramMemoryCapability];
 
-export const EngramObservationType = {
-  Decision: 'decision',
-  Preference: 'preference',
-  SessionSummary: 'session_summary',
-} as const;
+export const EngramObservationType = MemoryKind;
+export type EngramObservationType = MemoryKindValue;
 
-export type EngramObservationType =
-  (typeof EngramObservationType)[keyof typeof EngramObservationType];
+export const MemoryLinkStatus = MemoryLifecycleStatus;
+export type MemoryLinkStatus = MemoryLifecycleStatusValue;
 
-export const MemoryLinkStatus = {
-  Active: 'active',
-  Deleted: 'deleted',
-} as const;
+export const MemoryOutboxStatus = MemoryDeliveryStatus;
+export type MemoryOutboxStatus = MemoryDeliveryStatusValue;
 
-export type MemoryLinkStatus = (typeof MemoryLinkStatus)[keyof typeof MemoryLinkStatus];
+export const MemoryOutboxOperation = SharedMemoryOutboxOperation;
+export type MemoryOutboxOperation = MemoryOutboxOperationValue;
 
-export const MemoryOutboxStatus = {
-  Pending: 'pending',
-  Completed: 'completed',
-  Failed: 'failed',
-} as const;
-
-export type MemoryOutboxStatus = (typeof MemoryOutboxStatus)[keyof typeof MemoryOutboxStatus];
-
-export const MemoryOutboxOperation = {
-  Confirm: 'confirm',
-  SessionSummary: 'session_summary',
-  Supersede: 'supersede',
-  Forget: 'forget',
-} as const;
-
-export type MemoryOutboxOperation =
-  (typeof MemoryOutboxOperation)[keyof typeof MemoryOutboxOperation];
-
-export const MemorySourceKind = {
-  Explicit: 'explicit',
-  SessionSummary: 'session_summary',
-  TaskVerifier: 'task_verifier',
-} as const;
-
-export type MemorySourceKind = (typeof MemorySourceKind)[keyof typeof MemorySourceKind];
+export const MemorySourceKind = SharedMemorySourceKind;
+export type MemorySourceKind = MemorySourceKindValue;
 
 export const PiMemoryAction = {
   Recall: 'recall',
   Save: 'save',
+  ProposePersonal: 'propose_personal',
   SessionSummary: 'session_summary',
 } as const;
 

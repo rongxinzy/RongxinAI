@@ -6,7 +6,9 @@ import { buildPiProjectMemoryTool } from './piMemoryTool';
 test('exposes only controlled project memory actions', async () => {
   const service = {
     recallProject: vi.fn(async () => [{ id: 7, title: 'Database', content: 'Use SQLite.' }]),
+    recallPersonal: vi.fn(async () => []),
     saveProjectMemory: vi.fn(),
+    proposePersonalMemory: vi.fn(),
     saveSessionSummary: vi.fn(),
   };
   const tool = buildPiProjectMemoryTool({

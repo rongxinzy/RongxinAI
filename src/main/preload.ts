@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import type { CoworkError } from '../common/coworkError';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
+import { MemoryIpcChannel } from '../shared/memory';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { ChannelRunIpc, type ChannelRunSummary } from '../shared/channelRun/constants';
@@ -237,8 +238,10 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
   marketplace: {
-    search: (request: MarketplaceSearchRequest) => ipcRenderer.invoke(MarketplaceIpcChannel.Search, request),
-    cancelSearch: (requestId: string) => ipcRenderer.invoke(MarketplaceIpcChannel.CancelSearch, requestId),
+    search: (request: MarketplaceSearchRequest) =>
+      ipcRenderer.invoke(MarketplaceIpcChannel.Search, request),
+    cancelSearch: (requestId: string) =>
+      ipcRenderer.invoke(MarketplaceIpcChannel.CancelSearch, requestId),
   },
 
   triage: {
@@ -455,8 +458,7 @@ contextBridge.exposeInMainWorld('electron', {
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 
-    listPendingMessages: (sessionId: string) =>
-      ipcRenderer.invoke(CoworkQueueIpc.List, sessionId),
+    listPendingMessages: (sessionId: string) => ipcRenderer.invoke(CoworkQueueIpc.List, sessionId),
     enqueuePendingMessage: (options: { sessionId: string; text: string }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
     updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
@@ -762,6 +764,16 @@ contextBridge.exposeInMainWorld('electron', {
     onStatusChange: (callback: (status: unknown) => void) => onPush(ImIpc.StatusChange, callback),
     onMessageReceived: (callback: (message: unknown) => void) =>
       onPush(ImIpc.MessageReceived, callback),
+  },
+
+  memory: {
+    list: (input?: unknown) => ipcRenderer.invoke(MemoryIpcChannel.List, input),
+    confirmCandidate: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.ConfirmCandidate, id),
+    archive: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.Archive, id),
+    restore: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.Restore, id),
+    forget: (id: string, hardDelete: boolean) =>
+      ipcRenderer.invoke(MemoryIpcChannel.Forget, id, hardDelete),
+    drainOutbox: () => ipcRenderer.invoke(MemoryIpcChannel.DrainOutbox),
   },
 
   scheduledTasks: {

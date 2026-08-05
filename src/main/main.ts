@@ -82,6 +82,7 @@ import { EngramManager } from './memory/engramManager';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
+import { registerMemoryIpcHandlers } from './memory/ipc';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
 import {
   resolveAnySearchGatewayToken,
@@ -1002,7 +1003,12 @@ const getProjectMemoryService = (): ProjectMemoryService => {
   if (!engramAdapter) engramAdapter = new ZhiYuanEngramAdapter(getEngramManager());
   if (!memoryRepository) memoryRepository = new MemoryRepository(getStore().getDatabase());
   if (!projectMemoryService) {
-    projectMemoryService = new ProjectMemoryService(memoryRepository, engramAdapter);
+    projectMemoryService = new ProjectMemoryService(
+      memoryRepository,
+      engramAdapter,
+      undefined,
+      path.join(app.getPath('userData'), 'memory'),
+    );
   }
   return projectMemoryService;
 };
@@ -7880,6 +7886,7 @@ if (!gotTheLock) {
         );
       },
     });
+    registerMemoryIpcHandlers({ getService: getProjectMemoryService });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
     registerLlamaCppIpcHandlers(getLlamaCppManager(), {

@@ -32,6 +32,10 @@ class FakeRepository {
     return this.items.filter(item => item.status === MemoryOutboxStatus.Pending);
   }
 
+  filterRecallableMemoryIds(_projectId: string, memoryIds: number[]) {
+    return new Set(memoryIds);
+  }
+
   createLink(input: Record<string, unknown>) {
     this.links.push(input);
     return String(input.id);
@@ -133,10 +137,14 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
 
 test('enforces the project context token budget', async () => {
   const adapter = {
-    recall: vi.fn(async () => [
-      { id: 1, title: 'First', content: 'A'.repeat(40) },
-      { id: 2, title: 'Second', content: 'B'.repeat(400) },
-    ]),
+    recall: vi.fn(async (input: { scope: string }) =>
+      input.scope === EngramMemoryScope.Personal
+        ? []
+        : [
+            { id: 1, title: 'First', content: 'A'.repeat(40) },
+            { id: 2, title: 'Second', content: 'B'.repeat(400) },
+          ],
+    ),
   };
   const service = new ProjectMemoryService(
     new FakeRepository() as never,

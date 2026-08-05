@@ -14,8 +14,8 @@ export function buildPiProjectMemoryTool(input: {
     name: 'memory',
     label: 'Memory',
     description:
-      'Recall or explicitly save durable project memory, or save a short-lived session summary. ' +
-      'Project memory is isolated to the current project.',
+      'Recall project and confirmed personal memory, explicitly save durable project memory, ' +
+      'propose personal memory for user review, or save a short-lived session summary.',
     promptSnippet:
       'Use memory to recall prior project decisions or save durable facts only when they are useful later.',
     parameters: {
@@ -24,12 +24,16 @@ export function buildPiProjectMemoryTool(input: {
         action: {
           type: 'string',
           enum: Object.values(PiMemoryAction),
-          description: 'recall, save, or session_summary',
+          description: 'recall, save, propose_personal, or session_summary',
         },
         query: { type: 'string', description: 'Search query for recall.' },
         title: { type: 'string', description: 'Short title for a saved project memory.' },
         content: { type: 'string', description: 'Atomic memory content or session summary.' },
         topicKey: { type: 'string', description: 'Stable topic key for project memory upsert.' },
+        supersedesMemoryId: {
+          type: 'number',
+          description: 'Observation ID replaced by a proposed personal memory.',
+        },
         kind: {
           type: 'string',
           enum: [EngramObservationType.Decision, EngramObservationType.Preference],
@@ -44,16 +48,32 @@ export function buildPiProjectMemoryTool(input: {
         const action = typeof params.action === 'string' ? params.action : '';
         if (action === PiMemoryAction.Recall) {
           const query = requiredString(params.query, 'query');
-          const observations = await input.service.recallProject({
-            workingDirectory: input.workingDirectory,
-            query,
-          });
+          const [project, personal] = await Promise.all([
+            input.service.recallProject({ workingDirectory: input.workingDirectory, query }),
+            input.service.recallPersonal({ query }),
+          ]);
+          const observations = [...project, ...personal];
           const text = observations.length
             ? observations
                 .map(item => `[memory:${item.id}] ${item.title}: ${item.content}`)
                 .join('\n')
             : 'No relevant project memory found.';
           return toolResult(text, { count: observations.length });
+        }
+        if (action === PiMemoryAction.ProposePersonal) {
+          const candidateId = input.service.proposePersonalMemory({
+            sessionId: input.sessionId,
+            type: normalizeKind(params.kind),
+            title: requiredString(params.title, 'title'),
+            content: requiredString(params.content, 'content'),
+            topicKey: typeof params.topicKey === 'string' ? params.topicKey.trim() : undefined,
+            supersedesMemoryId:
+              typeof params.supersedesMemoryId === 'number' ? params.supersedesMemoryId : undefined,
+          });
+          return toolResult('Personal memory was proposed and requires user confirmation.', {
+            candidateId,
+            needsReview: true,
+          });
         }
         if (action === PiMemoryAction.Save) {
           const title = requiredString(params.title, 'title');
