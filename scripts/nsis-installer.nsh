@@ -351,7 +351,30 @@
 
   LlamaCppBackendResourcesPresent:
     StrCpy $R8 ""
-    IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallRun LlamaCppBackendHelperMissing
+    IfSilent LlamaCppBackendInstallDeferred 0
+    MessageBox MB_OKCANCEL|MB_ICONQUESTION "The local inference runtime contains unsigned executable files. ZhiYuan Agent can create a local code-signing certificate and sign only these runtime files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
+
+  LlamaCppBackendLocalSigningConfirmed:
+    StrCpy $R8 "--local-signing-confirmed"
+    Goto LlamaCppBackendInstallRun
+
+  LlamaCppBackendInstallDeferred:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=silent-no-local-signing-confirmation$\r$\n"
+    FileClose $2
+    DetailPrint "[Installer] Skipping local inference runtime installation during unattended update"
+    Goto LlamaCppBackendInstallDone
+
+  LlamaCppBackendLocalSigningCancelled:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro GetTimestamp $8
+    FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-cancelled$\r$\n"
+    FileClose $2
+    Abort
+
+  LlamaCppBackendInstallRun:
+    IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallExecute LlamaCppBackendHelperMissing
 
   LlamaCppBackendHelperMissing:
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
@@ -361,7 +384,7 @@
     MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installer helper is missing from the installer resources. Please reinstall 知远 with a valid installer package."
     Abort
 
-  LlamaCppBackendInstallRun:
+  LlamaCppBackendInstallExecute:
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   !insertmacro GetTimestamp $8
   FileWrite $2 "$8 phase=llamacpp-backend-install-start helper=$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs manifest=$INSTDIR\resources\llamacpp-backends\manifest.json local_signing_arg=$R8$\r$\n"
@@ -397,31 +420,8 @@
   IntCmp $0 0 LlamaCppBackendInstallDone LlamaCppBackendInstallNonZero LlamaCppBackendInstallNonZero
 
   LlamaCppBackendInstallNonZero:
-    IntCmp $0 30 LlamaCppBackendLocalSigningConfirmationRequired 0 0
     IntCmp $0 31 LlamaCppBackendLocalSigningFailed 0 0
     IntCmp $0 16 LlamaCppBackendInstallNetworkFailed LlamaCppBackendInstallFailed LlamaCppBackendInstallFailed
-
-  LlamaCppBackendLocalSigningConfirmationRequired:
-    StrCmp $R8 "--local-signing-confirmed" LlamaCppBackendLocalSigningFailed
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-confirmation-required exit=$0 output=$1$\r$\n"
-    FileClose $2
-    ; /S is used only after the user explicitly chooses Restart to Update.
-    ; Continue unattended instead of blocking the background updater on a MessageBox.
-    IfSilent LlamaCppBackendLocalSigningConfirmed 0
-    MessageBox MB_OKCANCEL|MB_ICONQUESTION "The local inference backend contains unsigned executable files. ZhiYuan Agent can create a local code-signing certificate and sign only the unsigned inference files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
-
-  LlamaCppBackendLocalSigningConfirmed:
-    StrCpy $R8 "--local-signing-confirmed"
-    Goto LlamaCppBackendInstallRun
-
-  LlamaCppBackendLocalSigningCancelled:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-cancelled$\r$\n"
-    FileClose $2
-    Abort
 
   LlamaCppBackendLocalSigningFailed:
     MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend local signing failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-llamacpp.log and %APPDATA%\ZhiYuanAgent\install-timing.log for details."

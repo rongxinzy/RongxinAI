@@ -105,19 +105,16 @@ describe('unattended installation handoff', () => {
     );
   });
 
-  test('NSIS silent mode bypasses the local-signing confirmation dialog', async () => {
+  test('NSIS silent mode defers local signing without implicit approval', async () => {
     const nsisSource = await fs.promises.readFile(
       path.resolve(process.cwd(), 'scripts/nsis-installer.nsh'),
       'utf8',
     );
-    const confirmationBlock = nsisSource.slice(
-      nsisSource.indexOf('LlamaCppBackendLocalSigningConfirmationRequired:'),
-      nsisSource.indexOf('LlamaCppBackendLocalSigningConfirmed:'),
-    );
 
-    expect(confirmationBlock).toContain('IfSilent LlamaCppBackendLocalSigningConfirmed 0');
-    expect(confirmationBlock.indexOf('IfSilent')).toBeLessThan(
-      confirmationBlock.indexOf('    MessageBox'),
+    expect(nsisSource).toContain('IfSilent LlamaCppBackendInstallDeferred 0');
+    expect(nsisSource).toContain(
+      'phase=llamacpp-backend-install-skipped reason=silent-no-local-signing-confirmation',
     );
+    expect(nsisSource).not.toContain('IfSilent LlamaCppBackendLocalSigningConfirmed 0');
   });
 });
