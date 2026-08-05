@@ -579,7 +579,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const settingsManager = this.createPiSettingsManager(pi, workspaceRoot);
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
-        runId: workbenchRunId,
+        getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
         settingsManager,
         getAutoApprove: () =>
           this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
@@ -710,7 +710,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             },
             {
               sessionId,
-              runId: workbenchRunId,
+              getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
               getAutoApprove: () =>
                 this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
             },
@@ -1416,7 +1416,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     resourceState: PiResourceState,
     approvalContext?: {
       sessionId: string;
-      runId: string | null;
+      getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
       getAutoApprove: () => boolean;
     },
@@ -1456,17 +1456,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           ? [createPiLargeFileWriteSystemPrompt(resourceState.maxOutputTokens)]
           : []),
       ],
-      extensionFactories: approvalContext?.runId
+      extensionFactories: approvalContext?.getRunId()
         ? [
             (extensionApi: PiExtensionApi) => {
               extensionApi.on('tool_call', async event => {
+                const runId = approvalContext.getRunId();
+                if (!runId) {
+                  return {
+                    block: true as const,
+                    reason: 'No active workbench run is available.',
+                  };
+                }
                 const toolInput =
                   event.input && typeof event.input === 'object'
                     ? (event.input as Record<string, unknown>)
                     : {};
                 const authorization = await this.workbenchTaskService?.authorizeToolCall({
                   sessionId: approvalContext.sessionId,
-                  runId: approvalContext.runId as string,
+                  runId,
                   toolCallId: event.toolCallId,
                   toolName: event.toolName,
                   toolInput,

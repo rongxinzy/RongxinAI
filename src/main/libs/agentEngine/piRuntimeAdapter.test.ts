@@ -854,6 +854,68 @@ describe('PiRuntimeAdapter', () => {
       expect(beginRun).toHaveBeenCalledTimes(2);
     });
 
+    it('authorizes follow-up tool calls against the current workbench run', async () => {
+      const beginRun = vi.fn().mockImplementation((_input: unknown) => ({
+        run: { id: `run-${beginRun.mock.calls.length}` },
+      }));
+      const authorizeToolCall = vi.fn().mockResolvedValue({ allow: true });
+      adapter.setWorkbenchTaskService({
+        beginRun,
+        authorizeToolCall,
+        on: vi.fn(),
+        off: vi.fn(),
+      } as unknown as WorkbenchTaskService);
+
+      await adapter.startSession('test', 'First');
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        extensionFactories?: Array<
+          (api: {
+            on: (
+              event: 'tool_call',
+              handler: (toolCall: {
+                toolCallId: string;
+                toolName: string;
+                input: Record<string, unknown>;
+              }) => Promise<unknown>,
+            ) => void;
+          }) => void
+        >;
+      };
+      let handleToolCall:
+        | ((toolCall: {
+            toolCallId: string;
+            toolName: string;
+            input: Record<string, unknown>;
+          }) => Promise<unknown>)
+        | undefined;
+      loaderOptions.extensionFactories?.[0]({
+        on: (_event, handler) => {
+          handleToolCall = handler;
+        },
+      });
+
+      await handleToolCall?.({
+        toolCallId: 'first-call',
+        toolName: 'write',
+        input: { path: 'first.txt' },
+      });
+      await adapter.continueSession('test', 'Second');
+      await handleToolCall?.({
+        toolCallId: 'second-call',
+        toolName: 'write',
+        input: { path: 'second.txt' },
+      });
+
+      expect(authorizeToolCall).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ runId: 'run-1', toolCallId: 'first-call' }),
+      );
+      expect(authorizeToolCall).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ runId: 'run-2', toolCallId: 'second-call' }),
+      );
+    });
+
     it('starts the Goal loop only when Work explicitly enables goal mode', async () => {
       await adapter.startSession('goal-work', 'Finish the requested task', {
         sessionMode: 'work',
