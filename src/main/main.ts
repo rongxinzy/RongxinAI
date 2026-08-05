@@ -75,7 +75,7 @@ import {
 import { PlatformRegistry } from '../shared/platform';
 import { OpenClawEnginePhase } from '../shared/openclaw/constants';
 import { ProviderName } from '../shared/providers';
-import { WorkspaceIpc } from '../shared/workspace';
+import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
@@ -4054,12 +4054,23 @@ if (!gotTheLock) {
     try {
       const store = getCoworkStore();
       let workspaces = store.listWorkspaces();
-      if (workspaces.length === 0) {
-        const configuredPath = store.getConfig().workingDirectory.trim();
-        if (configuredPath) {
-          store.ensureWorkspace(configuredPath);
-          workspaces = store.listWorkspaces();
+      for (const workspace of workspaces) {
+        if (isDefaultConversationWorkspacePath(workspace.path)) {
+          if (workspace.isHidden) store.setWorkspaceHidden(workspace.id, false);
+          continue;
         }
+        if (!workspace.isHidden && isInternalWorkspacePath(workspace.path)) {
+          store.setWorkspaceHidden(workspace.id, true);
+        }
+      }
+      workspaces = store.listWorkspaces();
+      if (getStore().get<boolean>(WorkspaceStoreKey.DefaultConversationInitialized) !== true) {
+        const defaultWorkspacePath = getDefaultConversationWorkspacePath();
+        await fs.promises.mkdir(defaultWorkspacePath, { recursive: true });
+        const defaultWorkspace = store.ensureWorkspace(defaultWorkspacePath);
+        store.setWorkspaceHidden(defaultWorkspace.id, false);
+        getStore().set(WorkspaceStoreKey.DefaultConversationInitialized, true);
+        workspaces = store.listWorkspaces();
       }
       return { success: true, workspaces };
     } catch (error) {
@@ -4072,11 +4083,15 @@ if (!gotTheLock) {
 
   ipcMain.handle(
     WorkspaceIpc.Ensure,
-    async (_event, rawOptions: { path?: string; name?: string }) => {
+    async (_event, rawOptions: { path?: string; name?: string; isHidden?: boolean }) => {
       try {
         const workspacePath = rawOptions?.path?.trim();
         if (!workspacePath) return { success: false, error: 'Workspace path is required' };
-        const workspace = getCoworkStore().ensureWorkspace(workspacePath, rawOptions.name);
+        const workspace = getCoworkStore().ensureWorkspace(
+          workspacePath,
+          rawOptions.name,
+          rawOptions.isHidden === true,
+        );
         return { success: true, workspace };
       } catch (error) {
         return {
@@ -4089,10 +4104,39 @@ if (!gotTheLock) {
 
   ipcMain.handle(WorkspaceIpc.Rename, async (_event, id: string, name: string) => {
     try {
-      const workspace = getCoworkStore().renameWorkspace(id, name);
-      return workspace
-        ? { success: true, workspace }
-        : { success: false, error: 'Workspace not found' };
+      const normalizedName = name.trim();
+      if (!normalizedName || /[\\/:*?"<>|]/.test(normalizedName) || normalizedName === '.' || normalizedName === '..') {
+        return { success: false, error: 'Invalid project name' };
+      }
+
+      const coworkStore = getCoworkStore();
+      const workspace = coworkStore.getWorkspace(id);
+      if (!workspace) return { success: false, error: 'Workspace not found' };
+      if (isDefaultConversationWorkspacePath(workspace.path)) {
+        return { success: false, error: 'The default conversation workspace cannot be renamed' };
+      }
+      if (!fs.existsSync(workspace.path) || !fs.statSync(workspace.path).isDirectory()) {
+        return { success: false, error: 'Project directory no longer exists' };
+      }
+
+      const targetPath = path.join(path.dirname(workspace.path), normalizedName);
+      const pathsMatch =
+        process.platform === 'win32'
+          ? path.resolve(targetPath).toLowerCase() === path.resolve(workspace.path).toLowerCase()
+          : path.resolve(targetPath) === path.resolve(workspace.path);
+      if (!pathsMatch && fs.existsSync(targetPath)) {
+        return { success: false, error: 'A directory with this name already exists' };
+      }
+
+      fs.renameSync(workspace.path, targetPath);
+      try {
+        const renamedWorkspace = coworkStore.relocateWorkspace(id, targetPath, normalizedName);
+        if (!renamedWorkspace) throw new Error('Workspace not found');
+        return { success: true, workspace: renamedWorkspace };
+      } catch (error) {
+        fs.renameSync(targetPath, workspace.path);
+        throw error;
+      }
     } catch (error) {
       return {
         success: false,
@@ -4106,7 +4150,10 @@ if (!gotTheLock) {
       if (typeof id !== 'string' || !id.trim()) {
         return { success: false, error: 'Workspace id is required' };
       }
-      const deletedSessionIds = getCoworkStore().deleteWorkspace(id);
+      const coworkStore = getCoworkStore();
+      const workspace = coworkStore.getWorkspace(id);
+      if (!workspace) return { success: false, error: 'Workspace not found' };
+      const deletedSessionIds = coworkStore.deleteWorkspace(id);
       console.log(`[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`);
       return { success: true, deletedSessionIds };
     } catch (error) {
@@ -4118,8 +4165,32 @@ if (!gotTheLock) {
   });
 
   // Project working-directory helpers
+  function getDefaultConversationWorkspacePath(): string {
+    return path.join(os.homedir(), '.zhiyuan', 'scratch');
+  }
+  function isDefaultConversationWorkspacePath(candidatePath: string): boolean {
+    const normalizedCandidatePath = path.resolve(candidatePath);
+    const normalizedDefaultPath = path.resolve(getDefaultConversationWorkspacePath());
+    return process.platform === 'win32'
+      ? normalizedCandidatePath.toLowerCase() === normalizedDefaultPath.toLowerCase()
+      : normalizedCandidatePath === normalizedDefaultPath;
+  }
   const getDefaultProjectBaseDir = () =>
     path.join(app.getPath('documents'), 'ZhiYuanAgent', 'Workspaces');
+  const getUnmanagedWorkspaceBaseDir = () =>
+    path.join(app.getPath('userData'), 'unmanaged-workspaces');
+  const isUuidDirectoryName = (directoryName: string): boolean =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(directoryName);
+  const isLegacyUnmanagedWorkspacePath = (candidatePath: string): boolean => {
+    const relativePath = path.relative(getDefaultProjectBaseDir(), candidatePath);
+    return !relativePath.includes(path.sep) && isUuidDirectoryName(relativePath);
+  };
+  const isUnmanagedWorkspacePath = (candidatePath: string): boolean => {
+    const relativePath = path.relative(getUnmanagedWorkspaceBaseDir(), candidatePath);
+    return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+  };
+  const isInternalWorkspacePath = (candidatePath: string): boolean =>
+    isLegacyUnmanagedWorkspacePath(candidatePath) || isUnmanagedWorkspacePath(candidatePath);
 
   ipcMain.handle(ProjectIpc.GetDefaultBaseDir, async () => {
     try {
@@ -4164,7 +4235,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(ProjectIpc.EnsureScratchDir, async () => {
     try {
-      const scratchDir = path.join(os.homedir(), '.zhiyuan', 'scratch');
+      const scratchDir = getDefaultConversationWorkspacePath();
       await fs.promises.mkdir(scratchDir, { recursive: true });
       return { success: true, path: scratchDir };
     } catch (error) {
@@ -4172,6 +4243,23 @@ if (!gotTheLock) {
         success: false,
         path: null,
         error: error instanceof Error ? error.message : 'Failed to ensure scratch directory',
+      };
+    }
+  });
+
+  ipcMain.handle(ProjectIpc.CreateRandomWorkspace, async () => {
+    try {
+      const randomWorkspacePath = path.join(
+        getUnmanagedWorkspaceBaseDir(),
+        crypto.randomUUID(),
+      );
+      await fs.promises.mkdir(randomWorkspacePath, { recursive: true });
+      return { success: true, path: randomWorkspacePath };
+    } catch (error) {
+      return {
+        success: false,
+        path: null,
+        error: error instanceof Error ? error.message : 'Failed to create random workspace',
       };
     }
   });
@@ -4216,7 +4304,7 @@ if (!gotTheLock) {
           ? coworkStoreInstance.getWorkspace(options.workspaceId)
           : null;
         const selectedTaskDirectory = resolveSessionWorkingDirectory({
-          cwd: workspace?.path || options.cwd,
+          cwd: options.cwd || workspace?.path,
         });
 
         if (!selectedTaskDirectory) {
@@ -4282,6 +4370,7 @@ if (!gotTheLock) {
           content: options.prompt,
           metadata: Object.keys(messageMetadata).length > 0 ? messageMetadata : undefined,
         });
+        coworkStoreInstance.touchWorkspace(session.workspaceId);
 
         // Update session status to 'running' before starting async task
         // This ensures the frontend receives the correct status immediately
@@ -4433,6 +4522,10 @@ if (!gotTheLock) {
               basePrompt: options.systemPrompt,
               language: resolveCoworkPromptLanguage(),
             });
+
+        if (existingSession && options.prompt.trim()) {
+          store.touchWorkspace(existingSession.workspaceId);
+        }
 
         runtime
           .continueSession(options.sessionId, options.prompt, {
@@ -6604,7 +6697,10 @@ if (!gotTheLock) {
 
   ipcMain.handle('get-recent-cwds', async (_event, limit?: number) => {
     const boundedLimit = limit ? Math.min(Math.max(limit, 1), 20) : 8;
-    return getCoworkStore().listRecentCwds(boundedLimit);
+    return getCoworkStore()
+      .listRecentCwds(20)
+      .filter(cwd => !isInternalWorkspacePath(cwd))
+      .slice(0, boundedLimit);
   });
 
   ipcMain.handle('get-api-config', async () => {
@@ -6646,10 +6742,12 @@ if (!gotTheLock) {
   );
 
   // Dialog handlers
-  ipcMain.handle('dialog:selectDirectory', async event => {
+  ipcMain.handle('dialog:selectDirectory', async (event, options?: { defaultPath?: string }) => {
     const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+    const defaultPath = options?.defaultPath?.trim();
     const dialogOptions = {
       properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[],
+      ...(defaultPath ? { defaultPath } : {}),
     };
     const result = ownerWindow
       ? await dialog.showOpenDialog(ownerWindow, dialogOptions)

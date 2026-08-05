@@ -520,8 +520,18 @@ select::-ms-expand {
 
 /* Sidebar interactive surfaces follow the active application theme. */
 .sidebar-interactive-surface:hover,
+.sidebar-interactive-surface[data-popup-open],
+.sidebar-interactive-surface[data-state='open'],
 .sidebar-interactive-surface-active {
   background-color: color-mix(in srgb, var(--zy-text-primary) 4%, transparent);
+}
+
+/* Workspace rows use the outer row for hover feedback. Button expansion must
+   not create a second, persistent surface inside the row. */
+[data-slot='workspace-tree-row'] > [data-slot='button'],
+[data-slot='workspace-tree-row'] > [data-slot='button']:hover,
+[data-slot='workspace-tree-row'] > [data-slot='button'][aria-expanded='true'] {
+  background-color: transparent;
 }
 
 [data-active-view]:not([data-active-view='cowork']) .sidebar-session-row.sidebar-interactive-surface-active {

@@ -17,6 +17,7 @@ const CURRENT_WORKSPACE_KEY = 'workspace.currentId';
 
 type SelectWorkspaceOptions = {
   preserveSessionLoading?: boolean;
+  persistSelection?: boolean;
 };
 
 type LegacyCompatibleCoworkApi = {
@@ -24,6 +25,7 @@ type LegacyCompatibleCoworkApi = {
   ensureWorkspace?: (options: {
     path: string;
     name?: string;
+    isHidden?: boolean;
   }) => Promise<{ success: boolean; workspace?: Workspace }>;
   renameWorkspace?: (
     id: string,
@@ -45,6 +47,7 @@ const createLegacyWorkspace = (workspacePath: string): Workspace => {
     id: WorkspaceDefault.Main,
     name: segments[segments.length - 1] || normalizedPath,
     path: normalizedPath,
+    isHidden: false,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -89,9 +92,9 @@ class WorkspaceService {
       store.dispatch(setWorkspaces(workspaces));
 
       const savedId = await localStore.getItem<string>(CURRENT_WORKSPACE_KEY);
-      const currentId = workspaces.some(workspace => workspace.id === savedId)
+      const currentId = workspaces.some(workspace => workspace.id === savedId && !workspace.isHidden)
         ? savedId
-        : (workspaces[0]?.id ?? null);
+        : (workspaces.find(workspace => !workspace.isHidden)?.id ?? null);
       store.dispatch(setCurrentWorkspaceId(currentId));
       if (currentId) await localStore.setItem(CURRENT_WORKSPACE_KEY, currentId);
       return workspaces;
@@ -100,12 +103,45 @@ class WorkspaceService {
     }
   }
 
-  async ensureWorkspace(path: string, name?: string): Promise<Workspace | null> {
+  async refreshWorkspaces(): Promise<void> {
+    if (!this.workspaceApiAvailable) return;
+
+    const cowork = getCompatibleCoworkApi();
+    if (typeof cowork?.listWorkspaces !== 'function') return;
+
+    try {
+      const result = await cowork.listWorkspaces();
+      if (!result.success) return;
+      store.dispatch(setWorkspaces(result.workspaces ?? []));
+    } catch (error) {
+      this.workspaceApiAvailable = false;
+      console.warn('[WorkspaceService] Failed to refresh workspaces:', error);
+    }
+  }
+
+  promoteWorkspace(workspaceId: string): void {
+    const workspaces = store.getState().workspace.workspaces;
+    const workspace = workspaces.find(item => item.id === workspaceId);
+    if (!workspace) return;
+
+    store.dispatch(
+      setWorkspaces([
+        { ...workspace, updatedAt: Date.now() },
+        ...workspaces.filter(item => item.id !== workspaceId),
+      ]),
+    );
+  }
+
+  async ensureWorkspace(
+    path: string,
+    name?: string,
+    options: { isHidden?: boolean } = {},
+  ): Promise<Workspace | null> {
     const cowork = getCompatibleCoworkApi();
     let workspace: Workspace | undefined;
     if (this.workspaceApiAvailable && typeof cowork?.ensureWorkspace === 'function') {
       try {
-        const result = await cowork.ensureWorkspace({ path, name });
+        const result = await cowork.ensureWorkspace({ path, name, isHidden: options.isHidden });
         workspace = result.success ? result.workspace : undefined;
       } catch (error) {
         this.workspaceApiAvailable = false;
@@ -119,7 +155,11 @@ class WorkspaceService {
     const current = store.getState().workspace.workspaces;
     const next = [
       ...current.filter(item => item.id !== workspace!.id),
-      { ...workspace, name: name?.trim() || workspace.name },
+      {
+        ...workspace,
+        name: name?.trim() || workspace.name,
+        isHidden: options.isHidden ?? workspace.isHidden,
+      },
     ];
     store.dispatch(setWorkspaces(next));
     return next[next.length - 1];
@@ -127,7 +167,7 @@ class WorkspaceService {
 
   async selectWorkspace(
     workspaceId: string,
-    { preserveSessionLoading = false }: SelectWorkspaceOptions = {},
+    { preserveSessionLoading = false, persistSelection = true }: SelectWorkspaceOptions = {},
   ): Promise<void> {
     if (!store.getState().workspace.workspaces.some(workspace => workspace.id === workspaceId))
       return;
@@ -137,28 +177,46 @@ class WorkspaceService {
       );
     }
     store.dispatch(setCurrentWorkspaceId(workspaceId));
-    await localStore.setItem(CURRENT_WORKSPACE_KEY, workspaceId);
+    if (persistSelection) await localStore.setItem(CURRENT_WORKSPACE_KEY, workspaceId);
+  }
+
+  async clearWorkspaceSelection(): Promise<void> {
+    store.dispatch(setCurrentWorkspaceId(null));
+    await localStore.removeItem(CURRENT_WORKSPACE_KEY);
   }
 
   async renameWorkspace(workspaceId: string, name: string): Promise<Workspace | null> {
     const cowork = getCompatibleCoworkApi();
-    let workspace: Workspace | undefined;
-    if (this.workspaceApiAvailable && typeof cowork?.renameWorkspace === 'function') {
-      const result = await cowork.renameWorkspace(workspaceId, name);
-      workspace = result.success ? result.workspace : undefined;
-    }
-    workspace ??= store.getState().workspace.workspaces.find(item => item.id === workspaceId);
-    if (!workspace) return null;
-    const renamedWorkspace = { ...workspace, name: name.trim(), updatedAt: Date.now() };
-    store.dispatch(
-      setWorkspaces(
-        store
-          .getState()
-          .workspace.workspaces.map(item =>
-            item.id === renamedWorkspace.id ? renamedWorkspace : item,
-          ),
-      ),
+    if (!this.workspaceApiAvailable || typeof cowork?.renameWorkspace !== 'function') return null;
+
+    const result = await cowork.renameWorkspace(workspaceId, name);
+    const renamedWorkspace = result.success ? result.workspace : undefined;
+    if (!renamedWorkspace) return null;
+
+    const { currentWorkspaceId, workspaces } = store.getState().workspace;
+    const originalIndex = workspaces.findIndex(item => item.id === workspaceId);
+    const workspacesWithoutRenamed = workspaces.filter(
+      item => item.id !== workspaceId && item.id !== renamedWorkspace.id,
     );
+    const insertionIndex =
+      originalIndex < 0
+        ? workspacesWithoutRenamed.length
+        : workspaces
+            .slice(0, originalIndex)
+            .filter(item => item.id !== renamedWorkspace.id).length;
+    const nextWorkspaces = [
+      ...workspacesWithoutRenamed.slice(0, insertionIndex),
+      renamedWorkspace,
+      ...workspacesWithoutRenamed.slice(insertionIndex),
+    ];
+
+    if (currentWorkspaceId === workspaceId) {
+      // Keep the replacement ID selected before replacing the list so no
+      // workspace switch runs and the open session remains intact.
+      store.dispatch(setCurrentWorkspaceId(renamedWorkspace.id));
+      await localStore.setItem(CURRENT_WORKSPACE_KEY, renamedWorkspace.id);
+    }
+    store.dispatch(setWorkspaces(nextWorkspaces));
     return renamedWorkspace;
   }
 

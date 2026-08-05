@@ -601,7 +601,8 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   dialog: {
-    selectDirectory: () => ipcRenderer.invoke(DialogIpc.SelectDirectory),
+    selectDirectory: (options?: { defaultPath?: string }) =>
+      ipcRenderer.invoke(DialogIpc.SelectDirectory, options),
     selectFile: (options?: {
       title?: string;
       filters?: { name: string; extensions: string[] }[];
@@ -632,6 +633,7 @@ contextBridge.exposeInMainWorld('electron', {
     createDirectory: (options: { name: string; baseDir?: string }) =>
       ipcRenderer.invoke(ProjectIpc.CreateDirectory, options),
     ensureScratchDir: () => ipcRenderer.invoke(ProjectIpc.EnsureScratchDir),
+    createRandomWorkspace: () => ipcRenderer.invoke(ProjectIpc.CreateRandomWorkspace),
   },
 
   shell: {

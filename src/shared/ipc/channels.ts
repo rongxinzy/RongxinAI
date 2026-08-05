@@ -212,6 +212,7 @@ export const ProjectIpc = {
   GetDefaultBaseDir: 'project:getDefaultBaseDir',
   CreateDirectory: 'project:createDirectory',
   EnsureScratchDir: 'project:ensureScratchDir',
+  CreateRandomWorkspace: 'project:createRandomWorkspace',
 } as const;
 export type ProjectIpc = (typeof ProjectIpc)[keyof typeof ProjectIpc];
 

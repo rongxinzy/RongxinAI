@@ -465,6 +465,8 @@ class CoworkService {
     });
     if (result.success && result.session) {
       store.dispatch(addSession(result.session));
+      workspaceService.promoteWorkspace(result.session.workspaceId);
+      await workspaceService.refreshWorkspaces();
       return { session: result.session };
     }
 
@@ -541,6 +543,10 @@ class CoworkService {
       return false;
     }
 
+    if (result.session?.workspaceId) {
+      workspaceService.promoteWorkspace(result.session.workspaceId);
+    }
+    await workspaceService.refreshWorkspaces();
     void this.loadSession(options.sessionId);
     return true;
   }

@@ -170,8 +170,11 @@ interface CoworkPromptInputProps {
   disabled?: boolean;
   size?: 'normal' | 'large';
   workingDirectory?: string;
+  workingDirectoryName?: string;
   onWorkingDirectoryChange?: (dir: string) => void;
+  onUseNoFolder?: (dir: string) => void | Promise<void>;
   showFolderSelector?: boolean;
+  showNoFolderAction?: boolean;
   showModelSelector?: boolean;
   onManageSkills?: () => void;
   onManageConnectors?: () => void;
@@ -199,8 +202,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       disabled = false,
       size = 'normal',
       workingDirectory = '',
+      workingDirectoryName,
       onWorkingDirectoryChange,
+      onUseNoFolder,
       showFolderSelector = false,
+      showNoFolderAction = true,
       showModelSelector = false,
       onManageSkills,
       onManageConnectors,
@@ -1277,12 +1283,19 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         </PromptInput>
         {showFolderSelector && (
           <div className="relative mt-1.5 flex justify-start">
-            <FolderSelectorPopover onSelectFolder={handleFolderSelect} side="bottom" align="start">
+            <FolderSelectorPopover
+              onSelectFolder={handleFolderSelect}
+              onUseNoFolder={onUseNoFolder}
+              side="bottom"
+              align="start"
+              showNoFolderAction={showNoFolderAction}
+              initialDirectory={workingDirectory}
+            >
               <PromptInputButton
-                className={`gap-1 px-2 text-sm hover:bg-surface-raised ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                className={`sidebar-interactive-surface gap-1 px-2 text-sm hover:shadow-subtle data-popup-open:shadow-subtle ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
               >
                 <Folder className="size-4 shrink-0" />
-                <span>{i18nService.t('enterProjectWork')}</span>
+                <span>{workingDirectoryName || i18nService.t('enterProjectWork')}</span>
                 <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               </PromptInputButton>
             </FolderSelectorPopover>

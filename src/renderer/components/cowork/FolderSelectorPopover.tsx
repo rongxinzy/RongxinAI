@@ -13,7 +13,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
-import { getCompactFolderName } from '../../utils/path';
+import { getCompactFolderName, isScratchWorkspacePath } from '../../utils/path';
 import CreateProjectDialog from './CreateProjectDialog';
 
 interface FolderSelectorPopoverProps {
@@ -21,10 +21,16 @@ interface FolderSelectorPopoverProps {
   children: React.ReactNode;
   /** Called when a folder is selected */
   onSelectFolder: (path: string) => void;
+  /** Called when an unlisted working directory is selected. */
+  onUseNoFolder?: (path: string) => void | Promise<void>;
   /** Dropdown side relative to trigger (default: "top") */
   side?: 'top' | 'bottom';
   /** Dropdown alignment relative to trigger (default: "start") */
   align?: 'start' | 'center' | 'end';
+  /** Whether the no-folder action is available. */
+  showNoFolderAction?: boolean;
+  /** Directory the native picker should open initially. */
+  initialDirectory?: string;
 }
 
 const isWindowsDriveRoot = (dirPath: string): boolean => {
@@ -35,8 +41,11 @@ const isWindowsDriveRoot = (dirPath: string): boolean => {
 const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   children,
   onSelectFolder,
+  onUseNoFolder,
   side = 'top',
   align = 'start',
+  showNoFolderAction = true,
+  initialDirectory,
 }) => {
   const [open, setOpen] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -77,7 +86,9 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
   const handleUseExistingFolder = useCallback(async () => {
     setOpen(false);
     try {
-      const result = await window.electron.dialog.selectDirectory();
+      const result = await window.electron.dialog.selectDirectory({
+        defaultPath: initialDirectory,
+      });
       if (result.success && result.path) {
         if (isWindowsDriveRoot(result.path)) {
           window.dispatchEvent(
@@ -92,26 +103,30 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
     } catch (error) {
       console.error('Failed to select directory:', error);
     }
-  }, [onSelectFolder]);
+  }, [initialDirectory, onSelectFolder]);
 
   const handleUseNoFolder = useCallback(async () => {
     setOpen(false);
     try {
-      const result = await window.electron.project.ensureScratchDir();
+      const result = await window.electron.project.createRandomWorkspace();
       if (result.success && result.path) {
-        onSelectFolder(result.path);
+        if (onUseNoFolder) {
+          await onUseNoFolder(result.path);
+        } else {
+          onSelectFolder(result.path);
+        }
       } else {
         window.dispatchEvent(
           new CustomEvent('app:showToast', { detail: i18nService.t('projectCreateFailed') }),
         );
       }
     } catch (error) {
-      console.error('Failed to ensure scratch directory:', error);
+      console.error('Failed to create random workspace:', error);
       window.dispatchEvent(
         new CustomEvent('app:showToast', { detail: i18nService.t('projectCreateFailed') }),
       );
     }
-  }, [onSelectFolder]);
+  }, [onSelectFolder, onUseNoFolder]);
 
   const handleSelectRecentFolder = useCallback(
     (path: string) => {
@@ -129,6 +144,7 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
 
   const truncatePath = (path: string, maxLength = 40): string => {
     if (!path) return i18nService.t('noFolderSelected');
+    if (isScratchWorkspacePath(path)) return i18nService.t('defaultConversation');
     return getCompactFolderName(path, maxLength) || i18nService.t('noFolderSelected');
   };
 
@@ -149,11 +165,12 @@ const FolderSelectorPopover: React.FC<FolderSelectorPopoverProps> = ({
             <span>{i18nService.t('useExistingFolder')}</span>
           </DropdownMenuItem>
 
-          {/* Scratch workspace without a folder */}
-          <DropdownMenuItem onClick={() => void handleUseNoFolder()}>
-            <FolderX className="h-4 w-4 text-muted-foreground" />
-            <span>{i18nService.t('useNoFolder')}</span>
-          </DropdownMenuItem>
+          {showNoFolderAction && (
+            <DropdownMenuItem onClick={() => void handleUseNoFolder()}>
+              <FolderX className="h-4 w-4 text-muted-foreground" />
+              <span>{i18nService.t('useNoFolder')}</span>
+            </DropdownMenuItem>
+          )}
 
           <DropdownMenuSeparator />
 

@@ -108,6 +108,7 @@ export class SqliteStore {
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         path TEXT NOT NULL UNIQUE,
+        is_hidden INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
@@ -324,6 +325,12 @@ export class SqliteStore {
 
     // Migration: Add agent_id column to cowork_sessions
     try {
+      const workspaceCols = this.db.pragma('table_info(workspaces)') as Array<{ name: string }>;
+      if (!workspaceCols.some(column => column.name === 'is_hidden')) {
+        this.db.exec('ALTER TABLE workspaces ADD COLUMN is_hidden INTEGER NOT NULL DEFAULT 0;');
+        this.didRunMigration = true;
+      }
+
       const sessionCols = this.db.pragma('table_info(cowork_sessions)') as Array<{ name: string }>;
       const sessionColNames = sessionCols.map(c => c.name);
       if (!sessionColNames.includes('agent_id')) {

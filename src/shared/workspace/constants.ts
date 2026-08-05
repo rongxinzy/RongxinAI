@@ -12,3 +12,7 @@ export const WorkspaceDefault = {
 } as const;
 
 export type WorkspaceDefault = (typeof WorkspaceDefault)[keyof typeof WorkspaceDefault];
+
+export const WorkspaceStoreKey = {
+  DefaultConversationInitialized: 'workspace.defaultConversationInitialized',
+} as const;

@@ -729,7 +729,7 @@ interface IElectronAPI {
       workspaces?: import('../../shared/workspace').Workspace[];
       error?: string;
     }>;
-    ensureWorkspace: (options: { path: string; name?: string }) => Promise<{
+    ensureWorkspace: (options: { path: string; name?: string; isHidden?: boolean }) => Promise<{
       success: boolean;
       workspace?: import('../../shared/workspace').Workspace;
       error?: string;
@@ -943,7 +943,9 @@ interface IElectronAPI {
     onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) => () => void;
   };
   dialog: {
-    selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
+    selectDirectory: (options?: {
+      defaultPath?: string;
+    }) => Promise<{ success: boolean; path: string | null }>;
     selectFile: (options?: {
       title?: string;
       filters?: { name: string; extensions: string[] }[];
@@ -979,6 +981,7 @@ interface IElectronAPI {
       error?: string;
     }>;
     ensureScratchDir: () => Promise<{ success: boolean; path: string | null; error?: string }>;
+    createRandomWorkspace: () => Promise<{ success: boolean; path: string | null; error?: string }>;
   };
   shell: {
     openPath: (filePath: string) => Promise<{ success: boolean; error?: string }>;

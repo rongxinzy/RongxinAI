@@ -19,6 +19,7 @@ vi.mock('electron', () => ({
 // Now import the class under test
 // ---------------------------------------------------------------------------
 import BetterSqlite3 from 'better-sqlite3';
+import path from 'path';
 
 import {
   AgentAvatarSvg,
@@ -66,6 +67,7 @@ function setupDb(): void {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       path TEXT NOT NULL UNIQUE,
+      is_hidden INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -218,6 +220,46 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(
     store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
   ).toEqual(expect.arrayContaining([first.id, second.id]));
+});
+
+test('workspace order changes only when the workspace is explicitly touched', () => {
+  const first = store.ensureWorkspace('/tmp/workspace-a', 'Workspace A');
+  const second = store.ensureWorkspace('/tmp/workspace-b', 'Workspace B');
+  db.prepare('UPDATE workspaces SET updated_at = ? WHERE id = ?').run(100, first.id);
+  db.prepare('UPDATE workspaces SET updated_at = ? WHERE id = ?').run(200, second.id);
+
+  store.ensureWorkspace('/tmp/workspace-a', 'Renamed by selection');
+
+  expect(store.getWorkspace(first.id)).toMatchObject({
+    name: 'Workspace A',
+    updatedAt: 100,
+  });
+
+  vi.useFakeTimers();
+  vi.setSystemTime(300);
+  store.touchWorkspace(first.id);
+  vi.useRealTimers();
+
+  expect(store.listWorkspaces().map(workspace => workspace.id)).toEqual([first.id, second.id]);
+});
+
+test('relocateWorkspace preserves session ownership under the renamed directory', () => {
+  const beforePath = path.join(process.cwd(), 'workspace-before');
+  const afterPath = path.join(process.cwd(), 'workspace-after');
+  const session = store.createSession('rename me', beforePath);
+  const oldWorkspace = store.getWorkspace(session.workspaceId)!;
+
+  const renamedWorkspace = store.relocateWorkspace(oldWorkspace.id, afterPath, 'workspace-after');
+
+  expect(renamedWorkspace).toMatchObject({ name: 'workspace-after', path: afterPath });
+  expect(renamedWorkspace!.id).not.toBe(oldWorkspace.id);
+  expect(store.getWorkspace(oldWorkspace.id)).toBeNull();
+  expect(store.getSession(session.id)).toMatchObject({
+    cwd: afterPath,
+    workspaceId: renamedWorkspace!.id,
+  });
+  expect(store.countSessions(undefined, oldWorkspace.id)).toBe(0);
+  expect(store.countSessions(undefined, renamedWorkspace!.id)).toBe(1);
 });
 
 test('listSessions filters by mode without mixing work and chat history', () => {

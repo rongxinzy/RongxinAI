@@ -6,7 +6,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ShieldAlert, ShieldCheck } from 'lucide-react';
 import React from 'react';
 
 import { CoworkPermissionMode } from '../../../shared/cowork/constants';
@@ -32,6 +32,8 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
   onChange,
   disabled = false,
 }) => {
+  const TriggerIcon = value === CoworkPermissionMode.Ask ? ShieldCheck : ShieldAlert;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -40,17 +42,19 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
         render={
           <PromptInputButton
             disabled={disabled}
-            className="gap-1 px-2 text-sm hover:bg-surface-raised"
+            className="sidebar-interactive-surface gap-1 px-2 text-sm hover:shadow-subtle data-popup-open:shadow-subtle"
           >
+            <TriggerIcon className="size-4 text-foreground" />
             <span>{i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}</span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </PromptInputButton>
         }
       />
-      <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56">
+      <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56 p-2">
         <DropdownMenuRadioGroup
           value={value}
           onValueChange={nextValue => onChange(nextValue as CoworkPermissionMode)}
+          className="space-y-1"
         >
           {(
             [
@@ -62,7 +66,16 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
               ],
             ] as const
           ).map(([mode, labelKey, descriptionKey]) => (
-            <DropdownMenuRadioItem key={mode} value={mode} className="items-center py-1.5">
+            <DropdownMenuRadioItem
+              key={mode}
+              value={mode}
+              className="items-start gap-2 rounded-lg px-2 py-2.5 data-checked:bg-surface-raised"
+            >
+              {mode === CoworkPermissionMode.Ask ? (
+                <ShieldCheck className="mt-0.5 size-5" />
+              ) : (
+                <ShieldAlert className="mt-0.5 size-5" />
+              )}
               <div className="flex min-w-0 flex-col gap-0.5">
                 <span className="text-sm">{i18nService.t(labelKey)}</span>
                 <span className="text-xs text-muted-foreground">

@@ -6,6 +6,7 @@ import { type RefObject, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../services/i18n';
+import { workspaceService } from '../services/workspace';
 import type { RootState } from '../store';
 import { selectHasActiveChannelRun } from '../store/selectors/activitySelectors';
 import { clearActiveSkills } from '../store/slices/skillSlice';
@@ -95,6 +96,7 @@ export const SidebarNavigationControls = ({
   };
   const handleNewConversation = () => {
     if (workMode === WorkMode.Chat) dispatch(clearActiveSkills());
+    if (workMode === WorkMode.Work) void workspaceService.clearWorkspaceSelection();
     onNewChat();
   };
 
