@@ -1160,9 +1160,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               {i18nService.t('coworkDropFileHint')}
             </div>
           )}
-          {isStreaming && !canQueueWhileStreaming && (
-            <div className="pointer-events-none absolute inset-0 z-10 rounded-[inherit] bg-input/50 dark:bg-input/80" />
-          )}
           <PromptInputBody>
             <PromptInputTextarea
               ref={textareaRef}
