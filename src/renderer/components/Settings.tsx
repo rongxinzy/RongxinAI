@@ -508,6 +508,12 @@ const shouldUseMaxCompletionTokensForOpenAI = (provider: string, modelId?: strin
 };
 const CONNECTIVITY_TEST_TOKEN_BUDGET = 64;
 
+const shouldShowProviderModels = (providerKey: string, providerConfig: ProviderConfig): boolean => {
+  if (providerKey === ProviderName.Ollama || providerKey === ProviderName.LlamaCpp) return true;
+  if (isCustomProvider(providerKey)) return Boolean(providerConfig.baseUrl?.trim());
+  return Boolean(providerConfig.apiKey?.trim());
+};
+
 const getDefaultProviders = (): ProvidersConfig => {
   const providers = (defaultConfig.providers ?? {}) as ProvidersConfig;
   const entries = Object.entries(providers) as Array<[string, ProviderConfig]>;
@@ -517,11 +523,13 @@ const getDefaultProviders = (): ProvidersConfig => {
       providerKey,
       {
         ...providerConfig,
-        models: providerConfig.models?.map(model => ({
-          ...model,
-          name: model.name.replace('(Secure)', secureSuffix),
-          supportsImage: resolveModelSupportsImageForProvider(providerKey, model),
-        })),
+        models: providerConfig.enabled
+          ? providerConfig.models?.map(model => ({
+              ...model,
+              name: model.name.replace('(Secure)', secureSuffix),
+              supportsImage: resolveModelSupportsImageForProvider(providerKey, model),
+            }))
+          : [],
       },
     ]),
   ) as ProvidersConfig;
@@ -1217,10 +1225,12 @@ const Settings: React.FC<SettingsProps> = ({
 
             return Object.fromEntries(
               Object.entries(merged).map(([providerKey, providerConfig]) => {
-                const models = normalizeProviderModelsForSettings(
-                  providerKey,
-                  providerConfig.models,
-                );
+                const models = shouldShowProviderModels(providerKey, providerConfig)
+                  ? normalizeProviderModelsForSettings(
+                      providerKey,
+                      providerConfig.models,
+                    )
+                  : [];
                 return [
                   providerKey,
                   {
