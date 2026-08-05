@@ -130,3 +130,29 @@ function extractWriteToolPath(input: Record<string, unknown>): string | null {
   }
   return null;
 }
+
+/** Merge newly collected artifacts into the existing persisted set, deduplicating by normalized filePath. */
+export function mergeArtifactsIncremental(
+  existing: CoworkPersistedArtifact[],
+  incoming: CoworkPersistedArtifact[],
+): CoworkPersistedArtifact[] {
+  const merged = [...existing];
+  const existingPaths = new Set(
+    existing
+      .filter(a => a.filePath)
+      .map(a => a.filePath!.replace(/\\/g, '/').toLowerCase()),
+  );
+
+  for (const artifact of incoming) {
+    if (!artifact.filePath) {
+      merged.push(artifact);
+      continue;
+    }
+    const normalized = artifact.filePath.replace(/\\/g, '/').toLowerCase();
+    if (existingPaths.has(normalized)) continue;
+    existingPaths.add(normalized);
+    merged.push(artifact);
+  }
+
+  return merged;
+}

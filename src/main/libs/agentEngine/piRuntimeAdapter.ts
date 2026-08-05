@@ -88,7 +88,7 @@ import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
-import { collectSessionArtifacts } from '../../coworkArtifactCollector';
+import { collectSessionArtifacts, mergeArtifactsIncremental } from '../../coworkArtifactCollector';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
@@ -241,6 +241,8 @@ interface ActivePiSession {
   turnFailed: boolean;
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
   queueFlushInFlight: boolean;
+  /** Index into the session message list after the last incremental artifact collection. */
+  lastCollectedMessageIndex: number;
 }
 
 // ── Dynamic imports ──
@@ -1842,11 +1844,24 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         }
         if (this.store) {
           this.store.updateSession(sessionId, { status: 'idle' });
-          // Persist artifacts from the full message history so they survive
-          // renderer-side pagination across page reloads.
+          // Incrementally collect and persist artifacts from new messages
+          // since the last collection. This avoids O(n) full-history scans
+          // on every turn in long-running sessions.
           const sessionMessages = this.store.getSessionMessages(sessionId);
-          const persistedArtifacts = collectSessionArtifacts(sessionMessages);
-          this.store.saveSessionArtifacts(sessionId, persistedArtifacts);
+          const existingArtifacts = this.store.getSession(sessionId)?.artifacts ?? [];
+          const collectedCount = existingArtifacts.length;
+          const newMessages =
+            collectedCount > 0
+              ? sessionMessages.slice(active.lastCollectedMessageIndex ?? 0)
+              : sessionMessages;
+          if (newMessages.length > 0) {
+            const newArtifacts = collectSessionArtifacts(newMessages);
+            // Merge: dedup by filePath (normalized), prefer existing entries
+            // that were explicitly declared via declare_artifact.
+            const merged = mergeArtifactsIncremental(existingArtifacts, newArtifacts);
+            this.store.saveSessionArtifacts(sessionId, merged);
+            active.lastCollectedMessageIndex = sessionMessages.length;
+          }
         }
         if (active.workbenchRunId && this.workbenchTaskService) {
           const workflowSnapshot = active.researchRun
