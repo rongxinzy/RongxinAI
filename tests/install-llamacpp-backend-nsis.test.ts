@@ -4,6 +4,7 @@ import http from 'node:http';
 import type { Socket } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 
 import JSZip from 'jszip';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -12,17 +13,20 @@ import {
   ArchiveSource,
   BackendId,
   buildInstallPlan,
+  ensureWindowsRuntimeLocalSigning,
   ExitCode,
   installBackendFromPlan,
   RuntimeArch,
   RuntimeBuildInfoSource,
   RuntimePlatform,
+  runPowerShellScript,
   SelectionReason,
   selectRecommendedBackend,
   WindowsSignatureStatus,
 } from '../scripts/install-llamacpp-backend-nsis.cjs';
 
 const tempDirs: string[] = [];
+const testOnWindows = process.platform === 'win32' ? test : test.skip;
 
 afterEach(() => {
   for (const tempDir of tempDirs.splice(0)) {
@@ -32,6 +36,55 @@ afterEach(() => {
       // Windows can keep short-lived handles open after downloader tests.
     }
   }
+});
+
+describe('install-llamacpp-backend-nsis PowerShell argument transport', () => {
+  testOnWindows('preserves file paths supplied to PowerShell through the child environment', () => {
+    const tempDir = createTempDir();
+    const filePath = path.join(tempDir, '模型', 'llama-server.exe');
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, 'test server', 'utf8');
+    const output = runPowerShellScript(
+      'if (Test-Path -LiteralPath $zhiyuanLlamaCppArgs[0]) { Write-Output true } else { Write-Output false }',
+      [filePath],
+    );
+
+    expect(output).toBe('true');
+  });
+
+  testOnWindows('checks the signature of a Windows executable stored under a Unicode path', () => {
+    const sourceExecutable = process.env.COMSPEC;
+    expect(sourceExecutable).toBeTruthy();
+
+    const tempDir = createTempDir();
+    const binDir = path.join(tempDir, '模型', 'build', 'bin');
+    const executablePath = path.join(binDir, 'llama-server.exe');
+    fs.mkdirSync(binDir, { recursive: true });
+    fs.copyFileSync(sourceExecutable!, executablePath);
+
+    const result = ensureWindowsRuntimeLocalSigning({
+      binDir,
+      logPath: path.join(tempDir, 'install-llamacpp.log'),
+      platform: RuntimePlatform.Windows,
+    });
+
+    expect(result).toMatchObject({ success: true, checkedCount: 1, signedCount: 0 });
+  });
+
+  testOnWindows('preserves Unicode paths and certificate thumbprints across two arguments', () => {
+    const tempDir = createTempDir();
+    const filePath = path.join(tempDir, '模型', 'llama-server.exe');
+    const thumbprint = '0123456789ABCDEF0123456789ABCDEF01234567';
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, 'test server', 'utf8');
+
+    const output = runPowerShellScript(
+      `if ((Test-Path -LiteralPath $zhiyuanLlamaCppArgs[0]) -and $zhiyuanLlamaCppArgs[1] -eq '${thumbprint}') { Write-Output true } else { Write-Output false }`,
+      [filePath, thumbprint],
+    );
+
+    expect(output).toBe('true');
+  });
 });
 
 const HttpMethod = {

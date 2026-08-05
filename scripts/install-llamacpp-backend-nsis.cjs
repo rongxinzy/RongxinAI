@@ -856,7 +856,7 @@ function findWindowsRuntimeSignableFiles(rootDir) {
 function getWindowsAuthenticodeStatus(filePath) {
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    '$signature = Get-AuthenticodeSignature -FilePath $args[0]',
+    '$signature = Get-AuthenticodeSignature -FilePath $zhiyuanLlamaCppArgs[0]',
     'Write-Output $signature.Status',
   ].join('; ');
   return readLastNonEmptyLine(runPowerShellScript(script, [filePath], { timeoutMs: 15000 }));
@@ -865,7 +865,7 @@ function getWindowsAuthenticodeStatus(filePath) {
 function ensureWindowsLocalCodeSigningCertificate(logPath) {
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    '$subject = $args[0]',
+    '$subject = $zhiyuanLlamaCppArgs[0]',
     '$cert = Get-ChildItem -Path Cert:\\CurrentUser\\My -CodeSigningCert | Where-Object { $_.Subject -eq $subject -and $_.NotAfter -gt (Get-Date).AddDays(7) } | Sort-Object NotAfter -Descending | Select-Object -First 1',
     'if (-not $cert) { $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $subject -CertStoreLocation Cert:\\CurrentUser\\My -KeyUsage DigitalSignature }',
     "$stores = @('Cert:\\CurrentUser\\Root', 'Cert:\\CurrentUser\\TrustedPublisher')",
@@ -891,8 +891,8 @@ function ensureWindowsLocalCodeSigningCertificate(logPath) {
 function signWindowsRuntimeFile(filePath, thumbprint) {
   const script = [
     "$ErrorActionPreference = 'Stop'",
-    '$thumbprint = $args[0]',
-    '$filePath = $args[1]',
+    '$thumbprint = $zhiyuanLlamaCppArgs[0]',
+    '$filePath = $zhiyuanLlamaCppArgs[1]',
     '$cert = Get-Item -Path ("Cert:\\CurrentUser\\My\\" + $thumbprint)',
     '$signature = Set-AuthenticodeSignature -FilePath $filePath -Certificate $cert',
     'if ($signature.Status -eq "NotSigned") { Write-Output $signature.Status; exit 2 }',
@@ -905,6 +905,13 @@ function signWindowsRuntimeFile(filePath, thumbprint) {
 }
 
 function runPowerShellScript(script, args = [], options = {}) {
+  const argumentEnvironment = {};
+  const argumentReferences = args.map((arg, index) => {
+    const variableName = `ZHIYUAN_LLAMACPP_POWERSHELL_ARG_${index}`;
+    argumentEnvironment[variableName] = String(arg);
+    return `$env:${variableName}`;
+  });
+  const command = `$zhiyuanLlamaCppArgs = @(${argumentReferences.join(', ')}); ${script}`;
   const result = spawnSync(
     PowerShellCommand.Executable,
     [
@@ -913,13 +920,13 @@ function runPowerShellScript(script, args = [], options = {}) {
       PowerShellCommand.ExecutionPolicy,
       PowerShellCommand.Bypass,
       PowerShellCommand.Command,
-      script,
-      ...args,
+      command,
     ],
     {
       encoding: 'utf8',
       timeout: options.timeoutMs || 60000,
       windowsHide: true,
+      env: { ...process.env, ...argumentEnvironment },
     },
   );
   const stdout = String(result.stdout || '').trim();
@@ -1054,6 +1061,7 @@ module.exports = {
   resolveAppDataDir,
   resolveDefaultResourcesDir,
   resolveLogPath,
+  runPowerShellScript,
   runCli,
   selectRecommendedBackend,
 };
