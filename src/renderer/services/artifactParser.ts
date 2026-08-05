@@ -2,6 +2,8 @@ import { ArtifactRole, type Artifact, type ArtifactType } from '../types/artifac
 import type { CoworkMessage } from '../types/cowork';
 import { discoverWorkbenchMessageArtifactBlocks } from '../../shared/workbenchTask';
 
+const DECLARE_ARTIFACT_TOOL_NAME = 'declare_artifact';
+
 /**
  * Normalize file path for deduplication comparison.
  * Handles Windows file:// URL leading slash and backslash differences.
@@ -131,116 +133,54 @@ export function parseCodeBlockArtifacts(
   return artifacts;
 }
 
-const FILE_LINK_RE = /\[([^\]]+)\]\(file:\/\/([^)]+)\)/g;
-
-export function stripFileLinksFromText(text: string): string {
-  return text.replace(/\[([^\]]+)\]\(file:\/\/([^)]+)\)/g, '');
-}
-
-const BARE_FILE_PATH_RE =
-  /(?:^|[\s"'`(])(\/?(?:[^\s"'`()\[\]]+\/)*[^\s"'`()\[\]]+\.(?:html?|svg|png|jpe?g|gif|webp|mermaid|mmd|jsx|tsx|js|mjs|cjs|ts|mts|cts|css|scss|less|json|yaml|yml|xml|py|java|go|rs|docx|xlsx|pptx|pdf|md|txt|log|csv|tsv|xls))(?:[\s"'`)]|$)/gm;
-
-export function parseFilePathsFromText(
-  messageContent: string,
-  messageId: string,
+export function parseDeclareArtifactFromMessages(
+  messages: CoworkMessage[],
   sessionId: string,
-  idPrefix = 'artifact-path',
-  role: Artifact['role'] = ArtifactRole.Deliverable,
+  roleForMessage: (msg: CoworkMessage) => ArtifactRole,
 ): Artifact[] {
-  if (!messageContent) return [];
-
   const artifacts: Artifact[] = [];
-  const re = new RegExp(BARE_FILE_PATH_RE.source, 'gm');
-  let match: RegExpExecArray | null;
   let index = 0;
 
-  while ((match = re.exec(messageContent)) !== null) {
-    let filePath = match[1];
+  for (const msg of messages) {
+    if (msg.type !== 'tool_use') continue;
+    if (msg.metadata?.toolName !== DECLARE_ARTIFACT_TOOL_NAME) continue;
 
-    if (filePath.startsWith('file:///')) {
-      filePath = filePath.slice(7);
-    } else if (filePath.startsWith('file://')) {
-      filePath = filePath.slice(7);
-    } else if (filePath.startsWith('file:/')) {
-      filePath = filePath.slice(5);
-    }
+    const input = msg.metadata?.toolInput as Record<string, unknown> | undefined;
+    if (!input) continue;
 
-    // Strip leading / before Windows drive letter (e.g. /D:/path from file:///D:/path)
-    if (/^\/[A-Za-z]:/.test(filePath)) {
-      filePath = filePath.slice(1);
-    }
+    const filePath = typeof input.filePath === 'string' ? input.filePath.trim() : '';
+    if (!filePath) continue;
 
     const ext = getFileExtension(filePath);
-    const artifactType = getArtifactTypeFromExtension(ext);
-    if (!artifactType) continue;
-
+    const declaredKind = typeof input.kind === 'string' ? input.kind.trim() : undefined;
+    const artifactType =
+      (declaredKind && getArtifactTypeFromLanguage(declaredKind)) ||
+      getArtifactTypeFromExtension(ext) ||
+      'code';
     const fileName = getFileName(filePath);
+    const declaredRole =
+      input.role === 'intermediate'
+        ? ArtifactRole.Intermediate
+        : input.role === 'deliverable'
+          ? ArtifactRole.Deliverable
+          : roleForMessage(msg);
+
+    const title =
+      typeof input.title === 'string' && input.title.trim() ? input.title.trim() : fileName;
 
     artifacts.push({
-      id: `${idPrefix}-${messageId}-${index}`,
-      messageId,
+      id: `artifact-declare-${msg.id}-${index}`,
+      messageId: msg.id,
       sessionId,
       type: artifactType,
-      title: fileName,
+      title,
       content: '',
       fileName,
       filePath,
       source: 'tool',
-      role,
-      createdAt: Date.now(),
+      role: declaredRole,
+      createdAt: msg.timestamp || Date.now(),
     });
-
-    index++;
-  }
-
-  return artifacts;
-}
-
-export function parseFileLinksFromMessage(
-  messageContent: string,
-  messageId: string,
-  sessionId: string,
-  role: Artifact['role'] = ArtifactRole.Deliverable,
-): Artifact[] {
-  if (!messageContent) return [];
-
-  const artifacts: Artifact[] = [];
-  const re = new RegExp(FILE_LINK_RE.source, 'g');
-  let match: RegExpExecArray | null;
-  let index = 0;
-
-  while ((match = re.exec(messageContent)) !== null) {
-    const linkText = match[1];
-    let filePath: string;
-    try {
-      filePath = decodeURIComponent(match[2]);
-    } catch {
-      filePath = match[2];
-    }
-    // Strip leading / before Windows drive letter (e.g. /D:/path from file:///D:/path)
-    if (/^\/[A-Za-z]:/.test(filePath)) {
-      filePath = filePath.slice(1);
-    }
-    const ext = getFileExtension(filePath);
-    const artifactType = getArtifactTypeFromExtension(ext);
-    if (!artifactType) continue;
-
-    const fileName = getFileName(filePath);
-
-    artifacts.push({
-      id: `artifact-link-${messageId}-${index}`,
-      messageId,
-      sessionId,
-      type: artifactType,
-      title: linkText || fileName,
-      content: '',
-      fileName,
-      filePath,
-      source: 'tool',
-      role,
-      createdAt: Date.now(),
-    });
-
     index++;
   }
 
@@ -346,6 +286,8 @@ export interface DetectedArtifact {
   artifact: Artifact;
   /** If true, the artifact references a file that should be loaded from disk. */
   needsFileLoad: boolean;
+  /** If true, the role was explicitly set by a declare_artifact call and should not be auto-promoted. */
+  roleIsExplicit?: boolean;
 }
 
 /**
@@ -363,14 +305,18 @@ export function detectArtifactsFromMessages(
   const detectedFilePathIndexes = new Map<string, number>();
   const finalAnswerMessageId = findFinalAnswerMessageId(messages);
 
-  const addPathArtifact = (artifact: Artifact, needsFileLoad: boolean) => {
+  const addPathArtifact = (
+    artifact: Artifact,
+    needsFileLoad: boolean,
+    roleIsExplicit = false,
+  ) => {
     if (!artifact.filePath) return;
 
     const normalized = normalizeFilePathForDedup(artifact.filePath);
     const existingIndex = detectedFilePathIndexes.get(normalized);
     if (existingIndex === undefined) {
       detectedFilePathIndexes.set(normalized, detected.length);
-      detected.push({ artifact, needsFileLoad });
+      detected.push({ artifact, needsFileLoad, roleIsExplicit });
       return;
     }
 
@@ -382,6 +328,7 @@ export function detectArtifactsFromMessages(
       detected[existingIndex] = {
         artifact,
         needsFileLoad: existing.needsFileLoad || needsFileLoad,
+        roleIsExplicit: existing.roleIsExplicit || roleIsExplicit,
       };
     }
   };
@@ -392,25 +339,16 @@ export function detectArtifactsFromMessages(
       for (const artifact of codeBlockArtifacts) {
         detected.push({ artifact, needsFileLoad: false });
       }
-
-      const fileRole =
-        msg.id === finalAnswerMessageId ? ArtifactRole.Deliverable : ArtifactRole.Intermediate;
-      const fileLinks = parseFileLinksFromMessage(msg.content, msg.id, sessionId, fileRole);
-      for (const fl of fileLinks) {
-        addPathArtifact(fl, true);
-      }
-
-      const filePaths = parseFilePathsFromText(
-        msg.content,
-        msg.id,
-        sessionId,
-        'artifact-path',
-        fileRole,
-      );
-      for (const artifact of filePaths) {
-        addPathArtifact(artifact, true);
-      }
     }
+  }
+
+  // Structured artifact declarations from declare_artifact tool calls.
+  // These are the authoritative source for file-backed artifacts — no regex.
+  const declaredArtifacts = parseDeclareArtifactFromMessages(messages, sessionId, msg => {
+    return msg.id === finalAnswerMessageId ? ArtifactRole.Deliverable : ArtifactRole.Intermediate;
+  });
+  for (const artifact of declaredArtifacts) {
+    addPathArtifact(artifact, true, /* roleIsExplicit */ true);
   }
 
   for (let i = 0; i < messages.length; i++) {
@@ -428,6 +366,20 @@ export function detectArtifactsFromMessages(
       } else if (toolArtifact && !toolArtifact.filePath) {
         detected.push({ artifact: toolArtifact, needsFileLoad: false });
       }
+    }
+  }
+
+  // Auto-promotion safety net: intermediate file-backed artifacts (from
+  // write tools) that were not explicitly declared via declare_artifact
+  // are promoted so they remain visible by default.
+  // Explicit declare_artifact role:intermediate calls are preserved.
+  for (const entry of detected) {
+    if (
+      entry.artifact.filePath &&
+      entry.artifact.role === ArtifactRole.Intermediate &&
+      !entry.roleIsExplicit
+    ) {
+      entry.artifact = { ...entry.artifact, role: ArtifactRole.Deliverable };
     }
   }
 

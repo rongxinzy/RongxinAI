@@ -191,6 +191,7 @@ vi.mock('./piOpenAICompatProxy', () => ({
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import type { CoworkStore } from '../../coworkStore';
@@ -1036,7 +1037,10 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         appendSystemPromptOverride: () => string[];
       };
-      expect(loaderOptions.appendSystemPromptOverride()).toEqual([PiAskUserQuestionSystemPrompt]);
+      expect(loaderOptions.appendSystemPromptOverride()).toEqual([
+        PiAskUserQuestionSystemPrompt,
+        DeclareArtifactSystemPrompt,
+      ]);
     });
   });
 
@@ -1087,6 +1091,7 @@ describe('PiRuntimeAdapter', () => {
         PiAskUserQuestionSystemPrompt,
         expect.stringContaining('## Local document reading'),
         expect.stringContaining('## Large File Writes'),
+        DeclareArtifactSystemPrompt,
       ]);
     });
 

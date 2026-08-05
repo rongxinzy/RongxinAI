@@ -87,6 +87,7 @@ import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
@@ -601,6 +602,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       );
       if (resourceState.fileToolsEnabled) {
         customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
+        customTools.push(buildDeclareArtifactTool());
       }
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
@@ -1466,6 +1468,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ...(resourceState.fileToolsEnabled
           ? [createPiLargeFileWriteSystemPrompt(resourceState.maxOutputTokens)]
           : []),
+        DeclareArtifactSystemPrompt,
       ],
       extensionFactories: approvalContext?.getRunId()
         ? [

@@ -3,8 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   normalizeFilePathForDedup,
   detectArtifactsFromMessages,
-  parseFileLinksFromMessage,
-  parseFilePathsFromText,
+  parseDeclareArtifactFromMessages,
   parseToolArtifact,
 } from './artifactParser';
 import { ArtifactRole } from '../types/artifact';
@@ -33,35 +32,123 @@ describe('normalizeFilePathForDedup', () => {
   });
 });
 
-describe('parseFileLinksFromMessage', () => {
-  test('strips leading / from Windows file:// link path', () => {
-    const content = '文件：[hello.pptx](file:///D:/workspace/hello.pptx)';
-    const artifacts = parseFileLinksFromMessage(content, 'msg1', 'sess1');
+describe('parseDeclareArtifactFromMessages', () => {
+  const sessId = 'sess-declare';
+  const defaultRole = () => ArtifactRole.Deliverable;
+
+  test('extracts artifact from declare_artifact tool_use message', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolInput: {
+            filePath: 'D:/workspace/report.pptx',
+            title: 'Final Report',
+            kind: 'document',
+            role: 'deliverable',
+          },
+        },
+      },
+    ];
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].filePath).toBe('D:/workspace/hello.pptx');
+    expect(artifacts[0].filePath).toBe('D:/workspace/report.pptx');
+    expect(artifacts[0].title).toBe('Final Report');
+    expect(artifacts[0].type).toBe('document');
+    expect(artifacts[0].role).toBe(ArtifactRole.Deliverable);
   });
 
-  test('preserves Unix file:// link path', () => {
-    const content = '[report.pdf](file:///home/user/report.pdf)';
-    const artifacts = parseFileLinksFromMessage(content, 'msg1', 'sess1');
+  test('defaults title to fileName when no title provided', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolInput: { filePath: '/home/user/code.ts' },
+        },
+      },
+    ];
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].filePath).toBe('/home/user/report.pdf');
+    expect(artifacts[0].title).toBe('code.ts');
+    expect(artifacts[0].role).toBe(ArtifactRole.Deliverable);
   });
 
-  test('handles URI-encoded paths', () => {
-    const content = '[文件.pptx](file:///D:/my%20folder/%E6%96%87%E4%BB%B6.pptx)';
-    const artifacts = parseFileLinksFromMessage(content, 'msg1', 'sess1');
+  test('infers type from file extension when kind not specified', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolInput: { filePath: 'D:/workspace/output.html' },
+        },
+      },
+    ];
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].filePath).toBe('D:/my folder/文件.pptx');
+    expect(artifacts[0].type).toBe('html');
   });
-});
 
-describe('parseFilePathsFromText', () => {
-  test('strips leading / after file:/// protocol removal on Windows', () => {
-    const content = 'output at file:///D:/project/output.pdf done';
-    const artifacts = parseFilePathsFromText(content, 'msg1', 'sess1');
+  test('respects intermediate role', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolInput: { filePath: 'D:/workspace/draft.ts', role: 'intermediate' },
+        },
+      },
+    ];
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
     expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].filePath).toBe('D:/project/output.pdf');
+    expect(artifacts[0].role).toBe(ArtifactRole.Intermediate);
+  });
+
+  test('skips non-declare_artifact tool_use messages', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'write_file',
+          toolInput: { filePath: 'D:/workspace/other.ts' },
+        },
+      },
+    ];
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
+    expect(artifacts).toHaveLength(0);
+  });
+
+  test('skips messages without filePath', () => {
+    const messages = [
+      {
+        id: 'tool-1',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolInput: { title: 'Missing path' },
+        },
+      },
+    ];
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
+    expect(artifacts).toHaveLength(0);
   });
 });
 
@@ -88,17 +175,6 @@ describe('parseToolArtifact', () => {
     const artifact = parseToolArtifact(toolUseMsg, toolResultMsg, 'sess1');
     expect(artifact).not.toBeNull();
     expect(artifact!.filePath).toBe('D:\\workspace\\hello.html');
-  });
-
-  test('dedup: tool path and file link path normalize to same value', () => {
-    const toolPath = 'D:\\new_ws_test_2\\hello-slide.pptx';
-    const linkContent = '[hello-slide.pptx](file:///D:/new_ws_test_2/hello-slide.pptx)';
-    const linkArtifacts = parseFileLinksFromMessage(linkContent, 'msg1', 'sess1');
-    expect(linkArtifacts).toHaveLength(1);
-
-    expect(normalizeFilePathForDedup(toolPath)).toBe(
-      normalizeFilePathForDedup(linkArtifacts[0].filePath!),
-    );
   });
 });
 
@@ -138,14 +214,21 @@ describe('detectArtifactsFromMessages', () => {
     expect(artifacts[0].needsFileLoad).toBe(false);
   });
 
-  test('detects bare Windows PPTX paths in assistant messages', () => {
+  test('detects declare_artifact tool calls as file-backed artifacts', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
-          id: 'assistant-1',
-          type: 'assistant',
-          content: 'Created D:/workspace/presentations/刘德华_AndyLau.pptx',
+          id: 'tool-1',
+          type: 'tool_use' as const,
+          content: '',
           timestamp: Date.now(),
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: 'D:/workspace/presentations/slides.pptx',
+              role: 'deliverable',
+            },
+          },
         },
       ],
       'sess1',
@@ -153,28 +236,29 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.type).toBe('document');
-    expect(artifacts[0].artifact.filePath).toBe('D:/workspace/presentations/刘德华_AndyLau.pptx');
+    expect(artifacts[0].artifact.filePath).toBe('D:/workspace/presentations/slides.pptx');
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
     expect(artifacts[0].needsFileLoad).toBe(true);
   });
 
-  test('detects bare POSIX PPTX paths in assistant messages', () => {
+  test('does not detect bare paths in assistant messages (no regex)', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
           id: 'assistant-1',
           type: 'assistant',
-          content: 'Created /home/user/presentations/report.pptx',
+          content: 'Created D:/workspace/report.pptx',
           timestamp: Date.now(),
         },
       ],
       'sess1',
     );
 
-    expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].artifact.filePath).toBe('/home/user/presentations/report.pptx');
+    // Bare paths in prose are no longer detected — artifacts must be explicitly declared.
+    expect(artifacts).toHaveLength(0);
   });
 
-  test('deduplicates file links against their embedded paths', () => {
+  test('does not detect file:// links in assistant messages (no regex)', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
@@ -187,8 +271,8 @@ describe('detectArtifactsFromMessages', () => {
       'sess1',
     );
 
-    expect(artifacts).toHaveLength(1);
-    expect(artifacts[0].artifact.filePath).toBe('D:/workspace/report.pptx');
+    // File links are no longer regex-parsed — artifacts must be explicitly declared.
+    expect(artifacts).toHaveLength(0);
   });
 
   test('does not detect bare paths in thinking messages', () => {
@@ -238,26 +322,45 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.filePath).toBe('D:/workspace/output.ts');
-    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Intermediate);
+    expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
     expect(artifacts[0].needsFileLoad).toBe(true);
   });
 
-  test('marks only the final answer file path as a deliverable', () => {
+  test('marks only the final answer artifact as deliverable via declare_artifact', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
-          id: 'assistant-progress',
-          type: 'assistant',
-          content: 'Working file: D:/workspace/slides/slide-01.js',
+          id: 'tool-intermediate',
+          type: 'tool_use' as const,
+          content: '',
           timestamp: Date.now(),
-          metadata: { isFinal: true, isStreaming: false },
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: 'D:/workspace/slides/draft.js',
+              role: 'intermediate',
+            },
+          },
         },
         {
           id: 'assistant-final',
           type: 'assistant',
-          content: 'Final file: D:/workspace/output/presentation.pptx',
+          content: 'Done.',
           timestamp: Date.now(),
           metadata: { isFinal: true, isStreaming: false, isFinalAnswer: true },
+        },
+        {
+          id: 'tool-deliverable',
+          type: 'tool_use' as const,
+          content: '',
+          timestamp: Date.now(),
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: 'D:/workspace/output/presentation.pptx',
+              role: 'deliverable',
+            },
+          },
         },
       ],
       'sess1',
@@ -268,22 +371,34 @@ describe('detectArtifactsFromMessages', () => {
     expect(artifacts[1].artifact.role).toBe(ArtifactRole.Deliverable);
   });
 
-  test('promotes a repeated intermediate path when the final answer references it', () => {
+  test('deduplicates declare_artifact with same filePath (promotes to deliverable)', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
-          id: 'assistant-progress',
-          type: 'assistant',
-          content: 'Generated script: D:/workspace/output/build.js',
+          id: 'tool-intermediate',
+          type: 'tool_use' as const,
+          content: '',
           timestamp: Date.now(),
-          metadata: { isStreaming: false },
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: 'D:/workspace/output/build.js',
+              role: 'intermediate',
+            },
+          },
         },
         {
-          id: 'assistant-final',
-          type: 'assistant',
-          content: 'Final file: D:/workspace/output/build.js',
+          id: 'tool-deliverable',
+          type: 'tool_use' as const,
+          content: '',
           timestamp: Date.now(),
-          metadata: { isStreaming: false, isFinalAnswer: true },
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: 'D:/workspace/output/build.js',
+              role: 'deliverable',
+            },
+          },
         },
       ],
       'sess1',
@@ -291,6 +406,5 @@ describe('detectArtifactsFromMessages', () => {
 
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].artifact.role).toBe(ArtifactRole.Deliverable);
-    expect(artifacts[0].artifact.messageId).toBe('assistant-final');
   });
 });

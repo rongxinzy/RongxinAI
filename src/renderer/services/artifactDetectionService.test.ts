@@ -38,13 +38,14 @@ describe('ArtifactDetectionService', () => {
     vi.unstubAllGlobals();
   });
 
-  test('reprocesses an assistant message when the same id becomes the final answer', async () => {
+  test('reprocesses when a declare_artifact tool call arrives after thinking is done', async () => {
     const detectedArtifacts: ReturnType<typeof detectArtifactsFromMessages> = [];
     const service = new ArtifactDetectionService(
       detected => detectedArtifacts.push(...detected),
       () => {},
     );
     const messageId = 'assistant-message';
+    const toolMessageId = 'tool-declare';
     const sessionId = 'session-1';
     const thinkingMessage: CoworkMessage = {
       id: messageId,
@@ -54,24 +55,42 @@ describe('ArtifactDetectionService', () => {
       metadata: { isStreaming: false, isFinal: true, isThinking: true },
     };
 
+    // First pass: only thinking message, no tool calls
     await service.processMessages([thinkingMessage], sessionId);
 
-    const finalMessage: CoworkMessage = {
+    // Second pass: thinking becomes final answer + declare_artifact tool call arrives
+    const finalAssistant: CoworkMessage = {
       ...thinkingMessage,
-      content: 'Final file: `C:/workspace/presentation.pptx`',
+      content: 'Deliverable completed.',
       metadata: {
         isStreaming: false,
         isFinal: true,
         isFinalAnswer: true,
       },
     };
-    await service.processMessages([finalMessage], sessionId);
-    await service.processMessages([finalMessage], sessionId);
+    const declareToolMessage: CoworkMessage = {
+      id: toolMessageId,
+      type: 'tool_use',
+      content: '',
+      timestamp: 2,
+      metadata: {
+        toolName: 'declare_artifact',
+        toolInput: {
+          filePath: 'C:/workspace/presentation.pptx',
+          role: 'deliverable',
+        },
+      },
+    };
+    await service.processMessages([finalAssistant, declareToolMessage], sessionId);
+    // Third pass: same messages, should be skipped (no changes)
+    await service.processMessages([finalAssistant, declareToolMessage], sessionId);
 
     expect(FakeArtifactDetectionWorker.requests).toHaveLength(2);
+    // Only the declare_artifact tool call produces an artifact
+    // (the assistant message content no longer triggers file path detection)
     expect(detectedArtifacts).toHaveLength(1);
     expect(detectedArtifacts[0].artifact).toMatchObject({
-      messageId,
+      messageId: toolMessageId,
       filePath: 'C:/workspace/presentation.pptx',
       role: ArtifactRole.Deliverable,
     });
