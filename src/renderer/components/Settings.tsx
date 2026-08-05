@@ -1362,7 +1362,16 @@ const Settings: React.FC<SettingsProps> = ({
     // Keep the selected provider available while switching locales. Provider visibility
     // is region-based, so otherwise switching languages could unexpectedly change tabs.
     if (providers[activeProvider] && !filtered[activeProvider]) {
-      filtered[activeProvider] = providers[activeProvider];
+      const activeConfig = providers[activeProvider];
+      // Keep a provider across locale changes only when the user has actually
+      // enabled or configured it. Disabled preset providers must not appear
+      // as a lone entry in the provider list.
+      if (
+        isProviderEnabled(activeProvider, activeConfig) ||
+        hasProviderAuthConfigured(activeProvider, activeConfig)
+      ) {
+        filtered[activeProvider] = activeConfig;
+      }
     }
     return filtered as ProvidersConfig;
   }, [activeProvider, language, providers]);
