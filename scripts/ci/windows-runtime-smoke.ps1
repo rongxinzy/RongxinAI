@@ -86,7 +86,8 @@ try {
   Set-Content -LiteralPath $markdown -Value "# Windows runtime smoke`n`nManaged DOCX conversion works.`n" -Encoding UTF8
   Invoke-Checked $electron @($converter, $markdown, $docx) 'DOCX Markdown conversion'
   Assert-Path $docx 'generated DOCX'
-  Invoke-Checked $electron @('-e', "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.readUInt32LE(0) -ne 0x04034b50) { process.exit(1) }", $docx) 'generated DOCX ZIP validation'
+  Invoke-Checked $electron @('-e', "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.readUInt32LE(0) !== 0x04034b50) { process.exit(1) }", $docx) 'generated DOCX ZIP validation'
+  Invoke-Checked $electron @('-e', "const fs=require('fs'),z=require('zlib'); const b=fs.readFileSync(process.argv[1]); let o=0,x=''; while(o+30<=b.length&&b.readUInt32LE(o)===0x04034b50){const m=b.readUInt16LE(o+8),n=b.readUInt32LE(o+18),l=b.readUInt16LE(o+26),e=b.readUInt16LE(o+28),s=o+30+l+e,k=b.subarray(o+30,o+30+l).toString(); if(k==='word/document.xml'){x=(m===8?z.inflateRawSync(b.subarray(s,s+n)):b.subarray(s,s+n)).toString();break} o=s+n} if(!x.includes('Heading1'))process.exit(1)", $docx) 'generated DOCX heading validation'
   $fixture = Join-Path $smokeRoot 'smoke.xlsx'
   $createFixture = "from openpyxl import Workbook; w=Workbook(); s=w.active; s.title='Smoke'; s.append(['Name','Score']); s.append(['Windows',100]); w.save(r'$fixture')"
   Invoke-Checked $skillPython @('-c', $createFixture) 'XLSX fixture creation'

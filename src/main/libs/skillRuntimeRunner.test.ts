@@ -171,7 +171,10 @@ describe('skillRuntimeRunner', () => {
     roots.push(root);
     const inputPath = path.join(root, 'content.md');
     const outputPath = path.join(root, 'content.docx');
-    fs.writeFileSync(inputPath, '# Managed DOCX\n\nCreated through the Pi Skill runner.\n');
+    fs.writeFileSync(
+      inputPath,
+      '\uFEFF# Managed DOCX\n\nCreated through the Pi Skill runner.\n',
+    );
 
     const result = await runManagedSkillScript({
       skillsRoot,

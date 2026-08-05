@@ -114,7 +114,7 @@ function table(rows) {
 }
 
 function documentXml(markdown) {
-  const lines = markdown.replaceAll('\r\n', '\n').split('\n');
+  const lines = markdown.replace(/^\uFEFF/, '').replaceAll('\r\n', '\n').split('\n');
   const body = [];
   let codeLines = null;
   const isBlockBoundary = candidateIndex => {
