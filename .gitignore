@@ -24,6 +24,7 @@ __pycache__/
 vendor/openclaw-runtime/
 vendor/openclaw-plugins/
 vendor/llamacpp-runtime/
+vendor/engram-runtime/
 
 # Tar archives generated during Windows packaging
 build-tar/

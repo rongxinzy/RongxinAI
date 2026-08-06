@@ -78,8 +78,17 @@ import { ProviderName } from '../shared/providers';
 import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
+import { EngramManager } from './memory/engramManager';
+import { ProjectMemoryService } from './memory/projectMemoryService';
+import { MemoryRepository } from './memory/repository';
+import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
+import { registerMemoryIpcHandlers } from './memory/ipc';
+import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
-import { resolveAnySearchGatewayToken, resolveAnySearchGatewayUrl } from './libs/anysearchGatewayCredentials';
+import {
+  resolveAnySearchGatewayToken,
+  resolveAnySearchGatewayUrl,
+} from './libs/anysearchGatewayCredentials';
 import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
@@ -744,8 +753,7 @@ const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
 // The packaged Ubuntu smoke test needs an actual painted window. Production
 // startup stays hidden until ready-to-show to avoid a flash of empty content.
-const isLinuxRendererSmoke =
-  isLinux && process.argv.includes('--zhiyuan-linux-renderer-smoke');
+const isLinuxRendererSmoke = isLinux && process.argv.includes('--zhiyuan-linux-renderer-smoke');
 const DEV_SERVER_URL = process.env.ELECTRON_START_URL || 'http://localhost:5175';
 const enableVerboseLogging =
   process.env.ELECTRON_ENABLE_LOGGING === '1' || process.env.ELECTRON_ENABLE_LOGGING === 'true';
@@ -969,12 +977,45 @@ let coworkStore: CoworkStore | null = null;
 let openClawChannelGateway: OpenClawChannelGateway | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
 let workbenchTaskService: WorkbenchTaskService | null = null;
+let engramManager: EngramManager | null = null;
+let engramAdapter: ZhiYuanEngramAdapter | null = null;
+let memoryRepository: MemoryRepository | null = null;
+let projectMemoryService: ProjectMemoryService | null = null;
 
 const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!workbenchTaskService) {
-    workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase());
+    workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
+      onVerifiedRun: event => {
+        promoteVerifiedWorkbenchRun(getProjectMemoryService(), event);
+      },
+    });
   }
   return workbenchTaskService;
+};
+
+const getEngramManager = (): EngramManager => {
+  if (!engramManager) {
+    engramManager = new EngramManager({
+      userDataPath: app.getPath('userData'),
+      resourcesPath: process.resourcesPath,
+      projectRoot: app.isPackaged ? undefined : process.cwd(),
+    });
+  }
+  return engramManager;
+};
+
+const getProjectMemoryService = (): ProjectMemoryService => {
+  if (!engramAdapter) engramAdapter = new ZhiYuanEngramAdapter(getEngramManager());
+  if (!memoryRepository) memoryRepository = new MemoryRepository(getStore().getDatabase());
+  if (!projectMemoryService) {
+    projectMemoryService = new ProjectMemoryService(
+      memoryRepository,
+      engramAdapter,
+      undefined,
+      path.join(app.getPath('userData'), 'memory'),
+    );
+  }
+  return projectMemoryService;
 };
 
 const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
@@ -1001,6 +1042,7 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter = new PiRuntimeAdapter();
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
     piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
+    piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
     // mcpServerManager is created async later (ensureOpenClawRunningForCowork),
     // so it is always null here. Late-injection happens on every subsequent call.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
@@ -1111,14 +1153,18 @@ let appUpdatePollTimer: NodeJS.Timeout | null = null;
 let lastSuccessfulAppUpdateCheckAt = 0;
 
 const checkForAppUpdate = (): void => {
-  void getAppUpdateCoordinator().checkNow().then(result => {
-    if (result.success) lastSuccessfulAppUpdateCheckAt = Date.now();
-  });
+  void getAppUpdateCoordinator()
+    .checkNow()
+    .then(result => {
+      if (result.success) lastSuccessfulAppUpdateCheckAt = Date.now();
+    });
 };
 
 const startAppUpdatePolling = (): void => {
   if (appUpdatePollTimer) return;
-  const startupDelay = APP_UPDATE_STARTUP_DELAY_MIN_MS + Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
+  const startupDelay =
+    APP_UPDATE_STARTUP_DELAY_MIN_MS +
+    Math.floor(Math.random() * APP_UPDATE_STARTUP_DELAY_JITTER_MS);
   setTimeout(checkForAppUpdate, startupDelay);
   appUpdatePollTimer = setInterval(checkForAppUpdate, APP_UPDATE_POLL_INTERVAL_MS);
 };
@@ -2121,7 +2167,9 @@ const removeFeishuSkills = (): void => {
   console.log('[Feishu] official CLI skills removed from the Agent');
 };
 
-const refreshMcpOAuthHeaders = async <T extends { id: string; registryId?: string; url?: string; headers?: Record<string, string> }>(
+const refreshMcpOAuthHeaders = async <
+  T extends { id: string; registryId?: string; url?: string; headers?: Record<string, string> },
+>(
   servers: T[],
 ): Promise<T[]> => {
   const oauthManager = new McpOAuthManager(getStore());
@@ -2657,9 +2705,7 @@ const getAppIconPath = (): string | undefined => {
   }
 
   const developmentIconPath =
-    process.platform === 'win32'
-      ? path.join('win', 'icon.ico')
-      : path.join('png', '256x256.png');
+    process.platform === 'win32' ? path.join('win', 'icon.ico') : path.join('png', '256x256.png');
   return path.join(__dirname, '..', 'build', 'icons', developmentIconPath);
 };
 
@@ -3466,17 +3512,20 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle(SkillsIpc.SetEnabledBatch, (_event, options: { ids: string[]; enabled: boolean }) => {
-    try {
-      const skills = getSkillManager().setSkillsEnabled(options.ids, options.enabled);
-      return { success: true, skills };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to update skills',
-      };
-    }
-  });
+  ipcMain.handle(
+    SkillsIpc.SetEnabledBatch,
+    (_event, options: { ids: string[]; enabled: boolean }) => {
+      try {
+        const skills = getSkillManager().setSkillsEnabled(options.ids, options.enabled);
+        return { success: true, skills };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to update skills',
+        };
+      }
+    },
+  );
 
   ipcMain.handle(SkillsIpc.SetPinned, (_event, options: { id: string; pinned: boolean }) => {
     try {
@@ -3921,7 +3970,9 @@ if (!gotTheLock) {
   ipcMain.handle(McpIpc.LoadIcon, async (_event, iconPath: string) => {
     try {
       const marketplace = loadBundledMcpMarketplace(app.getAppPath(), process.resourcesPath);
-      if (!marketplace.servers.some(server => (server as { iconPath?: string }).iconPath === iconPath)) {
+      if (
+        !marketplace.servers.some(server => (server as { iconPath?: string }).iconPath === iconPath)
+      ) {
         return { success: false, error: 'MCP icon is not registered' };
       }
       const roots = [
@@ -3942,11 +3993,17 @@ if (!gotTheLock) {
                 ? 'image/svg+xml'
                 : null;
         if (!mimeType) return { success: false, error: 'Unsupported MCP icon format' };
-        return { success: true, data: `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}` };
+        return {
+          success: true,
+          data: `data:${mimeType};base64,${fs.readFileSync(filePath).toString('base64')}`,
+        };
       }
       return { success: false, error: 'MCP icon was not found' };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to load MCP icon' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to load MCP icon',
+      };
     }
   });
 
@@ -3965,7 +4022,10 @@ if (!gotTheLock) {
       await prepareFeishuCli();
       return { success: true };
     } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to install Feishu CLI' };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to install Feishu CLI',
+      };
     }
   });
 
@@ -3980,60 +4040,67 @@ if (!gotTheLock) {
       const ensureNotCancelled = () => {
         if (cancellation?.signal.aborted) throw new Error('MCP authorization was cancelled');
       };
-    try {
-      ensureNotCancelled();
-      if (data.registryId === FEISHU_MCP_REGISTRY_ID) {
-        await authorizeFeishuCli(cancellation?.signal);
+      try {
         ensureNotCancelled();
-        installFeishuSkills();
-        ensureNotCancelled();
-        const existingFeishu = getMcpStore()
-          .listServers()
-          .find(server => server.registryId === FEISHU_MCP_REGISTRY_ID);
-        if (!existingFeishu) {
-          getMcpStore().createServer({
-            name: data.name,
-            description: data.description,
-            transportType: 'stdio',
-            command: 'lark-cli',
-            isBuiltIn: true,
-            registryId: FEISHU_MCP_REGISTRY_ID,
-          });
+        if (data.registryId === FEISHU_MCP_REGISTRY_ID) {
+          await authorizeFeishuCli(cancellation?.signal);
+          ensureNotCancelled();
+          installFeishuSkills();
+          ensureNotCancelled();
+          const existingFeishu = getMcpStore()
+            .listServers()
+            .find(server => server.registryId === FEISHU_MCP_REGISTRY_ID);
+          if (!existingFeishu) {
+            getMcpStore().createServer({
+              name: data.name,
+              description: data.description,
+              transportType: 'stdio',
+              command: 'lark-cli',
+              isBuiltIn: true,
+              registryId: FEISHU_MCP_REGISTRY_ID,
+            });
+          }
+          const servers = getMcpStore().listServers();
+          const refreshResult = await refreshMcpBridge();
+          if (refreshResult.error) {
+            console.error('[McpBridge] Feishu refresh error:', refreshResult.error);
+          }
+          return { success: true, servers, refreshError: refreshResult.error };
         }
+        const validationError = await validateMcpServerConfig(data);
+        if (validationError) return { success: false, error: validationError };
+        if (!data.registryId || !data.url)
+          return { success: false, error: 'Official MCP configuration is incomplete' };
+
+        const accessToken = await new McpOAuthManager(getStore()).authorize(
+          data.registryId,
+          data.url,
+          cancellation?.signal,
+        );
+        ensureNotCancelled();
+        if (!accessToken)
+          return { success: false, error: 'OAuth authorization did not return an access token' };
+
+        const createdServer = getMcpStore().createServer({
+          ...data,
+          isBuiltIn: true,
+          headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
+        });
+        getMcpStore().setEnabled(createdServer.id, true);
         const servers = getMcpStore().listServers();
-        const refreshResult = await refreshMcpBridge();
-        if (refreshResult.error) {
-          console.error('[McpBridge] Feishu refresh error:', refreshResult.error);
-        }
-        return { success: true, servers, refreshError: refreshResult.error };
+        refreshMcpBridge().catch(err =>
+          console.error('[McpBridge] background refresh error:', err),
+        );
+        return { success: true, servers };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to authorize MCP server',
+        };
+      } finally {
+        if (authorizationRequestId) activeMcpAuthorizations.delete(authorizationRequestId);
       }
-      const validationError = await validateMcpServerConfig(data);
-      if (validationError) return { success: false, error: validationError };
-      if (!data.registryId || !data.url) return { success: false, error: 'Official MCP configuration is incomplete' };
-
-      const accessToken = await new McpOAuthManager(getStore()).authorize(
-        data.registryId,
-        data.url,
-        cancellation?.signal,
-      );
-      ensureNotCancelled();
-      if (!accessToken) return { success: false, error: 'OAuth authorization did not return an access token' };
-
-      const createdServer = getMcpStore().createServer({
-        ...data,
-        isBuiltIn: true,
-        headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
-      });
-      getMcpStore().setEnabled(createdServer.id, true);
-      const servers = getMcpStore().listServers();
-      refreshMcpBridge().catch(err => console.error('[McpBridge] background refresh error:', err));
-      return { success: true, servers };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to authorize MCP server' };
-    } finally {
-      if (authorizationRequestId) activeMcpAuthorizations.delete(authorizationRequestId);
-    }
-  },
+    },
   );
 
   // Explicit bridge refresh — renderer can await this for loading state
@@ -4105,7 +4172,12 @@ if (!gotTheLock) {
   ipcMain.handle(WorkspaceIpc.Rename, async (_event, id: string, name: string) => {
     try {
       const normalizedName = name.trim();
-      if (!normalizedName || /[\\/:*?"<>|]/.test(normalizedName) || normalizedName === '.' || normalizedName === '..') {
+      if (
+        !normalizedName ||
+        /[\\/:*?"<>|]/.test(normalizedName) ||
+        normalizedName === '.' ||
+        normalizedName === '..'
+      ) {
         return { success: false, error: 'Invalid project name' };
       }
 
@@ -4154,7 +4226,9 @@ if (!gotTheLock) {
       const workspace = coworkStore.getWorkspace(id);
       if (!workspace) return { success: false, error: 'Workspace not found' };
       const deletedSessionIds = coworkStore.deleteWorkspace(id);
-      console.log(`[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`);
+      console.log(
+        `[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`,
+      );
       return { success: true, deletedSessionIds };
     } catch (error) {
       return {
@@ -4187,7 +4261,9 @@ if (!gotTheLock) {
   };
   const isUnmanagedWorkspacePath = (candidatePath: string): boolean => {
     const relativePath = path.relative(getUnmanagedWorkspaceBaseDir(), candidatePath);
-    return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
+    return (
+      Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
+    );
   };
   const isInternalWorkspacePath = (candidatePath: string): boolean =>
     isLegacyUnmanagedWorkspacePath(candidatePath) || isUnmanagedWorkspacePath(candidatePath);
@@ -4249,10 +4325,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(ProjectIpc.CreateRandomWorkspace, async () => {
     try {
-      const randomWorkspacePath = path.join(
-        getUnmanagedWorkspaceBaseDir(),
-        crypto.randomUUID(),
-      );
+      const randomWorkspacePath = path.join(getUnmanagedWorkspaceBaseDir(), crypto.randomUUID());
       await fs.promises.mkdir(randomWorkspacePath, { recursive: true });
       return { success: true, path: randomWorkspacePath };
     } catch (error) {
@@ -4893,16 +4966,18 @@ if (!gotTheLock) {
         const workspaceId = options?.workspaceId;
         const mode = options?.mode;
         const store = getCoworkStore();
-        const sessions = store.listSessions(limit, offset, agentId, workspaceId, mode).map(session => {
-          const reconciledSession = reconcileWorkSessionRuntimeState(
-            session,
-            getPiRuntimeAdapter().isSessionRunning(session.id),
-          );
-          if (reconciledSession.status !== session.status) {
-            store.updateSession(session.id, { status: reconciledSession.status });
-          }
-          return reconciledSession;
-        });
+        const sessions = store
+          .listSessions(limit, offset, agentId, workspaceId, mode)
+          .map(session => {
+            const reconciledSession = reconcileWorkSessionRuntimeState(
+              session,
+              getPiRuntimeAdapter().isSessionRunning(session.id),
+            );
+            if (reconciledSession.status !== session.status) {
+              store.updateSession(session.id, { status: reconciledSession.status });
+            }
+            return reconciledSession;
+          });
         const total = store.countSessions(agentId, workspaceId, mode);
         return { success: true, sessions, hasMore: offset + sessions.length < total };
       } catch (error) {
@@ -7647,6 +7722,12 @@ if (!gotTheLock) {
       });
     }
 
+    if (engramManager) {
+      await engramManager.stop().catch(error => {
+        console.error('[MemoryRuntime] Failed to stop local memory service:', error);
+      });
+    }
+
     // Stop the cron job polling
     try {
       getCronJobService().stopPolling();
@@ -7717,6 +7798,18 @@ if (!gotTheLock) {
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
 
+    void getEngramManager()
+      .start()
+      .then(connection => {
+        if (!connection || !store) return;
+        void getProjectMemoryService()
+          .drainOutbox()
+          .catch(error =>
+            console.warn('[ProjectMemory] Failed to drain pending operations:', error),
+          );
+      })
+      .catch(error => console.warn('[MemoryRuntime] Failed to start local memory service:', error));
+
     // Note: Calendar permission is checked on-demand when calendar operations are requested
     // We don't trigger permission dialogs at startup to avoid annoying users
 
@@ -7771,6 +7864,9 @@ if (!gotTheLock) {
         `[WorkbenchTask] marked ${recoveredWorkbenchTasks} interrupted task(s) for explicit recovery`,
       );
     }
+    void getProjectMemoryService()
+      .drainOutbox()
+      .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
       startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun) => {
@@ -7795,6 +7891,7 @@ if (!gotTheLock) {
         );
       },
     });
+    registerMemoryIpcHandlers({ getService: getProjectMemoryService });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
     registerLlamaCppIpcHandlers(getLlamaCppManager(), {

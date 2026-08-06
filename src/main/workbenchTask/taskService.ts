@@ -42,6 +42,20 @@ export interface WorkbenchToolAuthorizationResult {
   reason?: string;
 }
 
+export interface VerifiedWorkbenchRunEvent {
+  task: WorkbenchTask;
+  run: WorkbenchRun;
+  artifacts: WorkbenchTaskDetail['artifacts'];
+  approvals: WorkbenchTaskDetail['approvals'];
+  verificationResult: WorkbenchVerificationResult;
+  workspaceRoot: string;
+  finalAnswer: string;
+}
+
+export interface WorkbenchTaskServiceOptions {
+  onVerifiedRun?: (event: VerifiedWorkbenchRunEvent) => void;
+}
+
 type PendingApproval = {
   resolve: (result: WorkbenchToolAuthorizationResult) => void;
 };
@@ -58,7 +72,10 @@ export class WorkbenchTaskService extends EventEmitter {
   readonly productionLoop: ProductionLoopService;
   private readonly pendingApprovals = new Map<string, PendingApproval>();
 
-  constructor(db: Database.Database) {
+  constructor(
+    db: Database.Database,
+    private readonly options: WorkbenchTaskServiceOptions = {},
+  ) {
     super();
     this.repository = new WorkbenchTaskRepository(db);
     this.measurement = new HarnessMeasurementService(this.repository);
@@ -206,6 +223,24 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
+    if (result.outcome === WorkbenchVerificationOutcome.Passed) {
+      const verifiedRun = detail.runs.find(candidate => candidate.id === run.id);
+      if (verifiedRun) {
+        try {
+          this.options.onVerifiedRun?.({
+            task: detail.task,
+            run: verifiedRun,
+            artifacts: detail.artifacts.filter(artifact => artifact.runId === run.id),
+            approvals: detail.approvals.filter(approval => approval.runId === run.id),
+            verificationResult: result,
+            workspaceRoot: input.workspaceRoot,
+            finalAnswer: input.finalAnswer,
+          });
+        } catch (error) {
+          console.warn('[WorkbenchTask] Failed to propose verified run memory:', error);
+        }
+      }
+    }
     this.emitChanged(detail.task);
     return detail;
   }

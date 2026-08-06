@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import {
   WorkbenchApprovalDecision,
@@ -20,12 +20,13 @@ import {
 import { initializeWorkbenchTaskSchema } from './schema';
 import { initializeProductionLoopSchema } from '../productionLoop/schema';
 import { WorkbenchTaskService } from './taskService';
+import type { WorkbenchTaskServiceOptions } from './taskService';
 
-const createService = () => {
+const createService = (options: WorkbenchTaskServiceOptions = {}) => {
   const db = new Database(':memory:');
   initializeWorkbenchTaskSchema(db);
   initializeProductionLoopSchema(db);
-  return { db, service: new WorkbenchTaskService(db) };
+  return { db, service: new WorkbenchTaskService(db, options) };
 };
 
 const chatContract = {
@@ -98,8 +99,41 @@ test('completes the production loop only after deterministic verification passes
   }
 });
 
+test('emits a verified run source only after deterministic verification passes', () => {
+  const onVerifiedRun = vi.fn();
+  const { db, service } = createService({ onVerifiedRun });
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'record a verified outcome',
+      contract: chatContract,
+    });
+    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.Chat);
+    service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'The deterministic verifier accepted this completed task result.',
+    });
+
+    expect(onVerifiedRun).toHaveBeenCalledOnce();
+    expect(onVerifiedRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        task: expect.objectContaining({ id: task.id }),
+        run: expect.objectContaining({ id: run.id, status: WorkbenchRunStatus.Succeeded }),
+        verificationResult: expect.objectContaining({
+          outcome: WorkbenchVerificationOutcome.Passed,
+        }),
+      }),
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test('returns critic-approved work to revision when deterministic verification fails', () => {
-  const { db, service } = createService();
+  const onVerifiedRun = vi.fn();
+  const { db, service } = createService({ onVerifiedRun });
   try {
     const contract = {
       kind: WorkbenchContractKind.Shortcut,
@@ -129,6 +163,7 @@ test('returns critic-approved work to revision when deterministic verification f
       status: ProductionLoopStatus.NeedsRevision,
       deliveryReason: null,
     });
+    expect(onVerifiedRun).not.toHaveBeenCalled();
   } finally {
     db.close();
   }

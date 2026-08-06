@@ -50,6 +50,11 @@ import {
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
 import { t } from '../../i18n';
+import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
+import {
+  buildProjectMemoryContextSafe,
+  type ProjectMemoryService,
+} from '../../memory/projectMemoryService';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -399,11 +404,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
   private workbenchTaskService: WorkbenchTaskService | null = null;
+  private projectMemoryService: ProjectMemoryService | null = null;
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
 
   setCoworkStore(store: CoworkStore): void {
     this.store = store;
+  }
+  setProjectMemoryService(service: ProjectMemoryService): void {
+    this.projectMemoryService = service;
   }
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
     if (this.workbenchTaskService && this.workbenchApprovalListener) {
@@ -600,6 +609,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
         ),
       );
+      if (this.projectMemoryService) {
+        customTools.push(
+          buildPiProjectMemoryTool({
+            service: this.projectMemoryService,
+            sessionId,
+            workingDirectory: workspaceRoot,
+          }),
+        );
+      }
       if (resourceState.fileToolsEnabled) {
         customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
         customTools.push(buildDeclareArtifactTool());
@@ -830,6 +848,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (productionLoop) {
         initialPrompt = `${productionLoop.buildInitialPrompt()}\n\n${initialPrompt}`;
       }
+      const projectMemoryContext = await buildProjectMemoryContextSafe(
+        this.projectMemoryService,
+        workspaceRoot,
+        prompt,
+      );
+      if (projectMemoryContext) initialPrompt = `${projectMemoryContext}\n\n${initialPrompt}`;
 
       // The user may stop the session while the execution-mode question is
       // open. Do not revive an aborted Pi turn when that question resolves.
@@ -1047,6 +1071,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     try {
+      const projectMemoryContext = await buildProjectMemoryContextSafe(
+        this.projectMemoryService,
+        active.workspaceRoot,
+        prompt,
+      );
+      if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;
       const promptOptions = options._streamingBehavior
         ? { streamingBehavior: options._streamingBehavior }
         : undefined;
