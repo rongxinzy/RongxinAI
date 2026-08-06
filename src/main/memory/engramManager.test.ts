@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { resolveEngramBinary } from './binaryResolver';
 import { EngramEnvironment, EngramManagerPhase } from './constants';
 import { EngramManager } from './engramManager';
 
@@ -23,7 +24,19 @@ function createUserDataDirectory(): string {
 afterEach(() => {
   vi.useRealTimers();
   for (const directory of temporaryDirectories.splice(0)) {
-    fs.rmSync(directory, { recursive: true, force: true });
+    // Windows: the engram child (stdio: 'ignore') may still hold SQLite file
+    // handles briefly after stop() — retry after a short real-time pause
+    // before giving up on cleanup.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        fs.rmSync(directory, { recursive: true, force: true });
+        break;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        const delay = (attempt + 1) * 100;
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+      }
+    }
   }
 });
 
@@ -100,3 +113,49 @@ test('restarts after an unexpected process exit', async () => {
   expect(manager.getStatus().phase).toBe(EngramManagerPhase.Running);
   await manager.stop();
 });
+
+test('integration: starts the vendored binary end-to-end when one exists', async () => {
+  // The vendored runtime is a build-time artifact (vendor/engram-runtime/current),
+  // downloaded by scripts/download-engram-runtime.cjs and absent in a clean checkout.
+  // Skip when the binary is not installed so CI without the artifact stays green.
+  const binary = resolveEngramBinary({
+    env: {},
+    projectRoot: path.resolve(__dirname, '..', '..', '..'),
+    fileExists: fs.existsSync,
+  });
+  if (!binary) {
+    console.warn(
+      '[verify] No vendored engram binary found — skipping live integration test. ' +
+        'Run `npm run engram:runtime:host` to install it.',
+    );
+    return;
+  }
+
+  const userDataPath = createUserDataDirectory();
+  const manager = new EngramManager({
+    userDataPath,
+    projectRoot: path.resolve(__dirname, '..', '..', '..'),
+  });
+
+  const connection = await manager.start();
+  expect(connection).not.toBeNull();
+  expect(connection!.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
+  expect(connection!.token).toHaveLength(64);
+  expect(manager.getStatus().phase).toBe(EngramManagerPhase.Running);
+
+  // The launch token must be required by the loopback health endpoint.
+  const health = await fetch(`${connection!.url}/health`, {
+    headers: { Authorization: `Bearer ${connection!.token}` },
+    signal: AbortSignal.timeout(3_000),
+  });
+  expect(health.ok).toBe(true);
+
+  // The runtime must own a private SQLite store under userData/memory/engram.
+  const dataDirectory = path.join(userDataPath, 'memory', 'engram');
+  expect(
+    fs.readdirSync(dataDirectory).some(entry => entry.endsWith('.db') || entry.endsWith('.sqlite')),
+  ).toBe(true);
+
+  await manager.stop();
+  expect(manager.getStatus().phase).toBe(EngramManagerPhase.Stopped);
+}, 30_000);

@@ -28,12 +28,87 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-async function download(url, destination) {
-  const response = await fetch(url, {
-    headers: { 'User-Agent': 'ZhiYuanAgent/memory-runtime-downloader' },
+const http = require('http');
+const https = require('https');
+
+function downloadWithAgent(url, destination, proxyUrl) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const isProxy = Boolean(proxyUrl);
+    const requestUrl = isProxy ? new URL(proxyUrl) : target;
+    const requestPath = isProxy ? url : target.pathname + target.search;
+    const module = requestUrl.protocol === 'http:' ? http : https;
+    const headers = {
+      Host: target.host,
+      'User-Agent': 'ZhiYuanAgent/memory-runtime-downloader',
+    };
+    if (isProxy && requestUrl.username) {
+      headers['Proxy-Authorization'] =
+        'Basic ' +
+        Buffer.from(
+          `${decodeURIComponent(requestUrl.username)}:${decodeURIComponent(requestUrl.password)}`,
+        ).toString('base64');
+    }
+    const request = module.get(
+      {
+        hostname: requestUrl.hostname,
+        port: requestUrl.port || (requestUrl.protocol === 'http:' ? 80 : 443),
+        path: requestPath,
+        headers,
+        timeout: 60_000,
+      },
+      response => {
+        if (response.statusCode === 200) {
+          response.pipe(fs.createWriteStream(destination));
+          response.on('end', resolve);
+          response.on('error', reject);
+        } else if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          // Follow a single redirect (GitHub release URLs redirect to objects.githubusercontent.com).
+          const nextUrl = new URL(response.headers.location, url).toString();
+          reject(new Error(`Redirect to ${nextUrl} is not supported in proxy mode.`));
+        } else {
+          response.resume();
+          reject(new Error(`Download failed with HTTP ${response.statusCode}.`));
+        }
+      },
+    );
+    request.on('timeout', () => request.destroy(new Error('Download timed out.')));
+    request.on('error', reject);
   });
-  if (!response.ok) throw new Error(`Download failed with HTTP ${response.status}.`);
-  fs.writeFileSync(destination, Buffer.from(await response.arrayBuffer()));
+}
+
+async function download(url, destination) {
+  // npm_config_proxy / HTTPS_PROXY are commonly configured in corporate or
+  // restricted environments; honor them so the runtime can be fetched.
+  const proxy =
+    process.env.npm_config_https_proxy ||
+    process.env.npm_config_proxy ||
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy;
+  if (proxy) {
+    await downloadWithAgent(url, destination, proxy);
+    return;
+  }
+  try {
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'ZhiYuanAgent/memory-runtime-downloader' },
+    });
+    if (!response.ok) throw new Error(`Download failed with HTTP ${response.status}.`);
+    fs.writeFileSync(destination, Buffer.from(await response.arrayBuffer()));
+  } catch (error) {
+    // Node's fetch can fail on flaky or restricted networks (TLS, connection
+    // resets, no fallback to keep-alive sockets). curl has a more robust
+    // network stack and retries — fall back to it before failing.
+    const { spawnSync } = require('child_process');
+    const curlArgs = ['-L', '--fail', '--retry', '3', '--retry-all-errors', '-o', destination, url];
+    if (process.env.npm_config_proxy) curlArgs.push('--proxy', process.env.npm_config_proxy);
+    const result = spawnSync('curl', curlArgs, { stdio: 'inherit', timeout: 240_000 });
+    if (result.status !== 0) {
+      throw new Error(`Download failed (fetch: ${error.message}; curl exited ${result.status}).`);
+    }
+  }
 }
 
 function findExecutable(rootDir, executableName) {
@@ -51,7 +126,7 @@ function findExecutable(rootDir, executableName) {
 
 async function extract(archivePath, destination) {
   if (archivePath.endsWith('.zip')) {
-    await extractZip(archivePath, { dir: destination });
+    await extractZipArchive(archivePath, destination);
     return;
   }
   if (archivePath.endsWith('.tar.gz')) {
@@ -59,6 +134,43 @@ async function extract(archivePath, destination) {
     return;
   }
   throw new Error(`Unsupported memory runtime archive: ${archivePath}`);
+}
+
+/**
+ * extract-zip (the package) occasionally resolves its promise before the last
+ * file is fully flushed on Windows, yielding a truncated binary. Prefer the
+ * OS's own extractors, which are known-correct: Windows 10+ ships bsdtar
+ * (tar.exe) with zip support; PowerShell Expand-Archive is the fallback.
+ */
+async function extractZipArchive(archivePath, destination) {
+  const { spawnSync } = require('child_process');
+  const trySystemTar = () => {
+    if (process.platform !== 'win32') return null;
+    const result = spawnSync('tar', ['-xf', archivePath, '-C', destination], { timeout: 120_000 });
+    return result.status === 0 ? 'ok' : null;
+  };
+  const tryExpandArchive = async () => {
+    if (process.platform !== 'win32') return false;
+    const { execFileSync } = require('child_process');
+    try {
+      execFileSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-Command',
+          `Expand-Archive -LiteralPath '${archivePath}' -DestinationPath '${destination}' -Force`,
+        ],
+        { timeout: 120_000, stdio: 'ignore' },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (trySystemTar()) return;
+  if (await tryExpandArchive()) return;
+  // Last resort: the npm package (may truncate on Windows, see above).
+  await extractZip(archivePath, { dir: destination });
 }
 
 async function main() {
