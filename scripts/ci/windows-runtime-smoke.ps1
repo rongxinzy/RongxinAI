@@ -51,14 +51,26 @@ try {
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
   $skillPython = Join-Path $resourcesRoot 'skill-python\xlsx\Scripts\python.exe'
   $pdfPython = Join-Path $resourcesRoot 'skill-python\pdf\Scripts\python.exe'
-  $electron = Join-Path $ProjectRoot 'node_modules\electron\dist\electron.exe'
+  $builderConfigPath = Join-Path $ProjectRoot 'electron-builder.json'
+  Assert-Path $builderConfigPath 'electron-builder configuration'
+  $builderConfig = Get-Content -LiteralPath $builderConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $appExecutableName = $builderConfig.executableName
+  if (-not $appExecutableName) {
+    $appExecutableName = $builderConfig.productName
+  }
+  if (-not $appExecutableName) {
+    throw 'electron-builder.json must define executableName or productName'
+  }
+  # Exercise the packaged Electron binary instead of relying on the optional
+  # node_modules Electron download that bun install --ignore-scripts omits.
+  $electron = Join-Path $ProjectRoot ("release\win-unpacked\{0}.exe" -f $appExecutableName)
   $skillsRoot = Join-Path $resourcesRoot 'SKILLs'
 
   Assert-Path $bash 'bundled PortableGit Bash'
   Assert-Path $python 'bundled application Python'
   Assert-Path $skillPython 'bundled XLSX Skill Python'
   Assert-Path $pdfPython 'bundled PDF Skill Python'
-  Assert-Path $electron 'Electron Node runtime'
+  Assert-Path $electron 'packaged Electron Node runtime'
   Assert-Path (Join-Path $resourcesRoot 'uv-win\uv.exe') 'bundled uv'
   Assert-Path (Join-Path $skillsRoot 'xlsx\scripts\xlsx_reader.py') 'XLSX Skill reader'
   Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs') 'DOCX Markdown converter'
