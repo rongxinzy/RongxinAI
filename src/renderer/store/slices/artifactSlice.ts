@@ -83,7 +83,7 @@ function restoreSessionView(state: ArtifactState, viewState: ArtifactSessionView
 
 function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
   const declaredArtifact = incoming.declared ? incoming : existing.declared ? existing : null;
-  return {
+  const merged = {
     ...existing,
     ...incoming,
     ...(declaredArtifact
@@ -107,6 +107,13 @@ function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
         ? ArtifactRole.Deliverable
         : ArtifactRole.Intermediate),
   };
+
+  const existingKeys = Object.keys(existing) as (keyof Artifact)[];
+  const mergedKeys = Object.keys(merged) as (keyof Artifact)[];
+  return existingKeys.length === mergedKeys.length &&
+    mergedKeys.every(key => existing[key] === merged[key])
+    ? existing
+    : merged;
 }
 
 const artifactSlice = createSlice({
@@ -149,7 +156,10 @@ const artifactSlice = createSlice({
       );
       if (existing >= 0) {
         const old = state.artifactsBySession[sessionId][existing];
-        state.artifactsBySession[sessionId][existing] = mergeArtifact(old, projectedArtifact);
+        const merged = mergeArtifact(old, projectedArtifact);
+        if (merged !== old) {
+          state.artifactsBySession[sessionId][existing] = merged;
+        }
       } else {
         // Deduplicate by filePath: if another artifact with same filePath already exists, update it
         if (projectedArtifact.filePath) {
@@ -159,7 +169,10 @@ const artifactSlice = createSlice({
           );
           if (dupIndex >= 0) {
             const old = state.artifactsBySession[sessionId][dupIndex];
-            state.artifactsBySession[sessionId][dupIndex] = mergeArtifact(old, projectedArtifact);
+            const merged = mergeArtifact(old, projectedArtifact);
+            if (merged !== old) {
+              state.artifactsBySession[sessionId][dupIndex] = merged;
+            }
             return;
           }
         }

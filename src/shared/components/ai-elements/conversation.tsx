@@ -22,17 +22,23 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
 
 export type ConversationContentProps = ComponentProps<typeof StickToBottom.Content> & {
   observeContentResize?: boolean;
+  reverse?: boolean;
 };
 
 export const ConversationContent = ({
   children,
   className,
   observeContentResize = true,
+  reverse = true,
   scrollClassName,
   ...props
 }: ConversationContentProps) => {
   const context = useStickToBottomContext();
-  const contentClassName = cn('flex flex-col-reverse gap-8 p-4', className);
+  const contentClassName = cn(
+    'flex gap-8 p-4',
+    reverse ? 'flex-col-reverse' : 'flex-col',
+    className,
+  );
   const passiveContentRef = useCallback(
     (element: HTMLDivElement | null) => {
       context.contentRef.current = element;

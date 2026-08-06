@@ -52,3 +52,21 @@ test('observes content resize by default', () => {
 
   expect(resizeObserverMocks.observe).toHaveBeenCalledTimes(1);
 });
+
+test('supports normal flow for virtualized conversation content', () => {
+  const view = render(
+    React.createElement(
+      Conversation,
+      null,
+      React.createElement(
+        TestConversationContent,
+        { observeContentResize: false, reverse: false },
+        'message',
+      ),
+    ),
+  );
+
+  const content = view.getByText('message');
+  expect(content).toHaveClass('flex-col');
+  expect(content).not.toHaveClass('flex-col-reverse');
+});

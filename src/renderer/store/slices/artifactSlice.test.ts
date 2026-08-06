@@ -55,6 +55,21 @@ describe('artifact reducer', () => {
     });
   });
 
+  test('keeps state identity when the same artifact is detected more than once', () => {
+    const artifact = makeArtifact({ content: '<h1>ready</h1>' });
+    const state = artifactReducer(undefined, addArtifact({ sessionId: 'session-1', artifact }));
+    const repeated = artifactReducer(
+      state,
+      addArtifact({ sessionId: 'session-1', artifact: { ...artifact } }),
+    );
+
+    expect(repeated).toBe(state);
+    expect(repeated.artifactsBySession['session-1']).toBe(state.artifactsBySession['session-1']);
+    expect(repeated.artifactsBySession['session-1'][0]).toBe(
+      state.artifactsBySession['session-1'][0],
+    );
+  });
+
   test('keeps explicit declaration metadata while merging inferred file content', () => {
     const declared = makeArtifact({
       id: 'declared-artifact',

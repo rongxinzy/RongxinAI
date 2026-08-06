@@ -1,5 +1,5 @@
-import { useVirtualizer } from '@tanstack/react-virtual';
-import React, { useImperativeHandle, useLayoutEffect, useRef } from 'react';
+import { elementScroll, useVirtualizer } from '@tanstack/react-virtual';
+import React, { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 
 import type { ConversationTurn } from '../helpers/messageGrouping';
@@ -11,6 +11,7 @@ export interface VirtualizedTurnListHandle {
 interface VirtualizedTurnListProps {
   isStreaming: boolean;
   turns: ConversationTurn[];
+  onInitialTailPositioned?: () => void;
   /** Renders one turn row, including its wrapper element. */
   renderTurn: (turn: ConversationTurn, index: number) => React.ReactNode;
   /** When true (e.g. image export), every turn stays mounted for DOM capture. */
@@ -21,6 +22,8 @@ interface VirtualizedTurnListProps {
 const TURN_HEIGHT_ESTIMATE_PX = 300;
 const INITIAL_VIEWPORT_HEIGHT_PX = 1200;
 const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
+const INITIAL_TAIL_STABLE_FRAMES = 2;
+const INITIAL_TAIL_MAX_POSITIONING_FRAMES = 12;
 
 /**
  * Renders only the visible window of conversation turns (issue #141
@@ -32,23 +35,61 @@ const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
 export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
->(({ isStreaming, turns, renderTurn, renderAll }, ref) => {
+>(({ isStreaming, turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
   const { scrollRef } = useStickToBottomContext();
-  const measuredSizesRef = useRef(new Map<React.Key, number>());
   const hasPositionedInitialTailRef = useRef(false);
+  const scrollRetryFrameRef = useRef<number | null>(null);
+  const scrollRetryWindowRef = useRef<Window | null>(null);
+  const scrollToFn = useCallback<typeof elementScroll>((offset, options, instance) => {
+    const scrollElement = instance.scrollElement as HTMLElement | null;
+    const targetWindow = scrollElement?.ownerDocument.defaultView;
+
+    elementScroll(offset, options, instance);
+    if (!scrollElement || !targetWindow) return;
+
+    const requestedOffset = offset + (options.adjustments ?? 0);
+    const clampedOffset = scrollElement.scrollTop;
+    if (requestedOffset - clampedOffset < 1) return;
+
+    if (scrollRetryFrameRef.current !== null && scrollRetryWindowRef.current) {
+      scrollRetryWindowRef.current.cancelAnimationFrame(scrollRetryFrameRef.current);
+    }
+
+    // A ResizeObserver batch can grow several tail rows before React commits
+    // the new sizer height. Retry only a browser-clamped correction after that
+    // commit, and abandon it if another scroll changed the DOM position.
+    scrollRetryWindowRef.current = targetWindow;
+    scrollRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
+      scrollRetryFrameRef.current = null;
+      scrollRetryWindowRef.current = null;
+      const currentScrollElement = instance.scrollElement as HTMLElement | null;
+      if (currentScrollElement === scrollElement && scrollElement.scrollTop === clampedOffset) {
+        scrollElement.scrollTo({ top: requestedOffset, behavior: 'auto' });
+      }
+    });
+  }, []);
   const initialOffset = turns.length * TURN_HEIGHT_ESTIMATE_PX;
   const virtualizer = useVirtualizer({
     count: turns.length,
     getScrollElement: () => scrollRef.current,
     getItemKey: index => turns[index]?.id ?? index,
-    estimateSize: index =>
-      measuredSizesRef.current.get(turns[index]?.id ?? index) ?? TURN_HEIGHT_ESTIMATE_PX,
+    estimateSize: () => TURN_HEIGHT_ESTIMATE_PX,
     overscan: 4,
     initialOffset,
     initialRect: INITIAL_VIEWPORT_RECT,
     anchorTo: 'end',
     followOnAppend: isStreaming ? 'auto' : false,
+    scrollToFn,
   });
+
+  useEffect(
+    () => () => {
+      if (scrollRetryFrameRef.current !== null && scrollRetryWindowRef.current) {
+        scrollRetryWindowRef.current.cancelAnimationFrame(scrollRetryFrameRef.current);
+      }
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
@@ -66,9 +107,54 @@ export const VirtualizedTurnList = React.forwardRef<
     const scrollElement = scrollRef.current;
     if (!scrollElement || renderAll || hasPositionedInitialTailRef.current) return;
 
-    hasPositionedInitialTailRef.current = true;
+    const targetWindow = scrollElement.ownerDocument.defaultView;
+    if (!targetWindow) {
+      virtualizer.scrollToEnd({ behavior: 'auto' });
+      hasPositionedInitialTailRef.current = true;
+      onInitialTailPositioned?.();
+      return;
+    }
+
+    let stableFrames = 0;
+    let positioningFrames = 0;
+    let previousScrollHeight = scrollElement.scrollHeight;
+    let previousTotalSize = virtualizer.getTotalSize();
+    let settleFrame: number;
+
+    const positionTail = () => {
+      positioningFrames += 1;
+      virtualizer.scrollToEnd({ behavior: 'auto' });
+
+      const virtualItems = virtualizer.getVirtualItems();
+      const lastVirtualItem = virtualItems[virtualItems.length - 1];
+      const lastTurnIsRendered = turns.length === 0 || lastVirtualItem?.index === turns.length - 1;
+      const maxScrollOffset = Math.max(scrollElement.scrollHeight - scrollElement.clientHeight, 0);
+      const isAtTail = Math.abs(scrollElement.scrollTop - maxScrollOffset) < 1;
+      const totalSize = virtualizer.getTotalSize();
+      const sizeIsStable =
+        scrollElement.scrollHeight === previousScrollHeight && totalSize === previousTotalSize;
+
+      stableFrames = lastTurnIsRendered && isAtTail && sizeIsStable ? stableFrames + 1 : 0;
+      previousScrollHeight = scrollElement.scrollHeight;
+      previousTotalSize = totalSize;
+
+      if (
+        stableFrames >= INITIAL_TAIL_STABLE_FRAMES ||
+        positioningFrames >= INITIAL_TAIL_MAX_POSITIONING_FRAMES
+      ) {
+        hasPositionedInitialTailRef.current = true;
+        onInitialTailPositioned?.();
+        return;
+      }
+
+      settleFrame = targetWindow.requestAnimationFrame(positionTail);
+    };
+
     virtualizer.scrollToEnd({ behavior: 'auto' });
-  }, [renderAll, scrollRef, virtualizer]);
+    settleFrame = targetWindow.requestAnimationFrame(positionTail);
+
+    return () => targetWindow.cancelAnimationFrame(settleFrame);
+  }, [onInitialTailPositioned, renderAll, scrollRef, turns.length, virtualizer]);
 
   useImperativeHandle(
     ref,
@@ -90,18 +176,12 @@ export const VirtualizedTurnList = React.forwardRef<
         <div
           key={virtualItem.key}
           data-index={virtualItem.index}
-          ref={element => {
-            virtualizer.measureElement(element);
-            if (element) {
-              measuredSizesRef.current.set(virtualItem.key, element.getBoundingClientRect().height);
-            }
-          }}
+          ref={virtualizer.measureElement}
           style={{
             position: 'absolute',
-            top: 0,
+            top: virtualItem.start,
             left: 0,
             width: '100%',
-            transform: `translateY(${virtualItem.start}px)`,
           }}
         >
           {renderTurn(turns[virtualItem.index], virtualItem.index)}

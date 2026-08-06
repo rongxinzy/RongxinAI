@@ -4990,7 +4990,7 @@ if (!gotTheLock) {
   );
 
   ipcMain.handle(
-    'cowork:session:getMessages',
+    CoworkSessionIpc.GetMessages,
     async (_event, options: { sessionId: string; limit?: number; offset?: number }) => {
       try {
         const { sessionId, limit = COWORK_MESSAGE_PAGE_SIZE, offset = 0 } = options;

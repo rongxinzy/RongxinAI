@@ -4,6 +4,9 @@ export const COWORK_SESSION_PAGE_SIZE = 50;
 /** Default page size for message history pagination. */
 export const COWORK_MESSAGE_PAGE_SIZE = 30;
 
+/** Background page size used to keep scroll-up history ahead of the viewport. */
+export const COWORK_MESSAGE_HISTORY_PAGE_SIZE = 50;
+
 export const CoworkSessionMode = {
   Work: 'work',
   Chat: 'chat',
