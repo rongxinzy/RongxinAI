@@ -6,8 +6,14 @@ import { afterEach, expect, test } from 'vitest';
 
 import { __skillManagerTestUtils } from './skillManager';
 
-const { parseFrontmatter, isTruthy, extractDescription, hasMatchingBundledRequirements } =
-  __skillManagerTestUtils;
+const {
+  parseFrontmatter,
+  isTruthy,
+  extractDescription,
+  normalizeSkillName,
+  findDuplicateSkillName,
+  hasMatchingBundledRequirements,
+} = __skillManagerTestUtils;
 
 const tempRoots: string[] = [];
 
@@ -44,6 +50,24 @@ test('parseFrontmatter: simple key-value pairs', () => {
   expect(frontmatter.description).toBe('A simple skill');
   expect(frontmatter.official).toBe(true); // YAML parses 'true' as boolean
   expect(content.trim()).toBe('# Content here');
+});
+
+test('skill name identity normalizes case, whitespace, underscores, and hyphens', () => {
+  expect(normalizeSkillName('  Document_Reader  ')).toBe('document-reader');
+});
+
+test('duplicate skill names are rejected even when their folders differ', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-manager-duplicate-name-'));
+  tempRoots.push(root);
+  const firstDir = path.join(root, 'first-folder');
+  const secondDir = path.join(root, 'second-folder');
+  fs.mkdirSync(firstDir);
+  fs.mkdirSync(secondDir);
+  fs.writeFileSync(path.join(firstDir, 'SKILL.md'), '---\nname: Document Reader\n---\n');
+  fs.writeFileSync(path.join(secondDir, 'SKILL.md'), '---\nname: document_reader\n---\n');
+
+  expect(findDuplicateSkillName([firstDir], ['document-reader'])).toBe('Document Reader');
+  expect(findDuplicateSkillName([firstDir, secondDir], [])).toBe('document_reader');
 });
 test('parseFrontmatter: block scalar with pipe (|)', () => {
   const raw =

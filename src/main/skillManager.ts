@@ -461,6 +461,37 @@ const normalizeFolderName = (name: string): string => {
   return normalized || 'skill';
 };
 
+const normalizeSkillName = (name: string): string =>
+  name
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '-');
+
+const getSkillNameFromDir = (skillDir: string): string => {
+  const skillFile = path.join(skillDir, SKILL_FILE_NAME);
+  const raw = fs.readFileSync(skillFile, 'utf8');
+  const { frontmatter } = parseFrontmatter(raw);
+  return (String(frontmatter.name || '') || path.basename(skillDir)).trim() || path.basename(skillDir);
+};
+
+const findDuplicateSkillName = (
+  skillDirs: string[],
+  installedSkillNames: Iterable<string>,
+): string | null => {
+  const knownNames = new Set(
+    Array.from(installedSkillNames, normalizeSkillName).filter(Boolean),
+  );
+
+  for (const skillDir of skillDirs) {
+    const name = getSkillNameFromDir(skillDir);
+    const normalizedName = normalizeSkillName(name);
+    if (knownNames.has(normalizedName)) return name;
+    knownNames.add(normalizedName);
+  }
+
+  return null;
+};
+
 const isZipFile = (filePath: string): boolean => path.extname(filePath).toLowerCase() === '.zip';
 
 /**
@@ -2050,6 +2081,19 @@ export class SkillManager {
         return { success: false, error: t('skillErrNoSkillMd') };
       }
 
+      const duplicateSkillName = findDuplicateSkillName(
+        skillDirs,
+        this.listSkills().map(skill => skill.name),
+      );
+      if (duplicateSkillName) {
+        cleanupPathSafely(cleanupPath);
+        cleanupPath = null;
+        return {
+          success: false,
+          error: t('skillErrAlreadyInstalled', { name: duplicateSkillName }),
+        };
+      }
+
       // Security scan before installation
       let auditReport: SkillSecurityReport | null = null;
       try {
@@ -2109,6 +2153,19 @@ export class SkillManager {
 
       // Safe or scan failed 鈥?install directly
       console.log(`[SkillManager] Skill is safe (or scan failed), installing directly`);
+      const duplicateSkillNameBeforeInstall = findDuplicateSkillName(
+        skillDirs,
+        this.listSkills().map(skill => skill.name),
+      );
+      if (duplicateSkillNameBeforeInstall) {
+        cleanupPathSafely(cleanupPath);
+        cleanupPath = null;
+        return {
+          success: false,
+          error: t('skillErrAlreadyInstalled', { name: duplicateSkillNameBeforeInstall }),
+        };
+      }
+
       const installedIds: string[] = [];
       for (const skillDir of skillDirs) {
         const folderName = normalizeFolderName(path.basename(skillDir));
@@ -2452,6 +2509,20 @@ export class SkillManager {
     if (action === 'cancel') {
       cleanupPathSafely(pending.cleanupPath);
       return { success: true };
+    }
+
+    if (!pending.isUpgrade) {
+      const duplicateSkillName = findDuplicateSkillName(
+        pending.skillDirs,
+        this.listSkills().map(skill => skill.name),
+      );
+      if (duplicateSkillName) {
+        cleanupPathSafely(pending.cleanupPath);
+        return {
+          success: false,
+          error: t('skillErrAlreadyInstalled', { name: duplicateSkillName }),
+        };
+      }
     }
 
     // Install the skill(s)
@@ -3381,6 +3452,8 @@ export const __skillManagerTestUtils = {
   parseFrontmatter,
   isTruthy,
   extractDescription,
+  normalizeSkillName,
+  findDuplicateSkillName,
   isWindowsDeletePermissionError,
   hasMatchingBundledRequirements,
 };
