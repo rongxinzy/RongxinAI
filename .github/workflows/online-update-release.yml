@@ -3,7 +3,7 @@ name: Publish online update
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 concurrency:
   group: zhiyuan-online-update-production
@@ -85,9 +85,9 @@ jobs:
         with:
           ref: ${{ needs.prepare-release.outputs.commit }}
       - uses: actions/setup-node@v6
-        with: { node-version: "24.x" }
+        with: { node-version: '24.x' }
       - uses: oven-sh/setup-bun@v2
-        with: { bun-version: "1.3.14" }
+        with: { bun-version: '1.3.14' }
       # OpenClaw is built with pnpm upstream; Bun remains this repository's installer.
       - uses: pnpm/action-setup@v4
         with: { version: 10 }
@@ -159,6 +159,26 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Require macOS signing and notarization credentials
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          missing=()
+          [[ -n "$CSC_LINK" ]] || missing+=(MACOS_CSC_LINK)
+          [[ -n "$CSC_KEY_PASSWORD" ]] || missing+=(MACOS_CSC_KEY_PASSWORD)
+          [[ -n "$APPLE_ID" ]] || missing+=(APPLE_ID)
+          [[ -n "$APPLE_APP_SPECIFIC_PASSWORD" ]] || missing+=(APPLE_APP_SPECIFIC_PASSWORD)
+          [[ -n "$APPLE_TEAM_ID" ]] || missing+=(APPLE_TEAM_ID)
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            printf 'macOS auto-update requires release secret: %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       - name: Build macOS package
         if: ${{ matrix.platform == 'macos' }}
         run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
@@ -166,7 +186,11 @@ jobs:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Linux packages
         if: ${{ matrix.platform == 'linux' }}
@@ -198,11 +222,18 @@ jobs:
         run: |
           shopt -s nullglob
           files=(release/*.exe)
-          [[ ${#files[@]} -eq 1 ]] || { echo 'Expected exactly one Windows installer' >&2; exit 1; }
+          blockmaps=(release/*.exe.blockmap)
+          [[ ${#files[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected exactly one Windows installer and blockmap' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-release.outputs.version }}' win32 x64 lite \
+            release/latest.yml release/electron-updater/latest.yml
           node scripts/release/upload-update-artifacts.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             update-artifacts.json \
-            "${files[0]}:win32:x64:lite"
+            "${files[0]}:win32:x64:lite:installer" \
+            "${files[0]}:win32:x64:lite:updater" \
+            "${blockmaps[0]}:win32:x64:lite:blockmap" \
+            "release/electron-updater/latest.yml:win32:x64:lite:metadata"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -212,12 +243,20 @@ jobs:
         if: ${{ matrix.platform == 'macos' }}
         run: |
           shopt -s nullglob
-          files=(release/*.dmg)
-          [[ ${#files[@]} -eq 1 ]] || { echo 'Expected exactly one macOS installer' >&2; exit 1; }
+          dmgs=(release/*.dmg)
+          zips=(release/*.zip)
+          blockmaps=(release/*.zip.blockmap)
+          [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected exactly one macOS DMG, update ZIP, and ZIP blockmap' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-release.outputs.version }}' darwin arm64 default \
+            release/latest-mac.yml release/electron-updater/latest-mac.yml
           node scripts/release/upload-update-artifacts.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             update-artifacts.json \
-            "${files[0]}:darwin:arm64:default"
+            "${dmgs[0]}:darwin:arm64:default:installer" \
+            "${zips[0]}:darwin:arm64:default:updater" \
+            "${blockmaps[0]}:darwin:arm64:default:blockmap" \
+            "release/electron-updater/latest-mac.yml:darwin:arm64:default:metadata"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -229,12 +268,22 @@ jobs:
           shopt -s nullglob
           debs=(release/*.deb)
           appimages=(release/*.AppImage)
-          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected exactly one deb and AppImage installer' >&2; exit 1; }
+          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected exactly one deb and AppImage' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-release.outputs.version }}' linux x64 appimage \
+            release/latest-linux.yml release/electron-updater/latest-linux.yml
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-release.outputs.version }}' linux x64 deb \
+            release/latest-linux.yml release/electron-updater/deb/latest-linux.yml
           node scripts/release/upload-update-artifacts.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
             update-artifacts.json \
-            "${debs[0]}:linux:x64:deb" \
-            "${appimages[0]}:linux:x64:appimage"
+            "${debs[0]}:linux:x64:deb:installer" \
+            "${debs[0]}:linux:x64:deb:updater" \
+            "${appimages[0]}:linux:x64:appimage:installer" \
+            "${appimages[0]}:linux:x64:appimage:updater" \
+            "release/electron-updater/latest-linux.yml:linux:x64:appimage:metadata" \
+            "release/electron-updater/deb/latest-linux.yml:linux:x64:deb:metadata"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -258,7 +307,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with: { path: artifacts }
       - uses: actions/setup-node@v6
-        with: { node-version: "24.x" }
+        with: { node-version: '24.x' }
       - name: Install release tools
         run: |
           pipx install 'awscli>=1.45.10,<2'
@@ -270,7 +319,7 @@ jobs:
             echo 'Expected exactly three platform artifact metadata files' >&2
             exit 1
           fi
-          jq -e 'all(.artifacts[]; .key and .size and .sha256)' "${metadata[@]}" > /dev/null
+          jq -e 'all(.artifacts[]; .key and .size and .sha256 and .sha512 and .kind)' "${metadata[@]}" > /dev/null
       - name: Create and verify signed manifest
         run: |
           node scripts/release/publish-update-manifest.mjs \
@@ -282,27 +331,58 @@ jobs:
         env:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PRIVATE_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PRIVATE_KEY_BASE64 }}
-      - name: Read current stable manifest
+      - name: Read the current stable generation
         id: current
         run: |
+          mkdir -p manifest
           set +e
           aws s3api head-object \
             --bucket "$R2_BUCKET" \
-            --key channels/stable.json \
-            > manifest/current-head.json 2> manifest/current-head.err
+            --key channels/stable-pointer.json \
+            > manifest/current-pointer-head.json 2> manifest/current-pointer-head.err
           status=$?
           set -e
           if [[ $status -eq 0 ]]; then
             aws s3api get-object \
               --bucket "$R2_BUCKET" \
-              --key channels/stable.json \
+              --key channels/stable-pointer.json \
+              manifest/current-pointer.json > /dev/null
+            generation="$(jq -er '
+              select(.schemaVersion == 1)
+              | select(.generation | type == "string" and test("^[A-Za-z0-9._-]+$"))
+              | .generation
+            ' manifest/current-pointer.json)"
+            aws s3api get-object \
+              --bucket "$R2_BUCKET" \
+              --key "generations/${generation}/legacy/stable.json" \
               manifest/current.json > /dev/null
             echo 'exists=true' >> "$GITHUB_OUTPUT"
-            echo "etag=$(jq -r '.ETag' manifest/current-head.json)" >> "$GITHUB_OUTPUT"
-          elif grep -Eq '404|Not Found|NoSuchKey' manifest/current-head.err; then
-            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo 'pointer_exists=true' >> "$GITHUB_OUTPUT"
+            echo "pointer_etag=$(jq -r '.ETag' manifest/current-pointer-head.json)" >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/current-pointer-head.err; then
+            set +e
+            aws s3api head-object \
+              --bucket "$R2_BUCKET" \
+              --key channels/stable.json \
+              > manifest/current-head.json 2> manifest/current-head.err
+            stable_status=$?
+            set -e
+            if [[ $stable_status -eq 0 ]]; then
+              aws s3api get-object \
+                --bucket "$R2_BUCKET" \
+                --key channels/stable.json \
+                manifest/current.json > /dev/null
+              echo 'exists=true' >> "$GITHUB_OUTPUT"
+              echo 'pointer_exists=false' >> "$GITHUB_OUTPUT"
+            elif grep -Eq '404|Not Found|NoSuchKey' manifest/current-head.err; then
+              echo 'exists=false' >> "$GITHUB_OUTPUT"
+              echo 'pointer_exists=false' >> "$GITHUB_OUTPUT"
+            else
+              cat manifest/current-head.err >&2
+              exit "$stable_status"
+            fi
           else
-            cat manifest/current-head.err >&2
+            cat manifest/current-pointer-head.err >&2
             exit "$status"
           fi
         env:
@@ -343,6 +423,67 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Verify and publish the immutable update generation
+        if: steps.version_check.outputs.idempotent != 'true'
+        run: |
+          mapfile -t metadata < <(find artifacts -type f -name update-artifacts.json | sort)
+          mkdir -p manifest/electron
+          while IFS=$'\t' read -r key target filename; do
+            target_file="${target//:/-}"
+            output="manifest/electron/${target_file}-${filename}"
+            aws s3api get-object --bucket "$R2_BUCKET" --key "$key" "$output" > /dev/null
+          done < <(
+            jq -rsr '
+              [.[].artifacts[] | select(.kind == "metadata")]
+              | sort_by(.platform, .arch, .variant)
+              | .[]
+              | [.key, (.platform + ":" + .arch + ":" + .variant), .filename]
+              | @tsv
+            ' "${metadata[@]}"
+          )
+          node scripts/release/verify-electron-updater-generation.mjs \
+            '${{ needs.prepare-release.outputs.version }}' \
+            manifest/electron/win32-x64-lite-latest.yml:win32:x64:lite \
+            manifest/electron/darwin-arm64-default-latest-mac.yml:darwin:arm64:default \
+            manifest/electron/linux-x64-appimage-latest-linux.yml:linux:x64:appimage \
+            manifest/electron/linux-x64-deb-latest-linux.yml:linux:x64:deb \
+            --artifact-metadata "${metadata[@]}"
+          generation_key='generations/${{ needs.prepare-release.outputs.version }}/legacy/stable.json'
+          set +e
+          aws s3api head-object --bucket "$R2_BUCKET" --key "$generation_key" \
+            > manifest/generation-head.json 2> manifest/generation-head.err
+          generation_status=$?
+          set -e
+          if [[ $generation_status -eq 0 ]]; then
+            aws s3api get-object --bucket "$R2_BUCKET" --key "$generation_key" \
+              manifest/existing-generation.json > /dev/null
+            node scripts/release/verify-update-transition.mjs \
+              manifest/existing-generation.json \
+              manifest/stable.json \
+              '${{ needs.prepare-release.outputs.version }}'
+            cp manifest/existing-generation.json manifest/stable.json
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/generation-head.err; then
+            aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key "$generation_key" \
+              --body manifest/stable.json \
+              --content-type application/json \
+              --cache-control 'public, max-age=31536000, immutable' \
+              --if-none-match '*' > /dev/null
+          else
+            cat manifest/generation-head.err >&2
+            exit "$generation_status"
+          fi
+          node scripts/release/create-update-generation-pointer.mjs \
+            manifest/stable-pointer.json \
+            '${{ needs.prepare-release.outputs.version }}'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
       - name: Preserve previous stable manifest
         if: steps.version_check.outputs.idempotent != 'true' && steps.current.outputs.exists == 'true'
         run: |
@@ -357,24 +498,133 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
-      - name: Conditionally publish stable manifest
+      - name: Preserve previous stable generation pointer
+        if: steps.version_check.outputs.idempotent != 'true' && steps.current.outputs.pointer_exists == 'true'
+        run: |
+          aws s3api put-object \
+            --bucket "$R2_BUCKET" \
+            --key channels/stable.previous-pointer.json \
+            --body manifest/current-pointer.json \
+            --content-type application/json \
+            --cache-control no-store
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Read legacy stable manifest ETag
+        id: legacy_mirror
+        if: steps.version_check.outputs.idempotent != 'true'
+        run: |
+          set +e
+          aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.json > manifest/legacy-mirror-head.json 2> manifest/legacy-mirror-head.err
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "etag=$(jq -r '.ETag' manifest/legacy-mirror-head.json)" >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/legacy-mirror-head.err; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            cat manifest/legacy-mirror-head.err >&2
+            exit "$status"
+          fi
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      - name: Conditionally publish the dual-protocol stable release
         id: publish
         if: steps.version_check.outputs.idempotent != 'true'
         run: |
-          conditional_args=(--if-none-match '*')
-          if [[ '${{ steps.current.outputs.exists }}' == 'true' ]]; then
-            conditional_args=(--if-match '${{ steps.current.outputs.etag }}')
+          legacy_args=(--if-none-match '*')
+          if [[ '${{ steps.legacy_mirror.outputs.exists }}' == 'true' ]]; then
+            legacy_args=(--if-match '${{ steps.legacy_mirror.outputs.etag }}')
           fi
-          aws s3api put-object \
-            --bucket "$R2_BUCKET" \
-            --key channels/stable.json \
-            --body manifest/stable.json \
-            --content-type application/json \
-            --cache-control no-store \
-            "${conditional_args[@]}" \
-            > manifest/publish-result.json
+          pointer_args=(--if-none-match '*')
+          if [[ '${{ steps.current.outputs.pointer_exists }}' == 'true' ]]; then
+            pointer_args=(--if-match '${{ steps.current.outputs.pointer_etag }}')
+          fi
+
+          publish_legacy() {
+            aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key channels/stable.json \
+              --body manifest/stable.json \
+              --content-type application/json \
+              --cache-control no-store \
+              "${legacy_args[@]}" \
+              > manifest/publish-legacy-result.json || return $?
+            legacy_etag=$(jq -er '.ETag' manifest/publish-legacy-result.json)
+          }
+          publish_pointer() {
+            aws s3api put-object \
+              --bucket "$R2_BUCKET" \
+              --key channels/stable-pointer.json \
+              --body manifest/stable-pointer.json \
+              --content-type application/json \
+              --cache-control no-store \
+              "${pointer_args[@]}" \
+              > manifest/publish-pointer-result.json || return $?
+            pointer_etag=$(jq -er '.ETag' manifest/publish-pointer-result.json)
+          }
+          rollback_legacy() {
+            if [[ '${{ steps.legacy_mirror.outputs.exists }}' == 'true' ]]; then
+              aws s3api put-object \
+                --bucket "$R2_BUCKET" \
+                --key channels/stable.json \
+                --body manifest/current.json \
+                --content-type application/json \
+                --cache-control no-store \
+                --if-match "$legacy_etag"
+            else
+              published_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.json --query ETag --output text)
+              [[ "$published_etag" == "$legacy_etag" ]] || { echo 'Legacy stable manifest changed concurrently; refusing an unsafe rollback' >&2; return 1; }
+              aws s3api delete-object --bucket "$R2_BUCKET" --key channels/stable.json
+            fi
+          }
+          rollback_pointer() {
+            if [[ '${{ steps.current.outputs.pointer_exists }}' == 'true' ]]; then
+              aws s3api put-object \
+                --bucket "$R2_BUCKET" \
+                --key channels/stable-pointer.json \
+                --body manifest/current-pointer.json \
+                --content-type application/json \
+                --cache-control no-store \
+                --if-match "$pointer_etag"
+            else
+              published_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json --query ETag --output text)
+              [[ "$published_etag" == "$pointer_etag" ]] || { echo 'Stable generation pointer changed concurrently; refusing an unsafe rollback' >&2; return 1; }
+              aws s3api delete-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json
+            fi
+          }
+
+          if [[ '${{ steps.current.outputs.pointer_exists }}' == 'true' ]]; then
+            publish_legacy
+            set +e
+            publish_pointer
+            publish_status=$?
+            set -e
+            if [[ $publish_status -ne 0 ]]; then
+              rollback_legacy
+              exit "$publish_status"
+            fi
+          else
+            publish_pointer
+            set +e
+            publish_legacy
+            publish_status=$?
+            set -e
+            if [[ $publish_status -ne 0 ]]; then
+              rollback_pointer
+              exit "$publish_status"
+            fi
+          fi
+
           echo 'changed=true' >> "$GITHUB_OUTPUT"
-          echo "etag=$(jq -r '.ETag' manifest/publish-result.json)" >> "$GITHUB_OUTPUT"
+          echo "etag=$pointer_etag" >> "$GITHUB_OUTPUT"
+          echo "legacy_etag=$legacy_etag" >> "$GITHUB_OUTPUT"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -400,14 +650,31 @@ jobs:
                 --body manifest/current.json \
                 --content-type application/json \
                 --cache-control no-store \
-                --if-match '${{ steps.publish.outputs.etag }}'
+                --if-match '${{ steps.publish.outputs.legacy_etag }}'
             else
-              published_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.json --query ETag --output text)
-              if [[ "$published_etag" != '${{ steps.publish.outputs.etag }}' ]]; then
-                echo 'Stable manifest changed concurrently; refusing an unsafe rollback' >&2
+              published_legacy_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.json --query ETag --output text)
+              if [[ "$published_legacy_etag" != '${{ steps.publish.outputs.legacy_etag }}' ]]; then
+                echo 'Legacy stable manifest changed concurrently; refusing an unsafe rollback' >&2
                 exit 1
               fi
               aws s3api delete-object --bucket "$R2_BUCKET" --key channels/stable.json
+            fi
+
+            if [[ '${{ steps.current.outputs.pointer_exists }}' == 'true' ]]; then
+              aws s3api put-object \
+                --bucket "$R2_BUCKET" \
+                --key channels/stable-pointer.json \
+                --body manifest/current-pointer.json \
+                --content-type application/json \
+                --cache-control no-store \
+                --if-match '${{ steps.publish.outputs.etag }}'
+            else
+              published_etag=$(aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json --query ETag --output text)
+              if [[ "$published_etag" != '${{ steps.publish.outputs.etag }}' ]]; then
+                echo 'Stable generation pointer changed concurrently; refusing an unsafe rollback' >&2
+                exit 1
+              fi
+              aws s3api delete-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json
             fi
           fi
           exit "$smoke_status"

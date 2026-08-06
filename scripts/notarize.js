@@ -35,8 +35,6 @@ exports.default = async function notarizing(context) {
 
   console.log(`🔐 正在公证 ${appName}...`);
   console.log(`   应用路径: ${appPath}`);
-  console.log(`   Apple ID: ${process.env.APPLE_ID}`);
-  console.log(`   Team ID: ${process.env.APPLE_TEAM_ID}`);
 
   try {
     await notarize({

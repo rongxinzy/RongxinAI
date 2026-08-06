@@ -1028,6 +1028,8 @@ interface IElectronAPI {
       userId?: string | null;
     }) => Promise<AppUpdateCheckResult>;
     retryDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
+    pauseDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
+    resumeDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     cancelDownload: () => Promise<{ success: boolean; state: AppUpdateRuntimeState }>;
     installReady: () => Promise<{ success: boolean; state: AppUpdateRuntimeState; error?: string }>;
     onStateChanged: (callback: (data: AppUpdateRuntimeState) => void) => () => void;

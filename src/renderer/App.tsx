@@ -108,6 +108,7 @@ const App: React.FC = () => {
     readyFilePath: null,
     readyFileHash: null,
     errorMessage: null,
+    lastCheckedAt: null,
   });
   const [enterpriseConfig, setEnterpriseConfig] = useState<{
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
@@ -643,8 +644,6 @@ const App: React.FC = () => {
     return unsubscribe;
   }, [handleNewChat]);
 
-  // Update system is permanently disabled
-
   const isOverlayActive = showSettings;
   const shouldShowUpdateBadge =
     updateInfo &&
@@ -709,6 +708,7 @@ const App: React.FC = () => {
                   initialTab={settingsOptions.initialTab}
                   notice={settingsOptions.notice}
                   enterpriseConfig={enterpriseConfig}
+                  appUpdateState={appUpdateState}
                 />
               </React.Suspense>
             </LazyChunkErrorBoundary>
@@ -850,6 +850,7 @@ const App: React.FC = () => {
                 initialTab={settingsOptions.initialTab}
                 notice={settingsOptions.notice}
                 enterpriseConfig={enterpriseConfig}
+                appUpdateState={appUpdateState}
               />
             </React.Suspense>
           </LazyChunkErrorBoundary>

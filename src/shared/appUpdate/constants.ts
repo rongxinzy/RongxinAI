@@ -3,8 +3,10 @@ export const AppUpdateStatus = {
   Checking: 'checking',
   Available: 'available',
   Downloading: 'downloading',
+  Paused: 'paused',
   Ready: 'ready',
   Installing: 'installing',
+  UpToDate: 'up_to_date',
   Error: 'error',
 } as const;
 
@@ -21,6 +23,8 @@ export const AppUpdateIpc = {
   GetState: 'appUpdate:getState',
   CheckNow: 'appUpdate:checkNow',
   RetryDownload: 'appUpdate:retryDownload',
+  PauseDownload: 'appUpdate:pauseDownload',
+  ResumeDownload: 'appUpdate:resumeDownload',
   CancelDownload: 'appUpdate:cancelDownload',
   InstallReady: 'appUpdate:installReady',
   StateChanged: 'appUpdate:stateChanged',
@@ -38,6 +42,10 @@ export interface AppUpdateInfo {
   url: string;
   expectedSize: number;
   expectedSha256: string;
+  /** SHA-512 of the electron-updater artifact authorized by the signed manifest. */
+  expectedUpdaterSha512: string;
+  /** Basename of the updater artifact whose SHA-512 was authorized. */
+  expectedUpdaterFileName: string;
   mandatory: boolean;
   minimumSupportedVersion: string | null;
 }
@@ -47,6 +55,7 @@ export interface AppUpdateRuntimeState {
   source: AppUpdateSource | null;
   info: AppUpdateInfo | null;
   progress: AppUpdateDownloadProgress | null;
+  lastCheckedAt: number | null;
   readyFilePath: string | null;
   readyFileHash: string | null;
   errorMessage: string | null;

@@ -7102,6 +7102,16 @@ if (!gotTheLock) {
     return { success: true, state };
   });
 
+  ipcMain.handle(AppUpdateIpc.PauseDownload, async () => {
+    const state = getAppUpdateCoordinator().pauseDownload();
+    return { success: true, state };
+  });
+
+  ipcMain.handle(AppUpdateIpc.ResumeDownload, async () => {
+    const state = getAppUpdateCoordinator().resumeDownload();
+    return { success: true, state };
+  });
+
   ipcMain.handle(AppUpdateIpc.CancelDownload, async () => {
     const state = getAppUpdateCoordinator().cancelDownload();
     return { success: true, state };
