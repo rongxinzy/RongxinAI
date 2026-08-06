@@ -46,6 +46,7 @@ jobs:
             aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json \
               manifest/stable-pointer.json > /dev/null
             generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/stable-pointer.json)"
+            echo "generation=$generation" >> "$GITHUB_OUTPUT"
             aws s3api get-object --bucket "$R2_BUCKET" \
               --key "generations/${generation}/legacy/stable.json" manifest/stable.json > /dev/null
             pointer=true
@@ -55,6 +56,7 @@ jobs:
               manifest/stable.json > /dev/null
             pointer=false
             echo 'pointer=false' >> "$GITHUB_OUTPUT"
+            echo 'generation=-' >> "$GITHUB_OUTPUT"
           else
             cat manifest/stable-pointer-head.err >&2
             exit "$pointer_status"
@@ -71,11 +73,13 @@ jobs:
               aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable.previous-pointer.json \
                 manifest/previous-pointer.json > /dev/null
               previous_generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/previous-pointer.json)"
+              echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
               aws s3api get-object --bucket "$R2_BUCKET" \
                 --key "generations/${previous_generation}/legacy/stable.json" manifest/previous.json > /dev/null
               echo 'previous=true' >> "$GITHUB_OUTPUT"
             elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
               echo 'previous=false' >> "$GITHUB_OUTPUT"
+              echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
             else
               cat manifest/previous-head.err >&2
               exit "$previous_status"
@@ -89,36 +93,43 @@ jobs:
             if [[ $previous_status -eq 0 ]]; then
               aws s3api get-object --bucket "$R2_BUCKET" --key "$previous_key" manifest/previous.json > /dev/null
               echo 'previous=true' >> "$GITHUB_OUTPUT"
+              echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
             elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
               echo 'previous=false' >> "$GITHUB_OUTPUT"
+              echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
             else
               cat manifest/previous-head.err >&2
               exit "$previous_status"
             fi
           fi
 
-          page=1
-          continuation_token=''
-          while :; do
-            page_path="manifest/cleanup/release-objects-${page}.json"
-            list_args=(--bucket "$R2_BUCKET" --prefix releases/ --max-keys 1000)
-            if [[ -n "$continuation_token" ]]; then
-              list_args+=(--continuation-token "$continuation_token")
-            fi
-            aws s3api list-objects-v2 "${list_args[@]}" > "$page_path"
+          inventory_files=()
+          for prefix in releases/ generations/; do
+            label="${prefix%/}"
+            page=1
+            continuation_token=''
+            while :; do
+              page_path="manifest/cleanup/${label}-objects-${page}.json"
+              inventory_files+=("$page_path")
+              list_args=(--bucket "$R2_BUCKET" --prefix "$prefix" --max-keys 1000)
+              if [[ -n "$continuation_token" ]]; then
+                list_args+=(--continuation-token "$continuation_token")
+              fi
+              aws s3api list-objects-v2 "${list_args[@]}" > "$page_path"
 
-            if [[ "$(jq -r '.IsTruncated // false' "$page_path")" != 'true' ]]; then
-              break
-            fi
-            continuation_token="$(jq -r '.NextContinuationToken // empty' "$page_path")"
-            if [[ -z "$continuation_token" ]]; then
-              echo "R2 returned a truncated listing without a continuation token" >&2
-              exit 1
-            fi
-            page=$((page + 1))
+              if [[ "$(jq -r '.IsTruncated // false' "$page_path")" != 'true' ]]; then
+                break
+              fi
+              continuation_token="$(jq -r '.NextContinuationToken // empty' "$page_path")"
+              if [[ -z "$continuation_token" ]]; then
+                echo "R2 returned a truncated listing without a continuation token for $prefix" >&2
+                exit 1
+              fi
+              page=$((page + 1))
+            done
           done
-          jq -s '{Contents: [.[].Contents[]?]}' manifest/cleanup/release-objects-*.json \
-            > manifest/release-objects.json
+          jq -s '{Contents: [.[].Contents[]?]}' "${inventory_files[@]}" \
+            > manifest/r2-objects.json
       - name: Plan expired object cleanup
         run: |
           previous_path='-'
@@ -131,7 +142,9 @@ jobs:
             manifest/stable.json \
             "$previous_path" \
             "$previous_head_path" \
-            manifest/release-objects.json \
+            '${{ steps.inventory.outputs.generation }}' \
+            '${{ steps.inventory.outputs.previous_generation }}' \
+            manifest/r2-objects.json \
             manifest/cleanup
       - name: Delete expired unreferenced objects
         run: |

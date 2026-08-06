@@ -3,6 +3,7 @@ import {
   loadTrustedReleaseKey,
   verifyEnvelope,
 } from './update-manifest-lib.mjs';
+import { verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
 import yaml from 'js-yaml';
 
 const [expectedVersion, ...targets] = process.argv.slice(2);
@@ -164,5 +165,11 @@ for (const target of targets) {
   ) {
     throw new Error(`${target} updater artifact did not satisfy the one-byte range smoke test`);
   }
+  await verifyPublishedBlockmap({
+    target,
+    updaterUrl,
+    immutableUpdaterUrl: new URL(signedUpdater.url),
+    updaterFilename: signedUpdater.filename,
+  });
   console.log(`[UpdateRelease] ${target} passed electron-updater feed smoke test`);
 }

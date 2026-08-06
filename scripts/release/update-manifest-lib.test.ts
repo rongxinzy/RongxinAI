@@ -295,13 +295,29 @@ describe('online update release tools', () => {
             Key: 'releases/2026.7.2/win32-x64-lite/recent.exe',
             LastModified: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
           },
+          {
+            Key: 'generations/active-opaque-id/legacy/stable.json',
+            LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            Key: 'generations/2026.7.3/legacy/stable.json',
+            LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            Key: 'generations/2026.7.1/electron/win32-x64-lite/latest.yml',
+            LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            Key: 'generations/2026.7.2/legacy/stable.json',
+            LastModified: new Date(now - 2 * 60 * 60 * 1000).toISOString(),
+          },
         ],
       }),
     );
 
     const result = runScript(
       'plan-r2-cleanup.mjs',
-      [stableManifest, '-', '-', objectListPath, cleanupDirectory],
+      [stableManifest, '-', '-', 'active-opaque-id', '-', objectListPath, cleanupDirectory],
       releaseEnvironment,
     );
     expect(result.stderr).toBe('');
@@ -312,6 +328,8 @@ describe('online update release tools', () => {
     );
     expect(deletePlan.Objects).toEqual([
       { Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' },
+      { Key: 'generations/2026.7.3/legacy/stable.json' },
+      { Key: 'generations/2026.7.1/electron/win32-x64-lite/latest.yml' },
     ]);
   });
 

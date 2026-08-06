@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import {
   autoUpdater,
   CancellationToken,
@@ -124,6 +124,7 @@ export class AppUpdateCoordinator {
   private state: AppUpdateRuntimeState = initialState();
   private readonly store: SqliteStore;
   private readonly updater: ElectronUpdaterAdapter;
+  private readonly openExternal: (url: string) => Promise<unknown>;
   private checkPromise: Promise<AppUpdateCheckResult> | null = null;
   private downloadPromise: Promise<void> | null = null;
   private downloadCancellation: CancellationToken | null = null;
@@ -136,9 +137,14 @@ export class AppUpdateCoordinator {
   };
   private readonly onUpdaterError = (error: Error): void => this.handleUpdaterError(error);
 
-  constructor(store: SqliteStore, updater: ElectronUpdaterAdapter = autoUpdater) {
+  constructor(
+    store: SqliteStore,
+    updater: ElectronUpdaterAdapter = autoUpdater,
+    openExternal: (url: string) => Promise<unknown> = url => shell.openExternal(url),
+  ) {
     this.store = store;
     this.updater = updater;
+    this.openExternal = openExternal;
     this.updater.autoDownload = false;
     this.updater.autoInstallOnAppQuit = false;
     this.updater.on('download-progress', this.onDownloadProgress);
@@ -155,13 +161,13 @@ export class AppUpdateCoordinator {
   }
 
   getState(): AppUpdateRuntimeState {
+    this.clearStateIfUpdatesDisabled();
     return { ...this.state };
   }
 
   async checkNow(options: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
-    if (this.isUpdateDisabled()) {
-      this.currentSignedEnvelope = null;
-      return { success: true, state: this.setState(initialState()), updateFound: false };
+    if (this.clearStateIfUpdatesDisabled()) {
+      return { success: true, state: { ...this.state }, updateFound: false };
     }
     if (this.checkPromise) return this.checkPromise;
     // Do not let the periodic checker replace an active download state. Apart
@@ -183,6 +189,7 @@ export class AppUpdateCoordinator {
   }
 
   async retryDownload(): Promise<AppUpdateRuntimeState> {
+    if (this.clearStateIfUpdatesDisabled()) return { ...this.state };
     const info = this.state.info;
     const target = this.resolveUpdateTarget();
     if (!info || !target || this.state.status === AppUpdateStatus.Installing) {
@@ -201,6 +208,19 @@ export class AppUpdateCoordinator {
         currentState.status === AppUpdateStatus.Installing
       ) {
         return currentState;
+      }
+    }
+    if (info.manualDownloadOnly) {
+      try {
+        await this.openExternal(info.url);
+        return this.getState();
+      } catch (error) {
+        return this.setState({
+          ...this.state,
+          status: AppUpdateStatus.Error,
+          errorMessage:
+            error instanceof Error ? error.message : 'Unable to open the update download page',
+        });
       }
     }
     if (!this.currentSignedEnvelope) {
@@ -245,6 +265,13 @@ export class AppUpdateCoordinator {
     state: AppUpdateRuntimeState;
     error?: string;
   }> {
+    if (this.clearStateIfUpdatesDisabled()) {
+      return {
+        success: false,
+        state: { ...this.state },
+        error: 'Updates are disabled by enterprise policy',
+      };
+    }
     const { info, readyFileHash, readyFilePath } = this.state;
     if (this.state.status !== AppUpdateStatus.Ready || !info || !readyFileHash || !readyFilePath) {
       return { success: false, state: this.getState(), error: 'No verified update is ready' };
@@ -310,6 +337,16 @@ export class AppUpdateCoordinator {
       }
 
       this.currentSignedEnvelope = update.envelope;
+      if (update.info.manualDownloadOnly) {
+        const state = this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.Available,
+          source,
+          info: update.info,
+          lastCheckedAt: Date.now(),
+        });
+        return { success: true, state, updateFound: true };
+      }
       this.configureUpdater(update.target);
       const result = await this.updater.checkForUpdates();
       if (!result?.isUpdateAvailable) {
@@ -481,6 +518,10 @@ export class AppUpdateCoordinator {
   }
 
   private restoreReadyUpdate(): void {
+    if (this.isUpdateDisabled()) {
+      this.store.delete(READY_UPDATE_CACHE_KEY);
+      return;
+    }
     const cached = this.store.get<unknown>(READY_UPDATE_CACHE_KEY);
     if (!cached || typeof cached !== 'object') return;
     // Windows owns the final installer handoff directly. macOS and Linux let
@@ -677,6 +718,7 @@ export class AppUpdateCoordinator {
       expectedSha256: artifact.sha256,
       expectedUpdaterSha512: artifact.updater.sha512,
       expectedUpdaterFileName: artifact.updater.filename,
+      manualDownloadOnly: !this.isElectronUpdaterEnabled(target),
       mandatory: payload.mandatory === true,
       minimumSupportedVersion,
     };
@@ -697,6 +739,33 @@ export class AppUpdateCoordinator {
 
   private isUpdateDisabled(): boolean {
     return this.store.get<{ disableUpdate?: boolean }>('enterprise_config')?.disableUpdate === true;
+  }
+
+  private clearStateIfUpdatesDisabled(): boolean {
+    if (!this.isUpdateDisabled()) return false;
+    this.downloadCancellation?.cancel();
+    this.downloadCancellation = null;
+    this.currentSignedEnvelope = null;
+    this.downloadedFilePath = null;
+    this.store.delete(READY_UPDATE_CACHE_KEY);
+    if (this.state.status !== AppUpdateStatus.Idle || this.state.info !== null) {
+      this.setState(initialState());
+    }
+    return true;
+  }
+
+  private isElectronUpdaterEnabled(target: UpdateTarget): boolean {
+    if (target.platform !== 'darwin' || !app.isPackaged) return true;
+    try {
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'),
+      ) as { zhiyuanMacAutoUpdateEnabled?: unknown };
+      return packageJson.zhiyuanMacAutoUpdateEnabled === true;
+    } catch {
+      // A packaged macOS build must opt in only after CI has signed and
+      // notarized it. Missing metadata therefore falls back to manual DMG.
+      return false;
+    }
   }
 
   private resolveCurrentVersion(): string {

@@ -1616,6 +1616,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     updateCheckFailed: '检查失败',
     updateNotChecked: '尚未检查',
     updateDownloadNow: '下载更新',
+    updateOpenDownloadPage: '前往下载',
+    updateManualOnly: '当前 macOS 构建暂不支持应用内安装，请下载 DMG 手动更新。',
     updateCheckNow: '检查更新',
     updateLastChecked: '上次检查：',
     coworkStartingSession: '正在启动会话...',
@@ -4520,6 +4522,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     updateCheckFailed: 'Check failed',
     updateNotChecked: 'Not checked yet',
     updateDownloadNow: 'Download update',
+    updateOpenDownloadPage: 'Open download page',
+    updateManualOnly:
+      'In-app installation is unavailable for this macOS build. Download the DMG to update manually.',
     updateCheckNow: 'Check for updates',
     updateLastChecked: 'Last checked: ',
     coworkStartingSession: 'Starting session...',

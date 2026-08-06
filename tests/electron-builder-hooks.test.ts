@@ -7,13 +7,33 @@ import {
   LLAMACPP_NSIS_HELPER_RESOURCES_DIR,
   LLAMACPP_NSIS_HELPER_RUNTIME_PACKAGES,
   LLAMACPP_NSIS_HELPER_SCRIPT,
+  configureMacAutoUpdateMetadata,
   prepareWindowsLlamaCppBackendResources,
   prepareWindowsLlamaCppNsisHelperResources,
   resolveWindowsLlamaCppBackendBundleMode,
   WindowsLlamaCppBackendBundleMode,
 } from '../scripts/electron-builder-hooks.cjs';
 
-describe('electron-builder Windows llama.cpp packaging hooks', () => {
+describe('electron-builder packaging hooks', () => {
+  test('marks macOS automatic installation disabled unless signing explicitly enables it', () => {
+    const context = {
+      electronPlatformName: 'darwin',
+      packager: { config: { extraMetadata: { retained: true } } },
+    };
+
+    configureMacAutoUpdateMetadata(context, {});
+    expect(context.packager.config.extraMetadata).toEqual({
+      retained: true,
+      zhiyuanMacAutoUpdateEnabled: false,
+    });
+
+    configureMacAutoUpdateMetadata(context, { ZHIYUAN_MAC_AUTO_UPDATE_ENABLED: 'true' });
+    expect(context.packager.config.extraMetadata).toEqual({
+      retained: true,
+      zhiyuanMacAutoUpdateEnabled: true,
+    });
+  });
+
   test('defaults Windows llama.cpp backend bundle mode to lite', () => {
     expect(resolveWindowsLlamaCppBackendBundleMode({})).toBe(WindowsLlamaCppBackendBundleMode.Lite);
     expect(
