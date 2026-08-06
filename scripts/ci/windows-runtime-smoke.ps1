@@ -24,6 +24,28 @@ function Invoke-Checked {
   }
 }
 
+function Invoke-PackagedElectronChecked {
+  param(
+    [Parameter(Mandatory = $true)][string]$FilePath,
+    [string[]]$ArgumentList = @(),
+    [string]$Label = $FilePath
+  )
+  # The packaged Electron binary is a Windows GUI executable even when
+  # ELECTRON_RUN_AS_NODE is set. Start-Process -Wait provides deterministic
+  # process-tree completion and an explicit exit code on Windows PowerShell 5.1.
+  $quotedArguments = @($ArgumentList | ForEach-Object {
+    if ($_ -match '"') {
+      throw "$Label received an argument containing an unsupported double quote: $_"
+    }
+    '"' + $_ + '"'
+  })
+  $process = Start-Process -FilePath $FilePath -ArgumentList $quotedArguments `
+    -NoNewWindow -Wait -PassThru
+  if ($process.ExitCode -ne 0) {
+    throw "$Label failed with exit code $($process.ExitCode)"
+  }
+}
+
 $osVersion = [Environment]::OSVersion.Version
 if ($osVersion.Major -ne 10) {
   throw "This gate requires a Windows 10/11-compatible host; detected $osVersion"
@@ -64,6 +86,7 @@ try {
   # Exercise the packaged Electron binary instead of relying on the optional
   # node_modules Electron download that bun install --ignore-scripts omits.
   $electron = Join-Path $ProjectRoot ("release\win-unpacked\{0}.exe" -f $appExecutableName)
+  $docxValidator = Join-Path $ProjectRoot 'scripts\ci\validate-docx-smoke.mjs'
   $skillsRoot = Join-Path $resourcesRoot 'SKILLs'
 
   Assert-Path $bash 'bundled PortableGit Bash'
@@ -71,6 +94,7 @@ try {
   Assert-Path $skillPython 'bundled XLSX Skill Python'
   Assert-Path $pdfPython 'bundled PDF Skill Python'
   Assert-Path $electron 'packaged Electron Node runtime'
+  Assert-Path $docxValidator 'DOCX smoke validator'
   Assert-Path (Join-Path $resourcesRoot 'uv-win\uv.exe') 'bundled uv'
   Assert-Path (Join-Path $skillsRoot 'xlsx\scripts\xlsx_reader.py') 'XLSX Skill reader'
   Assert-Path (Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs') 'DOCX Markdown converter'
@@ -96,10 +120,9 @@ try {
   $docx = Join-Path $smokeRoot 'smoke.docx'
   $converter = Join-Path $skillsRoot 'docx\scripts\markdown_to_docx.mjs'
   Set-Content -LiteralPath $markdown -Value "# Windows runtime smoke`n`nManaged DOCX conversion works.`n" -Encoding UTF8
-  Invoke-Checked $electron @($converter, $markdown, $docx) 'DOCX Markdown conversion'
+  Invoke-PackagedElectronChecked $electron @($converter, $markdown, $docx) 'DOCX Markdown conversion'
   Assert-Path $docx 'generated DOCX'
-  Invoke-Checked $electron @('-e', "const fs=require('fs'); const b=fs.readFileSync(process.argv[1]); if (b.readUInt32LE(0) !== 0x04034b50) { process.exit(1) }", $docx) 'generated DOCX ZIP validation'
-  Invoke-Checked $electron @('-e', "const fs=require('fs'),z=require('zlib'); const b=fs.readFileSync(process.argv[1]); let o=0,x=''; while(o+30<=b.length&&b.readUInt32LE(o)===0x04034b50){const m=b.readUInt16LE(o+8),n=b.readUInt32LE(o+18),l=b.readUInt16LE(o+26),e=b.readUInt16LE(o+28),s=o+30+l+e,k=b.subarray(o+30,o+30+l).toString(); if(k==='word/document.xml'){x=(m===8?z.inflateRawSync(b.subarray(s,s+n)):b.subarray(s,s+n)).toString();break} o=s+n} if(!x.includes('Heading1'))process.exit(1)", $docx) 'generated DOCX heading validation'
+  Invoke-PackagedElectronChecked $electron @($docxValidator, $docx) 'generated DOCX validation'
   $fixture = Join-Path $smokeRoot 'smoke.xlsx'
   $createFixture = "from openpyxl import Workbook; w=Workbook(); s=w.active; s.title='Smoke'; s.append(['Name','Score']); s.append(['Windows',100]); w.save(r'$fixture')"
   Invoke-Checked $skillPython @('-c', $createFixture) 'XLSX fixture creation'

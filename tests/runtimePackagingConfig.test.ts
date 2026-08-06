@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { prerelease } from 'semver';
@@ -112,9 +114,11 @@ test('Windows release workflow runs the clean-path bundled runtime gate', () => 
   assert.match(smoke, /packaged Electron Node runtime/);
   assert.doesNotMatch(smoke, /node_modules\\electron\\dist\\electron\.exe/);
   assert.match(smoke, /ELECTRON_RUN_AS_NODE/);
+  assert.match(smoke, /Start-Process[\s\S]*-Wait[\s\S]*-PassThru/);
   assert.match(smoke, /DOCX Markdown conversion/);
-  assert.match(smoke, /DOCX heading validation/);
-  assert.doesNotMatch(smoke, /readUInt32LE\(0\) -ne/);
+  assert.match(smoke, /validate-docx-smoke\.mjs/);
+  assert.match(smoke, /generated DOCX validation/);
+  assert.doesNotMatch(smoke, /Invoke-Checked \$electron/);
   assert.match(smoke, /External command unexpectedly remains discoverable/);
   assert.match(smoke, /mingit\\usr\\bin\\bash\.exe/);
   assert.match(smoke, /PATH = "\$env:SystemRoot\\System32;\$env:SystemRoot"/);
@@ -123,4 +127,29 @@ test('Windows release workflow runs the clean-path bundled runtime gate', () => 
     'utf8',
   );
   assert.match(packageScript, /windows-runtime-smoke\.ps1/);
+});
+
+test('DOCX smoke validator accepts the bundled Markdown converter output', () => {
+  const workspace = mkdtempSync(path.join(tmpdir(), 'zhiyuan-docx-smoke-'));
+  const markdown = path.join(workspace, 'smoke.md');
+  const docx = path.join(workspace, 'smoke.docx');
+  try {
+    writeFileSync(markdown, '# Runtime smoke\n\nPackaged Electron conversion works.\n');
+    execFileSync(
+      process.execPath,
+      [path.join(root, 'SKILLs', 'docx', 'scripts', 'markdown_to_docx.mjs'), markdown, docx],
+      { stdio: 'pipe' },
+    );
+    execFileSync(
+      process.execPath,
+      [path.join(root, 'scripts', 'ci', 'validate-docx-smoke.mjs'), docx],
+      {
+        stdio: 'pipe',
+      },
+    );
+    assert.equal(existsSync(docx), true);
+    assert.ok(statSync(docx).size > 0);
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+  }
 });
