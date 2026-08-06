@@ -21,8 +21,42 @@ const MANIFEST_VERSION = 1;
 const IMPORT_NAME_OVERRIDES = {
   pillow: 'PIL',
   'scikit-learn': 'sklearn',
+  'psycopg2-binary': 'psycopg2',
   pypdfium2: 'pypdfium2',
 };
+const PYTHON_STDLIB_MODULES = new Set([
+  '__future__',
+  'argparse',
+  'ast',
+  'builtins',
+  'cProfile',
+  'collections',
+  'colorsys',
+  'copy',
+  'datetime',
+  'decimal',
+  'html',
+  'io',
+  'json',
+  'math',
+  'os',
+  'pathlib',
+  'pstats',
+  'random',
+  're',
+  'shutil',
+  'sqlite3',
+  'subprocess',
+  'sys',
+  'tempfile',
+  'textwrap',
+  'time',
+  'traceback',
+  'tracemalloc',
+  'typing',
+  'xml',
+  'zipfile',
+]);
 
 function normalizePlatform(value = process.platform) {
   const normalized = String(value).trim().toLowerCase();
@@ -44,6 +78,81 @@ function listRequirementFiles(skillsRoot = SKILLS_ROOT) {
     })
     .filter(Boolean)
     .sort((left, right) => left.skillId.localeCompare(right.skillId));
+}
+
+function listPythonFiles(root) {
+  const files = [];
+  const visit = current => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.py')) {
+        files.push(fullPath);
+      }
+    }
+  };
+  visit(root);
+  return files;
+}
+
+function parsePythonImportNames(filePath) {
+  const names = new Set();
+  const source = fs.readFileSync(filePath, 'utf8');
+  for (const line of source.split(/\r?\n/)) {
+    const fromMatch = line.match(/^\s*from\s+([A-Za-z_][A-Za-z0-9_.]*)\s+import\s+/);
+    if (fromMatch) {
+      names.add(fromMatch[1].split('.')[0]);
+      continue;
+    }
+    const importMatch = line.match(/^\s*import\s+(.+)$/);
+    if (!importMatch) continue;
+    for (const imported of importMatch[1].split(',')) {
+      const name = imported.trim().split(/\s+as\s+/)[0].trim();
+      if (/^[A-Za-z_][A-Za-z0-9_.]*$/.test(name)) {
+        names.add(name.split('.')[0]);
+      }
+    }
+  }
+  return names;
+}
+
+function validateSkillDependencyDeclarations(skillsRoot = SKILLS_ROOT) {
+  const missing = [];
+  if (!fs.existsSync(skillsRoot)) return { ok: true, missing };
+
+  for (const entry of fs.readdirSync(skillsRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const skillId = entry.name;
+    const skillDir = path.join(skillsRoot, skillId);
+    const pythonFiles = listPythonFiles(skillDir);
+    const localModules = new Set(pythonFiles.map(filePath => path.basename(filePath, '.py')));
+    const requirementsPath = path.join(skillDir, 'requirements.txt');
+    const declaredImports = fs.existsSync(requirementsPath)
+      ? new Set(parseImportNames(requirementsPath))
+      : new Set();
+
+    for (const pythonFile of pythonFiles) {
+      for (const importName of parsePythonImportNames(pythonFile)) {
+        if (
+          PYTHON_STDLIB_MODULES.has(importName) ||
+          localModules.has(importName) ||
+          declaredImports.has(importName)
+        ) {
+          continue;
+        }
+        missing.push(`${skillId}: ${importName} is imported but not declared in requirements.txt`);
+      }
+    }
+  }
+
+  return { ok: missing.length === 0, missing };
 }
 
 function sha256File(filePath) {
@@ -223,7 +332,8 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   const arch = options.arch || process.arch;
   const requirements = listRequirementFiles(options.skillsRoot || SKILLS_ROOT);
   const environments = [];
-  const missing = [];
+  const declarations = validateSkillDependencyDeclarations(options.skillsRoot || SKILLS_ROOT);
+  const missing = [...declarations.missing];
 
   for (const entry of requirements) {
     const environmentRoot = path.join(options.runtimeRoot || RUNTIME_ROOT, entry.skillId);
@@ -294,6 +404,10 @@ async function ensureSkillPythonRuntimes(options = {}) {
   const skillsRoot = options.skillsRoot || SKILLS_ROOT;
   const runtimeRoot = options.runtimeRoot || RUNTIME_ROOT;
   const requirements = listRequirementFiles(skillsRoot);
+  const declarations = validateSkillDependencyDeclarations(skillsRoot);
+  if (!declarations.ok) {
+    throw new Error(`Skill dependency declarations are incomplete: ${declarations.missing.join('; ')}`);
+  }
   if (requirements.length === 0) {
     return { ok: true, skipped: true, environments: [] };
   }
@@ -408,5 +522,6 @@ module.exports = {
   normalizePlatform,
   parseImportNames,
   pythonExecutableForEnvironment,
+  validateSkillDependencyDeclarations,
   ensureSkillPythonRuntimes,
 };

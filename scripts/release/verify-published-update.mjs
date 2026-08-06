@@ -3,7 +3,11 @@ import {
   loadTrustedReleaseKey,
   verifyEnvelope,
 } from './update-manifest-lib.mjs';
-import { verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
+import {
+  fetchOneByteRange,
+  redirectMatches,
+  verifyPublishedBlockmap,
+} from './published-update-smoke-lib.mjs';
 import yaml from 'js-yaml';
 
 const [expectedVersion, ...targets] = process.argv.slice(2);
@@ -58,11 +62,7 @@ for (const target of targets) {
     throw new Error(`${target} artifact size does not match the signed manifest`);
   }
 
-  const rangeResponse = await fetch(payload.artifact.url, {
-    headers: { range: 'bytes=0-0' },
-    redirect: 'error',
-    signal: AbortSignal.timeout(15_000),
-  });
+  const rangeResponse = await fetchOneByteRange({ url: payload.artifact.url });
   await rangeResponse.body?.cancel();
   if (
     rangeResponse.status !== 206 ||
@@ -137,7 +137,7 @@ for (const target of targets) {
   if (
     ![301, 302, 307, 308].includes(redirectResponse.status) ||
     !location ||
-    new URL(location, updaterUrl).toString() !== signedUpdater.url
+    !redirectMatches(location, updaterUrl, signedUpdater.url)
   ) {
     throw new Error(`${target} electron-updater artifact did not redirect to the immutable download`);
   }
@@ -153,11 +153,7 @@ for (const target of targets) {
   ) {
     throw new Error(`${target} updater artifact size does not match the signed manifest`);
   }
-  const updaterRangeResponse = await fetch(signedUpdater.url, {
-    headers: { range: 'bytes=0-0' },
-    redirect: 'error',
-    signal: AbortSignal.timeout(15_000),
-  });
+  const updaterRangeResponse = await fetchOneByteRange({ url: signedUpdater.url });
   await updaterRangeResponse.body?.cancel();
   if (
     updaterRangeResponse.status !== 206 ||

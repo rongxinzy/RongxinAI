@@ -1,5 +1,6 @@
 reportlab>=4,<5
 pypdf>=5,<7
 matplotlib>=3.9,<4
+numpy>=2,<3
 pypdfium2>=4,<5
 pillow>=10,<12
