@@ -80,6 +80,7 @@ export class ProductionLoopController {
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',
       'Call agent_loop done only after the production loop reports ready_to_deliver.',
+      'Pure information requests or trivial tasks with no work to plan (e.g. simple Q&A) may call skip_workflow with a reason instead, then answer directly.',
     ].join('\n');
   }
 
@@ -138,7 +139,16 @@ export class ProductionLoopController {
     return this.update(this.service.recordRevision(this.state.runId, summary, evidence));
   }
 
+  skipWorkflow(reason: string): ProductionLoopState {
+    return this.update(this.service.skipWorkflow(this.state.runId, reason));
+  }
+
   requestCompletion(reason: string): string {
+    if (this.state.skip) {
+      return this.downstream
+        ? this.downstream.requestCompletion(reason)
+        : 'Workflow skipped. End the turn now so verification can run.';
+    }
     if (this.state.status !== ProductionLoopStatus.ReadyToDeliver) {
       this.update(
         this.service.recordRecovery(
@@ -156,6 +166,9 @@ export class ProductionLoopController {
   }
 
   onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
+    if (this.state.skip) {
+      return { shouldFinish: true, reason: this.state.skip.reason };
+    }
     if (this.state.status === ProductionLoopStatus.ReadyToDeliver && this.state.deliveryReason) {
       if (this.downstream) {
         const decision = this.downstream.onAgentEnd();

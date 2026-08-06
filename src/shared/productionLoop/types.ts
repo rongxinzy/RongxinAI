@@ -57,6 +57,11 @@ export interface ProductionRecovery {
   createdAt: number;
 }
 
+export interface ProductionSkip {
+  reason: string;
+  createdAt: number;
+}
+
 export interface ProductionLoopState {
   version: 1;
   taskId: string;
@@ -76,6 +81,8 @@ export interface ProductionLoopState {
   critic: ProductionCriticState;
   revisions: ProductionRevision[];
   recoveries: ProductionRecovery[];
+  /** Set when the model declares the task needs no production workflow. */
+  skip: ProductionSkip | null;
   deliveryReason: string | null;
   progressVersion: number;
   lastObservedProgressVersion: number;

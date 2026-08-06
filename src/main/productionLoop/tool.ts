@@ -117,6 +117,10 @@ export function buildProductionLoopTool(
         itemId: { type: 'string' },
         status: { type: 'string', enum: Object.values(ProductionPlanItemStatus) },
         evidence: { type: 'object' },
+        reason: {
+          type: 'string',
+          description: 'Required for skip_workflow: why this task needs no production workflow.',
+        },
       },
       required: ['action'],
       additionalProperties: false,
@@ -185,6 +189,11 @@ export function buildProductionLoopTool(
             );
             return result(
               'Revision recorded. Inspect the revised result and request critique again.',
+            );
+          case ProductionLoopAction.SkipWorkflow:
+            controller.skipWorkflow(String(params.reason || ''));
+            return result(
+              'Production workflow skipped for this task. Answer directly and end the turn.',
             );
           case ProductionLoopAction.GetState:
             return result(stateForModel());
