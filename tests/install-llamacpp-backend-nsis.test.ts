@@ -39,6 +39,23 @@ afterEach(() => {
 });
 
 describe('install-llamacpp-backend-nsis PowerShell argument transport', () => {
+  test('adds the local signing certificate to the current user trust stores', () => {
+    const helperScript = fs.readFileSync(
+      path.resolve('scripts/install-llamacpp-backend-nsis.cjs'),
+      'utf8',
+    );
+
+    expect(helperScript).toContain(
+      '$storeLocation = [System.Security.Cryptography.X509Certificates.StoreLocation]::CurrentUser',
+    );
+    expect(helperScript).toContain(
+      '$store = [System.Security.Cryptography.X509Certificates.X509Store]::new($storeName, $storeLocation)',
+    );
+    expect(helperScript).toContain('$store.Add($cert)');
+    expect(helperScript).not.toContain('Copy-Item -Path ("Cert:\\\\CurrentUser\\\\My\\\\"');
+    expect(helperScript).not.toContain('Import-Certificate -FilePath');
+  });
+
   testOnWindows('preserves file paths supplied to PowerShell through the child environment', () => {
     const tempDir = createTempDir();
     const filePath = path.join(tempDir, '模型', 'llama-server.exe');
