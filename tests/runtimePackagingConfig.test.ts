@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { prerelease } from 'semver';
 import { test } from 'vitest';
 
 const root = path.resolve(__dirname, '..');
@@ -22,19 +23,15 @@ test('each desktop target keeps the private document and Python toolchain resour
   const linux = resourceSources(config.linux);
 
   assert.deepEqual(
-    [
-      'resources/uv-mac',
-      'resources/python-mac',
-      'resources/skill-python',
-    ].every(source => mac.includes(source)),
+    ['resources/uv-mac', 'resources/python-mac', 'resources/skill-python'].every(source =>
+      mac.includes(source),
+    ),
     true,
   );
   assert.deepEqual(
-    [
-      'resources/uv-linux',
-      'resources/python-linux',
-      'resources/skill-python',
-    ].every(source => linux.includes(source)),
+    ['resources/uv-linux', 'resources/python-linux', 'resources/skill-python'].every(source =>
+      linux.includes(source),
+    ),
     true,
   );
 
@@ -53,6 +50,21 @@ test('unpacks AnyDoc native bindings from the application archive', () => {
 
   const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
   assert.match(viteConfig, /staticExternals\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/);
+});
+
+test('stable release metadata does not inherit the build prerelease channel', () => {
+  const config = JSON.parse(readFileSync(path.join(root, 'electron-builder.json'), 'utf8')) as {
+    detectUpdateChannel?: boolean;
+    linux?: { publish?: Array<{ url?: string }> };
+    mac?: { publish?: Array<{ url?: string }> };
+    win?: { publish?: Array<{ url?: string }> };
+  };
+
+  assert.deepEqual(prerelease('2026.8.6-build.1'), ['build', 1]);
+  assert.equal(config.detectUpdateChannel, false);
+  for (const target of [config.win, config.mac, config.linux]) {
+    assert.match(target?.publish?.[0]?.url || '', /\/v2\/electron\/stable\//);
+  }
 });
 
 test('release workflows explicitly provision the private POSIX toolchain', () => {
