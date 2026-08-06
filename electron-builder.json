@@ -5,6 +5,7 @@
   "directories": {
     "output": "release"
   },
+  "afterSign": "scripts/notarize.js",
   "beforePack": "./scripts/electron-builder-hooks.cjs",
   "afterPack": "./scripts/electron-builder-hooks.cjs",
   "files": [
