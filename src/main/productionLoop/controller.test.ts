@@ -105,3 +105,27 @@ test('invalid critic output enters revision instead of silently passing', () => 
   expect(controller.getState().phase).toBe(ProductionLoopPhase.Revise);
   expect(controller.getState().critic.findings[0].summary).toContain('invalid structured response');
 });
+
+test('skip_workflow lets the agent finish without the completion gate', () => {
+  const { controller, downstream } = createController();
+  controller.skipWorkflow('Pure information request with no work to plan');
+  expect(controller.getState()).toMatchObject({
+    phase: ProductionLoopPhase.Plan,
+    status: ProductionLoopStatus.Completed,
+    skip: { reason: 'Pure information request with no work to plan' },
+  });
+
+  // Completion is no longer blocked.
+  expect(controller.requestCompletion('answered')).toBe('downstream requested');
+  expect(downstream.requestCompletion).toHaveBeenCalledOnce();
+
+  // Agent end finishes without a recovery prompt.
+  expect(controller.onAgentEnd()).toEqual({ shouldFinish: true, reason: 'Pure information request with no work to plan' });
+  expect(downstream.onAgentEnd).not.toHaveBeenCalled();
+});
+
+test('skip_workflow is rejected after a plan is committed', () => {
+  const { controller } = createController();
+  reachCritique(controller);
+  expect(() => controller.skipWorkflow('too late')).toThrow('before a plan is committed');
+});

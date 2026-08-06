@@ -22,6 +22,7 @@ const createTool = () => {
     getState: vi.fn(() => state),
     commitPlan: vi.fn(),
     updatePlanItem: vi.fn(),
+    skipWorkflow: vi.fn(),
   } as unknown as ProductionLoopController;
   const tool = buildProductionLoopTool(controller) as {
     execute(
@@ -106,4 +107,16 @@ test('does not dispatch unknown actions', async () => {
   expect(output.content[0].text).toBe('Unknown production_loop action: delete_everything');
   expect(controller.commitPlan).not.toHaveBeenCalled();
   expect(controller.updatePlanItem).not.toHaveBeenCalled();
+});
+
+test('skip_workflow forwards the reason to the controller', async () => {
+  const { controller, tool } = createTool();
+
+  const output = await tool.execute('call', {
+    action: ProductionLoopAction.SkipWorkflow,
+    reason: 'Pure information request',
+  });
+
+  expect(controller.skipWorkflow).toHaveBeenCalledWith('Pure information request');
+  expect(output.content[0].text).toContain('skipped');
 });

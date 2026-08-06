@@ -155,6 +155,7 @@ export class ProductionLoopService {
       },
       revisions: [],
       recoveries: [],
+      skip: null,
       deliveryReason: null,
       progressVersion: 0,
       lastObservedProgressVersion: 0,
@@ -400,6 +401,31 @@ export class ProductionLoopService {
     });
   }
 
+  /**
+   * Declare that this task needs no production workflow (pure information
+   * requests, trivial edits). Only valid before a plan is committed. The loop
+   * is marked completed so the agent may end the turn without a completion
+   * gate; deterministic verification still applies on run completion.
+   */
+  skipWorkflow(runId: string, reason: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.skip) return;
+      if (state.phase !== ProductionLoopPhase.Explore && state.phase !== ProductionLoopPhase.Plan) {
+        throw new Error('The workflow can only be skipped before a plan is committed.');
+      }
+      const normalized = reason.trim();
+      if (!normalized) throw new Error('A skip reason is required.');
+      state.skip = { reason: normalized, createdAt: Date.now() };
+      state.status = ProductionLoopStatus.Completed;
+      state.progressVersion += 1;
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.WorkflowSkipped,
+        mechanism: 'production_loop',
+        evidence: { reason: normalized },
+      });
+    });
+  }
+
   recordVerificationResult(
     runId: string,
     outcome: WorkbenchVerificationOutcome,
@@ -407,8 +433,11 @@ export class ProductionLoopService {
   ): ProductionLoopState | null {
     if (!this.repository.get(runId)) return null;
     return this.mutate(runId, state => {
+      // The loop may have been skipped or never reached delivery readiness
+      // (e.g. the run settled outside the workflow). That is not an error:
+      // verification outcome still applies to the underlying run.
       if (state.status !== ProductionLoopStatus.ReadyToDeliver || !state.deliveryReason) {
-        throw new Error('The production loop cannot complete before delivery is requested.');
+        return;
       }
       if (outcome === WorkbenchVerificationOutcome.Passed) {
         state.status = ProductionLoopStatus.Completed;

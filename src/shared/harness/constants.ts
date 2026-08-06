@@ -37,6 +37,7 @@ export const HarnessActivationType = {
   CriticRequested: 'critic_requested',
   CriticRejected: 'critic_rejected',
   RevisionApplied: 'revision_applied',
+  WorkflowSkipped: 'workflow_skipped',
   RecoveryTriggered: 'recovery_triggered',
 } as const;
 export type HarnessActivationType =

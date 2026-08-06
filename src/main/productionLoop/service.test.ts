@@ -113,6 +113,34 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   ).toBe(ProductionLoopStatus.Completed);
 });
 
+test('skip_workflow marks the loop completed and skips the completion gate', () => {
+  const { run } = begin();
+  const skipped = service.skipWorkflow(run.id, 'Pure information request');
+  expect(skipped).toMatchObject({
+    status: ProductionLoopStatus.Completed,
+    skip: { reason: 'Pure information request' },
+  });
+
+  // Verification on a skipped loop is a no-op, not an error.
+  expect(
+    service.recordVerificationResult(run.id, WorkbenchVerificationOutcome.Failed, 'n/a'),
+  ).toMatchObject({ status: ProductionLoopStatus.Completed });
+});
+
+test('skip_workflow requires a reason and is only allowed before a plan', () => {
+  const { run } = begin();
+  expect(() => service.skipWorkflow(run.id, '  ')).toThrow('skip reason');
+  commitPlan(run.id);
+  expect(() => service.skipWorkflow(run.id, 'too late')).toThrow('before a plan is committed');
+});
+
+test('verification on a loop that never reached delivery readiness is a no-op', () => {
+  const { run } = begin();
+  expect(
+    service.recordVerificationResult(run.id, WorkbenchVerificationOutcome.Failed, 'never ready'),
+  ).toMatchObject({ status: ProductionLoopStatus.Active });
+});
+
 test('accepts a critic verdict wrapped in a Markdown JSON fence', () => {
   const { run } = begin();
   const planned = commitPlan(run.id);

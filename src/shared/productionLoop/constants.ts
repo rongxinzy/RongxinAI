@@ -52,6 +52,7 @@ export const ProductionLoopAction = {
   StartInspection: 'start_inspection',
   RequestCritique: 'request_critique',
   RecordRevision: 'record_revision',
+  SkipWorkflow: 'skip_workflow',
   GetState: 'get_state',
 } as const;
 export type ProductionLoopAction = (typeof ProductionLoopAction)[keyof typeof ProductionLoopAction];
