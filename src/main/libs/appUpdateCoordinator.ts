@@ -164,6 +164,16 @@ export class AppUpdateCoordinator {
       return { success: true, state: this.setState(initialState()), updateFound: false };
     }
     if (this.checkPromise) return this.checkPromise;
+    // Do not let the periodic checker replace an active download state. Apart
+    // from hiding About-page progress, changing the state makes the completion
+    // guard discard an otherwise valid download.
+    if (this.downloadPromise && this.state.status === AppUpdateStatus.Downloading) {
+      return {
+        success: true,
+        state: this.getState(),
+        updateFound: this.state.info !== null,
+      };
+    }
 
     const source = options.manual ? AppUpdateSource.Manual : AppUpdateSource.Auto;
     this.checkPromise = this.checkForUpdate(source).finally(() => {
@@ -175,13 +185,23 @@ export class AppUpdateCoordinator {
   async retryDownload(): Promise<AppUpdateRuntimeState> {
     const info = this.state.info;
     const target = this.resolveUpdateTarget();
-    if (
-      !info ||
-      !target ||
-      this.downloadPromise ||
-      this.state.status === AppUpdateStatus.Installing
-    ) {
+    if (!info || !target || this.state.status === AppUpdateStatus.Installing) {
       return this.getState();
+    }
+    // Cancellation is asynchronous in electron-updater. If the user retries
+    // immediately, wait for the cancelled promise to drain instead of making
+    // the first retry click appear to do nothing.
+    if (this.downloadPromise) {
+      await this.downloadPromise;
+      const currentState = this.getState();
+      if (
+        currentState.info?.latestVersion !== info.latestVersion ||
+        currentState.status === AppUpdateStatus.Downloading ||
+        currentState.status === AppUpdateStatus.Ready ||
+        currentState.status === AppUpdateStatus.Installing
+      ) {
+        return currentState;
+      }
     }
     if (!this.currentSignedEnvelope) {
       void this.checkNow({ manual: true });

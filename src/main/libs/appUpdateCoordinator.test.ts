@@ -283,6 +283,38 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(state.progress).toBeNull();
   });
 
+  test('preserves active download progress when another update check is triggered', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(envelope), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(
+      () => new Promise(() => {}),
+    );
+
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    updaterMocks.emit('download-progress', {
+      transferred: 10,
+      total: 20,
+      bytesPerSecond: 5,
+    });
+
+    const result = await coordinator.checkNow();
+
+    expect(result.success).toBe(true);
+    expect(result.updateFound).toBe(true);
+    expect(result.state.status).toBe(AppUpdateStatus.Downloading);
+    expect(result.state.progress?.percent).toBe(0.5);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(updaterMocks.autoUpdater.checkForUpdates).toHaveBeenCalledOnce();
+  });
+
   test('marks a successful same-version check as up to date without reading the v2 feed', async () => {
     const envelope = signedManifest(privateKey, {
       version: '2026.7.1',
