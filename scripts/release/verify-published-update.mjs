@@ -3,7 +3,11 @@ import {
   loadTrustedReleaseKey,
   verifyEnvelope,
 } from './update-manifest-lib.mjs';
-import { redirectMatches, verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
+import {
+  ONE_BYTE_RANGE_HEADERS,
+  redirectMatches,
+  verifyPublishedBlockmap,
+} from './published-update-smoke-lib.mjs';
 import yaml from 'js-yaml';
 
 const [expectedVersion, ...targets] = process.argv.slice(2);
@@ -59,7 +63,7 @@ for (const target of targets) {
   }
 
   const rangeResponse = await fetch(payload.artifact.url, {
-    headers: { range: 'bytes=0-0' },
+    headers: ONE_BYTE_RANGE_HEADERS,
     redirect: 'error',
     signal: AbortSignal.timeout(15_000),
   });
@@ -154,7 +158,7 @@ for (const target of targets) {
     throw new Error(`${target} updater artifact size does not match the signed manifest`);
   }
   const updaterRangeResponse = await fetch(signedUpdater.url, {
-    headers: { range: 'bytes=0-0' },
+    headers: ONE_BYTE_RANGE_HEADERS,
     redirect: 'error',
     signal: AbortSignal.timeout(15_000),
   });

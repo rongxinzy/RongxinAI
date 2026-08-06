@@ -1,4 +1,8 @@
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
+export const ONE_BYTE_RANGE_HEADERS = Object.freeze({
+  range: 'bytes=0-0',
+  'cache-control': 'no-cache',
+});
 
 export function redirectMatches(location, baseUrl, expectedUrl) {
   try {
@@ -45,7 +49,7 @@ export async function verifyPublishedBlockmap({
   }
 
   const rangeResponse = await fetchImpl(immutableBlockmapUrl, {
-    headers: { range: 'bytes=0-0' },
+    headers: ONE_BYTE_RANGE_HEADERS,
     redirect: 'error',
     signal: AbortSignal.timeout(timeoutMs),
   });
