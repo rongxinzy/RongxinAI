@@ -4990,14 +4990,14 @@ if (!gotTheLock) {
   );
 
   ipcMain.handle(
-    'cowork:session:getMessages',
+    CoworkSessionIpc.GetMessages,
     async (_event, options: { sessionId: string; limit?: number; offset?: number }) => {
       try {
         const { sessionId, limit = COWORK_MESSAGE_PAGE_SIZE, offset = 0 } = options;
         const store = getCoworkStore();
         const total = store.countSessionMessages(sessionId);
-        const messages = store.getPagedSessionMessages(sessionId, limit, offset);
-        return { success: true, messages, offset, total };
+        const page = store.getSessionMessagePageBefore(sessionId, offset + limit, limit);
+        return { success: true, messages: page.messages, offset: page.offset, total };
       } catch (error) {
         return {
           success: false,

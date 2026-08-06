@@ -85,6 +85,63 @@ function getPagedSessionMessages(db: Database, sessionId: string, limit: number,
   );
 }
 
+function findUserMessageOffsetAtOrBefore(
+  database: Database,
+  sessionId: string,
+  messageOffset: number,
+  skip = 0,
+): number | null {
+  const rows = getAll<{ message_offset: number }>(
+    database,
+    `SELECT message_offset
+     FROM (
+       SELECT
+         type,
+         ROW_NUMBER() OVER (
+           ORDER BY COALESCE(sequence, created_at) ASC, created_at ASC, ROWID ASC
+         ) - 1 AS message_offset
+       FROM cowork_messages
+       WHERE session_id = ?
+     )
+     WHERE type = 'user' AND message_offset <= ?
+     ORDER BY message_offset DESC
+     LIMIT 1 OFFSET ?`,
+    [sessionId, Math.max(0, messageOffset), Math.max(0, skip)],
+  );
+  return rows[0]?.message_offset ?? null;
+}
+
+function getTurnAwarePageBefore(
+  database: Database,
+  sessionId: string,
+  endOffset: number,
+  messageLimit: number,
+) {
+  const requestedOffset = Math.max(0, endOffset - messageLimit);
+  const offset = findUserMessageOffsetAtOrBefore(database, sessionId, requestedOffset) ?? 0;
+  return {
+    messages: getPagedSessionMessages(database, sessionId, endOffset - offset, offset),
+    offset,
+  };
+}
+
+function getTurnAwareTailPage(database: Database, sessionId: string, messageLimit: number) {
+  const totalMessages = countSessionMessages(database, sessionId);
+  const requestedOffset = Math.max(0, totalMessages - messageLimit);
+  const secondLatestUserOffset = findUserMessageOffsetAtOrBefore(
+    database,
+    sessionId,
+    totalMessages - 1,
+    1,
+  );
+  const boundaryCandidate = Math.min(requestedOffset, secondLatestUserOffset ?? 0);
+  const offset = findUserMessageOffsetAtOrBefore(database, sessionId, boundaryCandidate) ?? 0;
+  return {
+    messages: getPagedSessionMessages(database, sessionId, totalMessages - offset, offset),
+    offset,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Schema setup
 // ---------------------------------------------------------------------------
@@ -327,4 +384,68 @@ test('getPagedSessionMessages: session with 0 messages returns empty array', () 
 test('getPagedSessionMessages: offset beyond total returns empty', () => {
   const msgs = getPagedSessionMessages(db, sessionWithManyMessagesId, 50, 999);
   expect(msgs.length).toBe(0);
+});
+
+test('turn-aware tail page includes the previous turn when the latest turn exceeds the limit', () => {
+  const sessionId = uuidv4();
+  const now = Date.now();
+  db.run(
+    `INSERT INTO cowork_sessions (id, title, status, pinned, cwd, created_at, updated_at)
+     VALUES (?, 'Tool-heavy session', 'idle', 0, '/tmp', ?, ?)`,
+    [sessionId, now, now],
+  );
+  db.run(
+    `INSERT INTO cowork_messages (id, session_id, type, content, created_at, sequence)
+     VALUES (?, ?, 'user', 'first turn', ?, 1),
+            (?, ?, 'assistant', 'first answer', ?, 2),
+            (?, ?, 'user', 'large final turn', ?, 3)`,
+    [uuidv4(), sessionId, now + 1, uuidv4(), sessionId, now + 2, uuidv4(), sessionId, now + 3],
+  );
+  for (let sequence = 4; sequence <= 40; sequence += 1) {
+    db.run(
+      `INSERT INTO cowork_messages (id, session_id, type, content, created_at, sequence)
+       VALUES (?, ?, 'tool_use', ?, ?, ?)`,
+      [uuidv4(), sessionId, `tool call ${sequence}`, now + sequence, sequence],
+    );
+  }
+
+  const page = getTurnAwareTailPage(db, sessionId, 30);
+
+  expect(page.offset).toBe(0);
+  expect(page.messages.filter(message => message.content.includes('turn'))).toHaveLength(2);
+});
+
+test('turn-aware history page expands backward without leaving a message gap', () => {
+  const sessionId = uuidv4();
+  const now = Date.now();
+  db.run(
+    `INSERT INTO cowork_sessions (id, title, status, pinned, cwd, created_at, updated_at)
+     VALUES (?, 'Paged turns', 'idle', 0, '/tmp', ?, ?)`,
+    [sessionId, now, now],
+  );
+  for (let turn = 0; turn < 4; turn += 1) {
+    const turnStart = turn * 20 + 1;
+    for (let index = 0; index < 20; index += 1) {
+      const sequence = turnStart + index;
+      db.run(
+        `INSERT INTO cowork_messages (id, session_id, type, content, created_at, sequence)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          uuidv4(),
+          sessionId,
+          index === 0 ? 'user' : 'tool_use',
+          `message ${sequence}`,
+          now + sequence,
+          sequence,
+        ],
+      );
+    }
+  }
+
+  const page = getTurnAwarePageBefore(db, sessionId, 60, 30);
+
+  expect(page.offset).toBe(20);
+  expect(page.messages).toHaveLength(40);
+  expect(page.messages[0]?.content).toBe('message 21');
+  expect(page.messages.at(-1)?.content).toBe('message 60');
 });

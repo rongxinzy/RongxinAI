@@ -7,6 +7,7 @@ import {
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
 import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import {
+  COWORK_MESSAGE_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionOrigin,
   CoworkSessionMode,
@@ -773,13 +774,18 @@ class CoworkService {
     const currentOffset = state.currentSession.messagesOffset;
     if (currentOffset <= 0) return false;
 
-    const PAGE_SIZE = 50;
-    const newOffset = Math.max(0, currentOffset - PAGE_SIZE);
+    const newOffset = Math.max(0, currentOffset - COWORK_MESSAGE_PAGE_SIZE);
     const limit = currentOffset - newOffset;
 
     const result = await cowork.getSessionMessages({ sessionId, limit, offset: newOffset });
     if (result.success && result.messages && result.messages.length > 0) {
-      store.dispatch(prependMessages({ sessionId, messages: result.messages, newOffset }));
+      store.dispatch(
+        prependMessages({
+          sessionId,
+          messages: result.messages,
+          newOffset: result.offset ?? newOffset,
+        }),
+      );
       return true;
     }
     return false;

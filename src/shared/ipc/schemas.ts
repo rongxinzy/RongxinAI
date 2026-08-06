@@ -249,6 +249,8 @@ export const CoworkSessionGetMessagesSchema = {
   }),
   output: IpcResult({
     messages: z.array(z.object({}).passthrough()),
+    offset: z.number().int().min(0).optional(),
+    total: z.number().int().min(0).optional(),
   }),
 };
 
