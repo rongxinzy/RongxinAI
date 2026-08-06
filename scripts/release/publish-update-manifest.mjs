@@ -26,7 +26,16 @@ const privateKey = crypto.createPrivateKey({
   type: 'pkcs8',
 });
 
-function resolveArtifactFormat(platform, variant) {
+function resolveArtifactFormat(platform, variant, kind = 'installer') {
+  if (kind === 'metadata') {
+    return { extension: '.yml', contentType: 'application/x-yaml' };
+  }
+  if (kind === 'blockmap') {
+    return { extension: '.blockmap', contentType: 'application/octet-stream' };
+  }
+  if (kind === 'updater' && platform === 'darwin' && variant === 'default') {
+    return { extension: '.zip', contentType: 'application/zip' };
+  }
   if (platform === 'win32' && (variant === 'lite' || variant === 'full')) {
     return {
       extension: '.exe',
@@ -66,6 +75,7 @@ async function localArtifact(spec) {
     filename,
     size: content.length,
     sha256: crypto.createHash('sha256').update(content).digest('hex'),
+    sha512: crypto.createHash('sha512').update(content).digest('base64'),
   };
 }
 
@@ -80,9 +90,12 @@ async function metadataArtifacts(metadataPath) {
     throw new Error(`Invalid uploaded artifact metadata: ${metadataPath}`);
   }
   return metadata.artifacts.map(artifact => {
-    const { platform, arch, variant, filename, key, size, sha256 } = artifact ?? {};
-    const format = resolveArtifactFormat(platform, variant);
-    const expectedKey = `releases/${releaseVersion}/${platform}-${arch}-${variant}/${filename}`;
+    const { platform, arch, variant, kind = 'installer', filename, key, size, sha256, sha512 } = artifact ?? {};
+    const format = resolveArtifactFormat(platform, variant, kind);
+    const expectedKey =
+      kind === 'metadata'
+        ? `generations/${releaseVersion}/electron/${platform}-${arch}-${variant}/${filename}`
+        : `releases/${releaseVersion}/${platform}-${arch}-${variant}/${filename}`;
     if (
       typeof arch !== 'string' ||
       typeof filename !== 'string' ||
@@ -92,11 +105,13 @@ async function metadataArtifacts(metadataPath) {
       !Number.isSafeInteger(size) ||
       size <= 0 ||
       typeof sha256 !== 'string' ||
-      !/^[a-f0-9]{64}$/.test(sha256)
+      !/^[a-f0-9]{64}$/.test(sha256) ||
+      typeof sha512 !== 'string' ||
+      !/^[A-Za-z0-9+/]{86}(?:==)?$/.test(sha512)
     ) {
       throw new Error(`Invalid uploaded artifact metadata entry: ${metadataPath}`);
     }
-    return { platform, arch, variant, filename, size, sha256 };
+    return { platform, arch, variant, kind, filename, size, sha256, sha512 };
   });
 }
 
@@ -111,8 +126,9 @@ const artifacts = [
   ...(await Promise.all(localSpecs.map(localArtifact))),
   ...(await Promise.all(metadataPaths.map(metadataArtifacts))).flat(),
 ];
+const installerArtifacts = artifacts.filter(({ kind = 'installer' }) => kind === 'installer');
 const targets = new Set();
-for (const { platform, arch, variant } of artifacts) {
+for (const { platform, arch, variant } of installerArtifacts) {
   const target = `${platform}:${arch}:${variant}`;
   if (targets.has(target)) throw new Error(`Duplicate release target: ${target}`);
   targets.add(target);
@@ -125,8 +141,18 @@ if (missingTargets.length > 0 || unexpectedTargets.length > 0) {
   );
 }
 
-const manifests = artifacts.map(({ platform, arch, variant, filename, size, sha256 }) => {
+const manifests = installerArtifacts.map(({ platform, arch, variant, filename, size, sha256, sha512 }) => {
   const format = resolveArtifactFormat(platform, variant);
+  const target = `${platform}:${arch}:${variant}`;
+  const updaterArtifacts = artifacts.filter(
+    artifact =>
+      `${artifact.platform}:${artifact.arch}:${artifact.variant}` === target &&
+      artifact.kind === 'updater',
+  );
+  if (metadataPaths.length > 0 && updaterArtifacts.length !== 1) {
+    throw new Error(`Release target ${target} must contain exactly one updater artifact`);
+  }
+  const updaterArtifact = updaterArtifacts[0] ?? { filename, size, sha512 };
   const payload = {
     channel: 'stable',
     version: releaseVersion,
@@ -144,7 +170,17 @@ const manifests = artifacts.map(({ platform, arch, variant, filename, size, sha2
       url: `https://downloads.rongxzyai.com/releases/${releaseVersion}/${platform}-${arch}-${variant}/${filename}`,
       size,
       sha256,
+      // Existing clients validate these legacy fields. New clients use the
+      // nested updater object, which is a ZIP on macOS and therefore differs
+      // from the legacy DMG installer.
+      sha512,
       contentType: format.contentType,
+      updater: {
+        filename: updaterArtifact.filename,
+        url: `https://downloads.rongxzyai.com/releases/${releaseVersion}/${platform}-${arch}-${variant}/${updaterArtifact.filename}`,
+        size: updaterArtifact.size,
+        sha512: updaterArtifact.sha512,
+      },
     },
     source: {
       commitSha,

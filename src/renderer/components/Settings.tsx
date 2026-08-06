@@ -5270,31 +5270,33 @@ const Settings: React.FC<SettingsProps> = ({
                             : i18nService.t('updateNotChecked')}
                   </span>
                 </div>
-                {isDownloading && progress ? (
+                {isDownloading ? (
                   <>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full bg-primary transition-[width] duration-200"
+                        className={`h-full bg-primary transition-[width] duration-200 ${progress?.percent === undefined ? 'w-1/3 animate-pulse' : ''}`}
                         style={{
-                          width: `${Math.min(100, Math.max(0, (progress.percent ?? 0) * 100))}%`,
+                          width:
+                            progress?.percent === undefined
+                              ? undefined
+                              : `${Math.min(100, Math.max(0, progress.percent * 100))}%`,
                         }}
                       />
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>
-                        {formatBytes(progress.received)}
-                        {progress.total ? ` / ${formatBytes(progress.total)}` : ''}
+                        {progress
+                          ? `${formatBytes(progress.received)}${progress.total ? ` / ${formatBytes(progress.total)}` : ''}`
+                          : i18nService.t('updateDownloading')}
                       </span>
-                      <span>{progress.speed ? `${formatBytes(progress.speed)}/s` : ''}</span>
+                      <span>
+                        {progress?.percent !== undefined
+                          ? `${Math.round(progress.percent * 100)}%`
+                          : ''}
+                        {progress?.speed ? ` · ${formatBytes(progress.speed)}/s` : ''}
+                      </span>
                     </div>
                     <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => void window.electron.appUpdate.pauseDownload()}
-                      >
-                        {i18nService.t('updatePause')}
-                      </Button>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -5304,22 +5306,6 @@ const Settings: React.FC<SettingsProps> = ({
                       </Button>
                     </div>
                   </>
-                ) : update?.status === AppUpdateStatus.Paused ? (
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => void window.electron.appUpdate.resumeDownload()}
-                    >
-                      {i18nService.t('updateResume')}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => void window.electron.appUpdate.cancelDownload()}
-                    >
-                      {i18nService.t('updateDownloadCancel')}
-                    </Button>
-                  </div>
                 ) : update?.status === AppUpdateStatus.Ready ? (
                   <Button size="sm" onClick={() => void window.electron.appUpdate.installReady()}>
                     {i18nService.t('updateReadyConfirm')}
@@ -5349,6 +5335,11 @@ const Settings: React.FC<SettingsProps> = ({
                   >
                     {i18nService.t('updateCheckNow')}
                   </Button>
+                ) : null}
+                {update?.status === AppUpdateStatus.Error && !update.info ? (
+                  <div className="text-xs text-destructive">
+                    {update.errorMessage || i18nService.t('updateCheckFailed')}
+                  </div>
                 ) : null}
                 {update?.lastCheckedAt ? (
                   <div className="text-xs text-muted-foreground">

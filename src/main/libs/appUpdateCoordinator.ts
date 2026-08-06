@@ -1,5 +1,11 @@
 import crypto from 'crypto';
 import { app, BrowserWindow } from 'electron';
+import {
+  autoUpdater,
+  CancellationToken,
+  type ProgressInfo,
+  type UpdateInfo,
+} from 'electron-updater';
 import fs from 'fs';
 import path from 'path';
 import { gt, lt, valid } from 'semver';
@@ -13,23 +19,22 @@ import {
   AppUpdateStatus,
 } from '../../shared/appUpdate/constants';
 import { APP_UPDATE_TRUSTED_KEYS } from '../../shared/appUpdate/trustedKeys';
-import {
-  cancelActiveDownload,
-  downloadUpdate,
-  installUpdate,
-  pauseActiveDownload,
-  resumeActiveDownload,
-  type AppUpdateResumeState,
-} from './appUpdateInstaller';
 import type { SqliteStore } from '../sqliteStore';
+import { installWindowsNsis } from './appUpdateInstaller';
 
 const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
+const ELECTRON_UPDATE_FEED_BASE = 'https://updates.rongxzyai.com/v2/electron';
 const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
 const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
-const READY_UPDATE_CACHE_KEY = 'app_update_ready';
-const DOWNLOAD_UPDATE_CACHE_KEY = 'app_update_download';
+const READY_UPDATE_CACHE_KEY = 'app_update_ready_v2';
 const SUPPORTED_UPDATE_PLATFORMS = new Set(['win32', 'darwin', 'linux']);
 const SUPPORTED_UPDATE_ARCHITECTURES = new Set(['x64', 'arm64']);
+
+type UpdateTarget = {
+  platform: string;
+  arch: string;
+  variant: string;
+};
 
 type UpdatePayload = {
   channel?: unknown;
@@ -44,6 +49,11 @@ type UpdatePayload = {
     url?: unknown;
     size?: unknown;
     sha256?: unknown;
+    updater?: {
+      sha512?: unknown;
+      size?: unknown;
+      filename?: unknown;
+    };
   };
 };
 
@@ -63,18 +73,26 @@ type CachedSignedManifest = {
 type ReadyUpdateCache = {
   envelope: unknown;
   filePath: string;
-  sha256: string;
-};
-
-type PendingDownloadCache = {
-  envelope: unknown;
-  resumeState: AppUpdateResumeState;
+  sha512: string;
 };
 
 type VerifiedUpdate = {
   envelope: unknown;
   info: AppUpdateInfo;
+  target: UpdateTarget;
 };
+
+type ElectronUpdaterAdapter = Pick<
+  typeof autoUpdater,
+  | 'autoDownload'
+  | 'autoInstallOnAppQuit'
+  | 'on'
+  | 'removeListener'
+  | 'setFeedURL'
+  | 'checkForUpdates'
+  | 'downloadUpdate'
+  | 'quitAndInstall'
+>;
 
 const initialState = (): AppUpdateRuntimeState => ({
   status: AppUpdateStatus.Idle,
@@ -92,16 +110,48 @@ function base64UrlToBuffer(value: string): Buffer {
   return Buffer.from(value.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 }
 
+function isSha512(value: unknown): value is string {
+  // A SHA-512 digest is 86 base64 characters, optionally followed by "==".
+  return typeof value === 'string' && /^[A-Za-z0-9+/]{86}(?:==)?$/.test(value);
+}
+
+/**
+ * Authorizes electron-updater with the existing signed v1 manifest before it
+ * reads any v2 metadata. The legacy manifest remains the trust root during the
+ * protocol migration; electron-updater provides download, cache and install.
+ */
 export class AppUpdateCoordinator {
   private state: AppUpdateRuntimeState = initialState();
   private readonly store: SqliteStore;
+  private readonly updater: ElectronUpdaterAdapter;
   private checkPromise: Promise<AppUpdateCheckResult> | null = null;
   private downloadPromise: Promise<void> | null = null;
+  private downloadCancellation: CancellationToken | null = null;
   private currentSignedEnvelope: unknown | null = null;
+  private downloadedFilePath: string | null = null;
+  private readonly onDownloadProgress = (progress: ProgressInfo): void =>
+    this.handleDownloadProgress(progress);
+  private readonly onUpdateDownloaded = (event: { downloadedFile: string }): void => {
+    this.downloadedFilePath = event.downloadedFile;
+  };
+  private readonly onUpdaterError = (error: Error): void => this.handleUpdaterError(error);
 
-  constructor(store: SqliteStore) {
+  constructor(store: SqliteStore, updater: ElectronUpdaterAdapter = autoUpdater) {
     this.store = store;
+    this.updater = updater;
+    this.updater.autoDownload = false;
+    this.updater.autoInstallOnAppQuit = false;
+    this.updater.on('download-progress', this.onDownloadProgress);
+    this.updater.on('update-downloaded', this.onUpdateDownloaded);
+    this.updater.on('error', this.onUpdaterError);
     this.restoreReadyUpdate();
+  }
+
+  /** Release global autoUpdater listeners when a coordinator is replaced in tests or embedding code. */
+  dispose(): void {
+    this.updater.removeListener('download-progress', this.onDownloadProgress);
+    this.updater.removeListener('update-downloaded', this.onUpdateDownloaded);
+    this.updater.removeListener('error', this.onUpdaterError);
   }
 
   getState(): AppUpdateRuntimeState {
@@ -111,11 +161,7 @@ export class AppUpdateCoordinator {
   async checkNow(options: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
     if (this.isUpdateDisabled()) {
       this.currentSignedEnvelope = null;
-      return {
-        success: true,
-        state: this.setState(initialState()),
-        updateFound: false,
-      };
+      return { success: true, state: this.setState(initialState()), updateFound: false };
     }
     if (this.checkPromise) return this.checkPromise;
 
@@ -128,7 +174,13 @@ export class AppUpdateCoordinator {
 
   async retryDownload(): Promise<AppUpdateRuntimeState> {
     const info = this.state.info;
-    if (!info || this.downloadPromise || this.state.status === AppUpdateStatus.Installing) {
+    const target = this.resolveUpdateTarget();
+    if (
+      !info ||
+      !target ||
+      this.downloadPromise ||
+      this.state.status === AppUpdateStatus.Installing
+    ) {
       return this.getState();
     }
     if (!this.currentSignedEnvelope) {
@@ -136,40 +188,35 @@ export class AppUpdateCoordinator {
       return this.getState();
     }
     this.startBackgroundDownload(
-      { info, envelope: this.currentSignedEnvelope },
+      { info, target, envelope: this.currentSignedEnvelope },
       this.state.source ?? AppUpdateSource.Manual,
     );
     return this.getState();
   }
 
   cancelDownload(): AppUpdateRuntimeState {
-    if (
-      this.state.status === AppUpdateStatus.Downloading ||
-      this.state.status === AppUpdateStatus.Paused
-    ) {
-      cancelActiveDownload();
-      this.store.delete(DOWNLOAD_UPDATE_CACHE_KEY);
+    if (this.state.status === AppUpdateStatus.Downloading && this.downloadCancellation) {
+      this.downloadCancellation.cancel();
+      this.downloadCancellation = null;
+      this.downloadedFilePath = null;
       this.setState({
         ...initialState(),
         status: AppUpdateStatus.Available,
         source: this.state.source,
         info: this.state.info,
+        lastCheckedAt: this.state.lastCheckedAt,
       });
     }
     return this.getState();
   }
 
+  // electron-updater has no public pause/resume API. Keep IPC compatibility,
+  // but never claim a paused or resumable transfer to the renderer.
   pauseDownload(): AppUpdateRuntimeState {
-    if (this.state.status === AppUpdateStatus.Downloading && pauseActiveDownload()) {
-      return this.setState({ ...this.state, status: AppUpdateStatus.Paused });
-    }
     return this.getState();
   }
 
   resumeDownload(): AppUpdateRuntimeState {
-    if (this.state.status === AppUpdateStatus.Paused && resumeActiveDownload()) {
-      return this.setState({ ...this.state, status: AppUpdateStatus.Downloading });
-    }
     return this.getState();
   }
 
@@ -178,21 +225,21 @@ export class AppUpdateCoordinator {
     state: AppUpdateRuntimeState;
     error?: string;
   }> {
-    const { readyFilePath, readyFileHash, info, source } = this.state;
-    if (!readyFilePath || !readyFileHash || !info) {
-      return {
-        success: false,
-        state: this.getState(),
-        error: 'No verified update is ready',
-      };
+    const { info, readyFileHash, readyFilePath } = this.state;
+    if (this.state.status !== AppUpdateStatus.Ready || !info || !readyFileHash || !readyFilePath) {
+      return { success: false, state: this.getState(), error: 'No verified update is ready' };
     }
 
     try {
       const stat = await fs.promises.stat(readyFilePath);
-      if (stat.size !== info.expectedSize)
+      if (!stat.isFile() || stat.size === 0) {
         throw new Error('Downloaded update file is no longer valid');
-      const actualHash = await this.sha256File(readyFilePath);
-      if (actualHash !== readyFileHash || actualHash !== info.expectedSha256) {
+      }
+      if (path.basename(readyFilePath) !== info.expectedUpdaterFileName) {
+        throw new Error('Downloaded update filename no longer matches the signed manifest');
+      }
+      const actualSha512 = await this.sha512File(readyFilePath);
+      if (actualSha512 !== readyFileHash || actualSha512 !== info.expectedUpdaterSha512) {
         throw new Error('Downloaded update checksum verification failed');
       }
       this.setState({
@@ -201,17 +248,17 @@ export class AppUpdateCoordinator {
         progress: null,
         errorMessage: null,
       });
-      await installUpdate(readyFilePath);
+      if (process.platform === 'win32') {
+        await installWindowsNsis(readyFilePath);
+      } else {
+        this.updater.quitAndInstall(false, true);
+      }
       return { success: true, state: this.getState() };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Update installation failed';
       const state = this.setState({
-        ...initialState(),
+        ...this.state,
         status: AppUpdateStatus.Error,
-        source,
-        info,
-        readyFilePath,
-        readyFileHash,
         errorMessage: message,
       });
       return { success: false, state, error: message };
@@ -233,7 +280,7 @@ export class AppUpdateCoordinator {
       const update = await this.fetchUpdateInfo(currentVersion);
       if (!update) {
         this.currentSignedEnvelope = null;
-        if (previousReady?.readyFilePath) this.discardReadyUpdate(previousReady.readyFilePath);
+        this.store.delete(READY_UPDATE_CACHE_KEY);
         const state = this.setState({
           ...initialState(),
           status: AppUpdateStatus.UpToDate,
@@ -241,24 +288,24 @@ export class AppUpdateCoordinator {
         });
         return { success: true, state, updateFound: false };
       }
+
+      this.currentSignedEnvelope = update.envelope;
+      this.configureUpdater(update.target);
+      const result = await this.updater.checkForUpdates();
+      if (!result?.isUpdateAvailable) {
+        throw new Error('The electron updater feed does not contain the signed update');
+      }
+      this.assertUpdaterMatchesSignedManifest(result.updateInfo, update.info);
+
       if (
         previousReady?.info?.latestVersion === update.info.latestVersion &&
-        previousReady.readyFilePath &&
-        previousReady.readyFileHash === update.info.expectedSha256
+        previousReady.readyFileHash === update.info.expectedUpdaterSha512 &&
+        previousReady.readyFilePath
       ) {
         this.currentSignedEnvelope = update.envelope;
-        this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, {
-          envelope: update.envelope,
-          filePath: previousReady.readyFilePath,
-          sha256: previousReady.readyFileHash,
-        });
-        return {
-          success: true,
-          state: this.setState(previousReady),
-          updateFound: true,
-        };
+        return { success: true, state: this.setState(previousReady), updateFound: true };
       }
-      this.currentSignedEnvelope = update.envelope;
+
       const state = this.setState({
         ...initialState(),
         status: AppUpdateStatus.Available,
@@ -266,18 +313,22 @@ export class AppUpdateCoordinator {
         info: update.info,
         lastCheckedAt: Date.now(),
       });
-      this.startBackgroundDownload(update, source, previousReady?.readyFilePath ?? undefined);
+      this.startBackgroundDownload(update, source);
       return { success: true, state, updateFound: true };
     } catch (error) {
       console.warn(
         '[AppUpdate] update check failed:',
         error instanceof Error ? error.message : 'unknown',
       );
-      if (previousReady) {
-        this.currentSignedEnvelope = previousEnvelope;
-      }
+      if (previousReady) this.currentSignedEnvelope = previousEnvelope;
       const state = this.setState(
-        previousReady ?? { ...initialState(), lastCheckedAt: previousState.lastCheckedAt },
+        previousReady ?? {
+          ...initialState(),
+          status: AppUpdateStatus.Error,
+          source,
+          lastCheckedAt: previousState.lastCheckedAt,
+          errorMessage: error instanceof Error ? error.message : 'Update check failed',
+        },
       );
       return {
         success: false,
@@ -288,13 +339,12 @@ export class AppUpdateCoordinator {
     }
   }
 
-  private startBackgroundDownload(
-    update: VerifiedUpdate,
-    source: AppUpdateSource,
-    supersededFilePath?: string,
-  ): void {
+  private startBackgroundDownload(update: VerifiedUpdate, source: AppUpdateSource): void {
     if (this.downloadPromise) return;
     const { envelope, info } = update;
+    const cancellation = new CancellationToken();
+    this.downloadCancellation = cancellation;
+    this.downloadedFilePath = null;
     this.setState({
       ...initialState(),
       status: AppUpdateStatus.Downloading,
@@ -302,41 +352,40 @@ export class AppUpdateCoordinator {
       info,
       lastCheckedAt: this.state.lastCheckedAt,
     });
-    this.downloadPromise = downloadUpdate(
-      info.url,
-      source,
-      { size: info.expectedSize, sha256: info.expectedSha256 },
-      progress => {
-        this.setState({ ...this.state, progress });
-      },
-      {
-        resumeState: this.readPendingDownload(envelope, info),
-        onResumeState: resumeState => {
-          this.store.set<PendingDownloadCache>(DOWNLOAD_UPDATE_CACHE_KEY, {
-            envelope,
-            resumeState,
-          });
-        },
-      },
-    )
-      .then(({ filePath, sha256 }) => {
-        const readyUpdate: ReadyUpdateCache = { envelope, filePath, sha256 };
+    this.downloadPromise = this.updater
+      .downloadUpdate(cancellation)
+      .then(async filePaths => {
+        const downloadedFile = this.downloadedFilePath ?? filePaths[0];
+        if (!downloadedFile) throw new Error('electron-updater did not return an update file');
+        const sha512 = await this.sha512File(downloadedFile);
+        if (
+          cancellation.cancelled ||
+          this.state.status !== AppUpdateStatus.Downloading ||
+          this.state.info?.latestVersion !== info.latestVersion
+        ) {
+          return;
+        }
+        if (sha512 !== info.expectedUpdaterSha512) {
+          throw new Error('electron-updater file checksum does not match the signed manifest');
+        }
+        const readyUpdate: ReadyUpdateCache = {
+          envelope,
+          filePath: downloadedFile,
+          sha512,
+        };
         this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, readyUpdate);
-        this.store.delete(DOWNLOAD_UPDATE_CACHE_KEY);
         this.currentSignedEnvelope = envelope;
         this.setState({
           ...initialState(),
           status: AppUpdateStatus.Ready,
           source,
           info,
-          readyFilePath: filePath,
-          readyFileHash: sha256,
+          readyFilePath: downloadedFile,
+          readyFileHash: sha512,
         });
-        if (supersededFilePath && supersededFilePath !== filePath) {
-          void fs.promises.unlink(supersededFilePath).catch(() => {});
-        }
       })
       .catch(error => {
+        // cancelDownload already restored Available. Cancellation is not an error.
         if (
           this.state.status !== AppUpdateStatus.Downloading ||
           this.state.info?.latestVersion !== info.latestVersion
@@ -354,108 +403,119 @@ export class AppUpdateCoordinator {
         });
       })
       .finally(() => {
+        if (this.downloadCancellation === cancellation) this.downloadCancellation = null;
         this.downloadPromise = null;
       });
   }
 
+  private handleDownloadProgress(progress: ProgressInfo): void {
+    if (this.state.status !== AppUpdateStatus.Downloading) return;
+    const total = progress.total > 0 ? progress.total : undefined;
+    this.setState({
+      ...this.state,
+      progress: {
+        received: progress.transferred,
+        total,
+        percent: total ? progress.transferred / total : undefined,
+        speed: progress.bytesPerSecond > 0 ? progress.bytesPerSecond : undefined,
+      },
+    });
+  }
+
+  private handleUpdaterError(error: Error): void {
+    if (this.state.status !== AppUpdateStatus.Downloading) return;
+    this.setState({
+      ...this.state,
+      status: AppUpdateStatus.Error,
+      progress: null,
+      errorMessage: error.message || 'electron-updater failed',
+    });
+  }
+
+  private configureUpdater(target: UpdateTarget): void {
+    const feedUrl = new URL(
+      `${target.platform}/${target.arch}/${target.variant}/`,
+      `${ELECTRON_UPDATE_FEED_BASE}/stable/`,
+    );
+    this.updater.setFeedURL({ provider: 'generic', url: feedUrl.toString() });
+  }
+
+  private assertUpdaterMatchesSignedManifest(updateInfo: UpdateInfo, info: AppUpdateInfo): void {
+    if (updateInfo.version !== info.latestVersion) {
+      throw new Error('electron-updater version does not match the signed manifest');
+    }
+    const expectedFile = updateInfo.files.find(file => {
+      try {
+        return (
+          decodeURIComponent(
+            path.basename(new URL(file.url, 'https://updates.rongxzyai.com/').pathname),
+          ) === info.expectedUpdaterFileName
+        );
+      } catch {
+        return false;
+      }
+    });
+    if (!expectedFile || expectedFile.sha512 !== info.expectedUpdaterSha512) {
+      throw new Error('electron-updater checksum does not match the signed manifest');
+    }
+  }
+
   private restoreReadyUpdate(): void {
     const cached = this.store.get<unknown>(READY_UPDATE_CACHE_KEY);
-    if (!this.isReadyUpdateCache(cached)) {
-      if (cached !== undefined) this.store.delete(READY_UPDATE_CACHE_KEY);
+    if (!cached || typeof cached !== 'object') return;
+    // Windows owns the final installer handoff directly. macOS and Linux let
+    // electron-updater manage their internal cache, which is not a stable API
+    // we should reconstruct after restart.
+    if (process.platform !== 'win32') {
+      this.store.delete(READY_UPDATE_CACHE_KEY);
       return;
     }
     try {
-      const payload = this.verifyAndDecodeManifest(cached.envelope);
+      const ready = cached as ReadyUpdateCache;
+      if (
+        typeof ready.filePath !== 'string' ||
+        !isSha512(ready.sha512) ||
+        !ready.envelope ||
+        typeof ready.envelope !== 'object'
+      ) {
+        throw new Error('invalid ready update cache');
+      }
       const target = this.resolveUpdateTarget();
-      if (!target) throw new Error('unsupported update target');
-      const info = this.toUpdateInfo(payload, target);
-      if (!info || info.expectedSha256 !== cached.sha256) throw new Error('manifest mismatch');
-      const updateDir = path.resolve(app.getPath('userData'), 'updates');
-      const resolvedFilePath = path.resolve(cached.filePath);
-      if (!resolvedFilePath.startsWith(`${updateDir}${path.sep}`)) {
-        throw new Error('installer path is outside the update directory');
+      const info = target
+        ? this.toUpdateInfo(this.verifyAndDecodeManifest(ready.envelope), target)
+        : null;
+      if (!info || ready.sha512 !== info.expectedUpdaterSha512)
+        throw new Error('manifest mismatch');
+      const resolvedFile = path.resolve(ready.filePath);
+      if (path.basename(resolvedFile) !== info.expectedUpdaterFileName) {
+        throw new Error('installer filename mismatch');
       }
-      const stat = fs.statSync(resolvedFilePath);
-      if (stat.size !== info.expectedSize) throw new Error('size mismatch');
+      const stat = fs.statSync(resolvedFile);
+      if (!stat.isFile() || stat.size === 0) {
+        throw new Error('installer is missing or empty');
+      }
       if (!this.isNewerVersion(info.latestVersion, this.resolveCurrentVersion())) {
-        throw new Error('not newer than the running app');
+        throw new Error('cached update is not newer than the running app');
       }
-      this.currentSignedEnvelope = cached.envelope;
+      this.currentSignedEnvelope = ready.envelope;
+      this.downloadedFilePath = resolvedFile;
       this.state = {
         ...initialState(),
         status: AppUpdateStatus.Ready,
         source: AppUpdateSource.Auto,
         info,
-        readyFilePath: resolvedFilePath,
-        readyFileHash: cached.sha256,
+        readyFilePath: resolvedFile,
+        readyFileHash: ready.sha512,
       };
     } catch {
       this.store.delete(READY_UPDATE_CACHE_KEY);
     }
   }
 
-  private isReadyUpdateCache(value: unknown): value is ReadyUpdateCache {
-    if (!value || typeof value !== 'object') return false;
-    const cached = value as ReadyUpdateCache;
-    return (
-      typeof cached.filePath === 'string' &&
-      /^[a-f0-9]{64}$/.test(cached.sha256) &&
-      Boolean(cached.envelope) &&
-      typeof cached.envelope === 'object'
-    );
-  }
-
-  private discardReadyUpdate(filePath: string): void {
-    this.store.delete(READY_UPDATE_CACHE_KEY);
-    const updateDir = path.resolve(app.getPath('userData'), 'updates');
-    const resolvedFilePath = path.resolve(filePath);
-    if (resolvedFilePath.startsWith(`${updateDir}${path.sep}`)) {
-      void fs.promises.unlink(resolvedFilePath).catch(() => {});
-    }
-  }
-
-  private readPendingDownload(envelope: unknown, info: AppUpdateInfo): AppUpdateResumeState | null {
-    const pending = this.store.get<unknown>(DOWNLOAD_UPDATE_CACHE_KEY);
-    if (!pending || typeof pending !== 'object') return null;
-    const cached = pending as Partial<PendingDownloadCache>;
-    if (!cached.resumeState || typeof cached.resumeState.filePath !== 'string') return null;
-    try {
-      const payload = this.verifyAndDecodeManifest(cached.envelope);
-      const target = this.resolveUpdateTarget();
-      const cachedInfo = target ? this.toUpdateInfo(payload, target) : null;
-      if (
-        !cachedInfo ||
-        cachedInfo.latestVersion !== info.latestVersion ||
-        cachedInfo.expectedSha256 !== info.expectedSha256 ||
-        cachedInfo.url !== info.url
-      ) {
-        throw new Error('pending update does not match the current manifest');
-      }
-      const updateDir = path.resolve(app.getPath('userData'), 'updates');
-      const partialPath = path.resolve(cached.resumeState.filePath);
-      if (!partialPath.startsWith(`${updateDir}${path.sep}`) || !partialPath.endsWith('.part')) {
-        throw new Error('pending update path is invalid');
-      }
-      return cached.resumeState;
-    } catch {
-      this.store.delete(DOWNLOAD_UPDATE_CACHE_KEY);
-      return null;
-    }
-  }
-
-  private async sha256File(filePath: string): Promise<string> {
-    const hash = crypto.createHash('sha256');
-    for await (const chunk of fs.createReadStream(filePath)) {
-      hash.update(chunk);
-    }
-    return hash.digest('hex');
-  }
-
   private async fetchUpdateInfo(currentVersion: string): Promise<VerifiedUpdate | null> {
     const target = this.resolveUpdateTarget();
     if (!target) return null;
     const { platform, arch, variant } = target;
-
     const cacheKey = `${MANIFEST_CACHE_KEY_PREFIX}:${platform}:${arch}:${variant}`;
     const cachedManifest = this.readCachedManifest(cacheKey);
     const url = new URL(UPDATE_ENDPOINT);
@@ -481,32 +541,21 @@ export class AppUpdateCoordinator {
     if (response.status !== 304 && !response.ok) {
       throw new Error(`Update service returned HTTP ${response.status}`);
     }
-
     const envelope: unknown =
       response.status === 304 ? cachedManifest?.envelope : await response.json();
     const payload = this.verifyAndDecodeManifest(envelope);
     const info = this.toUpdateInfo(payload, target);
-
     if (response.status !== 304) {
       const receivedEtag = response.headers.get('etag');
-      if (receivedEtag) {
-        this.store.set<CachedSignedManifest>(cacheKey, {
-          etag: receivedEtag,
-          envelope,
-        });
-      } else {
-        this.store.delete(cacheKey);
-      }
+      if (receivedEtag)
+        this.store.set<CachedSignedManifest>(cacheKey, { etag: receivedEtag, envelope });
+      else this.store.delete(cacheKey);
     }
     if (!info || !this.isNewerVersion(info.latestVersion, currentVersion)) return null;
-    return { envelope, info };
+    return { envelope, info, target };
   }
 
-  private resolveUpdateTarget(): {
-    platform: string;
-    arch: string;
-    variant: string;
-  } | null {
+  private resolveUpdateTarget(): UpdateTarget | null {
     const platform = process.platform;
     const arch = process.arch;
     if (!SUPPORTED_UPDATE_PLATFORMS.has(platform) || !SUPPORTED_UPDATE_ARCHITECTURES.has(arch)) {
@@ -543,7 +592,6 @@ export class AppUpdateCoordinator {
     }
     const trustedKey = APP_UPDATE_TRUSTED_KEYS[envelope.keyId];
     if (!trustedKey) throw new Error(`Unknown update signing key: ${envelope.keyId}`);
-
     const payloadBytes = base64UrlToBuffer(envelope.payload);
     const isValid = crypto.verify(
       null,
@@ -556,16 +604,12 @@ export class AppUpdateCoordinator {
       base64UrlToBuffer(envelope.signature),
     );
     if (!isValid) throw new Error('Update manifest signature verification failed');
-
     const payload: unknown = JSON.parse(payloadBytes.toString('utf8'));
     if (!payload || typeof payload !== 'object') throw new Error('Invalid update manifest payload');
     return payload as UpdatePayload;
   }
 
-  private toUpdateInfo(
-    payload: UpdatePayload,
-    target: { platform: string; arch: string; variant: string },
-  ): AppUpdateInfo | null {
+  private toUpdateInfo(payload: UpdatePayload, target: UpdateTarget): AppUpdateInfo | null {
     const artifact = payload.artifact;
     if (
       payload.channel !== 'stable' ||
@@ -580,29 +624,28 @@ export class AppUpdateCoordinator {
       !Number.isSafeInteger(artifact.size) ||
       artifact.size <= 0 ||
       typeof artifact.sha256 !== 'string' ||
-      !/^[a-f0-9]{64}$/.test(artifact.sha256)
+      !/^[a-f0-9]{64}$/.test(artifact.sha256) ||
+      !artifact.updater ||
+      !isSha512(artifact.updater.sha512) ||
+      typeof artifact.updater.size !== 'number' ||
+      !Number.isSafeInteger(artifact.updater.size) ||
+      artifact.updater.size <= 0 ||
+      typeof artifact.updater.filename !== 'string' ||
+      artifact.updater.filename.length > 240 ||
+      /[\\/\u0000-\u001f\u007f]/.test(artifact.updater.filename) ||
+      artifact.updater.filename === '.' ||
+      artifact.updater.filename === '..'
     ) {
-      throw new Error('Update manifest payload failed validation');
+      throw new Error('Update manifest is missing electron-updater integrity metadata');
     }
-
     const downloadUrl = new URL(artifact.url);
-    const expectedExtension =
-      target.platform === 'darwin'
-        ? '.dmg'
-        : target.platform === 'linux'
-          ? target.variant === 'appimage'
-            ? '.appimage'
-            : '.deb'
-          : '.exe';
     if (
       downloadUrl.protocol !== 'https:' ||
       downloadUrl.hostname !== DOWNLOAD_HOST ||
-      !downloadUrl.pathname.startsWith('/releases/') ||
-      !downloadUrl.pathname.toLowerCase().endsWith(expectedExtension)
+      !downloadUrl.pathname.startsWith('/releases/')
     ) {
       throw new Error('Update artifact URL is not allowed');
     }
-
     const minimumSupportedVersion =
       typeof payload.minimumSupportedVersion === 'string' && valid(payload.minimumSupportedVersion)
         ? payload.minimumSupportedVersion
@@ -612,15 +655,15 @@ export class AppUpdateCoordinator {
       url: downloadUrl.toString(),
       expectedSize: artifact.size,
       expectedSha256: artifact.sha256,
+      expectedUpdaterSha512: artifact.updater.sha512,
+      expectedUpdaterFileName: artifact.updater.filename,
       mandatory: payload.mandatory === true,
       minimumSupportedVersion,
     };
   }
 
   private resolveBuildVariant(): string {
-    if (process.platform === 'linux') {
-      return process.env.APPIMAGE ? 'appimage' : 'deb';
-    }
+    if (process.platform === 'linux') return process.env.APPIMAGE ? 'appimage' : 'deb';
     if (process.platform !== 'win32') return 'default';
     try {
       const packageJson = JSON.parse(
@@ -640,6 +683,12 @@ export class AppUpdateCoordinator {
     const version = app.getVersion();
     if (!valid(version)) throw new Error(`Current application version is not SemVer: ${version}`);
     return version;
+  }
+
+  private async sha512File(filePath: string): Promise<string> {
+    const hash = crypto.createHash('sha512');
+    for await (const chunk of fs.createReadStream(filePath)) hash.update(chunk);
+    return hash.digest('base64');
   }
 
   private isNewerVersion(latestVersion: string, currentVersion: string): boolean {

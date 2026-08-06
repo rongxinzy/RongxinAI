@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import yaml from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { artifactIdentity } from './update-manifest-lib.mjs';
 
 const releaseToolsDirectory = path.join(process.cwd(), 'scripts', 'release');
 
@@ -110,7 +112,17 @@ describe('online update release tools', () => {
       key: `releases/${version}/${platform}-${arch}-${variant}/${filename}`,
       size: index + 1,
       sha256: `${index}`.repeat(64),
+      sha512: crypto.createHash('sha512').update(`sha512-${index}`).digest('base64'),
     }));
+    artifacts.push(
+      ...artifacts.map(artifact => ({
+        ...artifact,
+        kind: 'updater',
+        filename:
+          artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename,
+        key: `releases/${version}/${artifact.platform}-${artifact.arch}-${artifact.variant}/${artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename}`,
+      })),
+    );
     fs.writeFileSync(
       metadataPath,
       JSON.stringify({ schemaVersion: 1, releaseVersion: version, artifacts }),
@@ -131,7 +143,10 @@ describe('online update release tools', () => {
       JSON.parse(Buffer.from(envelope.payload, 'base64url').toString('utf8')),
     );
     expect(payloads.map(payload => payload.artifact.sha256)).toEqual(
-      artifacts.map(artifact => artifact.sha256),
+      artifacts.filter(artifact => !artifact.kind || artifact.kind === 'installer').map(artifact => artifact.sha256),
+    );
+    expect(payloads.find(payload => payload.artifact.platform === 'darwin').artifact.updater.filename).toBe(
+      'installer.zip',
     );
   });
 
@@ -150,15 +165,28 @@ describe('online update release tools', () => {
       key: `releases/${version}/${platform}-${arch}-${variant}/${filename}`,
       size: index + 1,
       sha256: `${index}`.repeat(64),
+      sha512: crypto.createHash('sha512').update(`sha512-${index}`).digest('base64'),
+    }));
+    const updaterArtifacts = artifacts.map(artifact => ({
+      ...artifact,
+      kind: 'updater',
+      filename: artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename,
+      key: `releases/${version}/${artifact.platform}-${artifact.arch}-${artifact.variant}/${artifact.platform === 'darwin' ? 'installer.zip' : artifact.filename}`,
     }));
 
     for (const [caseName, invalidArtifacts, expectedError] of [
-      ['missing', artifacts.slice(0, -1), 'must contain exactly the required targets'],
-      ['duplicate', [...artifacts, artifacts[0]], 'Duplicate release target'],
+      ['missing', [...artifacts.slice(0, -1), ...updaterArtifacts], 'must contain exactly the required targets'],
+      ['duplicate', [...artifacts, artifacts[0], ...updaterArtifacts], 'Duplicate release target'],
+      [
+        'missing-updater',
+        [...artifacts, ...updaterArtifacts.slice(0, -1)],
+        'must contain exactly one updater artifact',
+      ],
       [
         'unexpected',
         [
           ...artifacts,
+          ...updaterArtifacts,
           {
             ...artifacts[1],
             arch: 'x64',
@@ -216,6 +244,32 @@ describe('online update release tools', () => {
     expect(conflictResult.stderr).toContain('already exists with different artifacts');
   });
 
+  test('includes the electron-updater artifact in same-version identity checks', () => {
+    const payload = {
+      artifact: {
+        platform: 'darwin',
+        arch: 'arm64',
+        variant: 'default',
+        url: 'https://downloads.rongxzyai.com/releases/2026.7.3/darwin-arm64-default/app.dmg',
+        size: 10,
+        sha256: 'a'.repeat(64),
+        updater: {
+          filename: 'app.zip',
+          url: 'https://downloads.rongxzyai.com/releases/2026.7.3/darwin-arm64-default/app.zip',
+          size: 11,
+          sha512: crypto.createHash('sha512').update('updater-a').digest('base64'),
+        },
+      },
+    };
+    const changedUpdater = structuredClone(payload);
+    changedUpdater.artifact.updater.sha512 = crypto
+      .createHash('sha512')
+      .update('updater-b')
+      .digest('base64');
+
+    expect(artifactIdentity(payload).value).not.toBe(artifactIdentity(changedUpdater).value);
+  });
+
   test('keeps referenced and recent objects while deleting expired orphans', () => {
     const stableManifest = createManifest('2026.7.3', 'current');
     const objectListPath = path.join(temporaryDirectory, 'objects.json');
@@ -227,6 +281,10 @@ describe('online update release tools', () => {
         Contents: [
           {
             Key: 'releases/2026.7.3/win32-x64-lite/current.exe',
+            LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
+          },
+          {
+            Key: 'releases/2026.7.3/win32-x64-lite/current.exe.blockmap',
             LastModified: new Date(now - 48 * 60 * 60 * 1000).toISOString(),
           },
           {
@@ -255,5 +313,116 @@ describe('online update release tools', () => {
     expect(deletePlan.Objects).toEqual([
       { Key: 'releases/2026.7.1/win32-x64-lite/expired.exe' },
     ]);
+  });
+
+  test('normalizes a multi-file Linux feed to a versioned AppImage Worker URL', () => {
+    const inputPath = path.join(temporaryDirectory, 'latest-linux.yml');
+    const outputPath = path.join(temporaryDirectory, 'normalized.yml');
+    const debSha512 = crypto.createHash('sha512').update('deb').digest('base64');
+    const appImageSha512 = crypto.createHash('sha512').update('appimage').digest('base64');
+    fs.writeFileSync(
+      inputPath,
+      yaml.dump({
+        version: '2026.7.6',
+        files: [
+          { url: 'ZhiYuan.deb', sha512: debSha512 },
+          { url: 'ZhiYuan.AppImage', sha512: appImageSha512 },
+        ],
+        path: 'ZhiYuan.AppImage',
+        sha512: appImageSha512,
+        releaseDate: '2026-08-06T00:00:00.000Z',
+      }),
+    );
+    const result = runScript(
+      'normalize-electron-updater-metadata.mjs',
+      ['2026.7.6', 'linux', 'x64', 'appimage', inputPath, outputPath],
+      releaseEnvironment,
+    );
+    expect(result.status).toBe(0);
+    const normalized = yaml.load(fs.readFileSync(outputPath, 'utf8')) as any;
+    expect(normalized.files).toEqual([
+      {
+        url: 'https://updates.rongxzyai.com/v2/electron/releases/2026.7.6/linux/x64/appimage/ZhiYuan.AppImage',
+        sha512: appImageSha512,
+      },
+    ]);
+    expect(normalized.path).toBe(normalized.files[0].url);
+    expect(normalized.releaseDate).toBe('2026-08-06T00:00:00.000Z');
+  });
+
+  test('rejects unsafe updater filenames while normalizing metadata', () => {
+    const inputPath = path.join(temporaryDirectory, 'unsafe.yml');
+    fs.writeFileSync(
+      inputPath,
+      yaml.dump({
+        version: '2026.7.6',
+        files: [{ url: '../escape.AppImage', sha512: 'sha512' }],
+        path: '../escape.AppImage',
+        sha512: 'sha512',
+      }),
+    );
+    const result = runScript(
+      'normalize-electron-updater-metadata.mjs',
+      ['2026.7.6', 'linux', 'x64', 'appimage', inputPath, path.join(temporaryDirectory, 'out.yml')],
+      releaseEnvironment,
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('unsafe artifact name');
+  });
+
+  test('verifies every electron-updater generation target exactly once', () => {
+    const version = '2026.7.7';
+    const targets = [
+      ['win32', 'x64', 'lite', 'latest.yml', 'ZhiYuan.exe'],
+      ['darwin', 'arm64', 'default', 'latest-mac.yml', 'ZhiYuan.zip'],
+      ['linux', 'x64', 'appimage', 'latest-linux.yml', 'ZhiYuan.AppImage'],
+      ['linux', 'x64', 'deb', 'latest-linux.yml', 'ZhiYuan.deb'],
+    ] as const;
+    const artifactMetadataPath = path.join(temporaryDirectory, 'generation-artifacts.json');
+    const artifacts = [];
+    const metadataSpecs = [];
+    for (const [platform, arch, variant, metadataName, filename] of targets) {
+      const targetDirectory = path.join(temporaryDirectory, `${platform}-${arch}-${variant}`);
+      fs.mkdirSync(targetDirectory);
+      const metadataPath = path.join(targetDirectory, metadataName);
+      const sha512 = crypto
+        .createHash('sha512')
+        .update(`${platform}-${variant}`)
+        .digest('base64');
+      const url = `https://updates.rongxzyai.com/v2/electron/releases/${version}/${platform}/${arch}/${variant}/${filename}`;
+      fs.writeFileSync(
+        metadataPath,
+        yaml.dump({ version, files: [{ url, sha512 }], path: url, sha512 }),
+      );
+      metadataSpecs.push(`${metadataPath}:${platform}:${arch}:${variant}`);
+      artifacts.push({ platform, arch, variant, kind: 'updater', filename, sha512 });
+    }
+    fs.writeFileSync(
+      artifactMetadataPath,
+      JSON.stringify({ schemaVersion: 1, releaseVersion: version, artifacts }),
+    );
+
+    const valid = runScript(
+      'verify-electron-updater-generation.mjs',
+      [version, ...metadataSpecs, '--artifact-metadata', artifactMetadataPath],
+      releaseEnvironment,
+    );
+    expect(valid.status).toBe(0);
+
+    const duplicate = runScript(
+      'verify-electron-updater-generation.mjs',
+      [
+        version,
+        metadataSpecs[0],
+        metadataSpecs[0],
+        metadataSpecs[1],
+        metadataSpecs[2],
+        '--artifact-metadata',
+        artifactMetadataPath,
+      ],
+      releaseEnvironment,
+    );
+    expect(duplicate.status).not.toBe(0);
+    expect(duplicate.stderr).toContain('Duplicate electron-updater metadata target');
   });
 });

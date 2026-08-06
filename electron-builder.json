@@ -79,7 +79,13 @@
     }
   ],
   "mac": {
-    "target": ["dmg"],
+    "target": ["dmg", "zip"],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.rongxzyai.com/v2/electron/stable/darwin/arm64/default"
+      }
+    ],
     "icon": "build/icons/mac/icon.icns",
     "category": "public.app-category.productivity",
     "hardenedRuntime": true,
@@ -177,6 +183,12 @@
   },
   "win": {
     "target": ["nsis"],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.rongxzyai.com/v2/electron/stable/win32/x64/lite"
+      }
+    ],
     "icon": "build/icons/win/icon.ico",
     "requestedExecutionLevel": "asInvoker",
     "extraResources": [
@@ -192,6 +204,12 @@
   },
   "linux": {
     "target": ["AppImage", "deb"],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.rongxzyai.com/v2/electron/stable/linux/x64/appimage"
+      }
+    ],
     "icon": "build/icons/png",
     "category": "Utility",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -287,6 +305,8 @@
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
   "electronVersion": "40.2.1",
+  "electronUpdaterCompatibility": ">=6.0.0",
+  "generateUpdatesFilesForAllChannels": false,
   "asarUnpack": [
     "node_modules/@img/**",
     "node_modules/@firecrawl/**",

@@ -37,29 +37,64 @@ jobs:
         id: inventory
         run: |
           mkdir -p manifest/cleanup
-          aws s3api get-object \
-            --bucket "$R2_BUCKET" \
-            --key channels/stable.json \
-            manifest/stable.json > /dev/null
-
           set +e
-          aws s3api head-object \
-            --bucket "$R2_BUCKET" \
-            --key channels/stable.previous.json \
-            > manifest/previous-head.json 2> manifest/previous-head.err
-          previous_status=$?
+          aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json \
+            > manifest/stable-pointer-head.json 2> manifest/stable-pointer-head.err
+          pointer_status=$?
           set -e
-          if [[ $previous_status -eq 0 ]]; then
-            aws s3api get-object \
-              --bucket "$R2_BUCKET" \
-              --key channels/stable.previous.json \
-              manifest/previous.json > /dev/null
-            echo 'previous=true' >> "$GITHUB_OUTPUT"
-          elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
-            echo 'previous=false' >> "$GITHUB_OUTPUT"
+          if [[ $pointer_status -eq 0 ]]; then
+            aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json \
+              manifest/stable-pointer.json > /dev/null
+            generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/stable-pointer.json)"
+            aws s3api get-object --bucket "$R2_BUCKET" \
+              --key "generations/${generation}/legacy/stable.json" manifest/stable.json > /dev/null
+            pointer=true
+            echo 'pointer=true' >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/stable-pointer-head.err; then
+            aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable.json \
+              manifest/stable.json > /dev/null
+            pointer=false
+            echo 'pointer=false' >> "$GITHUB_OUTPUT"
           else
-            cat manifest/previous-head.err >&2
-            exit "$previous_status"
+            cat manifest/stable-pointer-head.err >&2
+            exit "$pointer_status"
+          fi
+
+          previous_key=channels/stable.previous.json
+          if [[ "$pointer" == 'true' ]]; then
+            set +e
+            aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.previous-pointer.json \
+              > manifest/previous-head.json 2> manifest/previous-head.err
+            previous_status=$?
+            set -e
+            if [[ $previous_status -eq 0 ]]; then
+              aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable.previous-pointer.json \
+                manifest/previous-pointer.json > /dev/null
+              previous_generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/previous-pointer.json)"
+              aws s3api get-object --bucket "$R2_BUCKET" \
+                --key "generations/${previous_generation}/legacy/stable.json" manifest/previous.json > /dev/null
+              echo 'previous=true' >> "$GITHUB_OUTPUT"
+            elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
+              echo 'previous=false' >> "$GITHUB_OUTPUT"
+            else
+              cat manifest/previous-head.err >&2
+              exit "$previous_status"
+            fi
+          else
+            set +e
+            aws s3api head-object --bucket "$R2_BUCKET" --key "$previous_key" \
+              > manifest/previous-head.json 2> manifest/previous-head.err
+            previous_status=$?
+            set -e
+            if [[ $previous_status -eq 0 ]]; then
+              aws s3api get-object --bucket "$R2_BUCKET" --key "$previous_key" manifest/previous.json > /dev/null
+              echo 'previous=true' >> "$GITHUB_OUTPUT"
+            elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
+              echo 'previous=false' >> "$GITHUB_OUTPUT"
+            else
+              cat manifest/previous-head.err >&2
+              exit "$previous_status"
+            fi
           fi
 
           page=1

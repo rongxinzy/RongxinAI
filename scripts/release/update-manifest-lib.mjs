@@ -94,6 +94,7 @@ export function compareVersions(left, right) {
 
 export function artifactIdentity(payload) {
   const artifact = payload.artifact;
+  const updater = artifact.updater;
   const target = `${artifact.platform}:${artifact.arch}:${artifact.variant}`;
   if (
     !artifact.platform ||
@@ -107,20 +108,42 @@ export function artifactIdentity(payload) {
   ) {
     throw new Error(`Invalid artifact metadata for ${target}`);
   }
+  if (
+    updater &&
+    (typeof updater.filename !== 'string' ||
+      !updater.filename ||
+      typeof updater.url !== 'string' ||
+      !Number.isSafeInteger(updater.size) ||
+      updater.size <= 0 ||
+      typeof updater.sha512 !== 'string' ||
+      !/^[A-Za-z0-9+/]{86}(?:==)?$/.test(updater.sha512))
+  ) {
+    throw new Error(`Invalid updater artifact metadata for ${target}`);
+  }
   return {
     target,
     value: JSON.stringify({
       url: artifact.url,
       size: artifact.size,
       sha256: artifact.sha256,
+      updater: updater
+        ? {
+            filename: updater.filename,
+            url: updater.url,
+            size: updater.size,
+            sha512: updater.sha512,
+          }
+        : null,
     }),
   };
 }
 
 export function referencedObjectKeys(entries) {
-  return new Set(
-    entries.map(entry => {
-      const artifactUrl = new URL(entry.payload.artifact.url);
+  const referenced = new Set();
+  for (const entry of entries) {
+    const artifactUrls = [entry.payload.artifact.url, entry.payload.artifact.updater?.url].filter(Boolean);
+    for (const value of artifactUrls) {
+      const artifactUrl = new URL(value);
       if (
         artifactUrl.protocol !== 'https:' ||
         artifactUrl.hostname !== 'downloads.rongxzyai.com' ||
@@ -128,9 +151,14 @@ export function referencedObjectKeys(entries) {
       ) {
         throw new Error(`Unexpected release artifact URL: ${artifactUrl.toString()}`);
       }
-      return decodeURIComponent(artifactUrl.pathname.slice(1));
-    }),
-  );
+      const key = decodeURIComponent(artifactUrl.pathname.slice(1));
+      referenced.add(key);
+      if (value === entry.payload.artifact.updater?.url && /\.(?:exe|zip)$/i.test(key)) {
+        referenced.add(`${key}.blockmap`);
+      }
+    }
+  }
+  return referenced;
 }
 
 export function writeActionOutput(name, value) {

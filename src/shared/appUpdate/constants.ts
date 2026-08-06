@@ -42,6 +42,10 @@ export interface AppUpdateInfo {
   url: string;
   expectedSize: number;
   expectedSha256: string;
+  /** SHA-512 of the electron-updater artifact authorized by the signed manifest. */
+  expectedUpdaterSha512: string;
+  /** Basename of the updater artifact whose SHA-512 was authorized. */
+  expectedUpdaterFileName: string;
   mandatory: boolean;
   minimumSupportedVersion: string | null;
 }
