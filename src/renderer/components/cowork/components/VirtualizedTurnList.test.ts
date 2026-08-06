@@ -8,6 +8,7 @@ import type { ConversationTurn } from '../helpers/messageGrouping';
 import { VirtualizedTurnList } from './VirtualizedTurnList';
 
 const mocks = vi.hoisted(() => ({
+  measureElement: vi.fn(),
   scrollRef: { current: null as HTMLElement | null },
   scrollToEnd: vi.fn(),
   scrollToIndex: vi.fn(),
@@ -24,13 +25,14 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 beforeEach(() => {
   mocks.scrollRef.current = document.createElement('div');
+  mocks.measureElement.mockReset();
   mocks.scrollToEnd.mockReset();
   mocks.scrollToIndex.mockReset();
   mocks.useVirtualizer.mockReset();
   mocks.useVirtualizer.mockReturnValue({
     getTotalSize: () => 0,
     getVirtualItems: () => [],
-    measureElement: vi.fn(),
+    measureElement: mocks.measureElement,
     scrollToEnd: mocks.scrollToEnd,
     scrollToIndex: mocks.scrollToIndex,
   });
@@ -117,7 +119,7 @@ test('positions only the virtual tail window instead of rendering the full sessi
   mocks.useVirtualizer.mockReturnValue({
     getTotalSize: () => 30_000,
     getVirtualItems: () => [{ index: 99, key: 'turn-99', start: 29_700 }],
-    measureElement: vi.fn(),
+    measureElement: mocks.measureElement,
     scrollToEnd: mocks.scrollToEnd,
     scrollToIndex: mocks.scrollToIndex,
   });
@@ -142,4 +144,43 @@ test('positions only the virtual tail window instead of rendering the full sessi
       initialOffset: 30_000,
     }),
   );
+});
+
+test('leaves row measurement and positioning exclusively to the virtualizer', () => {
+  const turns: ConversationTurn[] = [
+    {
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [],
+    },
+  ];
+  mocks.useVirtualizer.mockReturnValue({
+    getTotalSize: () => 300,
+    getVirtualItems: () => [{ index: 0, key: 'turn-1', start: 0 }],
+    measureElement: mocks.measureElement,
+    scrollToEnd: mocks.scrollToEnd,
+    scrollToIndex: mocks.scrollToIndex,
+  });
+
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns,
+      renderAll: false,
+      renderTurn: () => React.createElement('div', null, 'turn'),
+    }),
+  );
+  view.rerender(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns,
+      renderAll: false,
+      renderTurn: () => React.createElement('div', null, 'turn'),
+    }),
+  );
+
+  const row = view.container.querySelector<HTMLElement>('[data-index="0"]');
+  expect(mocks.measureElement).toHaveBeenCalledTimes(1);
+  expect(row?.style.top).toBe('0px');
+  expect(row?.style.transform).toBe('');
 });

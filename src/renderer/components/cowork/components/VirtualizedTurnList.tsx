@@ -1,5 +1,5 @@
-import { useVirtualizer } from '@tanstack/react-virtual';
-import React, { useImperativeHandle, useLayoutEffect, useRef } from 'react';
+import { elementScroll, useVirtualizer } from '@tanstack/react-virtual';
+import React, { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 
 import type { ConversationTurn } from '../helpers/messageGrouping';
@@ -34,21 +34,61 @@ export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListProps
 >(({ isStreaming, turns, renderTurn, renderAll }, ref) => {
   const { scrollRef } = useStickToBottomContext();
-  const measuredSizesRef = useRef(new Map<React.Key, number>());
   const hasPositionedInitialTailRef = useRef(false);
+  const scrollRetryFrameRef = useRef<number | null>(null);
+  const scrollRetryWindowRef = useRef<Window | null>(null);
+  const scrollToFn = useCallback<typeof elementScroll>((offset, options, instance) => {
+    const scrollElement = instance.scrollElement as HTMLElement | null;
+    const targetWindow = scrollElement?.ownerDocument.defaultView;
+
+    if (scrollRetryFrameRef.current !== null && scrollRetryWindowRef.current) {
+      scrollRetryWindowRef.current.cancelAnimationFrame(scrollRetryFrameRef.current);
+      scrollRetryFrameRef.current = null;
+      scrollRetryWindowRef.current = null;
+    }
+
+    elementScroll(offset, options, instance);
+    if (!scrollElement || !targetWindow || !options.adjustments) return;
+
+    const requestedOffset = offset + options.adjustments;
+    const clampedOffset = scrollElement.scrollTop;
+    if (requestedOffset - clampedOffset < 1) return;
+
+    // A ResizeObserver batch can grow several tail rows before React commits
+    // the new sizer height. Retry only a browser-clamped correction after that
+    // commit, and abandon it if another scroll changed the DOM position.
+    scrollRetryWindowRef.current = targetWindow;
+    scrollRetryFrameRef.current = targetWindow.requestAnimationFrame(() => {
+      scrollRetryFrameRef.current = null;
+      scrollRetryWindowRef.current = null;
+      const currentScrollElement = instance.scrollElement as HTMLElement | null;
+      if (currentScrollElement === scrollElement && scrollElement.scrollTop === clampedOffset) {
+        scrollElement.scrollTo({ top: requestedOffset, behavior: 'auto' });
+      }
+    });
+  }, []);
   const initialOffset = turns.length * TURN_HEIGHT_ESTIMATE_PX;
   const virtualizer = useVirtualizer({
     count: turns.length,
     getScrollElement: () => scrollRef.current,
     getItemKey: index => turns[index]?.id ?? index,
-    estimateSize: index =>
-      measuredSizesRef.current.get(turns[index]?.id ?? index) ?? TURN_HEIGHT_ESTIMATE_PX,
+    estimateSize: () => TURN_HEIGHT_ESTIMATE_PX,
     overscan: 4,
     initialOffset,
     initialRect: INITIAL_VIEWPORT_RECT,
     anchorTo: 'end',
     followOnAppend: isStreaming ? 'auto' : false,
+    scrollToFn,
   });
+
+  useEffect(
+    () => () => {
+      if (scrollRetryFrameRef.current !== null && scrollRetryWindowRef.current) {
+        scrollRetryWindowRef.current.cancelAnimationFrame(scrollRetryFrameRef.current);
+      }
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     const scrollElement = scrollRef.current;
@@ -90,18 +130,12 @@ export const VirtualizedTurnList = React.forwardRef<
         <div
           key={virtualItem.key}
           data-index={virtualItem.index}
-          ref={element => {
-            virtualizer.measureElement(element);
-            if (element) {
-              measuredSizesRef.current.set(virtualItem.key, element.getBoundingClientRect().height);
-            }
-          }}
+          ref={virtualizer.measureElement}
           style={{
             position: 'absolute',
-            top: 0,
+            top: virtualItem.start,
             left: 0,
             width: '100%',
-            transform: `translateY(${virtualItem.start}px)`,
           }}
         >
           {renderTurn(turns[virtualItem.index], virtualItem.index)}
