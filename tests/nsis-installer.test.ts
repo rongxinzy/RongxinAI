@@ -6,6 +6,12 @@ import { describe, expect, test } from 'vitest';
 const installerScriptPath = path.resolve('scripts/nsis-installer.nsh');
 
 describe('NSIS local inference runtime signing flow', () => {
+  test('declares the installer as DPI-aware for high-DPI displays', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript).toContain('ManifestDPIAware true');
+  });
+
   test('requires interactive confirmation before invoking the runtime helper', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const confirmationIndex = installerScript.indexOf(

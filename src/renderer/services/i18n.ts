@@ -716,7 +716,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     piRuntimeReasoningHint: '未勾选时根据模型能力自动判断；不确定时保持关闭。',
     piRuntimeCompat: 'OpenAI 兼容参数',
     modelContextWindowK: '上下文窗口（K tokens）',
-    modelMaxOutputTokensK: '最大输出字段（K tokens）',
+    modelMaxOutputTokensK: '最大输出（K tokens）',
     piRuntimeCompatAuto: '默认',
     piRuntimeCompatSupportsDeveloperRole: '支持 developer 角色',
     piRuntimeCompatSupportsReasoningEffort: '支持 reasoning_effort',
@@ -3532,7 +3532,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     piRuntimeReasoningHint:
       'When unchecked, reasoning follows model capability metadata. Keep this off if unsure.',
     modelContextWindowK: 'Context window (K tokens)',
-    modelMaxOutputTokensK: 'Max output tokens (K tokens)',
+    modelMaxOutputTokensK: 'Max output (K tokens)',
     piRuntimeCompat: 'OpenAI compatibility parameters',
     piRuntimeCompatAuto: 'Default',
     piRuntimeCompatSupportsDeveloperRole: 'Supports developer role',

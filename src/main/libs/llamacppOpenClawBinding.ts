@@ -59,10 +59,10 @@ function normalizeLlamaCppProviderModels(
       id: model.id,
       name: model.name,
       supportsImage: model.supportsImage,
-      contextWindow: model.contextWindow,
-      contextTokens: model.contextTokens,
-      maxTokens: model.maxTokens,
-      capabilities: model.capabilities,
+      ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
+      ...(model.contextTokens ? { contextTokens: model.contextTokens } : {}),
+      ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
+      ...(model.capabilities ? { capabilities: model.capabilities } : {}),
     }))
     .sort((modelA, modelB) => {
       const keyA = `${modelA.id.trim()}::${modelA.name.trim()}`;
@@ -77,6 +77,28 @@ function buildManagedLlamaCppProviderConfig(
 ): ProviderConfig {
   const providerDef = ProviderRegistry.get(ProviderName.LlamaCpp);
   const userEnabled = currentProvider?.userEnabled === true;
+  const existingModels = currentProvider?.models ?? [];
+  const managedModels = models.map(model => {
+    const existing = existingModels.find(
+      candidate => candidate.id.trim() === model.id.trim(),
+    );
+    if (!existing) return model;
+
+    const nextModel = { ...model };
+    if (existing.contextWindow) {
+      nextModel.contextWindow = existing.contextWindow;
+      if (existing.contextTokens) {
+        nextModel.contextTokens = existing.contextTokens;
+      } else {
+        delete nextModel.contextTokens;
+      }
+    } else if (existing.contextTokens) {
+      nextModel.contextTokens = existing.contextTokens;
+    }
+    if (existing.maxTokens) nextModel.maxTokens = existing.maxTokens;
+    if (existing.capabilities) nextModel.capabilities = existing.capabilities;
+    return nextModel;
+  });
 
   return {
     ...currentProvider,
@@ -85,7 +107,7 @@ function buildManagedLlamaCppProviderConfig(
     apiKey: currentProvider?.apiKey ?? '',
     baseUrl: providerDef?.defaultBaseUrl ?? 'http://127.0.0.1:8080/v1',
     apiFormat: ApiFormat.OpenAI,
-    models: normalizeLlamaCppProviderModels(models),
+    models: normalizeLlamaCppProviderModels(managedModels),
   };
 }
 
