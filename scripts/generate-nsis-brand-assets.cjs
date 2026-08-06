@@ -11,7 +11,7 @@ const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const projectRoot = path.resolve(__dirname, '..');
 const assetDir = path.join(projectRoot, 'build', 'installer-assets');
-const appMarkPath = path.join(projectRoot, 'build', 'icons', 'app-icon-master.png');
+const logoPath = path.join(projectRoot, 'public', 'zhiyuan-logo-light-1600.png');
 
 function roundedRect(context, x, y, width, height, radius) {
   context.beginPath();
@@ -28,6 +28,51 @@ function drawDots(context, width, height, opacity = 0.1) {
       context.fill();
     }
   }
+}
+
+function drawAppMark(context, logo, x, y, size) {
+  const radius = size * (220 / 1024);
+  const logoWidth = size * (748 / 1024);
+  const logoHeight = logoWidth * (logo.height / logo.width);
+
+  context.save();
+  roundedRect(context, x, y, size, size, radius);
+  context.clip();
+
+  const background = context.createLinearGradient(x, y, x, y + size);
+  background.addColorStop(0, '#ffffff');
+  background.addColorStop(1, '#edf5ff');
+  context.fillStyle = background;
+  context.fillRect(x, y, size, size);
+
+  const glow = context.createRadialGradient(
+    x + size * 0.74,
+    y + size * 0.78,
+    0,
+    x + size * 0.74,
+    y + size * 0.78,
+    size * 0.53,
+  );
+  glow.addColorStop(0, 'rgba(108, 165, 255, 0.14)');
+  glow.addColorStop(1, 'rgba(108, 165, 255, 0)');
+  context.fillStyle = glow;
+  context.fillRect(x, y, size, size);
+
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(
+    logo,
+    x + (size - logoWidth) / 2,
+    y + (size - logoHeight) / 2 + size * 0.008,
+    logoWidth,
+    logoHeight,
+  );
+  context.restore();
+
+  context.strokeStyle = 'rgba(208, 213, 221, 0.82)';
+  context.lineWidth = Math.max(1, size * (12 / 1024));
+  roundedRect(context, x, y, size, size, radius);
+  context.stroke();
 }
 
 function writeBmp(canvas, filename) {
@@ -69,7 +114,7 @@ function writeBmp(canvas, filename) {
 }
 
 async function build() {
-  const appMark = await loadImage(appMarkPath);
+  const logo = await loadImage(logoPath);
 
   const sidebar = createCanvas(164, 314);
   const side = sidebar.getContext('2d');
@@ -87,7 +132,7 @@ async function build() {
   side.fillStyle = glow;
   side.fillRect(0, 0, 164, 155);
 
-  side.drawImage(appMark, 14, 14, 58, 58);
+  drawAppMark(side, logo, 14, 14, 58);
   side.fillStyle = '#397bff';
   side.fillRect(14, 71, 44, 2);
 
@@ -141,7 +186,7 @@ async function build() {
   headerGlow.addColorStop(1, 'rgba(83, 147, 255, 0)');
   head.fillStyle = headerGlow;
   head.fillRect(0, 0, 150, 57);
-  head.drawImage(appMark, 13, 12, 30, 30);
+  drawAppMark(head, logo, 13, 12, 30);
   head.fillStyle = '#397bff';
   head.fillRect(13, 48, 124, 1);
   writeBmp(header, 'installerHeader.bmp');

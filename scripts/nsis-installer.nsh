@@ -9,6 +9,9 @@
 !macroend
 
 !macro customHeader
+  ; Keep the assisted installer from being bitmap-scaled by Windows on high-DPI displays.
+  ManifestDPIAware true
+
   ; Request admin privileges for script execution (tar extract, etc.)
   ; This does NOT change the default install path — just ensures UAC elevation.
   RequestExecutionLevel admin

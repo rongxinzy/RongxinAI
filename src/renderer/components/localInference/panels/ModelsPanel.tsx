@@ -19,7 +19,7 @@ import {
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { ArrowRight, Box, Clock3, Ellipsis, Pencil, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRight, Box, Clock3, Ellipsis, Settings2, Trash2 } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   type ComponentType,
@@ -110,7 +110,6 @@ type ModelsPanelProps = {
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
-  onConfigureCapabilities: (model: LlamaCppModel) => void;
   onOpenMarketplace?: () => void;
   onOpenLaunchLog?: (modelName: string) => void;
   renderLoadButton?: (
@@ -131,7 +130,6 @@ type ModelCardProps = {
   unloading: boolean;
   onLoadModel: () => void;
   onConfigureContext: () => void;
-  onConfigureCapabilities: () => void;
   onUnload: () => void;
   onDelete: () => void;
   dragging: boolean;
@@ -159,7 +157,6 @@ export function ModelsPanel({
   onUnload,
   onDelete,
   onConfigureContext,
-  onConfigureCapabilities,
   onOpenMarketplace,
   onOpenLaunchLog,
   renderLoadButton,
@@ -332,7 +329,6 @@ export function ModelsPanel({
                   unloading={unloadingModelName === model.name}
                   onLoadModel={() => onLoadModel(model)}
                   onConfigureContext={() => onConfigureContext(model)}
-                  onConfigureCapabilities={() => onConfigureCapabilities(model)}
                   onUnload={() => onUnload(model.name)}
                   onDelete={() => setPendingDeleteModel(model)}
                   dragging={draggedModelName === model.name}
@@ -451,7 +447,6 @@ function ModelCard({
   unloading,
   onLoadModel,
   onConfigureContext,
-  onConfigureCapabilities,
   onUnload,
   onDelete,
   dragging,
@@ -564,18 +559,6 @@ function ModelCard({
               {displayName}
             </CardTitle>
             <div className="ml-auto flex shrink-0 items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="text-muted-foreground hover:text-foreground"
-                disabled={buttonsDisabled}
-                onClick={onConfigureCapabilities}
-                aria-label={i18nService.t('modelCapabilities')}
-                title={i18nService.t('modelCapabilities')}
-              >
-                <Pencil className="size-4" />
-              </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={

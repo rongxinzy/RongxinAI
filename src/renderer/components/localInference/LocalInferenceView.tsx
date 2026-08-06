@@ -12,7 +12,6 @@ import type {
   LlamaCppRunningModel as OllamaRunningModel,
   LlamaCppStatusSnapshot as OllamaStatusSnapshot,
 } from '../../../shared/llamacpp';
-import { ModelCapabilityStatus } from '../../../shared/providers';
 import type {
   MarketplaceModel,
   MarketplaceSearchParams,
@@ -26,7 +25,6 @@ import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
-import { ModelCapabilitySettingsModal } from './components/ModelCapabilitySettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
 import {
@@ -135,7 +133,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [librarySettingsOpen, setLibrarySettingsOpen] = useState(false);
   const [draftModelsDir, setDraftModelsDir] = useState('');
   const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
-  const [capabilityModel, setCapabilityModel] = useState<OllamaModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingModelName, setLoadingModelName] = useState<string | null>(null);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
@@ -877,21 +874,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [runAction, runningModels, showToast],
   );
 
-  const handleSaveModelCapabilities = useCallback(
-    (modelName: string, toolCalling: ModelCapabilityStatus) => {
-      void runAction(async () => {
-        const nextPreferences = await window.electron.llamacpp.setModelPreference({
-          modelName,
-          preference: { ...modelPreferences[modelName], capabilities: { toolCalling } },
-        });
-        setModelPreferences(nextPreferences);
-        notifyLlamaCppRunningModelsChanged();
-        setCapabilityModel(null);
-      });
-    },
-    [modelPreferences, runAction],
-  );
-
   const handleTabChange = (value: string) => {
     const nextTab = value as LocalInferenceTab;
     if (nextTab === activeTab) return;
@@ -1018,7 +1000,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onConfigureContext={model => {
                     setContextModel(model);
                   }}
-                  onConfigureCapabilities={setCapabilityModel}
                   onOpenMarketplace={() => handleTabChange('marketplace')}
                   onOpenLaunchLog={launchLogs.openPanelForModel}
                   showRegisteredModelsTitle={false}
@@ -1101,15 +1082,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onSave={ctxSize => {
           if (!contextModel) return;
           handleSaveModelContext(contextModel.name, ctxSize);
-        }}
-      />
-      <ModelCapabilitySettingsModal
-        isOpen={Boolean(capabilityModel)}
-        model={capabilityModel}
-        preference={capabilityModel ? modelPreferences[capabilityModel.name] : undefined}
-        onClose={() => setCapabilityModel(null)}
-        onSave={toolCalling => {
-          if (capabilityModel) handleSaveModelCapabilities(capabilityModel.name, toolCalling);
         }}
       />
     </div>

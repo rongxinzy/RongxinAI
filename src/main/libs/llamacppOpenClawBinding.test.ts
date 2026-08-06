@@ -217,6 +217,51 @@ test('upsertLlamaCppProviderInAppConfig preserves a user-disabled llama.cpp prov
   expect(result.config.providers?.[ProviderName.LlamaCpp]?.userEnabled).toBe(false);
 });
 
+test('upsertLlamaCppProviderInAppConfig preserves provider model metadata overrides', () => {
+  const result = upsertLlamaCppProviderInAppConfig(
+    {
+      providers: {
+        [ProviderName.LlamaCpp]: {
+          enabled: true,
+          userEnabled: true,
+          apiKey: '',
+          baseUrl: 'http://127.0.0.1:8080/v1',
+          apiFormat: 'openai',
+          models: [
+            {
+              id: 'qwen-local',
+              name: 'qwen-local',
+              supportsImage: false,
+              contextWindow: 16384,
+              maxTokens: 3072,
+            },
+          ],
+        },
+      },
+    },
+    [
+      {
+        id: 'qwen-local',
+        name: 'qwen-local',
+        supportsImage: false,
+        contextWindow: 8192,
+        contextTokens: 8192,
+        maxTokens: 2048,
+      },
+    ],
+  );
+
+  expect(result.config.providers?.[ProviderName.LlamaCpp]?.models).toEqual([
+    {
+      id: 'qwen-local',
+      name: 'qwen-local',
+      supportsImage: false,
+      contextWindow: 16384,
+      maxTokens: 3072,
+    },
+  ]);
+});
+
 test('upsertLlamaCppProviderInAppConfig resets legacy auto-enabled llama.cpp providers without user intent', () => {
   const result = upsertLlamaCppProviderInAppConfig(
     {
