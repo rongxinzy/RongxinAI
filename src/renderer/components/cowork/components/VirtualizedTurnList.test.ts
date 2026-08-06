@@ -117,6 +117,46 @@ test('enables history pagination only after the rendered tail is stable', () => 
   cancelFrame.mockRestore();
 });
 
+test('releases history pagination when a dynamic tail does not settle', () => {
+  const frameCallbacks: FrameRequestCallback[] = [];
+  const requestFrame = vi
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation(callback => frameCallbacks.push(callback));
+  const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  const onInitialTailPositioned = vi.fn();
+  const turns: ConversationTurn[] = [
+    {
+      id: 'turn-1',
+      userMessage: null,
+      assistantItems: [],
+    },
+  ];
+
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns,
+      onInitialTailPositioned,
+      renderAll: false,
+      renderTurn: () => null,
+    }),
+  );
+
+  act(() => {
+    for (let frame = 0; frame < 12; frame += 1) {
+      frameCallbacks.shift()?.(frame * 16);
+    }
+  });
+
+  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(13);
+  expect(onInitialTailPositioned).toHaveBeenCalledOnce();
+  expect(frameCallbacks).toHaveLength(0);
+
+  view.unmount();
+  requestFrame.mockRestore();
+  cancelFrame.mockRestore();
+});
+
 test('lets a short session clamp its estimated end to the top of a non-overflowing viewport', () => {
   const turns: ConversationTurn[] = [
     {

@@ -23,6 +23,7 @@ const TURN_HEIGHT_ESTIMATE_PX = 300;
 const INITIAL_VIEWPORT_HEIGHT_PX = 1200;
 const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
 const INITIAL_TAIL_STABLE_FRAMES = 2;
+const INITIAL_TAIL_MAX_POSITIONING_FRAMES = 12;
 
 /**
  * Renders only the visible window of conversation turns (issue #141
@@ -115,11 +116,13 @@ export const VirtualizedTurnList = React.forwardRef<
     }
 
     let stableFrames = 0;
+    let positioningFrames = 0;
     let previousScrollHeight = scrollElement.scrollHeight;
     let previousTotalSize = virtualizer.getTotalSize();
     let settleFrame: number;
 
     const positionTail = () => {
+      positioningFrames += 1;
       virtualizer.scrollToEnd({ behavior: 'auto' });
 
       const virtualItems = virtualizer.getVirtualItems();
@@ -135,7 +138,10 @@ export const VirtualizedTurnList = React.forwardRef<
       previousScrollHeight = scrollElement.scrollHeight;
       previousTotalSize = totalSize;
 
-      if (stableFrames >= INITIAL_TAIL_STABLE_FRAMES) {
+      if (
+        stableFrames >= INITIAL_TAIL_STABLE_FRAMES ||
+        positioningFrames >= INITIAL_TAIL_MAX_POSITIONING_FRAMES
+      ) {
         onInitialTailPositioned?.();
         return;
       }
