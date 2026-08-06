@@ -13,13 +13,21 @@ import {
   AppUpdateStatus,
 } from '../../shared/appUpdate/constants';
 import { APP_UPDATE_TRUSTED_KEYS } from '../../shared/appUpdate/trustedKeys';
-import { cancelActiveDownload, downloadUpdate, installUpdate } from './appUpdateInstaller';
+import {
+  cancelActiveDownload,
+  downloadUpdate,
+  installUpdate,
+  pauseActiveDownload,
+  resumeActiveDownload,
+  type AppUpdateResumeState,
+} from './appUpdateInstaller';
 import type { SqliteStore } from '../sqliteStore';
 
 const UPDATE_ENDPOINT = 'https://updates.rongxzyai.com/v1/updates/latest';
 const DOWNLOAD_HOST = 'downloads.rongxzyai.com';
 const MANIFEST_CACHE_KEY_PREFIX = 'app_update_manifest_cache';
 const READY_UPDATE_CACHE_KEY = 'app_update_ready';
+const DOWNLOAD_UPDATE_CACHE_KEY = 'app_update_download';
 const SUPPORTED_UPDATE_PLATFORMS = new Set(['win32', 'darwin', 'linux']);
 const SUPPORTED_UPDATE_ARCHITECTURES = new Set(['x64', 'arm64']);
 
@@ -58,6 +66,11 @@ type ReadyUpdateCache = {
   sha256: string;
 };
 
+type PendingDownloadCache = {
+  envelope: unknown;
+  resumeState: AppUpdateResumeState;
+};
+
 type VerifiedUpdate = {
   envelope: unknown;
   info: AppUpdateInfo;
@@ -68,6 +81,7 @@ const initialState = (): AppUpdateRuntimeState => ({
   source: null,
   info: null,
   progress: null,
+  lastCheckedAt: null,
   readyFilePath: null,
   readyFileHash: null,
   errorMessage: null,
@@ -129,14 +143,32 @@ export class AppUpdateCoordinator {
   }
 
   cancelDownload(): AppUpdateRuntimeState {
-    if (this.state.status === AppUpdateStatus.Downloading) {
+    if (
+      this.state.status === AppUpdateStatus.Downloading ||
+      this.state.status === AppUpdateStatus.Paused
+    ) {
       cancelActiveDownload();
+      this.store.delete(DOWNLOAD_UPDATE_CACHE_KEY);
       this.setState({
         ...initialState(),
         status: AppUpdateStatus.Available,
         source: this.state.source,
         info: this.state.info,
       });
+    }
+    return this.getState();
+  }
+
+  pauseDownload(): AppUpdateRuntimeState {
+    if (this.state.status === AppUpdateStatus.Downloading && pauseActiveDownload()) {
+      return this.setState({ ...this.state, status: AppUpdateStatus.Paused });
+    }
+    return this.getState();
+  }
+
+  resumeDownload(): AppUpdateRuntimeState {
+    if (this.state.status === AppUpdateStatus.Paused && resumeActiveDownload()) {
+      return this.setState({ ...this.state, status: AppUpdateStatus.Downloading });
     }
     return this.getState();
   }
@@ -187,12 +219,14 @@ export class AppUpdateCoordinator {
   }
 
   private async checkForUpdate(source: AppUpdateSource): Promise<AppUpdateCheckResult> {
+    const previousState = this.getState();
     const previousReady = this.state.status === AppUpdateStatus.Ready ? this.getState() : null;
     const previousEnvelope = this.currentSignedEnvelope;
     this.setState({
       ...initialState(),
       status: AppUpdateStatus.Checking,
       source,
+      lastCheckedAt: previousState.lastCheckedAt,
     });
     try {
       const currentVersion = this.resolveCurrentVersion();
@@ -200,7 +234,11 @@ export class AppUpdateCoordinator {
       if (!update) {
         this.currentSignedEnvelope = null;
         if (previousReady?.readyFilePath) this.discardReadyUpdate(previousReady.readyFilePath);
-        const state = this.setState(initialState());
+        const state = this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.UpToDate,
+          lastCheckedAt: Date.now(),
+        });
         return { success: true, state, updateFound: false };
       }
       if (
@@ -226,6 +264,7 @@ export class AppUpdateCoordinator {
         status: AppUpdateStatus.Available,
         source,
         info: update.info,
+        lastCheckedAt: Date.now(),
       });
       this.startBackgroundDownload(update, source, previousReady?.readyFilePath ?? undefined);
       return { success: true, state, updateFound: true };
@@ -237,7 +276,9 @@ export class AppUpdateCoordinator {
       if (previousReady) {
         this.currentSignedEnvelope = previousEnvelope;
       }
-      const state = this.setState(previousReady ?? initialState());
+      const state = this.setState(
+        previousReady ?? { ...initialState(), lastCheckedAt: previousState.lastCheckedAt },
+      );
       return {
         success: false,
         state,
@@ -259,6 +300,7 @@ export class AppUpdateCoordinator {
       status: AppUpdateStatus.Downloading,
       source,
       info,
+      lastCheckedAt: this.state.lastCheckedAt,
     });
     this.downloadPromise = downloadUpdate(
       info.url,
@@ -267,10 +309,20 @@ export class AppUpdateCoordinator {
       progress => {
         this.setState({ ...this.state, progress });
       },
+      {
+        resumeState: this.readPendingDownload(envelope, info),
+        onResumeState: resumeState => {
+          this.store.set<PendingDownloadCache>(DOWNLOAD_UPDATE_CACHE_KEY, {
+            envelope,
+            resumeState,
+          });
+        },
+      },
     )
       .then(({ filePath, sha256 }) => {
         const readyUpdate: ReadyUpdateCache = { envelope, filePath, sha256 };
         this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, readyUpdate);
+        this.store.delete(DOWNLOAD_UPDATE_CACHE_KEY);
         this.currentSignedEnvelope = envelope;
         this.setState({
           ...initialState(),
@@ -359,6 +411,35 @@ export class AppUpdateCoordinator {
     const resolvedFilePath = path.resolve(filePath);
     if (resolvedFilePath.startsWith(`${updateDir}${path.sep}`)) {
       void fs.promises.unlink(resolvedFilePath).catch(() => {});
+    }
+  }
+
+  private readPendingDownload(envelope: unknown, info: AppUpdateInfo): AppUpdateResumeState | null {
+    const pending = this.store.get<unknown>(DOWNLOAD_UPDATE_CACHE_KEY);
+    if (!pending || typeof pending !== 'object') return null;
+    const cached = pending as Partial<PendingDownloadCache>;
+    if (!cached.resumeState || typeof cached.resumeState.filePath !== 'string') return null;
+    try {
+      const payload = this.verifyAndDecodeManifest(cached.envelope);
+      const target = this.resolveUpdateTarget();
+      const cachedInfo = target ? this.toUpdateInfo(payload, target) : null;
+      if (
+        !cachedInfo ||
+        cachedInfo.latestVersion !== info.latestVersion ||
+        cachedInfo.expectedSha256 !== info.expectedSha256 ||
+        cachedInfo.url !== info.url
+      ) {
+        throw new Error('pending update does not match the current manifest');
+      }
+      const updateDir = path.resolve(app.getPath('userData'), 'updates');
+      const partialPath = path.resolve(cached.resumeState.filePath);
+      if (!partialPath.startsWith(`${updateDir}${path.sep}`) || !partialPath.endsWith('.part')) {
+        throw new Error('pending update path is invalid');
+      }
+      return cached.resumeState;
+    } catch {
+      this.store.delete(DOWNLOAD_UPDATE_CACHE_KEY);
+      return null;
     }
   }
 

@@ -11,7 +11,6 @@ const { fetchMock, getPathMock } = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   app: { getPath: getPathMock },
-  session: { defaultSession: { fetch: fetchMock } },
 }));
 
 import { buildMacReplacementScript, downloadUpdate } from './appUpdateInstaller';
@@ -22,10 +21,12 @@ describe('downloadUpdate', () => {
   beforeEach(async () => {
     userDataDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'zhiyuan-update-test-'));
     getPathMock.mockReturnValue(userDataDir);
+    vi.stubGlobal('fetch', fetchMock);
   });
 
   afterEach(async () => {
     await fs.promises.rm(userDataDir, { recursive: true, force: true });
+    vi.unstubAllGlobals();
     vi.clearAllMocks();
   });
 
@@ -33,8 +34,12 @@ describe('downloadUpdate', () => {
     const body = Buffer.from('verified installer bytes');
     const sha256 = crypto.createHash('sha256').update(body).digest('hex');
     fetchMock.mockResolvedValue(
-      new Response(body, {
-        headers: { 'content-length': String(body.length) },
+      new Response(null, {
+        headers: {
+          'content-length': String(body.length),
+          'accept-ranges': 'bytes',
+          etag: '"test-artifact"',
+        },
       }),
     );
 
@@ -43,6 +48,7 @@ describe('downloadUpdate', () => {
       'auto',
       { size: body.length, sha256 },
       () => {},
+      { createDownloader: createTestDownloader(body) },
     );
 
     expect(result.sha256).toBe(sha256);
@@ -55,8 +61,12 @@ describe('downloadUpdate', () => {
   test('removes the partial file and rejects when the manifest hash does not match', async () => {
     const body = Buffer.from('tampered installer bytes');
     fetchMock.mockResolvedValue(
-      new Response(body, {
-        headers: { 'content-length': String(body.length) },
+      new Response(null, {
+        headers: {
+          'content-length': String(body.length),
+          'accept-ranges': 'bytes',
+          etag: '"test-artifact"',
+        },
       }),
     );
 
@@ -66,12 +76,38 @@ describe('downloadUpdate', () => {
         'auto',
         { size: body.length, sha256: '0'.repeat(64) },
         () => {},
+        { createDownloader: createTestDownloader(body) },
       ),
     ).rejects.toThrow('checksum verification failed');
 
     await expect(fs.promises.readdir(path.join(userDataDir, 'updates'))).resolves.toEqual([]);
   });
 });
+
+function createTestDownloader(body: Buffer) {
+  return (_url: string, directory: string, options: { fileName: string }) => {
+    const callbacks = new Map<string, ((value: any) => void)[]>();
+    const outputPath = path.join(directory, options.fileName);
+    return {
+      on(event: string, callback: (value: any) => void) {
+        callbacks.set(event, [...(callbacks.get(event) ?? []), callback]);
+        return this;
+      },
+      getResumeState: () => ({ filePath: outputPath }),
+      start: async () => {
+        await fs.promises.writeFile(outputPath, body);
+        for (const callback of callbacks.get('progress.throttled') ?? []) {
+          callback({ downloaded: body.length, total: body.length, speed: body.length });
+        }
+        return true;
+      },
+      resumeFromFile: async () => true,
+      pause: async () => true,
+      resume: async () => true,
+      stop: async () => true,
+    };
+  };
+}
 
 describe('unattended installation handoff', () => {
   test('macOS waits for exit, atomically swaps the staged bundle, and keeps a rollback path', () => {

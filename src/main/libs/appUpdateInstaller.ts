@@ -1,10 +1,9 @@
 import crypto from 'crypto';
 import { exec, spawn } from 'child_process';
-import { app, session } from 'electron';
+import { app } from 'electron';
 import fs from 'fs';
+import { DownloaderHelper } from 'node-downloader-helper';
 import path from 'path';
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 import { type AppUpdateSource } from '../../shared/appUpdate/constants';
 
@@ -20,16 +19,46 @@ export interface DownloadedAppUpdate {
   sha256: string;
 }
 
-let activeDownloadController: AbortController | null = null;
+let activeDownloader: DownloaderHelper | null = null;
+let activeDownloadPath: string | null = null;
+
+export interface AppUpdateResumeState {
+  filePath: string;
+  downloaded?: number;
+  total?: number;
+  etag?: string | null;
+}
+
+type UpdateDownloader = Pick<
+  DownloaderHelper,
+  'on' | 'getResumeState' | 'start' | 'resumeFromFile' | 'pause' | 'resume' | 'stop'
+>;
 
 export function cancelActiveDownload(): boolean {
-  if (activeDownloadController) {
+  if (activeDownloader) {
     console.log('[AppUpdate] Download cancelled by user');
-    activeDownloadController.abort('cancelled');
-    activeDownloadController = null;
+    const downloader = activeDownloader;
+    const downloadPath = activeDownloadPath;
+    void downloader.stop().finally(() => {
+      if (downloadPath) void fs.promises.unlink(downloadPath).catch(() => {});
+    });
+    activeDownloader = null;
+    activeDownloadPath = null;
     return true;
   }
   return false;
+}
+
+export function pauseActiveDownload(): boolean {
+  if (!activeDownloader) return false;
+  void activeDownloader.pause();
+  return true;
+}
+
+export function resumeActiveDownload(): boolean {
+  if (!activeDownloader) return false;
+  void activeDownloader.resume();
+  return true;
 }
 
 /** Escape a string for safe use as a single-quoted POSIX shell argument. */
@@ -119,8 +148,13 @@ export async function downloadUpdate(
   source: AppUpdateSource,
   expected: { size: number; sha256: string },
   onProgress: (progress: AppUpdateDownloadProgress) => void,
+  options: {
+    resumeState?: AppUpdateResumeState | null;
+    onResumeState?: (state: AppUpdateResumeState) => void;
+    createDownloader?: (url: string, directory: string, options: object) => UpdateDownloader;
+  } = {},
 ): Promise<DownloadedAppUpdate> {
-  if (activeDownloadController) {
+  if (activeDownloader) {
     throw new Error('A download is already in progress');
   }
 
@@ -136,106 +170,77 @@ export async function downloadUpdate(
 
   const ext = path.extname(parsedUrl.pathname) || (process.platform === 'darwin' ? '.dmg' : '.exe');
   const updateDir = path.join(app.getPath('userData'), 'updates');
-  const ts = Date.now();
-  const downloadPath = path.join(updateDir, `zhiyuan-update-${source}-${ts}${ext}.download`);
-  const finalPath = path.join(updateDir, `zhiyuan-update-${source}-${ts}${ext}`);
+  const artifactId = expected.sha256;
+  const downloadPath = path.join(updateDir, `zhiyuan-update-${artifactId}${ext}.part`);
+  const finalPath = path.join(updateDir, `zhiyuan-update-${artifactId}${ext}`);
 
   console.log(`[AppUpdate] Temp path: ${downloadPath}`);
   console.log(`[AppUpdate] Final path: ${finalPath}`);
 
-  const controller = new AbortController();
-  activeDownloadController = controller;
-
-  let writeStream: fs.WriteStream | null = null;
-  let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const clearInactivityTimer = () => {
-    if (inactivityTimer) {
-      clearTimeout(inactivityTimer);
-      inactivityTimer = null;
-    }
-  };
-
-  const resetInactivityTimer = () => {
-    clearInactivityTimer();
-    inactivityTimer = setTimeout(() => {
-      console.error('[AppUpdate] Download inactivity timeout (60s), aborting');
-      controller.abort('timeout');
-    }, DOWNLOAD_INACTIVITY_TIMEOUT_MS);
-  };
-
   try {
-    const response = await session.defaultSession.fetch(url, {
-      signal: controller.signal,
-    });
-
-    console.log(`[AppUpdate] HTTP response: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      throw new Error(`Download failed (HTTP ${response.status})`);
-    }
-
-    if (!response.body) {
-      throw new Error('Response has no body');
-    }
-
-    const totalHeader = response.headers.get('content-length');
-    const total = totalHeader ? Number(totalHeader) : undefined;
-    console.log(`[AppUpdate] Content-Length: ${totalHeader ?? 'unknown'}`);
-
-    let received = 0;
-    const hash = crypto.createHash('sha256');
-    let lastSpeedTime = Date.now();
-    let lastSpeedBytes = 0;
-    let currentSpeed: number | undefined = undefined;
-    let lastProgressTime = 0;
-
-    const emitProgress = () => {
-      onProgress({
-        received,
-        total: total && Number.isFinite(total) ? total : undefined,
-        percent: total && Number.isFinite(total) ? received / total : undefined,
-        speed: currentSpeed,
-      });
-    };
-
-    // Emit initial progress
-    emitProgress();
-
     await fs.promises.mkdir(updateDir, { recursive: true });
-    writeStream = fs.createWriteStream(downloadPath);
-
-    const nodeStream = Readable.fromWeb(response.body as any);
-
-    // Start inactivity timer
-    resetInactivityTimer();
-
-    nodeStream.on('data', (chunk: Buffer) => {
-      received += chunk.length;
-      hash.update(chunk);
-
-      // Reset inactivity timer on each chunk
-      resetInactivityTimer();
-
-      // Calculate speed with 1-second window
-      const now = Date.now();
-      const elapsed = now - lastSpeedTime;
-      if (elapsed >= 1000) {
-        currentSpeed = ((received - lastSpeedBytes) / elapsed) * 1000;
-        lastSpeedTime = now;
-        lastSpeedBytes = received;
-      }
-
-      // Throttle progress events to avoid flooding IPC channel
-      if (now - lastProgressTime >= PROGRESS_THROTTLE_MS) {
-        lastProgressTime = now;
-        emitProgress();
-      }
+    const head = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10_000),
     });
+    if (!head.ok) throw new Error(`Download preflight failed (HTTP ${head.status})`);
+    const remoteSize = Number(head.headers.get('content-length'));
+    if (!Number.isSafeInteger(remoteSize) || remoteSize !== expected.size) {
+      throw new Error('Update artifact size does not match the signed manifest');
+    }
+    const remoteEtag = head.headers.get('etag');
+    const canResume = head.headers.get('accept-ranges') === 'bytes';
+    const resumeState = options.resumeState;
+    const shouldResume = Boolean(
+      resumeState &&
+      resumeState.filePath === downloadPath &&
+      typeof remoteEtag === 'string' &&
+      resumeState.etag === remoteEtag &&
+      canResume &&
+      fs.existsSync(downloadPath),
+    );
+    if (!shouldResume) await fs.promises.unlink(downloadPath).catch(() => {});
 
-    await pipeline(nodeStream, writeStream);
-    writeStream = null;
-    clearInactivityTimer();
+    const downloaderOptions = {
+      fileName: path.basename(downloadPath),
+      headers: { 'User-Agent': 'ZhiYuanAgent/app-updater' },
+      override: true,
+      maxRedirects: 0,
+      timeout: DOWNLOAD_INACTIVITY_TIMEOUT_MS,
+      removeOnFail: false,
+      removeOnStop: false,
+      resumeIfFileExists: false,
+      resumeOnIncomplete: true,
+      resumeOnIncompleteMaxRetry: 3,
+      retry: { maxRetries: 3, delay: 2_000 },
+      progressThrottle: PROGRESS_THROTTLE_MS,
+    } as ConstructorParameters<typeof DownloaderHelper>[2];
+    const downloader =
+      options.createDownloader?.(url, updateDir, downloaderOptions) ??
+      new DownloaderHelper(url, updateDir, downloaderOptions);
+    activeDownloader = downloader;
+    activeDownloadPath = downloadPath;
+    downloader.on('error', () => undefined);
+    downloader.on('progress.throttled', stats => {
+      const total = stats.total > 0 ? stats.total : undefined;
+      onProgress({
+        received: stats.downloaded,
+        total,
+        percent: total ? stats.downloaded / total : undefined,
+        speed: stats.speed > 0 ? stats.speed : undefined,
+      });
+      options.onResumeState?.({
+        ...downloader.getResumeState(),
+        filePath: downloadPath,
+        etag: remoteEtag,
+      });
+    });
+    if (shouldResume) {
+      await downloader.resumeFromFile(downloadPath, resumeState);
+    } else {
+      await downloader.start();
+    }
 
     // Validate downloaded file
     const stat = await fs.promises.stat(downloadPath);
@@ -244,57 +249,44 @@ export async function downloadUpdate(
     if (stat.size === 0) {
       throw new Error('Downloaded file is empty');
     }
-    if (total && Number.isFinite(total) && stat.size !== total) {
-      throw new Error(`Download incomplete: expected ${total} bytes but got ${stat.size}`);
-    }
     if (stat.size !== expected.size) {
       throw new Error(
         `Downloaded size mismatch: expected ${expected.size} bytes but got ${stat.size}`,
       );
     }
 
-    const sha256 = hash.digest('hex');
+    const sha256 = await sha256File(downloadPath);
     if (!crypto.timingSafeEqual(Buffer.from(sha256, 'hex'), Buffer.from(expected.sha256, 'hex'))) {
+      await fs.promises.unlink(downloadPath).catch(() => {});
       throw new Error('Downloaded file checksum verification failed');
     }
 
-    // Rename to final path (atomic on same filesystem)
+    await fs.promises.unlink(finalPath).catch(() => {});
     await fs.promises.rename(downloadPath, finalPath);
     console.log(`[AppUpdate] File saved to: ${finalPath}`);
 
     // Emit final 100% progress
     onProgress({
-      received,
-      total: total && Number.isFinite(total) ? total : received,
+      received: stat.size,
+      total: stat.size,
       percent: 1,
-      speed: currentSpeed,
+      speed: undefined,
     });
 
     return { filePath: finalPath, sha256 };
   } catch (error) {
-    clearInactivityTimer();
     console.error('[AppUpdate] Download error:', error);
-
-    // Clean up partial download
-    try {
-      if (writeStream) {
-        writeStream.destroy();
-      }
-      await fs.promises.unlink(downloadPath).catch(() => {});
-    } catch {
-      // Ignore cleanup errors
-    }
-
-    if (controller.signal.aborted) {
-      if (controller.signal.reason === 'timeout') {
-        throw new Error('Download timed out: no data received for 60 seconds');
-      }
-      throw new Error('Download cancelled');
-    }
     throw error;
   } finally {
-    activeDownloadController = null;
+    activeDownloader = null;
+    activeDownloadPath = null;
   }
+}
+
+async function sha256File(filePath: string): Promise<string> {
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of fs.createReadStream(filePath)) hash.update(chunk);
+  return hash.digest('hex');
 }
 
 export async function installUpdate(filePath: string): Promise<void> {

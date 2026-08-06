@@ -399,6 +399,7 @@ describe('AppUpdateCoordinator manifest cache', () => {
       'auto',
       { size: 1024, sha256: 'a'.repeat(64) },
       expect.any(Function),
+      expect.any(Object),
     );
 
     resolveDownload?.({
@@ -407,6 +408,27 @@ describe('AppUpdateCoordinator manifest cache', () => {
     });
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
     expect(coordinator.getState().readyFilePath).toBe('/tmp/zhiyuan-update.dmg');
+  });
+
+  test('records a successful no-update check as up to date', async () => {
+    const envelope = signedManifest(privateKey, undefined, { version: '2026.7.1' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(envelope), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+
+    const result = await new AppUpdateCoordinator(
+      new MemoryStore() as unknown as SqliteStore,
+    ).checkNow();
+
+    expect(result.updateFound).toBe(false);
+    expect(result.state.status).toBe(AppUpdateStatus.UpToDate);
+    expect(result.state.lastCheckedAt).toEqual(expect.any(Number));
   });
 
   test('does not expose a restart action when the background download fails', async () => {

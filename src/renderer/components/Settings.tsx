@@ -42,6 +42,7 @@ import {
 } from '../../shared/providers';
 import type { LlamaCppModelPreference } from '../../shared/llamacpp';
 import { OpenClawEnginePhase } from '../../shared/openclaw/constants';
+import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../shared/appUpdate/constants';
 import {
   type AppConfig,
   defaultConfig,
@@ -159,6 +160,7 @@ interface SettingsProps extends SettingsOpenOptions {
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
   } | null;
+  appUpdateState?: AppUpdateRuntimeState;
 }
 
 const CUSTOM_PROVIDER_KEYS = [
@@ -728,6 +730,7 @@ const Settings: React.FC<SettingsProps> = ({
   noticeI18nKey,
   noticeExtra,
   enterpriseConfig,
+  appUpdateState,
 }) => {
   const dispatch = useDispatch();
   // 状态
@@ -5218,7 +5221,14 @@ const Settings: React.FC<SettingsProps> = ({
       case 'im':
         return <IMSettings />;
 
-      case 'about':
+      case 'about': {
+        const update = appUpdateState;
+        const progress = update?.progress;
+        const isDownloading = update?.status === AppUpdateStatus.Downloading;
+        const formatBytes = (value: number) =>
+          value < 1024 * 1024
+            ? `${Math.round(value / 1024)} KB`
+            : `${(value / (1024 * 1024)).toFixed(1)} MB`;
         return (
           <div className="flex min-h-full flex-col items-center pt-6 pb-3">
             {/* Logo & App Name */}
@@ -5242,6 +5252,110 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{appVersion}</span>
                 </div>
+              </div>
+              <div className="px-4 py-3 border-b border-border space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-foreground">
+                    {i18nService.t('updateReadyTitle')}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {update?.info?.latestVersion
+                      ? `v${update.info.latestVersion}`
+                      : update?.status === AppUpdateStatus.UpToDate
+                        ? i18nService.t('updateUpToDate')
+                        : update?.status === AppUpdateStatus.Checking
+                          ? i18nService.t('updateChecking')
+                          : update?.status === AppUpdateStatus.Error
+                            ? i18nService.t('updateCheckFailed')
+                            : i18nService.t('updateNotChecked')}
+                  </span>
+                </div>
+                {isDownloading && progress ? (
+                  <>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full bg-primary transition-[width] duration-200"
+                        style={{
+                          width: `${Math.min(100, Math.max(0, (progress.percent ?? 0) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>
+                        {formatBytes(progress.received)}
+                        {progress.total ? ` / ${formatBytes(progress.total)}` : ''}
+                      </span>
+                      <span>{progress.speed ? `${formatBytes(progress.speed)}/s` : ''}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void window.electron.appUpdate.pauseDownload()}
+                      >
+                        {i18nService.t('updatePause')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void window.electron.appUpdate.cancelDownload()}
+                      >
+                        {i18nService.t('updateDownloadCancel')}
+                      </Button>
+                    </div>
+                  </>
+                ) : update?.status === AppUpdateStatus.Paused ? (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => void window.electron.appUpdate.resumeDownload()}
+                    >
+                      {i18nService.t('updateResume')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => void window.electron.appUpdate.cancelDownload()}
+                    >
+                      {i18nService.t('updateDownloadCancel')}
+                    </Button>
+                  </div>
+                ) : update?.status === AppUpdateStatus.Ready ? (
+                  <Button size="sm" onClick={() => void window.electron.appUpdate.installReady()}>
+                    {i18nService.t('updateReadyConfirm')}
+                  </Button>
+                ) : update?.status === AppUpdateStatus.Error && update.info ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs text-destructive">
+                      {update.errorMessage || i18nService.t('updateDownloadFailed')}
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => void window.electron.appUpdate.retryDownload()}
+                    >
+                      {i18nService.t('updateRetry')}
+                    </Button>
+                  </div>
+                ) : update?.status === AppUpdateStatus.Available ? (
+                  <Button size="sm" onClick={() => void window.electron.appUpdate.retryDownload()}>
+                    {i18nService.t('updateDownloadNow')}
+                  </Button>
+                ) : update?.status !== AppUpdateStatus.Checking &&
+                  update?.status !== AppUpdateStatus.UpToDate ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void window.electron.appUpdate.checkNow({ manual: true })}
+                  >
+                    {i18nService.t('updateCheckNow')}
+                  </Button>
+                ) : null}
+                {update?.lastCheckedAt ? (
+                  <div className="text-xs text-muted-foreground">
+                    {i18nService.t('updateLastChecked')}
+                    {new Date(update.lastCheckedAt).toLocaleString()}
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                 <span className="text-sm text-foreground">GitHub</span>
@@ -5305,6 +5419,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
           </div>
         );
+      }
 
       default:
         return null;
@@ -5510,9 +5625,7 @@ const Settings: React.FC<SettingsProps> = ({
         )}
 
         {(isAddingModel || isEditingModel) && (
-          <div
-            className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 px-4 rounded-2xl"
-          >
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 px-4 rounded-2xl">
             <div
               role="dialog"
               aria-modal="true"

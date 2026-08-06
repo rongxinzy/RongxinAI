@@ -3,8 +3,10 @@ export const AppUpdateStatus = {
   Checking: 'checking',
   Available: 'available',
   Downloading: 'downloading',
+  Paused: 'paused',
   Ready: 'ready',
   Installing: 'installing',
+  UpToDate: 'up_to_date',
   Error: 'error',
 } as const;
 
@@ -21,6 +23,8 @@ export const AppUpdateIpc = {
   GetState: 'appUpdate:getState',
   CheckNow: 'appUpdate:checkNow',
   RetryDownload: 'appUpdate:retryDownload',
+  PauseDownload: 'appUpdate:pauseDownload',
+  ResumeDownload: 'appUpdate:resumeDownload',
   CancelDownload: 'appUpdate:cancelDownload',
   InstallReady: 'appUpdate:installReady',
   StateChanged: 'appUpdate:stateChanged',
@@ -47,6 +51,7 @@ export interface AppUpdateRuntimeState {
   source: AppUpdateSource | null;
   info: AppUpdateInfo | null;
   progress: AppUpdateDownloadProgress | null;
+  lastCheckedAt: number | null;
   readyFilePath: string | null;
   readyFileHash: string | null;
   errorMessage: string | null;
