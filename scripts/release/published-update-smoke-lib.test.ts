@@ -1,8 +1,19 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { redirectMatches, verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
+import {
+  ONE_BYTE_RANGE_HEADERS,
+  redirectMatches,
+  verifyPublishedBlockmap,
+} from './published-update-smoke-lib.mjs';
 
 describe('published update smoke helpers', () => {
+  test('disables cache for one-byte Range probes', () => {
+    expect(ONE_BYTE_RANGE_HEADERS).toEqual({
+      range: 'bytes=0-0',
+      'cache-control': 'no-cache',
+    });
+  });
+
   test('compares redirects after URL normalization for Unicode filenames', () => {
     const signedUrl =
       'https://downloads.rongxzyai.com/releases/2026.8.6-build.6/win32-x64-lite/知远-Setup-2026.8.6-build.6.exe';
@@ -48,7 +59,7 @@ describe('published update smoke helpers', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
     expect(fetchImpl.mock.calls[0]?.[0].toString()).toMatch(/ZhiYuan\.exe\.blockmap$/);
     expect(fetchImpl.mock.calls[2]?.[1]).toMatchObject({
-      headers: { range: 'bytes=0-0' },
+      headers: ONE_BYTE_RANGE_HEADERS,
     });
   });
 
