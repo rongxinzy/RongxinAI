@@ -48,6 +48,14 @@ import type { CoworkPermissionResult } from './types/cowork';
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
 const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
 const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
+const DEFAULT_TOAST_DURATION_MS = 2_200;
+
+interface AppToastOptions {
+  autoClose?: boolean;
+  durationMs?: number;
+  isError?: boolean;
+  onClose?: () => void;
+}
 
 // Feature areas outside the default cowork view are code-split so they stay
 // out of the initial preload graph (see issue #141).
@@ -98,6 +106,7 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isToastError, setIsToastError] = useState(false);
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [appUpdateState, setAppUpdateState] = useState<AppUpdateRuntimeState>({
@@ -115,6 +124,7 @@ const App: React.FC = () => {
     disableUpdate?: boolean;
   } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
+  const toastOnCloseRef = useRef<(() => void) | null>(null);
   const hasInitialized = useRef(false);
   const dispatch = useDispatch();
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
@@ -450,20 +460,37 @@ const App: React.FC = () => {
     [dispatch, handleNewChat],
   );
 
-  const showToast = useCallback((message: string, autoClose: boolean = true) => {
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setToastMessage(null);
+    setIsToastError(false);
+    const onClose = toastOnCloseRef.current;
+    toastOnCloseRef.current = null;
+    onClose?.();
+  }, []);
+
+  const showToast = useCallback((message: string, options: AppToastOptions = {}) => {
+    const {
+      autoClose = true,
+      durationMs = DEFAULT_TOAST_DURATION_MS,
+      isError = false,
+      onClose = null,
+    } = options;
     setToastMessage(message);
+    setIsToastError(isError);
+    toastOnCloseRef.current = onClose;
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
     }
     if (autoClose) {
-      toastTimerRef.current = window.setTimeout(() => {
-        setToastMessage(null);
-        toastTimerRef.current = null;
-      }, 2200);
+      toastTimerRef.current = window.setTimeout(dismissToast, durationMs);
     } else {
       toastTimerRef.current = null;
     }
-  }, []);
+  }, [dismissToast]);
 
   useEffect(() => {
     let mounted = true;
@@ -595,18 +622,19 @@ const App: React.FC = () => {
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
       }
+      toastOnCloseRef.current = null;
     };
   }, []);
 
   // Listen for toast events from child components
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ message: string; autoClose?: boolean } | string>).detail;
+      const detail = (e as CustomEvent<{ message: string } & AppToastOptions | string>).detail;
       if (!detail) return;
       if (typeof detail === 'string') {
         showToast(detail);
       } else {
-        showToast(detail.message, detail.autoClose !== false);
+        showToast(detail.message, detail);
       }
     };
     window.addEventListener('app:showToast', handler);
@@ -734,7 +762,7 @@ const App: React.FC = () => {
   return (
     <TooltipProvider delay={400}>
       <div className="h-screen overflow-hidden flex flex-col bg-surface-raised">
-        {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+        {toastMessage && <Toast message={toastMessage} isError={isToastError} onClose={dismissToast} />}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar
             onShowLogin={handleShowLogin}

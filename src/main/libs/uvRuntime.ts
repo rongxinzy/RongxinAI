@@ -6,6 +6,15 @@ import { getManagedPythonExecutable } from './pythonRuntime';
 
 const UV_RUNTIME_DIR_NAME =
   process.platform === 'darwin' ? 'uv-mac' : process.platform === 'linux' ? 'uv-linux' : 'uv-win';
+const UV_CONFIG_DIR_NAME = 'uv';
+const UV_CONFIG_FILE_NAME = 'uv.toml';
+const DOMESTIC_PYPI_INDEX_URL = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
+const MANAGED_UV_CONFIG = [
+  '[[index]]',
+  `url = '${DOMESTIC_PYPI_INDEX_URL}'`,
+  'default = true',
+  '',
+].join('\n');
 const IS_WINDOWS = process.platform === 'win32';
 type UvExecutableName = 'uv.exe' | 'uvx.exe' | 'uv' | 'uvx';
 
@@ -75,6 +84,26 @@ export function getUserUvRoot(): string {
   return path.join(app.getPath('userData'), 'runtimes', UV_RUNTIME_DIR_NAME);
 }
 
+function ensureManagedUvConfig(): string | null {
+  const configPath = path.join(
+    app.getPath('userData'),
+    'runtimes',
+    UV_CONFIG_DIR_NAME,
+    UV_CONFIG_FILE_NAME,
+  );
+  try {
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    const existing = fs.existsSync(configPath) ? fs.readFileSync(configPath, 'utf8') : null;
+    if (existing !== MANAGED_UV_CONFIG) {
+      fs.writeFileSync(configPath, MANAGED_UV_CONFIG, 'utf8');
+    }
+    return configPath;
+  } catch (error) {
+    console.warn('[UvRuntime] could not prepare the private uv configuration:', error);
+    return null;
+  }
+}
+
 export function findBundledUvExecutable(name: UvExecutableName): string | null {
   const candidates = [getUserUvRoot(), getBundledUvRoot()].filter((value): value is string =>
     Boolean(value),
@@ -137,6 +166,13 @@ export function configureUvForManagedPython(
   env.UV_NO_MANAGED_PYTHON = '1';
   env.UV_CACHE_DIR = path.join(app.getPath('userData'), 'runtimes', 'uv-cache');
   env.UV_TOOL_DIR = path.join(app.getPath('userData'), 'runtimes', 'uv-tools');
+  const configPath = ensureManagedUvConfig();
+  if (configPath) {
+    env.UV_CONFIG_FILE = configPath;
+    // An inherited UV_DEFAULT_INDEX has higher priority than uv.toml. Pin this
+    // process to the app's mirror so external shell configuration cannot change it.
+    env.UV_DEFAULT_INDEX = DOMESTIC_PYPI_INDEX_URL;
+  }
   env.ZHIYUAN_PYTHON_BIN = python;
   return env;
 }

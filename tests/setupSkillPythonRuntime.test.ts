@@ -8,6 +8,7 @@ import {
   listRequirementFiles,
   normalizePlatform,
   parseImportNames,
+  validateSkillDependencyDeclarations,
 } from '../scripts/setup-skill-python-runtime.js';
 
 describe('setup-skill-python-runtime', () => {
@@ -23,9 +24,9 @@ describe('setup-skill-python-runtime', () => {
       const requirements = path.join(root, 'requirements.txt');
       fs.writeFileSync(
         requirements,
-        '# comment\nPillow>=10\nscikit-learn>=1\n--extra-index-url https://example.invalid\n',
+        '# comment\nPillow>=10\nscikit-learn>=1\npsycopg2-binary>=2.9\n--extra-index-url https://example.invalid\n',
       );
-      expect(parseImportNames(requirements)).toEqual(['PIL', 'sklearn']);
+      expect(parseImportNames(requirements)).toEqual(['PIL', 'sklearn', 'psycopg2']);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -38,6 +39,29 @@ describe('setup-skill-python-runtime', () => {
       fs.mkdirSync(path.join(root, 'docx'), { recursive: true });
       fs.writeFileSync(path.join(root, 'xlsx', 'requirements.txt'), 'openpyxl>=3\n');
       expect(listRequirementFiles(root).map(entry => entry.skillId)).toEqual(['xlsx']);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('requires third-party Python imports to be declared by their Skill', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'skills-'));
+    try {
+      const skillRoot = path.join(root, 'analysis');
+      fs.mkdirSync(path.join(skillRoot, 'scripts'), { recursive: true });
+      fs.writeFileSync(
+        path.join(skillRoot, 'scripts', 'analyze.py'),
+        'import json\nimport pandas as pd\nfrom helpers import report\n',
+      );
+      fs.writeFileSync(path.join(skillRoot, 'scripts', 'helpers.py'), 'def report(): pass\n');
+
+      expect(validateSkillDependencyDeclarations(root)).toEqual({
+        ok: false,
+        missing: ['analysis: pandas is imported but not declared in requirements.txt'],
+      });
+
+      fs.writeFileSync(path.join(skillRoot, 'requirements.txt'), 'pandas>=2.2,<3\n');
+      expect(validateSkillDependencyDeclarations(root)).toEqual({ ok: true, missing: [] });
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

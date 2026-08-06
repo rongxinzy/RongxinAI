@@ -1,19 +1,24 @@
 import { Button } from '@shared/components/ui/button';
-import { Info, X } from 'lucide-react';
+import { Info, TriangleAlert, X } from 'lucide-react';
 import React from 'react';
 
 interface ToastProps {
   message: string;
+  isError?: boolean;
   onClose?: () => void;
 }
 
-const Toast: React.FC<ToastProps> = ({ message, onClose }) => {
+const Toast: React.FC<ToastProps> = ({ message, isError = false, onClose }) => {
   return (
     <div className="pointer-events-none fixed right-4 top-4 z-10000 w-[min(24rem,calc(100vw-2rem))]">
       <div className="pointer-events-auto rounded-xl border border-border-subtle bg-surface px-5 py-3.5 text-foreground shadow-xl backdrop-blur-md animate-scale-in">
         <div className="flex items-center gap-3">
-          <div className="shrink-0 rounded-full bg-primary-muted p-2">
-            <Info className="h-4 w-4 text-primary" />
+          <div className={`shrink-0 rounded-full p-2 ${isError ? 'bg-red-500/15' : 'bg-primary-muted'}`}>
+            {isError ? (
+              <TriangleAlert className="h-4 w-4 text-red-500" />
+            ) : (
+              <Info className="h-4 w-4 text-primary" />
+            )}
           </div>
           <div className="flex-1 text-sm font-medium leading-snug">{message}</div>
           {onClose && (
