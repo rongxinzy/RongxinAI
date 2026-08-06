@@ -307,6 +307,7 @@
   },
   "electronVersion": "40.2.1",
   "electronUpdaterCompatibility": ">=6.0.0",
+  "detectUpdateChannel": false,
   "generateUpdatesFilesForAllChannels": false,
   "asarUnpack": [
     "node_modules/@img/**",
