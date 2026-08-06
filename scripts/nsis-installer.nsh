@@ -351,7 +351,7 @@
   LlamaCppBackendResourcesPresent:
     StrCpy $R8 ""
     IfSilent LlamaCppBackendInstallDeferred 0
-    MessageBox MB_OKCANCEL|MB_ICONQUESTION "The local inference runtime contains unsigned executable files. ZhiYuan Agent can create a local code-signing certificate and sign only these runtime files during installation. Choose OK to confirm local signing and continue, or Cancel to stop installation." IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
+    MessageBox MB_OKCANCEL|MB_ICONQUESTION "本地推理运行时包含未签名的程序文件。知远智能体需要创建本机证书并仅签名这些文件，以便正常运行。$\r$\n$\r$\n点击“确定”继续安装；点击“取消”退出安装。证书不会上传，也不会用于其他应用。" IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
 
   LlamaCppBackendLocalSigningConfirmed:
     StrCpy $R8 "--local-signing-confirmed"
