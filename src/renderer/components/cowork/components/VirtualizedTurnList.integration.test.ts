@@ -70,6 +70,12 @@ const flushResizeObservers = async (afterPass?: () => void): Promise<void> => {
       TestResizeObserver.flush();
       await Promise.resolve();
     });
+    await act(
+      () =>
+        new Promise<void>(resolve => {
+          requestAnimationFrame(() => resolve());
+        }),
+    );
     afterPass?.();
   }
 };
@@ -223,6 +229,7 @@ test('keeps a long variable-height session at the tail without overlapping rows'
 test('preserves the visible turn and viewport offset when older turns are prepended', async () => {
   const viewport = installViewport();
   const turns = makeTurns(100, 'existing');
+  const onInitialTailPositioned = vi.fn();
   const renderTurn = (turn: ConversationTurn) =>
     React.createElement('div', {
       'data-turn-height': '200',
@@ -232,17 +239,20 @@ test('preserves the visible turn and viewport offset when older turns are prepen
     React.createElement(VirtualizedTurnList, {
       isStreaming: false,
       turns,
+      onInitialTailPositioned,
       renderAll: false,
       renderTurn,
     }),
     { container: viewport },
   );
   await flushResizeObservers();
+  await waitFor(() => expect(onInitialTailPositioned).toHaveBeenCalledOnce());
 
   await act(async () => {
     viewport.scrollTop = 15_000;
     viewport.dispatchEvent(new Event('scroll'));
   });
+  await flushResizeObservers();
 
   const anchorRow = Array.from(viewport.querySelectorAll<HTMLElement>('[data-index]')).find(row => {
     const start = Number.parseFloat(row.style.top);
@@ -257,6 +267,7 @@ test('preserves the visible turn and viewport offset when older turns are prepen
     React.createElement(VirtualizedTurnList, {
       isStreaming: false,
       turns: prepended,
+      onInitialTailPositioned,
       renderAll: false,
       renderTurn,
     }),

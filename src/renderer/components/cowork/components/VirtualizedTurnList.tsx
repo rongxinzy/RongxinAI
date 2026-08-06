@@ -22,6 +22,7 @@ interface VirtualizedTurnListProps {
 const TURN_HEIGHT_ESTIMATE_PX = 300;
 const INITIAL_VIEWPORT_HEIGHT_PX = 1200;
 const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
+const INITIAL_TAIL_STABLE_FRAMES = 2;
 
 /**
  * Renders only the visible window of conversation turns (issue #141
@@ -42,18 +43,16 @@ export const VirtualizedTurnList = React.forwardRef<
     const scrollElement = instance.scrollElement as HTMLElement | null;
     const targetWindow = scrollElement?.ownerDocument.defaultView;
 
-    if (scrollRetryFrameRef.current !== null && scrollRetryWindowRef.current) {
-      scrollRetryWindowRef.current.cancelAnimationFrame(scrollRetryFrameRef.current);
-      scrollRetryFrameRef.current = null;
-      scrollRetryWindowRef.current = null;
-    }
-
     elementScroll(offset, options, instance);
-    if (!scrollElement || !targetWindow || !options.adjustments) return;
+    if (!scrollElement || !targetWindow) return;
 
-    const requestedOffset = offset + options.adjustments;
+    const requestedOffset = offset + (options.adjustments ?? 0);
     const clampedOffset = scrollElement.scrollTop;
     if (requestedOffset - clampedOffset < 1) return;
+
+    if (scrollRetryFrameRef.current !== null && scrollRetryWindowRef.current) {
+      scrollRetryWindowRef.current.cancelAnimationFrame(scrollRetryFrameRef.current);
+    }
 
     // A ResizeObserver batch can grow several tail rows before React commits
     // the new sizer height. Retry only a browser-clamped correction after that
@@ -108,24 +107,47 @@ export const VirtualizedTurnList = React.forwardRef<
     if (!scrollElement || renderAll || hasPositionedInitialTailRef.current) return;
 
     hasPositionedInitialTailRef.current = true;
-    virtualizer.scrollToEnd({ behavior: 'auto' });
-
-    if (!onInitialTailPositioned) return;
     const targetWindow = scrollElement.ownerDocument.defaultView;
     if (!targetWindow) {
-      onInitialTailPositioned();
+      virtualizer.scrollToEnd({ behavior: 'auto' });
+      onInitialTailPositioned?.();
       return;
     }
 
-    let settleFrame = targetWindow.requestAnimationFrame(() => {
-      settleFrame = targetWindow.requestAnimationFrame(() => {
-        virtualizer.scrollToEnd({ behavior: 'auto' });
-        onInitialTailPositioned();
-      });
-    });
+    let stableFrames = 0;
+    let previousScrollHeight = scrollElement.scrollHeight;
+    let previousTotalSize = virtualizer.getTotalSize();
+    let settleFrame: number;
+
+    const positionTail = () => {
+      virtualizer.scrollToEnd({ behavior: 'auto' });
+
+      const virtualItems = virtualizer.getVirtualItems();
+      const lastVirtualItem = virtualItems[virtualItems.length - 1];
+      const lastTurnIsRendered = turns.length === 0 || lastVirtualItem?.index === turns.length - 1;
+      const maxScrollOffset = Math.max(scrollElement.scrollHeight - scrollElement.clientHeight, 0);
+      const isAtTail = Math.abs(scrollElement.scrollTop - maxScrollOffset) < 1;
+      const totalSize = virtualizer.getTotalSize();
+      const sizeIsStable =
+        scrollElement.scrollHeight === previousScrollHeight && totalSize === previousTotalSize;
+
+      stableFrames = lastTurnIsRendered && isAtTail && sizeIsStable ? stableFrames + 1 : 0;
+      previousScrollHeight = scrollElement.scrollHeight;
+      previousTotalSize = totalSize;
+
+      if (stableFrames >= INITIAL_TAIL_STABLE_FRAMES) {
+        onInitialTailPositioned?.();
+        return;
+      }
+
+      settleFrame = targetWindow.requestAnimationFrame(positionTail);
+    };
+
+    virtualizer.scrollToEnd({ behavior: 'auto' });
+    settleFrame = targetWindow.requestAnimationFrame(positionTail);
 
     return () => targetWindow.cancelAnimationFrame(settleFrame);
-  }, [onInitialTailPositioned, renderAll, scrollRef, virtualizer]);
+  }, [onInitialTailPositioned, renderAll, scrollRef, turns.length, virtualizer]);
 
   useImperativeHandle(
     ref,

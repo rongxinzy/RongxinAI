@@ -84,7 +84,7 @@ test('positions a newly mounted virtualizer at the end before paint', () => {
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(2);
 });
 
-test('enables history pagination only after two measured animation frames', () => {
+test('enables history pagination only after the rendered tail is stable', () => {
   const frameCallbacks: FrameRequestCallback[] = [];
   const requestFrame = vi
     .spyOn(window, 'requestAnimationFrame')
@@ -109,7 +109,7 @@ test('enables history pagination only after two measured animation frames', () =
   expect(onInitialTailPositioned).not.toHaveBeenCalled();
 
   act(() => frameCallbacks.shift()?.(16));
-  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(2);
+  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(3);
   expect(onInitialTailPositioned).toHaveBeenCalledOnce();
 
   view.unmount();
