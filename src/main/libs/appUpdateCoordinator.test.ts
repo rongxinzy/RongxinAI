@@ -50,16 +50,23 @@ vi.mock('electron-updater', () => ({
 }));
 
 const electronMocks = vi.hoisted(() => ({
+  getAppPath: vi.fn(() => process.cwd()),
   getPath: vi.fn(() => os.tmpdir()),
+  isPackaged: false,
+  openExternal: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
   app: {
-    getAppPath: () => process.cwd(),
+    getAppPath: electronMocks.getAppPath,
     getPath: electronMocks.getPath,
     getVersion: () => '2026.7.1',
+    get isPackaged() {
+      return electronMocks.isPackaged;
+    },
   },
   BrowserWindow: { getAllWindows: () => [] },
+  shell: { openExternal: electronMocks.openExternal },
 }));
 
 vi.mock('./appUpdateInstaller', () => ({ installWindowsNsis: vi.fn() }));
@@ -156,6 +163,9 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockReset();
     vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockReset();
     vi.mocked(updaterMocks.autoUpdater.quitAndInstall).mockReset();
+    electronMocks.getAppPath.mockReturnValue(process.cwd());
+    electronMocks.isPackaged = false;
+    electronMocks.openExternal.mockReset();
   });
 
   afterEach(async () => {
@@ -285,9 +295,9 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
 
   test('preserves active download progress when another update check is triggered', async () => {
     const envelope = signedManifest(privateKey, { updaterSha512 });
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(envelope), { status: 200 }),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
       isUpdateAvailable: true,
@@ -335,6 +345,35 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(updaterMocks.autoUpdater.checkForUpdates).not.toHaveBeenCalled();
   });
 
+  test('uses the signed manifest as a manual DMG fallback for unsigned packaged macOS builds', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 })),
+    );
+    electronMocks.isPackaged = true;
+    electronMocks.getAppPath.mockReturnValue(path.dirname(downloadedFile));
+    await fs.promises.writeFile(
+      path.join(path.dirname(downloadedFile), 'package.json'),
+      JSON.stringify({ zhiyuanMacAutoUpdateEnabled: false }),
+    );
+    electronMocks.openExternal.mockResolvedValue(undefined);
+
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    const result = await coordinator.checkNow({ manual: true });
+
+    expect(result.success).toBe(true);
+    expect(result.state.status).toBe(AppUpdateStatus.Available);
+    expect(result.state.info?.manualDownloadOnly).toBe(true);
+    expect(updaterMocks.autoUpdater.checkForUpdates).not.toHaveBeenCalled();
+    expect(updaterMocks.autoUpdater.downloadUpdate).not.toHaveBeenCalled();
+
+    await coordinator.retryDownload();
+    expect(electronMocks.openExternal).toHaveBeenCalledWith(
+      'https://downloads.rongxzyai.com/releases/2026.7.2/darwin-arm64-default/ZhiYuan.dmg',
+    );
+  });
+
   test('surfaces update check failures instead of returning to an unchecked idle state', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network offline')));
 
@@ -370,6 +409,62 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
 
     expect(result.success).toBe(false);
     expect(result.state.status).toBe(AppUpdateStatus.Error);
+    expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
+  });
+
+  test('revokes an active download when enterprise policy disables updates', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 })),
+    );
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const store = new MemoryStore();
+    const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
+    await coordinator.checkNow();
+    const token = vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mock.calls[0]?.[0] as {
+      cancel: ReturnType<typeof vi.fn>;
+    };
+
+    store.set('enterprise_config', { disableUpdate: true });
+    const state = coordinator.getState();
+
+    expect(token.cancel).toHaveBeenCalledOnce();
+    expect(state.status).toBe(AppUpdateStatus.Idle);
+    expect(state.info).toBeNull();
+  });
+
+  test('rechecks enterprise policy before installing an already ready update', async () => {
+    const envelope = signedManifest(privateKey, { updaterSha512 });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(envelope), { status: 200 })),
+    );
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
+      updaterMocks.emit('update-downloaded', { downloadedFile });
+      return [downloadedFile];
+    });
+    const store = new MemoryStore();
+    const coordinator = new AppUpdateCoordinator(store as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    store.set('enterprise_config', { disableUpdate: true });
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Updates are disabled by enterprise policy');
+    expect(result.state.status).toBe(AppUpdateStatus.Idle);
     expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
 });

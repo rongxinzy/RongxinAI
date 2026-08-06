@@ -94,6 +94,21 @@ function isLinuxTarget(context) {
   return context?.electronPlatformName === 'linux';
 }
 
+function configureMacAutoUpdateMetadata(context, env = process.env) {
+  if (!isMacTarget(context)) {
+    return;
+  }
+
+  const enabled = env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED === 'true';
+  context.packager.config.extraMetadata = {
+    ...(context.packager.config.extraMetadata || {}),
+    zhiyuanMacAutoUpdateEnabled: enabled,
+  };
+  console.log(
+    `[electron-builder-hooks] macOS in-app automatic installation: ${enabled ? 'enabled' : 'disabled (manual DMG fallback)'}`,
+  );
+}
+
 function collectLatestMtimeMs(dir) {
   let latest = 0;
 
@@ -909,6 +924,7 @@ function installSkillDependencies() {
 }
 
 async function beforePack(context) {
+  configureMacAutoUpdateMetadata(context);
   ensureBundledOpenClawRuntime(context);
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
@@ -1123,6 +1139,7 @@ module.exports = {
   beforePack,
   afterPack,
   collectRuntimePackageClosure,
+  configureMacAutoUpdateMetadata,
   prepareWindowsLlamaCppBackendResources,
   prepareWindowsLlamaCppNsisHelperResources,
   resolveWindowsLlamaCppBackendBundleMode,

@@ -507,8 +507,20 @@ const App: React.FC = () => {
     }
     if (appUpdateState.status === AppUpdateStatus.Error) {
       await window.electron.appUpdate.retryDownload();
+      return;
     }
-  }, [appUpdateState.readyFilePath, appUpdateState.status, showToast]);
+    if (
+      appUpdateState.status === AppUpdateStatus.Available &&
+      appUpdateState.info?.manualDownloadOnly
+    ) {
+      await window.electron.appUpdate.retryDownload();
+    }
+  }, [
+    appUpdateState.info?.manualDownloadOnly,
+    appUpdateState.readyFilePath,
+    appUpdateState.status,
+    showToast,
+  ]);
 
   const handlePermissionResponse = useCallback(
     async (result: CoworkPermissionResult) => {
@@ -648,7 +660,8 @@ const App: React.FC = () => {
   const shouldShowUpdateBadge =
     updateInfo &&
     (appUpdateState.status === AppUpdateStatus.Ready ||
-      appUpdateState.status === AppUpdateStatus.Error);
+      appUpdateState.status === AppUpdateStatus.Error ||
+      (appUpdateState.status === AppUpdateStatus.Available && updateInfo.manualDownloadOnly));
   const updateEntry = shouldShowUpdateBadge ? (
     <AppUpdateBadge
       latestVersion={updateInfo.latestVersion}

@@ -5323,9 +5323,23 @@ const Settings: React.FC<SettingsProps> = ({
                     </Button>
                   </div>
                 ) : update?.status === AppUpdateStatus.Available ? (
-                  <Button size="sm" onClick={() => void window.electron.appUpdate.retryDownload()}>
-                    {i18nService.t('updateDownloadNow')}
-                  </Button>
+                  <div className="space-y-2">
+                    {update.info?.manualDownloadOnly ? (
+                      <div className="text-xs text-muted-foreground">
+                        {i18nService.t('updateManualOnly')}
+                      </div>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      onClick={() => void window.electron.appUpdate.retryDownload()}
+                    >
+                      {i18nService.t(
+                        update.info?.manualDownloadOnly
+                          ? 'updateOpenDownloadPage'
+                          : 'updateDownloadNow',
+                      )}
+                    </Button>
+                  </div>
                 ) : update?.status !== AppUpdateStatus.Checking &&
                   update?.status !== AppUpdateStatus.UpToDate ? (
                   <Button

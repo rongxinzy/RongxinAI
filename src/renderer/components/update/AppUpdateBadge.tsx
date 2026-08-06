@@ -18,7 +18,9 @@ const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, 
   const label =
     status === AppUpdateStatus.Ready
       ? i18nService.t('updateReadyConfirm')
-      : i18nService.t('updateErrorPill');
+      : status === AppUpdateStatus.Available
+        ? i18nService.t('updateOpenDownloadPage')
+        : i18nService.t('updateErrorPill');
 
   return (
     <Button
@@ -29,7 +31,7 @@ const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, 
       title={`${label} ${latestVersion}`}
       aria-label={`${label} ${latestVersion}`}
     >
-      {status === AppUpdateStatus.Error ? (
+      {status === AppUpdateStatus.Error || status === AppUpdateStatus.Available ? (
         <Download className="h-4 w-4 shrink-0" />
       ) : (
         <ArrowUpCircle className="h-4 w-4 shrink-0" />

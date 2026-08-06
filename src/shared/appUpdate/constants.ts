@@ -46,6 +46,8 @@ export interface AppUpdateInfo {
   expectedUpdaterSha512: string;
   /** Basename of the updater artifact whose SHA-512 was authorized. */
   expectedUpdaterFileName: string;
+  /** The current build must open the installer URL instead of using electron-updater. */
+  manualDownloadOnly: boolean;
   mandatory: boolean;
   minimumSupportedVersion: string | null;
 }
