@@ -204,8 +204,16 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      - name: Build macOS package
-        if: ${{ matrix.platform == 'macos' }}
+      - name: Build unsigned macOS package
+        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build signed macOS package
+        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
         run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
