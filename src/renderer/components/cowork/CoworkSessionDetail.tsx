@@ -1242,6 +1242,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <ConversationContent
                 className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
                 observeContentResize={false}
+                reverse={false}
                 scrollClassName="cowork-conversation-scroll"
               >
                 <div ref={scrollContainerRef}>

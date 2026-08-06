@@ -107,10 +107,10 @@ export const VirtualizedTurnList = React.forwardRef<
     const scrollElement = scrollRef.current;
     if (!scrollElement || renderAll || hasPositionedInitialTailRef.current) return;
 
-    hasPositionedInitialTailRef.current = true;
     const targetWindow = scrollElement.ownerDocument.defaultView;
     if (!targetWindow) {
       virtualizer.scrollToEnd({ behavior: 'auto' });
+      hasPositionedInitialTailRef.current = true;
       onInitialTailPositioned?.();
       return;
     }
@@ -142,6 +142,7 @@ export const VirtualizedTurnList = React.forwardRef<
         stableFrames >= INITIAL_TAIL_STABLE_FRAMES ||
         positioningFrames >= INITIAL_TAIL_MAX_POSITIONING_FRAMES
       ) {
+        hasPositionedInitialTailRef.current = true;
         onInitialTailPositioned?.();
         return;
       }

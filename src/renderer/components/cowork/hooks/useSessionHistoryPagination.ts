@@ -3,7 +3,7 @@ import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { coworkService } from '../../../services/cowork';
 
 const HISTORY_SCROLL_THRESHOLD_PX = 64;
-const HISTORY_PRELOAD_VIEWPORTS = 2;
+const HISTORY_PRELOAD_VIEWPORTS = 3;
 
 type UseSessionHistoryPaginationOptions = {
   sessionId: string | undefined;
@@ -11,7 +11,7 @@ type UseSessionHistoryPaginationOptions = {
   rootRef: RefObject<HTMLElement | null>;
 };
 
-/** Loads older messages when the conversation viewport reaches its top edge. */
+/** Primes and extends older history while preserving an upward viewport buffer. */
 export function useSessionHistoryPagination({
   sessionId,
   messagesOffset,
@@ -19,6 +19,7 @@ export function useSessionHistoryPagination({
 }: UseSessionHistoryPaginationOptions): () => void {
   const isLoadingRef = useRef(false);
   const loadingOffsetRef = useRef<number | null>(null);
+  const prefetchedSessionIdRef = useRef<string | null>(null);
   const [positionedSessionId, setPositionedSessionId] = useState<string | null>(null);
   const markInitialTailPositioned = useCallback(() => {
     setPositionedSessionId(sessionId ?? null);
@@ -27,6 +28,8 @@ export function useSessionHistoryPagination({
   useEffect(() => {
     isLoadingRef.current = false;
     loadingOffsetRef.current = null;
+    prefetchedSessionIdRef.current = null;
+    setPositionedSessionId(null);
   }, [sessionId]);
 
   useEffect(() => {
@@ -37,7 +40,7 @@ export function useSessionHistoryPagination({
   }, [messagesOffset]);
 
   useEffect(() => {
-    if (!sessionId || positionedSessionId !== sessionId || messagesOffset <= 0) return;
+    if (!sessionId || messagesOffset <= 0) return;
 
     const root = rootRef.current;
     const element = root?.querySelector<HTMLElement>('.cowork-conversation-scroll');
@@ -67,17 +70,34 @@ export function useSessionHistoryPagination({
     const getPreloadThreshold = () =>
       Math.max(HISTORY_SCROLL_THRESHOLD_PX, element.clientHeight * HISTORY_PRELOAD_VIEWPORTS);
 
+    const shouldLoadForViewport = () => {
+      const preloadThreshold = getPreloadThreshold();
+      if (positionedSessionId === sessionId) {
+        return element.scrollTop <= preloadThreshold;
+      }
+
+      // Before the initial tail position settles, prime enough history to
+      // make upward scrolling available immediately. This check uses total
+      // scroll range because scrollTop is still moving toward the tail.
+      return Math.max(element.scrollHeight - element.clientHeight, 0) < preloadThreshold;
+    };
+
     const handleScroll = () => {
-      if (element.scrollTop <= getPreloadThreshold()) {
+      if (shouldLoadForViewport()) {
         loadOlderMessages();
       }
     };
 
     element.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Wait for the virtualizer to measure and anchor a prepended page before
-    // checking the buffer again. Continue only while fewer than two viewports
-    // remain above the user, keeping the initial tail page small and immediate.
+    // Start one history request immediately instead of waiting for the tail
+    // measurement loop. Later pages wait for two frames so the virtualizer can
+    // measure and anchor the page before the buffer is evaluated again.
+    if (prefetchedSessionIdRef.current !== sessionId) {
+      prefetchedSessionIdRef.current = sessionId;
+      loadOlderMessages();
+    }
+
     let secondFrame = 0;
     const firstFrame = window.requestAnimationFrame(() => {
       secondFrame = window.requestAnimationFrame(handleScroll);

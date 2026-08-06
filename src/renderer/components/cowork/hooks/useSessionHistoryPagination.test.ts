@@ -36,12 +36,10 @@ beforeEach(() => {
   document.body.replaceChildren();
 });
 
-test('ignores the initial top position until the virtual tail has settled', async () => {
-  const { root, scrollElement } = installScrollElement(2_000, 800);
-  let markInitialTailPositioned: () => void = () => undefined;
-
+test('prefetches history before the virtual tail has settled', async () => {
+  const { root } = installScrollElement(2_000, 800);
   const Harness = () => {
-    markInitialTailPositioned = useSessionHistoryPagination({
+    useSessionHistoryPagination({
       sessionId: 'session-1',
       messagesOffset: 50,
       rootRef: { current: root },
@@ -49,12 +47,6 @@ test('ignores the initial top position until the virtual tail has settled', asyn
     return null;
   };
   render(React.createElement(Harness));
-
-  scrollElement.dispatchEvent(new Event('scroll'));
-  expect(mocks.loadMoreMessages).not.toHaveBeenCalled();
-
-  act(() => markInitialTailPositioned());
-  scrollElement.dispatchEvent(new Event('scroll'));
 
   await waitFor(() => {
     expect(mocks.loadMoreMessages).toHaveBeenCalledOnce();
@@ -62,51 +54,50 @@ test('ignores the initial top position until the virtual tail has settled', asyn
   });
 });
 
-test('loads more after settling when real content still does not fill the viewport', async () => {
+test('keeps priming history before settling when content does not fill the viewport', async () => {
   const { root } = installScrollElement(400, 800);
-  let markInitialTailPositioned: () => void = () => undefined;
 
-  const Harness = () => {
-    markInitialTailPositioned = useSessionHistoryPagination({
+  const Harness = ({ messagesOffset }: { messagesOffset: number }) => {
+    useSessionHistoryPagination({
       sessionId: 'session-1',
-      messagesOffset: 50,
+      messagesOffset,
       rootRef: { current: root },
     });
     return null;
   };
-  render(React.createElement(Harness));
+  const view = render(React.createElement(Harness, { messagesOffset: 100 }));
 
-  expect(mocks.loadMoreMessages).not.toHaveBeenCalled();
-  act(() => markInitialTailPositioned());
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(1));
+  view.rerender(React.createElement(Harness, { messagesOffset: 50 }));
 
-  await waitFor(() => {
-    expect(mocks.loadMoreMessages).toHaveBeenCalledWith('session-1');
-  });
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(2));
 });
 
 test('prefetches before the user reaches the top edge', async () => {
-  const { root, scrollElement } = installScrollElement(4_000, 800);
-  scrollElement.scrollTop = 1_700;
+  const { root, scrollElement } = installScrollElement(8_000, 800);
+  scrollElement.scrollTop = 2_500;
   let markInitialTailPositioned: () => void = () => undefined;
 
-  const Harness = () => {
+  const Harness = ({ messagesOffset }: { messagesOffset: number }) => {
     markInitialTailPositioned = useSessionHistoryPagination({
       sessionId: 'session-1',
-      messagesOffset: 50,
+      messagesOffset,
       rootRef: { current: root },
     });
     return null;
   };
-  render(React.createElement(Harness));
+  const view = render(React.createElement(Harness, { messagesOffset: 100 }));
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(1));
   act(() => markInitialTailPositioned());
+  view.rerender(React.createElement(Harness, { messagesOffset: 50 }));
 
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  expect(mocks.loadMoreMessages).not.toHaveBeenCalled();
+  expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(1);
 
-  scrollElement.scrollTop = 1_500;
+  scrollElement.scrollTop = 2_300;
   scrollElement.dispatchEvent(new Event('scroll'));
 
-  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledWith('session-1'));
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(2));
 });
 
 test('keeps filling the viewport buffer after a page is prepended', async () => {
@@ -123,9 +114,8 @@ test('keeps filling the viewport buffer after a page is prepended', async () => 
     return null;
   };
   const view = render(React.createElement(Harness, { messagesOffset: 100 }));
-  act(() => markInitialTailPositioned());
-
   await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(1));
+  act(() => markInitialTailPositioned());
 
   view.rerender(React.createElement(Harness, { messagesOffset: 50 }));
   await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(2));

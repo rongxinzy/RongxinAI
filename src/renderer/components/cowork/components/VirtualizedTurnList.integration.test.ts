@@ -283,3 +283,41 @@ test('preserves the visible turn and viewport offset when older turns are prepen
     );
   });
 });
+
+test('finishes initial tail positioning when history is prepended concurrently', async () => {
+  const viewport = installViewport();
+  const initialTurns = makeTurns(10, 'recent');
+  const onInitialTailPositioned = vi.fn();
+  const renderTurn = (turn: ConversationTurn) =>
+    React.createElement('div', {
+      'data-turn-height': '200',
+      'data-turn-id': turn.id,
+    });
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns: initialTurns,
+      onInitialTailPositioned,
+      renderAll: false,
+      renderTurn,
+    }),
+    { container: viewport },
+  );
+
+  view.rerender(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns: [...makeTurns(10, 'older'), ...initialTurns],
+      onInitialTailPositioned,
+      renderAll: false,
+      renderTurn,
+    }),
+  );
+  await flushResizeObservers();
+
+  await waitFor(() => {
+    expect(onInitialTailPositioned).toHaveBeenCalledOnce();
+    expect(viewport.scrollTop).toBe(Math.max(viewport.scrollHeight - VIEWPORT_HEIGHT, 0));
+    expect(viewport.querySelector('[data-turn-id="recent-9"]')).not.toBeNull();
+  });
+});
