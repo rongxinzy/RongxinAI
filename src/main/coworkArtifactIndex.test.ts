@@ -1,7 +1,7 @@
 import BetterSqlite3 from 'better-sqlite3';
 import { beforeEach, describe, expect, test } from 'vitest';
 
-import { CoworkArtifactRole } from '../shared/cowork/artifacts';
+import { CoworkArtifactRole, CoworkArtifactSource } from '../shared/cowork/artifacts';
 import {
   COWORK_ARTIFACT_INDEX_VERSION,
   CoworkArtifactIndex,
@@ -86,6 +86,46 @@ describe('CoworkArtifactIndex', () => {
       )
       .get() as { cursor_sequence: number };
     expect(state.cursor_sequence).toBe(2);
+  });
+
+  test('rebuilds stale running-session indexes with write outputs as intermediate', () => {
+    insertMessage('write-1', 1, 'tool_use', '', {
+      toolName: 'write',
+      toolInput: { path: 'D:/output/_verify_tetris.js', content: 'runTests();' },
+    });
+    db.prepare(
+      `INSERT INTO cowork_session_artifacts (
+         session_id, artifact_key, id, message_id, type, title, content,
+         file_name, file_path, source, role, declared, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'session-1',
+      'path:d:/output/_verify_tetris.js',
+      'legacy-artifact',
+      'write-1',
+      'code',
+      '_verify_tetris.js',
+      '',
+      '_verify_tetris.js',
+      'D:/output/_verify_tetris.js',
+      CoworkArtifactSource.Tool,
+      CoworkArtifactRole.Deliverable,
+      0,
+      100,
+    );
+    db.prepare(
+      `INSERT INTO cowork_artifact_index_state
+         (session_id, cursor_sequence, index_version)
+       VALUES (?, ?, ?)`,
+    ).run('session-1', 1, COWORK_ARTIFACT_INDEX_VERSION - 1);
+
+    expect(index.listSession('session-1')).toEqual([
+      expect.objectContaining({
+        fileName: '_verify_tetris.js',
+        role: CoworkArtifactRole.Intermediate,
+        declared: false,
+      }),
+    ]);
   });
 
   test('keeps declaration metadata authoritative across incremental batches', () => {

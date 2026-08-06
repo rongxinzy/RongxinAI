@@ -181,7 +181,7 @@ function collectWrites(messages: CoworkArtifactMessage[]): CoworkArtifactCandida
         fileName,
         filePath,
         source: CoworkArtifactSource.Tool,
-        role: CoworkArtifactRole.Deliverable,
+        role: CoworkArtifactRole.Intermediate,
         declared: false,
         createdAt: message.timestamp,
       },

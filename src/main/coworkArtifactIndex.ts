@@ -7,7 +7,7 @@ import {
   type CoworkArtifactMessage,
 } from './coworkArtifactCollector';
 
-export const COWORK_ARTIFACT_INDEX_VERSION = 1;
+export const COWORK_ARTIFACT_INDEX_VERSION = 2;
 
 interface ArtifactIndexStateRow {
   cursor_sequence: number;
@@ -137,11 +137,26 @@ export class CoworkArtifactIndex {
         )
         .run(sessionId, nextCursor, COWORK_ARTIFACT_INDEX_VERSION);
 
-      return this.listSession(sessionId);
+      return this.readSession(sessionId);
     })();
   }
 
   listSession(sessionId: string): CoworkPersistedArtifact[] {
+    const state = this.db
+      .prepare(
+        `SELECT index_version
+         FROM cowork_artifact_index_state
+         WHERE session_id = ?`,
+      )
+      .get(sessionId) as Pick<ArtifactIndexStateRow, 'index_version'> | undefined;
+    if (!state || state.index_version !== COWORK_ARTIFACT_INDEX_VERSION) {
+      return this.refreshSession(sessionId);
+    }
+
+    return this.readSession(sessionId);
+  }
+
+  private readSession(sessionId: string): CoworkPersistedArtifact[] {
     const rows = this.db
       .prepare(
         `SELECT id, message_id, type, title, content, language, file_name,
