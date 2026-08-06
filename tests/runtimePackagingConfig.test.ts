@@ -78,6 +78,14 @@ test('publish verification uses portable jq flags and preserves updater filename
   assert.doesNotMatch(workflow, /jq -rsr/);
   assert.match(workflow, /output="manifest\/electron\/\$\{target_file\}\/\$\{filename\}"/);
   assert.match(workflow, /manifest\/electron\/win32-x64-lite\/latest\.yml:win32:x64:lite/);
+  assert.match(
+    workflow,
+    /manifest\/electron\/darwin-arm64-default\/latest-mac\.yml:darwin:arm64:default/,
+  );
+  assert.match(
+    workflow,
+    /manifest\/electron\/linux-x64-appimage\/latest-linux\.yml:linux:x64:appimage/,
+  );
   assert.match(workflow, /manifest\/electron\/linux-x64-deb\/latest-linux\.yml:linux:x64:deb/);
 });
 
