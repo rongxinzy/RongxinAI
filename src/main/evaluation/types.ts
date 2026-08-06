@@ -21,6 +21,15 @@ export interface ZhiyuanEvaluationPolicyContext {
   candidateRoot: string;
   workspace: string;
   agentDir: string;
+  runtimeCapabilities?: Readonly<{
+    reviewerSubagent?:
+      | false
+      | Readonly<{
+          isolated: boolean;
+          readOnly: boolean;
+          tools: ReadonlyArray<string>;
+        }>;
+  }>;
   emitActivation(name: string, evidence?: WorkbenchJsonObject): void;
 }
 

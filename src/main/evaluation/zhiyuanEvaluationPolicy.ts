@@ -150,6 +150,14 @@ export function createZhiyuanEvaluationPolicy(
     start: true,
   });
   const agentLoop = workLoop.controller;
+  const reviewerCapability = context.runtimeCapabilities?.reviewerSubagent;
+  const isolatedReviewerAvailable = Boolean(
+    reviewerCapability &&
+      reviewerCapability.isolated &&
+      reviewerCapability.readOnly &&
+      Array.isArray(reviewerCapability.tools) &&
+      reviewerCapability.tools.length === 0,
+  );
   let criticFallbackPending = false;
   let criticAttempt = 0;
 
@@ -158,14 +166,25 @@ export function createZhiyuanEvaluationPolicy(
     modelProfile: context.modelProfile,
     toolNames: context.tools.map(tool => tool.name),
     resources: ['resources/SYSTEM_PROMPT.md', 'SKILLs'],
-    orchestration: ['production_loop', 'agent_loop'],
-    disabledInteractiveFeatures: ['approval_ui', 'ask_user', 'mcp', 'subagent'],
+    orchestration: [
+      'production_loop',
+      'agent_loop',
+      ...(isolatedReviewerAvailable ? ['reviewer_subagent'] : []),
+    ],
+    disabledInteractiveFeatures: [
+      'approval_ui',
+      'ask_user',
+      'mcp',
+      ...(!isolatedReviewerAvailable ? ['subagent'] : []),
+    ],
   });
-  context.emitActivation(ZhiyuanEvaluationActivation.CriticDegraded, {
-    reason: 'No independent reviewer model is configured for this evaluation.',
-    mode: 'same_model_transcript_only',
-    readOnly: true,
-  });
+  if (!isolatedReviewerAvailable) {
+    context.emitActivation(ZhiyuanEvaluationActivation.CriticDegraded, {
+      reason: 'No isolated reviewer subagent is configured for this evaluation.',
+      mode: 'same_model_transcript_only',
+      readOnly: true,
+    });
+  }
 
   const onEvent = (event: Record<string, unknown>): void => {
     const toolName = typeof event.toolName === 'string' ? event.toolName : '';
@@ -191,6 +210,15 @@ export function createZhiyuanEvaluationPolicy(
         toolResultText(event.result),
         event.isError === true,
       );
+      criticAttempt += 1;
+      const critic = controller.getState().critic;
+      context.emitActivation(ZhiyuanEvaluationActivation.CriticCompleted, {
+        attempt: criticAttempt,
+        mode: 'isolated_reviewer_subsession',
+        outputPresent: Boolean(toolResultText(event.result).trim()),
+        passed: critic.passed,
+        findingSeverities: critic.findings.map(finding => finding.severity),
+      });
     }
   };
 
@@ -218,6 +246,18 @@ export function createZhiyuanEvaluationPolicy(
       state.critic.requested &&
       !state.critic.toolCallId
     ) {
+      if (isolatedReviewerAvailable) {
+        return {
+          shouldContinue: true,
+          nextPrompt: [
+            controller.requestCriticPrompt(),
+            `Observed Inspect sandbox tool outcomes: ${JSON.stringify(toolEvidence)}`,
+            'Include those outcomes in the self-contained reviewer task.',
+            'The reviewer has an isolated context and no tools, so do not rely on unstated evidence.',
+            'The official benchmark scorer remains the final deterministic gate after delivery.',
+          ].join('\n'),
+        };
+      }
       criticFallbackPending = true;
       return {
         shouldContinue: true,
