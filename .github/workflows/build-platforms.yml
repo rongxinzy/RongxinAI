@@ -94,6 +94,7 @@ jobs:
             ~/AppData/Local/pnpm/store
             vendor/openclaw-runtime/${{ matrix.runtime_target }}
             vendor/openclaw-plugins
+            vendor/engram-runtime
           key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
@@ -110,11 +111,13 @@ jobs:
         run: |
           bun run setup:uv-runtime
           bun run setup:python-runtime
+          bun run engram:runtime:${{ matrix.runtime_target }}
       - name: Set up POSIX runtimes
         if: ${{ matrix.platform != 'windows' }}
         run: |
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
+          bun run engram:runtime:${{ matrix.runtime_target }}
       - name: Build macOS
         if: ${{ matrix.platform == 'macos' }}
         run: bun run dist:mac
