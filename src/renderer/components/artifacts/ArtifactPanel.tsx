@@ -19,7 +19,13 @@ import {
   setArtifactLayoutMode,
 } from '@/store/slices/artifactSlice';
 import type { ArtifactActiveTab } from '@/store/slices/artifactSlice';
-import { ArtifactRole, type Artifact, type ArtifactType } from '@/types/artifact';
+import {
+  ArtifactPreviewMode,
+  ArtifactRole,
+  getArtifactPreviewMode,
+  type Artifact,
+  type ArtifactType,
+} from '@/types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
 import ArtifactRenderer from './ArtifactRenderer';
@@ -93,6 +99,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     artifact => showIntermediateArtifacts || artifact.role === ArtifactRole.Deliverable,
   );
   const previewableArtifacts = visibleArtifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
+  const artifactPreviewMode = selectedArtifact
+    ? getArtifactPreviewMode(selectedArtifact.type)
+    : ArtifactPreviewMode.Preview;
+  const availableTabs: ArtifactActiveTab[] =
+    artifactPreviewMode === ArtifactPreviewMode.Preview
+      ? ['preview']
+      : artifactPreviewMode === ArtifactPreviewMode.Source
+        ? ['code']
+        : ['preview', 'code'];
+  const displayedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
 
   const intermediateToggle = (
     <Button
@@ -145,6 +161,12 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showFileList]);
+
+  useEffect(() => {
+    if (selectedArtifact && displayedTab !== activeTab) {
+      dispatch(setActiveTab(displayedTab));
+    }
+  }, [activeTab, dispatch, displayedTab, selectedArtifact]);
 
   const handleClose = useCallback(() => {
     if (document.fullscreenElement === panelRef.current) {
@@ -446,22 +468,21 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
               </Button>
             </div>
 
-            {/* Preview/Code tabs */}
             <div className="flex shrink-0 border-b border-border px-2 py-1.5">
               <FluidTabs<ArtifactActiveTab>
                 aria-label={t('artifactViewMode')}
-                value={activeTab}
+                value={displayedTab}
                 onValueChange={value => dispatch(setActiveTab(value))}
-                items={[
-                  { value: 'preview', label: t('artifactPreview') },
-                  { value: 'code', label: t('artifactCode') },
-                ]}
+                items={availableTabs.map(value => ({
+                  value,
+                  label: t(value === 'preview' ? 'artifactPreview' : 'artifactCode'),
+                }))}
               />
             </div>
 
             {/* Render area */}
             <div className="flex-1 min-h-0 overflow-hidden">
-              {activeTab === 'preview' ? (
+              {displayedTab === 'preview' ? (
                 <ArtifactRenderer artifact={selectedArtifact} sessionArtifacts={artifacts} />
               ) : (
                 <CodeRenderer artifact={selectedArtifact} />

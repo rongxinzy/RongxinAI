@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { ArtifactRole } from '../types/artifact';
+import { ArtifactRole, type Artifact } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
 import { ArtifactDetectionService } from './artifactDetectionService';
 import type {
@@ -94,5 +94,71 @@ describe('ArtifactDetectionService', () => {
       filePath: 'C:/workspace/presentation.pptx',
       role: ArtifactRole.Deliverable,
     });
+  });
+
+  test('loads UTF-8 CSV files as text for the table preview', async () => {
+    const loadedArtifacts: Artifact[] = [];
+    const service = new ArtifactDetectionService(
+      () => {},
+      artifact => loadedArtifacts.push(artifact),
+      async () => ({
+        success: true,
+        dataUrl: `data:text/csv;base64,${Buffer.from('姓名,分数\n王浩哲,100', 'utf8').toString('base64')}`,
+      }),
+    );
+
+    await service.processMessages(
+      [
+        {
+          id: 'write-csv',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1,
+          metadata: {
+            toolName: 'write',
+            toolInput: { path: 'C:/workspace/scores.csv' },
+          },
+        },
+      ],
+      'session-csv',
+      'C:/workspace',
+    );
+
+    expect(loadedArtifacts).toHaveLength(1);
+    expect(loadedArtifacts[0]).toMatchObject({
+      type: 'document',
+      filePath: 'C:/workspace/scores.csv',
+      content: '姓名,分数\n王浩哲,100',
+    });
+  });
+
+  test('keeps XLS files base64-encoded for the spreadsheet renderer', async () => {
+    const loadedArtifacts: Artifact[] = [];
+    const dataUrl = 'data:application/vnd.ms-excel;base64,AAEC';
+    const service = new ArtifactDetectionService(
+      () => {},
+      artifact => loadedArtifacts.push(artifact),
+      async () => ({ success: true, dataUrl }),
+    );
+
+    await service.processMessages(
+      [
+        {
+          id: 'write-xls',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1,
+          metadata: {
+            toolName: 'write',
+            toolInput: { path: 'C:/workspace/scores.xls' },
+          },
+        },
+      ],
+      'session-xls',
+      'C:/workspace',
+    );
+
+    expect(loadedArtifacts).toHaveLength(1);
+    expect(loadedArtifacts[0].content).toBe(dataUrl);
   });
 });

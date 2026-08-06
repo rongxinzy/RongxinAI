@@ -17,6 +17,9 @@ function getExtension(name: string): string {
 }
 
 function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
+  if (!/^data:[^,]*;base64,/i.test(dataUrl)) {
+    return new TextEncoder().encode(dataUrl).buffer;
+  }
   const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);

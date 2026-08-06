@@ -1,26 +1,10 @@
 import type { Artifact } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
+import { isBinaryArtifactFile } from '../../shared/cowork/artifactPreview';
 import type {
   ArtifactDetectionWorkerRequest,
   ArtifactDetectionWorkerResponse,
 } from './artifactDetection.worker';
-
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
-const BINARY_DOCUMENT_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx', '.pdf']);
-
-function getExtension(filePath: string): string {
-  const lastDot = filePath.lastIndexOf('.');
-  if (lastDot === -1) return '';
-  return filePath.slice(lastDot).toLowerCase();
-}
-
-function isImageExtension(ext: string): boolean {
-  return IMAGE_EXTENSIONS.has(ext.toLowerCase());
-}
-
-function isBinaryDocumentExtension(ext: string): boolean {
-  return BINARY_DOCUMENT_EXTENSIONS.has(ext.toLowerCase());
-}
 
 export type ArtifactDetectionResult = {
   artifact: Artifact;
@@ -176,8 +160,7 @@ export class ArtifactDetectionService {
       try {
         const result = await this.readFile(absPath);
         if (result?.success && result.dataUrl) {
-          const ext = getExtension(absPath);
-          const isTextType = !isImageExtension(ext) && !isBinaryDocumentExtension(ext);
+          const isTextType = !isBinaryArtifactFile(absPath);
           let content = result.dataUrl;
           if (isTextType) {
             try {
