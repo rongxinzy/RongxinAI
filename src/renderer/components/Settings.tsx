@@ -613,6 +613,15 @@ const SEND_SHORTCUT_OPTIONS = [
 
 const isMacPlatform = navigator.platform.includes('Mac');
 
+const formatShortcutLabel = (shortcut: string): string => {
+  if (!isMacPlatform) return shortcut;
+  return shortcut
+    .replace('CmdOrCtrl', '⌘')
+    .replace('Cmd', '⌘')
+    .replace('Option', '⌥')
+    .replace('Alt', '⌥');
+};
+
 const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void }> = ({
   value,
   onChange,
@@ -666,7 +675,7 @@ const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void 
             : 'dark:border-claude-darkBorder border-claude-border hover:border-claude-accent/50'
         }`}
     >
-      {value || i18nService.t('shortcutNotSet')}
+      {value ? formatShortcutLabel(value) : i18nService.t('shortcutNotSet')}
     </Button>
   );
 };
@@ -826,10 +835,7 @@ const Settings: React.FC<SettingsProps> = ({
   const importInputRef = useRef<HTMLInputElement>(null);
   // 快捷键设置
   const [shortcuts, setShortcuts] = useState({
-    newChat: 'Ctrl+N',
-    search: 'Ctrl+F',
-    settings: 'Ctrl+,',
-    sendMessage: defaultConfig.shortcuts!.sendMessage,
+    ...defaultConfig.shortcuts!,
   });
 
   // GitHub Copilot device code auth state
@@ -5504,7 +5510,6 @@ const Settings: React.FC<SettingsProps> = ({
         {(isAddingModel || isEditingModel) && (
           <div
             className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 px-4 rounded-2xl"
-            onClick={handleCancelModelEdit}
           >
             <div
               role="dialog"
