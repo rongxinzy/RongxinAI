@@ -112,7 +112,7 @@ test('accepts only the requested read-only reviewer result before delivery', () 
   });
 
   expect(controller.requestCompletion('ready')).toBe('downstream requested');
-  expect(controller.onAgentEnd()).toEqual({ shouldFinish: true, reason: 'ready' });
+  expect(controller.onAgentEnd({ next: false })).toEqual({ shouldFinish: true, reason: 'ready' });
   expect(downstream.onAgentEnd).toHaveBeenCalledOnce();
   expect(controller.getState().status).toBe(ProductionLoopStatus.ReadyToDeliver);
 });
@@ -140,7 +140,10 @@ test('skip_workflow lets the agent finish without the completion gate', () => {
   expect(downstream.requestCompletion).toHaveBeenCalledOnce();
 
   // Agent end finishes without a recovery prompt.
-  expect(controller.onAgentEnd()).toEqual({ shouldFinish: true, reason: 'Pure information request with no work to plan' });
+  expect(controller.onAgentEnd({ next: false })).toEqual({
+    shouldFinish: true,
+    reason: 'Pure information request with no work to plan',
+  });
   expect(downstream.onAgentEnd).not.toHaveBeenCalled();
 });
 
