@@ -476,10 +476,11 @@ jobs:
           mkdir -p manifest/electron
           while IFS=$'\t' read -r key target filename; do
             target_file="${target//:/-}"
-            output="manifest/electron/${target_file}-${filename}"
+            mkdir -p "manifest/electron/${target_file}"
+            output="manifest/electron/${target_file}/${filename}"
             aws s3api get-object --bucket "$R2_BUCKET" --key "$key" "$output" > /dev/null
           done < <(
-            jq -rsr '
+            jq -s -r '
               [.[].artifacts[] | select(.kind == "metadata")]
               | sort_by(.platform, .arch, .variant)
               | .[]
@@ -489,10 +490,10 @@ jobs:
           )
           node scripts/release/verify-electron-updater-generation.mjs \
             '${{ needs.prepare-release.outputs.version }}' \
-            manifest/electron/win32-x64-lite-latest.yml:win32:x64:lite \
-            manifest/electron/darwin-arm64-default-latest-mac.yml:darwin:arm64:default \
-            manifest/electron/linux-x64-appimage-latest-linux.yml:linux:x64:appimage \
-            manifest/electron/linux-x64-deb-latest-linux.yml:linux:x64:deb \
+            manifest/electron/win32-x64-lite/latest.yml:win32:x64:lite \
+            manifest/electron/darwin-arm64-default/latest-mac.yml:darwin:arm64:default \
+            manifest/electron/linux-x64-appimage/latest-linux.yml:linux:x64:appimage \
+            manifest/electron/linux-x64-deb/latest-linux.yml:linux:x64:deb \
             --artifact-metadata "${metadata[@]}"
           generation_key='generations/${{ needs.prepare-release.outputs.version }}/legacy/stable.json'
           set +e

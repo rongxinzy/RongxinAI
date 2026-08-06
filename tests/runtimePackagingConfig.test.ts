@@ -69,6 +69,18 @@ test('stable release metadata does not inherit the build prerelease channel', ()
   }
 });
 
+test('publish verification uses portable jq flags and preserves updater filenames per target', () => {
+  const workflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'online-update-release.yml'),
+    'utf8',
+  );
+  assert.match(workflow, /jq -s -r/);
+  assert.doesNotMatch(workflow, /jq -rsr/);
+  assert.match(workflow, /output="manifest\/electron\/\$\{target_file\}\/\$\{filename\}"/);
+  assert.match(workflow, /manifest\/electron\/win32-x64-lite\/latest\.yml:win32:x64:lite/);
+  assert.match(workflow, /manifest\/electron\/linux-x64-deb\/latest-linux\.yml:linux:x64:deb/);
+});
+
 test('unsigned macOS release builds do not receive empty signing credentials', () => {
   const workflow = readFileSync(
     path.join(root, '.github', 'workflows', 'online-update-release.yml'),
