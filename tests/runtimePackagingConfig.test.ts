@@ -67,6 +67,27 @@ test('stable release metadata does not inherit the build prerelease channel', ()
   }
 });
 
+test('unsigned macOS release builds do not receive empty signing credentials', () => {
+  const workflow = readFileSync(
+    path.join(root, '.github', 'workflows', 'online-update-release.yml'),
+    'utf8',
+  );
+  const unsignedStart = workflow.indexOf('- name: Build unsigned macOS package');
+  const signedStart = workflow.indexOf('- name: Build signed macOS package');
+  const verifyStart = workflow.indexOf('- name: Verify signed and notarized macOS app');
+
+  assert.ok(unsignedStart >= 0 && signedStart > unsignedStart && verifyStart > signedStart);
+  const unsignedStep = workflow.slice(unsignedStart, signedStart);
+  const signedStep = workflow.slice(signedStart, verifyStart);
+  assert.match(unsignedStep, /ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true'/);
+  assert.doesNotMatch(
+    unsignedStep,
+    /CSC_LINK|CSC_KEY_PASSWORD|APPLE_ID|APPLE_APP_SPECIFIC_PASSWORD|APPLE_TEAM_ID/,
+  );
+  assert.match(signedStep, /ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true'/);
+  assert.match(signedStep, /CSC_LINK:[\s\S]*APPLE_TEAM_ID:/);
+});
+
 test('release workflows explicitly provision the private POSIX toolchain', () => {
   for (const workflow of ['build-platforms.yml', 'online-update-release.yml']) {
     const content = readFileSync(path.join(root, '.github', 'workflows', workflow), 'utf8');
