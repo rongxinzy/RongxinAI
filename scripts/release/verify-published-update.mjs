@@ -3,7 +3,7 @@ import {
   loadTrustedReleaseKey,
   verifyEnvelope,
 } from './update-manifest-lib.mjs';
-import { verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
+import { redirectMatches, verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
 import yaml from 'js-yaml';
 
 const [expectedVersion, ...targets] = process.argv.slice(2);
@@ -137,7 +137,7 @@ for (const target of targets) {
   if (
     ![301, 302, 307, 308].includes(redirectResponse.status) ||
     !location ||
-    new URL(location, updaterUrl).toString() !== signedUpdater.url
+    !redirectMatches(location, updaterUrl, signedUpdater.url)
   ) {
     throw new Error(`${target} electron-updater artifact did not redirect to the immutable download`);
   }

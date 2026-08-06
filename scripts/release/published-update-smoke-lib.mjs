@@ -1,5 +1,13 @@
 const REDIRECT_STATUSES = new Set([301, 302, 307, 308]);
 
+export function redirectMatches(location, baseUrl, expectedUrl) {
+  try {
+    return new URL(location, baseUrl).toString() === new URL(expectedUrl).toString();
+  } catch {
+    return false;
+  }
+}
+
 export async function verifyPublishedBlockmap({
   fetchImpl = fetch,
   target,
@@ -21,7 +29,7 @@ export async function verifyPublishedBlockmap({
   if (
     !REDIRECT_STATUSES.has(redirectResponse.status) ||
     !location ||
-    new URL(location, blockmapUrl).toString() !== immutableBlockmapUrl.toString()
+    !redirectMatches(location, blockmapUrl, immutableBlockmapUrl)
   ) {
     throw new Error(`${target} blockmap did not redirect to the immutable download`);
   }

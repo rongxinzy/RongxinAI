@@ -1,8 +1,19 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import { verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
+import { redirectMatches, verifyPublishedBlockmap } from './published-update-smoke-lib.mjs';
 
 describe('published update smoke helpers', () => {
+  test('compares redirects after URL normalization for Unicode filenames', () => {
+    const signedUrl =
+      'https://downloads.rongxzyai.com/releases/2026.8.6-build.6/win32-x64-lite/知远-Setup-2026.8.6-build.6.exe';
+    const encodedLocation =
+      'https://downloads.rongxzyai.com/releases/2026.8.6-build.6/win32-x64-lite/%E7%9F%A5%E8%BF%9C-Setup-2026.8.6-build.6.exe';
+
+    expect(redirectMatches(encodedLocation, new URL('https://updates.rongxzyai.com/'), signedUrl)).toBe(
+      true,
+    );
+  });
+
   test('verifies the versioned redirect and Range support for differential blockmaps', async () => {
     const immutable =
       'https://downloads.rongxzyai.com/releases/2026.8.6/win32-x64-lite/ZhiYuan.exe.blockmap';
