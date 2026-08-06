@@ -83,3 +83,50 @@ test('loads more after settling when real content still does not fill the viewpo
     expect(mocks.loadMoreMessages).toHaveBeenCalledWith('session-1');
   });
 });
+
+test('prefetches before the user reaches the top edge', async () => {
+  const { root, scrollElement } = installScrollElement(4_000, 800);
+  scrollElement.scrollTop = 1_700;
+  let markInitialTailPositioned: () => void = () => undefined;
+
+  const Harness = () => {
+    markInitialTailPositioned = useSessionHistoryPagination({
+      sessionId: 'session-1',
+      messagesOffset: 50,
+      rootRef: { current: root },
+    });
+    return null;
+  };
+  render(React.createElement(Harness));
+  act(() => markInitialTailPositioned());
+
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  expect(mocks.loadMoreMessages).not.toHaveBeenCalled();
+
+  scrollElement.scrollTop = 1_500;
+  scrollElement.dispatchEvent(new Event('scroll'));
+
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledWith('session-1'));
+});
+
+test('keeps filling the viewport buffer after a page is prepended', async () => {
+  const { root, scrollElement } = installScrollElement(8_000, 800);
+  scrollElement.scrollTop = 1_500;
+  let markInitialTailPositioned: () => void = () => undefined;
+
+  const Harness = ({ messagesOffset }: { messagesOffset: number }) => {
+    markInitialTailPositioned = useSessionHistoryPagination({
+      sessionId: 'session-1',
+      messagesOffset,
+      rootRef: { current: root },
+    });
+    return null;
+  };
+  const view = render(React.createElement(Harness, { messagesOffset: 100 }));
+  act(() => markInitialTailPositioned());
+
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(1));
+
+  view.rerender(React.createElement(Harness, { messagesOffset: 50 }));
+  await waitFor(() => expect(mocks.loadMoreMessages).toHaveBeenCalledTimes(2));
+});

@@ -249,58 +249,6 @@ test('getSession lazily backfills artifacts from messages outside the loaded pag
   ]);
 });
 
-test('getSession includes the previous turn when the latest turn exceeds the message page', () => {
-  const sid = 'turn-aware-tail-session';
-  insertSession(sid);
-  insertMessage('user-1', sid, 'user', 'first turn', null, 1, 1);
-  insertMessage('assistant-1', sid, 'assistant', 'first answer', null, 2, 2);
-  insertMessage('user-2', sid, 'user', 'large final turn', null, 3, 3);
-  for (let sequence = 4; sequence <= 40; sequence += 1) {
-    insertMessage(
-      `tool-${sequence}`,
-      sid,
-      'tool_use',
-      `tool call ${sequence}`,
-      null,
-      sequence,
-      sequence,
-    );
-  }
-
-  const session = store.getSession(sid);
-
-  expect(session?.messagesOffset).toBe(0);
-  expect(session?.messages[0]?.id).toBe('user-1');
-  expect(session?.messages.filter(message => message.type === 'user')).toHaveLength(2);
-});
-
-test('message pagination expands backward to a complete user turn boundary', () => {
-  const sid = 'turn-aware-page-session';
-  insertSession(sid);
-  for (let turn = 0; turn < 4; turn += 1) {
-    const turnStart = turn * 20 + 1;
-    insertMessage(`user-${turn}`, sid, 'user', `turn ${turn}`, null, turnStart, turnStart);
-    for (let index = 1; index < 20; index += 1) {
-      const sequence = turnStart + index;
-      insertMessage(
-        `tool-${turn}-${index}`,
-        sid,
-        'tool_use',
-        `tool call ${turn}-${index}`,
-        null,
-        sequence,
-        sequence,
-      );
-    }
-  }
-
-  const page = store.getSessionMessagePageBefore(sid, 60, 30);
-
-  expect(page.offset).toBe(20);
-  expect(page.messages[0]?.id).toBe('user-1');
-  expect(page.messages.at(-1)?.id).toBe('tool-2-19');
-});
-
 test('sessions are grouped by workspace independently of their agent snapshot', () => {
   const first = store.createSession('first', '/tmp/workspace-a', '', 'local', [], 'agent-a');
   const second = store.createSession('second', '/tmp/workspace-a', '', 'local', [], 'agent-b');

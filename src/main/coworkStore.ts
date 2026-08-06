@@ -581,11 +581,6 @@ interface CoworkMessageRow {
   sequence: number | null;
 }
 
-interface CoworkMessagePage {
-  messages: CoworkMessage[];
-  offset: number;
-}
-
 interface CoworkUserMemoryRow {
   id: string;
   text: string;
@@ -878,8 +873,11 @@ export class CoworkStore {
     if (!row) return null;
 
     const totalMessages = this.countSessionMessages(id);
-    const messagePage = this.getTailSessionMessagePage(id, messageLimit, totalMessages);
-    const { messages, offset: messageOffset } = messagePage;
+    const messageOffset = Math.max(0, totalMessages - messageLimit);
+    const messages =
+      messageOffset > 0
+        ? this.getPagedSessionMessages(id, messageLimit, messageOffset)
+        : this.getSessionMessages(id);
 
     let activeSkillIds: string[] = [];
     if (row.active_skill_ids) {
@@ -1283,80 +1281,7 @@ export class CoworkStore {
     return row?.count || 0;
   }
 
-  /**
-   * Loads a page ending at `endOffset` and expands its start to the nearest
-   * user-message boundary. Raw message pages must not split a conversation
-   * turn because one tool-heavy turn can contain more messages than a page.
-   */
-  getSessionMessagePageBefore(
-    sessionId: string,
-    endOffset: number,
-    messageLimit: number,
-  ): CoworkMessagePage {
-    const boundedEndOffset = Math.max(0, endOffset);
-    const requestedOffset = Math.max(0, boundedEndOffset - messageLimit);
-    const offset = this.findUserMessageOffsetAtOrBefore(sessionId, requestedOffset) ?? 0;
-    return {
-      messages: this.getPagedSessionMessages(
-        sessionId,
-        Math.max(0, boundedEndOffset - offset),
-        offset,
-      ),
-      offset,
-    };
-  }
-
-  private getTailSessionMessagePage(
-    sessionId: string,
-    messageLimit: number,
-    totalMessages: number,
-  ): CoworkMessagePage {
-    if (totalMessages <= 0) return { messages: [], offset: 0 };
-
-    const requestedOffset = Math.max(0, totalMessages - messageLimit);
-    const secondLatestUserOffset = this.findUserMessageOffsetAtOrBefore(
-      sessionId,
-      totalMessages - 1,
-      1,
-    );
-    const turnAwareOffset = secondLatestUserOffset ?? 0;
-    const boundaryCandidate = Math.min(requestedOffset, turnAwareOffset);
-    const offset = this.findUserMessageOffsetAtOrBefore(sessionId, boundaryCandidate) ?? 0;
-
-    return {
-      messages: this.getPagedSessionMessages(sessionId, totalMessages - offset, offset),
-      offset,
-    };
-  }
-
-  private findUserMessageOffsetAtOrBefore(
-    sessionId: string,
-    messageOffset: number,
-    skip = 0,
-  ): number | null {
-    const row = this.getOne<{ message_offset: number }>(
-      `
-      SELECT message_offset
-      FROM (
-        SELECT
-          type,
-          ROW_NUMBER() OVER (
-            ORDER BY COALESCE(sequence, created_at) ASC, created_at ASC, ROWID ASC
-          ) - 1 AS message_offset
-        FROM cowork_messages
-        WHERE session_id = ?
-      )
-      WHERE type = 'user' AND message_offset <= ?
-      ORDER BY message_offset DESC
-      LIMIT 1 OFFSET ?
-    `,
-      [sessionId, Math.max(0, messageOffset), Math.max(0, skip)],
-    );
-    return row?.message_offset ?? null;
-  }
-
   getPagedSessionMessages(sessionId: string, limit: number, offset: number): CoworkMessage[] {
-    if (limit <= 0) return [];
     const rows = this.getAll<CoworkMessageRow>(
       `
       SELECT id, type, content, metadata, created_at, sequence

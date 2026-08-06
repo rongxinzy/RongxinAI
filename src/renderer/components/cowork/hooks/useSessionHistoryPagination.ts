@@ -3,6 +3,7 @@ import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
 import { coworkService } from '../../../services/cowork';
 
 const HISTORY_SCROLL_THRESHOLD_PX = 64;
+const HISTORY_PRELOAD_VIEWPORTS = 2;
 
 type UseSessionHistoryPaginationOptions = {
   sessionId: string | undefined;
@@ -63,21 +64,30 @@ export function useSessionHistoryPagination({
         });
     };
 
+    const getPreloadThreshold = () =>
+      Math.max(HISTORY_SCROLL_THRESHOLD_PX, element.clientHeight * HISTORY_PRELOAD_VIEWPORTS);
+
     const handleScroll = () => {
-      if (element.scrollTop <= HISTORY_SCROLL_THRESHOLD_PX) {
+      if (element.scrollTop <= getPreloadThreshold()) {
         loadOlderMessages();
       }
     };
 
     element.addEventListener('scroll', handleScroll, { passive: true });
 
-    // If the first page does not fill the viewport, there may be no scroll
-    // event. Keep loading until the viewport can expose the older history.
-    if (element.scrollHeight <= element.clientHeight && messagesOffset > 0) {
-      loadOlderMessages();
-    }
+    // Wait for the virtualizer to measure and anchor a prepended page before
+    // checking the buffer again. Continue only while fewer than two viewports
+    // remain above the user, keeping the initial tail page small and immediate.
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(handleScroll);
+    });
 
-    return () => element.removeEventListener('scroll', handleScroll);
+    return () => {
+      element.removeEventListener('scroll', handleScroll);
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+    };
   }, [messagesOffset, positionedSessionId, rootRef, sessionId]);
 
   return markInitialTailPositioned;

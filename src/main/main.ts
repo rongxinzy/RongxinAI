@@ -4996,8 +4996,8 @@ if (!gotTheLock) {
         const { sessionId, limit = COWORK_MESSAGE_PAGE_SIZE, offset = 0 } = options;
         const store = getCoworkStore();
         const total = store.countSessionMessages(sessionId);
-        const page = store.getSessionMessagePageBefore(sessionId, offset + limit, limit);
-        return { success: true, messages: page.messages, offset: page.offset, total };
+        const messages = store.getPagedSessionMessages(sessionId, limit, offset);
+        return { success: true, messages, offset, total };
       } catch (error) {
         return {
           success: false,
