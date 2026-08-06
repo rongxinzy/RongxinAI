@@ -5,6 +5,14 @@ import {
   type CoworkArtifactType,
 } from '../../shared/cowork/artifacts';
 
+export {
+  ArtifactPreviewMode,
+  getArtifactPreviewMode,
+  getArtifactTypeByExtension,
+  isBinaryArtifactFile,
+  type ArtifactPreviewMode as ArtifactPreviewModeValue,
+} from '../../shared/cowork/artifactPreview';
+
 export type ArtifactType = CoworkArtifactType;
 
 export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([

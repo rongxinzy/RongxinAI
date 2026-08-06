@@ -1,6 +1,7 @@
 import { discoverWorkbenchMessageArtifactBlocks } from '../shared/workbenchTask';
 import type { CoworkArtifactType, CoworkPersistedArtifact } from '../shared/cowork/artifacts';
 import { CoworkArtifactRole, CoworkArtifactSource } from '../shared/cowork/artifacts';
+import { getArtifactTypeByExtension } from '../shared/cowork/artifactPreview';
 
 const DECLARE_ARTIFACT_TOOL = 'declare_artifact';
 const WRITE_TOOL_NAMES = new Set(['write', 'writefile']);
@@ -16,48 +17,6 @@ const LANGUAGE_TYPES: Record<string, CoworkArtifactType> = {
   text: 'text',
   txt: 'text',
   plaintext: 'text',
-};
-
-const EXTENSION_TYPES: Record<string, CoworkArtifactType> = {
-  '.html': 'html',
-  '.htm': 'html',
-  '.svg': 'svg',
-  '.png': 'image',
-  '.jpg': 'image',
-  '.jpeg': 'image',
-  '.gif': 'image',
-  '.webp': 'image',
-  '.mermaid': 'mermaid',
-  '.mmd': 'mermaid',
-  '.jsx': 'code',
-  '.tsx': 'code',
-  '.js': 'code',
-  '.mjs': 'code',
-  '.cjs': 'code',
-  '.ts': 'code',
-  '.mts': 'code',
-  '.cts': 'code',
-  '.css': 'code',
-  '.scss': 'code',
-  '.less': 'code',
-  '.json': 'code',
-  '.yaml': 'code',
-  '.yml': 'code',
-  '.xml': 'code',
-  '.py': 'code',
-  '.java': 'code',
-  '.go': 'code',
-  '.rs': 'code',
-  '.md': 'markdown',
-  '.txt': 'text',
-  '.log': 'text',
-  '.csv': 'document',
-  '.tsv': 'document',
-  '.xls': 'document',
-  '.docx': 'document',
-  '.xlsx': 'document',
-  '.pptx': 'document',
-  '.pdf': 'document',
 };
 
 export interface CoworkArtifactMessage {
@@ -101,7 +60,7 @@ function resolveArtifactType(filePath: string, declaredKind?: string): CoworkArt
     const declaredType = LANGUAGE_TYPES[declaredKind.toLowerCase()];
     if (declaredType) return declaredType;
   }
-  return EXTENSION_TYPES[getFileExtension(filePath)] ?? null;
+  return getArtifactTypeByExtension(getFileExtension(filePath));
 }
 
 function extractWriteToolPath(input: Record<string, unknown>): string | null {

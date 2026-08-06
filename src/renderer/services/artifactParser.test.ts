@@ -30,6 +30,12 @@ describe('normalizeFilePathForDedup', () => {
     const fromTool = 'D:\\new_ws_test_2\\hello-slide.html';
     expect(normalizeFilePathForDedup(fromFileUrl)).toBe(normalizeFilePathForDedup(fromTool));
   });
+
+  test('decodes percent-encoded paths before deduplication', () => {
+    expect(normalizeFilePathForDedup('file:///D:/output/report%20final.csv')).toBe(
+      'd:/output/report final.csv',
+    );
+  });
 });
 
 describe('parseDeclareArtifactFromMessages', () => {
@@ -241,24 +247,79 @@ describe('detectArtifactsFromMessages', () => {
     expect(artifacts[0].needsFileLoad).toBe(true);
   });
 
-  test('does not detect bare paths in assistant messages (no regex)', () => {
+  test('detects supported absolute paths in final assistant answers', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {
           id: 'assistant-1',
           type: 'assistant',
-          content: 'Created D:/workspace/report.pptx',
+          content: 'Created [report](file:///D:/workspace/report%20final.csv).',
           timestamp: Date.now(),
+          metadata: { isFinal: true, isFinalAnswer: true },
         },
       ],
       'sess1',
     );
 
     // Bare paths in prose are no longer detected — artifacts must be explicitly declared.
-    expect(artifacts).toHaveLength(0);
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0]).toMatchObject({
+      needsFileLoad: true,
+      artifact: {
+        filePath: 'D:/workspace/report final.csv',
+        type: 'document',
+        role: ArtifactRole.Deliverable,
+      },
+    });
   });
 
-  test('does not detect file:// links in assistant messages (no regex)', () => {
+  test('recognizes local paths with spaces and parentheses without matching web URLs', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'assistant-1',
+          type: 'assistant',
+          content:
+            'Reference: https://example.com/report.csv. Deliverable: [D:\\Output (final)\\report.csv]',
+          timestamp: Date.now(),
+          metadata: { isFinal: true, isFinalAnswer: true },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.filePath).toBe('D:\\Output (final)\\report.csv');
+  });
+
+  test('deduplicates an encoded declaration with the final-answer path', () => {
+    const artifacts = detectArtifactsFromMessages(
+      [
+        {
+          id: 'declare-1',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1,
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: { filePath: 'file:///D:/output/report%20final.csv' },
+          },
+        },
+        {
+          id: 'assistant-1',
+          type: 'assistant',
+          content: 'Created D:/output/report final.csv',
+          timestamp: 2,
+          metadata: { isFinal: true, isFinalAnswer: true },
+        },
+      ],
+      'sess1',
+    );
+
+    expect(artifacts).toHaveLength(1);
+  });
+
+  test('does not detect paths from non-final assistant messages', () => {
     const artifacts = detectArtifactsFromMessages(
       [
         {

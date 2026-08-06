@@ -1,6 +1,10 @@
 import { ArtifactRole, type Artifact, type ArtifactType } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
 import { discoverWorkbenchMessageArtifactBlocks } from '../../shared/workbenchTask';
+import {
+  ArtifactTypeByExtension,
+  getArtifactTypeByExtension,
+} from '../../shared/cowork/artifactPreview';
 
 const DECLARE_ARTIFACT_TOOL_NAME = 'declare_artifact';
 
@@ -9,6 +13,12 @@ const DECLARE_ARTIFACT_TOOL_NAME = 'declare_artifact';
  * Handles Windows file:// URL leading slash and backslash differences.
  */
 export function normalizeFilePathForDedup(p: string): string {
+  p = p.replace(/^file:\/\/\/?/i, '');
+  try {
+    p = decodeURIComponent(p);
+  } catch {
+    // Keep malformed percent-encoded paths unchanged for a stable comparison.
+  }
   // Strip leading / before drive letter (e.g. /D:/path from file:///D:/path)
   if (/^\/[A-Za-z]:/.test(p)) p = p.slice(1);
   // Unify separators and case for comparison
@@ -28,48 +38,6 @@ const LANGUAGE_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
   plaintext: 'text',
 };
 
-const EXTENSION_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
-  '.html': 'html',
-  '.htm': 'html',
-  '.svg': 'svg',
-  '.png': 'image',
-  '.jpg': 'image',
-  '.jpeg': 'image',
-  '.gif': 'image',
-  '.webp': 'image',
-  '.mermaid': 'mermaid',
-  '.mmd': 'mermaid',
-  '.jsx': 'code',
-  '.tsx': 'code',
-  '.js': 'code',
-  '.mjs': 'code',
-  '.cjs': 'code',
-  '.ts': 'code',
-  '.mts': 'code',
-  '.cts': 'code',
-  '.css': 'code',
-  '.scss': 'code',
-  '.less': 'code',
-  '.json': 'code',
-  '.yaml': 'code',
-  '.yml': 'code',
-  '.xml': 'code',
-  '.py': 'code',
-  '.java': 'code',
-  '.go': 'code',
-  '.rs': 'code',
-  '.md': 'markdown',
-  '.txt': 'text',
-  '.log': 'text',
-  '.csv': 'document',
-  '.tsv': 'document',
-  '.xls': 'document',
-  '.docx': 'document',
-  '.xlsx': 'document',
-  '.pptx': 'document',
-  '.pdf': 'document',
-};
-
 const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
 const BINARY_DOCUMENT_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx', '.pdf']);
 
@@ -78,7 +46,7 @@ export function getArtifactTypeFromLanguage(lang: string): ArtifactType | null {
 }
 
 export function getArtifactTypeFromExtension(ext: string): ArtifactType | null {
-  return EXTENSION_TO_ARTIFACT_TYPE[ext.toLowerCase()] ?? null;
+  return getArtifactTypeByExtension(ext) as ArtifactType | null;
 }
 
 export function isImageExtension(ext: string): boolean {
@@ -238,6 +206,61 @@ function getFileName(filePath: string): string {
   return lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1);
 }
 
+const SUPPORTED_ARTIFACT_EXTENSION_PATTERN = Object.keys(ArtifactTypeByExtension)
+  .sort((a, b) => b.length - a.length)
+  .map(extension => extension.replace('.', '\\.'))
+  .join('|');
+const FINAL_ANSWER_PATH_PATTERN = new RegExp(
+  String.raw`(?:^|[\s(\[{"=>：])((?:file:\/\/\/?[A-Za-z]:[\\/]|[A-Za-z]:[\\/]|\/(?!\/))(?:[^\r\n<>"'])*?(?:${SUPPORTED_ARTIFACT_EXTENSION_PATTERN})(?=$|[\s\])}>,;:!?，。；：！？]))`,
+  'gm',
+);
+
+function normalizeDetectedPath(rawPath: string): string {
+  const withoutFileUrlPrefix = rawPath.replace(/^file:\/\/\/?/i, '');
+  try {
+    return decodeURIComponent(withoutFileUrlPrefix);
+  } catch {
+    return withoutFileUrlPrefix;
+  }
+}
+
+function parseFinalAnswerPathArtifacts(messages: CoworkMessage[], sessionId: string): Artifact[] {
+  const artifacts: Artifact[] = [];
+
+  for (const message of messages) {
+    const isFinalAnswer =
+      message.type === 'assistant' &&
+      !message.metadata?.isThinking &&
+      (message.metadata?.isFinalAnswer || message.metadata?.isFinal);
+    if (!isFinalAnswer || !message.content) continue;
+
+    for (const match of message.content.matchAll(FINAL_ANSWER_PATH_PATTERN)) {
+      const rawPath = match[1];
+      if (!rawPath) continue;
+      const filePath = normalizeDetectedPath(rawPath);
+      const artifactType = getArtifactTypeFromExtension(getFileExtension(filePath));
+      if (!artifactType) continue;
+
+      artifacts.push({
+        id: `artifact-final-path-${message.id}-${artifacts.length}`,
+        messageId: message.id,
+        sessionId,
+        type: artifactType,
+        title: getFileName(filePath),
+        content: '',
+        fileName: getFileName(filePath),
+        filePath,
+        source: 'tool',
+        role: ArtifactRole.Deliverable,
+        declared: false,
+        createdAt: message.timestamp || Date.now(),
+      });
+    }
+  }
+
+  return artifacts;
+}
+
 export function parseToolArtifact(
   toolUseMsg: CoworkMessage,
   toolResultMsg: CoworkMessage | undefined,
@@ -344,6 +367,13 @@ export function detectArtifactsFromMessages(
     () => ArtifactRole.Deliverable,
   );
   for (const artifact of declaredArtifacts) {
+    addPathArtifact(artifact, true);
+  }
+
+  // The final answer often names an output path without a preceding explicit
+  // declaration. Accept supported absolute paths there, but not paths from
+  // streamed reasoning or arbitrary tool output.
+  for (const artifact of parseFinalAnswerPathArtifacts(messages, sessionId)) {
     addPathArtifact(artifact, true);
   }
 
