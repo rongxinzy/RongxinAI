@@ -4,7 +4,7 @@ import {
   verifyEnvelope,
 } from './update-manifest-lib.mjs';
 import {
-  ONE_BYTE_RANGE_HEADERS,
+  fetchOneByteRange,
   redirectMatches,
   verifyPublishedBlockmap,
 } from './published-update-smoke-lib.mjs';
@@ -62,11 +62,7 @@ for (const target of targets) {
     throw new Error(`${target} artifact size does not match the signed manifest`);
   }
 
-  const rangeResponse = await fetch(payload.artifact.url, {
-    headers: ONE_BYTE_RANGE_HEADERS,
-    redirect: 'error',
-    signal: AbortSignal.timeout(15_000),
-  });
+  const rangeResponse = await fetchOneByteRange({ url: payload.artifact.url });
   await rangeResponse.body?.cancel();
   if (
     rangeResponse.status !== 206 ||
@@ -157,11 +153,7 @@ for (const target of targets) {
   ) {
     throw new Error(`${target} updater artifact size does not match the signed manifest`);
   }
-  const updaterRangeResponse = await fetch(signedUpdater.url, {
-    headers: ONE_BYTE_RANGE_HEADERS,
-    redirect: 'error',
-    signal: AbortSignal.timeout(15_000),
-  });
+  const updaterRangeResponse = await fetchOneByteRange({ url: signedUpdater.url });
   await updaterRangeResponse.body?.cancel();
   if (
     updaterRangeResponse.status !== 206 ||
