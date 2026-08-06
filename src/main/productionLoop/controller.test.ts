@@ -72,7 +72,27 @@ test('blocks premature finalization and returns a recovery prompt', () => {
   const { controller, downstream } = createController();
   expect(controller.requestCompletion('done')).toContain('Completion blocked');
   expect(downstream.requestCompletion).not.toHaveBeenCalled();
-  expect(controller.onAgentEnd()).toMatchObject({ shouldFinish: false });
+  expect(controller.onAgentEnd({ next: false })).toMatchObject({ shouldFinish: false });
+});
+
+test('a normal agent_loop next continues without recording a recovery', () => {
+  const { controller } = createController();
+  const before = controller.getState().recoveries.length;
+  const decision = controller.onAgentEnd({ next: true, summary: 'drafted the outline' });
+  expect(decision.shouldFinish).toBe(false);
+  expect(decision.nextPrompt).toContain('ended normally');
+  expect(decision.nextPrompt).toContain('drafted the outline');
+  // No recovery is recorded for an explicit, orderly iteration end.
+  expect(controller.getState().recoveries.length).toBe(before);
+});
+
+test('an omitted agent_loop signal records a missing-signal recovery', () => {
+  const { controller } = createController();
+  const before = controller.getState().recoveries.length;
+  const decision = controller.onAgentEnd({ next: false });
+  expect(decision.shouldFinish).toBe(false);
+  expect(decision.nextPrompt).toContain('ended before delivery');
+  expect(controller.getState().recoveries.length).toBe(before + 1);
 });
 
 test('accepts only the requested read-only reviewer result before delivery', () => {

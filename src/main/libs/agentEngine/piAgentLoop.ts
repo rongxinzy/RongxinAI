@@ -73,6 +73,16 @@ export interface PiAgentLoopContinueDecision {
   nextPrompt?: string;
 }
 
+/**
+ * What the domain completion workflow needs to know when an iteration ends:
+ * whether the model explicitly signaled `agent_loop next` (with its summary)
+ * or ended the turn without a loop signal (a protocol omission).
+ */
+export interface PiAgentLoopEndSignal {
+  next: boolean;
+  summary?: string;
+}
+
 interface PiAgentLoopToolResult {
   content: Array<{ type: 'text'; text: string }>;
   details: Record<string, unknown>;
@@ -114,7 +124,11 @@ export class PiAgentLoopController {
 
   constructor(
     private readonly researchRun?: {
-      onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
+      onAgentEnd(signal: PiAgentLoopEndSignal): {
+        shouldFinish: boolean;
+        reason?: string;
+        nextPrompt?: string;
+      };
       requestCompletion(reason: string): string;
     },
     private readonly onActivation?: (event: HarnessActivationEvent) => void,
@@ -200,7 +214,10 @@ export class PiAgentLoopController {
     }
 
     if (this.researchRun) {
-      const researchDecision = this.researchRun.onAgentEnd();
+      const researchDecision = this.researchRun.onAgentEnd({
+        next: this.pendingNext,
+        summary: this.state.lastSummary,
+      });
       if (researchDecision.shouldFinish) {
         this.finish(researchDecision.reason || 'Academic research completion gate passed');
         return { shouldContinue: false };

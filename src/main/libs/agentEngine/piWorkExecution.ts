@@ -90,7 +90,9 @@ export class PiWorkExecutionController {
     this.writeState();
   }
 
-  onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
+  onAgentEnd(
+    _signal?: { next: boolean; summary?: string },
+  ): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
     if (this.state.status === 'completion_requested' && this.state.accepted) {
       this.state.status = 'completed';
       this.writeState();

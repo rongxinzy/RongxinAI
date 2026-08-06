@@ -180,7 +180,9 @@ export class PiResearchRunController {
     return 'Completion recorded as a request. The run remains active until an isolated reviewer returns REVIEW_VERDICT: PASS and every evidence gate passes.';
   }
 
-  onAgentEnd(): ResearchEndDecision {
+  onAgentEnd(
+    _signal?: { next: boolean; summary?: string },
+  ): ResearchEndDecision {
     let deferredFailures: string[] = [];
     if (this.state.status === ResearchRunStatus.CompletionRequested) {
       deferredFailures = collectEvidenceFailures(this.state);

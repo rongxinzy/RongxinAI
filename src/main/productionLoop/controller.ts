@@ -5,13 +5,16 @@ import {
   type ProductionLoopState,
 } from '../../shared/productionLoop';
 import type { WorkbenchContractKind, WorkbenchJsonObject } from '../../shared/workbenchTask';
+import type { PiAgentLoopEndSignal } from '../libs/agentEngine/piAgentLoop';
 import type { ProductionLoopService } from './service';
 
 interface DownstreamCompletionWorkflow {
   readonly goal: string;
   resumeForPrompt?(prompt: string): void;
   requestCompletion(reason: string): string;
-  onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
+  onAgentEnd(
+    signal: PiAgentLoopEndSignal,
+  ): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
 }
 
 const hasReviewer = (args: unknown): boolean => {
@@ -165,18 +168,38 @@ export class ProductionLoopController {
       : 'Delivery requested. End the turn so deterministic verification can run.';
   }
 
-  onAgentEnd(): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
+  onAgentEnd(
+    signal: PiAgentLoopEndSignal,
+  ): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
     if (this.state.skip) {
       return { shouldFinish: true, reason: this.state.skip.reason };
     }
     if (this.state.status === ProductionLoopStatus.ReadyToDeliver && this.state.deliveryReason) {
       if (this.downstream) {
-        const decision = this.downstream.onAgentEnd();
+        const decision = this.downstream.onAgentEnd(signal);
         if (!decision.shouldFinish) return decision;
       }
       return {
         shouldFinish: true,
         reason: this.state.deliveryReason || 'Production workflow completed.',
+      };
+    }
+
+    // The model explicitly ended the iteration with agent_loop next: this is
+    // normal progress, not a protocol violation. Continue without recording a
+    // recovery so telemetry only reflects genuine omissions.
+    if (signal.next) {
+      const summary = signal.summary?.trim()
+        ? `\nPrevious iteration summary: ${signal.summary.trim()}`
+        : '';
+      return {
+        shouldFinish: false,
+        nextPrompt: [
+          '## Production workflow continuation',
+          `The previous iteration ended normally. Current phase: ${this.state.phase}.`,
+          this.nextPhaseInstruction(),
+          summary,
+        ].join('\n'),
       };
     }
 

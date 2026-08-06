@@ -106,7 +106,9 @@ export class PiShortcutWorkflowController {
     return 'Completion recorded as a request. The workflow remains active until every required deliverable and verification artifact is independently checked.';
   }
 
-  onAgentEnd(): ShortcutWorkflowEndDecision {
+  onAgentEnd(
+    _signal?: { next: boolean; summary?: string },
+  ): ShortcutWorkflowEndDecision {
     const failures = [
       ...collectShortcutCompletionFailures(this.state),
       ...this.collectArtifactIntegrityFailures(),
