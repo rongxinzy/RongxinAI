@@ -11,6 +11,7 @@ export interface VirtualizedTurnListHandle {
 interface VirtualizedTurnListProps {
   isStreaming: boolean;
   turns: ConversationTurn[];
+  onInitialTailPositioned?: () => void;
   /** Renders one turn row, including its wrapper element. */
   renderTurn: (turn: ConversationTurn, index: number) => React.ReactNode;
   /** When true (e.g. image export), every turn stays mounted for DOM capture. */
@@ -32,7 +33,7 @@ const INITIAL_VIEWPORT_RECT = { width: 0, height: INITIAL_VIEWPORT_HEIGHT_PX };
 export const VirtualizedTurnList = React.forwardRef<
   VirtualizedTurnListHandle,
   VirtualizedTurnListProps
->(({ isStreaming, turns, renderTurn, renderAll }, ref) => {
+>(({ isStreaming, turns, onInitialTailPositioned, renderTurn, renderAll }, ref) => {
   const { scrollRef } = useStickToBottomContext();
   const hasPositionedInitialTailRef = useRef(false);
   const scrollRetryFrameRef = useRef<number | null>(null);
@@ -108,7 +109,23 @@ export const VirtualizedTurnList = React.forwardRef<
 
     hasPositionedInitialTailRef.current = true;
     virtualizer.scrollToEnd({ behavior: 'auto' });
-  }, [renderAll, scrollRef, virtualizer]);
+
+    if (!onInitialTailPositioned) return;
+    const targetWindow = scrollElement.ownerDocument.defaultView;
+    if (!targetWindow) {
+      onInitialTailPositioned();
+      return;
+    }
+
+    let settleFrame = targetWindow.requestAnimationFrame(() => {
+      settleFrame = targetWindow.requestAnimationFrame(() => {
+        virtualizer.scrollToEnd({ behavior: 'auto' });
+        onInitialTailPositioned();
+      });
+    });
+
+    return () => targetWindow.cancelAnimationFrame(settleFrame);
+  }, [onInitialTailPositioned, renderAll, scrollRef, virtualizer]);
 
   useImperativeHandle(
     ref,

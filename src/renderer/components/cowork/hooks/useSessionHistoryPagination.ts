@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 
 import { coworkService } from '../../../services/cowork';
 
@@ -15,9 +15,13 @@ export function useSessionHistoryPagination({
   sessionId,
   messagesOffset,
   rootRef,
-}: UseSessionHistoryPaginationOptions): void {
+}: UseSessionHistoryPaginationOptions): () => void {
   const isLoadingRef = useRef(false);
   const loadingOffsetRef = useRef<number | null>(null);
+  const [positionedSessionId, setPositionedSessionId] = useState<string | null>(null);
+  const markInitialTailPositioned = useCallback(() => {
+    setPositionedSessionId(sessionId ?? null);
+  }, [sessionId]);
 
   useEffect(() => {
     isLoadingRef.current = false;
@@ -32,7 +36,7 @@ export function useSessionHistoryPagination({
   }, [messagesOffset]);
 
   useEffect(() => {
-    if (!sessionId || messagesOffset <= 0) return;
+    if (!sessionId || positionedSessionId !== sessionId || messagesOffset <= 0) return;
 
     const root = rootRef.current;
     const element = root?.querySelector<HTMLElement>('.cowork-conversation-scroll');
@@ -74,5 +78,7 @@ export function useSessionHistoryPagination({
     }
 
     return () => element.removeEventListener('scroll', handleScroll);
-  }, [messagesOffset, rootRef, sessionId]);
+  }, [messagesOffset, positionedSessionId, rootRef, sessionId]);
+
+  return markInitialTailPositioned;
 }

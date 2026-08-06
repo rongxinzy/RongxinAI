@@ -4,13 +4,7 @@ import {
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
 import { Button } from '@shared/components/ui/button';
-import {
-  ChevronDown,
-  ChevronUp,
-  Download,
-  Image as ImageIcon,
-  PanelLeft,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Image as ImageIcon, PanelLeft } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -965,7 +959,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   // keep correct rail numbering.
   const turnRailIndices = useMemo(() => buildTurnRailIndices(turns), [turns]);
 
-  useSessionHistoryPagination({
+  const markInitialHistoryTailPositioned = useSessionHistoryPagination({
     sessionId,
     messagesOffset: currentSession?.messagesOffset ?? 0,
     rootRef: detailRootRef,
@@ -1096,6 +1090,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         ref={virtualizedTurnListRef}
         isStreaming={isStreaming}
         turns={turns}
+        onInitialTailPositioned={markInitialHistoryTailPositioned}
         renderTurn={renderTurn}
         renderAll={isExportingImage}
       />

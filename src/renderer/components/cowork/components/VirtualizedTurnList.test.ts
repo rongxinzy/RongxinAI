@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
@@ -82,6 +82,39 @@ test('positions a newly mounted virtualizer at the end before paint', () => {
   );
 
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(2);
+});
+
+test('enables history pagination only after two measured animation frames', () => {
+  const frameCallbacks: FrameRequestCallback[] = [];
+  const requestFrame = vi
+    .spyOn(window, 'requestAnimationFrame')
+    .mockImplementation(callback => frameCallbacks.push(callback));
+  const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  const onInitialTailPositioned = vi.fn();
+
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns: [],
+      onInitialTailPositioned,
+      renderAll: false,
+      renderTurn: () => null,
+    }),
+  );
+
+  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
+  expect(onInitialTailPositioned).not.toHaveBeenCalled();
+
+  act(() => frameCallbacks.shift()?.(0));
+  expect(onInitialTailPositioned).not.toHaveBeenCalled();
+
+  act(() => frameCallbacks.shift()?.(16));
+  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(2);
+  expect(onInitialTailPositioned).toHaveBeenCalledOnce();
+
+  view.unmount();
+  requestFrame.mockRestore();
+  cancelFrame.mockRestore();
 });
 
 test('lets a short session clamp its estimated end to the top of a non-overflowing viewport', () => {
