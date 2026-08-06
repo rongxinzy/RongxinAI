@@ -48,7 +48,7 @@ export function MarketplacePanel({
   marketplaceLoading,
   marketplaceError,
   totalCount,
-  nextPageNumber,
+  hasNextPage,
   query,
   installedModelPathMap,
   installProgress,
@@ -65,7 +65,7 @@ export function MarketplacePanel({
   marketplaceLoading: boolean;
   marketplaceError: string | null;
   totalCount?: number;
-  nextPageNumber?: number;
+  hasNextPage: boolean;
   query: string;
   installedModelPathMap: Map<string, string>;
   installProgress: InstallProgressState;
@@ -105,7 +105,7 @@ export function MarketplacePanel({
   const showAllModels = fitFilter === 'all';
   const pageCount = Math.max(
     1,
-    totalCount ? Math.ceil(totalCount / MARKETPLACE_PAGE_SIZE) : nextPageNumber ? Math.max(page, nextPageNumber) : page,
+    totalCount ? Math.ceil(totalCount / MARKETPLACE_PAGE_SIZE) : hasNextPage ? page + 1 : page,
   );
   const currentPage = page;
   const visibleModels = showAllModels ? models : installableModels;
@@ -438,7 +438,7 @@ export function MarketplacePanel({
               <Button
                 type="button"
                 onClick={() => handlePageChange(currentPage + 1)}
-                disabled={marketplaceLoading || currentPage >= pageCount}
+                disabled={marketplaceLoading || !hasNextPage || currentPage >= pageCount}
                 variant="ghost"
                 size="icon-sm"
                 aria-label={i18nService.t('skillMarketplaceNextPage')}

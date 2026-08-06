@@ -136,19 +136,21 @@ test('MarketplaceService propagates external cancellation to the catalogue reque
   expect(fetchMock).toHaveBeenCalledOnce();
 });
 
-test('MarketplaceService returns one cloud page with continuation metadata', async () => {
+test('MarketplaceService returns one cloud page with cursor continuation metadata', async () => {
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     expect(init?.headers).not.toHaveProperty('Authorization');
-    const page = new URL(url).searchParams.get('page');
-    return page === '1'
+    const requestUrl = new URL(url);
+    expect(requestUrl.searchParams.has('page')).toBe(false);
+    return requestUrl.searchParams.has('cursor')
       ? Response.json({
-          models: [verifiedModel('Qwen/Qwen3-8B-GGUF')],
-          totalCount: 2,
-          next: 2,
-        })
-      : Response.json({
           models: [verifiedModel('Qwen/Qwen3-14B-GGUF')],
           totalCount: 2,
+        })
+      : Response.json({
+          models: [verifiedModel('Qwen/Qwen3-8B-GGUF')],
+          totalCount: 2,
+          nextCursor: 'cursor-2',
+          hasMore: true,
         });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -161,28 +163,26 @@ test('MarketplaceService returns one cloud page with continuation metadata', asy
   expect(fetchMock).toHaveBeenCalledOnce();
   expect(result.models.map(model => model.repoId)).toEqual(['Qwen/Qwen3-8B-GGUF']);
   expect(result.totalCount).toBe(2);
-  expect(result.nextPageNumber).toBe(2);
+  expect(result.nextCursor).toBe('cursor-2');
+  expect(result.hasMore).toBe(true);
 });
 test('MarketplaceService returns the current page when later pages remain', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    const page = new URL(url).searchParams.get('page');
-    if (page === '1') {
+    const requestUrl = new URL(url);
+    expect(requestUrl.searchParams.has('page')).toBe(false);
+    if (!requestUrl.searchParams.has('cursor')) {
       return Response.json({
         models: [verifiedModel('Qwen/Qwen3-8B-GGUF')],
         totalCount: 3,
-        next: 2,
-      });
-    }
-    if (page === '2') {
-      return Response.json({
-        models: [{ ...verifiedModel('Qwen/Pending-GGUF'), metadataStatus: 'pending', files: [] }],
-        totalCount: 3,
-        next: 3,
+        nextCursor: 'cursor-2',
+        hasMore: true,
       });
     }
     return Response.json({
-      models: [verifiedModel('Qwen/Qwen3-14B-GGUF')],
+      models: [{ ...verifiedModel('Qwen/Pending-GGUF'), metadataStatus: 'pending', files: [] }],
       totalCount: 3,
+      nextCursor: 'cursor-3',
+      hasMore: true,
     });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -195,7 +195,8 @@ test('MarketplaceService returns the current page when later pages remain', asyn
   expect(fetchMock).toHaveBeenCalledOnce();
   expect(result.models.map(model => model.repoId)).toEqual(['Qwen/Qwen3-8B-GGUF']);
   expect(result.totalCount).toBe(3);
-  expect(result.nextPageNumber).toBe(2);
+  expect(result.nextCursor).toBe('cursor-2');
+  expect(result.hasMore).toBe(true);
 });
 test('MarketplaceService keeps the all-model cache separate from recommendations', async () => {
   const fetchMock = vi.fn(async (_url: string) => {
@@ -224,7 +225,7 @@ test('MarketplaceService keeps the all-model cache separate from recommendations
 });
 test('MarketplaceService uses the search API for default recommendations', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&page=1&sortby=asc');
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&sortby=asc');
     return Response.json({ models: [verifiedModel()], totalCount: 1 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -240,7 +241,7 @@ test('MarketplaceService uses the search API for default recommendations', async
 
 test('MarketplaceService uses the search API for recommendation task tabs', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?task=vision&limit=120&page=1&sortby=asc');
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?task=vision&limit=120&sortby=asc');
     return Response.json({
       models: [
         verifiedModel('Qwen/Chat-GGUF'),
@@ -270,7 +271,7 @@ test('MarketplaceService uses the search API for recommendation task tabs', asyn
 
 test('MarketplaceService uses the search API for the recommended all-model view', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&page=1&sortby=asc');
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&sortby=asc');
     return Response.json({ models: [verifiedModel()], totalCount: 1 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -379,7 +380,7 @@ test('MarketplaceService resolves install metadata through the catalogue search 
     expect(url.pathname).toBe('/v1/catalog/search');
     expect(url.searchParams.get('q')).toBe('Qwen/Qwen3-8B-GGUF');
     expect(url.searchParams.get('limit')).toBe('8');
-    expect(url.searchParams.get('page')).toBe('1');
+    expect(url.searchParams.has('page')).toBe(false);
     expect(url.searchParams.has('featured')).toBe(false);
     return Response.json({ models: [verifiedModel()], totalCount: 1 });
   });

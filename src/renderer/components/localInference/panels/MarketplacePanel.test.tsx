@@ -75,6 +75,7 @@ function renderPanel(overrides: Partial<Parameters<typeof MarketplacePanel>[0]> 
     hasSearched: false,
     marketplaceLoading: false,
     marketplaceError: null,
+    hasNextPage: false,
     query: '',
     installedModelPathMap: new Map(),
     installProgress: {},
@@ -190,7 +191,7 @@ describe('MarketplacePanel result grid and count consistency', () => {
       hasSearched: true,
       models,
       totalCount: MARKETPLACE_PAGE_SIZE * 2,
-      nextPageNumber: 2,
+      hasNextPage: true,
       onSearch,
     });
 
@@ -226,6 +227,7 @@ describe('MarketplacePanel search and filters', () => {
           hasSearched
           marketplaceLoading={false}
           marketplaceError={null}
+          hasNextPage={false}
           query={query}
           installedModelPathMap={new Map()}
           installProgress={{}}

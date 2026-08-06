@@ -22,7 +22,7 @@ type CatalogModelPayload = Omit<MarketplaceModel, 'capability' | 'sizes'> & {
   sizes?: string[];
 };
 
-type CatalogSearchPayload = { models?: CatalogModelPayload[]; totalCount?: number; nextPageNumber?: number; next?: number | string | null; warning?: string; source?: MarketplaceSearchResult['source']; catalogUpdatedAt?: string; scoreVersion?: string };
+type CatalogSearchPayload = { models?: CatalogModelPayload[]; totalCount?: number; nextCursor?: string | null; hasMore?: boolean; warning?: string; source?: MarketplaceSearchResult['source']; catalogUpdatedAt?: string; scoreVersion?: string };
 
 const MARKETPLACE_CAPABILITIES = ['chat', 'reasoning', 'embedding', 'code', 'vision'] as const;
 
@@ -67,9 +67,9 @@ function isGenerativeLanguageModel(model: MarketplaceModel): boolean {
   );
 }
 
-function normalizeNextPageNumber(value: number | string | null | undefined): number | undefined {
-  const pageNumber = typeof value === 'number' ? value : Number(value);
-  return Number.isInteger(pageNumber) && pageNumber > 0 ? pageNumber : undefined;
+function normalizeCursor(value: string | null | undefined): string | undefined {
+  const cursor = typeof value === 'string' ? value.trim() : '';
+  return cursor || undefined;
 }
 
 export class ModelCatalogClient {
@@ -96,7 +96,7 @@ export class ModelCatalogClient {
     // Device fit is computed from live local hardware and must never be sent to
     // the cloud catalogue as if it were a server-side model property.
     if (params.limit) url.searchParams.set('limit', String(params.limit));
-    if (params.pageNumber) url.searchParams.set('page', String(params.pageNumber));
+    if (params.cursor) url.searchParams.set('cursor', params.cursor);
     if (params.sortby) url.searchParams.set('sortby', params.sortby);
     const payload = await this.fetchJson(url.toString(), signal) as CatalogSearchPayload;
     const normalizedModels = (payload.models ?? []).map(normalizeModel);
@@ -104,7 +104,8 @@ export class ModelCatalogClient {
       models:
         params.fit === 'all' ? normalizedModels : normalizedModels.filter(isVerifiedGgufCatalogModel),
       totalCount: payload.totalCount,
-      nextPageNumber: normalizeNextPageNumber(payload.nextPageNumber ?? payload.next),
+      nextCursor: normalizeCursor(payload.nextCursor),
+      hasMore: payload.hasMore ?? Boolean(payload.nextCursor),
       warning: payload.warning,
       source: payload.source ?? 'cloud-catalog',
       catalogUpdatedAt: payload.catalogUpdatedAt,
@@ -118,7 +119,6 @@ export class ModelCatalogClient {
     const result = await this.search({
       query: normalizedRepoId,
       limit: 8,
-      pageNumber: 1,
       fit: 'all',
     });
     const model = result.models.find(candidate =>

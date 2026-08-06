@@ -145,7 +145,6 @@ export class MarketplaceService {
       {
         ...params,
         limit: params.limit ?? DEFAULT_LIMIT,
-        pageNumber: params.pageNumber ?? 1,
       },
       signal,
     );
@@ -384,6 +383,7 @@ function searchCacheKey(params: MarketplaceSearchParams): string {
     (params.tags ?? []).slice().sort().join(','),
     params.limit ?? '',
     params.pageNumber ?? '',
+    params.cursor ?? '',
     params.sortby ?? '',
     params.featuredOnly ? 'featured' : '',
     params.fit ?? '',

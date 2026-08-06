@@ -31,11 +31,12 @@ test('uses the search endpoint without sending the legacy featured query', async
   });
 
   const client = new ModelCatalogClient('https://catalog.example.test', fetchMock);
-  await client.search({ featuredOnly: true, limit: 8, pageNumber: 2 });
+  await client.search({ featuredOnly: true, limit: 8, pageNumber: 2, cursor: 'opaque cursor' });
 
   const url = new URL(requestedUrl);
   expect(url.pathname).toBe('/v1/catalog/search');
   expect(url.searchParams.get('limit')).toBe('8');
-  expect(url.searchParams.get('page')).toBe('2');
+  expect(url.searchParams.has('page')).toBe(false);
+  expect(url.searchParams.get('cursor')).toBe('opaque cursor');
   expect(url.searchParams.has('featured')).toBe(false);
 });
