@@ -224,6 +224,30 @@ export class PiAgentLoopController {
       }
       this.state.currentStep += 1;
       this.pendingNext = false;
+
+      // The wrap-up iteration just ended — close the loop unconditionally,
+      // even if the domain workflow keeps nudging.
+      if (this.wrapUpPending) {
+        this.finish(
+          `Iteration limit of ${AGENT_LOOP_MAX_ITERATIONS} reached; loop closed after the wrap-up iteration`,
+        );
+        console.warn(
+          `[PiAgentLoop] force-closed loop after the ${AGENT_LOOP_MAX_ITERATIONS}-iteration limit`,
+        );
+        return { shouldContinue: false };
+      }
+
+      // The iteration-limit safety cap applies to completion-workflow loops
+      // too: the last allowed iteration becomes a forced wrap-up turn.
+      if (this.state.currentStep >= AGENT_LOOP_MAX_ITERATIONS - 1) {
+        this.wrapUpPending = true;
+        this.onActivation?.({
+          activation: HarnessActivationType.RecoveryTriggered,
+          iteration: this.state.currentStep + 1,
+          mechanism: 'iteration_limit_wrap_up',
+        });
+        return { shouldContinue: true, nextPrompt: this.buildWrapUpPrompt() };
+      }
       return {
         shouldContinue: true,
         nextPrompt:

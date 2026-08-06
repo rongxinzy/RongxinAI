@@ -237,6 +237,42 @@ describe('buildPiAgentLoopTool', () => {
       expect(state.done).toBe(true);
       expect(state.reasonDone).toContain(String(AGENT_LOOP_MAX_ITERATIONS));
     });
+
+    it('applies the iteration cap to completion-workflow loops', async () => {
+      const workflow = {
+        onAgentEnd: vi.fn(() => ({
+          shouldFinish: false,
+          nextPrompt: 'Continue the domain workflow.',
+        })),
+        requestCompletion: vi.fn(() => 'blocked'),
+      };
+      const controller = new PiAgentLoopController(workflow);
+      const tool = buildPiAgentLoopTool(controller) as unknown as AgentLoopTool;
+      await callTool(tool, { action: 'start', mode: 'goal', goal: 'endless domain task' });
+
+      // The domain workflow keeps the loop alive past the cap.
+      for (let step = 1; step < AGENT_LOOP_MAX_ITERATIONS - 1; step++) {
+        await callTool(tool, { action: 'next', summary: `step ${step}` });
+        const decision = controller.handleAgentEnd();
+        expect(decision.shouldContinue).toBe(true);
+        expect(decision.nextPrompt).toContain('Continue the domain workflow');
+      }
+
+      // The last allowed iteration is a forced wrap-up even for the workflow.
+      await callTool(tool, { action: 'next', summary: 'still going' });
+      const wrapUp = controller.handleAgentEnd();
+      expect(wrapUp.shouldContinue).toBe(true);
+      expect(wrapUp.nextPrompt).toContain('iteration limit reached');
+
+      // The wrap-up iteration ends → the loop force-closes regardless of the
+      // domain workflow's opinion.
+      await callTool(tool, { action: 'next', summary: 'wrapping up' });
+      expect(controller.handleAgentEnd()).toEqual({ shouldContinue: false });
+      const state = controller.getState();
+      expect(state.active).toBe(false);
+      expect(state.done).toBe(true);
+      expect(state.reasonDone).toContain(String(AGENT_LOOP_MAX_ITERATIONS));
+    });
   });
 
   describe('restart and stop', () => {
