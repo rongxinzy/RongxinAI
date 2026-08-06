@@ -528,13 +528,8 @@ def scan_pip(project_dir):
     if not has_python:
         return findings
 
-    pip_audit_path = shutil.which("pip-audit")
-    if not pip_audit_path:
-        print("[INFO] pip-audit not found, skipping Python audit", file=sys.stderr)
-        return findings
-
     req_file = project_dir / "requirements.txt"
-    cmd = [pip_audit_path, "--format", "json"]
+    cmd = [sys.executable, "-m", "pip_audit", "--format", "json"]
     if req_file.exists():
         cmd.extend(["--requirement", str(req_file)])
 

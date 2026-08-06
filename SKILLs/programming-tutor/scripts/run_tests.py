@@ -65,7 +65,7 @@ class PytestRunner(TestRunner):
         try:
             # Run pytest with verbose output and JSON report
             cmd = [
-                'python', '-m', 'pytest',
+                sys.executable, '-m', 'pytest',
                 self.target,
                 '-v',
                 '--tb=short'
@@ -129,7 +129,7 @@ class UnittestRunner(TestRunner):
 
         try:
             cmd = [
-                'python', '-m', 'unittest',
+                sys.executable, '-m', 'unittest',
                 'discover',
                 '-s', self.target,
                 '-v'
