@@ -29,6 +29,7 @@ import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModa
 import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
+  MARKETPLACE_PREFETCH_PAGE_COUNT,
   LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS,
   LOCAL_INFERENCE_UNLOAD_MIN_BUSY_MS,
   LOCAL_INFERENCE_UNLOAD_SETTLE_POLL_INTERVAL_MS,
@@ -80,6 +81,8 @@ const LOCAL_INFERENCE_TAB_ORDER: LocalInferenceTab[] = ['models', 'marketplace']
 type MarketplacePageCache = {
   key: string;
   pages: Map<number, MarketplaceSearchResult>;
+  // Keep cursor positions for visited pages even when their model data is evicted.
+  cursors: Map<number, string | undefined>;
 };
 
 function marketplacePageCacheKey(params: MarketplaceSearchParams): string {
@@ -97,13 +100,8 @@ function marketplacePageCacheKey(params: MarketplaceSearchParams): string {
   });
 }
 
-function getMarketplaceNextPageNumber(params: MarketplaceSearchParams, result: MarketplaceSearchResult): number | undefined {
-  const currentPage = params.pageNumber ?? 1;
-  if (result.nextPageNumber && result.nextPageNumber > currentPage) return result.nextPageNumber;
-  const limit = params.limit ?? 0;
-  return result.totalCount && limit > 0 && currentPage * limit < result.totalCount
-    ? currentPage + 1
-    : undefined;
+function hasMarketplaceNextPage(result: MarketplaceSearchResult): boolean {
+  return result.hasMore !== false && Boolean(result.nextCursor);
 }
 
 let cachedStatus: OllamaStatusSnapshot | null = null;
@@ -149,7 +147,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const contentViewportRef = useRef<HTMLDivElement>(null);
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number>();
-  const [marketplaceNextPage, setMarketplaceNextPage] = useState<number>();
+  const [marketplaceHasNextPage, setMarketplaceHasNextPage] = useState(false);
   const [marketplaceSearchParams, setMarketplaceSearchParams] =
     useState<MarketplaceSearchParams>({});
   const [marketplaceHardware, setMarketplaceHardware] = useState<MarketplaceHardwareProfile>();
@@ -278,33 +276,59 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       currentResult: MarketplaceSearchResult,
       searchId: number,
     ) => {
-      const currentPage = params.pageNumber ?? 1;
-      const nextPage = getMarketplaceNextPageNumber(params, currentResult);
-      if (!nextPage) return;
       const cache = marketplacePageCacheRef.current;
-      if (!cache || cache.key !== cacheKey || cache.pages.has(nextPage)) return;
-      const requestId =
-        globalThis.crypto?.randomUUID?.() ??
-        `marketplace-prefetch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      marketplacePrefetchRequestIdsRef.current.add(requestId);
-      try {
-        const nextResult = await window.electron.marketplace.search({
-          requestId,
-          params: { ...params, pageNumber: nextPage },
-        });
-        if (searchId !== marketplaceSearchRef.current) return;
-        const currentCache = marketplacePageCacheRef.current;
-        if (!currentCache || currentCache.key !== cacheKey) return;
-        currentCache.pages.set(nextPage, nextResult);
-        for (const pageNumber of currentCache.pages.keys()) {
-          if (pageNumber !== currentPage && pageNumber !== nextPage) {
-            currentCache.pages.delete(pageNumber);
-          }
+      if (!cache || cache.key !== cacheKey) return;
+      const currentPage = params.pageNumber ?? 1;
+      let nextPage = currentPage + 1;
+      let nextCursor = hasMarketplaceNextPage(currentResult) ? currentResult.nextCursor : undefined;
+
+      // Cursor pagination is sequential: the second prefetched page can only be
+      // requested after the first prefetched response provides its next cursor.
+      for (
+        let offset = 0;
+        offset < MARKETPLACE_PREFETCH_PAGE_COUNT && nextCursor;
+        offset += 1
+      ) {
+        cache.cursors.set(nextPage, nextCursor);
+        const cachedNextResult = cache.pages.get(nextPage);
+        if (cachedNextResult) {
+          if (!hasMarketplaceNextPage(cachedNextResult)) break;
+          nextCursor = cachedNextResult.nextCursor;
+          nextPage += 1;
+          continue;
         }
-      } catch {
-        // Prefetch is best effort. The page will be fetched when requested.
-      } finally {
-        marketplacePrefetchRequestIdsRef.current.delete(requestId);
+
+        const requestId =
+          globalThis.crypto?.randomUUID?.() ??
+          `marketplace-prefetch-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        marketplacePrefetchRequestIdsRef.current.add(requestId);
+        try {
+          const nextResult = await window.electron.marketplace.search({
+            requestId,
+            params: { ...params, pageNumber: nextPage, cursor: nextCursor },
+          });
+          if (searchId !== marketplaceSearchRef.current) return;
+          const currentCache = marketplacePageCacheRef.current;
+          if (!currentCache || currentCache.key !== cacheKey) return;
+          currentCache.pages.set(nextPage, nextResult);
+          if (!hasMarketplaceNextPage(nextResult)) break;
+          nextCursor = nextResult.nextCursor;
+          nextPage += 1;
+        } catch {
+          // Prefetch is best effort. The page will be fetched when requested.
+          break;
+        } finally {
+          marketplacePrefetchRequestIdsRef.current.delete(requestId);
+        }
+      }
+
+      const currentCache = marketplacePageCacheRef.current;
+      if (!currentCache || currentCache.key !== cacheKey) return;
+      const lastPrefetchedPage = currentPage + MARKETPLACE_PREFETCH_PAGE_COUNT;
+      for (const pageNumber of currentCache.pages.keys()) {
+        if (pageNumber < currentPage || pageNumber > lastPrefetchedPage) {
+          currentCache.pages.delete(pageNumber);
+        }
       }
     },
     [],
@@ -315,10 +339,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const cacheKey = marketplacePageCacheKey(params);
     cancelMarketplacePrefetches();
     if (!marketplacePageCacheRef.current || marketplacePageCacheRef.current.key !== cacheKey) {
-      marketplacePageCacheRef.current = { key: cacheKey, pages: new Map() };
+      marketplacePageCacheRef.current = { key: cacheKey, pages: new Map(), cursors: new Map() };
     }
     const pageNumber = params.pageNumber ?? 1;
     const cache = marketplacePageCacheRef.current;
+    const cursor = pageNumber > 1 ? cache?.cursors.get(pageNumber) : undefined;
+    if (pageNumber > 1 && !cursor) {
+      setMarketplaceLoading(false);
+      return;
+    }
+    const requestParams = pageNumber > 1 ? { ...params, cursor } : params;
     const cachedResult = pageNumber > 1 ? cache?.pages.get(pageNumber) : undefined;
     if (cachedResult) {
       setMarketplaceSearchParams(params);
@@ -326,10 +356,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       if (pageNumber <= 1) {
         setMarketplaceTotalCount(cachedResult.totalCount);
       }
-      setMarketplaceNextPage(cachedResult.nextPageNumber);
+      setMarketplaceHasNextPage(hasMarketplaceNextPage(cachedResult));
       setMarketplaceError(cachedResult.warning ?? null);
       setMarketplaceLoading(false);
-      void preloadMarketplacePage(cacheKey, params, cachedResult, id);
+      void preloadMarketplacePage(cacheKey, requestParams, cachedResult, id);
       return;
     }
     const requestId =
@@ -339,13 +369,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setMarketplaceLoading(true);
     setMarketplaceError(null);
     try {
-      const result = await window.electron.marketplace.search({ requestId, params });
+      const result = await window.electron.marketplace.search({ requestId, params: requestParams });
       if (id === marketplaceSearchRef.current) {
         cache?.pages.set(pageNumber, result);
-        const nextPage = getMarketplaceNextPageNumber(params, result);
-        if (cache && nextPage) {
+        cache?.cursors.set(pageNumber, cursor);
+        const nextPage = hasMarketplaceNextPage(result) ? pageNumber + 1 : undefined;
+        if (cache && nextPage && result.nextCursor) {
+          cache.cursors.set(nextPage, result.nextCursor);
+          const lastPrefetchedPage = pageNumber + MARKETPLACE_PREFETCH_PAGE_COUNT;
           for (const cachedPage of cache.pages.keys()) {
-            if (cachedPage !== pageNumber && cachedPage !== nextPage) {
+            if (cachedPage < pageNumber || cachedPage > lastPrefetchedPage) {
               cache.pages.delete(cachedPage);
             }
           }
@@ -355,12 +388,13 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         if (pageNumber <= 1) {
           setMarketplaceTotalCount(result.totalCount);
         }
-        setMarketplaceNextPage(result.nextPageNumber);
+        setMarketplaceHasNextPage(hasMarketplaceNextPage(result));
         setMarketplaceError(result.warning ?? null);
-        void preloadMarketplacePage(cacheKey, params, result, id);
+        void preloadMarketplacePage(cacheKey, requestParams, result, id);
       }
     } catch (searchError) {
       if (id === marketplaceSearchRef.current) {
+        setMarketplaceHasNextPage(false);
         setMarketplaceError(getLocalInferenceUserFacingErrorMessage(searchError));
       }
     } finally {
@@ -386,7 +420,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     setMarketplaceModels([]);
     setMarketplaceHasSearched(false);
     setMarketplaceTotalCount(undefined);
-    setMarketplaceNextPage(undefined);
+    setMarketplaceHasNextPage(false);
     setMarketplaceSearchParams({});
   }, [cancelMarketplacePrefetches]);
   useEffect(() => {
@@ -1022,7 +1056,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   marketplaceLoading={marketplaceLoading}
                   marketplaceError={marketplaceError}
                   totalCount={marketplaceTotalCount}
-                  nextPageNumber={marketplaceNextPage}
+                  hasNextPage={marketplaceHasNextPage}
                   query={marketplaceQuery}
                   installedModelPathMap={installedModelPathMap}
                   installProgress={pullProgress}

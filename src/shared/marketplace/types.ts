@@ -122,6 +122,7 @@ export type MarketplaceSearchParams = {
   size?: MarketplaceSizeFilter;
   limit?: number;
   pageNumber?: number;
+  cursor?: string;
   sortby?: MarketplaceSortOrder;
   featuredOnly?: boolean;
   fit?: 'all' | 'recommended' | 'excellent' | 'compatible' | 'unsupported';
@@ -138,7 +139,8 @@ export type MarketplaceSearchRequest = {
 export type MarketplaceSearchResult = {
   models: MarketplaceModel[];
   totalCount?: number;
-  nextPageNumber?: number;
+  nextCursor?: string;
+  hasMore?: boolean;
   warning?: string;
   source?: 'cloud-catalog' | 'modelscope' | 'curated';
   catalogUpdatedAt?: string;
