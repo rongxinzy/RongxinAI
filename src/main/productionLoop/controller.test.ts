@@ -69,9 +69,10 @@ const reachCritique = (controller: ProductionLoopController) => {
   for (const item of planned.planItems) {
     controller.updatePlanItem(item.id, 'completed');
   }
+  controller.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
   controller.startInspection({
     artifacts: [],
-    verifiers: [{ name: 'preview', passed: true, evidence: 'Preview completed successfully.' }],
+    verifiers: [{ name: 'preview', toolCallId: 'preview-check' }],
   });
   controller.requestCritique();
 };

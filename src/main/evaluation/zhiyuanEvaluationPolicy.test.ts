@@ -93,23 +93,23 @@ describe('createZhiyuanEvaluationPolicy', () => {
       itemId: plan.details.planItems[0].id,
       status: ProductionPlanItemStatus.Completed,
     });
+    policy.onEvent?.({
+      type: 'tool_execution_end',
+      toolName: 'bash',
+      toolCallId: 'benchmark-check',
+      result: { content: [{ type: 'text', text: 'checks passed' }] },
+      isError: false,
+    });
     await productionTool.execute('inspect', {
       action: ProductionLoopAction.StartInspection,
       verifierEvidence: [
         {
           name: 'official benchmark scorer',
-          passed: true,
-          evidence: 'Official benchmark scorer passed.',
+          toolCallId: 'benchmark-check',
         },
       ],
     });
     await productionTool.execute('critic', { action: ProductionLoopAction.RequestCritique });
-    policy.onEvent?.({
-      type: 'tool_execution_end',
-      toolName: 'bash',
-      result: { content: [{ type: 'text', text: 'checks passed' }] },
-      isError: false,
-    });
 
     const criticTurn = await policy.onAgentEnd?.({ iteration: 1, messages: [], usage: {} });
     expect(criticTurn?.nextPrompt).toContain('read-only');
@@ -190,23 +190,23 @@ describe('createZhiyuanEvaluationPolicy', () => {
       itemId: plan.details.planItems[0].id,
       status: ProductionPlanItemStatus.Completed,
     });
+    policy.onEvent?.({
+      type: 'tool_execution_end',
+      toolName: 'bash',
+      toolCallId: 'benchmark-check',
+      result: { content: [{ type: 'text', text: 'checks passed' }] },
+      isError: false,
+    });
     await productionTool.execute('inspect', {
       action: ProductionLoopAction.StartInspection,
       verifierEvidence: [
         {
           name: 'official benchmark scorer',
-          passed: true,
-          evidence: 'Official benchmark scorer passed.',
+          toolCallId: 'benchmark-check',
         },
       ],
     });
     await productionTool.execute('critic', { action: ProductionLoopAction.RequestCritique });
-    policy.onEvent?.({
-      type: 'tool_execution_end',
-      toolName: 'bash',
-      result: { content: [{ type: 'text', text: 'checks passed' }] },
-      isError: false,
-    });
 
     const delegation = await policy.onAgentEnd?.({ iteration: 1, messages: [], usage: {} });
     expect(delegation?.nextPrompt).toContain('isolated context and no tools');

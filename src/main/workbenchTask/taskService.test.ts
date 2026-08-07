@@ -61,15 +61,15 @@ const prepareProductionDelivery = (
     planned.planItems[0].id,
     ProductionPlanItemStatus.Completed,
   );
+  service.productionLoop.recordToolResult(runId, {
+    toolCallId: 'completion-contract-check',
+    toolName: 'bash',
+    output: 'Completion contract passed.',
+    isError: false,
+  });
   service.productionLoop.startInspection(runId, {
     artifacts: [{ kind: 'result', reference: 'final-answer' }],
-    verifiers: [
-      {
-        name: 'completion_contract',
-        passed: true,
-        evidence: 'Completion contract passed.',
-      },
-    ],
+    verifiers: [{ name: 'completion_contract', toolCallId: 'completion-contract-check' }],
   });
   service.productionLoop.requestCritique(runId);
   service.productionLoop.recordCriticStart(runId, 'critic');

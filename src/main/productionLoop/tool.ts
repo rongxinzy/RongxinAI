@@ -5,7 +5,6 @@ import {
   type ProductionArtifactEvidence,
   type ProductionExpectedArtifact,
   type ProductionExpectedVerifier,
-  type ProductionVerifierEvidence,
 } from '../../shared/productionLoop';
 import type { ProductionLoopController } from './controller';
 
@@ -56,13 +55,13 @@ const artifactEvidence = (value: unknown): ProductionArtifactEvidence[] =>
       })
     : [];
 
-const verifierEvidence = (value: unknown): ProductionVerifierEvidence[] =>
+const verifierEvidence = (value: unknown): Array<{ name: string; toolCallId: string }> =>
   Array.isArray(value)
     ? value.flatMap(entry => {
         if (!entry || typeof entry !== 'object') return [];
         const raw = entry as Record<string, unknown>;
-        return typeof raw.name === 'string' && typeof raw.evidence === 'string'
-          ? [{ name: raw.name, passed: raw.passed === true, evidence: raw.evidence }]
+        return typeof raw.name === 'string' && typeof raw.toolCallId === 'string'
+          ? [{ name: raw.name, toolCallId: raw.toolCallId }]
           : [];
       })
     : [];
@@ -152,14 +151,15 @@ export function buildProductionLoopTool(
         verifierEvidence: {
           type: 'array',
           minItems: 1,
+          description:
+            'Map each deterministic verifier name to the successful tool call that ran it in the current workflow revision.',
           items: {
             type: 'object',
             properties: {
               name: { type: 'string' },
-              passed: { type: 'boolean' },
-              evidence: { type: 'string' },
+              toolCallId: { type: 'string' },
             },
-            required: ['name', 'passed', 'evidence'],
+            required: ['name', 'toolCallId'],
             additionalProperties: false,
           },
         },

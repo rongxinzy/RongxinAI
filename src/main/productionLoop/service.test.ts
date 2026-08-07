@@ -65,13 +65,24 @@ const commitPlan = (runId: string) =>
     selectedDirection: 'prototype-a',
   });
 
-const startInspection = (runId: string) =>
-  service.startInspection(runId, {
-    artifacts: [{ kind: 'file', reference: 'report.md' }],
-    verifiers: [
-      { name: 'artifact_verifier', passed: true, evidence: 'report.md exists and is valid.' },
-    ],
+const recordVerifier = (runId: string, isError = false) => {
+  const toolCallId = `artifact-verifier-${service.repository.get(runId)?.observedToolResults.length ?? 0}`;
+  service.recordToolResult(runId, {
+    toolCallId,
+    toolName: 'bash',
+    output: isError ? 'Verifier failed.' : 'report.md exists and is valid.',
+    isError,
   });
+  return toolCallId;
+};
+
+const startInspection = (runId: string) => {
+  const toolCallId = recordVerifier(runId);
+  return service.startInspection(runId, {
+    artifacts: [{ kind: 'file', reference: 'report.md' }],
+    verifiers: [{ name: 'artifact_verifier', toolCallId }],
+  });
+};
 
 test('requires a prototype only for explicitly high-ambiguity runs', () => {
   const { run, state } = begin(true);
@@ -98,20 +109,18 @@ test('requires deterministic verifier and artifact evidence before inspection', 
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
+  const successfulToolCallId = recordVerifier(run.id);
   expect(() =>
     service.startInspection(run.id, {
       artifacts: [],
-      verifiers: [
-        { name: 'artifact_verifier', passed: true, evidence: 'Verifier passed.' },
-      ],
+      verifiers: [{ name: 'artifact_verifier', toolCallId: successfulToolCallId }],
     }),
   ).toThrow('artifact evidence');
+  const failedToolCallId = recordVerifier(run.id, true);
   expect(() =>
     service.startInspection(run.id, {
       artifacts: [{ kind: 'file', reference: 'report.md' }],
-      verifiers: [
-        { name: 'artifact_verifier', passed: false, evidence: 'Verifier failed.' },
-      ],
+      verifiers: [{ name: 'artifact_verifier', toolCallId: failedToolCallId }],
     }),
   ).toThrow('Passing deterministic verifier evidence');
 
@@ -119,7 +128,8 @@ test('requires deterministic verifier and artifact evidence before inspection', 
   expect(inspecting.inspections).toHaveLength(1);
   expect(inspecting.inspections[0].verifiers[0]).toMatchObject({
     name: 'artifact_verifier',
-    passed: true,
+    toolName: 'bash',
+    evidence: 'report.md exists and is valid.',
   });
 });
 
@@ -129,7 +139,7 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  startInspection(run.id);
+  const firstInspection = startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review-1');
   const rejected = service.recordCriticResult(
@@ -145,6 +155,17 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   expect(rejected.status).toBe(ProductionLoopStatus.NeedsRevision);
 
   service.recordRevision(run.id, 'Added test evidence', { command: 'npm test' });
+  expect(() =>
+    service.startInspection(run.id, {
+      artifacts: [{ kind: 'file', reference: 'report.md' }],
+      verifiers: [
+        {
+          name: 'artifact_verifier',
+          toolCallId: firstInspection.inspections[0].verifiers[0].toolCallId,
+        },
+      ],
+    }),
+  ).toThrow('Passing deterministic verifier evidence');
   startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review-2');

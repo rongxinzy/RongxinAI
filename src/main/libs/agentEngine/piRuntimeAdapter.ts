@@ -1788,6 +1788,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             Boolean(event.isError),
           );
         }
+        if (event.toolName) {
+          active.productionLoop?.recordToolResult(
+            event.toolCallId,
+            event.toolName,
+            resultText,
+            Boolean(event.isError),
+          );
+        }
         if (event.toolName === PiSubagentToolName) {
           active.productionLoop?.recordSubagentResult(
             event.toolCallId,

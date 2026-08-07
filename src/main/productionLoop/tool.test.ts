@@ -47,6 +47,7 @@ test('publishes concrete nested schemas for model-generated plans', () => {
     'name',
     'deterministic',
   ]);
+  expect(parameters.properties.verifierEvidence.items?.required).toEqual(['name', 'toolCallId']);
 });
 
 test('normalizes a plan payload before passing it to the controller', async () => {

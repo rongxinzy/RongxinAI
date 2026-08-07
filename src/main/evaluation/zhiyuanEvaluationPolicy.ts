@@ -188,6 +188,19 @@ export function createZhiyuanEvaluationPolicy(
 
   const onEvent = (event: Record<string, unknown>): void => {
     const toolName = typeof event.toolName === 'string' ? event.toolName : '';
+    const toolCallId = typeof event.toolCallId === 'string' ? event.toolCallId : '';
+    if (
+      event.type === ZhiyuanEvaluationEventType.ToolExecutionEnd &&
+      toolName &&
+      toolCallId
+    ) {
+      controller.recordToolResult(
+        toolCallId,
+        toolName,
+        toolResultText(event.result),
+        event.isError === true,
+      );
+    }
     if (
       event.type === ZhiyuanEvaluationEventType.ToolExecutionEnd &&
       inspectToolNames.has(toolName)
@@ -200,7 +213,6 @@ export function createZhiyuanEvaluationPolicy(
       if (toolEvidence.length > 20) toolEvidence.shift();
     }
     if (toolName !== ZhiyuanEvaluationCriticToolName) return;
-    const toolCallId = typeof event.toolCallId === 'string' ? event.toolCallId : '';
     if (!toolCallId) return;
     if (event.type === ZhiyuanEvaluationEventType.ToolExecutionStart) {
       controller.recordSubagentStart(toolCallId, event.args);

@@ -38,8 +38,18 @@ export interface ProductionArtifactEvidence {
 
 export interface ProductionVerifierEvidence {
   name: string;
-  passed: boolean;
+  toolCallId: string;
+  toolName: string;
   evidence: string;
+}
+
+export interface ProductionObservedToolResult {
+  toolCallId: string;
+  toolName: string;
+  output: string;
+  isError: boolean;
+  progressVersion: number;
+  createdAt: number;
 }
 
 export interface ProductionInspectionEvidence {
@@ -94,6 +104,7 @@ export interface ProductionLoopState {
   acceptanceCriteria: string[];
   expectedArtifacts: ProductionExpectedArtifact[];
   expectedVerifiers: ProductionExpectedVerifier[];
+  observedToolResults: ProductionObservedToolResult[];
   inspections: ProductionInspectionEvidence[];
   planItems: ProductionPlanItem[];
   critic: ProductionCriticState;
