@@ -60,6 +60,7 @@ import type {
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
 import { ProductionLoopController } from '../../productionLoop/controller';
+import { shouldEnableProductionLoop } from '../../productionLoop/entryPolicy';
 import { buildProductionLoopTool } from '../../productionLoop/tool';
 import {
   type ApiConfigResolution,
@@ -528,6 +529,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         options.sessionMode,
         resourceState.skillIds,
       );
+      const productionLoopEnabled = shouldEnableProductionLoop({
+        sessionMode: options.sessionMode,
+        prompt,
+        goalMode: options.goalMode,
+        skillIds: resourceState.skillIds,
+        expertIds: normalizeExpertIds(options.expertIds),
+        imageAttachmentCount: options.imageAttachments?.length,
+        resumeRun: Boolean(options._workbenchRunId),
+      });
       if (this.workbenchTaskService) {
         const workbench = this.workbenchTaskService.beginRun({
           sessionId,
@@ -746,7 +756,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // loops; the controller continues the session on agent_end.
       const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
       const productionLoop =
-        options.sessionMode === CoworkSessionMode.Work &&
+        productionLoopEnabled &&
         workbenchTaskId &&
         workbenchRunId &&
         this.workbenchTaskService?.productionLoop
@@ -924,11 +934,33 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       options.expertIds === undefined
         ? active.requestedExpertIds
         : normalizeExpertIds(options.expertIds);
-    if (!haveSameStringList(requestedExpertIds, active.requestedExpertIds)) {
+    const requestedSessionMode =
+      options.sessionMode ??
+      (active.workbenchContract.kind === WorkbenchContractKind.Chat
+        ? CoworkSessionMode.Chat
+        : CoworkSessionMode.Work);
+    const productionLoopEnabled = Boolean(
+      this.workbenchTaskService &&
+      shouldEnableProductionLoop({
+        sessionMode: requestedSessionMode,
+        prompt,
+        goalMode: options.goalMode ?? active.goalMode,
+        skillIds: requestedSkillIds,
+        expertIds: requestedExpertIds,
+        imageAttachmentCount: options.imageAttachments?.length,
+        resumeRun: Boolean(options._workbenchRunId),
+      }),
+    );
+    const productionLoopTopologyChanged = productionLoopEnabled !== Boolean(active.productionLoop);
+    if (
+      !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
+      productionLoopTopologyChanged
+    ) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
+        sessionMode: requestedSessionMode,
         systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
@@ -945,6 +977,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
+        sessionMode: requestedSessionMode,
         systemPrompt: nextSystemPrompt,
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
@@ -978,10 +1011,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     if (this.workbenchTaskService) {
-      const sessionMode =
-        options.sessionMode ??
-        (active.workbenchContract.kind === WorkbenchContractKind.Chat ? 'chat' : 'work');
-      const workbenchContract = this.createWorkbenchContract(sessionMode, requestedSkillIds);
+      const workbenchContract = this.createWorkbenchContract(
+        requestedSessionMode,
+        requestedSkillIds,
+      );
       const workbench = this.workbenchTaskService.beginRun({
         sessionId,
         goal: prompt,

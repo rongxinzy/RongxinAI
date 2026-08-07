@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
+import { ProductionLoopAction, ProductionLoopToolName } from '../../shared/productionLoop';
 import {
   classifyWorkbenchToolRisk,
   createToolIdempotencyKey,
@@ -28,6 +29,20 @@ test('idempotency hashing is stable across object key order', () => {
   expect(createToolIdempotencyKey('run', 'call', { a: 1, b: 2 })).toBe(
     createToolIdempotencyKey('run', 'call', { b: 2, a: 1 }),
   );
+});
+
+test('only skip_workflow bypasses production loop approval', () => {
+  expect(
+    classifyWorkbenchToolRisk(ProductionLoopToolName, {
+      action: ProductionLoopAction.SkipWorkflow,
+      reason: 'Simple information request',
+    }),
+  ).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
+  expect(
+    classifyWorkbenchToolRisk(ProductionLoopToolName, {
+      action: ProductionLoopAction.CommitPlan,
+    }),
+  ).toBe(WorkbenchApprovalRiskLevel.Unknown);
 });
 
 test('only explicitly read-only shell commands qualify for allow-all auto approval', () => {

@@ -13,8 +13,10 @@ import {
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
 import {
+  ProductionLoopAction,
   ProductionLoopPhase,
   ProductionLoopStatus,
+  ProductionLoopToolName,
   ProductionPlanItemStatus,
 } from '../../shared/productionLoop';
 import { initializeWorkbenchTaskSchema } from './schema';
@@ -287,6 +289,37 @@ test('successful side effects are not authorized twice', async () => {
     const duplicate = await service.authorizeToolCall(input);
     expect(duplicate.allow).toBe(false);
     expect(duplicate.reason).toContain('Reuse the persisted result: {"ok":true}');
+  } finally {
+    db.close();
+  }
+});
+
+test('skip_workflow executes without creating a user approval', async () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'Explain the current state',
+      contract: {
+        kind: WorkbenchContractKind.GenericWork,
+        requiresUserAcceptance: true,
+      },
+    });
+
+    await expect(
+      service.authorizeToolCall({
+        sessionId: 'session',
+        runId: run.id,
+        toolCallId: 'skip-call',
+        toolName: ProductionLoopToolName,
+        toolInput: {
+          action: ProductionLoopAction.SkipWorkflow,
+          reason: 'Simple information request',
+        },
+        autoApprove: false,
+      }),
+    ).resolves.toEqual({ allow: true });
+    expect(service.getDetail(task.id)?.approvals).toEqual([]);
   } finally {
     db.close();
   }
