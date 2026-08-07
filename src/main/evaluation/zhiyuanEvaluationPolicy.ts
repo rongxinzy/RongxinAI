@@ -6,6 +6,7 @@ import { ProductionLoopAction, ProductionLoopPhase } from '../../shared/producti
 import { WorkbenchContractKind, type WorkbenchJsonObject } from '../../shared/workbenchTask';
 import { createPiWorkLoop } from '../libs/agentEngine/piWorkLoop';
 import { ProductionLoopController } from '../productionLoop/controller';
+import { extractPiSubagentExecutionMetadata } from '../libs/agentEngine/piSubagentExecution';
 import type { ProductionLoopMeasurement } from '../productionLoop/ports';
 import { ProductionLoopService } from '../productionLoop/service';
 import { buildProductionLoopTool } from '../productionLoop/tool';
@@ -195,10 +196,12 @@ export function createZhiyuanEvaluationPolicy(
     if (event.type === ZhiyuanEvaluationEventType.ToolExecutionStart) {
       controller.recordSubagentStart(toolCallId, event.args);
     } else if (event.type === ZhiyuanEvaluationEventType.ToolExecutionEnd) {
+      const execution = extractPiSubagentExecutionMetadata(event.result);
       controller.recordSubagentResult(
         toolCallId,
         toolResultText(event.result),
         event.isError === true,
+        execution,
       );
       criticAttempt += 1;
       const critic = controller.getState().critic;
@@ -208,6 +211,15 @@ export function createZhiyuanEvaluationPolicy(
         outputPresent: Boolean(toolResultText(event.result).trim()),
         passed: critic.passed,
         findingSeverities: critic.findings.map(finding => finding.severity),
+        ...(execution
+          ? {
+              terminationReason: execution.terminationReason,
+              durationMs: execution.durationMs,
+              assistantTurns: execution.assistantTurns,
+              toolCalls: execution.toolCalls,
+              steerRequested: execution.steerRequested,
+            }
+          : {}),
       });
     }
   };

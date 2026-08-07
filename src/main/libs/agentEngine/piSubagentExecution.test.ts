@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 
 import {
+  extractPiSubagentExecutionMetadata,
   PiMessageRole,
   PiSubagentEventType,
   runPiSubagent,
@@ -11,6 +12,33 @@ import {
   PiBuiltinFileToolName,
   PiContentBlockType,
 } from './piWriteTokenLimit';
+
+test('extracts validated execution metadata from a subagent tool result', () => {
+  expect(
+    extractPiSubagentExecutionMetadata({
+      details: {
+        execution: {
+          terminationReason: 'hard_timeout',
+          durationMs: 180_000,
+          assistantTurns: 6,
+          toolCalls: 5,
+          steerRequested: true,
+        },
+      },
+    }),
+  ).toEqual({
+    terminationReason: 'hard_timeout',
+    durationMs: 180_000,
+    assistantTurns: 6,
+    toolCalls: 5,
+    steerRequested: true,
+  });
+  expect(
+    extractPiSubagentExecutionMetadata({
+      details: { execution: { terminationReason: 'unknown' } },
+    }),
+  ).toBeUndefined();
+});
 
 const createSession = () => {
   let listener: ((event: { type: string; message?: never }) => void) | undefined;
@@ -40,7 +68,7 @@ test('waits for agent_settled instead of returning after an intermediate assista
   let settled = false;
   const output = runPiSubagent(session, 'Implement it', {
     maxOutputTokens: 4096,
-    timeoutMs: 10_000,
+    hardTimeoutMs: 10_000,
   }).then(value => {
     settled = true;
     return value;
@@ -72,14 +100,20 @@ test('waits for agent_settled instead of returning after an intermediate assista
 
   emit({ type: PiSubagentEventType.AgentSettled });
 
-  await expect(output).resolves.toBe('Final answer');
+  await expect(output).resolves.toMatchObject({
+    output: 'Final answer',
+    terminationReason: 'settled',
+    assistantTurns: 2,
+    toolCalls: 0,
+    steerRequested: false,
+  });
 });
 
 test('queues Pi write recovery and keeps waiting after a truncated subagent write', async () => {
   const { session, emit, resolvePrompt } = createSession();
   const output = runPiSubagent(session, 'Write a large file', {
     maxOutputTokens: 4096,
-    timeoutMs: 10_000,
+    hardTimeoutMs: 10_000,
   });
 
   emit({
@@ -111,14 +145,14 @@ test('queues Pi write recovery and keeps waiting after a truncated subagent writ
   emit({ type: PiSubagentEventType.AgentSettled });
   resolvePrompt();
 
-  await expect(output).resolves.toBe('Completed');
+  await expect(output).resolves.toMatchObject({ output: 'Completed' });
 });
 
 test('returns a subagent error without waiting for agent_end', async () => {
   const { session, emit } = createSession();
   const output = runPiSubagent(session, 'Fail', {
     maxOutputTokens: 4096,
-    timeoutMs: 10_000,
+    hardTimeoutMs: 10_000,
   });
 
   emit({
@@ -131,7 +165,10 @@ test('returns a subagent error without waiting for agent_end', async () => {
     },
   });
 
-  await expect(output).resolves.toBe('Error: provider failed');
+  await expect(output).resolves.toMatchObject({
+    output: 'Error: provider failed',
+    terminationReason: 'error',
+  });
 });
 
 test('cleans up when subscribing throws synchronously', async () => {
@@ -145,7 +182,10 @@ test('cleans up when subscribing throws synchronously', async () => {
   };
 
   await expect(
-    runPiSubagent(session, 'Implement it', { maxOutputTokens: 4096, timeoutMs: 10_000 }),
+    runPiSubagent(session, 'Implement it', {
+      maxOutputTokens: 4096,
+      hardTimeoutMs: 10_000,
+    }),
   ).rejects.toBe(error);
   expect(session.prompt).not.toHaveBeenCalled();
 });
@@ -162,7 +202,73 @@ test('cleans up when prompting throws synchronously', async () => {
   };
 
   await expect(
-    runPiSubagent(session, 'Implement it', { maxOutputTokens: 4096, timeoutMs: 10_000 }),
+    runPiSubagent(session, 'Implement it', {
+      maxOutputTokens: 4096,
+      hardTimeoutMs: 10_000,
+    }),
   ).rejects.toBe(error);
   expect(unsubscribe).toHaveBeenCalledOnce();
+});
+
+test('requests at most one bounded steer when review budgets are exhausted', async () => {
+  const { session, emit, resolvePrompt } = createSession();
+  const output = runPiSubagent(session, 'Review it', {
+    maxOutputTokens: 4096,
+    hardTimeoutMs: 10_000,
+    maxAssistantTurns: 2,
+    maxToolCalls: 1,
+    steerPrompt: 'Return the verdict now.',
+  });
+
+  emit({ type: PiSubagentEventType.ToolExecutionStart });
+  emit({ type: PiSubagentEventType.ToolExecutionStart });
+  for (const text of ['First', 'Final']) {
+    emit({
+      type: PiSubagentEventType.MessageEnd,
+      message: {
+        role: PiMessageRole.Assistant,
+        stopReason: PiAssistantStopReason.Stop,
+        content: [{ type: PiContentBlockType.Text, text }],
+      },
+    });
+  }
+  emit({ type: PiSubagentEventType.AgentSettled });
+  resolvePrompt();
+
+  expect(session.steer).toHaveBeenCalledOnce();
+  await expect(output).resolves.toMatchObject({
+    output: 'Final',
+    terminationReason: 'settled',
+    assistantTurns: 2,
+    toolCalls: 2,
+    steerRequested: true,
+  });
+});
+
+test('steers at the soft timeout and returns structured hard-timeout metadata', async () => {
+  vi.useFakeTimers();
+  try {
+    const { session } = createSession();
+    const output = runPiSubagent(session, 'Review it', {
+      maxOutputTokens: 4096,
+      softTimeoutMs: 120_000,
+      hardTimeoutMs: 180_000,
+      steerPrompt: 'Return the verdict now.',
+    });
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(session.steer).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    await expect(output).resolves.toMatchObject({
+      output: '(subagent hard timeout after 180s)',
+      terminationReason: 'hard_timeout',
+      durationMs: 180_000,
+      assistantTurns: 0,
+      toolCalls: 0,
+      steerRequested: true,
+    });
+  } finally {
+    vi.useRealTimers();
+  }
 });

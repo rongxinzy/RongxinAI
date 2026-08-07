@@ -9,6 +9,7 @@ import {
   ProductionLoopStatus,
   ProductionPlanItemStatus,
   type ProductionCriticFinding,
+  type ProductionCriticExecution,
   type ProductionArtifactEvidence,
   type ProductionExpectedArtifact,
   type ProductionExpectedVerifier,
@@ -176,6 +177,7 @@ export class ProductionLoopService {
         passed: false,
         findings: [],
         outputSummary: null,
+        execution: null,
       },
       revisions: [],
       recoveries: [],
@@ -388,6 +390,7 @@ export class ProductionLoopService {
         passed: false,
         findings: [],
         outputSummary: null,
+        execution: null,
       };
       state.progressVersion += 1;
       this.measurement.recordActivation(runId, {
@@ -436,11 +439,34 @@ export class ProductionLoopService {
     toolCallId: string,
     output: string,
     isError: boolean,
+    execution?: ProductionCriticExecution,
   ): ProductionLoopState {
     return this.mutate(runId, state => {
       if (state.critic.toolCallId !== toolCallId) return;
-      const result = parseCriticPayload(output, isError);
       state.critic.outputSummary = output.slice(0, MAX_CRITIC_OUTPUT_LENGTH);
+      state.critic.execution = execution ?? null;
+      if (execution?.timedOut) {
+        state.critic.toolCallId = null;
+        state.critic.passed = false;
+        state.critic.findings = [];
+        state.progressVersion += 1;
+        console.warn(
+          `[ProductionLoop] critic timed out after ${execution.durationMs}ms; retaining critique phase for retry`,
+        );
+        this.measurement.recordActivation(runId, {
+          activation: HarnessActivationType.RecoveryTriggered,
+          mechanism: 'production_loop_reviewer',
+          evidence: {
+            durationMs: execution.durationMs,
+            assistantTurns: execution.assistantTurns,
+            toolCalls: execution.toolCalls,
+            steerRequested: execution.steerRequested,
+            timedOut: true,
+          },
+        });
+        return;
+      }
+      const result = parseCriticPayload(output, isError);
       state.critic.findings = result.findings;
       state.critic.passed = result.verdict === ProductionCriticVerdict.Pass;
       state.progressVersion += 1;
@@ -568,6 +594,7 @@ export class ProductionLoopService {
           },
         ],
         outputSummary: null,
+        execution: null,
       };
       state.deliveryReason = null;
     });

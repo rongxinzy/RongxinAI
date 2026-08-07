@@ -64,12 +64,21 @@ export interface ProductionCriticFinding {
   evidence?: string;
 }
 
+export interface ProductionCriticExecution {
+  durationMs: number;
+  assistantTurns: number;
+  toolCalls: number;
+  steerRequested: boolean;
+  timedOut: boolean;
+}
+
 export interface ProductionCriticState {
   requested: boolean;
   toolCallId: string | null;
   passed: boolean;
   findings: ProductionCriticFinding[];
   outputSummary: string | null;
+  execution: ProductionCriticExecution | null;
 }
 
 export interface ProductionRevision {
