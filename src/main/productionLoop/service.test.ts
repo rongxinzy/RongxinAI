@@ -17,7 +17,7 @@ import { WorkbenchTaskRepository } from '../workbenchTask/repository';
 import { initializeWorkbenchTaskSchema } from '../workbenchTask/schema';
 import { ProductionLoopRepository } from './repository';
 import { initializeProductionLoopSchema } from './schema';
-import { ProductionLoopService } from './service';
+import { MAX_OBSERVED_TOOL_RESULTS, ProductionLoopService } from './service';
 
 let db: Database.Database;
 let workbench: WorkbenchTaskRepository;
@@ -133,6 +133,39 @@ test('requires deterministic verifier and artifact evidence before inspection', 
   });
 });
 
+test('retains only the latest observed tool results', () => {
+  const { run } = begin();
+
+  for (let index = 0; index < MAX_OBSERVED_TOOL_RESULTS + 2; index += 1) {
+    service.recordToolResult(run.id, {
+      toolCallId: `tool-${index}`,
+      toolName: 'bash',
+      output: `result-${index}`,
+      isError: false,
+    });
+  }
+
+  const bounded = service.repository.get(run.id)?.observedToolResults ?? [];
+  expect(bounded).toHaveLength(MAX_OBSERVED_TOOL_RESULTS);
+  expect(bounded[0].toolCallId).toBe('tool-2');
+  expect(bounded.at(-1)?.toolCallId).toBe(`tool-${MAX_OBSERVED_TOOL_RESULTS + 1}`);
+
+  service.recordToolResult(run.id, {
+    toolCallId: 'tool-2',
+    toolName: 'bash',
+    output: 'updated-result',
+    isError: false,
+  });
+
+  const updated = service.repository.get(run.id)?.observedToolResults ?? [];
+  expect(updated).toHaveLength(MAX_OBSERVED_TOOL_RESULTS);
+  expect(updated[0].toolCallId).toBe('tool-3');
+  expect(updated.at(-1)).toMatchObject({
+    toolCallId: 'tool-2',
+    output: 'updated-result',
+  });
+});
+
 test('persists plan, critic rejection, revision, and delivery readiness', () => {
   const { run } = begin();
   const planned = commitPlan(run.id);
@@ -154,7 +187,11 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   expect(rejected.phase).toBe(ProductionLoopPhase.Revise);
   expect(rejected.status).toBe(ProductionLoopStatus.NeedsRevision);
 
-  service.recordRevision(run.id, 'Added test evidence', { command: 'npm test' });
+  const revision = service.recordRevision(run.id, 'Added test evidence', {
+    command: 'npm test',
+  });
+  expect(revision.revisions[0].progressVersion).toBe(revision.progressVersion);
+  expect(revision.observedToolResults).toEqual([]);
   expect(() =>
     service.startInspection(run.id, {
       artifacts: [{ kind: 'file', reference: 'report.md' }],

@@ -161,6 +161,19 @@ test('invalid critic output enters revision instead of silently passing', () => 
   expect(controller.getState().critic.findings[0].summary).toContain('invalid structured response');
 });
 
+test('builds the reviewer prompt from compact contract and execution evidence', () => {
+  const { controller } = createController();
+  reachCritique(controller);
+
+  const prompt = controller.requestCriticPrompt();
+
+  expect(prompt).toContain('compact persisted contract and execution evidence');
+  expect(prompt).toContain('"verifiers":[{"name":"preview","deterministic":true}]');
+  expect(prompt).toContain('"inspection"');
+  expect(prompt).toContain('Preview completed successfully.');
+  expect(prompt).toContain('"observedExecution"');
+});
+
 test('uses structured execution errors instead of parsing result text', () => {
   const { controller } = createController();
   reachCritique(controller);

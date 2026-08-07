@@ -85,6 +85,7 @@ export interface ProductionRevision {
   summary: string;
   evidence: WorkbenchJsonObject;
   createdAt: number;
+  progressVersion?: number;
 }
 
 export interface ProductionRecovery {
