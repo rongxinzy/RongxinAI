@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 const installerScriptPath = path.resolve('scripts/nsis-installer.nsh');
+const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
 
 describe('NSIS local inference runtime signing flow', () => {
   test('declares the installer as DPI-aware for high-DPI displays', () => {
@@ -48,5 +49,16 @@ describe('NSIS local inference runtime signing flow', () => {
       'phase=llamacpp-backend-install-skipped reason=silent-no-local-signing-confirmation',
     );
     expect(installerScript).not.toContain('IfSilent LlamaCppBackendLocalSigningConfirmed 0');
+  });
+});
+
+describe('NSIS visual assets', () => {
+  test('draws the full product wordmark directly in the installer artwork', () => {
+    const brandAssetScript = fs.readFileSync(brandAssetScriptPath, 'utf8');
+
+    expect(brandAssetScript).toContain('function drawWordmarkMark');
+    expect(brandAssetScript).toContain('drawWordmarkMark(head, 13, 12, 30)');
+    expect(brandAssetScript).toContain("fillText('\\u77e5\\u8fdc'");
+    expect(brandAssetScript).not.toContain('drawPrimaryMark');
   });
 });
