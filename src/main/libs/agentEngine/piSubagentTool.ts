@@ -24,6 +24,7 @@ import { CoreSkillId } from '../../../shared/skills/constants';
 import {
   PiSubagentProfileId,
   PiSubagentTerminationReason,
+  PiSubagentToolName,
 } from './piSubagentConstants';
 import {
   runPiSubagent,
@@ -33,7 +34,7 @@ import {
 
 // ── Constants ──
 
-export const PiSubagentToolName = 'subagent';
+export { PiSubagentToolName } from './piSubagentConstants';
 
 /** Per-subagent run timeout. */
 export const SUBAGENT_TIMEOUT_MS = 600_000;
@@ -169,6 +170,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
       'You are the independent, read-only critic for a production workflow.',
       'Review the implementation and supplied execution evidence against the assigned contract.',
       'Check correctness, required artifacts, deterministic verification, edge cases, and regressions.',
+      'Prioritize the supplied contract and execution evidence. Inspect at most 3 files, and only when evidence is insufficient.',
       'Never modify files. If evidence is insufficient, return revise with a concrete finding.',
       'Respond with exactly one JSON object and no Markdown or surrounding text:',
       '{"verdict":"pass"|"revise","findings":[{"severity":"critical"|"major"|"minor","summary":"...","evidence":"..."}]}',

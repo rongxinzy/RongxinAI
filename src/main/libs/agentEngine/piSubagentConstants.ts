@@ -9,6 +9,8 @@ export const PiSubagentProfileId = {
 export type PiSubagentProfileId =
   (typeof PiSubagentProfileId)[keyof typeof PiSubagentProfileId];
 
+export const PiSubagentToolName = 'subagent';
+
 export const PiSubagentTerminationReason = {
   Settled: 'settled',
   Error: 'error',

@@ -27,6 +27,7 @@ import type { ProductionLoopMeasurement, ProductionLoopStore } from './ports';
 import { assertProductionLoopTransition } from './stateMachine';
 
 const MAX_CRITIC_OUTPUT_LENGTH = 8_000;
+export const MAX_OBSERVED_TOOL_RESULTS = 256;
 
 interface CriticPayload {
   verdict: ProductionCriticVerdict;
@@ -408,7 +409,6 @@ export class ProductionLoopService {
       const toolCallId = input.toolCallId.trim();
       const toolName = input.toolName.trim();
       if (!toolCallId || !toolName) return;
-      state.observedToolResults ??= [];
       const result: ProductionObservedToolResult = {
         toolCallId,
         toolName,
@@ -417,11 +417,13 @@ export class ProductionLoopService {
         progressVersion: state.progressVersion,
         createdAt: Date.now(),
       };
-      const existingIndex = state.observedToolResults.findIndex(
-        existing => existing.toolCallId === toolCallId,
+      state.observedToolResults = (state.observedToolResults ?? []).filter(
+        existing => existing.toolCallId !== toolCallId,
       );
-      if (existingIndex >= 0) state.observedToolResults[existingIndex] = result;
-      else state.observedToolResults.push(result);
+      state.observedToolResults.push(result);
+      if (state.observedToolResults.length > MAX_OBSERVED_TOOL_RESULTS) {
+        state.observedToolResults = state.observedToolResults.slice(-MAX_OBSERVED_TOOL_RESULTS);
+      }
     });
   }
 
@@ -496,9 +498,15 @@ export class ProductionLoopService {
       }
       const normalizedSummary = summary.trim();
       if (!normalizedSummary) throw new Error('A revision requires a summary.');
-      state.revisions.push({ summary: normalizedSummary, evidence, createdAt: Date.now() });
+      state.revisions.push({
+        summary: normalizedSummary,
+        evidence,
+        createdAt: Date.now(),
+        progressVersion: state.progressVersion + 1,
+      });
       state.status = ProductionLoopStatus.Active;
       state.progressVersion += 1;
+      state.observedToolResults = [];
       this.measurement.recordActivation(runId, {
         activation: HarnessActivationType.RevisionApplied,
         mechanism: 'production_loop',
