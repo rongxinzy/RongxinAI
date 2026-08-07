@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { HarnessActivationType } from '../../shared/harness';
 import {
   ProductionCriticSeverity,
+  ProductionCriticVerdict,
   ProductionLoopPhase,
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
@@ -27,7 +28,7 @@ import { assertProductionLoopTransition } from './stateMachine';
 const MAX_CRITIC_OUTPUT_LENGTH = 8_000;
 
 interface CriticPayload {
-  verdict: 'pass' | 'revise';
+  verdict: ProductionCriticVerdict;
   findings: ProductionCriticFinding[];
 }
 
@@ -62,7 +63,7 @@ const parseJsonRecord = (output: string): Record<string, unknown> => {
 const parseCriticPayload = (output: string, isError: boolean): CriticPayload => {
   if (isError) {
     return {
-      verdict: 'revise',
+      verdict: ProductionCriticVerdict.Revise,
       findings: [
         {
           severity: ProductionCriticSeverity.Major,
@@ -74,31 +75,43 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
   }
   try {
     const parsed = parseJsonRecord(output);
-    const verdict = parsed.verdict === 'pass' ? 'pass' : 'revise';
-    const findings = Array.isArray(parsed.findings)
-      ? parsed.findings.flatMap(value => {
-          if (!value || typeof value !== 'object') return [];
-          const raw = value as Record<string, unknown>;
-          if (typeof raw.summary !== 'string' || !raw.summary.trim()) return [];
-          const severity = Object.values(ProductionCriticSeverity).includes(
-            raw.severity as ProductionCriticSeverity,
-          )
-            ? (raw.severity as ProductionCriticSeverity)
-            : ProductionCriticSeverity.Major;
-          return [
-            {
-              severity,
-              summary: raw.summary.trim(),
-              evidence: typeof raw.evidence === 'string' ? raw.evidence.trim() : undefined,
-            },
-          ];
-        })
-      : [];
-    if (verdict === 'pass' && findings.length > 0) return { verdict: 'revise', findings };
+    if (!Object.values(ProductionCriticVerdict).includes(parsed.verdict as ProductionCriticVerdict)) {
+      throw new Error('Critic verdict is missing or invalid.');
+    }
+    if (!Array.isArray(parsed.findings)) {
+      throw new Error('Critic findings must be an array.');
+    }
+    const verdict = parsed.verdict as ProductionCriticVerdict;
+    const findings = parsed.findings.map(value => {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        throw new Error('Critic finding must be an object.');
+      }
+      const raw = value as Record<string, unknown>;
+      if (typeof raw.summary !== 'string' || !raw.summary.trim()) {
+        throw new Error('Critic finding summary is required.');
+      }
+      if (!Object.values(ProductionCriticSeverity).includes(raw.severity as ProductionCriticSeverity)) {
+        throw new Error('Critic finding severity is invalid.');
+      }
+      if (raw.evidence !== undefined && typeof raw.evidence !== 'string') {
+        throw new Error('Critic finding evidence must be a string.');
+      }
+      return {
+        severity: raw.severity as ProductionCriticSeverity,
+        summary: raw.summary.trim(),
+        evidence: typeof raw.evidence === 'string' ? raw.evidence.trim() : undefined,
+      };
+    });
+    if (verdict === ProductionCriticVerdict.Pass && findings.length > 0) {
+      return { verdict: ProductionCriticVerdict.Revise, findings };
+    }
+    if (verdict === ProductionCriticVerdict.Revise && findings.length === 0) {
+      throw new Error('A revise verdict requires at least one finding.');
+    }
     return { verdict, findings };
   } catch {
     return {
-      verdict: 'revise',
+      verdict: ProductionCriticVerdict.Revise,
       findings: [
         {
           severity: ProductionCriticSeverity.Major,
@@ -379,9 +392,9 @@ export class ProductionLoopService {
       const result = parseCriticPayload(output, isError);
       state.critic.outputSummary = output.slice(0, MAX_CRITIC_OUTPUT_LENGTH);
       state.critic.findings = result.findings;
-      state.critic.passed = result.verdict === 'pass';
+      state.critic.passed = result.verdict === ProductionCriticVerdict.Pass;
       state.progressVersion += 1;
-      if (result.verdict === 'pass') {
+      if (result.verdict === ProductionCriticVerdict.Pass) {
         this.transition(state, ProductionLoopPhase.Deliver);
         state.status = ProductionLoopStatus.ReadyToDeliver;
         return;
