@@ -7,10 +7,12 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { createCanvas } = require('@napi-rs/canvas');
+const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
 const projectRoot = path.resolve(__dirname, '..');
 const assetDir = path.join(projectRoot, 'build', 'installer-assets');
+const sidebarIconPath = path.join(projectRoot, 'build', 'icons', 'png', '64x64.png');
+const headerIconPath = path.join(projectRoot, 'build', 'icons', 'png', '48x48.png');
 function roundedRect(context, x, y, width, height, radius) {
   context.beginPath();
   context.roundRect(x, y, width, height, radius);
@@ -28,29 +30,13 @@ function drawDots(context, width, height, opacity = 0.1) {
   }
 }
 
-// Draw the two-character product wordmark directly at the final bitmap size.
-// The prior image was downscaled from a larger square icon and became blurry.
-function drawWordmarkMark(context, x, y, size) {
-  const scale = size / 48;
+// Reuse the purpose-built application icon layers. The sidebar receives the
+// 64px layer and the header receives the 48px layer, so neither is enlarged.
+function drawAppIcon(context, icon, x, y, size) {
   context.save();
-  context.fillStyle = '#f3f7ff';
-  roundedRect(context, x, y, size, size, 11 * scale);
-  context.fill();
-
-  context.strokeStyle = 'rgba(57, 123, 255, 0.28)';
-  context.lineWidth = Math.max(1, scale);
-  context.stroke();
-
-  context.fillStyle = '#17191d';
-  context.font = `900 ${Math.round(size * 0.43)}px "Microsoft YaHei UI", "Microsoft YaHei", sans-serif`;
-  context.textAlign = 'center';
-  context.textBaseline = 'middle';
-  context.fillText('\u77e5\u8fdc', x + size * 0.48, y + size * 0.56, size * 0.76);
-
-  context.fillStyle = '#397bff';
-  context.beginPath();
-  context.arc(x + size * 0.8, y + size * 0.25, 2.6 * scale, 0, Math.PI * 2);
-  context.fill();
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(icon, x, y, size, size);
   context.restore();
 }
 
@@ -93,6 +79,11 @@ function writeBmp(canvas, filename) {
 }
 
 async function build() {
+  const [sidebarIcon, headerIcon] = await Promise.all([
+    loadImage(sidebarIconPath),
+    loadImage(headerIconPath),
+  ]);
+
   const sidebar = createCanvas(164, 314);
   const side = sidebar.getContext('2d');
   const background = side.createLinearGradient(0, 0, 0, 314);
@@ -109,7 +100,7 @@ async function build() {
   side.fillStyle = glow;
   side.fillRect(0, 0, 164, 155);
 
-  drawWordmarkMark(side, 14, 14, 58);
+  drawAppIcon(side, sidebarIcon, 14, 14, 58);
   side.fillStyle = '#397bff';
   side.fillRect(14, 71, 44, 2);
 
@@ -163,7 +154,7 @@ async function build() {
   headerGlow.addColorStop(1, 'rgba(83, 147, 255, 0)');
   head.fillStyle = headerGlow;
   head.fillRect(0, 0, 150, 57);
-  drawWordmarkMark(head, 13, 12, 30);
+  drawAppIcon(head, headerIcon, 7, 5, 40);
   head.fillStyle = '#397bff';
   head.fillRect(13, 48, 124, 1);
   writeBmp(header, 'installerHeader.bmp');
