@@ -258,7 +258,7 @@ function extractCronJobId(sessionKey: string): string {
   return idx >= 0 ? sessionKey.slice(idx + 'cron:'.length) : sessionKey;
 }
 
-function getChannelTitlePrefix(platform: string): string {
+function getChannelTitleLabel(platform: string): string {
   const i18nMap: Record<string, string> = {
     feishu: t('channelPrefixFeishu'),
     dingtalk: t('channelPrefixDingtalk'),
@@ -271,8 +271,16 @@ function getChannelTitlePrefix(platform: string): string {
     discord: 'Discord',
     qq: 'QQ',
   };
-  const label = i18nMap[platform] ?? staticMap[platform] ?? platform;
-  return `[${label}]`;
+  return i18nMap[platform] ?? staticMap[platform] ?? platform;
+}
+
+function buildChannelSessionTitle(platform: string, conversationId: string): string {
+  const displayId = conversationId.includes('@') ? conversationId.split('@')[0] : conversationId;
+  const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
+  return t('channelConversationTitle', {
+    channel: getChannelTitleLabel(platform),
+    id: shortId,
+  });
 }
 
 export interface ChannelSessionSyncDeps {
@@ -438,12 +446,7 @@ export class OpenClawChannelSessionSync {
           // Delete the old Cowork session so it doesn't linger in the
           // previous agent's sidebar list after the binding change.
           this.coworkStore.deleteSession(existingMapping.coworkSessionId);
-          const titlePrefix = getChannelTitlePrefix(parsed.platform);
-          const displayId = parsed.conversationId.includes('@')
-            ? parsed.conversationId.split('@')[0]
-            : parsed.conversationId;
-          const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
-          const title = `${titlePrefix} ${shortId}`;
+          const title = buildChannelSessionTitle(parsed.platform, parsed.conversationId);
           const cwd = this.getChannelCwd(currentAgentId);
           const newSession = this.coworkStore.createSession(
             title,
@@ -499,14 +502,7 @@ export class OpenClawChannelSessionSync {
     }
 
     // 5. Create new Cowork session
-    const titlePrefix = getChannelTitlePrefix(parsed.platform);
-    // For conversationIds that look like email addresses,
-    // use the local part before '@' as the display name.
-    const displayId = parsed.conversationId.includes('@')
-      ? parsed.conversationId.split('@')[0]
-      : parsed.conversationId;
-    const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
-    const title = `${titlePrefix} ${shortId}`;
+    const title = buildChannelSessionTitle(parsed.platform, parsed.conversationId);
     // Look up the per-platform agent binding so the session is filed under the correct agent.
     // (imSettings, accountId already resolved above; re-resolve agentId for the new-session path)
     const agentId = resolveAgentBinding(
