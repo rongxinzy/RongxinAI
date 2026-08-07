@@ -14,8 +14,8 @@ import {
   type ProductionExpectedVerifier,
   type ProductionInspectionEvidence,
   type ProductionLoopState,
+  type ProductionObservedToolResult,
   type ProductionPlanItem,
-  type ProductionVerifierEvidence,
 } from '../../shared/productionLoop';
 import {
   WorkbenchVerificationOutcome,
@@ -165,6 +165,7 @@ export class ProductionLoopService {
       acceptanceCriteria: previous?.acceptanceCriteria ?? [],
       expectedArtifacts: previous?.expectedArtifacts ?? [],
       expectedVerifiers: previous?.expectedVerifiers ?? [],
+      observedToolResults: [],
       inspections: [],
       planItems:
         previous?.planItems.map(item => ({ ...item, status: ProductionPlanItemStatus.Pending })) ??
@@ -313,7 +314,7 @@ export class ProductionLoopService {
     runId: string,
     input: {
       artifacts: ProductionArtifactEvidence[];
-      verifiers: ProductionVerifierEvidence[];
+      verifiers: Array<{ name: string; toolCallId: string }>;
     },
   ): ProductionLoopState {
     return this.mutate(runId, state => {
@@ -325,10 +326,28 @@ export class ProductionLoopService {
         const reference = artifact.reference.trim();
         return kind && reference ? [{ kind, reference }] : [];
       });
+      const observedToolResults = state.observedToolResults ?? [];
       const verifiers = input.verifiers.flatMap(verifier => {
         const name = verifier.name.trim();
-        const evidence = verifier.evidence.trim();
-        return name && evidence ? [{ name, passed: verifier.passed === true, evidence }] : [];
+        const toolCallId = verifier.toolCallId.trim();
+        const observed = observedToolResults.find(result => result.toolCallId === toolCallId);
+        if (
+          !name ||
+          !observed ||
+          observed.isError ||
+          observed.progressVersion !== state.progressVersion
+        ) {
+          return [];
+        }
+        return [
+          {
+            name,
+            toolCallId,
+            toolName: observed.toolName,
+            evidence:
+              observed.output.trim() || `Tool ${observed.toolName} completed successfully.`,
+          },
+        ];
       });
       const missingArtifact = state.expectedArtifacts.find(
         expected =>
@@ -340,7 +359,7 @@ export class ProductionLoopService {
       const failedVerifier = state.expectedVerifiers.find(
         expected =>
           expected.deterministic &&
-          !verifiers.some(verifier => verifier.name === expected.name && verifier.passed),
+          !verifiers.some(verifier => verifier.name === expected.name),
       );
       if (failedVerifier) {
         throw new Error(
@@ -375,6 +394,31 @@ export class ProductionLoopService {
         activation: HarnessActivationType.CriticRequested,
         mechanism: 'production_loop_reviewer',
       });
+    });
+  }
+
+  recordToolResult(
+    runId: string,
+    input: Omit<ProductionObservedToolResult, 'createdAt' | 'progressVersion'>,
+  ): ProductionLoopState {
+    return this.mutate(runId, state => {
+      const toolCallId = input.toolCallId.trim();
+      const toolName = input.toolName.trim();
+      if (!toolCallId || !toolName) return;
+      state.observedToolResults ??= [];
+      const result: ProductionObservedToolResult = {
+        toolCallId,
+        toolName,
+        output: input.output.slice(0, MAX_CRITIC_OUTPUT_LENGTH),
+        isError: input.isError,
+        progressVersion: state.progressVersion,
+        createdAt: Date.now(),
+      };
+      const existingIndex = state.observedToolResults.findIndex(
+        existing => existing.toolCallId === toolCallId,
+      );
+      if (existingIndex >= 0) state.observedToolResults[existingIndex] = result;
+      else state.observedToolResults.push(result);
     });
   }
 
