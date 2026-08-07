@@ -88,6 +88,7 @@ import {
 } from './piShortcutWorkflow';
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
 import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
+import { extractPiSubagentExecutionMetadata } from './piSubagentExecution';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
@@ -1811,10 +1812,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           );
         }
         if (event.toolName === PiSubagentToolName) {
+          const execution = extractPiSubagentExecutionMetadata(event.result);
           active.productionLoop?.recordSubagentResult(
             event.toolCallId,
             resultText,
             Boolean(event.isError),
+            execution,
           );
           active.researchRun?.recordSubagentResult(
             event.toolCallId,

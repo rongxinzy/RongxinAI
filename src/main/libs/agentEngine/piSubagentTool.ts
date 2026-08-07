@@ -21,8 +21,15 @@ import * as fs from 'fs';
 import path from 'path';
 
 import { CoreSkillId } from '../../../shared/skills/constants';
-import { PiSubagentProfileId } from './piSubagentConstants';
-import { runPiSubagent, type PiSubagentSession } from './piSubagentExecution';
+import {
+  PiSubagentProfileId,
+  PiSubagentTerminationReason,
+} from './piSubagentConstants';
+import {
+  runPiSubagent,
+  type PiSubagentExecutionMetadata,
+  type PiSubagentSession,
+} from './piSubagentExecution';
 
 // ── Constants ──
 
@@ -30,6 +37,15 @@ export const PiSubagentToolName = 'subagent';
 
 /** Per-subagent run timeout. */
 export const SUBAGENT_TIMEOUT_MS = 600_000;
+
+export const PRODUCTION_REVIEWER_SOFT_TIMEOUT_MS = 120_000;
+export const PRODUCTION_REVIEWER_HARD_TIMEOUT_MS = 180_000;
+export const PRODUCTION_REVIEWER_MAX_ASSISTANT_TURNS = 6;
+export const PRODUCTION_REVIEWER_MAX_TOOL_CALLS = 6;
+export const PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS = 4_000;
+
+const PRODUCTION_REVIEWER_STEER_PROMPT =
+  'Stop investigating now. Return the best supported verdict immediately as exactly one JSON object matching the required production critic contract.';
 
 /** Maximum number of subagent sessions running at once in parallel mode. */
 export const SUBAGENT_PARALLEL_LIMIT = 4;
@@ -102,6 +118,7 @@ interface SubagentTaskSpec {
 interface SubagentRunResult {
   ok: boolean;
   output: string;
+  execution?: PiSubagentExecutionMetadata;
 }
 
 interface SubagentToolResult {
@@ -241,26 +258,35 @@ function resolveAgentProfiles(deps: PiSubagentToolDeps): SubagentProfile[] {
 
 // ── Sub-session execution ──
 
-/** runPiSubagent reports run failures inline; classify them for the ok flag. */
-const FAILURE_OUTPUT_PREFIXES = ['Error:', '(subagent timed out'] as const;
-
-function isFailureOutput(output: string): boolean {
-  return FAILURE_OUTPUT_PREFIXES.some(prefix => output.startsWith(prefix));
-}
-
 /** Run a single subagent profile on a task in an isolated Pi sub-session. */
 async function runSubagent(
   deps: PiSubagentToolDeps,
   profile: SubagentProfile,
   task: string,
 ): Promise<SubagentRunResult> {
+  const startedAt = Date.now();
   let subSession: PiSubagentSubSession | null = null;
   try {
     const pi = await getPiSubagentModules();
     const cwd = deps.workspaceRoot || process.cwd();
+    const isProductionReviewer = profile.id === PiSubagentProfileId.ProductionReviewer;
+    const maxOutputTokens = isProductionReviewer
+      ? Math.min(deps.resolvedModel.maxOutputTokens, PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS)
+      : deps.resolvedModel.maxOutputTokens;
+    const model = isProductionReviewer
+      ? {
+          ...deps.resolvedModel.model,
+          maxTokens: Math.min(
+            typeof deps.resolvedModel.model.maxTokens === 'number'
+              ? deps.resolvedModel.model.maxTokens
+              : maxOutputTokens,
+            maxOutputTokens,
+          ),
+        }
+      : deps.resolvedModel.model;
     const subOptions: Record<string, unknown> = {
       cwd,
-      model: deps.resolvedModel.model,
+      model,
       // No customTools: subagents must not recursively spawn sub-subagents,
       // and AskUserQuestion is reserved for the parent session.
     };
@@ -280,10 +306,10 @@ async function runSubagent(
         'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
       : profile.systemPrompt;
     const resourceLoader = researcherUsesWebSearch
-      ? await deps.createPiResourceLoader(cwd, systemPrompt, deps.resolvedModel.maxOutputTokens, [
+      ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, [
           CoreSkillId.WebSearch,
         ])
-      : await deps.createPiResourceLoader(cwd, systemPrompt, deps.resolvedModel.maxOutputTokens);
+      : await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
     subOptions.resourceLoader = resourceLoader;
     if (
       resourceLoader &&
@@ -299,15 +325,37 @@ async function runSubagent(
 
     const { session } = await pi.createAgentSession(subOptions);
     subSession = session;
-    const output = await runPiSubagent(session, task, {
-      maxOutputTokens: deps.resolvedModel.maxOutputTokens,
-      timeoutMs: SUBAGENT_TIMEOUT_MS,
+    const result = await runPiSubagent(session, task, {
+      maxOutputTokens,
+      hardTimeoutMs: isProductionReviewer
+        ? PRODUCTION_REVIEWER_HARD_TIMEOUT_MS
+        : SUBAGENT_TIMEOUT_MS,
+      ...(isProductionReviewer
+        ? {
+            softTimeoutMs: PRODUCTION_REVIEWER_SOFT_TIMEOUT_MS,
+            maxAssistantTurns: PRODUCTION_REVIEWER_MAX_ASSISTANT_TURNS,
+            maxToolCalls: PRODUCTION_REVIEWER_MAX_TOOL_CALLS,
+            steerPrompt: PRODUCTION_REVIEWER_STEER_PROMPT,
+          }
+        : {}),
     });
-    return { ok: !isFailureOutput(output), output };
+    const { output, ...execution } = result;
+    return {
+      ok: execution.terminationReason === PiSubagentTerminationReason.Settled,
+      output,
+      execution,
+    };
   } catch (err) {
     return {
       ok: false,
       output: `Subagent "${profile.id}" failed: ${err instanceof Error ? err.message : String(err)}`,
+      execution: {
+        terminationReason: PiSubagentTerminationReason.Error,
+        durationMs: Math.max(0, Date.now() - startedAt),
+        assistantTurns: 0,
+        toolCalls: 0,
+        steerRequested: false,
+      },
     };
   } finally {
     if (subSession) {
@@ -421,7 +469,7 @@ export function buildPiSubagentTool(deps: PiSubagentToolDeps): Record<string, un
       return textResult(unknownAgentMessage(spec.agent));
     }
     const result = await runSubagent(deps, profile, spec.task);
-    return textResult(result.output, { agentId: spec.agent });
+    return textResult(result.output, { agentId: spec.agent, execution: result.execution });
   };
 
   const executeParallel = async (specs: SubagentTaskSpec[]): Promise<SubagentToolResult> => {

@@ -221,6 +221,15 @@ describe('createZhiyuanEvaluationPolicy', () => {
       toolCallId: 'review-1',
       result: {
         content: [{ type: 'text', text: '{"verdict":"pass","findings":[]}' }],
+        details: {
+          execution: {
+            terminationReason: 'settled',
+            durationMs: 1_500,
+            assistantTurns: 2,
+            toolCalls: 1,
+            steerRequested: false,
+          },
+        },
       },
       isError: false,
     });
@@ -236,7 +245,14 @@ describe('createZhiyuanEvaluationPolicy', () => {
       expect.arrayContaining([
         expect.objectContaining({
           activation: ZhiyuanEvaluationActivation.CriticCompleted,
-          evidence: expect.objectContaining({ mode: 'isolated_reviewer_subsession' }),
+          evidence: expect.objectContaining({
+            mode: 'isolated_reviewer_subsession',
+            terminationReason: 'settled',
+            durationMs: 1_500,
+            assistantTurns: 2,
+            toolCalls: 1,
+            steerRequested: false,
+          }),
         }),
       ]),
     );

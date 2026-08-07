@@ -8,7 +8,10 @@ import {
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
 import { HarnessMeasurementService } from '../harness/measurementService';
-import { PiSubagentProfileId } from '../libs/agentEngine/piSubagentConstants';
+import {
+  PiSubagentProfileId,
+  PiSubagentTerminationReason,
+} from '../libs/agentEngine/piSubagentConstants';
 import { WorkbenchTaskRepository } from '../workbenchTask/repository';
 import { initializeWorkbenchTaskSchema } from '../workbenchTask/schema';
 import { ProductionLoopController } from './controller';
@@ -118,10 +121,26 @@ test('accepts only the requested read-only reviewer result before delivery', () 
     'review',
     JSON.stringify({ verdict: 'pass', findings: [] }),
     false,
+    {
+      terminationReason: PiSubagentTerminationReason.Settled,
+      durationMs: 1_200,
+      assistantTurns: 2,
+      toolCalls: 1,
+      steerRequested: false,
+    },
   );
   expect(controller.getState()).toMatchObject({
     phase: ProductionLoopPhase.Deliver,
     status: ProductionLoopStatus.ReadyToDeliver,
+    critic: {
+      execution: {
+        durationMs: 1_200,
+        assistantTurns: 2,
+        toolCalls: 1,
+        steerRequested: false,
+        timedOut: false,
+      },
+    },
   });
 
   expect(controller.requestCompletion('ready')).toBe('downstream requested');
@@ -140,6 +159,72 @@ test('invalid critic output enters revision instead of silently passing', () => 
   controller.recordSubagentResult('review', 'looks fine', false);
   expect(controller.getState().phase).toBe(ProductionLoopPhase.Revise);
   expect(controller.getState().critic.findings[0].summary).toContain('invalid structured response');
+});
+
+test('uses structured execution errors instead of parsing result text', () => {
+  const { controller } = createController();
+  reachCritique(controller);
+  controller.recordSubagentStart('review-error', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'review',
+  });
+  controller.recordSubagentResult('review-error', 'provider unavailable', false, {
+    terminationReason: PiSubagentTerminationReason.Error,
+    durationMs: 900,
+    assistantTurns: 0,
+    toolCalls: 0,
+    steerRequested: false,
+  });
+
+  expect(controller.getState().phase).toBe(ProductionLoopPhase.Revise);
+  expect(controller.getState().critic.findings[0].summary).toContain(
+    'did not complete successfully',
+  );
+});
+
+test('keeps infrastructure timeouts in critique so the reviewer can retry', () => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const { controller } = createController();
+  reachCritique(controller);
+  controller.recordSubagentStart('review-timeout', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'review',
+  });
+  controller.recordSubagentResult('review-timeout', '(subagent hard timeout after 180s)', false, {
+    terminationReason: PiSubagentTerminationReason.HardTimeout,
+    durationMs: 180_000,
+    assistantTurns: 6,
+    toolCalls: 6,
+    steerRequested: true,
+  });
+
+  expect(controller.getState()).toMatchObject({
+    phase: ProductionLoopPhase.Critique,
+    status: ProductionLoopStatus.WaitingCritic,
+    critic: {
+      toolCallId: null,
+      passed: false,
+      findings: [],
+      execution: {
+        durationMs: 180_000,
+        assistantTurns: 6,
+        toolCalls: 6,
+        steerRequested: true,
+        timedOut: true,
+      },
+    },
+  });
+
+  controller.recordSubagentStart('review-retry', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'retry review',
+  });
+  controller.recordSubagentResult(
+    'review-retry',
+    JSON.stringify({ verdict: 'pass', findings: [] }),
+    false,
+  );
+  expect(controller.getState().phase).toBe(ProductionLoopPhase.Deliver);
 });
 
 test('does not bind grouped subagent calls as the independent reviewer', () => {

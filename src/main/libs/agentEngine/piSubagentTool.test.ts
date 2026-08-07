@@ -22,6 +22,7 @@ vi.mock('@earendil-works/pi-coding-agent', () => ({
 
 import {
   buildPiSubagentTool,
+  PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
   SUBAGENT_PARALLEL_LIMIT,
   type PiSubagentToolDeps,
 } from './piSubagentTool';
@@ -283,7 +284,7 @@ describe('buildPiSubagentTool', () => {
         expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
           '/tmp/workspace',
           expect.stringContaining('Respond with exactly one JSON object'),
-          4096,
+          PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
         );
       } finally {
         fs.rmSync(agentsDir, { recursive: true, force: true });
@@ -295,29 +296,52 @@ describe('buildPiSubagentTool', () => {
 
   describe('single mode', () => {
     it('runs one sub-session and returns its output', async () => {
-      const { tool } = buildTool();
+      const { tool, deps } = buildTool();
       const result = await tool.execute('call-1', { agent: 'scout', task: 'map the code' });
       expect(result.content[0].text).toBe('subagent output');
-      expect(result.details).toEqual({ agentId: 'scout' });
+      expect(result.details).toMatchObject({
+        agentId: 'scout',
+        execution: {
+          terminationReason: 'settled',
+          assistantTurns: 1,
+          toolCalls: 0,
+          steerRequested: false,
+        },
+      });
       expect(hoisted.mockCreateAgentSession).toHaveBeenCalledTimes(1);
       const options = hoisted.mockCreateAgentSession.mock.calls[0]?.[0] as Record<string, unknown>;
       expect(options).not.toHaveProperty('customTools');
       expect(options.tools).toEqual(['read', 'grep', 'find', 'ls']);
+      expect(options.model).toBe(deps.resolvedModel.model);
+      expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+        '/tmp/workspace',
+        expect.any(String),
+        4096,
+      );
     });
 
     it('enforces the production reviewer contract and read-only tool allowlist', async () => {
       const { tool, deps } = buildTool();
-      await tool.execute('call-1', {
+      const result = await tool.execute('call-1', {
         agent: PiSubagentProfileId.ProductionReviewer,
         task: 'review the implementation',
       });
       const options = hoisted.mockCreateAgentSession.mock.calls[0]?.[0] as Record<string, unknown>;
       expect(options.tools).toEqual(['read', 'grep', 'find', 'ls']);
+      expect(options.model).toMatchObject({ maxTokens: PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS });
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
         expect.stringContaining('Respond with exactly one JSON object'),
-        4096,
+        PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
       );
+      expect(result.details).toMatchObject({
+        execution: {
+          terminationReason: 'settled',
+          assistantTurns: 1,
+          toolCalls: 0,
+          steerRequested: false,
+        },
+      });
     });
 
     it('surfaces a sub-session error as the tool output', async () => {

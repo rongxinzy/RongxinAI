@@ -6,7 +6,11 @@ import {
 } from '../../shared/productionLoop';
 import type { WorkbenchContractKind, WorkbenchJsonObject } from '../../shared/workbenchTask';
 import type { PiAgentLoopEndSignal } from '../libs/agentEngine/piAgentLoop';
-import { PiSubagentProfileId } from '../libs/agentEngine/piSubagentConstants';
+import {
+  PiSubagentProfileId,
+  PiSubagentTerminationReason,
+} from '../libs/agentEngine/piSubagentConstants';
+import type { PiSubagentExecutionMetadata } from '../libs/agentEngine/piSubagentExecution';
 import type { ProductionLoopService } from './service';
 
 interface DownstreamCompletionWorkflow {
@@ -134,10 +138,34 @@ export class ProductionLoopController {
     this.update(this.service.recordCriticStart(this.state.runId, toolCallId));
   }
 
-  recordSubagentResult(toolCallId: string, output: string, isError: boolean): void {
+  recordSubagentResult(
+    toolCallId: string,
+    output: string,
+    isError: boolean,
+    execution?: PiSubagentExecutionMetadata,
+  ): void {
     this.refresh();
     if (this.state.critic.toolCallId !== toolCallId) return;
-    this.update(this.service.recordCriticResult(this.state.runId, toolCallId, output, isError));
+    const criticExecution = execution
+      ? {
+          durationMs: execution.durationMs,
+          assistantTurns: execution.assistantTurns,
+          toolCalls: execution.toolCalls,
+          steerRequested: execution.steerRequested,
+          timedOut: execution.terminationReason === PiSubagentTerminationReason.HardTimeout,
+        }
+      : undefined;
+    const criticFailed =
+      isError || execution?.terminationReason === PiSubagentTerminationReason.Error;
+    this.update(
+      this.service.recordCriticResult(
+        this.state.runId,
+        toolCallId,
+        output,
+        criticFailed,
+        criticExecution,
+      ),
+    );
   }
 
   recordRevision(summary: string, evidence: WorkbenchJsonObject): ProductionLoopState {
