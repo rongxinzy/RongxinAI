@@ -36,6 +36,13 @@ export const ProductionCriticSeverity = {
 export type ProductionCriticSeverity =
   (typeof ProductionCriticSeverity)[keyof typeof ProductionCriticSeverity];
 
+export const ProductionCriticVerdict = {
+  Pass: 'pass',
+  Revise: 'revise',
+} as const;
+export type ProductionCriticVerdict =
+  (typeof ProductionCriticVerdict)[keyof typeof ProductionCriticVerdict];
+
 export const ProductionLoopRecoveryReason = {
   MissingSignal: 'missing_signal',
   PrematureFinalize: 'premature_finalize',

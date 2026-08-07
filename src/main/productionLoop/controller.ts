@@ -17,20 +17,10 @@ interface DownstreamCompletionWorkflow {
   ): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
 }
 
-const hasReviewer = (args: unknown): boolean => {
+const isStandaloneReviewer = (args: unknown): boolean => {
   if (!args || typeof args !== 'object') return false;
   const raw = args as Record<string, unknown>;
-  if (raw.agent === 'reviewer') return true;
-  for (const key of ['parallel', 'chain']) {
-    const values = raw[key];
-    if (
-      Array.isArray(values) &&
-      values.some(value => value && typeof value === 'object' && value.agent === 'reviewer')
-    ) {
-      return true;
-    }
-  }
-  return false;
+  return raw.agent === 'reviewer' && raw.parallel === undefined && raw.chain === undefined;
 };
 
 export class ProductionLoopController {
@@ -129,7 +119,7 @@ export class ProductionLoopController {
   }
 
   recordSubagentStart(toolCallId: string, args: unknown): void {
-    if (!hasReviewer(args) || this.state.phase !== ProductionLoopPhase.Critique) return;
+    if (!isStandaloneReviewer(args) || this.state.phase !== ProductionLoopPhase.Critique) return;
     this.update(this.service.recordCriticStart(this.state.runId, toolCallId));
   }
 

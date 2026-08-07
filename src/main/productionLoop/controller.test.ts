@@ -129,6 +129,21 @@ test('invalid critic output enters revision instead of silently passing', () => 
   expect(controller.getState().critic.findings[0].summary).toContain('invalid structured response');
 });
 
+test('does not bind grouped subagent calls as the independent reviewer', () => {
+  const { controller } = createController();
+  reachCritique(controller);
+  controller.recordSubagentStart('parallel-review', {
+    parallel: [
+      { agent: 'reviewer', task: 'review' },
+      { agent: 'scout', task: 'inspect files' },
+    ],
+  });
+  expect(controller.getState().critic.toolCallId).toBeNull();
+
+  controller.recordSubagentStart('standalone-review', { agent: 'reviewer', task: 'review' });
+  expect(controller.getState().critic.toolCallId).toBe('standalone-review');
+});
+
 test('skip_workflow lets the agent finish without the completion gate', () => {
   const { controller, downstream } = createController();
   controller.skipWorkflow('Pure information request with no work to plan');
