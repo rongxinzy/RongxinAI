@@ -285,6 +285,8 @@ describe('buildPiSubagentTool', () => {
           '/tmp/workspace',
           expect.stringContaining('Respond with exactly one JSON object'),
           PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
+          undefined,
+          [expect.any(Function)],
         );
       } finally {
         fs.rmSync(agentsDir, { recursive: true, force: true });
@@ -331,8 +333,10 @@ describe('buildPiSubagentTool', () => {
       expect(options.model).toMatchObject({ maxTokens: PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS });
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
-        expect.stringContaining('Respond with exactly one JSON object'),
+        expect.stringContaining('Do not repeat an exact range'),
         PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
+        undefined,
+        [expect.any(Function)],
       );
       expect(result.details).toMatchObject({
         execution: {
@@ -342,6 +346,21 @@ describe('buildPiSubagentTool', () => {
           steerRequested: false,
         },
       });
+    });
+
+    it('does not apply the production read budget to the ordinary reviewer', async () => {
+      const { tool, deps } = buildTool();
+
+      await tool.execute('call-1', {
+        agent: PiSubagentProfileId.Reviewer,
+        task: 'review the implementation',
+      });
+
+      expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+        '/tmp/workspace',
+        expect.stringContaining('code review subagent'),
+        4096,
+      );
     });
 
     it('surfaces a sub-session error as the tool output', async () => {

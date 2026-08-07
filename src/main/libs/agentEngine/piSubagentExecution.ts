@@ -44,6 +44,9 @@ export type RunPiSubagentOptions = {
   maxAssistantTurns?: number;
   maxToolCalls?: number;
   steerPrompt?: string;
+  steerSignal?: {
+    subscribeLimitExceeded(listener: () => void): () => void;
+  };
 };
 
 export interface PiSubagentExecutionMetadata {
@@ -81,6 +84,7 @@ export const runPiSubagent = (
     let toolCalls = 0;
     let steerRequested = false;
     let unsubscribe = (): void => {};
+    let unsubscribeSteerSignal = (): void => {};
     let softTimeout: ReturnType<typeof setTimeout> | undefined;
 
     const finish = (output: string, terminationReason: PiSubagentTerminationReasonValue): void => {
@@ -89,6 +93,7 @@ export const runPiSubagent = (
       clearTimeout(hardTimeout);
       if (softTimeout) clearTimeout(softTimeout);
       unsubscribe();
+      unsubscribeSteerSignal();
       resolve({
         output,
         terminationReason,
@@ -105,6 +110,7 @@ export const runPiSubagent = (
       clearTimeout(hardTimeout);
       if (softTimeout) clearTimeout(softTimeout);
       unsubscribe();
+      unsubscribeSteerSignal();
       reject(error);
     };
 
@@ -174,7 +180,13 @@ export const runPiSubagent = (
         }
       });
       unsubscribe = subscribedUnsubscribe;
-      if (settled) subscribedUnsubscribe();
+      if (settled) {
+        subscribedUnsubscribe();
+        return;
+      }
+      if (options.steerSignal) {
+        unsubscribeSteerSignal = options.steerSignal.subscribeLimitExceeded(requestSteer);
+      }
     } catch (error) {
       fail(error);
       return;

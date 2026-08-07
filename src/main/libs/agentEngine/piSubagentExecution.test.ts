@@ -245,6 +245,35 @@ test('requests at most one bounded steer when review budgets are exhausted', asy
   });
 });
 
+test('steers once without terminating when an external review budget is exhausted', async () => {
+  const { session, emit, resolvePrompt } = createSession();
+  let signalLimitExceeded = (): void => {};
+  const unsubscribeSignal = vi.fn();
+  const output = runPiSubagent(session, 'Review it', {
+    maxOutputTokens: 4096,
+    hardTimeoutMs: 10_000,
+    steerPrompt: 'Return the verdict now.',
+    steerSignal: {
+      subscribeLimitExceeded: listener => {
+        signalLimitExceeded = listener;
+        return unsubscribeSignal;
+      },
+    },
+  });
+
+  signalLimitExceeded();
+  signalLimitExceeded();
+  expect(session.steer).toHaveBeenCalledOnce();
+
+  emit({ type: PiSubagentEventType.AgentSettled });
+  resolvePrompt();
+  await expect(output).resolves.toMatchObject({
+    terminationReason: 'settled',
+    steerRequested: true,
+  });
+  expect(unsubscribeSignal).toHaveBeenCalledOnce();
+});
+
 test('steers at the soft timeout and returns structured hard-timeout metadata', async () => {
   vi.useFakeTimers();
   try {
