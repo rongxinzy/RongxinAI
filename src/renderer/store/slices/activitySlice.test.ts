@@ -58,6 +58,50 @@ test('caps each trigger at 50 rendered runs', () => {
   );
 });
 
+test('keeps at most one started and one terminal event for each retained run', () => {
+  let state = activityReducer(undefined, { type: 'init' });
+  state = activityReducer(state, recordChannelRun(summary()));
+  for (let timestamp = 2; timestamp <= 100; timestamp += 1) {
+    state = activityReducer(
+      state,
+      recordChannelRun(summary({ status: ChannelRunStatus.Completed, timestamp })),
+    );
+  }
+
+  expect(state.channelRuns).toHaveLength(2);
+  expect(state.channelRuns[0]).toMatchObject({
+    status: ChannelRunStatus.Completed,
+    timestamp: 100,
+  });
+  expect(state.channelRuns[1]?.status).toBe(ChannelRunStatus.Started);
+});
+
+test('keeps a strict event bound when retained runs have full lifecycles', () => {
+  let state = activityReducer(undefined, { type: 'init' });
+  for (let i = 0; i < 75; i += 1) {
+    for (const trigger of [ChannelRunTrigger.Channel, ChannelRunTrigger.Cron]) {
+      const runId = `${trigger}-${i}`;
+      state = activityReducer(
+        state,
+        recordChannelRun(summary({ runId, trigger, timestamp: i * 2 })),
+      );
+      state = activityReducer(
+        state,
+        recordChannelRun(
+          summary({
+            runId,
+            trigger,
+            status: ChannelRunStatus.Completed,
+            timestamp: i * 2 + 1,
+          }),
+        ),
+      );
+    }
+  }
+
+  expect(state.channelRuns).toHaveLength(200);
+});
+
 test('clearChannelRuns empties the projection', () => {
   const withRuns = activityReducer(undefined, recordChannelRun(summary()));
   const cleared = activityReducer(withRuns, clearChannelRuns());

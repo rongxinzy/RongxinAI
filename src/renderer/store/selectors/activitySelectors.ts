@@ -68,26 +68,6 @@ export const foldChannelRunEvents = (events: ChannelRunSummary[]): ActivityRun[]
       continue;
     }
     let run = runById.get(event.runId);
-    if (!run && event.status !== ChannelRunStatus.Started) {
-      // Some channel adapters emit the start and terminal lifecycle events
-      // from different boundaries. When there is exactly one matching active
-      // channel run, merge the terminal event even if its runId differs.
-      let candidates = runs.filter(
-        candidate =>
-          candidate.trigger === ChannelRunTrigger.Channel &&
-          candidate.status === ChannelRunStatus.Started &&
-          event.trigger === ChannelRunTrigger.Channel &&
-          candidate.sessionId === event.sessionId &&
-          candidate.platform === event.platform &&
-          (!candidate.conversationId ||
-            !event.conversationId ||
-            candidate.conversationId === event.conversationId),
-      );
-      if (candidates.length === 1) {
-        run = candidates[0];
-        runById.set(event.runId, run);
-      }
-    }
     if (!run) {
       run = toRun(event);
       runs.push(run);

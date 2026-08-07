@@ -148,7 +148,7 @@ describe('foldChannelRunEvents', () => {
     expect(runs.find(run => run.id === 'r2')?.status).toBe(ChannelRunStatus.Completed);
   });
 
-  it('merges a channel terminal event when an adapter changed the run id', () => {
+  it('keeps an unmatched terminal event separate from an active run', () => {
     const started = makeEvent({ runId: 'gateway-run', sessionId: 's1' });
     const completed = makeEvent({
       runId: 'adapter-run',
@@ -159,26 +159,10 @@ describe('foldChannelRunEvents', () => {
 
     const runs = foldChannelRunEvents([completed, started]);
 
-    expect(runs).toHaveLength(1);
-    expect(runs[0]).toMatchObject({ id: 'gateway-run', status: ChannelRunStatus.Completed });
+    expect(runs).toHaveLength(2);
+    expect(runs.find(run => run.id === 'gateway-run')?.status).toBe(ChannelRunStatus.Started);
+    expect(runs.find(run => run.id === 'adapter-run')?.status).toBe(ChannelRunStatus.Completed);
   });
-
-  it('merges channel completion when the adapter omits the conversation id', () => {
-    const started = makeEvent({ runId: 'gateway-run', sessionId: 's1', conversationId: 'dm:1' });
-    const completed = makeEvent({
-      runId: 'adapter-run',
-      sessionId: 's1',
-      conversationId: '',
-      status: ChannelRunStatus.Completed,
-      timestamp: started.timestamp + 100,
-    });
-
-    const runs = foldChannelRunEvents([completed, started]);
-
-    expect(runs).toHaveLength(1);
-    expect(runs[0]?.status).toBe(ChannelRunStatus.Completed);
-  });
-
 });
 
 describe('selectActivityRuns', () => {

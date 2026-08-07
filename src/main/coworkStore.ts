@@ -21,7 +21,11 @@ import type {
 } from '../shared/cowork/sessionExperts';
 import type { Workspace } from '../shared/workspace';
 import { CoworkArtifactIndex } from './coworkArtifactIndex';
-import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
+import {
+  ensureDefaultConversationWorkspacePath,
+  getDefaultConversationWorkspacePath,
+  isDefaultConversationWorkspacePath,
+} from './defaultConversationWorkspace';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 // Default working directory for new users
@@ -768,7 +772,12 @@ export class CoworkStore {
   ): CoworkSession {
     const sessionId = id || uuidv4();
     const now = Date.now();
-    const workspace = workspaceId ? this.getWorkspace(workspaceId) : this.ensureWorkspace(cwd);
+    const resolvedCwd = isDefaultConversationWorkspacePath(cwd)
+      ? ensureDefaultConversationWorkspacePath()
+      : cwd;
+    const workspace = workspaceId
+      ? this.getWorkspace(workspaceId)
+      : this.ensureWorkspace(resolvedCwd);
     if (!workspace) throw new Error('Workspace not found');
 
     const insertSession = this.db.prepare(`
@@ -785,7 +794,7 @@ export class CoworkStore {
         sessionId,
         title,
         mode,
-        cwd,
+        resolvedCwd,
         systemPrompt,
         modelOverride,
         executionMode,

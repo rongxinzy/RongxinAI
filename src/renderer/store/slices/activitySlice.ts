@@ -1,6 +1,10 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { ChannelRunSummary } from '../../../shared/channelRun/constants';
+import {
+  ChannelRunStatus,
+  type ChannelRunSummary,
+  type ChannelRunTrigger,
+} from '../../../shared/channelRun/constants';
 
 /** Bound on how many rendered runs stay in memory for each trigger. */
 const RUN_HISTORY_LIMIT_PER_TRIGGER = 50;
@@ -26,19 +30,29 @@ const activitySlice = createSlice({
       state.channelRuns.unshift(action.payload);
 
       const retainedRunIds = new Set<string>();
-      const counts = new Map<string, number>();
+      const retainedStartedRunIds = new Set<string>();
+      const retainedTerminalRunIds = new Set<string>();
+      const counts = new Map<ChannelRunTrigger, number>();
+      const retainedEvents: ChannelRunSummary[] = [];
       for (const event of state.channelRuns) {
         const runKey = `${event.trigger}:${event.runId}`;
-        if (retainedRunIds.has(runKey)) continue;
-        const count = counts.get(event.trigger) ?? 0;
-        if (count < RUN_HISTORY_LIMIT_PER_TRIGGER) {
+        if (!retainedRunIds.has(runKey)) {
+          const count = counts.get(event.trigger) ?? 0;
+          if (count >= RUN_HISTORY_LIMIT_PER_TRIGGER) continue;
           retainedRunIds.add(runKey);
           counts.set(event.trigger, count + 1);
         }
+
+        if (event.status === ChannelRunStatus.Started) {
+          if (retainedStartedRunIds.has(runKey)) continue;
+          retainedStartedRunIds.add(runKey);
+        } else {
+          if (retainedTerminalRunIds.has(runKey)) continue;
+          retainedTerminalRunIds.add(runKey);
+        }
+        retainedEvents.push(event);
       }
-      state.channelRuns = state.channelRuns.filter(event =>
-        retainedRunIds.has(`${event.trigger}:${event.runId}`),
-      );
+      state.channelRuns = retainedEvents;
     },
     clearChannelRuns(state) {
       state.channelRuns = [];

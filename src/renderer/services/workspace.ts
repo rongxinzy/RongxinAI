@@ -99,10 +99,13 @@ class WorkspaceService {
       store.dispatch(setWorkspaces(workspaces));
 
       const savedId = await localStore.getItem<string>(CURRENT_WORKSPACE_KEY);
-      const currentId = workspaces.some(workspace => workspace.id === savedId && !workspace.isHidden)
+      const currentId = workspaces.some(
+        workspace => workspace.id === savedId && !workspace.isHidden,
+      )
         ? savedId
-        : (workspaces.find(workspace => !workspace.isHidden && isScratchWorkspacePath(workspace.path))
-            ?.id ??
+        : (workspaces.find(
+            workspace => !workspace.isHidden && isScratchWorkspacePath(workspace.path),
+          )?.id ??
           workspaces.find(workspace => !workspace.isHidden)?.id ??
           null);
       store.dispatch(setCurrentWorkspaceId(currentId));
@@ -185,16 +188,18 @@ class WorkspaceService {
     }
     workspace ??= createLegacyWorkspace(path);
     const current = store.getState().workspace.workspaces;
-    const next = [
-      ...current.filter(item => item.id !== workspace!.id),
-      {
-        ...workspace,
-        name: name?.trim() || workspace.name,
-        isHidden: options.isHidden ?? workspace.isHidden,
-      },
-    ];
+    const existingWorkspace = current.find(item => item.id === workspace!.id);
+    const ensuredWorkspace = {
+      ...workspace,
+      name: name?.trim() || workspace.name,
+      isHidden: options.isHidden ?? workspace.isHidden,
+      pinned: existingWorkspace?.pinned ?? false,
+    };
+    const next = [...current.filter(item => item.id !== workspace!.id), ensuredWorkspace].sort(
+      (a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)),
+    );
     store.dispatch(setWorkspaces(next));
-    return next[next.length - 1];
+    return ensuredWorkspace;
   }
 
   async selectWorkspace(
@@ -226,6 +231,11 @@ class WorkspaceService {
     if (!renamedWorkspace) return null;
 
     const { currentWorkspaceId, workspaces } = store.getState().workspace;
+    const originalWorkspace = workspaces.find(item => item.id === workspaceId);
+    const nextRenamedWorkspace = {
+      ...renamedWorkspace,
+      pinned: originalWorkspace?.pinned ?? false,
+    };
     const originalIndex = workspaces.findIndex(item => item.id === workspaceId);
     const workspacesWithoutRenamed = workspaces.filter(
       item => item.id !== workspaceId && item.id !== renamedWorkspace.id,
@@ -233,14 +243,21 @@ class WorkspaceService {
     const insertionIndex =
       originalIndex < 0
         ? workspacesWithoutRenamed.length
-        : workspaces
-            .slice(0, originalIndex)
-            .filter(item => item.id !== renamedWorkspace.id).length;
+        : workspaces.slice(0, originalIndex).filter(item => item.id !== renamedWorkspace.id).length;
     const nextWorkspaces = [
       ...workspacesWithoutRenamed.slice(0, insertionIndex),
-      renamedWorkspace,
+      nextRenamedWorkspace,
       ...workspacesWithoutRenamed.slice(insertionIndex),
     ];
+
+    if (workspaceId !== renamedWorkspace.id) {
+      const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+      const nextPinnedIds = pinnedIds.filter(
+        id => id !== workspaceId && id !== renamedWorkspace.id,
+      );
+      if (originalWorkspace?.pinned) nextPinnedIds.push(renamedWorkspace.id);
+      await localStore.setItem(PINNED_WORKSPACES_KEY, nextPinnedIds);
+    }
 
     if (currentWorkspaceId === workspaceId) {
       // Keep the replacement ID selected before replacing the list so no
@@ -249,7 +266,7 @@ class WorkspaceService {
       await localStore.setItem(CURRENT_WORKSPACE_KEY, renamedWorkspace.id);
     }
     store.dispatch(setWorkspaces(nextWorkspaces));
-    return renamedWorkspace;
+    return nextRenamedWorkspace;
   }
 
   /**
@@ -274,11 +291,17 @@ class WorkspaceService {
       store.dispatch(deleteSessionsAction(deletedSessionIds));
     }
 
+    const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+    if (pinnedIds.includes(workspaceId)) {
+      await localStore.setItem(
+        PINNED_WORKSPACES_KEY,
+        pinnedIds.filter(id => id !== workspaceId),
+      );
+    }
+
     const wasCurrent = store.getState().workspace.currentWorkspaceId === workspaceId;
     store.dispatch(
-      setWorkspaces(
-        store.getState().workspace.workspaces.filter(item => item.id !== workspaceId),
-      ),
+      setWorkspaces(store.getState().workspace.workspaces.filter(item => item.id !== workspaceId)),
     );
     if (wasCurrent) {
       // setWorkspaces auto-selects the next workspace when the current one

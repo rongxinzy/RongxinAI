@@ -476,6 +476,8 @@ export class CronJobService {
   private lastKnownStates: Map<string, string> = new Map();
   private lastKnownRunAtMs: Map<string, number> = new Map();
   private polling = false;
+  private pollInFlightGeneration: number | null = null;
+  private pollGeneration = 0;
   private firstPollDone = false;
   /** Synchronous jobId → name cache, populated during polling. */
   private jobNameCache: Map<string, string> = new Map();
@@ -487,7 +489,8 @@ export class CronJobService {
   /** Polling interval for cron job state and run log sync.
    *  15s is the production default.  During local development 5s gives
    *  a better chance of catching brief "running" windows for fast tasks. */
-  private static readonly POLL_INTERVAL_MS = 5_000;
+  private static readonly POLL_INTERVAL_MS =
+    process.env.NODE_ENV === 'development' ? 5_000 : 15_000;
 
   constructor(deps: CronJobServiceDeps) {
     this.getGatewayClient = deps.getGatewayClient;
@@ -609,6 +612,9 @@ export class CronJobService {
     await client.request('cron.remove', { id });
     this.lastKnownStates.delete(id);
     this.lastKnownRunAtMs.delete(id);
+    this.jobNameCache.delete(id);
+    this.runningJobIds.delete(id);
+    this.activeChannelRunIds.delete(id);
   }
 
   async listJobs(): Promise<ScheduledTask[]> {
@@ -633,7 +639,7 @@ export class CronJobService {
         query: id,
         limit: 20,
       });
-      return result.jobs?.find((job) => job.id === id) ?? null;
+      return result.jobs?.find(job => job.id === id) ?? null;
     } catch {
       return null;
     }
@@ -740,7 +746,7 @@ export class CronJobService {
       // fall through — running runs will be empty, completed runs still work
     }
 
-    const completed = result.entries.map((entry) => ({
+    const completed = result.entries.map(entry => ({
       ...mapGatewayRun(entry),
       taskName:
         entry.jobName || nameMap.get(entry.jobId) || extractRunTitle(entry.summary) || entry.jobId,
@@ -762,6 +768,7 @@ export class CronJobService {
 
   stopPolling(): void {
     this.polling = false;
+    this.pollGeneration += 1;
     if (this.pollingTimer) {
       clearInterval(this.pollingTimer);
       this.pollingTimer = null;
@@ -771,26 +778,30 @@ export class CronJobService {
   }
 
   handleGatewayDisconnected(): void {
-    this.clearPollingSnapshot();
+    this.pollGeneration += 1;
+    this.clearPollingSnapshot(false);
     this.firstPollDone = false;
   }
 
   handleGatewayConnected(): void {
-    this.clearPollingSnapshot();
+    this.pollGeneration += 1;
+    this.clearPollingSnapshot(false);
     this.firstPollDone = true;
     this.emitFullRefresh();
   }
 
-  private clearPollingSnapshot(): void {
+  private clearPollingSnapshot(clearActiveRuns = true): void {
     this.lastKnownStates.clear();
     this.lastKnownRunAtMs.clear();
     this.jobNameCache.clear();
     this.runningJobIds.clear();
-    this.activeChannelRunIds.clear();
+    if (clearActiveRuns) this.activeChannelRunIds.clear();
   }
 
   private async pollOnce(): Promise<void> {
-    if (!this.polling) return;
+    const generation = this.pollGeneration;
+    if (!this.polling || this.pollInFlightGeneration === generation) return;
+    this.pollInFlightGeneration = generation;
 
     try {
       // await this.ensureGatewayReady();
@@ -801,6 +812,7 @@ export class CronJobService {
         includeDisabled: true,
         limit: 200,
       });
+      if (!this.polling || generation !== this.pollGeneration) return;
       const jobs = Array.isArray(result.jobs) ? result.jobs : [];
 
       // Refresh jobId → name cache for synchronous lookups (used by session naming).
@@ -840,11 +852,13 @@ export class CronJobService {
         const lastRunAtMs = job.state.lastRunAtMs ?? 0;
         const previousRunAtMs = this.lastKnownRunAtMs.get(job.id) ?? 0;
         if (
+          !this.runningJobIds.has(job.id) &&
           lastRunAtMs > previousRunAtMs &&
           (previousRunAtMs > 0 || this.activeChannelRunIds.has(job.id))
         ) {
           try {
             const runs = await this.listRuns(job.id, 1, 0);
+            if (!this.polling || generation !== this.pollGeneration) return;
             if (runs[0]) {
               const task = mapGatewayJob(job);
               this.emitRunUpdate({ ...runs[0], taskName: task.name });
@@ -857,11 +871,16 @@ export class CronJobService {
         this.lastKnownRunAtMs.set(job.id, lastRunAtMs);
       }
 
-      const currentIds = new Set(jobs.map((job) => job.id));
-      for (const knownId of this.lastKnownStates.keys()) {
+      const currentIds = new Set(jobs.map(job => job.id));
+      const knownIds = new Set([
+        ...this.lastKnownStates.keys(),
+        ...this.activeChannelRunIds.keys(),
+      ]);
+      for (const knownId of knownIds) {
         if (!currentIds.has(knownId)) {
           this.lastKnownStates.delete(knownId);
           this.lastKnownRunAtMs.delete(knownId);
+          this.activeChannelRunIds.delete(knownId);
         }
       }
 
@@ -871,11 +890,15 @@ export class CronJobService {
       }
     } catch (error) {
       console.warn('[CronJobService] Polling error:', error);
+    } finally {
+      if (this.pollInFlightGeneration === generation) {
+        this.pollInFlightGeneration = null;
+      }
     }
   }
 
   private emitStatusUpdate(taskId: string, state: TaskState): void {
-    BrowserWindow.getAllWindows().forEach((window) => {
+    BrowserWindow.getAllWindows().forEach(window => {
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.StatusUpdate, { taskId, state });
       }
@@ -883,7 +906,7 @@ export class CronJobService {
   }
 
   private emitRunUpdate(run: ScheduledTaskRunWithName): void {
-    BrowserWindow.getAllWindows().forEach((window) => {
+    BrowserWindow.getAllWindows().forEach(window => {
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.RunUpdate, { run });
       }
@@ -896,9 +919,10 @@ export class CronJobService {
     this.activeChannelRunIds.set(job.id, runId);
     const delivery = job.delivery;
     const sessionTarget = job.sessionKey ? parseChannelSessionKey(job.sessionKey) : null;
-    const platform = delivery?.channel && delivery.channel !== DeliveryChannel.Last
-      ? (PlatformRegistry.platformOfChannel(delivery.channel) ?? '')
-      : (sessionTarget?.platform ?? '');
+    const platform =
+      delivery?.channel && delivery.channel !== DeliveryChannel.Last
+        ? (PlatformRegistry.platformOfChannel(delivery.channel) ?? '')
+        : (sessionTarget?.platform ?? '');
     const inputPreview =
       job.payload.kind === PayloadKind.SystemEvent ? job.payload.text : job.payload.message;
     this.onChannelRunEvent({
@@ -918,9 +942,10 @@ export class CronJobService {
     if (!this.onChannelRunEvent) return;
     const delivery = job.delivery;
     const sessionTarget = job.sessionKey ? parseChannelSessionKey(job.sessionKey) : null;
-    const platform = delivery?.channel && delivery.channel !== DeliveryChannel.Last
-      ? (PlatformRegistry.platformOfChannel(delivery.channel) ?? '')
-      : (sessionTarget?.platform ?? '');
+    const platform =
+      delivery?.channel && delivery.channel !== DeliveryChannel.Last
+        ? (PlatformRegistry.platformOfChannel(delivery.channel) ?? '')
+        : (sessionTarget?.platform ?? '');
     this.onChannelRunEvent({
       runId: this.activeChannelRunIds.get(job.id) ?? run.id,
       sessionId: run.sessionId ?? job.sessionKey ?? '',
@@ -937,7 +962,7 @@ export class CronJobService {
   }
 
   private emitFullRefresh(): void {
-    BrowserWindow.getAllWindows().forEach((window) => {
+    BrowserWindow.getAllWindows().forEach(window => {
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.Refresh);
       }
