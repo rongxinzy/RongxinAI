@@ -189,6 +189,14 @@ vi.mock('./piOpenAICompatProxy', () => ({
   registerPiOpenAICompatUpstream: hoisted.mockRegisterPiOpenAICompatUpstream,
 }));
 
+vi.mock('../coworkUtil', async importOriginal => {
+  const actual = await importOriginal<typeof import('../coworkUtil')>();
+  return {
+    ...actual,
+    resolveGitBashPathForPi: vi.fn(() => undefined),
+  };
+});
+
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
@@ -370,7 +378,7 @@ describe('PiRuntimeAdapter', () => {
       expect(onComplete).toHaveBeenCalledOnce();
     });
 
-    it('registers the production loop for Work sessions but not Chat sessions', async () => {
+    it('registers the production loop only for nontrivial Work sessions', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -378,6 +386,10 @@ describe('PiRuntimeAdapter', () => {
 
       try {
         await adapter.startSession('production-work', 'Build', {
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        await adapter.startSession('production-simple', '为什么天空是蓝色的？', {
           sessionMode: 'work',
           workspaceRoot: createTemporaryWorkspace(),
         });
@@ -389,13 +401,59 @@ describe('PiRuntimeAdapter', () => {
         const workOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
-        const chatOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        const simpleOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        const chatOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
         expect(workOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(simpleOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
         expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
           'production_loop',
         );
+      } finally {
+        db.close();
+      }
+    });
+
+    it('rebuilds the production loop topology when follow-up complexity changes', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
+
+      try {
+        await adapter.startSession('adaptive-gate', '你好', {
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        await adapter.continueSession('adaptive-gate', '修复登录流程中的刷新问题', {
+          sessionMode: 'work',
+        });
+        await adapter.continueSession('adaptive-gate', '解释一下事件循环', {
+          sessionMode: 'work',
+        });
+
+        const simpleStart = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        const complexFollowUp = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        const simpleFollowUp = mockCreateAgentSession.mock.calls[2]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        expect(simpleStart.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
+        expect(complexFollowUp.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(simpleFollowUp.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
+        expect(mockSession.abort).toHaveBeenCalledTimes(2);
       } finally {
         db.close();
       }
