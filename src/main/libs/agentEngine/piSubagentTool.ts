@@ -31,6 +31,8 @@ import {
   type PiSubagentExecutionMetadata,
   type PiSubagentSession,
 } from './piSubagentExecution';
+import type { PiExtensionFactory } from './piExtensionTypes';
+import { createPiReviewerReadBudgetExtension, PiReviewerReadBudget } from './piReviewerReadBudget';
 
 // ── Constants ──
 
@@ -101,6 +103,7 @@ export interface PiSubagentToolDeps {
     systemPrompt: string,
     maxOutputTokens: number,
     skillIds?: string[],
+    extensionFactories?: PiExtensionFactory[],
   ): Promise<unknown>;
 }
 
@@ -171,6 +174,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
       'Review the implementation and supplied execution evidence against the assigned contract.',
       'Check correctness, required artifacts, deterministic verification, edge cases, and regressions.',
       'Prioritize the supplied contract and execution evidence. Inspect at most 3 files, and only when evidence is insufficient.',
+      'Read files in targeted ranges. Do not repeat an exact range; each file allows at most 3 ranges and 6000 requested lines.',
       'Never modify files. If evidence is insufficient, return revise with a concrete finding.',
       'Respond with exactly one JSON object and no Markdown or surrounding text:',
       '{"verdict":"pass"|"revise","findings":[{"severity":"critical"|"major"|"minor","summary":"...","evidence":"..."}]}',
@@ -302,16 +306,21 @@ async function runSubagent(
     }
     const researcherUsesWebSearch =
       profile.id === PiSubagentProfileId.Researcher && Boolean(deps.webSearchSkillPath);
+    const reviewerReadBudget = isProductionReviewer ? new PiReviewerReadBudget(cwd) : undefined;
     const systemPrompt = researcherUsesWebSearch
       ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill with Bash:\n` +
         `bash "${path.join(deps.webSearchSkillPath || '', 'scripts/search.sh')}" "<query>" 10\n` +
         'Open the returned primary sources where possible. Never substitute model memory for a retrieved citation.'
       : profile.systemPrompt;
-    const resourceLoader = researcherUsesWebSearch
-      ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, [
-          CoreSkillId.WebSearch,
+    const resourceLoader = reviewerReadBudget
+      ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, undefined, [
+          createPiReviewerReadBudgetExtension(reviewerReadBudget),
         ])
-      : await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
+      : researcherUsesWebSearch
+        ? await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens, [
+            CoreSkillId.WebSearch,
+          ])
+        : await deps.createPiResourceLoader(cwd, systemPrompt, maxOutputTokens);
     subOptions.resourceLoader = resourceLoader;
     if (
       resourceLoader &&
@@ -338,6 +347,7 @@ async function runSubagent(
             maxAssistantTurns: PRODUCTION_REVIEWER_MAX_ASSISTANT_TURNS,
             maxToolCalls: PRODUCTION_REVIEWER_MAX_TOOL_CALLS,
             steerPrompt: PRODUCTION_REVIEWER_STEER_PROMPT,
+            steerSignal: reviewerReadBudget,
           }
         : {}),
     });

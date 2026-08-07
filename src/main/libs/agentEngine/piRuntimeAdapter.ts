@@ -89,6 +89,11 @@ import {
 } from './piShortcutWorkflow';
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
 import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
+import {
+  PiExtensionEventType,
+  type PiExtensionApi,
+  type PiExtensionFactory,
+} from './piExtensionTypes';
 import { extractPiSubagentExecutionMetadata } from './piSubagentExecution';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
@@ -277,19 +282,6 @@ interface PiResourceLoader {
 interface PiSettingsManager {
   applyOverrides(overrides: { shellPath?: string }): void;
   getShellPath?(): string | undefined;
-}
-
-interface PiToolCallEvent {
-  toolCallId: string;
-  toolName: string;
-  input?: unknown;
-}
-
-interface PiExtensionApi {
-  on(
-    event: 'tool_call',
-    handler: (event: PiToolCallEvent) => Promise<{ block: true; reason: string } | undefined>,
-  ): void;
 }
 
 interface PiResourceState {
@@ -730,7 +722,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           researchRun || shortcutKind === ShortcutWorkflowKind.DeepResearch
             ? path.join(getSkillsRoot(), 'web-search')
             : undefined,
-        createPiResourceLoader: (cwd, systemPrompt, maxOutputTokens, skillIds) =>
+        createPiResourceLoader: (
+          cwd,
+          systemPrompt,
+          maxOutputTokens,
+          skillIds,
+          extensionFactories,
+        ) =>
           this.createPiResourceLoader(
             pi,
             cwd,
@@ -746,6 +744,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               getAutoApprove: () =>
                 this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
             },
+            extensionFactories,
           ),
       });
       if (subagentTool) {
@@ -1511,6 +1510,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       settingsManager?: PiSettingsManager | null;
       getAutoApprove: () => boolean;
     },
+    additionalExtensionFactories: PiExtensionFactory[] = [],
   ): Promise<PiResourceLoader> {
     const settingsManager =
       approvalContext?.settingsManager ?? this.createPiSettingsManager(pi, cwd);
@@ -1548,39 +1548,42 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           : []),
         DeclareArtifactSystemPrompt,
       ],
-      extensionFactories: approvalContext?.getRunId()
-        ? [
-            (extensionApi: PiExtensionApi) => {
-              extensionApi.on('tool_call', async event => {
-                const runId = approvalContext.getRunId();
-                if (!runId) {
-                  return {
-                    block: true as const,
-                    reason: 'No active workbench run is available.',
-                  };
-                }
-                const toolInput =
-                  event.input && typeof event.input === 'object'
-                    ? (event.input as Record<string, unknown>)
-                    : {};
-                const authorization = await this.workbenchTaskService?.authorizeToolCall({
-                  sessionId: approvalContext.sessionId,
-                  runId,
-                  toolCallId: event.toolCallId,
-                  toolName: event.toolName,
-                  toolInput,
-                  autoApprove: approvalContext.getAutoApprove(),
-                });
-                return authorization && !authorization.allow
-                  ? {
+      extensionFactories: [
+        ...(approvalContext?.getRunId()
+          ? [
+              (extensionApi: PiExtensionApi) => {
+                extensionApi.on(PiExtensionEventType.ToolCall, async event => {
+                  const runId = approvalContext.getRunId();
+                  if (!runId) {
+                    return {
                       block: true as const,
-                      reason: authorization.reason || 'The action was not approved.',
-                    }
-                  : undefined;
-              });
-            },
-          ]
-        : [],
+                      reason: 'No active workbench run is available.',
+                    };
+                  }
+                  const toolInput =
+                    event.input && typeof event.input === 'object'
+                      ? (event.input as Record<string, unknown>)
+                      : {};
+                  const authorization = await this.workbenchTaskService?.authorizeToolCall({
+                    sessionId: approvalContext.sessionId,
+                    runId,
+                    toolCallId: event.toolCallId,
+                    toolName: event.toolName,
+                    toolInput,
+                    autoApprove: approvalContext.getAutoApprove(),
+                  });
+                  return authorization && !authorization.allow
+                    ? {
+                        block: true as const,
+                        reason: authorization.reason || 'The action was not approved.',
+                      }
+                    : undefined;
+                });
+              },
+            ]
+          : []),
+        ...additionalExtensionFactories,
+      ],
     });
     await resourceLoader.reload();
     // Pi's resource reload refreshes settings from disk, so apply the resolved
