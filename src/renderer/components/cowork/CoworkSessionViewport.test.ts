@@ -19,8 +19,8 @@ vi.mock('react-redux', () => ({
   useSelector: (selector: (state: typeof mocks.state) => unknown) => selector(mocks.state),
 }));
 
-vi.mock('@shared/components/ui/spinner', () => ({
-  Spinner: () => React.createElement('div', { 'data-testid': 'session-spinner' }),
+vi.mock('@shared/components/ui/skeleton', () => ({
+  Skeleton: () => React.createElement('div', { 'data-testid': 'session-skeleton' }),
 }));
 
 vi.mock('./CoworkSessionDetail', () => ({
@@ -32,39 +32,8 @@ beforeEach(() => {
   mocks.state.cowork.loadingSessionId = null;
 });
 
-test('keeps the current detail tree mounted while another session loads', () => {
+test('replaces the previous session with a loading skeleton while another session loads', () => {
   mocks.state.cowork.currentSession = { id: 'session-a' };
-  mocks.state.cowork.loadingSessionId = 'session-b';
-
-  const view = render(
-    React.createElement(CoworkSessionViewport, {
-      sessionId: 'session-b',
-      onContinue: () => undefined,
-      onStop: () => undefined,
-    }),
-  );
-
-  const retainedDetail = screen.getByTestId('session-detail');
-  expect(retainedDetail.parentElement).toHaveAttribute('inert');
-  expect(retainedDetail.parentElement?.parentElement).toHaveAttribute('aria-busy', 'true');
-  expect(screen.queryByTestId('session-spinner')).not.toBeInTheDocument();
-
-  mocks.state.cowork.currentSession = { id: 'session-b' };
-  mocks.state.cowork.loadingSessionId = null;
-  view.rerender(
-    React.createElement(CoworkSessionViewport, {
-      sessionId: 'session-b',
-      onContinue: () => undefined,
-      onStop: () => undefined,
-    }),
-  );
-
-  expect(screen.getByTestId('session-detail')).toBe(retainedDetail);
-  expect(retainedDetail.parentElement).not.toHaveAttribute('inert');
-  expect(retainedDetail.parentElement?.parentElement).toHaveAttribute('aria-busy', 'false');
-});
-
-test('uses a loading state only when no previous session can be retained', () => {
   mocks.state.cowork.loadingSessionId = 'session-b';
 
   render(
@@ -75,6 +44,55 @@ test('uses a loading state only when no previous session can be retained', () =>
     }),
   );
 
-  expect(screen.getByTestId('session-spinner')).toBeInTheDocument();
+  expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getAllByTestId('session-skeleton')).not.toHaveLength(0);
+  expect(screen.queryByTestId('session-detail')).not.toBeInTheDocument();
+});
+
+test('renders the target session as soon as its data is ready', () => {
+  mocks.state.cowork.currentSession = { id: 'session-b' };
+  mocks.state.cowork.loadingSessionId = 'session-b';
+
+  render(
+    React.createElement(CoworkSessionViewport, {
+      sessionId: 'session-b',
+      onContinue: () => undefined,
+      onStop: () => undefined,
+    }),
+  );
+
+  expect(screen.getByTestId('session-detail')).toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  expect(screen.queryByTestId('session-skeleton')).not.toBeInTheDocument();
+});
+
+test('renders the current session when no switch is pending', () => {
+  mocks.state.cowork.currentSession = { id: 'session-b' };
+
+  render(
+    React.createElement(CoworkSessionViewport, {
+      sessionId: 'session-b',
+      onContinue: () => undefined,
+      onStop: () => undefined,
+    }),
+  );
+
+  expect(screen.getByTestId('session-detail')).toBeInTheDocument();
+  expect(screen.queryByRole('status')).not.toBeInTheDocument();
+});
+
+test('uses the same loading skeleton when there is no previous session', () => {
+  mocks.state.cowork.loadingSessionId = 'session-b';
+
+  render(
+    React.createElement(CoworkSessionViewport, {
+      sessionId: 'session-b',
+      onContinue: () => undefined,
+      onStop: () => undefined,
+    }),
+  );
+
+  expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+  expect(screen.getAllByTestId('session-skeleton')).not.toHaveLength(0);
   expect(screen.queryByTestId('session-detail')).not.toBeInTheDocument();
 });
