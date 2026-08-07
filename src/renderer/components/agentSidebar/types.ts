@@ -38,6 +38,7 @@ export interface WorkspaceSidebarNode {
   id: string;
   name: string;
   path: string;
+  pinned?: boolean;
   isExpanded: boolean;
   isTaskListExpanded: boolean;
   canExpandTasks: boolean;

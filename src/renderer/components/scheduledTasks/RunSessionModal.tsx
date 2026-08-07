@@ -13,13 +13,14 @@ import { buildConversationTurns, buildDisplayItems } from '../cowork/helpers/mes
 interface RunSessionModalProps {
   sessionId?: string | null;
   sessionKey?: string | null;
+  title?: string;
   onClose: () => void;
 }
 
 const MAX_RETRIES = 5;
 const RETRY_INTERVAL_MS = 3000;
 
-const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey, onClose }) => {
+const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey, title, onClose }) => {
   const [session, setSession] = useState<CoworkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,10 +150,10 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
         if (!open) onClose();
       }}
     >
-      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0 bg-card overflow-hidden">
+      <DialogContent className="flex max-h-[72vh] w-[min(56rem,calc(100%-2rem))] flex-col gap-0 overflow-hidden bg-card p-0 sm:max-w-[56rem]">
         <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border shrink-0">
           <DialogTitle className="text-sm font-semibold truncate">
-            {session?.title || i18nService.t('scheduledTasksViewSession')}
+            {title || session?.title || i18nService.t('scheduledTasksViewSession')}
           </DialogTitle>
         </DialogHeader>
 

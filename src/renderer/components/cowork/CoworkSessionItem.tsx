@@ -36,6 +36,34 @@ const statusLabels: Record<CoworkSessionStatus, string> = {
   error: 'coworkStatusError',
 };
 
+const channelTitlePlatforms: Record<string, string> = {
+  飞书: 'feishu',
+  Feishu: 'feishu',
+  钉钉: 'dingtalk',
+  DingTalk: 'dingtalk',
+  企业微信: 'wecom',
+  WeCom: 'wecom',
+  微信: 'weixin',
+  WeChat: 'weixin',
+  QQ: 'qq',
+  TG: 'telegram',
+  Telegram: 'telegram',
+  Discord: 'discord',
+};
+
+const formatSessionTitle = (title: string): string => {
+  const match = /^\[([^\]]+)]\s+(.+)$/.exec(title);
+  if (!match) return title;
+
+  const platform = channelTitlePlatforms[match[1]];
+  if (!platform) return title;
+
+  return i18nService
+    .t('channelConversationTitle')
+    .replace('{channel}', i18nService.t(platform))
+    .replace('{id}', match[2]);
+};
+
 const formatRelativeTime = (timestamp: number): { compact: string; full: string } => {
   const now = Date.now();
   const diff = Math.max(0, now - timestamp);
@@ -180,6 +208,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
   const renameLabel = i18nService.t('renameConversation');
   const deleteLabel = i18nService.t('deleteSession');
   const relativeTime = formatRelativeTime(session.updatedAt);
+  const displayTitle = formatSessionTitle(session.title);
   const showRunningIndicator = session.status === 'running';
   const showPendingPermission = hasPendingPermission;
   const showUnreadIndicator = !showRunningIndicator && hasUnread;
@@ -242,9 +271,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             {showStatusIndicator && (
               <span
                 className={`block w-2 h-2 rounded-full shrink-0 ${
-                  showPendingPermission
-                    ? 'bg-success animate-pulse'
-                    : 'bg-ring'
+                  showPendingPermission ? 'bg-success animate-pulse' : 'bg-ring'
                 }`}
                 title={
                   showPendingPermission
@@ -275,7 +302,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
             ) : (
               <div className="flex min-w-0 items-center gap-2">
                 <h3 className="min-w-0 truncate text-sm font-medium text-foreground">
-                  {session.title}
+                  {displayTitle}
                 </h3>
                 {showPendingPermission && (
                   <span className="inline-flex shrink-0 items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">

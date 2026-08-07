@@ -1,14 +1,15 @@
-/**
+﻿/**
  * IM Settings Component
  * Configuration UI for DingTalk, Feishu and Telegram IM bots
  */
 
-import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
+import { Alert, AlertTitle } from '@shared/components/ui/alert';
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { DialogTitle } from '@shared/components/ui/dialog';
 import { Input } from '@shared/components/ui/input';
 import { Skeleton } from '@shared/components/ui/skeleton';
+import { Spinner } from '@shared/components/ui/spinner';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import type { Platform } from '@shared/platform';
@@ -119,6 +120,9 @@ const IMSettings: React.FC = () => {
   const [connectivityResults, setConnectivityResults] = useState<
     Partial<Record<Platform, IMConnectivityTestResult>>
   >({});
+  const [connectivityFailures, setConnectivityFailures] = useState<Partial<Record<Platform, true>>>(
+    {},
+  );
   const [connectivityModalPlatform, setConnectivityModalPlatform] = useState<Platform | null>(null);
   const [language, setLanguage] = useState<'zh' | 'en'>(i18nService.getLanguage());
   const [configLoaded, setConfigLoaded] = useState(false);
@@ -454,20 +458,6 @@ const IMSettings: React.FC = () => {
     return i18nService.t(`imConnectivityCheckTitle_${code}`);
   };
 
-  const getCheckSuggestion = (check: IMConnectivityCheck): string | undefined => {
-    if (check.suggestion) {
-      return check.suggestion;
-    }
-    if (check.code === 'gateway_running' && check.level === 'pass') {
-      return undefined;
-    }
-    const suggestion = i18nService.t(`imConnectivityCheckSuggestion_${check.code}`);
-    if (suggestion.startsWith('imConnectivityCheckSuggestion_')) {
-      return undefined;
-    }
-    return suggestion;
-  };
-
   const formatTestTime = (timestamp: number): string => {
     try {
       return new Date(timestamp).toLocaleString();
@@ -480,13 +470,27 @@ const IMSettings: React.FC = () => {
     platform: Platform,
     configOverride?: Partial<IMGatewayConfig>,
   ): Promise<IMConnectivityTestResult | null> => {
-    setTestingPlatform(platform);
+    setConnectivityResults(prev => {
+      const { [platform]: _, ...remaining } = prev;
+      return remaining;
+    });
+    setConnectivityFailures(prev => {
+      const { [platform]: _, ...remaining } = prev;
+      return remaining;
+    });
+
+    try {
     const result = await imService.testGateway(platform, configOverride);
     if (result) {
       setConnectivityResults(prev => ({ ...prev, [platform]: result }));
+      } else {
+        setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
     }
-    setTestingPlatform(null);
     return result;
+    } catch {
+      setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
+      return null;
+    }
   };
 
   // Toggle gateway on/off and persist enabled state
@@ -635,6 +639,7 @@ const IMSettings: React.FC = () => {
     setConnectivityModalPlatform(platform);
     setTestingPlatform(platform);
 
+    try {
     // For Telegram, persist telegram config and test (multi-instance)
     if (platform === 'telegram') {
       await imService.persistConfig({ telegram: tgMultiConfig });
@@ -762,7 +767,9 @@ const IMSettings: React.FC = () => {
       } as Partial<IMGatewayConfig>);
       // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
       if (activeFeishuInstanceId && result) {
-        const inst = feishuMultiConfig.instances.find(i => i.instanceId === activeFeishuInstanceId);
+          const inst = feishuMultiConfig.instances.find(
+            i => i.instanceId === activeFeishuInstanceId,
+          );
         if (inst && !inst.enabled) {
           const authCheck = result.checks.find(c => c.code === 'auth_check');
           if (authCheck && authCheck.level === 'pass') {
@@ -797,7 +804,9 @@ const IMSettings: React.FC = () => {
                 config: { enabled: true },
               }),
             );
-            await imService.updateDiscordInstanceConfig(activeDiscordInstanceId, { enabled: true });
+              await imService.updateDiscordInstanceConfig(activeDiscordInstanceId, {
+                enabled: true,
+              });
           }
         }
       }
@@ -824,6 +833,15 @@ const IMSettings: React.FC = () => {
         toggleGateway(platform);
       }
     }
+    } catch {
+      setConnectivityResults(prev => {
+        const { [platform]: _, ...remaining } = prev;
+        return remaining;
+      });
+      setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
+    } finally {
+      setTestingPlatform(null);
+    }
   };
 
   // Handle platform toggle
@@ -848,7 +866,11 @@ const IMSettings: React.FC = () => {
       onClick={() => handleConnectivityTest(platform)}
       disabled={!gatewayReady || isLoading || testingPlatform === platform}
     >
+      {testingPlatform === platform ? (
+        <Spinner data-icon="inline-start" />
+      ) : (
       <Signal data-icon="inline-start" />
+      )}
       {testingPlatform === platform
         ? i18nService.t('imConnectivityTesting')
         : connectivityResults[platform]
@@ -2393,9 +2415,9 @@ const IMSettings: React.FC = () => {
         {connectivityModalPlatform && (
           <Modal
             onClose={() => setConnectivityModalPlatform(null)}
-            className="w-full max-w-2xl overflow-hidden"
+            className="flex max-h-[min(24rem,calc(100vh-2rem))] w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-xl"
           >
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div className="flex shrink-0 items-center justify-between px-6 py-4">
               <DialogTitle>
                 {`${i18nService.t(connectivityModalPlatform)} ${i18nService.t('imConnectivitySectionTitle')}`}
               </DialogTitle>
@@ -2410,12 +2432,8 @@ const IMSettings: React.FC = () => {
               </Button>
             </div>
 
-            <div className="p-4 max-h-[65vh] overflow-y-auto">
-              {testingPlatform === connectivityModalPlatform ? (
-                <div className="text-sm text-muted-foreground">
-                  {i18nService.t('imConnectivityTesting')}
-                </div>
-              ) : connectivityResults[connectivityModalPlatform] ? (
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+              {connectivityResults[connectivityModalPlatform] ? (
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
                     <Badge
@@ -2457,25 +2475,31 @@ const IMSettings: React.FC = () => {
                           <CheckCircle />
                         )}
                         <AlertTitle>{getCheckTitle(check.code)}</AlertTitle>
-                        <AlertDescription>
-                          <p>{check.message}</p>
-                          {getCheckSuggestion(check) ? (
-                            <p>{`${i18nService.t('imConnectivitySuggestion')}: ${getCheckSuggestion(check)}`}</p>
-                          ) : null}
-                        </AlertDescription>
                       </Alert>
                     ))}
                   </div>
+                </div>
+              ) : connectivityFailures[connectivityModalPlatform] ? (
+                <div className="flex flex-col gap-3">
+                  <Badge variant="destructive" className="w-fit">
+                    <XCircle data-icon="inline-start" />
+                    {i18nService.t('imConnectivityVerdict_fail')}
+                  </Badge>
+                  <Alert variant="destructive">
+                    <XCircle />
+                    <AlertTitle>{i18nService.t('imConnectivityTestFailed')}</AlertTitle>
+                  </Alert>
+                </div>
+              ) : testingPlatform === connectivityModalPlatform ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner />
+                  <span>{i18nService.t('imConnectivityTesting')}</span>
                 </div>
               ) : (
                 <div className="text-sm text-muted-foreground">
                   {i18nService.t('imConnectivityNoResult')}
                 </div>
               )}
-            </div>
-
-            <div className="px-4 py-3 border-t border-border flex items-center justify-end">
-              {renderConnectivityTestButton(connectivityModalPlatform)}
             </div>
           </Modal>
         )}

@@ -258,7 +258,7 @@ function extractCronJobId(sessionKey: string): string {
   return idx >= 0 ? sessionKey.slice(idx + 'cron:'.length) : sessionKey;
 }
 
-function getChannelTitlePrefix(platform: string): string {
+function getChannelTitleLabel(platform: string): string {
   const i18nMap: Record<string, string> = {
     feishu: t('channelPrefixFeishu'),
     dingtalk: t('channelPrefixDingtalk'),
@@ -271,14 +271,26 @@ function getChannelTitlePrefix(platform: string): string {
     discord: 'Discord',
     qq: 'QQ',
   };
-  const label = i18nMap[platform] ?? staticMap[platform] ?? platform;
-  return `[${label}]`;
+  return i18nMap[platform] ?? staticMap[platform] ?? platform;
+}
+
+function buildChannelSessionTitle(platform: string, conversationId: string): string {
+  const displayId = conversationId.includes('@') ? conversationId.split('@')[0] : conversationId;
+  const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
+  return t('channelConversationTitle', {
+    channel: getChannelTitleLabel(platform),
+    id: shortId,
+  });
 }
 
 export interface ChannelSessionSyncDeps {
   coworkStore: CoworkStore;
   imStore: IMStore;
   getDefaultCwd: (agentId?: string) => string;
+  /** Working directory used only for IM channel sessions. */
+  getChannelCwd?: (agentId?: string) => string;
+  /** Working directory used only for scheduled-task sessions. */
+  getCronCwd?: (agentId?: string) => string;
   /** Optional synchronous lookup: jobId → human-readable name (for cron session titles). */
   resolveJobName?: (jobId: string) => string | null;
   /**
@@ -293,6 +305,8 @@ export class OpenClawChannelSessionSync {
   private readonly coworkStore: CoworkStore;
   private readonly imStore: IMStore;
   private readonly getDefaultCwd: (agentId?: string) => string;
+  private readonly getChannelCwd: (agentId?: string) => string;
+  private readonly getCronCwd: (agentId?: string) => string;
   private readonly resolveJobName: ((jobId: string) => string | null) | null;
   private readonly onBindingChanged:
     | ((sessionKey: string, platform: Platform, newAgentId: string) => void)
@@ -315,6 +329,8 @@ export class OpenClawChannelSessionSync {
     this.coworkStore = deps.coworkStore;
     this.imStore = deps.imStore;
     this.getDefaultCwd = deps.getDefaultCwd;
+    this.getChannelCwd = deps.getChannelCwd ?? deps.getDefaultCwd;
+    this.getCronCwd = deps.getCronCwd ?? deps.getDefaultCwd;
     this.resolveJobName = deps.resolveJobName ?? null;
     this.onBindingChanged = deps.onBindingChanged ?? null;
   }
@@ -430,13 +446,8 @@ export class OpenClawChannelSessionSync {
           // Delete the old Cowork session so it doesn't linger in the
           // previous agent's sidebar list after the binding change.
           this.coworkStore.deleteSession(existingMapping.coworkSessionId);
-          const titlePrefix = getChannelTitlePrefix(parsed.platform);
-          const displayId = parsed.conversationId.includes('@')
-            ? parsed.conversationId.split('@')[0]
-            : parsed.conversationId;
-          const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
-          const title = `${titlePrefix} ${shortId}`;
-          const cwd = this.getDefaultCwd(currentAgentId);
+          const title = buildChannelSessionTitle(parsed.platform, parsed.conversationId);
+          const cwd = this.getChannelCwd(currentAgentId);
           const newSession = this.coworkStore.createSession(
             title,
             cwd,
@@ -491,14 +502,7 @@ export class OpenClawChannelSessionSync {
     }
 
     // 5. Create new Cowork session
-    const titlePrefix = getChannelTitlePrefix(parsed.platform);
-    // For conversationIds that look like email addresses,
-    // use the local part before '@' as the display name.
-    const displayId = parsed.conversationId.includes('@')
-      ? parsed.conversationId.split('@')[0]
-      : parsed.conversationId;
-    const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
-    const title = `${titlePrefix} ${shortId}`;
+    const title = buildChannelSessionTitle(parsed.platform, parsed.conversationId);
     // Look up the per-platform agent binding so the session is filed under the correct agent.
     // (imSettings, accountId already resolved above; re-resolve agentId for the new-session path)
     const agentId = resolveAgentBinding(
@@ -506,7 +510,7 @@ export class OpenClawChannelSessionSync {
       parsed.platform,
       accountId,
     );
-    const cwd = this.getDefaultCwd(agentId);
+    const cwd = this.getChannelCwd(agentId);
     console.log(
       '[ChannelSessionSync] creating new cowork session: title=',
       title,
@@ -657,7 +661,7 @@ export class OpenClawChannelSessionSync {
       ? `[${cronLabel}] ${jobName}`
       : `[${cronLabel}] ${jobId.length > 8 ? jobId.slice(0, 8) : jobId}`;
     const agentId = extractAgentIdFromKey(sessionKey) || 'main';
-    const cwd = this.getDefaultCwd(agentId);
+    const cwd = this.getCronCwd(agentId);
     console.log(
       '[ChannelSessionSync] creating cron session: key=',
       sessionKey,

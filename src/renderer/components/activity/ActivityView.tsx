@@ -19,7 +19,7 @@ interface ActivityViewProps {
   updateBadge?: React.ReactNode;
 }
 
-/** Refresh relative timestamps once a minute; the feed itself is event-driven. */
+/** Refresh day grouping once a minute; the feed itself is event-driven. */
 const TIME_TICK_MS = 60_000;
 
 const ActivityView: React.FC<ActivityViewProps> = ({
@@ -40,7 +40,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   // the initial render lands quietly.
   const openedAtRef = useRef(Date.now());
 
-  // Minute tick so "N 分钟前" labels stay honest while the feed sits open.
+  // Keep day grouping current while the feed remains open.
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setCurrentTime(Date.now()), TIME_TICK_MS);

@@ -293,6 +293,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
           <RunSessionModal
             sessionId={viewingRun.sessionId}
             sessionKey={viewingRun.sessionKey}
+            title={viewingRun.taskName}
             onClose={() => setViewingRun(null)}
           />
         )}

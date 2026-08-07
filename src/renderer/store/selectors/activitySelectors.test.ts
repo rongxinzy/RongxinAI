@@ -147,6 +147,22 @@ describe('foldChannelRunEvents', () => {
     expect(runs.find(run => run.id === 'r1')?.status).toBe(ChannelRunStatus.Failed);
     expect(runs.find(run => run.id === 'r2')?.status).toBe(ChannelRunStatus.Completed);
   });
+
+  it('keeps an unmatched terminal event separate from an active run', () => {
+    const started = makeEvent({ runId: 'gateway-run', sessionId: 's1' });
+    const completed = makeEvent({
+      runId: 'adapter-run',
+      sessionId: 's1',
+      status: ChannelRunStatus.Completed,
+      timestamp: started.timestamp + 100,
+    });
+
+    const runs = foldChannelRunEvents([completed, started]);
+
+    expect(runs).toHaveLength(2);
+    expect(runs.find(run => run.id === 'gateway-run')?.status).toBe(ChannelRunStatus.Started);
+    expect(runs.find(run => run.id === 'adapter-run')?.status).toBe(ChannelRunStatus.Completed);
+  });
 });
 
 describe('selectActivityRuns', () => {

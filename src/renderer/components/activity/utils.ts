@@ -31,6 +31,17 @@ export const formatActivityTime = (timestampMs: number, nowMs: number = Date.now
   });
 };
 
+/** Fixed local clock time for an activity entry. */
+export const formatActivityClockTime = (timestampMs: number): string => {
+  const date = new Date(timestampMs);
+  const lang = i18nService.getLanguage();
+  return date.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: lang !== 'zh',
+  });
+};
+
 const startOfDay = (timestampMs: number): number => {
   const date = new Date(timestampMs);
   date.setHours(0, 0, 0, 0);

@@ -11,6 +11,7 @@ vi.mock('electron', () => ({
 }));
 
 import { DeliveryMode, GatewayStatus, IpcChannel, TaskStatus } from './constants';
+import { ChannelRunStatus, ChannelRunTrigger } from '../shared/channelRun/constants';
 import {
   CronJobService,
   mapGatewayJob,
@@ -62,6 +63,151 @@ test('gateway reconnection emits a full task-list refresh', () => {
 
   expect(send).toHaveBeenCalledWith(IpcChannel.Refresh);
   electronMocks.getAllWindows.mockReturnValue([]);
+});
+
+test('polling projects a cron run into the channel activity event stream', async () => {
+  const onChannelRunEvent = vi.fn();
+  let poll = 0;
+  const job = {
+    id: 'job-1',
+    name: 'Morning brief',
+    enabled: true,
+    schedule: { kind: 'cron', expr: '0 9 * * *' },
+    sessionTarget: 'isolated',
+    wakeMode: 'now',
+    payload: { kind: 'agentTurn', message: 'Summarize updates' },
+    delivery: { mode: 'announce', channel: 'feishu', to: 'chat-1' },
+    sessionKey: 'session-1',
+    state: { runningAtMs: 1700000000000, lastRunAtMs: 1 },
+    createdAtMs: 1,
+    updatedAtMs: 1,
+  };
+  const gatewayClient = {
+    request: vi.fn(async <T = Record<string, unknown>>(method: string): Promise<T> => {
+      if (method === 'cron.list') {
+        poll += 1;
+        const currentJob =
+          poll === 1
+            ? { ...job, state: { runningAtMs: undefined, lastRunAtMs: 1 } }
+            : poll === 2
+              ? job
+              : {
+                  ...job,
+                  state: {
+                    runningAtMs: undefined,
+                    lastRunAtMs: 2,
+                    lastRunStatus: GatewayStatus.Ok,
+                  },
+                };
+        return { jobs: [currentJob] } as T;
+      }
+      return {
+        entries: [
+          {
+            ts: 1700000010000,
+            jobId: 'job-1',
+            status: GatewayStatus.Ok,
+            runAtMs: 1700000000000,
+            durationMs: 10000,
+            summary: 'Done',
+          },
+        ],
+      } as T;
+    }),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+    onChannelRunEvent,
+  });
+  (service as unknown as { polling: boolean }).polling = true;
+
+  await (service as unknown as { pollOnce: () => Promise<void> }).pollOnce();
+  service.handleGatewayConnected();
+  await (service as unknown as { pollOnce: () => Promise<void> }).pollOnce();
+
+  expect(onChannelRunEvent).toHaveBeenCalledTimes(1);
+  expect(onChannelRunEvent.mock.calls[0]?.[0]).toMatchObject({
+    runId: 'job-1-1700000000000',
+    trigger: ChannelRunTrigger.Cron,
+    status: ChannelRunStatus.Started,
+  });
+
+  service.handleGatewayDisconnected();
+  service.handleGatewayConnected();
+  await (service as unknown as { pollOnce: () => Promise<void> }).pollOnce();
+
+  expect(onChannelRunEvent).toHaveBeenCalledTimes(2);
+  expect(onChannelRunEvent.mock.calls[0]?.[0]).toMatchObject({
+    runId: 'job-1-1700000000000',
+    trigger: ChannelRunTrigger.Cron,
+    status: ChannelRunStatus.Started,
+    inputPreview: 'Summarize updates',
+  });
+  expect(onChannelRunEvent.mock.calls[1]?.[0]).toMatchObject({
+    runId: 'job-1-1700000000000',
+    trigger: ChannelRunTrigger.Cron,
+    status: ChannelRunStatus.Completed,
+  });
+});
+
+test('removing a job clears all polling lifecycle state', async () => {
+  const gatewayClient = {
+    request: vi.fn(async () => ({})),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+  });
+  const pollingState = service as unknown as {
+    lastKnownStates: Map<string, string>;
+    lastKnownRunAtMs: Map<string, number>;
+    jobNameCache: Map<string, string>;
+    runningJobIds: Set<string>;
+    activeChannelRunIds: Map<string, string>;
+  };
+  pollingState.lastKnownStates.set('job-1', '{}');
+  pollingState.lastKnownRunAtMs.set('job-1', 1);
+  pollingState.jobNameCache.set('job-1', 'Morning brief');
+  pollingState.runningJobIds.add('job-1');
+  pollingState.activeChannelRunIds.set('job-1', 'run-1');
+
+  await service.removeJob('job-1');
+
+  expect(gatewayClient.request).toHaveBeenCalledWith('cron.remove', { id: 'job-1' });
+  expect(pollingState.lastKnownStates.has('job-1')).toBe(false);
+  expect(pollingState.lastKnownRunAtMs.has('job-1')).toBe(false);
+  expect(pollingState.jobNameCache.has('job-1')).toBe(false);
+  expect(pollingState.runningJobIds.has('job-1')).toBe(false);
+  expect(pollingState.activeChannelRunIds.has('job-1')).toBe(false);
+});
+
+test('polling does not overlap requests within the same gateway generation', async () => {
+  let resolveList: ((value: { jobs: unknown[] }) => void) | undefined;
+  const gatewayClient = {
+    request: vi.fn(
+      () =>
+        new Promise<{ jobs: unknown[] }>(resolve => {
+          resolveList = resolve;
+        }),
+    ),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+  });
+  const pollingService = service as unknown as {
+    polling: boolean;
+    pollOnce: () => Promise<void>;
+  };
+  pollingService.polling = true;
+
+  const firstPoll = pollingService.pollOnce();
+  await pollingService.pollOnce();
+
+  expect(gatewayClient.request).toHaveBeenCalledOnce();
+  resolveList?.({ jobs: [] });
+  await firstPoll;
 });
 
 describe('mapGatewayRun', () => {

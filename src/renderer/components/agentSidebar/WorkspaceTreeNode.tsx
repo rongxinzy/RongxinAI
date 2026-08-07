@@ -7,7 +7,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
-import { Ellipsis, Pencil, Trash2 } from 'lucide-react';
+import { Ellipsis, Pencil, Pin, PinOff, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -32,6 +32,7 @@ interface WorkspaceTreeNodeProps {
   onCreateTask: (workspace: WorkspaceSidebarNode) => void;
   onRenameWorkspace?: (workspace: WorkspaceSidebarNode) => void;
   onRemoveWorkspace?: (workspace: WorkspaceSidebarNode) => void;
+  onToggleWorkspacePin?: (workspace: WorkspaceSidebarNode, pinned: boolean) => Promise<void>;
   onRetryLoadTasks: (workspaceId: string) => void;
   onLoadMoreTasks: (workspaceId: string) => void;
   onCollapseTasks: (workspaceId: string) => void;
@@ -55,6 +56,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   onCreateTask,
   onRenameWorkspace,
   onRemoveWorkspace,
+  onToggleWorkspacePin,
   onRetryLoadTasks,
   onLoadMoreTasks,
   onCollapseTasks,
@@ -74,7 +76,8 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
   const createTaskIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const previousExpandedRef = useRef(workspace.isExpanded);
-  const canRemove = typeof onRemoveWorkspace === 'function';
+  const canRemove =
+    typeof onRemoveWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
   const canRename =
     typeof onRenameWorkspace === 'function' && !isScratchWorkspacePath(workspace.path);
   const canManage = canRemove || canRename;
@@ -168,6 +171,18 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                   <DropdownMenuItem onClick={() => onRenameWorkspace(workspace)}>
                     <Pencil className="h-3.5 w-3.5" />
                     {i18nService.t('renameProject')}
+                  </DropdownMenuItem>
+                )}
+                {onToggleWorkspacePin && (
+                  <DropdownMenuItem
+                    onClick={() => void onToggleWorkspacePin(workspace, !workspace.pinned)}
+                  >
+                    {workspace.pinned ? (
+                      <PinOff className="h-3.5 w-3.5" />
+                    ) : (
+                      <Pin className="h-3.5 w-3.5" />
+                    )}
+                    {i18nService.t(workspace.pinned ? 'unpinProject' : 'pinProject')}
                   </DropdownMenuItem>
                 )}
                 {canRemove && (

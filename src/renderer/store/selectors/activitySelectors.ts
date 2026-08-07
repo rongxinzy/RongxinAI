@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 
 import {
   ChannelRunStatus,
+  ChannelRunTrigger,
   type ChannelRunSummary,
-  type ChannelRunTrigger,
 } from '../../../shared/channelRun/constants';
 import type { RootState } from '../index';
 
@@ -20,6 +20,7 @@ export interface ActivityRun {
   conversationId: string;
   trigger: ChannelRunTrigger;
   status: ChannelRunStatus;
+  taskName?: string;
   /** Timestamp of the started event (or of the first seen event). */
   startedAt: number;
   /** Timestamp of the latest lifecycle transition. */
@@ -36,6 +37,7 @@ const toRun = (event: ChannelRunSummary): ActivityRun => ({
   conversationId: event.conversationId,
   trigger: event.trigger,
   status: event.status,
+  taskName: event.taskName,
   startedAt: event.timestamp,
   updatedAt: event.timestamp,
   inputPreview: event.inputPreview,
@@ -55,6 +57,16 @@ export const foldChannelRunEvents = (events: ChannelRunSummary[]): ActivityRun[]
   const runById = new Map<string, ActivityRun>();
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
+    // Ignore legacy/background-delivery Cron starts that carried neither a
+    // task name nor input. They are not actionable activity records.
+    if (
+      event.trigger === ChannelRunTrigger.Cron &&
+      event.status === ChannelRunStatus.Started &&
+      !event.taskName &&
+      !event.inputPreview
+    ) {
+      continue;
+    }
     let run = runById.get(event.runId);
     if (!run) {
       run = toRun(event);
@@ -66,6 +78,8 @@ export const foldChannelRunEvents = (events: ChannelRunSummary[]): ActivityRun[]
     }
     run.status = event.status;
     run.updatedAt = event.timestamp;
+    if (event.sessionId) run.sessionId = event.sessionId;
+    if (event.conversationId) run.conversationId = event.conversationId;
     run.replyPreview = event.replyPreview ?? run.replyPreview;
     run.errorMessage = event.errorMessage ?? run.errorMessage;
   }
