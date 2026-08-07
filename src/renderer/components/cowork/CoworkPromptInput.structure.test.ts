@@ -63,3 +63,10 @@ test('keeps streaming controls gated without obscuring the prompt', () => {
   expect(source).toContain("status={isStreaming ? 'streaming' : 'ready'}");
   expect(source).toContain('onStop={isStreaming ? onStop : undefined}');
 });
+
+test('keeps text editing mounted while a target session context is pending', () => {
+  expect(source).toContain('disabled={disabled}');
+  expect(source).toContain('inert={sessionContextPending ? true : undefined}');
+  expect(source).toContain('disabled={sessionContextPending}');
+  expect(source).toContain('sessionContextPending ||');
+});

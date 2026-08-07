@@ -24,7 +24,18 @@ vi.mock('@shared/components/ui/skeleton', () => ({
 }));
 
 vi.mock('./CoworkSessionDetail', () => ({
-  default: () => React.createElement('div', { 'data-testid': 'session-detail' }),
+  default: ({
+    displayedSessionId,
+    isSessionSwitching,
+  }: {
+    displayedSessionId: string;
+    isSessionSwitching: boolean;
+  }) =>
+    React.createElement('div', {
+      'data-testid': 'session-detail',
+      'data-displayed-session-id': displayedSessionId,
+      'data-session-switching': String(isSessionSwitching),
+    }),
 }));
 
 beforeEach(() => {
@@ -32,7 +43,7 @@ beforeEach(() => {
   mocks.state.cowork.loadingSessionId = null;
 });
 
-test('replaces the previous session with a loading skeleton while another session loads', () => {
+test('keeps the detail shell mounted while its conversation switches sessions', () => {
   mocks.state.cowork.currentSession = { id: 'session-a' };
   mocks.state.cowork.loadingSessionId = 'session-b';
 
@@ -44,9 +55,10 @@ test('replaces the previous session with a loading skeleton while another sessio
     }),
   );
 
-  expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
-  expect(screen.getAllByTestId('session-skeleton')).not.toHaveLength(0);
-  expect(screen.queryByTestId('session-detail')).not.toBeInTheDocument();
+  const detail = screen.getByTestId('session-detail');
+  expect(detail).toHaveAttribute('data-displayed-session-id', 'session-b');
+  expect(detail).toHaveAttribute('data-session-switching', 'true');
+  expect(screen.queryByTestId('session-skeleton')).not.toBeInTheDocument();
 });
 
 test('renders the target session as soon as its data is ready', () => {
@@ -62,6 +74,7 @@ test('renders the target session as soon as its data is ready', () => {
   );
 
   expect(screen.getByTestId('session-detail')).toBeInTheDocument();
+  expect(screen.getByTestId('session-detail')).toHaveAttribute('data-session-switching', 'false');
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
   expect(screen.queryByTestId('session-skeleton')).not.toBeInTheDocument();
 });
@@ -78,6 +91,7 @@ test('renders the current session when no switch is pending', () => {
   );
 
   expect(screen.getByTestId('session-detail')).toBeInTheDocument();
+  expect(screen.getByTestId('session-detail')).toHaveAttribute('data-session-switching', 'false');
   expect(screen.queryByRole('status')).not.toBeInTheDocument();
 });
 
