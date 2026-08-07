@@ -4525,18 +4525,22 @@ const Settings: React.FC<SettingsProps> = ({
                     )}
                   </div>
                   {isCustomProvider(activeProvider) && (
-                    <div className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground">
-                      <p>
-                        <span className="text-sm text-muted mr-1">•</span>
-                        {i18nService.t('baseUrlHint1')}
-                        <code className="ml-1 text-primary break-all">
+                    <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+                      <p className="flex min-w-0 items-start gap-1">
+                        <span className="shrink-0 text-sm text-muted">•</span>
+                        <span className="shrink-0 whitespace-nowrap">
+                          {i18nService.t('baseUrlHint1')}
+                        </span>
+                        <code className="min-w-0 text-primary break-all">
                           {i18nService.t('baseUrlHintExample1')}
                         </code>
                       </p>
-                      <p>
-                        <span className="text-sm text-muted mr-1">•</span>
-                        {i18nService.t('baseUrlHint2')}
-                        <code className="ml-1 text-primary break-all">
+                      <p className="flex min-w-0 items-start gap-1">
+                        <span className="shrink-0 text-sm text-muted">•</span>
+                        <span className="shrink-0 whitespace-nowrap">
+                          {i18nService.t('baseUrlHint2')}
+                        </span>
+                        <code className="min-w-0 text-primary break-all">
                           {i18nService.t('baseUrlHintExample2')}
                         </code>
                       </p>
