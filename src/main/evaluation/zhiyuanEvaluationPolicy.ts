@@ -11,7 +11,6 @@ import { ProductionLoopService } from '../productionLoop/service';
 import { buildProductionLoopTool } from '../productionLoop/tool';
 import {
   ZhiyuanEvaluationActivation,
-  ZhiyuanEvaluationCriticToolCallPrefix,
   ZhiyuanEvaluationCriticToolName,
   ZhiyuanEvaluationEventType,
   ZhiyuanEvaluationPolicyId,
@@ -21,7 +20,6 @@ import {
 } from './constants';
 import { InMemoryProductionLoopStore } from './inMemoryProductionLoopStore';
 import type {
-  ZhiyuanEvaluationAgentEndInput,
   ZhiyuanEvaluationPolicy,
   ZhiyuanEvaluationPolicyContext,
   ZhiyuanEvaluationTool,
@@ -33,25 +31,6 @@ const definedEvidence = (event: HarnessActivationEvent): WorkbenchJsonObject => 
   if (event.mechanism !== undefined) evidence.mechanism = event.mechanism;
   if (event.evidence !== undefined) evidence.evidence = event.evidence;
   return evidence;
-};
-
-const assistantText = (messages: unknown[]): string => {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (!message || typeof message !== 'object') continue;
-    const raw = message as Record<string, unknown>;
-    if (raw.role !== 'assistant') continue;
-    if (typeof raw.content === 'string') return raw.content;
-    if (!Array.isArray(raw.content)) continue;
-    return raw.content
-      .flatMap(item => {
-        if (!item || typeof item !== 'object') return [];
-        const content = item as Record<string, unknown>;
-        return content.type === 'text' && typeof content.text === 'string' ? [content.text] : [];
-      })
-      .join('\n');
-  }
-  return '';
 };
 
 const toolResultText = (result: unknown): string => {
@@ -158,7 +137,6 @@ export function createZhiyuanEvaluationPolicy(
       Array.isArray(reviewerCapability.tools) &&
       reviewerCapability.tools.length === 0,
   );
-  let criticFallbackPending = false;
   let criticAttempt = 0;
 
   context.emitActivation(ZhiyuanEvaluationActivation.PolicyLoaded, {
@@ -181,7 +159,7 @@ export function createZhiyuanEvaluationPolicy(
   if (!isolatedReviewerAvailable) {
     context.emitActivation(ZhiyuanEvaluationActivation.CriticDegraded, {
       reason: 'No isolated reviewer subagent is configured for this evaluation.',
-      mode: 'same_model_transcript_only',
+      mode: 'unavailable_fail_closed',
       readOnly: true,
     });
   }
@@ -234,24 +212,7 @@ export function createZhiyuanEvaluationPolicy(
     }
   };
 
-  const onAgentEnd = (input: ZhiyuanEvaluationAgentEndInput) => {
-    if (criticFallbackPending) {
-      criticFallbackPending = false;
-      criticAttempt += 1;
-      const toolCallId = `${ZhiyuanEvaluationCriticToolCallPrefix}-${criticAttempt}`;
-      controller.recordSubagentStart(toolCallId, { agent: 'reviewer' });
-      const output = assistantText(input.messages);
-      controller.recordSubagentResult(toolCallId, output, !output.trim());
-      const critic = controller.getState().critic;
-      context.emitActivation(ZhiyuanEvaluationActivation.CriticCompleted, {
-        attempt: criticAttempt,
-        mode: 'same_model_transcript_only',
-        outputPresent: Boolean(output.trim()),
-        passed: critic.passed,
-        findingSeverities: critic.findings.map(finding => finding.severity),
-      });
-    }
-
+  const onAgentEnd = () => {
     const state = controller.getState();
     if (
       state.phase === ProductionLoopPhase.Critique &&
@@ -270,18 +231,7 @@ export function createZhiyuanEvaluationPolicy(
           ].join('\n'),
         };
       }
-      criticFallbackPending = true;
-      return {
-        shouldContinue: true,
-        nextPrompt: [
-          controller.requestCriticPrompt(),
-          'Evaluation constraint: act as a read-only critic in this turn.',
-          `Observed Inspect sandbox tool outcomes: ${JSON.stringify(toolEvidence)}`,
-          'Treat successful required tool outcomes as execution evidence.',
-          'The official benchmark scorer remains the final deterministic gate after delivery.',
-          'Do not call tools or modify files. Return exactly the requested JSON object.',
-        ].join('\n'),
-      };
+      return { shouldContinue: false };
     }
     return agentLoop.handleAgentEnd();
   };

@@ -6,6 +6,7 @@ import {
 } from '../../shared/productionLoop';
 import type { WorkbenchContractKind, WorkbenchJsonObject } from '../../shared/workbenchTask';
 import type { PiAgentLoopEndSignal } from '../libs/agentEngine/piAgentLoop';
+import { PiSubagentProfileId } from '../libs/agentEngine/piSubagentConstants';
 import type { ProductionLoopService } from './service';
 
 interface DownstreamCompletionWorkflow {
@@ -17,10 +18,14 @@ interface DownstreamCompletionWorkflow {
   ): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
 }
 
-const isStandaloneReviewer = (args: unknown): boolean => {
+const isStandaloneProductionReviewer = (args: unknown): boolean => {
   if (!args || typeof args !== 'object') return false;
   const raw = args as Record<string, unknown>;
-  return raw.agent === 'reviewer' && raw.parallel === undefined && raw.chain === undefined;
+  return (
+    raw.agent === PiSubagentProfileId.ProductionReviewer &&
+    raw.parallel === undefined &&
+    raw.chain === undefined
+  );
 };
 
 export class ProductionLoopController {
@@ -72,7 +77,7 @@ export class ProductionLoopController {
       phaseInstruction,
       'The plan must include acceptance criteria, expected artifacts, and deterministic verifiers.',
       'After commit_plan, read the returned state and use each generated plan item ID with update_plan_item.',
-      'After execution, call start_inspection with every required artifact and the successful tool call ID for each deterministic verifier, then request_critique and delegate a read-only review to the reviewer subagent.',
+      'After execution, call start_inspection with every required artifact and the successful tool call ID for each deterministic verifier, then request_critique and delegate a read-only review to the production-reviewer subagent.',
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',
       'Call agent_loop done only after the production loop reports ready_to_deliver.',
@@ -83,7 +88,7 @@ export class ProductionLoopController {
   requestCriticPrompt(): string {
     this.refresh();
     return [
-      'Call the subagent tool with agent "reviewer". The reviewer must remain read-only.',
+      `Call the subagent tool with agent "${PiSubagentProfileId.ProductionReviewer}". The reviewer must remain read-only.`,
       'Ask it to inspect the implementation and available evidence against this persisted plan:',
       JSON.stringify({
         goal: this.state.goal,
@@ -124,7 +129,8 @@ export class ProductionLoopController {
 
   recordSubagentStart(toolCallId: string, args: unknown): void {
     this.refresh();
-    if (!isStandaloneReviewer(args) || this.state.phase !== ProductionLoopPhase.Critique) return;
+    if (!isStandaloneProductionReviewer(args) || this.state.phase !== ProductionLoopPhase.Critique)
+      return;
     this.update(this.service.recordCriticStart(this.state.runId, toolCallId));
   }
 
