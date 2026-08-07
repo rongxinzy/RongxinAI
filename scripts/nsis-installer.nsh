@@ -354,7 +354,7 @@
   LlamaCppBackendResourcesPresent:
     StrCpy $R8 ""
     IfSilent LlamaCppBackendInstallDeferred 0
-    MessageBox MB_OKCANCEL|MB_ICONQUESTION "本地推理运行时包含未签名的程序文件。知远智能体需要创建本机证书并仅签名这些文件，以便正常运行。$\r$\n$\r$\n点击“确定”继续安装；点击“取消”退出安装。证书不会上传，也不会用于其他应用。" IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
+    MessageBox MB_OKCANCEL|MB_ICONQUESTION "本地推理运行时包含未签名的程序文件。知远智能体需要创建本机证书并仅签名这些文件，以便正常运行。$\r$\n$\r$\n点击“确定”继续安装并启用本地推理；点击“取消”将跳过本地推理，App 仍可正常安装。证书不会上传，也不会用于其他应用。" IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
 
   LlamaCppBackendLocalSigningConfirmed:
     StrCpy $R8 "--local-signing-confirmed"
@@ -371,9 +371,10 @@
   LlamaCppBackendLocalSigningCancelled:
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-local-signing-cancelled$\r$\n"
+    FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=user-declined-local-signing$\r$\n"
     FileClose $2
-    Abort
+    DetailPrint "[Installer] Skipping local inference runtime installation because local signing was declined"
+    Goto LlamaCppBackendInstallDone
 
   LlamaCppBackendInstallRun:
     IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallExecute LlamaCppBackendHelperMissing

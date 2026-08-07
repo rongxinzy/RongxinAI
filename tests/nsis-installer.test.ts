@@ -23,7 +23,21 @@ describe('NSIS local inference runtime signing flow', () => {
     expect(helperInvocationIndex).toBeGreaterThan(confirmationIndex);
     expect(installerScript).toContain('StrCpy $R8 "--local-signing-confirmed"');
     expect(installerScript).toContain('Goto LlamaCppBackendInstallRun');
-    expect(installerScript).toContain('证书不会上传，也不会用于其他应用。');
+    expect(installerScript).toContain('点击“取消”将跳过本地推理，App 仍可正常安装。');
+  });
+
+  test('continues app installation when local signing is declined', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const cancellationBlock = installerScript.slice(
+      installerScript.indexOf('LlamaCppBackendLocalSigningCancelled:'),
+      installerScript.indexOf('LlamaCppBackendInstallRun:'),
+    );
+
+    expect(cancellationBlock).toContain(
+      'phase=llamacpp-backend-install-skipped reason=user-declined-local-signing',
+    );
+    expect(cancellationBlock).toContain('Goto LlamaCppBackendInstallDone');
+    expect(cancellationBlock).not.toContain('Abort');
   });
 
   test('does not silently authorize local signing during unattended updates', () => {
