@@ -109,7 +109,10 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
       const isSteerShortcut =
-        event.key === 'Enter' && event.shiftKey && !event.altKey && (event.ctrlKey || event.metaKey);
+        event.key === 'Enter' &&
+        event.shiftKey &&
+        !event.altKey &&
+        (event.ctrlKey || event.metaKey);
       if (!isSteerShortcut || !isStreaming || !selectedItemId) return;
       const selected = items.find(item => item.id === selectedItemId);
       if (!selected || selected.status === CoworkQueueItemStatus.Sending) return;
@@ -126,119 +129,122 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
     <div className="mb-2 overflow-hidden rounded-xl border border-border bg-card text-sm">
       <div>
         {items.map(item => {
-            const isEditing = editingId === item.id;
-            const isSending = item.status === CoworkQueueItemStatus.Sending;
-            const isFailed = item.status === CoworkQueueItemStatus.Failed;
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  'flex min-w-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 transition-colors last:border-b-0',
-                  selectedItemId === item.id && 'bg-accent/40',
-                  isFailed && 'bg-destructive/5',
-                )}
-                onClick={() => setSelectedItemId(item.id)}
-              >
+          const isEditing = editingId === item.id;
+          const isSending = item.status === CoworkQueueItemStatus.Sending;
+          const isFailed = item.status === CoworkQueueItemStatus.Failed;
+          return (
+            <div
+              key={item.id}
+              className={cn(
+                'flex min-w-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 transition-colors last:border-b-0',
+                selectedItemId === item.id && 'bg-accent/40',
+                isFailed && 'bg-destructive/5',
+              )}
+              onClick={() => setSelectedItemId(item.id)}
+            >
+              {isEditing ? (
+                <Input
+                  value={editingText}
+                  autoFocus
+                  onChange={event => setEditingText(event.currentTarget.value)}
+                  onKeyDown={event => {
+                    if (event.key === 'Escape') cancelEdit();
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      void saveEdit(item.id);
+                    }
+                  }}
+                  className="h-8 min-w-0 flex-1"
+                />
+              ) : (
+                <>
+                  <ListTodo className="size-4 shrink-0 text-muted-foreground" />
+                  <div
+                    className="min-w-0 flex-1 truncate font-medium text-foreground"
+                    title={item.text}
+                  >
+                    {item.text}
+                  </div>
+                  {(isFailed || isSending) && (
+                    <span
+                      className={cn(
+                        'shrink-0 text-xs',
+                        isFailed ? 'text-destructive' : 'text-muted-foreground',
+                      )}
+                    >
+                      {isFailed
+                        ? i18nService.t('coworkQueueStatusFailed')
+                        : i18nService.t('coworkQueueStatusSending')}
+                    </span>
+                  )}
+                </>
+              )}
+              <div className="flex shrink-0 items-center gap-0.5">
                 {isEditing ? (
-                  <Input
-                    value={editingText}
-                    autoFocus
-                    onChange={event => setEditingText(event.currentTarget.value)}
-                    onKeyDown={event => {
-                      if (event.key === 'Escape') cancelEdit();
-                      if (event.key === 'Enter' && !event.shiftKey) {
-                        event.preventDefault();
-                        void saveEdit(item.id);
-                      }
-                    }}
-                    className="h-8 min-w-0 flex-1"
-                  />
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      title={i18nService.t('save')}
+                      aria-label={i18nService.t('save')}
+                      onClick={() => void saveEdit(item.id)}
+                    >
+                      <Check />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      title={i18nService.t('cancel')}
+                      aria-label={i18nService.t('cancel')}
+                      onClick={cancelEdit}
+                    >
+                      <X />
+                    </Button>
+                  </>
                 ) : (
                   <>
-                    <ListTodo className="size-4 shrink-0 text-muted-foreground" />
-                    <div className="min-w-0 flex-1 truncate font-medium text-foreground" title={item.text}>
-                      {item.text}
-                    </div>
-                    {(isFailed || isSending) && (
-                      <span
-                        className={cn(
-                          'shrink-0 text-xs',
-                          isFailed ? 'text-destructive' : 'text-muted-foreground',
-                        )}
-                      >
-                        {isFailed
-                          ? i18nService.t('coworkQueueStatusFailed')
-                          : i18nService.t('coworkQueueStatusSending')}
-                      </span>
-                    )}
+                    <Button
+                      type="button"
+                      variant={isFailed ? 'outline' : 'ghost'}
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      disabled={isSending || (!isFailed && !isStreaming)}
+                      onClick={() => void (isFailed ? retryItem(item.id) : steerItem(item.id))}
+                    >
+                      {isFailed ? <RotateCcw /> : <Compass />}
+                      {isFailed
+                        ? i18nService.t('coworkQueueRetry')
+                        : i18nService.t('coworkQueueSteer')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs"
+                      disabled={isSending}
+                      onClick={() => beginEdit(item)}
+                    >
+                      <Pencil />
+                      {i18nService.t('edit')}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      title={i18nService.t('delete')}
+                      aria-label={i18nService.t('delete')}
+                      disabled={isSending}
+                      onClick={() => void removeItem(item.id)}
+                    >
+                      <Trash2 />
+                    </Button>
                   </>
                 )}
-                <div className="flex shrink-0 items-center gap-0.5">
-                  {isEditing ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        title={i18nService.t('save')}
-                        aria-label={i18nService.t('save')}
-                        onClick={() => void saveEdit(item.id)}
-                      >
-                        <Check />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        title={i18nService.t('cancel')}
-                        aria-label={i18nService.t('cancel')}
-                        onClick={cancelEdit}
-                      >
-                        <X />
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button
-                        type="button"
-                        variant={isFailed ? 'outline' : 'ghost'}
-                        size="sm"
-                        className="h-7 gap-1 px-2 text-xs"
-                        disabled={isSending || (!isFailed && !isStreaming)}
-                        onClick={() => void (isFailed ? retryItem(item.id) : steerItem(item.id))}
-                      >
-                        {isFailed ? <RotateCcw /> : <Compass />}
-                        {isFailed
-                          ? i18nService.t('coworkQueueRetry')
-                          : i18nService.t('coworkQueueSteer')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 gap-1 px-2 text-xs"
-                        disabled={isSending}
-                        onClick={() => beginEdit(item)}
-                      >
-                        <Pencil />
-                        {i18nService.t('edit')}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-xs"
-                        title={i18nService.t('delete')}
-                        aria-label={i18nService.t('delete')}
-                        disabled={isSending}
-                        onClick={() => void removeItem(item.id)}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </>
-                  )}
-                </div>
               </div>
-            );
+            </div>
+          );
         })}
       </div>
     </div>

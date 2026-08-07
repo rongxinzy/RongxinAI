@@ -24,6 +24,7 @@ export const PREVIEWABLE_ARTIFACT_TYPES = new Set<ArtifactType>([
   'markdown',
   'text',
   'document',
+  'unsupported',
 ]);
 
 export type ArtifactSource = CoworkArtifactSource;

@@ -6,7 +6,8 @@ export type CoworkArtifactType =
   | 'code'
   | 'markdown'
   | 'text'
-  | 'document';
+  | 'document'
+  | 'unsupported';
 
 export const CoworkArtifactSource = {
   CodeBlock: 'codeblock',

@@ -7,7 +7,7 @@ import {
   type CoworkArtifactMessage,
 } from './coworkArtifactCollector';
 
-export const COWORK_ARTIFACT_INDEX_VERSION = 2;
+export const COWORK_ARTIFACT_INDEX_VERSION = 6;
 
 interface ArtifactIndexStateRow {
   cursor_sequence: number;

@@ -145,7 +145,11 @@ export class ArtifactDetectionService {
   private async loadFiles(detected: ArtifactDetectionResult[], cwd?: string | null): Promise<void> {
     if (!this.readFile) return;
     const toLoad = detected.filter(
-      d => d.needsFileLoad && d.artifact.filePath && !this.loadedFileIds.has(d.artifact.id),
+      d =>
+        d.needsFileLoad &&
+        d.artifact.type !== 'unsupported' &&
+        d.artifact.filePath &&
+        !this.loadedFileIds.has(d.artifact.id),
     );
     if (toLoad.length === 0) return;
 

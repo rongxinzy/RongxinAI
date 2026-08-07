@@ -13,6 +13,7 @@ const MarkdownRenderer = React.lazy(() => import('./renderers/MarkdownRenderer')
 const MermaidRenderer = React.lazy(() => import('./renderers/MermaidRenderer'));
 const SvgRenderer = React.lazy(() => import('./renderers/SvgRenderer'));
 const TextRenderer = React.lazy(() => import('./renderers/TextRenderer'));
+const UnsupportedRenderer = React.lazy(() => import('./renderers/UnsupportedRenderer'));
 
 /**
  * Size-stable placeholder shown while a renderer chunk loads. A softly
@@ -56,6 +57,9 @@ const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact }) => {
       break;
     case 'code':
       renderer = <CodeRenderer artifact={artifact} />;
+      break;
+    case 'unsupported':
+      renderer = <UnsupportedRenderer artifact={artifact} />;
       break;
     default:
       return (

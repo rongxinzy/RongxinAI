@@ -4,6 +4,7 @@ import { discoverWorkbenchMessageArtifactBlocks } from '../../shared/workbenchTa
 import {
   ArtifactTypeByExtension,
   getArtifactTypeByExtension,
+  isBinaryArtifactFile,
 } from '../../shared/cowork/artifactPreview';
 
 const DECLARE_ARTIFACT_TOOL_NAME = 'declare_artifact';
@@ -38,9 +39,7 @@ const LANGUAGE_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
   plaintext: 'text',
 };
 
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
-const BINARY_DOCUMENT_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx', '.pdf']);
-
+const IMAGE_EXTENSIONS = new Set(['.png', '.bmp', '.ico', '.jpg', '.jpeg', '.gif', '.webp']);
 export function getArtifactTypeFromLanguage(lang: string): ArtifactType | null {
   return LANGUAGE_TO_ARTIFACT_TYPE[lang.toLowerCase()] ?? null;
 }
@@ -54,7 +53,7 @@ export function isImageExtension(ext: string): boolean {
 }
 
 export function isBinaryDocumentExtension(ext: string): boolean {
-  return BINARY_DOCUMENT_EXTENSIONS.has(ext.toLowerCase());
+  return isBinaryArtifactFile(`artifact${ext}`);
 }
 
 export function parseCodeBlockArtifacts(
@@ -124,7 +123,7 @@ export function parseDeclareArtifactFromMessages(
     const artifactType =
       (declaredKind && getArtifactTypeFromLanguage(declaredKind)) ||
       getArtifactTypeFromExtension(ext) ||
-      'code';
+      'unsupported';
     const fileName = getFileName(filePath);
     const declaredRole =
       input.role === 'intermediate'
@@ -174,6 +173,8 @@ function generateTitle(type: ArtifactType, language: string, content: string): s
       return 'Text File';
     case 'document':
       return 'Document';
+    case 'unsupported':
+      return 'Unsupported File';
     case 'code':
       return `${language.charAt(0).toUpperCase() + language.slice(1)} Code`;
   }

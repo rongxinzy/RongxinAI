@@ -23,12 +23,14 @@ import {
   ArtifactPreviewMode,
   ArtifactRole,
   getArtifactPreviewMode,
+  isBinaryArtifactFile,
   type Artifact,
   type ArtifactType,
 } from '@/types/artifact';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '@/types/artifact';
 
 import ArtifactRenderer from './ArtifactRenderer';
+import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
 import CodeRenderer from './renderers/CodeRenderer';
@@ -37,7 +39,7 @@ const t = (key: string) => i18nService.t(key);
 
 const BROWSER_OPENABLE_TYPES = new Set<ArtifactType>(['html', 'svg', 'mermaid']);
 
-const SYSTEM_OPENABLE_TYPES = new Set<ArtifactType>(['document']);
+const SYSTEM_OPENABLE_TYPES = new Set<ArtifactType>(['document', 'unsupported']);
 
 function buildBrowserHtml(artifact: Artifact): string | null {
   switch (artifact.type) {
@@ -228,7 +230,11 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 
     // Has file on disk: open directly
     if (selectedArtifact.filePath) {
-      const fileUrl = `file://${selectedArtifact.filePath}`;
+      if (window.electron.platform === 'win32') {
+        window.electron.shell.openPath(selectedArtifact.filePath);
+        return;
+      }
+      const fileUrl = toLocalFileUrl(selectedArtifact.filePath);
       window.electron?.shell?.openExternal(fileUrl);
       return;
     }
@@ -264,8 +270,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     try {
       const result = await window.electron.dialog.readFileAsDataUrl(selectedArtifact.filePath);
       if (result?.success && result.dataUrl) {
-        const isTextType =
-          selectedArtifact.type !== 'image' && selectedArtifact.type !== 'document';
+        const isTextType = !isBinaryArtifactFile(selectedArtifact.filePath);
         let content = result.dataUrl;
         if (isTextType) {
           try {
@@ -346,7 +351,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 {selectedArtifact.fileName || selectedArtifact.title}
               </span>
               <span className="flex-1" />
-              {selectedArtifact.filePath && (
+              {selectedArtifact.filePath && selectedArtifact.type !== 'unsupported' && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -357,7 +362,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <RefreshIcon />
                 </Button>
               )}
-              {selectedArtifact.type !== 'document' && (
+              {selectedArtifact.type !== 'document' && selectedArtifact.type !== 'unsupported' && (
                 <Button
                   variant="ghost"
                   size="icon"
