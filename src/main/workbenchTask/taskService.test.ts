@@ -61,7 +61,16 @@ const prepareProductionDelivery = (
     planned.planItems[0].id,
     ProductionPlanItemStatus.Completed,
   );
-  service.productionLoop.startInspection(runId);
+  service.productionLoop.startInspection(runId, {
+    artifacts: [{ kind: 'result', reference: 'final-answer' }],
+    verifiers: [
+      {
+        name: 'completion_contract',
+        passed: true,
+        evidence: 'Completion contract passed.',
+      },
+    ],
+  });
   service.productionLoop.requestCritique(runId);
   service.productionLoop.recordCriticStart(runId, 'critic');
   service.productionLoop.recordCriticResult(

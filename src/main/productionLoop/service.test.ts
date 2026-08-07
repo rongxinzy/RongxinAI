@@ -65,6 +65,14 @@ const commitPlan = (runId: string) =>
     selectedDirection: 'prototype-a',
   });
 
+const startInspection = (runId: string) =>
+  service.startInspection(runId, {
+    artifacts: [{ kind: 'file', reference: 'report.md' }],
+    verifiers: [
+      { name: 'artifact_verifier', passed: true, evidence: 'report.md exists and is valid.' },
+    ],
+  });
+
 test('requires a prototype only for explicitly high-ambiguity runs', () => {
   const { run, state } = begin(true);
   expect(state.phase).toBe(ProductionLoopPhase.Explore);
@@ -74,13 +82,54 @@ test('requires a prototype only for explicitly high-ambiguity runs', () => {
   expect(commitPlan(run.id).phase).toBe(ProductionLoopPhase.Execute);
 });
 
+test('requires deterministic verifier and artifact evidence before inspection', () => {
+  const { run } = begin();
+  expect(() =>
+    service.commitPlan(run.id, {
+      items: [{ title: 'Create artifact' }],
+      constraints: [],
+      acceptanceCriteria: ['Artifact exists'],
+      expectedArtifacts: [],
+      expectedVerifiers: [{ name: 'manual review', deterministic: false }],
+    }),
+  ).toThrow('deterministic verifier');
+
+  const planned = commitPlan(run.id);
+  for (const item of planned.planItems) {
+    service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
+  }
+  expect(() =>
+    service.startInspection(run.id, {
+      artifacts: [],
+      verifiers: [
+        { name: 'artifact_verifier', passed: true, evidence: 'Verifier passed.' },
+      ],
+    }),
+  ).toThrow('artifact evidence');
+  expect(() =>
+    service.startInspection(run.id, {
+      artifacts: [{ kind: 'file', reference: 'report.md' }],
+      verifiers: [
+        { name: 'artifact_verifier', passed: false, evidence: 'Verifier failed.' },
+      ],
+    }),
+  ).toThrow('Passing deterministic verifier evidence');
+
+  const inspecting = startInspection(run.id);
+  expect(inspecting.inspections).toHaveLength(1);
+  expect(inspecting.inspections[0].verifiers[0]).toMatchObject({
+    name: 'artifact_verifier',
+    passed: true,
+  });
+});
+
 test('persists plan, critic rejection, revision, and delivery readiness', () => {
   const { run } = begin();
   const planned = commitPlan(run.id);
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  service.startInspection(run.id);
+  startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review-1');
   const rejected = service.recordCriticResult(
@@ -96,6 +145,7 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   expect(rejected.status).toBe(ProductionLoopStatus.NeedsRevision);
 
   service.recordRevision(run.id, 'Added test evidence', { command: 'npm test' });
+  startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review-2');
   const accepted = service.recordCriticResult(
@@ -147,7 +197,7 @@ test('accepts a critic verdict wrapped in a Markdown JSON fence', () => {
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  service.startInspection(run.id);
+  startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review');
 
@@ -168,7 +218,7 @@ test('deterministic verification failure overrides critic PASS and returns to re
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  service.startInspection(run.id);
+  startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review');
   service.recordCriticResult(
@@ -196,7 +246,7 @@ test('keeps acceptance-required work ready until the user accepts it', () => {
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  service.startInspection(run.id);
+  startInspection(run.id);
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review');
   service.recordCriticResult(

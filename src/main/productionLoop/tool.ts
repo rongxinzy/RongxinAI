@@ -2,8 +2,10 @@ import {
   ProductionLoopAction,
   ProductionLoopToolName,
   ProductionPlanItemStatus,
+  type ProductionArtifactEvidence,
   type ProductionExpectedArtifact,
   type ProductionExpectedVerifier,
+  type ProductionVerifierEvidence,
 } from '../../shared/productionLoop';
 import type { ProductionLoopController } from './controller';
 
@@ -39,6 +41,28 @@ const expectedVerifiers = (value: unknown): ProductionExpectedVerifier[] =>
         const raw = entry as Record<string, unknown>;
         return typeof raw.name === 'string'
           ? [{ name: raw.name, deterministic: raw.deterministic === true }]
+          : [];
+      })
+    : [];
+
+const artifactEvidence = (value: unknown): ProductionArtifactEvidence[] =>
+  Array.isArray(value)
+    ? value.flatMap(entry => {
+        if (!entry || typeof entry !== 'object') return [];
+        const raw = entry as Record<string, unknown>;
+        return typeof raw.kind === 'string' && typeof raw.reference === 'string'
+          ? [{ kind: raw.kind, reference: raw.reference }]
+          : [];
+      })
+    : [];
+
+const verifierEvidence = (value: unknown): ProductionVerifierEvidence[] =>
+  Array.isArray(value)
+    ? value.flatMap(entry => {
+        if (!entry || typeof entry !== 'object') return [];
+        const raw = entry as Record<string, unknown>;
+        return typeof raw.name === 'string' && typeof raw.evidence === 'string'
+          ? [{ name: raw.name, passed: raw.passed === true, evidence: raw.evidence }]
           : [];
       })
     : [];
@@ -113,6 +137,32 @@ export function buildProductionLoopTool(
             additionalProperties: false,
           },
         },
+        artifactEvidence: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              kind: { type: 'string' },
+              reference: { type: 'string' },
+            },
+            required: ['kind', 'reference'],
+            additionalProperties: false,
+          },
+        },
+        verifierEvidence: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              passed: { type: 'boolean' },
+              evidence: { type: 'string' },
+            },
+            required: ['name', 'passed', 'evidence'],
+            additionalProperties: false,
+          },
+        },
         selectedDirection: { type: 'string' },
         itemId: { type: 'string' },
         status: { type: 'string', enum: Object.values(ProductionPlanItemStatus) },
@@ -172,7 +222,10 @@ export function buildProductionLoopTool(
             );
             return result('Plan item updated.');
           case ProductionLoopAction.StartInspection:
-            controller.startInspection();
+            controller.startInspection({
+              artifacts: artifactEvidence(params.artifactEvidence),
+              verifiers: verifierEvidence(params.verifierEvidence),
+            });
             return result(
               'Inspection phase started. Run deterministic checks, then request critique.',
             );

@@ -93,7 +93,16 @@ describe('createZhiyuanEvaluationPolicy', () => {
       itemId: plan.details.planItems[0].id,
       status: ProductionPlanItemStatus.Completed,
     });
-    await productionTool.execute('inspect', { action: ProductionLoopAction.StartInspection });
+    await productionTool.execute('inspect', {
+      action: ProductionLoopAction.StartInspection,
+      verifierEvidence: [
+        {
+          name: 'official benchmark scorer',
+          passed: true,
+          evidence: 'Official benchmark scorer passed.',
+        },
+      ],
+    });
     await productionTool.execute('critic', { action: ProductionLoopAction.RequestCritique });
     policy.onEvent?.({
       type: 'tool_execution_end',
@@ -181,7 +190,16 @@ describe('createZhiyuanEvaluationPolicy', () => {
       itemId: plan.details.planItems[0].id,
       status: ProductionPlanItemStatus.Completed,
     });
-    await productionTool.execute('inspect', { action: ProductionLoopAction.StartInspection });
+    await productionTool.execute('inspect', {
+      action: ProductionLoopAction.StartInspection,
+      verifierEvidence: [
+        {
+          name: 'official benchmark scorer',
+          passed: true,
+          evidence: 'Official benchmark scorer passed.',
+        },
+      ],
+    });
     await productionTool.execute('critic', { action: ProductionLoopAction.RequestCritique });
     policy.onEvent?.({
       type: 'tool_execution_end',
