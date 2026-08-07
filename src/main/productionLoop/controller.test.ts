@@ -8,6 +8,7 @@ import {
   WorkbenchVerificationOutcome,
 } from '../../shared/workbenchTask';
 import { HarnessMeasurementService } from '../harness/measurementService';
+import { PiSubagentProfileId } from '../libs/agentEngine/piSubagentConstants';
 import { WorkbenchTaskRepository } from '../workbenchTask/repository';
 import { initializeWorkbenchTaskSchema } from '../workbenchTask/schema';
 import { ProductionLoopController } from './controller';
@@ -109,7 +110,10 @@ test('accepts only the requested read-only reviewer result before delivery', () 
   reachCritique(controller);
   controller.recordSubagentStart('scout', { agent: 'scout', task: 'review' });
   expect(controller.getState().critic.toolCallId).toBeNull();
-  controller.recordSubagentStart('review', { agent: 'reviewer', task: 'review' });
+  controller.recordSubagentStart('review', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'review',
+  });
   controller.recordSubagentResult(
     'review',
     JSON.stringify({ verdict: 'pass', findings: [] }),
@@ -129,7 +133,10 @@ test('accepts only the requested read-only reviewer result before delivery', () 
 test('invalid critic output enters revision instead of silently passing', () => {
   const { controller } = createController();
   reachCritique(controller);
-  controller.recordSubagentStart('review', { agent: 'reviewer', task: 'review' });
+  controller.recordSubagentStart('review', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'review',
+  });
   controller.recordSubagentResult('review', 'looks fine', false);
   expect(controller.getState().phase).toBe(ProductionLoopPhase.Revise);
   expect(controller.getState().critic.findings[0].summary).toContain('invalid structured response');
@@ -140,20 +147,26 @@ test('does not bind grouped subagent calls as the independent reviewer', () => {
   reachCritique(controller);
   controller.recordSubagentStart('parallel-review', {
     parallel: [
-      { agent: 'reviewer', task: 'review' },
+      { agent: PiSubagentProfileId.ProductionReviewer, task: 'review' },
       { agent: 'scout', task: 'inspect files' },
     ],
   });
   expect(controller.getState().critic.toolCallId).toBeNull();
 
-  controller.recordSubagentStart('standalone-review', { agent: 'reviewer', task: 'review' });
+  controller.recordSubagentStart('standalone-review', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'review',
+  });
   expect(controller.getState().critic.toolCallId).toBe('standalone-review');
 });
 
 test('refreshes externally persisted verification state before making decisions', () => {
   const { controller, service } = createController();
   reachCritique(controller);
-  controller.recordSubagentStart('review', { agent: 'reviewer', task: 'review' });
+  controller.recordSubagentStart('review', {
+    agent: PiSubagentProfileId.ProductionReviewer,
+    task: 'review',
+  });
   controller.recordSubagentResult(
     'review',
     JSON.stringify({ verdict: 'pass', findings: [] }),

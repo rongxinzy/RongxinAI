@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { HarnessActivationType, type HarnessActivationEvent } from '../../shared/harness';
 import { ProductionLoopAction, ProductionPlanItemStatus } from '../../shared/productionLoop';
-import { PiAgentLoopAction } from '../libs/agentEngine/piAgentLoop';
+import { PiSubagentProfileId } from '../libs/agentEngine/piSubagentConstants';
 import {
   ZhiyuanEvaluationActivation,
   ZhiyuanEvaluationPolicyId,
@@ -73,7 +73,6 @@ describe('createZhiyuanEvaluationPolicy', () => {
     const testContext = context(ZhiyuanEvaluationToolMode.Execute);
     const policy = createZhiyuanEvaluationPolicy(testContext.value);
     const productionTool = tool(policy.customTools, 'production_loop');
-    const loopTool = tool(policy.customTools, 'agent_loop');
 
     expect(policy.systemPrompt).toContain('ZhiYuan Agent');
     expect(policy.skillPaths).toEqual(['SKILLs']);
@@ -111,24 +110,7 @@ describe('createZhiyuanEvaluationPolicy', () => {
     });
     await productionTool.execute('critic', { action: ProductionLoopAction.RequestCritique });
 
-    const criticTurn = await policy.onAgentEnd?.({ iteration: 1, messages: [], usage: {} });
-    expect(criticTurn?.nextPrompt).toContain('read-only');
-    const deliveryTurn = await policy.onAgentEnd?.({
-      iteration: 2,
-      messages: [
-        {
-          role: 'assistant',
-          content: [{ type: 'text', text: '{"verdict":"pass","findings":[]}' }],
-        },
-      ],
-      usage: {},
-    });
-    expect(deliveryTurn?.nextPrompt).toContain('agent_loop done');
-    await loopTool.execute('done', {
-      action: PiAgentLoopAction.Done,
-      reason: 'The task and production gates are complete.',
-    });
-    expect(await policy.onAgentEnd?.({ iteration: 3, messages: [], usage: {} })).toEqual({
+    expect(await policy.onAgentEnd?.({ iteration: 1, messages: [], usage: {} })).toEqual({
       shouldContinue: false,
     });
 
@@ -140,6 +122,19 @@ describe('createZhiyuanEvaluationPolicy', () => {
         ZhiyuanEvaluationActivation.ProductionToolCompleted,
         HarnessActivationType.PlanCommitted,
         HarnessActivationType.CriticRequested,
+      ]),
+    );
+    expect(testContext.activations).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ activation: ZhiyuanEvaluationActivation.CriticCompleted }),
+      ]),
+    );
+    expect(testContext.activations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          activation: ZhiyuanEvaluationActivation.CriticDegraded,
+          evidence: expect.objectContaining({ mode: 'unavailable_fail_closed' }),
+        }),
       ]),
     );
   });
@@ -215,7 +210,10 @@ describe('createZhiyuanEvaluationPolicy', () => {
       type: 'tool_execution_start',
       toolName: 'subagent',
       toolCallId: 'review-1',
-      args: { agent: 'reviewer', task: 'Review the supplied evidence.' },
+      args: {
+        agent: PiSubagentProfileId.ProductionReviewer,
+        task: 'Review the supplied evidence.',
+      },
     });
     policy.onEvent?.({
       type: 'tool_execution_end',

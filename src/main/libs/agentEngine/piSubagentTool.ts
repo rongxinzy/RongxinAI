@@ -21,6 +21,7 @@ import * as fs from 'fs';
 import path from 'path';
 
 import { CoreSkillId } from '../../../shared/skills/constants';
+import { PiSubagentProfileId } from './piSubagentConstants';
 import { runPiSubagent, type PiSubagentSession } from './piSubagentExecution';
 
 // ── Constants ──
@@ -112,7 +113,7 @@ interface SubagentToolResult {
 
 const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
   {
-    id: 'researcher',
+    id: PiSubagentProfileId.Researcher,
     description: 'Web and documentation research; produces findings with cited sources.',
     systemPrompt:
       'You are a research subagent. Investigate the assigned topic using the available ' +
@@ -120,7 +121,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
       '(URL or document reference) for every claim. Do not modify project files.',
   },
   {
-    id: 'scout',
+    id: PiSubagentProfileId.Scout,
     description: 'Local codebase recon: relevant files, entry points, data flow, risks.',
     systemPrompt:
       'You are a code reconnaissance subagent. Explore the local workspace to map the ' +
@@ -129,7 +130,7 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
       'Do not modify any files.',
   },
   {
-    id: 'planner',
+    id: PiSubagentProfileId.Planner,
     description: 'Turns existing context into a concrete implementation plan (read-only).',
     systemPrompt:
       'You are a planning subagent. Based on the existing context, produce a concrete, ' +
@@ -137,12 +138,25 @@ const BUILTIN_AGENT_PROFILES: ReadonlyArray<Omit<SubagentProfile, 'source'>> = [
       'edit files. End with risks and open questions.',
   },
   {
-    id: 'reviewer',
+    id: PiSubagentProfileId.Reviewer,
     description: 'Reviews an implementation against the task or plan; reports findings.',
     systemPrompt:
       'You are a code review subagent. Review the implementation against the assigned ' +
       'task or plan. Check correctness, test coverage, edge cases, and unnecessary ' +
       'complexity. Report findings ordered by severity with file references.',
+  },
+  {
+    id: PiSubagentProfileId.ProductionReviewer,
+    description: 'Validates a production workflow and returns its strict critic contract.',
+    systemPrompt: [
+      'You are the independent, read-only critic for a production workflow.',
+      'Review the implementation and supplied execution evidence against the assigned contract.',
+      'Check correctness, required artifacts, deterministic verification, edge cases, and regressions.',
+      'Never modify files. If evidence is insufficient, return revise with a concrete finding.',
+      'Respond with exactly one JSON object and no Markdown or surrounding text:',
+      '{"verdict":"pass"|"revise","findings":[{"severity":"critical"|"major"|"minor","summary":"...","evidence":"..."}]}',
+      'A pass requires an empty findings array. A revise verdict requires at least one finding.',
+    ].join('\n'),
   },
 ];
 
@@ -218,6 +232,7 @@ function resolveAgentProfiles(deps: PiSubagentToolDeps): SubagentProfile[] {
   }
   if (deps.presetId) {
     for (const member of loadMemberProfiles(deps.getPiAgentsDir(), deps.presetId)) {
+      if (member.id === PiSubagentProfileId.ProductionReviewer) continue;
       profiles.set(member.id, member);
     }
   }
@@ -249,10 +264,16 @@ async function runSubagent(
       // No customTools: subagents must not recursively spawn sub-subagents,
       // and AskUserQuestion is reserved for the parent session.
     };
-    if (profile.id === 'reviewer' || profile.id === 'planner' || profile.id === 'scout') {
+    if (
+      profile.id === PiSubagentProfileId.Reviewer ||
+      profile.id === PiSubagentProfileId.ProductionReviewer ||
+      profile.id === PiSubagentProfileId.Planner ||
+      profile.id === PiSubagentProfileId.Scout
+    ) {
       subOptions.tools = ['read', 'grep', 'find', 'ls'];
     }
-    const researcherUsesWebSearch = profile.id === 'researcher' && Boolean(deps.webSearchSkillPath);
+    const researcherUsesWebSearch =
+      profile.id === PiSubagentProfileId.Researcher && Boolean(deps.webSearchSkillPath);
     const systemPrompt = researcherUsesWebSearch
       ? `${profile.systemPrompt}\n\nYou have an explicit retrieval capability. Before reporting a web claim, run the bundled web-search skill with Bash:\n` +
         `bash "${path.join(deps.webSearchSkillPath || '', 'scripts/search.sh')}" "<query>" 10\n` +
