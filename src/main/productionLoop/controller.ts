@@ -79,7 +79,7 @@ export class ProductionLoopController {
       phaseInstruction,
       'The plan must include acceptance criteria, expected artifacts, and deterministic verifiers.',
       'After commit_plan, read the returned state and use each generated plan item ID with update_plan_item.',
-      'After execution, call start_inspection, then request_critique and delegate a read-only review to the reviewer subagent.',
+      'After execution, call start_inspection with evidence for every required artifact and deterministic verifier, then request_critique and delegate a read-only review to the reviewer subagent.',
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',
       'Call agent_loop done only after the production loop reports ready_to_deliver.',
@@ -119,8 +119,8 @@ export class ProductionLoopController {
     return this.update(this.service.updatePlanItem(this.state.runId, itemId, status));
   }
 
-  startInspection(): ProductionLoopState {
-    return this.update(this.service.startInspection(this.state.runId));
+  startInspection(input: Parameters<ProductionLoopService['startInspection']>[1]): ProductionLoopState {
+    return this.update(this.service.startInspection(this.state.runId, input));
   }
 
   requestCritique(): string {
@@ -236,7 +236,7 @@ export class ProductionLoopController {
       case ProductionLoopPhase.Critique:
         return this.requestCriticPrompt();
       case ProductionLoopPhase.Revise:
-        return 'Address the critic findings and record the revision before inspecting again.';
+        return 'Address the critic findings, record the revision, rerun deterministic checks, and submit fresh inspection evidence.';
       case ProductionLoopPhase.Deliver:
         return 'Call agent_loop done to request deterministic completion verification.';
     }

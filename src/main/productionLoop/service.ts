@@ -8,10 +8,13 @@ import {
   ProductionLoopStatus,
   ProductionPlanItemStatus,
   type ProductionCriticFinding,
+  type ProductionArtifactEvidence,
   type ProductionExpectedArtifact,
   type ProductionExpectedVerifier,
+  type ProductionInspectionEvidence,
   type ProductionLoopState,
   type ProductionPlanItem,
+  type ProductionVerifierEvidence,
 } from '../../shared/productionLoop';
 import {
   WorkbenchVerificationOutcome,
@@ -143,6 +146,7 @@ export class ProductionLoopService {
       acceptanceCriteria: previous?.acceptanceCriteria ?? [],
       expectedArtifacts: previous?.expectedArtifacts ?? [],
       expectedVerifiers: previous?.expectedVerifiers ?? [],
+      inspections: [],
       planItems:
         previous?.planItems.map(item => ({ ...item, status: ProductionPlanItemStatus.Pending })) ??
         [],
@@ -226,9 +230,13 @@ export class ProductionLoopService {
         return name ? [{ name, deterministic: verifier.deterministic === true }] : [];
       });
       const selectedDirection = input.selectedDirection?.trim() || null;
-      if (items.length === 0 || acceptanceCriteria.length === 0 || expectedVerifiers.length === 0) {
+      if (
+        items.length === 0 ||
+        acceptanceCriteria.length === 0 ||
+        !expectedVerifiers.some(verifier => verifier.deterministic)
+      ) {
         throw new Error(
-          'A plan requires at least one item, one acceptance criterion, and one expected verifier.',
+          'A plan requires at least one item, one acceptance criterion, and one deterministic verifier.',
         );
       }
       if (state.prototypeRequired && !selectedDirection) {
@@ -282,11 +290,51 @@ export class ProductionLoopService {
     });
   }
 
-  startInspection(runId: string): ProductionLoopState {
+  startInspection(
+    runId: string,
+    input: {
+      artifacts: ProductionArtifactEvidence[];
+      verifiers: ProductionVerifierEvidence[];
+    },
+  ): ProductionLoopState {
     return this.mutate(runId, state => {
       if (state.planItems.some(item => item.status !== ProductionPlanItemStatus.Completed)) {
         throw new Error('Every production plan item must be completed before inspection.');
       }
+      const artifacts = input.artifacts.flatMap(artifact => {
+        const kind = artifact.kind.trim();
+        const reference = artifact.reference.trim();
+        return kind && reference ? [{ kind, reference }] : [];
+      });
+      const verifiers = input.verifiers.flatMap(verifier => {
+        const name = verifier.name.trim();
+        const evidence = verifier.evidence.trim();
+        return name && evidence ? [{ name, passed: verifier.passed === true, evidence }] : [];
+      });
+      const missingArtifact = state.expectedArtifacts.find(
+        expected =>
+          expected.required && !artifacts.some(artifact => artifact.kind === expected.kind),
+      );
+      if (missingArtifact) {
+        throw new Error(`Required artifact evidence is missing for kind: ${missingArtifact.kind}`);
+      }
+      const failedVerifier = state.expectedVerifiers.find(
+        expected =>
+          expected.deterministic &&
+          !verifiers.some(verifier => verifier.name === expected.name && verifier.passed),
+      );
+      if (failedVerifier) {
+        throw new Error(
+          `Passing deterministic verifier evidence is missing for: ${failedVerifier.name}`,
+        );
+      }
+      const inspection: ProductionInspectionEvidence = {
+        artifacts,
+        verifiers,
+        createdAt: Date.now(),
+      };
+      state.inspections ??= [];
+      state.inspections.push(inspection);
       this.transition(state, ProductionLoopPhase.Inspect);
       state.progressVersion += 1;
     });
@@ -362,7 +410,6 @@ export class ProductionLoopService {
       state.revisions.push({ summary: normalizedSummary, evidence, createdAt: Date.now() });
       state.status = ProductionLoopStatus.Active;
       state.progressVersion += 1;
-      this.transition(state, ProductionLoopPhase.Inspect);
       this.measurement.recordActivation(runId, {
         activation: HarnessActivationType.RevisionApplied,
         mechanism: 'production_loop',

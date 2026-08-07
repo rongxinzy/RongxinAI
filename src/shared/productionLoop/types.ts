@@ -31,6 +31,23 @@ export interface ProductionExpectedVerifier {
   deterministic: boolean;
 }
 
+export interface ProductionArtifactEvidence {
+  kind: string;
+  reference: string;
+}
+
+export interface ProductionVerifierEvidence {
+  name: string;
+  passed: boolean;
+  evidence: string;
+}
+
+export interface ProductionInspectionEvidence {
+  artifacts: ProductionArtifactEvidence[];
+  verifiers: ProductionVerifierEvidence[];
+  createdAt: number;
+}
+
 export interface ProductionCriticFinding {
   severity: ProductionCriticSeverity;
   summary: string;
@@ -77,6 +94,7 @@ export interface ProductionLoopState {
   acceptanceCriteria: string[];
   expectedArtifacts: ProductionExpectedArtifact[];
   expectedVerifiers: ProductionExpectedVerifier[];
+  inspections: ProductionInspectionEvidence[];
   planItems: ProductionPlanItem[];
   critic: ProductionCriticState;
   revisions: ProductionRevision[];
