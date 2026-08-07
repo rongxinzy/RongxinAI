@@ -41,10 +41,12 @@ export class ProductionLoopController {
   }
 
   get goal(): string {
+    this.refresh();
     return this.downstream?.goal || this.state.goal;
   }
 
   getState(): ProductionLoopState {
+    this.refresh();
     return structuredClone(this.state);
   }
 
@@ -60,6 +62,7 @@ export class ProductionLoopController {
   }
 
   buildInitialPrompt(): string {
+    this.refresh();
     const phaseInstruction = this.state.prototypeRequired
       ? 'Begin by creating a concrete prototype or materially distinct direction, then record it with production_loop record_prototype.'
       : 'Begin by committing an executable plan with production_loop commit_plan before making changes.';
@@ -78,6 +81,7 @@ export class ProductionLoopController {
   }
 
   requestCriticPrompt(): string {
+    this.refresh();
     return [
       'Call the subagent tool with agent "reviewer". The reviewer must remain read-only.',
       'Ask it to inspect the implementation and available evidence against this persisted plan:',
@@ -119,11 +123,13 @@ export class ProductionLoopController {
   }
 
   recordSubagentStart(toolCallId: string, args: unknown): void {
+    this.refresh();
     if (!isStandaloneReviewer(args) || this.state.phase !== ProductionLoopPhase.Critique) return;
     this.update(this.service.recordCriticStart(this.state.runId, toolCallId));
   }
 
   recordSubagentResult(toolCallId: string, output: string, isError: boolean): void {
+    this.refresh();
     if (this.state.critic.toolCallId !== toolCallId) return;
     this.update(this.service.recordCriticResult(this.state.runId, toolCallId, output, isError));
   }
@@ -137,6 +143,7 @@ export class ProductionLoopController {
   }
 
   requestCompletion(reason: string): string {
+    this.refresh();
     if (this.state.skip) {
       return this.downstream
         ? this.downstream.requestCompletion(reason)
@@ -161,8 +168,15 @@ export class ProductionLoopController {
   onAgentEnd(
     signal: PiAgentLoopEndSignal,
   ): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
+    this.refresh();
     if (this.state.skip) {
       return { shouldFinish: true, reason: this.state.skip.reason };
+    }
+    if (this.state.status === ProductionLoopStatus.Completed) {
+      return {
+        shouldFinish: true,
+        reason: this.state.deliveryReason || 'Production workflow completed.',
+      };
     }
     if (this.state.status === ProductionLoopStatus.ReadyToDeliver && this.state.deliveryReason) {
       if (this.downstream) {
@@ -235,5 +249,9 @@ export class ProductionLoopController {
   private update(state: ProductionLoopState): ProductionLoopState {
     this.state = state;
     return this.getState();
+  }
+
+  private refresh(): void {
+    this.state = this.service.getState(this.state.runId);
   }
 }
