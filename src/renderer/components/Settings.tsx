@@ -74,6 +74,7 @@ import {
 } from '../services/encryption';
 import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
+import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
 import { selectCoworkConfig } from '../store/selectors/coworkSelectors';
 import { setAvailableModels } from '../store/slices/modelSlice';
@@ -619,15 +620,6 @@ const SEND_SHORTCUT_OPTIONS = [
 
 const isMacPlatform = navigator.platform.includes('Mac');
 
-const formatShortcutLabel = (shortcut: string): string => {
-  if (!isMacPlatform) return shortcut;
-  return shortcut
-    .replace('CmdOrCtrl', '⌘')
-    .replace('Cmd', '⌘')
-    .replace('Option', '⌥')
-    .replace('Alt', '⌥');
-};
-
 const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void }> = ({
   value,
   onChange,
@@ -681,7 +673,7 @@ const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void 
             : 'dark:border-claude-darkBorder border-claude-border hover:border-claude-accent/50'
         }`}
     >
-      {value ? formatShortcutLabel(value) : i18nService.t('shortcutNotSet')}
+      {value ? formatShortcutLabel(value, isMacPlatform) : i18nService.t('shortcutNotSet')}
     </Button>
   );
 };

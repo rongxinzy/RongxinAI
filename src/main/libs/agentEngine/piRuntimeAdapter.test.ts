@@ -2048,6 +2048,71 @@ describe('PiRuntimeAdapter', () => {
       expect(first.success).toBe(true);
     });
 
+    it('drains the next follow-up after its predecessor finishes while the queue flush is active', async () => {
+      let listener: ((event: { type: string }) => void) | null = null;
+      mockSession.subscribe.mockImplementation((callback: (event: { type: string }) => void) => {
+        listener = callback;
+        return () => {};
+      });
+      await adapter.startSession('queue-session', 'Start work', { sessionMode: 'work' });
+
+      let resolveFirstFollowUp: () => void = () => {};
+      mockSession.prompt.mockImplementationOnce(
+        () =>
+          new Promise<void>(resolve => {
+            resolveFirstFollowUp = resolve;
+          }),
+      );
+      adapter.enqueuePendingMessage('queue-session', 'First follow-up');
+      adapter.enqueuePendingMessage('queue-session', 'Second follow-up');
+
+      listener!({ type: 'agent_end' });
+      await vi.waitFor(() => {
+        expect(mockSession.prompt).toHaveBeenLastCalledWith('First follow-up', {
+          streamingBehavior: 'followUp',
+        });
+      });
+
+      // The first queued turn ends while the first queue flush still awaits
+      // prompt(). The second item must be picked up once that flush completes.
+      listener!({ type: 'agent_end' });
+      resolveFirstFollowUp();
+
+      await vi.waitFor(() => {
+        expect(mockSession.prompt).toHaveBeenLastCalledWith('Second follow-up', {
+          streamingBehavior: 'followUp',
+        });
+      });
+    });
+
+    it('keeps the replacement session when a stopped turn rejects after its queued follow-up starts', async () => {
+      let rejectInitialPrompt: (error: Error) => void = () => {};
+      mockSession.prompt
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>((_resolve, reject) => {
+              rejectInitialPrompt = reject;
+            }),
+        )
+        .mockResolvedValueOnce(undefined);
+
+      const initialRun = adapter.startSession('queue-session', 'Start work', {
+        sessionMode: 'work',
+      });
+      await vi.waitFor(() => expect(mockSession.prompt).toHaveBeenCalledTimes(1));
+
+      const queued = adapter.enqueuePendingMessage('queue-session', 'Queued follow-up');
+      expect(queued.success).toBe(true);
+
+      adapter.stopSession('queue-session');
+      await vi.waitFor(() => expect(mockCreateAgentSession).toHaveBeenCalledTimes(2));
+
+      rejectInitialPrompt(new Error('The stopped prompt rejected.'));
+      await initialRun;
+
+      expect(adapter.isSessionActive('queue-session')).toBe(true);
+    });
+
     it('rejects queue controls for Chat sessions', async () => {
       await adapter.startSession('chat-session', 'Hello', { sessionMode: 'chat' });
 

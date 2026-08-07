@@ -502,6 +502,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const abortController = new AbortController();
     let workbenchRunId: string | null = null;
     let workbenchTaskId: string | null = null;
+    let activeSession: ActivePiSession | null = null;
 
     try {
       const workspaceRoot = options.workspaceRoot || process.cwd();
@@ -825,6 +826,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         turnFailed: false,
         queueFlushInFlight: false,
       };
+      activeSession = active;
 
       // Subscribe to Pi events before sending the prompt
       active.unsubscribe = session.subscribe(event => {
@@ -861,7 +863,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       await session.prompt(initialPrompt);
     } catch (error) {
-      this.activeSessions.delete(sessionId);
+      // A stopped turn can immediately restart from the first queued follow-up.
+      // Its eventual abort rejection must not delete that replacement session.
+      if (activeSession && this.activeSessions.get(sessionId) === activeSession) {
+        this.activeSessions.delete(sessionId);
+      }
       if (abortController.signal.aborted) {
         this.emit('sessionStopped', sessionId);
         return;
@@ -1422,7 +1428,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     } finally {
       active.queueFlushInFlight = false;
-      if (retryAfterFailure) void this.flushFollowUpQueue(sessionId, active);
+      const hasNextFollowUp = this.pendingMessageQueue.hasPendingFollowUp(sessionId);
+      if (
+        (retryAfterFailure || hasNextFollowUp) &&
+        this.activeSessions.get(sessionId) === active &&
+        !active.aborted &&
+        !active.isRunning
+      ) {
+        void this.flushFollowUpQueue(sessionId, active);
+      }
     }
   }
 
