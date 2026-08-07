@@ -63,6 +63,10 @@ import {
 } from './components/VirtualizedTurnList';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
+import {
+  CoworkConversationLoadingSkeleton,
+  CoworkSessionTitleLoadingSkeleton,
+} from './CoworkSessionLoadingState';
 import PendingMessageQueue from './PendingMessageQueue';
 import type { CaptureRect } from './helpers/exportUtils';
 import {
@@ -105,6 +109,8 @@ const ArtifactPanelFrame = React.lazy(() =>
 );
 
 interface CoworkSessionDetailProps {
+  displayedSessionId?: string;
+  isSessionSwitching?: boolean;
   onManageSkills?: () => void;
   onManageConnectors?: () => void;
   permissionMode?: CoworkPermissionMode;
@@ -172,6 +178,8 @@ class ArtifactPanelErrorBoundary extends React.Component<
 }
 
 const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
+  displayedSessionId,
+  isSessionSwitching = false,
   onManageSkills,
   onManageConnectors,
   permissionMode,
@@ -949,10 +957,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
   // Stabilize turn object identity so completed turns do not re-render on
   // every streaming token (issue #141).
-  const turns = useStableConversationTurns(rawTurns);
+  const turns = useStableConversationTurns(rawTurns, sessionId);
   const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
-  // Scope persisted collapsible state to this session (orphan turn ids are
-  // positional and would collide across sessions). Rendered sessions are
+  // Scope persisted collapsible state to this session. Rendered sessions are
   // shown one at a time, so a render-time namespace assignment is safe.
   setPersistentToggleNamespace(currentSession?.id ?? '');
   // Rail indices come from data, not DOM, so virtualized (unmounted) turns
@@ -1124,18 +1131,24 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               {updateBadge}
             </div>
           )}
-          <h1 className="text-sm leading-none font-medium text-foreground truncate max-w-[400px]">
-            {currentSession.title || i18nService.t('coworkNewSession')}
-            {process.env.NODE_ENV === 'development' && gatewaySessionId && (
-              <span
-                className="non-draggable text-[10px] text-muted-foreground ml-1.5 font-mono select-text cursor-text"
-                onPointerDown={e => e.stopPropagation()}
-              >
-                {gatewaySessionId.slice(0, 8)}
-              </span>
-            )}
-          </h1>
-          {sessionId && <WorkbenchTaskStatusBar sessionId={sessionId} />}
+          {isSessionSwitching ? (
+            <CoworkSessionTitleLoadingSkeleton />
+          ) : (
+            <>
+              <h1 className="text-sm leading-none font-medium text-foreground truncate max-w-[400px]">
+                {currentSession.title || i18nService.t('coworkNewSession')}
+                {process.env.NODE_ENV === 'development' && gatewaySessionId && (
+                  <span
+                    className="non-draggable text-[10px] text-muted-foreground ml-1.5 font-mono select-text cursor-text"
+                    onPointerDown={e => e.stopPropagation()}
+                  >
+                    {gatewaySessionId.slice(0, 8)}
+                  </span>
+                )}
+              </h1>
+              {sessionId && <WorkbenchTaskStatusBar sessionId={sessionId} />}
+            </>
+          )}
         </div>
 
         {/* Right side: Artifact toggle */}
@@ -1146,8 +1159,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             size="icon"
             onClick={() => dispatch(togglePanel())}
             aria-label={i18nService.t('artifactPanelToggle')}
+            disabled={isSessionSwitching}
           >
-            <ArtifactPanelIcon className="h-4 w-4" open={isPanelOpen} />
+            <ArtifactPanelIcon className="h-4 w-4" open={!isSessionSwitching && isPanelOpen} />
           </Button>
 
           <WindowTitleBar inline className="ml-1" />
@@ -1155,7 +1169,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       </div>
 
       {/* Export Options Modal */}
-      {showExportOptions && (
+      {!isSessionSwitching && showExportOptions && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
           onClick={() => setShowExportOptions(false)}
@@ -1229,42 +1243,46 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         <div
           ref={detailRootRef}
           className={`relative min-w-0 flex-1 flex flex-col bg-background h-full ${
-            isArtifactWorkspace ? 'hidden' : ''
+            !isSessionSwitching && isArtifactWorkspace ? 'hidden' : ''
           }`}
-          aria-hidden={isArtifactWorkspace}
+          aria-hidden={!isSessionSwitching && isArtifactWorkspace}
         >
           <div className="relative flex-1 min-h-0">
-            <Conversation
-              className="h-full"
-              initial="instant"
-              resize={isStreaming ? 'smooth' : 'instant'}
-            >
-              <ConversationContent
-                className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
-                observeContentResize={false}
-                reverse={false}
-                scrollClassName="cowork-conversation-scroll"
+            {isSessionSwitching ? (
+              <CoworkConversationLoadingSkeleton />
+            ) : (
+              <Conversation
+                className="h-full"
+                initial="instant"
+                resize={isStreaming ? 'smooth' : 'instant'}
               >
-                <div ref={scrollContainerRef}>
-                  {renderConversationTurns()}
-                  {inlineQuestionPermission && onRespondToInlineQuestion && (
-                    <div className="px-3 pt-3">
-                      <AskUserQuestionCard
-                        permission={inlineQuestionPermission}
-                        onRespond={onRespondToInlineQuestion}
-                      />
-                    </div>
-                  )}
-                  <div className="h-20" />
-                </div>
-              </ConversationContent>
-              <ConversationScrollButton
-                className={todoQueue.todos.length > 0 ? 'bottom-14' : undefined}
-              />
-            </Conversation>
+                <ConversationContent
+                  className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
+                  observeContentResize={false}
+                  reverse={false}
+                  scrollClassName="cowork-conversation-scroll"
+                >
+                  <div ref={scrollContainerRef}>
+                    {renderConversationTurns()}
+                    {inlineQuestionPermission && onRespondToInlineQuestion && (
+                      <div className="px-3 pt-3">
+                        <AskUserQuestionCard
+                          permission={inlineQuestionPermission}
+                          onRespond={onRespondToInlineQuestion}
+                        />
+                      </div>
+                    )}
+                    <div className="h-20" />
+                  </div>
+                </ConversationContent>
+                <ConversationScrollButton
+                  className={todoQueue.todos.length > 0 ? 'bottom-14' : undefined}
+                />
+              </Conversation>
+            )}
 
             {/* Turn navigation rail removed: message content remains scrollable in the conversation. */}
-            {turns.length > 1 && (
+            {!isSessionSwitching && turns.length > 1 && (
               <div
                 className="hidden absolute right-[18px] top-1/2 -translate-y-1/2 w-5 flex flex-col items-end z-10"
                 style={{ maxHeight: 'calc(100% - 40px)' }}
@@ -1465,7 +1483,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </div>
             )}
 
-            {railTooltip &&
+            {!isSessionSwitching &&
+              railTooltip &&
               createPortal(
                 <div
                   className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
@@ -1504,7 +1523,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               )}
           </div>
 
-          {inlinePermission && onRespondToInlinePermission && (
+          {!isSessionSwitching && inlinePermission && onRespondToInlinePermission && (
             <div className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4">
               <div className="w-full max-w-5xl mx-auto">
                 <CoworkPermissionModal
@@ -1522,31 +1541,41 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               <CoworkPromptInput
                 ref={promptInputRef}
                 topAccessory={
-                  <>
-                    {workMode === CoworkSessionMode.Work && !isDirectChat && currentSession?.id && (
-                      <PendingMessageQueue
-                        sessionId={currentSession.id}
-                        isStreaming={isStreaming}
-                      />
-                    )}
-                    <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
-                  </>
+                  isSessionSwitching ? null : (
+                    <>
+                      {workMode === CoworkSessionMode.Work &&
+                        !isDirectChat &&
+                        currentSession?.id && (
+                          <PendingMessageQueue
+                            sessionId={currentSession.id}
+                            isStreaming={isStreaming}
+                          />
+                        )}
+                      <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
+                    </>
+                  )
                 }
                 onSubmit={onContinue}
                 onStop={onStop}
-                isStreaming={isStreaming}
+                isStreaming={isSessionSwitching ? false : isStreaming}
                 placeholder={i18nService.t(
-                  remoteManaged
+                  !isSessionSwitching && remoteManaged
                     ? 'coworkRemoteManagedPlaceholder'
                     : workMode === 'chat'
                       ? 'chatPlaceholder'
                       : 'coworkContinuePlaceholder',
                 )}
-                disabled={remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission)}
+                disabled={
+                  !isSessionSwitching &&
+                  (remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission))
+                }
+                sessionContextPending={isSessionSwitching}
                 size="large"
-                remoteManaged={remoteManaged}
-                onManageSkills={remoteManaged ? undefined : onManageSkills}
-                onManageConnectors={remoteManaged ? undefined : onManageConnectors}
+                remoteManaged={!isSessionSwitching && remoteManaged}
+                onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
+                onManageConnectors={
+                  !isSessionSwitching && remoteManaged ? undefined : onManageConnectors
+                }
                 showPermissionModeSelector={workMode === 'work'}
                 permissionMode={permissionMode}
                 onPermissionModeChange={onPermissionModeChange}
@@ -1555,7 +1584,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 showLocalThinkingToggle={isDirectChat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
-                sessionId={currentSession?.id}
+                sessionId={displayedSessionId ?? currentSession?.id}
               />
               <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
                 {i18nService.t('aiGeneratedDisclaimer')}
@@ -1563,7 +1592,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             </div>
           </div>
         </div>
-        {shouldRenderArtifactPanel && (
+        {!isSessionSwitching && shouldRenderArtifactPanel && (
           <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
             <React.Suspense
               fallback={

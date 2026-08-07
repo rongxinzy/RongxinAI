@@ -4899,7 +4899,10 @@ if (!gotTheLock) {
   ipcMain.handle(CoworkSessionIpc.Get, async (_event, sessionId: string) => {
     try {
       const store = getCoworkStore();
-      const session = store.getSession(sessionId);
+      // The renderer virtualizes turns, so it needs the complete local data
+      // model up front to expose the full scroll range without mounting the
+      // entire transcript in the DOM.
+      const session = store.getSession(sessionId, null);
       if (!session) return { success: true, session: null };
 
       const reconciledSession = reconcileWorkSessionRuntimeState(

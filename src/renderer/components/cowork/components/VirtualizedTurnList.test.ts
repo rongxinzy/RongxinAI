@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
@@ -8,6 +8,7 @@ import type { ConversationTurn } from '../helpers/messageGrouping';
 import { VirtualizedTurnList } from './VirtualizedTurnList';
 
 const mocks = vi.hoisted(() => ({
+  elementScroll: vi.fn(),
   measureElement: vi.fn(),
   scrollRef: { current: null as HTMLElement | null },
   scrollToEnd: vi.fn(),
@@ -20,11 +21,13 @@ vi.mock('use-stick-to-bottom', () => ({
 }));
 
 vi.mock('@tanstack/react-virtual', () => ({
+  elementScroll: mocks.elementScroll,
   useVirtualizer: (options: unknown) => mocks.useVirtualizer(options),
 }));
 
 beforeEach(() => {
   mocks.scrollRef.current = document.createElement('div');
+  mocks.elementScroll.mockReset();
   mocks.measureElement.mockReset();
   mocks.scrollToEnd.mockReset();
   mocks.scrollToIndex.mockReset();
@@ -84,15 +87,10 @@ test('positions a newly mounted virtualizer at the end before paint', () => {
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(2);
 });
 
-test('enables history pagination only after the rendered tail is stable', () => {
-  const frameCallbacks: FrameRequestCallback[] = [];
-  const requestFrame = vi
-    .spyOn(window, 'requestAnimationFrame')
-    .mockImplementation(callback => frameCallbacks.push(callback));
-  const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+test('positions the initial tail once before enabling history pagination', () => {
   const onInitialTailPositioned = vi.fn();
 
-  const view = render(
+  render(
     React.createElement(VirtualizedTurnList, {
       isStreaming: false,
       turns: [],
@@ -103,58 +101,39 @@ test('enables history pagination only after the rendered tail is stable', () => 
   );
 
   expect(mocks.scrollToEnd).toHaveBeenCalledTimes(1);
-  expect(onInitialTailPositioned).not.toHaveBeenCalled();
-
-  act(() => frameCallbacks.shift()?.(0));
-  expect(onInitialTailPositioned).not.toHaveBeenCalled();
-
-  act(() => frameCallbacks.shift()?.(16));
-  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(3);
   expect(onInitialTailPositioned).toHaveBeenCalledOnce();
-
-  view.unmount();
-  requestFrame.mockRestore();
-  cancelFrame.mockRestore();
 });
 
-test('releases history pagination when a dynamic tail does not settle', () => {
-  const frameCallbacks: FrameRequestCallback[] = [];
-  const requestFrame = vi
-    .spyOn(window, 'requestAnimationFrame')
-    .mockImplementation(callback => frameCallbacks.push(callback));
-  const cancelFrame = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
-  const onInitialTailPositioned = vi.fn();
-  const turns: ConversationTurn[] = [
-    {
-      id: 'turn-1',
-      userMessage: null,
-      assistantItems: [],
-    },
-  ];
+test('does not retry internal anchor adjustments while the user scrolls upward', () => {
+  const scrollElement = mocks.scrollRef.current!;
+  Object.defineProperties(scrollElement, {
+    clientHeight: { configurable: true, value: 600 },
+    scrollHeight: { configurable: true, value: 2_000 },
+    scrollTop: { configurable: true, writable: true, value: 500 },
+  });
+  const requestFrame = vi.spyOn(window, 'requestAnimationFrame');
 
-  const view = render(
+  render(
     React.createElement(VirtualizedTurnList, {
       isStreaming: false,
-      turns,
-      onInitialTailPositioned,
+      turns: [],
       renderAll: false,
       renderTurn: () => null,
     }),
   );
 
-  act(() => {
-    for (let frame = 0; frame < 12; frame += 1) {
-      frameCallbacks.shift()?.(frame * 16);
-    }
-  });
+  const options = mocks.useVirtualizer.mock.calls[0]?.[0] as {
+    scrollToFn: (
+      offset: number,
+      options: { adjustments?: number; behavior?: ScrollBehavior },
+      instance: { scrollElement: HTMLElement },
+    ) => void;
+  };
+  options.scrollToFn(1_000, { adjustments: 200 }, { scrollElement });
 
-  expect(mocks.scrollToEnd).toHaveBeenCalledTimes(13);
-  expect(onInitialTailPositioned).toHaveBeenCalledOnce();
-  expect(frameCallbacks).toHaveLength(0);
-
-  view.unmount();
+  expect(mocks.elementScroll).toHaveBeenCalledOnce();
+  expect(requestFrame).not.toHaveBeenCalled();
   requestFrame.mockRestore();
-  cancelFrame.mockRestore();
 });
 
 test('lets a short session clamp its estimated end to the top of a non-overflowing viewport', () => {
@@ -219,7 +198,7 @@ test('positions only the virtual tail window instead of rendering the full sessi
   );
 });
 
-test('leaves row measurement and positioning exclusively to the virtualizer', () => {
+test('synchronizes measured layout before the following React commit', () => {
   const turns: ConversationTurn[] = [
     {
       id: 'turn-1',
@@ -256,4 +235,22 @@ test('leaves row measurement and positioning exclusively to the virtualizer', ()
   expect(mocks.measureElement).toHaveBeenCalledTimes(1);
   expect(row?.style.top).toBe('0px');
   expect(row?.style.transform).toBe('');
+
+  const options = mocks.useVirtualizer.mock.calls[0]?.[0] as {
+    onChange: (instance: {
+      elementsCache: Map<React.Key, HTMLElement>;
+      getTotalSize: () => number;
+      getVirtualItems: () => Array<{ key: React.Key; start: number }>;
+    }) => void;
+  };
+  options.onChange({
+    elementsCache: new Map([['turn-1', row!]]),
+    getTotalSize: () => 480,
+    getVirtualItems: () => [{ key: 'turn-1', start: 120 }],
+  });
+
+  expect(
+    view.container.querySelector<HTMLElement>('[data-virtualized-turn-list]')?.style.height,
+  ).toBe('480px');
+  expect(row?.style.top).toBe('120px');
 });

@@ -125,6 +125,36 @@ const cacheStreamingSession = (state: CoworkState, session: CoworkSession) => {
   };
 };
 
+const mergeSessionWithLiveSnapshot = (
+  session: CoworkSession,
+  liveSession: CoworkSession,
+): CoworkSession => {
+  const liveMessagesById = new Map(liveSession.messages.map(message => [message.id, message]));
+  const mergedMessages = session.messages.map(
+    message => liveMessagesById.get(message.id) ?? message,
+  );
+  const mergedMessageIds = new Set(mergedMessages.map(message => message.id));
+
+  for (const message of liveSession.messages) {
+    if (!mergedMessageIds.has(message.id)) {
+      mergedMessages.push(message);
+      mergedMessageIds.add(message.id);
+    }
+  }
+
+  return {
+    ...session,
+    ...liveSession,
+    messages: mergedMessages,
+    messagesOffset: session.messagesOffset ?? 0,
+    totalMessages: Math.max(
+      session.totalMessages ?? session.messages.length,
+      liveSession.totalMessages ?? liveSession.messages.length,
+      mergedMessages.length,
+    ),
+  };
+};
+
 const toSessionSummary = (session: CoworkSession): CoworkSessionSummary => ({
   id: session.id,
   title: session.title,
@@ -304,7 +334,9 @@ const coworkSlice = createSlice({
         // messages would cause streaming content and user messages to vanish
         // when switching sessions and coming back.
         const liveSession = state.streamingSessions[session.id];
-        const effectiveSession = liveSession ?? session;
+        const effectiveSession = liveSession
+          ? mergeSessionWithLiveSnapshot(session, liveSession)
+          : session;
 
         state.currentSession = {
           ...effectiveSession,

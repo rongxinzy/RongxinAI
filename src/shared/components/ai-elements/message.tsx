@@ -24,9 +24,15 @@ import React, {
 } from 'react';
 import { Streamdown } from 'streamdown';
 
+import {
+  getLoadedRichMessageResponse,
+  hasRichMessageContent,
+  loadRichMessageResponse,
+} from './richMessageResponseLoader';
+
 // Code/math/mermaid plugins (and their Shiki/KaTeX/Mermaid runtimes) load
 // on demand when the content actually needs them (issue #141).
-const RichMessageResponse = React.lazy(() => import('./richMessageResponse'));
+const RichMessageResponse = React.lazy(loadRichMessageResponse);
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage['role'];
@@ -286,9 +292,6 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
 const basePlugins = { cjk };
 
-// Fenced code, math or mermaid content needs the rich plugin pipeline.
-const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4,}|\t+)\S/;
-
 export const MessageResponse = memo(
   ({ className, children, ...props }: MessageResponseProps) => {
     const base = (
@@ -301,8 +304,16 @@ export const MessageResponse = memo(
       </Streamdown>
     );
     const text = typeof children === 'string' ? children : '';
-    if (!RICH_CONTENT_PATTERN.test(text)) {
+    if (!hasRichMessageContent(text)) {
       return base;
+    }
+    const LoadedRichMessageResponse = getLoadedRichMessageResponse();
+    if (LoadedRichMessageResponse) {
+      return (
+        <LoadedRichMessageResponse className={className} {...props}>
+          {children}
+        </LoadedRichMessageResponse>
+      );
     }
     return (
       <React.Suspense fallback={base}>

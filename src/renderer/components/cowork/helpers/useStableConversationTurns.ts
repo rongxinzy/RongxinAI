@@ -8,10 +8,19 @@ import { stabilizeConversationTurns } from './messageGrouping';
  * whose messages actually changed get new references, so memoized turn
  * subtrees skip re-rendering on every token (issue #141).
  */
-export const useStableConversationTurns = (turns: ConversationTurn[]): ConversationTurn[] => {
-  const stableTurnsRef = useRef<ConversationTurn[]>([]);
+export const useStableConversationTurns = (
+  turns: ConversationTurn[],
+  sessionId: string | undefined,
+): ConversationTurn[] => {
+  const stableTurnsRef = useRef<{ sessionId: string | undefined; turns: ConversationTurn[] }>({
+    sessionId,
+    turns: [],
+  });
   return useMemo(() => {
-    stableTurnsRef.current = stabilizeConversationTurns(stableTurnsRef.current, turns);
-    return stableTurnsRef.current;
-  }, [turns]);
+    const previousTurns =
+      stableTurnsRef.current.sessionId === sessionId ? stableTurnsRef.current.turns : [];
+    const stableTurns = stabilizeConversationTurns(previousTurns, turns);
+    stableTurnsRef.current = { sessionId, turns: stableTurns };
+    return stableTurns;
+  }, [sessionId, turns]);
 };

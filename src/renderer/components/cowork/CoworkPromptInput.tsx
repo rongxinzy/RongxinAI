@@ -168,6 +168,8 @@ interface CoworkPromptInputProps {
   isStreaming?: boolean;
   placeholder?: string;
   disabled?: boolean;
+  /** Keeps text editing available while session-bound actions wait for the target session. */
+  sessionContextPending?: boolean;
   size?: 'normal' | 'large';
   workingDirectory?: string;
   workingDirectoryName?: string;
@@ -200,6 +202,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       isStreaming = false,
       placeholder = 'Enter your task...',
       disabled = false,
+      sessionContextPending = false,
       size = 'normal',
       workingDirectory = '',
       workingDirectoryName,
@@ -529,6 +532,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         (!trimmedValue && attachments.length === 0) ||
         (isStreaming && !canQueueWhileStreaming) ||
         disabled ||
+        sessionContextPending ||
         isPatchingModel
       )
         return;
@@ -655,6 +659,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       value,
       isStreaming,
       disabled,
+      sessionContextPending,
       isPatchingModel,
       isDirectChat,
       hasUnavailableLlamaCppModel,
@@ -1178,7 +1183,14 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             />
           </PromptInputBody>
           <PromptInputFooter className="flex-wrap">
-            <PromptInputTools className="min-w-0 flex-1 flex-wrap">
+            <PromptInputTools
+              className={cn(
+                'min-w-0 flex-1 flex-wrap',
+                sessionContextPending && 'pointer-events-none opacity-50',
+              )}
+              aria-disabled={sessionContextPending}
+              inert={sessionContextPending ? true : undefined}
+            >
               {!isPlusToolbar && showModelSelector && (
                 <>
                   <ContextUsageIndicator
@@ -1276,6 +1288,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             )}
             <PromptInputSubmit
               className={isStreaming ? 'relative z-20' : undefined}
+              disabled={sessionContextPending}
               status={isStreaming ? 'streaming' : 'ready'}
               onStop={isStreaming ? onStop : undefined}
             />

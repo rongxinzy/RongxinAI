@@ -353,6 +353,53 @@ test('keeps streaming messages when another session is selected', () => {
   expect(restoredState.currentSession?.messages[0]?.content).toBe('still streaming');
 });
 
+test('merges complete loaded history into a tracked streaming session', () => {
+  const recentMessage = {
+    id: 'assistant-live',
+    type: 'assistant' as const,
+    content: 'partial',
+    timestamp: 3,
+  };
+  const runningSession = makeSession({
+    status: CoworkSessionStatusValue.Running,
+    messages: [recentMessage],
+    messagesOffset: 30,
+    totalMessages: 31,
+  });
+  const streamingState = coworkReducer(undefined, addSession(runningSession));
+  const updatedState = coworkReducer(
+    streamingState,
+    updateMessageContents([
+      {
+        sessionId: runningSession.id,
+        messageId: recentMessage.id,
+        content: 'complete live response',
+      },
+    ]),
+  );
+  const completeHistory = makeSession({
+    status: CoworkSessionStatusValue.Completed,
+    messages: [
+      { id: 'user-old', type: 'user', content: 'old question', timestamp: 1 },
+      { id: 'assistant-old', type: 'assistant', content: 'old answer', timestamp: 2 },
+      recentMessage,
+    ],
+    messagesOffset: 0,
+    totalMessages: 3,
+  });
+
+  const restoredState = coworkReducer(updatedState, setCurrentSession(completeHistory));
+
+  expect(restoredState.currentSession?.messages.map(message => message.id)).toEqual([
+    'user-old',
+    'assistant-old',
+    'assistant-live',
+  ]);
+  expect(restoredState.currentSession?.messages[2]?.content).toBe('complete live response');
+  expect(restoredState.currentSession?.messagesOffset).toBe(0);
+  expect(restoredState.currentSession?.status).toBe(CoworkSessionStatusValue.Running);
+});
+
 test('tracks parallel transient tool activities by session and call id', () => {
   const runningState = coworkReducer(
     undefined,

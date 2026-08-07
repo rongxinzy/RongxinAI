@@ -651,7 +651,9 @@ export class CoworkStore {
       is_hidden: number;
       created_at: number;
       updated_at: number;
-    }>('SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces WHERE id = ?', [id]);
+    }>('SELECT id, name, path, is_hidden, created_at, updated_at FROM workspaces WHERE id = ?', [
+      id,
+    ]);
     if (!row) return null;
     return {
       id: row.id,
@@ -699,9 +701,7 @@ export class CoworkStore {
   }
 
   setWorkspaceHidden(id: string, isHidden: boolean): void {
-    this.db
-      .prepare('UPDATE workspaces SET is_hidden = ? WHERE id = ?')
-      .run(isHidden ? 1 : 0, id);
+    this.db.prepare('UPDATE workspaces SET is_hidden = ? WHERE id = ?').run(isHidden ? 1 : 0, id);
   }
 
   relocateWorkspace(id: string, workspacePath: string, name: string): Workspace | null {
@@ -841,7 +841,10 @@ export class CoworkStore {
     };
   }
 
-  getSession(id: string, messageLimit = COWORK_MESSAGE_PAGE_SIZE): CoworkSession | null {
+  getSession(
+    id: string,
+    messageLimit: number | null = COWORK_MESSAGE_PAGE_SIZE,
+  ): CoworkSession | null {
     interface SessionRow {
       id: string;
       title: string;
@@ -873,10 +876,11 @@ export class CoworkStore {
     if (!row) return null;
 
     const totalMessages = this.countSessionMessages(id);
-    const messageOffset = Math.max(0, totalMessages - messageLimit);
+    const resolvedMessageLimit = messageLimit === null ? totalMessages : Math.max(0, messageLimit);
+    const messageOffset = Math.max(0, totalMessages - resolvedMessageLimit);
     const messages =
       messageOffset > 0
-        ? this.getPagedSessionMessages(id, messageLimit, messageOffset)
+        ? this.getPagedSessionMessages(id, resolvedMessageLimit, messageOffset)
         : this.getSessionMessages(id);
 
     let activeSkillIds: string[] = [];
