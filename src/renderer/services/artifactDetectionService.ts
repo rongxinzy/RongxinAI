@@ -1,5 +1,6 @@
 import type { Artifact } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
+import { isBinaryArtifactFile } from '../../shared/cowork/artifactPreview';
 import type {
   ArtifactDetectionWorkerRequest,
   ArtifactDetectionWorkerResponse,
@@ -163,9 +164,7 @@ export class ArtifactDetectionService {
       try {
         const result = await this.readFile(absPath);
         if (result?.success && result.dataUrl) {
-          const isTextType = ['html', 'svg', 'mermaid', 'code', 'markdown', 'text'].includes(
-            artifact.type,
-          );
+          const isTextType = !isBinaryArtifactFile(absPath);
           let content = result.dataUrl;
           if (isTextType) {
             try {

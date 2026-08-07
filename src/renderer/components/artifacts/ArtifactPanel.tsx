@@ -23,6 +23,7 @@ import {
   ArtifactPreviewMode,
   ArtifactRole,
   getArtifactPreviewMode,
+  isBinaryArtifactFile,
   type Artifact,
   type ArtifactType,
 } from '@/types/artifact';
@@ -269,9 +270,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     try {
       const result = await window.electron.dialog.readFileAsDataUrl(selectedArtifact.filePath);
       if (result?.success && result.dataUrl) {
-        const isTextType = ['html', 'svg', 'mermaid', 'code', 'markdown', 'text'].includes(
-          selectedArtifact.type,
-        );
+        const isTextType = !isBinaryArtifactFile(selectedArtifact.filePath);
         let content = result.dataUrl;
         if (isTextType) {
           try {
