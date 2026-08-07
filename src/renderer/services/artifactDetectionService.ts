@@ -1,6 +1,5 @@
 import type { Artifact } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
-import { isBinaryArtifactFile } from '../../shared/cowork/artifactPreview';
 import type {
   ArtifactDetectionWorkerRequest,
   ArtifactDetectionWorkerResponse,
@@ -145,7 +144,11 @@ export class ArtifactDetectionService {
   private async loadFiles(detected: ArtifactDetectionResult[], cwd?: string | null): Promise<void> {
     if (!this.readFile) return;
     const toLoad = detected.filter(
-      d => d.needsFileLoad && d.artifact.filePath && !this.loadedFileIds.has(d.artifact.id),
+      d =>
+        d.needsFileLoad &&
+        d.artifact.type !== 'unsupported' &&
+        d.artifact.filePath &&
+        !this.loadedFileIds.has(d.artifact.id),
     );
     if (toLoad.length === 0) return;
 
@@ -160,7 +163,9 @@ export class ArtifactDetectionService {
       try {
         const result = await this.readFile(absPath);
         if (result?.success && result.dataUrl) {
-          const isTextType = !isBinaryArtifactFile(absPath);
+          const isTextType = ['html', 'svg', 'mermaid', 'code', 'markdown', 'text'].includes(
+            artifact.type,
+          );
           let content = result.dataUrl;
           if (isTextType) {
             try {

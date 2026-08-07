@@ -1017,16 +1017,29 @@ const DocumentRenderer: React.FC<DocumentRendererProps> = ({ artifact }) => {
   const ext = getExtension(artifact.fileName || artifact.filePath || '');
 
   switch (ext) {
+    case '.docm':
     case '.docx':
+    case '.dotm':
+    case '.dotx':
       return <DocxSubRenderer artifact={artifact} />;
     case '.xlsx':
     case '.xls':
+    case '.xlsm':
+    case '.xlam':
+    case '.xlt':
+    case '.xltm':
+    case '.xltx':
     case '.csv':
     case '.tsv':
       return <XlsxSubRenderer artifact={artifact} />;
     case '.pdf':
       return <PdfSubRenderer artifact={artifact} />;
     case '.pptx':
+    case '.pptm':
+    case '.potm':
+    case '.potx':
+    case '.ppsm':
+    case '.ppsx':
       return <PptxSubRenderer artifact={artifact} />;
     default:
       return <FileInfoFallback artifact={artifact} />;

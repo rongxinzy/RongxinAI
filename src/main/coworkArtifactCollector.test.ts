@@ -88,6 +88,21 @@ describe('collectSessionArtifactCandidates', () => {
     );
   });
 
+  test('preserves unknown declared file types as unsupported', () => {
+    const [candidate] = collectSessionArtifactCandidates([
+      message('declare-unknown', 1, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolInput: { filePath: 'D:/output/archive.custombinary' },
+      }),
+    ]);
+
+    expect(candidate.artifact).toMatchObject({
+      type: 'unsupported',
+      declared: true,
+      content: '',
+    });
+  });
+
   test('collects supported assistant code blocks with stable keys and content', () => {
     const [candidate] = collectSessionArtifactCandidates([
       message(

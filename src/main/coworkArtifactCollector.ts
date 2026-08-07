@@ -88,7 +88,7 @@ function collectDeclarations(messages: CoworkArtifactMessage[]): CoworkArtifactC
       artifact: {
         id: `artifact-declare-${message.id}`,
         messageId: message.id,
-        type: resolveArtifactType(filePath, kind) ?? 'code',
+        type: resolveArtifactType(filePath, kind) ?? 'unsupported',
         title:
           typeof input.title === 'string' && input.title.trim() ? input.title.trim() : fileName,
         content: '',

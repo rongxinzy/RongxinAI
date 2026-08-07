@@ -105,6 +105,26 @@ describe('parseDeclareArtifactFromMessages', () => {
     expect(artifacts[0].type).toBe('html');
   });
 
+  test('marks unknown declared file types as unsupported', () => {
+    const messages = [
+      {
+        id: 'tool-unknown',
+        type: 'tool_use' as const,
+        content: '',
+        timestamp: Date.now(),
+        metadata: {
+          toolName: 'declare_artifact',
+          toolInput: { filePath: 'D:/workspace/archive.custombinary' },
+        },
+      },
+    ];
+
+    const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
+
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0]).toMatchObject({ type: 'unsupported', declared: true, content: '' });
+  });
+
   test('respects intermediate role', () => {
     const messages = [
       {

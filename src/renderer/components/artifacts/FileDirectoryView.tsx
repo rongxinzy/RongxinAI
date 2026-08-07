@@ -15,6 +15,7 @@ const TYPE_ICONS: Record<ArtifactType, string> = {
   markdown: '📝',
   text: '📄',
   document: '📑',
+  unsupported: '📑',
 };
 
 const TYPE_ORDER: Record<ArtifactType, number> = {
@@ -23,6 +24,7 @@ const TYPE_ORDER: Record<ArtifactType, number> = {
   image: 2,
   mermaid: 3,
   document: 4,
+  unsupported: 8,
   markdown: 5,
   text: 6,
   code: 7,
@@ -34,6 +36,7 @@ const TYPE_LABEL_KEYS: Record<ArtifactType, string> = {
   image: 'artifactTypeImage',
   mermaid: 'artifactTypeMermaid',
   document: 'artifactTypeDocument',
+  unsupported: 'artifactTypeUnsupported',
   markdown: 'artifactTypeMarkdown',
   text: 'artifactTypeText',
   code: 'artifactCode',

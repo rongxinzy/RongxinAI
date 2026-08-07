@@ -133,6 +133,7 @@ const TYPE_ICON_MAP: Record<ArtifactType, React.FC<{ className?: string }>> = {
   markdown: MarkdownIcon,
   text: TextIcon,
   document: DocumentIcon,
+  unsupported: DocumentIcon,
 };
 
 const TYPE_LABEL_KEY: Record<ArtifactType, string> = {
@@ -144,6 +145,7 @@ const TYPE_LABEL_KEY: Record<ArtifactType, string> = {
   markdown: 'artifactTypeMarkdown',
   text: 'artifactTypeText',
   document: 'artifactTypeDocument',
+  unsupported: 'artifactTypeUnsupported',
 };
 
 interface ArtifactPreviewCardProps {

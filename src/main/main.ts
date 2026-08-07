@@ -20,6 +20,7 @@ import {
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 import type { OpenClawSessionPatch } from '../common/openclawSession';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
@@ -7085,7 +7086,12 @@ if (!gotTheLock) {
       fs.mkdirSync(tmpDir, { recursive: true });
       const tmpFile = path.join(tmpDir, `preview-${Date.now()}.html`);
       fs.writeFileSync(tmpFile, htmlContent, 'utf-8');
-      await shell.openExternal(`file://${tmpFile}`);
+      if (process.platform === 'win32') {
+        const result = await shell.openPath(tmpFile);
+        if (result) return { success: false, error: result };
+      } else {
+        await shell.openExternal(pathToFileURL(tmpFile).href);
+      }
       return { success: true };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
