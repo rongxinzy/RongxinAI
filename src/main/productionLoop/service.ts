@@ -133,6 +133,12 @@ export class ProductionLoopService {
     this.repository = repository;
   }
 
+  getState(runId: string): ProductionLoopState {
+    const state = this.repository.get(runId);
+    if (!state) throw new Error(`Production loop not found: ${runId}`);
+    return state;
+  }
+
   beginRun(input: {
     taskId: string;
     runId: string;

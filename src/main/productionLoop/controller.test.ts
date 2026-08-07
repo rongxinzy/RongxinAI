@@ -2,7 +2,11 @@ import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { ProductionLoopPhase, ProductionLoopStatus } from '../../shared/productionLoop';
-import { WorkbenchContractKind, WorkbenchRunTrigger } from '../../shared/workbenchTask';
+import {
+  WorkbenchContractKind,
+  WorkbenchRunTrigger,
+  WorkbenchVerificationOutcome,
+} from '../../shared/workbenchTask';
 import { HarnessMeasurementService } from '../harness/measurementService';
 import { WorkbenchTaskRepository } from '../workbenchTask/repository';
 import { initializeWorkbenchTaskSchema } from '../workbenchTask/schema';
@@ -49,6 +53,7 @@ const createController = () => {
       },
       downstream,
     ),
+    service,
     downstream,
   };
 };
@@ -142,6 +147,29 @@ test('does not bind grouped subagent calls as the independent reviewer', () => {
 
   controller.recordSubagentStart('standalone-review', { agent: 'reviewer', task: 'review' });
   expect(controller.getState().critic.toolCallId).toBe('standalone-review');
+});
+
+test('refreshes externally persisted verification state before making decisions', () => {
+  const { controller, service } = createController();
+  reachCritique(controller);
+  controller.recordSubagentStart('review', { agent: 'reviewer', task: 'review' });
+  controller.recordSubagentResult(
+    'review',
+    JSON.stringify({ verdict: 'pass', findings: [] }),
+    false,
+  );
+  controller.requestCompletion('ready');
+  const runId = controller.getState().runId;
+
+  service.recordVerificationResult(runId, WorkbenchVerificationOutcome.Failed, 'checks failed');
+
+  expect(controller.getState()).toMatchObject({
+    phase: ProductionLoopPhase.Revise,
+    status: ProductionLoopStatus.NeedsRevision,
+  });
+  expect(controller.onAgentEnd({ next: false })).toMatchObject({
+    shouldFinish: false,
+  });
 });
 
 test('skip_workflow lets the agent finish without the completion gate', () => {
