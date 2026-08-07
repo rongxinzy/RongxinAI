@@ -1,6 +1,10 @@
 // Vitest mock for electron — CI runs without electron binary (ELECTRON_SKIP_BINARY_DOWNLOAD=1)
 import { EventEmitter } from 'events';
 
+if (!process.resourcesPath) {
+  Object.defineProperty(process, 'resourcesPath', { value: process.cwd() });
+}
+
 export const app = {
   getPath: () => '',
   getName: () => 'RongxinAI',
