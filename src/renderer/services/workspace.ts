@@ -1,6 +1,7 @@
 import type { Workspace } from '../../shared/workspace';
 import { WorkspaceDefault } from '../../shared/workspace';
 import { store } from '../store';
+import { isScratchWorkspacePath } from '../utils/path';
 import {
   clearCurrentSession,
   clearCurrentSessionForWorkspaceChange,
@@ -14,6 +15,7 @@ import {
 import { localStore } from './store';
 
 const CURRENT_WORKSPACE_KEY = 'workspace.currentId';
+const PINNED_WORKSPACES_KEY = 'workspace.pinnedIds';
 
 type SelectWorkspaceOptions = {
   preserveSessionLoading?: boolean;
@@ -89,12 +91,20 @@ class WorkspaceService {
         }
       }
 
+      const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+      const pinnedSet = new Set(pinnedIds);
+      workspaces = workspaces
+        .map(workspace => ({ ...workspace, pinned: pinnedSet.has(workspace.id) }))
+        .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
       store.dispatch(setWorkspaces(workspaces));
 
       const savedId = await localStore.getItem<string>(CURRENT_WORKSPACE_KEY);
       const currentId = workspaces.some(workspace => workspace.id === savedId && !workspace.isHidden)
         ? savedId
-        : (workspaces.find(workspace => !workspace.isHidden)?.id ?? null);
+        : (workspaces.find(workspace => !workspace.isHidden && isScratchWorkspacePath(workspace.path))
+            ?.id ??
+          workspaces.find(workspace => !workspace.isHidden)?.id ??
+          null);
       store.dispatch(setCurrentWorkspaceId(currentId));
       if (currentId) await localStore.setItem(CURRENT_WORKSPACE_KEY, currentId);
       return workspaces;
@@ -112,11 +122,33 @@ class WorkspaceService {
     try {
       const result = await cowork.listWorkspaces();
       if (!result.success) return;
-      store.dispatch(setWorkspaces(result.workspaces ?? []));
+      const pinnedIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+      const pinnedSet = new Set(pinnedIds);
+      const workspaces = (result.workspaces ?? [])
+        .map(workspace => ({ ...workspace, pinned: pinnedSet.has(workspace.id) }))
+        .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
+      store.dispatch(setWorkspaces(workspaces));
     } catch (error) {
       this.workspaceApiAvailable = false;
       console.warn('[WorkspaceService] Failed to refresh workspaces:', error);
     }
+  }
+
+  async toggleWorkspacePin(workspaceId: string, pinned: boolean): Promise<void> {
+    const workspaces = store.getState().workspace.workspaces;
+    if (!workspaces.some(workspace => workspace.id === workspaceId)) return;
+    const currentIds = (await localStore.getItem<string[]>(PINNED_WORKSPACES_KEY)) ?? [];
+    const nextIds = pinned
+      ? [...currentIds.filter(id => id !== workspaceId), workspaceId]
+      : currentIds.filter(id => id !== workspaceId);
+    await localStore.setItem(PINNED_WORKSPACES_KEY, nextIds);
+    store.dispatch(
+      setWorkspaces(
+        workspaces
+          .map(workspace => ({ ...workspace, pinned: nextIds.includes(workspace.id) }))
+          .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))),
+      ),
+    );
   }
 
   promoteWorkspace(workspaceId: string): void {

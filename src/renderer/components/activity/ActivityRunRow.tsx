@@ -1,12 +1,13 @@
 import { cn } from '@shared/lib/utils';
-import { ChevronDown, Clock, MessageSquare } from 'lucide-react';
+import { CalendarClock, ChevronDown, MessageSquare } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import React, { useState } from 'react';
 
 import { ChannelRunStatus, ChannelRunTrigger } from '../../../shared/channelRun/constants';
+import { PlatformRegistry, type Platform } from '../../../shared/platform';
 import { i18nService } from '../../services/i18n';
 import type { ActivityRun } from '../../store/selectors/activitySelectors';
-import { formatActivityTime } from './utils';
+import { formatActivityClockTime } from './utils';
 
 interface ActivityRunRowProps {
   run: ActivityRun;
@@ -17,7 +18,7 @@ interface ActivityRunRowProps {
 /** Resolve the quiet left-hand label: cron runs name the trigger, channel runs name the platform. */
 const sourceLabel = (run: ActivityRun): string => {
   if (run.trigger === ChannelRunTrigger.Cron) {
-    return i18nService.t('activityTriggerCron');
+    return run.taskName || i18nService.t('activityTriggerCron');
   }
   return run.platform ? i18nService.t(run.platform) : i18nService.t('activityTriggerChannel');
 };
@@ -29,7 +30,12 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
   const isRunning = run.status === ChannelRunStatus.Started;
   const isFailed = run.status === ChannelRunStatus.Failed;
   const hasExpandableError = isFailed && Boolean(run.errorMessage);
-  const TriggerIcon = run.trigger === ChannelRunTrigger.Cron ? Clock : MessageSquare;
+  const TriggerIcon = run.trigger === ChannelRunTrigger.Cron ? CalendarClock : MessageSquare;
+  const platform =
+    run.trigger === ChannelRunTrigger.Channel &&
+    PlatformRegistry.platforms.includes(run.platform as Platform)
+    ? (run.platform as Platform)
+    : null;
 
   const row = (
     <div
@@ -75,13 +81,21 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
         )}
       </span>
 
-      <TriggerIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      {platform ? (
+        <img
+          src={PlatformRegistry.logo(platform)}
+          alt={i18nService.t(platform)}
+          className="mt-0.5 size-4 shrink-0 rounded object-contain"
+        />
+      ) : (
+        <TriggerIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="truncate text-sm text-foreground">{sourceLabel(run)}</span>
           <span className="shrink-0 text-xs text-muted-foreground">
-            {formatActivityTime(run.updatedAt)}
+            {formatActivityClockTime(run.updatedAt)}
           </span>
         </div>
         {run.inputPreview && (

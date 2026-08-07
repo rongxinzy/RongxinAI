@@ -118,7 +118,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   };
 
   return (
-    <div ref={containerRef} className={`relative ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}>
+    <div ref={containerRef} className={`relative ${disabled ? 'cursor-default' : 'cursor-pointer'}`}>
       <Select
         value={currentKey}
         onValueChange={handleModelSelect}
@@ -126,7 +126,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         disabled={disabled}
       >
         <SelectTrigger
-          className={`h-auto max-w-[320px] border-none bg-transparent px-3 py-1.5 shadow-none transition-colors hover:bg-surface-raised disabled:cursor-wait disabled:opacity-70 ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}
+          className={`h-auto max-w-[320px] border-none bg-transparent px-3 py-1.5 shadow-none transition-colors hover:bg-surface-raised disabled:cursor-default disabled:opacity-70 ${disabled ? 'cursor-default' : 'cursor-pointer'}`}
         >
           <SelectValue placeholder={defaultLabel}>
             <span className="truncate text-sm font-medium text-foreground">{triggerLabel}</span>

@@ -7,6 +7,8 @@ import * as path from 'path';
 import { classifyCoworkError } from '../../../common/coworkError';
 import type { OpenClawSessionPatch } from '../../../common/openclawSession';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
+import { ChannelRunStatus, ChannelRunTrigger } from '../../../shared/channelRun/constants';
+import { buildChannelRunSummary } from '../../../shared/channelRun/summary';
 import type { TriageConfig, TriageResult, TriageState } from '../../../shared/triage';
 import type {
   CoworkExecutionMode,
@@ -26,10 +28,12 @@ import { extractOpenClawAssistantStreamText } from '../openclawAssistantText';
 import {
   buildManagedSessionKey,
   isManagedSessionKey,
+  isCronSessionKey,
   type OpenClawChannelSessionSync,
   parseChannelSessionKey,
   parseManagedSessionKey,
 } from '../openclawChannelSessionSync';
+import { emitChannelRunEvent } from '../../im/channelRunEvents';
 import { OPENCLAW_AGENT_TIMEOUT_SECONDS } from '../openclawConfigSync';
 import {
   OpenClawEngineManager,
@@ -968,9 +972,6 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
   private readonly manuallyStoppedSessions = new Set<string>();
   /** Session keys whose origin is "heartbeat" — discovered via polling, used to filter real-time events. */
   private readonly heartbeatSessionKeys = new Set<string>();
-  private channelPollingTimer: ReturnType<typeof setInterval> | null = null;
-
-  private static readonly CHANNEL_POLL_INTERVAL_MS = 10_000;
   private static readonly FULL_HISTORY_SYNC_LIMIT = 50;
   private browserPrewarmAttempted = false;
 
@@ -1428,35 +1429,18 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
     this.stopGatewayClient();
   }
 
-  /**
-   * Start periodic polling for channel-originated sessions (e.g. Telegram).
-   * Uses the gateway `sessions.list` RPC to discover sessions that may not
-   * have been delivered via WebSocket events.
-   */
+  /** Discover channel sessions once after a gateway connection is ready. */
   startChannelPolling(): void {
     if (!this.channelSessionSync) {
       console.warn('[ChannelSync] startChannelPolling: no channelSessionSync set, skipping');
       return;
     }
-    // Already running
-    if (this.channelPollingTimer) {
-      console.log('[ChannelSync] startChannelPolling: already running, skipping');
-      return;
-    }
-
-    console.log('[ChannelSync] startChannelPolling: starting periodic channel session discovery');
-    // Run once immediately, then at interval
+    console.log('[ChannelSync] discovering channel sessions after gateway connection');
     void this.pollChannelSessions();
-    this.channelPollingTimer = setInterval(() => {
-      void this.pollChannelSessions();
-    }, OpenClawChannelGateway.CHANNEL_POLL_INTERVAL_MS);
   }
 
   stopChannelPolling(): void {
-    if (this.channelPollingTimer) {
-      clearInterval(this.channelPollingTimer);
-      this.channelPollingTimer = null;
-    }
+    // Session discovery is one-shot after connect; no background timer runs.
   }
 
   private async pollChannelSessions(): Promise<void> {
@@ -1566,11 +1550,34 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
           // Safety net: only sync each sessionId once per poll cycle
           if (syncedThisCycle.has(sessionId)) continue;
           syncedThisCycle.add(sessionId);
-          // Skip sessions with an active turn (they handle their own sync)
-          if (this.activeTurns.has(sessionId)) continue;
-          void this.incrementalChannelSync(sessionId, key).catch(err => {
-            console.warn('[ChannelSync] incremental sync failed for', key, err);
-          });
+          void this.incrementalChannelSync(sessionId, key)
+            .then(() => {
+              const turn = this.activeTurns.get(sessionId);
+              if (!turn) return;
+              const session = this.store.getSession(sessionId);
+              const messages = session?.messages ?? [];
+              const latestUserIndex = messages.reduce(
+                (index, message, currentIndex) =>
+                  message.type === 'user' ? currentIndex : index,
+                -1,
+              );
+              const latestAssistant =
+                latestUserIndex >= 0
+                  ? messages
+                      .slice(latestUserIndex + 1)
+                      .reverse()
+                      .find(message => message.type === 'assistant')
+                  : undefined;
+              const isFinal =
+                latestAssistant &&
+                (latestAssistant.metadata as Record<string, unknown> | undefined)?.isFinal === true;
+              if (isFinal && latestAssistant.content.trim()) {
+                void this.completeChannelTurnFallback(sessionId, turn);
+              }
+            })
+            .catch(err => {
+              console.warn('[ChannelSync] incremental sync failed for', key, err);
+            });
         }
       }
     } catch (error) {
@@ -3101,15 +3108,10 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
       }
       return;
     }
-    if (sessionIdByRunId && sessionIdBySessionKey && sessionIdByRunId !== sessionIdBySessionKey) {
-      console.log(
-        '[Debug:handleAgentEvent] sessionId mismatch, dropping. byRunId:',
-        sessionIdByRunId,
-        'bySessionKey:',
-        sessionIdBySessionKey,
-      );
-      return;
-    }
+    // The runId mapping is authoritative for an active turn. During channel
+    // history reconciliation, the same sessionKey can temporarily resolve to
+    // an older local session; dropping the event here delays the reply until
+    // the next inbound message triggers another sync.
 
     const turn = this.activeTurns.get(sessionId);
     if (!turn) {
@@ -3372,6 +3374,28 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
       const endingTurn = this.activeTurns.get(sessionId);
       const endingRunId =
         endingTurn?.runId ?? (isRecord(data) && typeof data.runId === 'string' ? data.runId : null);
+      const hasChannelReply = Boolean(
+        endingTurn?.currentText.trim() ||
+          endingTurn?.currentAssistantSegmentText.trim() ||
+          endingTurn?.committedAssistantText.trim() ||
+          endingTurn?.currentContentText.trim(),
+      );
+      const isChannelTurn = Boolean(
+        endingTurn &&
+          !isCronSessionKey(endingTurn.sessionKey) &&
+          this.channelSessionSync?.isChannelSessionKey(endingTurn.sessionKey),
+      );
+      if (endingTurn && isChannelTurn && hasChannelReply) {
+        this.store.updateSession(sessionId, { status: 'completed' });
+        this.emit('complete', sessionId, endingTurn.runId);
+        this.cleanupSessionTurn(sessionId);
+        this.resolveTurn(sessionId);
+        this.syncChannelAfterTurn(sessionId, endingTurn.sessionKey);
+        return;
+      }
+      if (endingTurn && isChannelTurn) {
+        this.syncChannelAfterTurn(sessionId, endingTurn.sessionKey);
+      }
       setTimeout(() => {
         const currentTurn = this.activeTurns.get(sessionId);
         if (!currentTurn) return; // Already completed by handleChatFinal
@@ -3382,7 +3406,13 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
         // lifecycle end + chat.final if it succeeds, or the turn timeout watchdog
         // will clean up if it never completes.
         const deferredSession = this.store.getSession(sessionId);
-        if (deferredSession?.status === 'idle') {
+        const hasReplyText = Boolean(
+          currentTurn.currentText.trim() ||
+            currentTurn.currentAssistantSegmentText.trim() ||
+            currentTurn.committedAssistantText.trim() ||
+            currentTurn.currentContentText.trim(),
+        );
+        if (deferredSession?.status === 'idle' && !hasReplyText) {
           console.debug(
             '[OpenClawRuntime] lifecycle end fallback: skipping — turn deferred for Gateway retry, sessionId:',
             sessionId,
@@ -4312,7 +4342,12 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
     const sessionAfterReconcile = this.store.getSession(sessionId);
     if (sessionAfterReconcile) {
       const hadToolCall = turn.toolResultMessageIdByToolCallId.size > 0;
-      const lastApiResponseHadNoText = !turn.currentText.trim();
+      const lastApiResponseHadNoText = !(
+        turn.currentText.trim() ||
+        turn.currentAssistantSegmentText.trim() ||
+        turn.committedAssistantText.trim() ||
+        turn.currentContentText.trim()
+      );
       console.debug(
         '[OpenClawRuntime] run end diagnostics, sessionId:',
         sessionId,
@@ -4421,7 +4456,13 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
     // turn alive so streaming delta events from the retry are not dropped
     // by isRecentlyClosedRunId / sessionIdByRunId cleanup.
     // The turn timeout watchdog handles cleanup if no retry ever arrives.
-    if (!turn.currentText.trim() && !turn.committedAssistantText.trim()) {
+    const hasVisibleReply = Boolean(
+      turn.currentText.trim() ||
+        turn.currentAssistantSegmentText.trim() ||
+        turn.committedAssistantText.trim() ||
+        turn.currentContentText.trim(),
+    );
+    if (!hasVisibleReply) {
       console.debug(
         '[OpenClawRuntime] deferring run close — empty response, awaiting potential Gateway retry',
         `sessionId=${sessionId}`,
@@ -5736,6 +5777,28 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
   private cleanupSessionTurn(sessionId: string): void {
     const turn = this.activeTurns.get(sessionId);
     if (turn) {
+      const parsedChannel =
+        !isCronSessionKey(turn.sessionKey) && !isManagedSessionKey(turn.sessionKey)
+          ? parseChannelSessionKey(turn.sessionKey)
+          : null;
+      if (parsedChannel) {
+        const replyText =
+          turn.currentText.trim() ||
+          turn.currentAssistantSegmentText.trim() ||
+          turn.committedAssistantText.trim() ||
+          turn.currentContentText.trim();
+        emitChannelRunEvent(
+          buildChannelRunSummary({
+            runId: turn.runId,
+            sessionId,
+            platform: parsedChannel.platform,
+            conversationId: parsedChannel.conversationId,
+            trigger: ChannelRunTrigger.Channel,
+            status: replyText ? ChannelRunStatus.Completed : ChannelRunStatus.Failed,
+            reply: replyText || undefined,
+          }),
+        );
+      }
       const clearActivity = turn.toolActivityTracker.clear();
       if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
       // Clear client-side timeout watchdog
@@ -5906,6 +5969,7 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
     const isChannel =
       this.channelSessionSync &&
       !isManagedSessionKey(sessionKey) &&
+      !isCronSessionKey(sessionKey) &&
       this.channelSessionSync.isChannelSessionKey(sessionKey);
     console.log(
       '[Debug:ensureActiveTurn] creating turn — sessionId:',
@@ -5945,6 +6009,21 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
       bufferedChatPayloads: [],
       bufferedAgentPayloads: [],
     });
+    if (isChannel) {
+      const parsedChannel = parseChannelSessionKey(sessionKey);
+      if (parsedChannel) {
+        emitChannelRunEvent(
+          buildChannelRunSummary({
+            runId: turnRunId,
+            sessionId,
+            platform: parsedChannel.platform,
+            conversationId: parsedChannel.conversationId,
+            trigger: ChannelRunTrigger.Channel,
+            status: ChannelRunStatus.Started,
+          }),
+        );
+      }
+    }
     if (runId) {
       this.sessionIdByRunId.set(runId, sessionId);
     }

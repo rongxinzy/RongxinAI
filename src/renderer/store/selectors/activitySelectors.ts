@@ -2,8 +2,8 @@ import { createSelector } from '@reduxjs/toolkit';
 
 import {
   ChannelRunStatus,
+  ChannelRunTrigger,
   type ChannelRunSummary,
-  type ChannelRunTrigger,
 } from '../../../shared/channelRun/constants';
 import type { RootState } from '../index';
 
@@ -20,6 +20,7 @@ export interface ActivityRun {
   conversationId: string;
   trigger: ChannelRunTrigger;
   status: ChannelRunStatus;
+  taskName?: string;
   /** Timestamp of the started event (or of the first seen event). */
   startedAt: number;
   /** Timestamp of the latest lifecycle transition. */
@@ -36,6 +37,7 @@ const toRun = (event: ChannelRunSummary): ActivityRun => ({
   conversationId: event.conversationId,
   trigger: event.trigger,
   status: event.status,
+  taskName: event.taskName,
   startedAt: event.timestamp,
   updatedAt: event.timestamp,
   inputPreview: event.inputPreview,
@@ -55,7 +57,37 @@ export const foldChannelRunEvents = (events: ChannelRunSummary[]): ActivityRun[]
   const runById = new Map<string, ActivityRun>();
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];
+    // Ignore legacy/background-delivery Cron starts that carried neither a
+    // task name nor input. They are not actionable activity records.
+    if (
+      event.trigger === ChannelRunTrigger.Cron &&
+      event.status === ChannelRunStatus.Started &&
+      !event.taskName &&
+      !event.inputPreview
+    ) {
+      continue;
+    }
     let run = runById.get(event.runId);
+    if (!run && event.status !== ChannelRunStatus.Started) {
+      // Some channel adapters emit the start and terminal lifecycle events
+      // from different boundaries. When there is exactly one matching active
+      // channel run, merge the terminal event even if its runId differs.
+      let candidates = runs.filter(
+        candidate =>
+          candidate.trigger === ChannelRunTrigger.Channel &&
+          candidate.status === ChannelRunStatus.Started &&
+          event.trigger === ChannelRunTrigger.Channel &&
+          candidate.sessionId === event.sessionId &&
+          candidate.platform === event.platform &&
+          (!candidate.conversationId ||
+            !event.conversationId ||
+            candidate.conversationId === event.conversationId),
+      );
+      if (candidates.length === 1) {
+        run = candidates[0];
+        runById.set(event.runId, run);
+      }
+    }
     if (!run) {
       run = toRun(event);
       runs.push(run);
@@ -66,6 +98,8 @@ export const foldChannelRunEvents = (events: ChannelRunSummary[]): ActivityRun[]
     }
     run.status = event.status;
     run.updatedAt = event.timestamp;
+    if (event.sessionId) run.sessionId = event.sessionId;
+    if (event.conversationId) run.conversationId = event.conversationId;
     run.replyPreview = event.replyPreview ?? run.replyPreview;
     run.errorMessage = event.errorMessage ?? run.errorMessage;
   }

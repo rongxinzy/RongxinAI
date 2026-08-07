@@ -4,14 +4,13 @@
  */
 
 import { EventEmitter } from 'events';
-import fs from 'fs';
-import path from 'path';
 
 import { type CoworkError, CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
 import { ChannelRunStatus, ChannelRunTrigger } from '../../shared/channelRun/constants';
 import { buildChannelRunSummary } from '../../shared/channelRun/summary';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
+import { getDefaultConversationWorkspacePath } from '../defaultConversationWorkspace';
 import { t } from '../i18n';
 import type { CoworkRuntime, PermissionRequest, PermissionResult } from '../libs/agentEngine/types';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
@@ -356,21 +355,9 @@ export class IMCoworkHandler extends EventEmitter {
     // multi-instance platforms route through OpenClaw channel session sync)
     const imSettings = this.imStore.getIMSettings();
     const agentId = imSettings.platformAgentBindings?.[platform] || 'main';
-    const selectedWorkspaceRoot = (
-      this.coworkStore.getAgent(agentId)?.workingDirectory?.trim() ||
-      config.workingDirectory ||
-      ''
-    ).trim();
-    if (!selectedWorkspaceRoot) {
-      throw new Error('IM 工作目录未配置，请先在应用中选择任务目录。');
-    }
-    const resolvedWorkspaceRoot = path.resolve(selectedWorkspaceRoot);
-    if (
-      !fs.existsSync(resolvedWorkspaceRoot) ||
-      !fs.statSync(resolvedWorkspaceRoot).isDirectory()
-    ) {
-      throw new Error(`IM 工作目录不存在或无效: ${resolvedWorkspaceRoot}`);
-    }
+    // IM channel conversations belong to the app's default conversation
+    // workspace, independently of the currently selected project.
+    const resolvedWorkspaceRoot = getDefaultConversationWorkspacePath();
 
     const session = this.coworkStore.createSession(
       title,
@@ -727,16 +714,6 @@ export class IMCoworkHandler extends EventEmitter {
       },
     };
     this.messageAccumulators.set(sessionId, nextAccumulator);
-    emitChannelRunEvent(
-      buildChannelRunSummary({
-        runId: nextAccumulator.runId,
-        sessionId,
-        platform: conversation.platform,
-        conversationId: conversation.conversationId,
-        trigger: ChannelRunTrigger.Cron,
-        status: ChannelRunStatus.Started,
-      }),
-    );
     return nextAccumulator;
   }
 
@@ -761,6 +738,9 @@ export class IMCoworkHandler extends EventEmitter {
     reply?: string,
     error?: string,
   ): void {
+    // Background delivery is an outbound Cron result. CronJobService owns the
+    // Cron activity lifecycle; do not project this accumulator as a second run.
+    if (accumulator.backgroundDelivery) return;
     const conversation =
       accumulator.backgroundDelivery ?? this.sessionConversationMap.get(sessionId);
     emitChannelRunEvent(
@@ -769,9 +749,7 @@ export class IMCoworkHandler extends EventEmitter {
         sessionId,
         platform: conversation?.platform ?? '',
         conversationId: conversation?.conversationId ?? '',
-        trigger: accumulator.backgroundDelivery
-          ? ChannelRunTrigger.Cron
-          : ChannelRunTrigger.Channel,
+        trigger: ChannelRunTrigger.Channel,
         status,
         reply,
         error,

@@ -147,6 +147,38 @@ describe('foldChannelRunEvents', () => {
     expect(runs.find(run => run.id === 'r1')?.status).toBe(ChannelRunStatus.Failed);
     expect(runs.find(run => run.id === 'r2')?.status).toBe(ChannelRunStatus.Completed);
   });
+
+  it('merges a channel terminal event when an adapter changed the run id', () => {
+    const started = makeEvent({ runId: 'gateway-run', sessionId: 's1' });
+    const completed = makeEvent({
+      runId: 'adapter-run',
+      sessionId: 's1',
+      status: ChannelRunStatus.Completed,
+      timestamp: started.timestamp + 100,
+    });
+
+    const runs = foldChannelRunEvents([completed, started]);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]).toMatchObject({ id: 'gateway-run', status: ChannelRunStatus.Completed });
+  });
+
+  it('merges channel completion when the adapter omits the conversation id', () => {
+    const started = makeEvent({ runId: 'gateway-run', sessionId: 's1', conversationId: 'dm:1' });
+    const completed = makeEvent({
+      runId: 'adapter-run',
+      sessionId: 's1',
+      conversationId: '',
+      status: ChannelRunStatus.Completed,
+      timestamp: started.timestamp + 100,
+    });
+
+    const runs = foldChannelRunEvents([completed, started]);
+
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.status).toBe(ChannelRunStatus.Completed);
+  });
+
 });
 
 describe('selectActivityRuns', () => {

@@ -944,6 +944,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     projectNameLabel: '项目名称',
     deleteProject: '删除项目',
     renameProject: '重命名项目',
+    pinProject: '置顶项目',
+    unpinProject: '取消置顶项目',
     renameProjectFailed: '重命名项目失败，请检查文件夹名称和权限后重试',
     workspaceActions: '工作区操作',
     confirmDeleteProject: '确定要删除这个项目吗？项目内聊天将移回到聊天列表。此操作不可撤销。',
@@ -3794,6 +3796,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     projectNameLabel: 'Project name',
     deleteProject: 'Delete project',
     renameProject: 'Rename project',
+    pinProject: 'Pin project',
+    unpinProject: 'Unpin project',
     renameProjectFailed:
       'Could not rename the project. Check the folder name and permissions, then try again.',
     workspaceActions: 'Workspace actions',

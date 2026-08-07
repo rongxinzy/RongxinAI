@@ -3,6 +3,7 @@ export interface Workspace {
   name: string;
   path: string;
   isHidden: boolean;
+  pinned?: boolean;
   createdAt: number;
   updatedAt: number;
 }

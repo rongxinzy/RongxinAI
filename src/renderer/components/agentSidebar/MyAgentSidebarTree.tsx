@@ -139,6 +139,10 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     setWorkspacePendingRename(workspace);
   };
 
+  const handleToggleWorkspacePin = async (workspace: WorkspaceSidebarNode, pinned: boolean) => {
+    await workspaceService.toggleWorkspacePin(workspace.id, pinned);
+  };
+
   const handleConfirmRenameWorkspace = async () => {
     const workspace = workspacePendingRename;
     const name = workspaceRenameValue.trim();
@@ -296,6 +300,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
               onToggleExpanded={toggleExpanded}
               onCreateTask={selectedWorkspace => void handleCreateTask(selectedWorkspace)}
               onRenameWorkspace={handleRenameWorkspace}
+              onToggleWorkspacePin={handleToggleWorkspacePin}
               onRemoveWorkspace={selectedWorkspace => setWorkspacePendingRemoval(selectedWorkspace)}
               onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
               onLoadMoreTasks={workspaceId => void loadMoreTasks(workspaceId)}

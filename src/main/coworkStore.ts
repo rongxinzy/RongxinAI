@@ -2,7 +2,6 @@ import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import { app } from 'electron';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -22,11 +21,12 @@ import type {
 } from '../shared/cowork/sessionExperts';
 import type { Workspace } from '../shared/workspace';
 import { CoworkArtifactIndex } from './coworkArtifactIndex';
+import { getDefaultConversationWorkspacePath } from './defaultConversationWorkspace';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 // Default working directory for new users
 const getDefaultWorkingDirectory = (): string => {
-  return path.join(os.homedir(), 'zhiyuan', 'project');
+  return getDefaultConversationWorkspacePath();
 };
 
 const DEFAULT_MEMORY_ENABLED = true;

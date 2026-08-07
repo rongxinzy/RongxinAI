@@ -64,6 +64,82 @@ test('gateway reconnection emits a full task-list refresh', () => {
   electronMocks.getAllWindows.mockReturnValue([]);
 });
 
+test('polling projects a cron run into the channel activity event stream', async () => {
+  const onChannelRunEvent = vi.fn();
+  let poll = 0;
+  const job = {
+    id: 'job-1',
+    name: 'Morning brief',
+    enabled: true,
+    schedule: { kind: 'cron', expr: '0 9 * * *' },
+    sessionTarget: 'isolated',
+    wakeMode: 'now',
+    payload: { kind: 'agentTurn', message: 'Summarize updates' },
+    delivery: { mode: 'announce', channel: 'feishu', to: 'chat-1' },
+    sessionKey: 'session-1',
+    state: { runningAtMs: 1700000000000, lastRunAtMs: 1 },
+    createdAtMs: 1,
+    updatedAtMs: 1,
+  };
+  const gatewayClient = {
+    request: vi.fn(async <T = Record<string, unknown>>(method: string): Promise<T> => {
+      if (method === 'cron.list') {
+        poll += 1;
+        const currentJob =
+          poll === 1
+            ? { ...job, state: { runningAtMs: undefined, lastRunAtMs: 1 } }
+            : poll === 2
+              ? job
+              : {
+                  ...job,
+                  state: {
+                    runningAtMs: undefined,
+                    lastRunAtMs: 2,
+                    lastRunStatus: GatewayStatus.Ok,
+                  },
+                };
+        return { jobs: [currentJob] } as T;
+      }
+      return {
+        entries: [
+          {
+            ts: 1700000010000,
+            jobId: 'job-1',
+            status: GatewayStatus.Ok,
+            runAtMs: 1700000000000,
+            durationMs: 10000,
+            summary: 'Done',
+          },
+        ],
+      } as T;
+    }),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+    onChannelRunEvent,
+  });
+  (service as unknown as { polling: boolean }).polling = true;
+
+  await (service as unknown as { pollOnce: () => Promise<void> }).pollOnce();
+  service.handleGatewayConnected();
+  await (service as unknown as { pollOnce: () => Promise<void> }).pollOnce();
+  await (service as unknown as { pollOnce: () => Promise<void> }).pollOnce();
+
+  expect(onChannelRunEvent).toHaveBeenCalledTimes(2);
+  expect(onChannelRunEvent.mock.calls[0]?.[0]).toMatchObject({
+    runId: 'job-1-1700000000000',
+    trigger: 'cron',
+    status: 'started',
+    inputPreview: 'Summarize updates',
+  });
+  expect(onChannelRunEvent.mock.calls[1]?.[0]).toMatchObject({
+    runId: 'job-1-1700000000000',
+    trigger: 'cron',
+    status: 'completed',
+  });
+});
+
 describe('mapGatewayRun', () => {
   const baseEntry = {
     ts: 1700000000000,

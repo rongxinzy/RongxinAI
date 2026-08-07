@@ -1,6 +1,11 @@
 import { BrowserWindow } from 'electron';
 
 import { parseChannelSessionKey } from '../main/libs/openclawChannelSessionSync';
+import {
+  ChannelRunStatus,
+  ChannelRunTrigger,
+  type ChannelRunSummary,
+} from '../shared/channelRun/constants';
 import { PlatformRegistry } from '../shared/platform';
 import type {
   DeliveryMode as DeliveryModeType,
@@ -10,6 +15,7 @@ import type {
 } from './constants';
 import {
   DeliveryMode,
+  DeliveryChannel,
   GatewayStatus,
   IpcChannel,
   PayloadKind,
@@ -130,6 +136,7 @@ interface GatewayRunLogEntry {
 interface CronJobServiceDeps {
   getGatewayClient: () => GatewayClientLike | null;
   ensureGatewayReady: () => Promise<void>;
+  onChannelRunEvent?: (summary: ChannelRunSummary) => void;
 }
 
 /**
@@ -464,6 +471,7 @@ function extractRunTitle(summary?: string): string | undefined {
 export class CronJobService {
   private readonly getGatewayClient: () => GatewayClientLike | null;
   private readonly ensureGatewayReady: () => Promise<void>;
+  private readonly onChannelRunEvent: ((summary: ChannelRunSummary) => void) | null;
   private pollingTimer: ReturnType<typeof setInterval> | null = null;
   private lastKnownStates: Map<string, string> = new Map();
   private lastKnownRunAtMs: Map<string, number> = new Map();
@@ -473,6 +481,8 @@ export class CronJobService {
   private jobNameCache: Map<string, string> = new Map();
   /** Job IDs currently running (non-null `runningAtMs`), updated during polling. */
   private runningJobIds: Set<string> = new Set();
+  /** Activity run IDs for jobs that started while this service was polling. */
+  private activeChannelRunIds: Map<string, string> = new Map();
 
   /** Polling interval for cron job state and run log sync.
    *  15s is the production default.  During local development 5s gives
@@ -482,6 +492,7 @@ export class CronJobService {
   constructor(deps: CronJobServiceDeps) {
     this.getGatewayClient = deps.getGatewayClient;
     this.ensureGatewayReady = deps.ensureGatewayReady;
+    this.onChannelRunEvent = deps.onChannelRunEvent ?? null;
   }
 
   /**
@@ -580,7 +591,9 @@ export class CronJobService {
     if (input.payload !== undefined)
       patch.payload = toGatewayPayload(input.payload, input.delivery);
     if (input.delivery !== undefined)
-      patch.delivery = toGatewayDelivery(input.delivery) ?? { mode: DeliveryMode.None };
+      patch.delivery = toGatewayDelivery(input.delivery) ?? {
+        mode: DeliveryMode.None,
+      };
     if (input.agentId !== undefined) patch.agentId = input.agentId?.trim() || null;
     if (input.sessionKey !== undefined) patch.sessionKey = input.sessionKey?.trim() || null;
 
@@ -620,7 +633,7 @@ export class CronJobService {
         query: id,
         limit: 20,
       });
-      return result.jobs?.find(job => job.id === id) ?? null;
+      return result.jobs?.find((job) => job.id === id) ?? null;
     } catch {
       return null;
     }
@@ -628,7 +641,10 @@ export class CronJobService {
 
   async toggleJob(id: string, enabled: boolean): Promise<ScheduledTask> {
     const client = await this.client();
-    const job = await client.request<GatewayJob>('cron.update', { id, patch: { enabled } });
+    const job = await client.request<GatewayJob>('cron.update', {
+      id,
+      patch: { enabled },
+    });
     return mapGatewayJob(job);
   }
 
@@ -650,8 +666,12 @@ export class CronJobService {
       limit,
       offset,
       sortDir: 'desc',
-      ...(filter?.startDate && { startMs: new Date(filter.startDate + 'T00:00:00').getTime() }),
-      ...(filter?.endDate && { endMs: new Date(filter.endDate + 'T23:59:59').getTime() }),
+      ...(filter?.startDate && {
+        startMs: new Date(filter.startDate + 'T00:00:00').getTime(),
+      }),
+      ...(filter?.endDate && {
+        endMs: new Date(filter.endDate + 'T23:59:59').getTime(),
+      }),
       ...(filter?.status && { status: toGatewayRunStatus(filter.status) }),
     });
     return Array.isArray(result.entries) ? result.entries.map(mapGatewayRun) : [];
@@ -678,8 +698,12 @@ export class CronJobService {
       limit,
       offset,
       sortDir: 'desc',
-      ...(filter?.startDate && { startMs: new Date(filter.startDate + 'T00:00:00').getTime() }),
-      ...(filter?.endDate && { endMs: new Date(filter.endDate + 'T23:59:59').getTime() }),
+      ...(filter?.startDate && {
+        startMs: new Date(filter.startDate + 'T00:00:00').getTime(),
+      }),
+      ...(filter?.endDate && {
+        endMs: new Date(filter.endDate + 'T23:59:59').getTime(),
+      }),
       ...(filter?.status && { status: toGatewayRunStatus(filter.status) }),
     });
     if (!Array.isArray(result.entries)) result.entries = [];
@@ -716,7 +740,7 @@ export class CronJobService {
       // fall through — running runs will be empty, completed runs still work
     }
 
-    const completed = result.entries.map(entry => ({
+    const completed = result.entries.map((entry) => ({
       ...mapGatewayRun(entry),
       taskName:
         entry.jobName || nameMap.get(entry.jobId) || extractRunTitle(entry.summary) || entry.jobId,
@@ -762,6 +786,7 @@ export class CronJobService {
     this.lastKnownRunAtMs.clear();
     this.jobNameCache.clear();
     this.runningJobIds.clear();
+    this.activeChannelRunIds.clear();
   }
 
   private async pollOnce(): Promise<void> {
@@ -779,12 +804,16 @@ export class CronJobService {
       const jobs = Array.isArray(result.jobs) ? result.jobs : [];
 
       // Refresh jobId → name cache for synchronous lookups (used by session naming).
+      const previousRunningJobIds = new Set(this.runningJobIds);
       this.jobNameCache.clear();
       this.runningJobIds.clear();
       for (const job of jobs) {
         this.jobNameCache.set(job.id, job.name);
         if (job.state.runningAtMs) {
           this.runningJobIds.add(job.id);
+          if (!previousRunningJobIds.has(job.id) && this.firstPollDone) {
+            this.emitChannelRunStarted(job);
+          }
         }
       }
 
@@ -810,12 +839,16 @@ export class CronJobService {
 
         const lastRunAtMs = job.state.lastRunAtMs ?? 0;
         const previousRunAtMs = this.lastKnownRunAtMs.get(job.id) ?? 0;
-        if (lastRunAtMs > previousRunAtMs && previousRunAtMs > 0) {
+        if (
+          lastRunAtMs > previousRunAtMs &&
+          (previousRunAtMs > 0 || this.activeChannelRunIds.has(job.id))
+        ) {
           try {
             const runs = await this.listRuns(job.id, 1, 0);
             if (runs[0]) {
               const task = mapGatewayJob(job);
               this.emitRunUpdate({ ...runs[0], taskName: task.name });
+              this.emitChannelRunFinished(job, runs[0]);
             }
           } catch {
             // Ignore run fetch failures during polling.
@@ -824,7 +857,7 @@ export class CronJobService {
         this.lastKnownRunAtMs.set(job.id, lastRunAtMs);
       }
 
-      const currentIds = new Set(jobs.map(job => job.id));
+      const currentIds = new Set(jobs.map((job) => job.id));
       for (const knownId of this.lastKnownStates.keys()) {
         if (!currentIds.has(knownId)) {
           this.lastKnownStates.delete(knownId);
@@ -842,7 +875,7 @@ export class CronJobService {
   }
 
   private emitStatusUpdate(taskId: string, state: TaskState): void {
-    BrowserWindow.getAllWindows().forEach(window => {
+    BrowserWindow.getAllWindows().forEach((window) => {
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.StatusUpdate, { taskId, state });
       }
@@ -850,15 +883,61 @@ export class CronJobService {
   }
 
   private emitRunUpdate(run: ScheduledTaskRunWithName): void {
-    BrowserWindow.getAllWindows().forEach(window => {
+    BrowserWindow.getAllWindows().forEach((window) => {
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.RunUpdate, { run });
       }
     });
   }
 
+  private emitChannelRunStarted(job: GatewayJob): void {
+    if (!this.onChannelRunEvent || !job.state.runningAtMs) return;
+    const runId = `${job.id}-${job.state.runningAtMs}`;
+    this.activeChannelRunIds.set(job.id, runId);
+    const delivery = job.delivery;
+    const sessionTarget = job.sessionKey ? parseChannelSessionKey(job.sessionKey) : null;
+    const platform = delivery?.channel && delivery.channel !== DeliveryChannel.Last
+      ? (PlatformRegistry.platformOfChannel(delivery.channel) ?? '')
+      : (sessionTarget?.platform ?? '');
+    const inputPreview =
+      job.payload.kind === PayloadKind.SystemEvent ? job.payload.text : job.payload.message;
+    this.onChannelRunEvent({
+      runId,
+      sessionId: '',
+      platform,
+      conversationId: delivery?.to ?? sessionTarget?.conversationId ?? '',
+      trigger: ChannelRunTrigger.Cron,
+      status: ChannelRunStatus.Started,
+      taskName: job.name,
+      timestamp: job.state.runningAtMs,
+      inputPreview,
+    });
+  }
+
+  private emitChannelRunFinished(job: GatewayJob, run: ScheduledTaskRun): void {
+    if (!this.onChannelRunEvent) return;
+    const delivery = job.delivery;
+    const sessionTarget = job.sessionKey ? parseChannelSessionKey(job.sessionKey) : null;
+    const platform = delivery?.channel && delivery.channel !== DeliveryChannel.Last
+      ? (PlatformRegistry.platformOfChannel(delivery.channel) ?? '')
+      : (sessionTarget?.platform ?? '');
+    this.onChannelRunEvent({
+      runId: this.activeChannelRunIds.get(job.id) ?? run.id,
+      sessionId: run.sessionId ?? job.sessionKey ?? '',
+      platform,
+      conversationId: delivery?.to ?? sessionTarget?.conversationId ?? '',
+      trigger: ChannelRunTrigger.Cron,
+      status:
+        run.status === TaskStatus.Success ? ChannelRunStatus.Completed : ChannelRunStatus.Failed,
+      taskName: job.name,
+      timestamp: new Date(run.finishedAt ?? run.startedAt).getTime(),
+      errorMessage: run.error ?? undefined,
+    });
+    this.activeChannelRunIds.delete(job.id);
+  }
+
   private emitFullRefresh(): void {
-    BrowserWindow.getAllWindows().forEach(window => {
+    BrowserWindow.getAllWindows().forEach((window) => {
       if (!window.isDestroyed()) {
         window.webContents.send(IpcChannel.Refresh);
       }

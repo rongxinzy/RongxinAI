@@ -1,4 +1,5 @@
 import { CronJobService } from '../../../scheduledTask/cronJobService';
+import { emitChannelRunEvent } from '../../im/channelRunEvents';
 
 type GatewayClientLike = {
   request: <T = Record<string, unknown>>(
@@ -40,6 +41,7 @@ export function getCronJobService(): CronJobService {
     const service = new CronJobService({
       getGatewayClient: () => adapter.getGatewayClient(),
       ensureGatewayReady: () => adapter.ensureReady(),
+      onChannelRunEvent: emitChannelRunEvent,
     });
     adapter.onGatewayDisconnect(() => service.handleGatewayDisconnected());
     adapter.onGatewayReconnect(() => service.handleGatewayConnected());

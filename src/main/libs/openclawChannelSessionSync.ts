@@ -279,6 +279,10 @@ export interface ChannelSessionSyncDeps {
   coworkStore: CoworkStore;
   imStore: IMStore;
   getDefaultCwd: (agentId?: string) => string;
+  /** Working directory used only for IM channel sessions. */
+  getChannelCwd?: (agentId?: string) => string;
+  /** Working directory used only for scheduled-task sessions. */
+  getCronCwd?: (agentId?: string) => string;
   /** Optional synchronous lookup: jobId → human-readable name (for cron session titles). */
   resolveJobName?: (jobId: string) => string | null;
   /**
@@ -293,6 +297,8 @@ export class OpenClawChannelSessionSync {
   private readonly coworkStore: CoworkStore;
   private readonly imStore: IMStore;
   private readonly getDefaultCwd: (agentId?: string) => string;
+  private readonly getChannelCwd: (agentId?: string) => string;
+  private readonly getCronCwd: (agentId?: string) => string;
   private readonly resolveJobName: ((jobId: string) => string | null) | null;
   private readonly onBindingChanged:
     | ((sessionKey: string, platform: Platform, newAgentId: string) => void)
@@ -315,6 +321,8 @@ export class OpenClawChannelSessionSync {
     this.coworkStore = deps.coworkStore;
     this.imStore = deps.imStore;
     this.getDefaultCwd = deps.getDefaultCwd;
+    this.getChannelCwd = deps.getChannelCwd ?? deps.getDefaultCwd;
+    this.getCronCwd = deps.getCronCwd ?? deps.getDefaultCwd;
     this.resolveJobName = deps.resolveJobName ?? null;
     this.onBindingChanged = deps.onBindingChanged ?? null;
   }
@@ -436,7 +444,7 @@ export class OpenClawChannelSessionSync {
             : parsed.conversationId;
           const shortId = displayId.length > 12 ? displayId.slice(-12) : displayId;
           const title = `${titlePrefix} ${shortId}`;
-          const cwd = this.getDefaultCwd(currentAgentId);
+          const cwd = this.getChannelCwd(currentAgentId);
           const newSession = this.coworkStore.createSession(
             title,
             cwd,
@@ -506,7 +514,7 @@ export class OpenClawChannelSessionSync {
       parsed.platform,
       accountId,
     );
-    const cwd = this.getDefaultCwd(agentId);
+    const cwd = this.getChannelCwd(agentId);
     console.log(
       '[ChannelSessionSync] creating new cowork session: title=',
       title,
@@ -657,7 +665,7 @@ export class OpenClawChannelSessionSync {
       ? `[${cronLabel}] ${jobName}`
       : `[${cronLabel}] ${jobId.length > 8 ? jobId.slice(0, 8) : jobId}`;
     const agentId = extractAgentIdFromKey(sessionKey) || 'main';
-    const cwd = this.getDefaultCwd(agentId);
+    const cwd = this.getCronCwd(agentId);
     console.log(
       '[ChannelSessionSync] creating cron session: key=',
       sessionKey,

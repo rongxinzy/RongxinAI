@@ -101,6 +101,10 @@ import {
   type CoworkSessionStatus,
   CoworkStore,
 } from './coworkStore';
+import {
+  getDefaultConversationWorkspacePath,
+  isDefaultConversationWorkspacePath,
+} from './defaultConversationWorkspace';
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig, IMGatewayManager } from './im';
 import {
@@ -1940,8 +1944,11 @@ const getOpenClawChannelGateway = (): OpenClawChannelGateway => {
         const channelSessionSync = new OpenClawChannelSessionSync({
           coworkStore: getCoworkStore(),
           imStore,
-          getDefaultCwd: (agentId?: string) =>
-            resolveAgentDefaultWorkingDirectory(agentId) || os.homedir(),
+          getDefaultCwd: () => getDefaultConversationWorkspacePath(),
+          // IM channel conversations belong to the app's default conversation
+          // workspace. Scheduled-task sessions use their own automation cwd.
+          getChannelCwd: () => getDefaultConversationWorkspacePath(),
+          getCronCwd: agentId => resolveAgentDefaultWorkingDirectory(agentId) || os.homedir(),
           resolveJobName: jobId => getCronJobService().getJobNameSync(jobId),
           onBindingChanged: (sessionKey, _platform, newAgentId) => {
             const agent = getCoworkStore().getAgent(newAgentId);
@@ -4225,6 +4232,9 @@ if (!gotTheLock) {
       const coworkStore = getCoworkStore();
       const workspace = coworkStore.getWorkspace(id);
       if (!workspace) return { success: false, error: 'Workspace not found' };
+      if (isDefaultConversationWorkspacePath(workspace.path)) {
+        return { success: false, error: 'The default conversation workspace cannot be removed' };
+      }
       const deletedSessionIds = coworkStore.deleteWorkspace(id);
       console.log(
         `[CoworkStore] removed a workspace along with ${deletedSessionIds.length} session(s)`,
@@ -4239,16 +4249,6 @@ if (!gotTheLock) {
   });
 
   // Project working-directory helpers
-  function getDefaultConversationWorkspacePath(): string {
-    return path.join(os.homedir(), '.zhiyuan', 'scratch');
-  }
-  function isDefaultConversationWorkspacePath(candidatePath: string): boolean {
-    const normalizedCandidatePath = path.resolve(candidatePath);
-    const normalizedDefaultPath = path.resolve(getDefaultConversationWorkspacePath());
-    return process.platform === 'win32'
-      ? normalizedCandidatePath.toLowerCase() === normalizedDefaultPath.toLowerCase()
-      : normalizedCandidatePath === normalizedDefaultPath;
-  }
   const getDefaultProjectBaseDir = () =>
     path.join(app.getPath('documents'), 'ZhiYuanAgent', 'Workspaces');
   const getUnmanagedWorkspaceBaseDir = () =>

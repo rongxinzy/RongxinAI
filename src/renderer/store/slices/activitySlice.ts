@@ -2,8 +2,8 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
 import type { ChannelRunSummary } from '../../../shared/channelRun/constants';
 
-/** Bound on how many Channel/Cron run events stay in memory. */
-const CHANNEL_RUN_HISTORY_LIMIT = 200;
+/** Bound on how many rendered runs stay in memory for each trigger. */
+const RUN_HISTORY_LIMIT_PER_TRIGGER = 50;
 
 export interface ActivityState {
   /**
@@ -24,9 +24,21 @@ const activitySlice = createSlice({
   reducers: {
     recordChannelRun(state, action: PayloadAction<ChannelRunSummary>) {
       state.channelRuns.unshift(action.payload);
-      if (state.channelRuns.length > CHANNEL_RUN_HISTORY_LIMIT) {
-        state.channelRuns.length = CHANNEL_RUN_HISTORY_LIMIT;
+
+      const retainedRunIds = new Set<string>();
+      const counts = new Map<string, number>();
+      for (const event of state.channelRuns) {
+        const runKey = `${event.trigger}:${event.runId}`;
+        if (retainedRunIds.has(runKey)) continue;
+        const count = counts.get(event.trigger) ?? 0;
+        if (count < RUN_HISTORY_LIMIT_PER_TRIGGER) {
+          retainedRunIds.add(runKey);
+          counts.set(event.trigger, count + 1);
+        }
       }
+      state.channelRuns = state.channelRuns.filter(event =>
+        retainedRunIds.has(`${event.trigger}:${event.runId}`),
+      );
     },
     clearChannelRuns(state) {
       state.channelRuns = [];

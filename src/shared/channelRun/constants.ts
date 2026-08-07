@@ -36,6 +36,8 @@ export type ChannelRunSummary = {
   conversationId: string;
   trigger: ChannelRunTrigger;
   status: ChannelRunStatus;
+  /** Scheduled task name, kept separate from the trigger and delivery channel. */
+  taskName?: string;
   /** Epoch ms when this transition happened. */
   timestamp: number;
   /** First characters of the inbound message (started events). */
