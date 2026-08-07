@@ -249,6 +249,7 @@ test('preserves the visible turn and viewport offset when older turns are prepen
   await waitFor(() => expect(onInitialTailPositioned).toHaveBeenCalledOnce());
 
   await act(async () => {
+    viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }));
     viewport.scrollTop = 15_000;
     viewport.dispatchEvent(new Event('scroll'));
   });
@@ -281,6 +282,97 @@ test('preserves the visible turn and viewport offset when older turns are prepen
     expect(Number.parseFloat(anchoredRow?.style.top ?? '0') - viewport.scrollTop).toBe(
       anchorOffset,
     );
+  });
+});
+
+test('preserves visible content when a missing turn prefix is prepended', async () => {
+  const viewport = installViewport();
+  const turns = makeTurns(100, 'existing').map(turn => ({
+    ...turn,
+    assistantItems: [
+      {
+        type: 'assistant' as const,
+        message: {
+          id: `${turn.id}-content`,
+          type: 'assistant' as const,
+          content: 'existing content',
+          timestamp: 1,
+        },
+      },
+    ],
+  }));
+  const heights = new Map(turns.map(turn => [turn.id, 200]));
+  const prefixHeights = new Map<string, number>();
+  const renderTurn = (turn: ConversationTurn) =>
+    React.createElement('div', {
+      'data-turn-height': String(heights.get(turn.id)),
+      'data-turn-id': turn.id,
+    });
+  const view = render(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns,
+      renderAll: false,
+      renderTurn,
+    }),
+    { container: viewport },
+  );
+  await flushResizeObservers();
+
+  await act(async () => {
+    viewport.dispatchEvent(new WheelEvent('wheel', { deltaY: -100 }));
+    viewport.scrollTop = 15_000;
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  await flushResizeObservers();
+
+  const anchorRow = Array.from(viewport.querySelectorAll<HTMLElement>('[data-index]')).find(row => {
+    const start = Number.parseFloat(row.style.top);
+    return start <= viewport.scrollTop && start + row.offsetHeight > viewport.scrollTop;
+  });
+  const anchorId = anchorRow?.querySelector<HTMLElement>('[data-turn-id]')?.dataset.turnId;
+  const originalContentOffset = Number.parseFloat(anchorRow?.style.top ?? '0') - viewport.scrollTop;
+  expect(anchorId).toBeTruthy();
+
+  heights.set(anchorId!, (heights.get(anchorId!) ?? 0) + 400);
+  prefixHeights.set(anchorId!, 400);
+  const expandedTurns = turns.map(turn =>
+    turn.id === anchorId
+      ? {
+          ...turn,
+          assistantItems: [
+            {
+              type: 'assistant' as const,
+              message: {
+                id: `${turn.id}-prefix`,
+                type: 'assistant' as const,
+                content: 'newly loaded prefix',
+                timestamp: 1,
+              },
+            },
+            ...turn.assistantItems,
+          ],
+        }
+      : turn,
+  );
+  view.rerender(
+    React.createElement(VirtualizedTurnList, {
+      isStreaming: false,
+      turns: [...makeTurns(50, 'older'), ...expandedTurns],
+      renderAll: false,
+      renderTurn,
+    }),
+  );
+  await flushResizeObservers();
+
+  await waitFor(() => {
+    const anchoredContent = viewport.querySelector<HTMLElement>(`[data-turn-id="${anchorId}"]`);
+    const anchoredRow = anchoredContent?.closest<HTMLElement>('[data-index]');
+    const retainedContentOffset =
+      Number.parseFloat(anchoredRow?.style.top ?? '0') +
+      (prefixHeights.get(anchorId!) ?? 0) -
+      viewport.scrollTop;
+    expect(retainedContentOffset).toBe(originalContentOffset);
   });
 });
 

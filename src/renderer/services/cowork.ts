@@ -55,6 +55,7 @@ import type {
 } from '../types/cowork';
 import { i18nService } from './i18n';
 import { respondToPermissionByOrigin } from './coworkPermissionRouting';
+import { prepareCoworkSessionRender } from './coworkSessionRenderPreparation';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
 
@@ -726,6 +727,10 @@ class CoworkService {
     const result = await cowork.getSession(sessionId);
     if (result.success && result.session) {
       // Keep only the latest session load result to avoid stale async overwrites.
+      if (requestId !== this.latestLoadSessionRequestId) {
+        return result.session;
+      }
+      await prepareCoworkSessionRender(result.session);
       if (requestId !== this.latestLoadSessionRequestId) {
         return result.session;
       }

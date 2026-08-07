@@ -161,7 +161,48 @@ test('pagination prepend keeps existing turn references', () => {
   const initialById = new Map(initial.map(turn => [turn.id, turn]));
   for (const turn of prepended) {
     const previous = initialById.get(turn.id);
-    if (previous) expect(turn).toBe(previous);
+    if (previous?.userMessage) expect(turn).toBe(previous);
   }
   expect(prepended.length).toBe(50);
+});
+
+test('pagination keeps a partial turn key when its user message is prepended', () => {
+  const completeMessages = [
+    message('user-1', 'user', 'question'),
+    message('assistant-1', 'assistant', 'first answer block'),
+    message('tool-1', 'tool_use', 'read file'),
+    message('tool-result-1', 'tool_result', 'file contents'),
+    message('assistant-2', 'assistant', 'final answer block'),
+  ];
+  const partial = buildTurns(completeMessages.slice(2));
+
+  expect(partial).toHaveLength(1);
+  expect(partial[0]?.id).toBe('orphan:tool-1');
+
+  const prepended = stabilizeConversationTurns(partial, buildTurns(completeMessages));
+
+  expect(prepended).toHaveLength(1);
+  expect(prepended[0]?.id).toBe('orphan:tool-1');
+  expect(prepended[0]?.userMessage?.id).toBe('user-1');
+});
+
+test('pagination assigns unique keys when an earlier page also starts mid-turn', () => {
+  const currentPage = buildTurns([
+    message('assistant-b', 'assistant', 'partial B'),
+    message('user-c', 'user', 'question C'),
+    message('assistant-c', 'assistant', 'answer C'),
+  ]);
+  const withEarlierPage = buildTurns([
+    message('assistant-a', 'assistant', 'partial A'),
+    message('user-b', 'user', 'question B'),
+    message('assistant-b', 'assistant', 'partial B'),
+    message('user-c', 'user', 'question C'),
+    message('assistant-c', 'assistant', 'answer C'),
+  ]);
+
+  const stabilized = stabilizeConversationTurns(currentPage, withEarlierPage);
+  const turnIds = stabilized.map(turn => turn.id);
+
+  expect(turnIds).toEqual(['orphan:assistant-a', 'orphan:assistant-b', 'user-c']);
+  expect(new Set(turnIds).size).toBe(turnIds.length);
 });

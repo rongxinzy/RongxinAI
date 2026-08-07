@@ -949,10 +949,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const rawTurns = useMemo(() => buildConversationTurns(displayItems), [displayItems]);
   // Stabilize turn object identity so completed turns do not re-render on
   // every streaming token (issue #141).
-  const turns = useStableConversationTurns(rawTurns);
+  const turns = useStableConversationTurns(rawTurns, sessionId);
   const turnArtifactsMap = useTurnArtifacts(turns, sessionArtifacts, PREVIEWABLE_ARTIFACT_TYPES);
-  // Scope persisted collapsible state to this session (orphan turn ids are
-  // positional and would collide across sessions). Rendered sessions are
+  // Scope persisted collapsible state to this session. Rendered sessions are
   // shown one at a time, so a render-time namespace assignment is safe.
   setPersistentToggleNamespace(currentSession?.id ?? '');
   // Rail indices come from data, not DOM, so virtualized (unmounted) turns

@@ -73,10 +73,10 @@ export const buildConversationTurns = (items: DisplayItem[]): ConversationTurn[]
   let currentTurn: ConversationTurn | null = null;
   let orphanIndex = 0;
 
-  const ensureTurn = (): ConversationTurn => {
+  const ensureTurn = (anchorMessageId: string): ConversationTurn => {
     if (currentTurn) return currentTurn;
     const orphanTurn: ConversationTurn = {
-      id: `orphan-${orphanIndex++}`,
+      id: anchorMessageId ? `orphan:${anchorMessageId}` : `orphan-${orphanIndex++}`,
       userMessage: null,
       assistantItems: [],
     };
@@ -96,7 +96,8 @@ export const buildConversationTurns = (items: DisplayItem[]): ConversationTurn[]
       continue;
     }
 
-    const turn = ensureTurn();
+    const anchorMessageId = item.type === 'tool_group' ? item.toolUse.id : item.message.id;
+    const turn = ensureTurn(anchorMessageId);
     if (item.type === 'tool_group') {
       turn.assistantItems.push({ type: 'tool_group', group: item });
       continue;
@@ -157,6 +158,20 @@ const reuseConversationTurn = (
   return allReused ? previous : { ...next, assistantItems: items };
 };
 
+export const getConversationTurnMessageIds = (turn: ConversationTurn): string[] => {
+  const ids: string[] = [];
+  if (turn.userMessage) ids.push(turn.userMessage.id);
+  for (const item of turn.assistantItems) {
+    if (item.type === 'tool_group') {
+      ids.push(item.group.toolUse.id);
+      if (item.group.toolResult) ids.push(item.group.toolResult.id);
+    } else {
+      ids.push(item.message.id);
+    }
+  }
+  return ids;
+};
+
 /**
  * Rebuilds the turn list while preserving object identity for every turn
  * whose messages did not change. Streaming deltas only alter the active
@@ -168,10 +183,39 @@ export const stabilizeConversationTurns = (
   nextTurns: ConversationTurn[],
 ): ConversationTurn[] => {
   const previousById = new Map(previousTurns.map(turn => [turn.id, turn]));
+  const previousByMessageId = new Map<string, ConversationTurn>();
+  for (const turn of previousTurns) {
+    for (const messageId of getConversationTurnMessageIds(turn)) {
+      previousByMessageId.set(messageId, turn);
+    }
+  }
+
+  const claimedTurnIds = new Set<string>();
   let allReused = previousTurns.length === nextTurns.length;
-  const stabilized = nextTurns.map(nextTurn => {
-    const turn = reuseConversationTurn(previousById.get(nextTurn.id), nextTurn);
-    if (turn !== previousById.get(nextTurn.id)) allReused = false;
+  const stabilized = nextTurns.map((nextTurn, index) => {
+    const exactPrevious = previousById.get(nextTurn.id);
+    const previous =
+      (exactPrevious && !claimedTurnIds.has(exactPrevious.id) ? exactPrevious : undefined) ??
+      getConversationTurnMessageIds(nextTurn)
+        .map(messageId => previousByMessageId.get(messageId))
+        .find((candidate): candidate is ConversationTurn =>
+          Boolean(candidate && !claimedTurnIds.has(candidate.id)),
+        );
+    const preferredTurnId = previous?.id ?? nextTurn.id;
+    let uniqueTurnId = preferredTurnId;
+    if (claimedTurnIds.has(uniqueTurnId)) {
+      const messageAnchor = getConversationTurnMessageIds(nextTurn)[0] ?? String(index);
+      uniqueTurnId = `${preferredTurnId}:${messageAnchor}`;
+      let duplicateIndex = 1;
+      while (claimedTurnIds.has(uniqueTurnId)) {
+        uniqueTurnId = `${preferredTurnId}:${messageAnchor}:${duplicateIndex++}`;
+      }
+    }
+    const normalizedNext =
+      uniqueTurnId === nextTurn.id ? nextTurn : { ...nextTurn, id: uniqueTurnId };
+    const turn = reuseConversationTurn(previous, normalizedNext);
+    claimedTurnIds.add(turn.id);
+    if (turn !== previousTurns[index]) allReused = false;
     return turn;
   });
   return allReused ? previousTurns : stabilized;

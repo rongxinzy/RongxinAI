@@ -26,7 +26,7 @@ import {
   DefaultAgentAvatarIcon,
   encodeAgentAvatarIcon,
 } from '../shared/agent/avatar';
-import { CoworkSessionMode } from '../shared/cowork/constants';
+import { COWORK_MESSAGE_PAGE_SIZE, CoworkSessionMode } from '../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import { CoworkStore } from './coworkStore';
@@ -247,6 +247,31 @@ test('getSession lazily backfills artifacts from messages outside the loaded pag
       content: '<h1>old</h1>',
     }),
   ]);
+});
+
+test('getSession can return the complete transcript for a virtualized renderer', () => {
+  const sid = 'full-history-session';
+  insertSession(sid);
+  for (let sequence = 1; sequence <= 75; sequence += 1) {
+    insertMessage(
+      `message-${sequence}`,
+      sid,
+      sequence % 2 === 0 ? 'assistant' : 'user',
+      `message ${sequence}`,
+      null,
+      sequence,
+      sequence,
+    );
+  }
+
+  const pagedSession = store.getSession(sid);
+  const completeSession = store.getSession(sid, null);
+
+  expect(pagedSession?.messages).toHaveLength(COWORK_MESSAGE_PAGE_SIZE);
+  expect(pagedSession?.messagesOffset).toBe(45);
+  expect(completeSession?.messages).toHaveLength(75);
+  expect(completeSession?.messagesOffset).toBe(0);
+  expect(completeSession?.totalMessages).toBe(75);
 });
 
 test('sessions are grouped by workspace independently of their agent snapshot', () => {

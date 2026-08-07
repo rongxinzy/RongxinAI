@@ -15,11 +15,12 @@ type CoworkSessionViewportProps = ComponentProps<typeof CoworkSessionDetail> & {
 const CoworkSessionViewport = ({ sessionId, ...props }: CoworkSessionViewportProps) => {
   const loadingSessionId = useSelector(selectLoadingSessionId);
   const currentSession = useSelector(selectCurrentSession);
+  const isLoadingTargetSession = loadingSessionId === sessionId;
 
-  // If a live streaming snapshot has already been restored for this session,
-  // show it immediately instead of a blank loading spinner. This keeps the
-  // stream visible when switching back to a running session.
-  if (loadingSessionId === sessionId && currentSession?.id !== sessionId) {
+  // Keep the current detail tree mounted until the target session is ready.
+  // Replacing it during the async load creates a blank frame and throws away
+  // the measured virtual-list state that can still be displayed safely.
+  if (isLoadingTargetSession && !currentSession) {
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center bg-background">
         <Spinner className="size-5 text-muted-foreground" />
@@ -27,10 +28,15 @@ const CoworkSessionViewport = ({ sessionId, ...props }: CoworkSessionViewportPro
     );
   }
 
-  // Keep the detail tree mounted while switching sessions. In particular, this
-  // preserves expensive document and PPT preview renderers instead of rebuilding
-  // them whenever the selected session changes.
-  return <CoworkSessionDetail {...props} />;
+  const isShowingPreviousSession = isLoadingTargetSession && currentSession?.id !== sessionId;
+
+  return (
+    <div className="flex min-h-0 flex-1" aria-busy={isShowingPreviousSession}>
+      <div className="flex min-h-0 flex-1" inert={isShowingPreviousSession}>
+        <CoworkSessionDetail {...props} />
+      </div>
+    </div>
+  );
 };
 
 export default CoworkSessionViewport;
