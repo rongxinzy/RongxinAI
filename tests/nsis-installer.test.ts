@@ -53,12 +53,13 @@ describe('NSIS local inference runtime signing flow', () => {
 });
 
 describe('NSIS visual assets', () => {
-  test('draws the full product wordmark directly in the installer artwork', () => {
+  test('uses the matching application icon layer for each installer artwork size', () => {
     const brandAssetScript = fs.readFileSync(brandAssetScriptPath, 'utf8');
 
-    expect(brandAssetScript).toContain('function drawWordmarkMark');
-    expect(brandAssetScript).toContain('drawWordmarkMark(head, 13, 12, 30)');
-    expect(brandAssetScript).toContain("fillText('\\u77e5\\u8fdc'");
-    expect(brandAssetScript).not.toContain('drawPrimaryMark');
+    expect(brandAssetScript).toContain('const sidebarIconPath');
+    expect(brandAssetScript).toContain('const headerIconPath');
+    expect(brandAssetScript).toContain('drawAppIcon(side, sidebarIcon, 14, 14, 58)');
+    expect(brandAssetScript).toContain('drawAppIcon(head, headerIcon, 7, 5, 40)');
+    expect(brandAssetScript).not.toContain('drawWordmarkMark');
   });
 });
