@@ -84,7 +84,14 @@ jobs:
             SKILLs/presentation-studio/package-lock.json \
             SKILLs/web-search/package-lock.json \
             scripts/release/package-lock.json; do
-            npm --prefix "$(dirname "$lockfile")" audit signatures --package-lock-only --ignore-scripts
+            directory="$(dirname "$lockfile")"
+            # npm's signature command needs the child package tree on disk.
+            # Keep its lifecycle scripts disabled while materializing exactly
+            # the package-lock graph for each bundled child project.
+            if [[ "$directory" != '.' ]]; then
+              npm --prefix "$directory" ci --ignore-scripts
+            fi
+            npm --prefix "$directory" audit signatures --package-lock-only --ignore-scripts
           done
       - name: Enforce approved package sources
         run: bun run check:supply-chain-inputs
