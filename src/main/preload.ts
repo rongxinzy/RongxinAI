@@ -829,7 +829,15 @@ contextBridge.exposeInMainWorld('electron', {
     getAccessToken: () => ipcRenderer.invoke(AuthIpc.GetAccessToken),
     getModels: () => ipcRenderer.invoke(AuthIpc.GetModels),
     getProfileSummary: () => ipcRenderer.invoke(AuthIpc.GetProfileSummary),
-    onCallback: (callback: (data: { code: string }) => void) => onPush(AuthIpc.Callback, callback),
+    onCallback: (
+      callback: (data: {
+        code?: string;
+        community?: boolean;
+        success?: boolean;
+        user?: { id: string; email: string; name: string };
+        error?: string;
+      }) => void,
+    ) => onPush(AuthIpc.Callback, callback),
     onQuotaChanged: (callback: () => void) => onPushVoid(AuthIpc.QuotaChanged, callback),
   },
 

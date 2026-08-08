@@ -16,6 +16,7 @@ import {
   screen,
   session,
   shell,
+  safeStorage,
 } from 'electron';
 import fs from 'fs';
 import os from 'os';
@@ -2899,7 +2900,11 @@ if (!gotTheLock) {
   // Register custom protocol for OAuth callback
   app.setAsDefaultProtocolClient('zhiyuan');
 
-  // Buffer for deep link auth code received before renderer is ready
+  const COMMUNITY_AUTH_ORIGIN = 'https://account.rongxzyai.com';
+  const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
+  let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
+
+  // Buffer for legacy deep link auth code received before renderer is ready
   let pendingAuthCode: string | null = null;
 
   /**
@@ -2910,6 +2915,11 @@ if (!gotTheLock) {
       const parsed = new URL(url);
       if (parsed.hostname === 'auth' && parsed.pathname === '/callback') {
         const code = parsed.searchParams.get('code');
+        const state = parsed.searchParams.get('state');
+        if (code && state && pendingCommunityLogin?.state === state) {
+          void completeCommunityLogin(code, state);
+          return;
+        }
         if (code) {
           if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('auth:callback', { code });
@@ -3173,6 +3183,86 @@ if (!gotTheLock) {
 
   // ── Auth IPC handlers ──
 
+  type CommunityAuthSession = {
+    accessToken: string;
+    refreshToken: string;
+    user: { id: string; email: string };
+  };
+
+  const canPersistCommunitySession = () => {
+    if (!safeStorage.isEncryptionAvailable()) return false;
+    return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text';
+  };
+
+  const saveCommunitySession = (value: CommunityAuthSession) => {
+    if (!canPersistCommunitySession()) {
+      throw new Error('System secure storage is unavailable; the login session cannot be saved safely.');
+    }
+    const encrypted = safeStorage.encryptString(JSON.stringify(value)).toString('base64');
+    getStore().set(COMMUNITY_AUTH_SESSION_KEY, { version: 1, encrypted });
+  };
+
+  const getCommunitySession = (): CommunityAuthSession | null => {
+    const stored = getStore().get<{ version?: unknown; encrypted?: unknown }>(COMMUNITY_AUTH_SESSION_KEY);
+    if (stored?.version !== 1 || typeof stored.encrypted !== 'string' || !canPersistCommunitySession()) return null;
+    try {
+      const decoded = JSON.parse(safeStorage.decryptString(Buffer.from(stored.encrypted, 'base64'))) as CommunityAuthSession;
+      if (!decoded.accessToken || !decoded.refreshToken || !decoded.user?.id || !decoded.user?.email) throw new Error('invalid session');
+      return decoded;
+    } catch {
+      getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
+      return null;
+    }
+  };
+
+  const clearCommunitySession = () => getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
+
+  async function completeCommunityLogin(code: string, state: string): Promise<void> {
+    const pending = pendingCommunityLogin;
+    pendingCommunityLogin = null;
+    if (!pending || pending.state !== state || pending.expiresAt < Date.now()) return;
+    try {
+      const response = await net.fetch(`${COMMUNITY_AUTH_ORIGIN}/v1/auth/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grant_type: 'authorization_code',
+          code,
+          code_verifier: pending.verifier,
+          redirect_uri: 'zhiyuan://auth/callback',
+        }),
+      });
+      const payload = (await response.json()) as {
+        access_token?: string;
+        refresh_token?: string;
+        user?: { id?: string; email?: string };
+      };
+      if (!response.ok || !payload.access_token || !payload.refresh_token || !payload.user?.id || !payload.user.email) {
+        throw new Error('Token exchange failed');
+      }
+      saveCommunitySession({
+        accessToken: payload.access_token,
+        refreshToken: payload.refresh_token,
+        user: { id: payload.user.id, email: payload.user.email },
+      });
+      mainWindow?.webContents.send(AuthIpc.Callback, {
+        community: true,
+        success: true,
+        user: { id: payload.user.id, email: payload.user.email, name: payload.user.email },
+      });
+      if (mainWindow?.isMinimized()) mainWindow.restore();
+      if (mainWindow && !mainWindow.isVisible()) mainWindow.show();
+      mainWindow?.focus();
+    } catch (error) {
+      console.warn('[CommunityAuth] login callback failed:', error instanceof Error ? error.message : error);
+      mainWindow?.webContents.send(AuthIpc.Callback, {
+        community: true,
+        success: false,
+        error: '登录未完成，请重试。',
+      });
+    }
+  }
+
   /**
    * Helper: Persist auth tokens into the kv store.
    */
@@ -3273,14 +3363,30 @@ if (!gotTheLock) {
     };
   };
 
-  ipcMain.handle('auth:login', async (_event, { loginUrl }: { loginUrl?: string } = {}) => {
+  ipcMain.handle('auth:login', async () => {
     try {
-      const serverUrl = requireServerUrl();
-      const baseUrl = loginUrl || (serverUrl ? `${serverUrl}/login` : '');
-      if (!baseUrl)
-        return { success: false, error: 'Server not configured. Set ZHIYUAN_SERVER_API_BASE_URL.' };
-      const finalUrl = `${baseUrl}?source=electron`;
-      await shell.openExternal(finalUrl);
+      if (!canPersistCommunitySession()) {
+        return { success: false, error: '系统安全存储不可用，无法安全地保存登录状态。' };
+      }
+      const verifier = crypto.randomBytes(48).toString('base64url');
+      const state = crypto.randomBytes(32).toString('base64url');
+      const codeChallenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+      const response = await net.fetch(`${COMMUNITY_AUTH_ORIGIN}/v1/auth/authorize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          redirect_uri: 'zhiyuan://auth/callback',
+          state,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        }),
+      });
+      const payload = (await response.json()) as { login_url?: string; error?: string };
+      if (!response.ok || !payload.login_url || !payload.login_url.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)) {
+        return { success: false, error: payload.error || '无法开始登录，请稍后重试。' };
+      }
+      pendingCommunityLogin = { state, verifier, expiresAt: Date.now() + 10 * 60 * 1000 };
+      await shell.openExternal(payload.login_url);
       return { success: true };
     } catch (error) {
       console.error('[Auth] login failed:', error);
@@ -3408,10 +3514,12 @@ if (!gotTheLock) {
         }
       }
       clearAuthTokens();
+      clearCommunitySession();
       clearServerModelMetadata();
       return { success: true };
     } catch {
       clearAuthTokens();
+      clearCommunitySession();
       clearServerModelMetadata();
       return { success: true };
     }
@@ -8351,17 +8459,7 @@ if (!gotTheLock) {
     // Always buffer since renderer is not ready yet after createWindow()
     const coldStartDeepLink = process.argv.find(arg => arg.startsWith('zhiyuan://'));
     if (coldStartDeepLink) {
-      try {
-        const parsed = new URL(coldStartDeepLink);
-        if (parsed.hostname === 'auth' && parsed.pathname === '/callback') {
-          const code = parsed.searchParams.get('code');
-          if (code) {
-            pendingAuthCode = code;
-          }
-        }
-      } catch (e) {
-        console.error('[Main] Failed to parse cold-start deep link:', e);
-      }
+      handleDeepLink(coldStartDeepLink);
     }
 
     // Auto-reconnect IM bots that were enabled before restart
