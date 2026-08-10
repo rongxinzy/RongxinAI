@@ -1,6 +1,7 @@
 'use strict';
 
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -38,89 +39,98 @@ function sha256(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
 }
 
-const http = require('http');
-const https = require('https');
+const PROXY_ENV_KEYS = [
+  'npm_config_https_proxy',
+  'npm_config_proxy',
+  'HTTPS_PROXY',
+  'https_proxy',
+  'HTTP_PROXY',
+  'http_proxy',
+  'ALL_PROXY',
+  'all_proxy',
+];
 
-function downloadWithAgent(url, destination, proxyUrl) {
-  return new Promise((resolve, reject) => {
-    const target = new URL(url);
-    const isProxy = Boolean(proxyUrl);
-    const requestUrl = isProxy ? new URL(proxyUrl) : target;
-    const requestPath = isProxy ? url : target.pathname + target.search;
-    const module = requestUrl.protocol === 'http:' ? http : https;
-    const headers = {
-      Host: target.host,
-      'User-Agent': 'ZhiYuanAgent/memory-runtime-downloader',
-    };
-    if (isProxy && requestUrl.username) {
-      headers['Proxy-Authorization'] =
-        'Basic ' +
-        Buffer.from(
-          `${decodeURIComponent(requestUrl.username)}:${decodeURIComponent(requestUrl.password)}`,
-        ).toString('base64');
-    }
-    const request = module.get(
-      {
-        hostname: requestUrl.hostname,
-        port: requestUrl.port || (requestUrl.protocol === 'http:' ? 80 : 443),
-        path: requestPath,
-        headers,
-        timeout: 60_000,
-      },
-      response => {
-        if (response.statusCode === 200) {
-          response.pipe(fs.createWriteStream(destination));
-          response.on('end', resolve);
-          response.on('error', reject);
-        } else if (
-          response.statusCode >= 300 &&
-          response.statusCode < 400 &&
-          response.headers.location
-        ) {
-          // Follow a single redirect (GitHub release URLs redirect to objects.githubusercontent.com).
-          const nextUrl = new URL(response.headers.location, url).toString();
-          reject(new Error(`Redirect to ${nextUrl} is not supported in proxy mode.`));
-        } else {
-          response.resume();
-          reject(new Error(`Download failed with HTTP ${response.statusCode}.`));
-        }
-      },
-    );
-    request.on('timeout', () => request.destroy(new Error('Download timed out.')));
-    request.on('error', reject);
-  });
+function readProxyFromEnvironment(environment = process.env) {
+  for (const key of PROXY_ENV_KEYS) {
+    const value = environment[key]?.trim();
+    if (value) return value;
+  }
+  return null;
 }
 
-async function download(url, destination) {
-  // npm_config_proxy / HTTPS_PROXY are commonly configured in corporate or
-  // restricted environments; honor them so the runtime can be fetched.
-  const proxy =
-    process.env.npm_config_https_proxy ||
-    process.env.npm_config_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy ||
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy;
+function readGitProxy(url, runCommand = spawnSync) {
+  try {
+    const result = runCommand('git', ['config', '--get-urlmatch', 'http.proxy', url], {
+      encoding: 'utf8',
+      timeout: 5_000,
+      windowsHide: true,
+    });
+    if (result.status === 0) return String(result.stdout || '').trim() || null;
+  } catch {
+    // Git is optional; curl can still use environment or system proxy configuration.
+  }
+  return null;
+}
+
+function resolveDownloadProxy(url, options = {}) {
+  const environment = options.environment ?? process.env;
+  return (
+    readProxyFromEnvironment(environment) || readGitProxy(url, options.runCommand ?? spawnSync)
+  );
+}
+
+function downloadWithCurl(url, destination, proxy, runCommand = spawnSync) {
+  const curlArgs = [
+    '-L',
+    '--fail',
+    '--retry',
+    '5',
+    '--retry-all-errors',
+    '--retry-delay',
+    '2',
+    '--connect-timeout',
+    '30',
+  ];
+  if (proxy) curlArgs.push('--proxy', proxy);
+  curlArgs.push('-o', destination, url);
+
+  const result = runCommand('curl', curlArgs, {
+    stdio: 'inherit',
+    timeout: 360_000,
+    windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`curl exited ${result.status ?? 'without a status'}.`);
+  }
+}
+
+async function download(url, destination, options = {}) {
+  const runCommand = options.runCommand ?? spawnSync;
+  const proxy = resolveDownloadProxy(url, {
+    environment: options.environment,
+    runCommand,
+  });
   if (proxy) {
-    await downloadWithAgent(url, destination, proxy);
+    console.log('[MemoryRuntime] Downloading through the configured proxy.');
+    downloadWithCurl(url, destination, proxy, runCommand);
     return;
   }
   try {
-    const response = await fetch(url, {
+    const response = await (options.fetchImplementation ?? fetch)(url, {
       headers: { 'User-Agent': 'ZhiYuanAgent/memory-runtime-downloader' },
     });
     if (!response.ok) throw new Error(`Download failed with HTTP ${response.status}.`);
     fs.writeFileSync(destination, Buffer.from(await response.arrayBuffer()));
-  } catch (error) {
-    // Node's fetch can fail on flaky or restricted networks (TLS, connection
-    // resets, no fallback to keep-alive sockets). curl has a more robust
-    // network stack and retries — fall back to it before failing.
-    const { spawnSync } = require('child_process');
-    const curlArgs = ['-L', '--fail', '--retry', '3', '--retry-all-errors', '-o', destination, url];
-    if (process.env.npm_config_proxy) curlArgs.push('--proxy', process.env.npm_config_proxy);
-    const result = spawnSync('curl', curlArgs, { stdio: 'inherit', timeout: 240_000 });
-    if (result.status !== 0) {
-      throw new Error(`Download failed (fetch: ${error.message}; curl exited ${result.status}).`);
+  } catch (fetchError) {
+    // curl has a more robust network stack and retries transient direct
+    // connection failures before the download is rejected.
+    try {
+      downloadWithCurl(url, destination, null, runCommand);
+    } catch (curlError) {
+      throw new Error(
+        `Download failed (fetch: ${fetchError.message}; curl: ${curlError.message}).`,
+      );
     }
   }
 }
@@ -341,10 +351,15 @@ if (require.main === module) {
 }
 
 module.exports = {
+  download,
+  downloadWithCurl,
   ensureMemoryRuntime,
   readBuildInfo,
+  readGitProxy,
+  readProxyFromEnvironment,
   readRuntimeConfig,
   replaceDirectoryAtomically,
+  resolveDownloadProxy,
   resolveHostTargetId,
   runtimeMatchesConfig,
   sha256,

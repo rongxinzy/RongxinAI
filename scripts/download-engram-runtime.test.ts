@@ -6,24 +6,59 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { ensureMemoryRuntime, replaceDirectoryAtomically } =
-  require('./download-engram-runtime.cjs') as {
-    ensureMemoryRuntime: (
-      rootDir: string,
-      targetId: string,
-      options: {
-        config: RuntimeConfig;
-        temporaryRoot: string;
-        downloadRuntime: (url: string, destination: string) => Promise<void>;
-        extractRuntime: (archive: string, destination: string) => Promise<void>;
-      },
-    ) => Promise<string>;
-    replaceDirectoryAtomically: (
-      stagedDirectory: string,
-      targetDirectory: string,
-      fileSystem?: Pick<typeof fs, 'existsSync' | 'renameSync' | 'rmSync'>,
-    ) => void;
-  };
+const {
+  download,
+  downloadWithCurl,
+  ensureMemoryRuntime,
+  readGitProxy,
+  resolveDownloadProxy,
+  replaceDirectoryAtomically,
+} = require('./download-engram-runtime.cjs') as {
+  download: (
+    url: string,
+    destination: string,
+    options: {
+      environment: Record<string, string | undefined>;
+      fetchImplementation: typeof fetch;
+      runCommand: RunCommand;
+    },
+  ) => Promise<void>;
+  downloadWithCurl: (
+    url: string,
+    destination: string,
+    proxy: string | null,
+    runCommand: RunCommand,
+  ) => void;
+  ensureMemoryRuntime: (
+    rootDir: string,
+    targetId: string,
+    options: {
+      config: RuntimeConfig;
+      temporaryRoot: string;
+      downloadRuntime: (url: string, destination: string) => Promise<void>;
+      extractRuntime: (archive: string, destination: string) => Promise<void>;
+    },
+  ) => Promise<string>;
+  replaceDirectoryAtomically: (
+    stagedDirectory: string,
+    targetDirectory: string,
+    fileSystem?: Pick<typeof fs, 'existsSync' | 'renameSync' | 'rmSync'>,
+  ) => void;
+  readGitProxy: (url: string, runCommand: RunCommand) => string | null;
+  resolveDownloadProxy: (
+    url: string,
+    options: {
+      environment: Record<string, string | undefined>;
+      runCommand: RunCommand;
+    },
+  ) => string | null;
+};
+
+type RunCommand = (
+  command: string,
+  args: string[],
+  options: Record<string, unknown>,
+) => { status: number | null; stdout?: string; error?: Error };
 
 interface RuntimeConfig {
   version: string;
@@ -191,5 +226,73 @@ describe('Engram runtime downloader', () => {
     expect(fs.readFileSync(path.join(targetDirectory(), executableName), 'utf8')).toBe(
       'old runtime',
     );
+  });
+
+  test('prefers an explicit proxy environment variable without consulting Git', () => {
+    let gitCallCount = 0;
+    const proxy = resolveDownloadProxy('https://github.com/example/archive.zip', {
+      environment: { ALL_PROXY: 'socks5h://127.0.0.1:1080' },
+      runCommand: () => {
+        gitCallCount += 1;
+        return { status: 1 };
+      },
+    });
+
+    expect(proxy).toBe('socks5h://127.0.0.1:1080');
+    expect(gitCallCount).toBe(0);
+  });
+
+  test('uses the URL-matched Git proxy when the environment has none', () => {
+    let invocation: { command: string; args: string[] } | undefined;
+    const proxy = readGitProxy('https://github.com/example/archive.zip', (command, args) => {
+      invocation = { command, args };
+      return { status: 0, stdout: 'http://127.0.0.1:7897\n' };
+    });
+
+    expect(proxy).toBe('http://127.0.0.1:7897');
+    expect(invocation).toEqual({
+      command: 'git',
+      args: ['config', '--get-urlmatch', 'http.proxy', 'https://github.com/example/archive.zip'],
+    });
+  });
+
+  test('passes proxy, redirects, and retry options to curl', () => {
+    let invocation: { command: string; args: string[] } | undefined;
+    downloadWithCurl(
+      'https://github.com/example/archive.zip',
+      'archive.zip',
+      'http://127.0.0.1:7897',
+      (command, args) => {
+        invocation = { command, args };
+        return { status: 0 };
+      },
+    );
+
+    expect(invocation?.command).toBe('curl');
+    expect(invocation?.args).toContain('-L');
+    expect(invocation?.args).toContain('--retry-all-errors');
+    expect(invocation?.args).toContain('5');
+    expect(invocation?.args).toContain('--proxy');
+    expect(invocation?.args).toContain('http://127.0.0.1:7897');
+  });
+
+  test('uses curl immediately when Git provides a proxy', async () => {
+    const commands: string[] = [];
+    await download('https://github.com/example/archive.zip', 'archive.zip', {
+      environment: {},
+      fetchImplementation: async () => {
+        throw new Error('fetch should not run');
+      },
+      runCommand: (command, args) => {
+        commands.push(command);
+        if (command === 'git') {
+          return { status: 0, stdout: 'http://127.0.0.1:7897\n' };
+        }
+        expect(args).toContain('--proxy');
+        return { status: 0 };
+      },
+    });
+
+    expect(commands).toEqual(['git', 'curl']);
   });
 });
