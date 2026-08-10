@@ -463,6 +463,10 @@ export class WorkbenchTaskService extends EventEmitter {
     return updated;
   }
 
+  isRunRunning(runId: string): boolean {
+    return this.repository.getRun(runId)?.status === WorkbenchRunStatus.Running;
+  }
+
   recordToolResult(runId: string, toolCallId: string, result: unknown, isError: boolean): void {
     const approval = this.repository.getApprovalByToolCall(runId, toolCallId);
     if (!approval || approval.effectStatus !== WorkbenchApprovalEffectStatus.Executing) return;

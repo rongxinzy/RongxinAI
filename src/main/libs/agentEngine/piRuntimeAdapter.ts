@@ -34,6 +34,7 @@ import {
   type HarnessActivationEvent,
   type HarnessModelProfileInput,
 } from '../../../shared/harness';
+import { MAX_STALE_PRODUCTION_ITERATIONS } from '../../../shared/productionLoop';
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
@@ -1202,10 +1203,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   stopSession(sessionId: string): void {
+    this.stopActiveSession(sessionId, 'The user stopped this run.', true);
+  }
+
+  private stopActiveSession(sessionId: string, reason: string, drainQueuedFollowUp: boolean): void {
     this.dismissAskUserQuestionsBySession(sessionId);
     const active = this.activeSessions.get(sessionId);
     if (!active) {
-      this.workbenchTaskService?.pauseRun?.(sessionId, 'The user stopped this run.');
+      this.workbenchTaskService?.pauseRun?.(sessionId, reason);
       this.clearApprovalsBySession(sessionId);
       return;
     }
@@ -1231,7 +1236,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.abortController.abort();
     active.unsubscribe();
     void active.piSession.abort();
-    this.workbenchTaskService?.pauseRun?.(sessionId, 'The user stopped this run.');
+    this.workbenchTaskService?.pauseRun?.(sessionId, reason);
     this.clearApprovalsBySession(sessionId);
     this.emit('sessionStopped', sessionId);
 
@@ -1241,6 +1246,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // recursively drain the queue.
     if (
       wasRunning &&
+      drainQueuedFollowUp &&
       active.workbenchContract.kind !== WorkbenchContractKind.Chat &&
       this.pendingMessageQueue.hasPendingFollowUp(sessionId)
     ) {
@@ -1281,11 +1287,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.approvalSessionMap.delete(requestId);
 
     if (this.workbenchTaskService?.repository.getApproval(requestId)) {
+      const denied = result.behavior === 'deny';
       this.workbenchTaskService.respondToApproval({
         approvalId: requestId,
-        approved: result.behavior === 'allow',
-        reason: result.behavior === 'deny' ? result.message : undefined,
+        approved: !denied,
+        reason: denied ? result.message : undefined,
       });
+      if (denied) {
+        this.stopActiveSession(sessionId, result.message || 'The user denied this action.', false);
+      }
       return;
     }
 
@@ -1916,10 +1926,29 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // loop, mark completed, or emit complete. flushPendingError surfaces
         // the error when the run settles (auto_retry_end / agent_settled).
         if (active.pendingError) break;
+        if (
+          active.workbenchRunId &&
+          this.workbenchTaskService &&
+          !this.workbenchTaskService.isRunRunning(active.workbenchRunId)
+        ) {
+          this.stopActiveSession(sessionId, 'The workbench run is no longer active.', false);
+          break;
+        }
         // Agent loop: when the finished iteration signaled "next", continue
         // the session with the next iteration prompt instead of completing.
         const loopDecision = active.agentLoop.handleAgentEnd();
         if (loopDecision.shouldContinue && loopDecision.nextPrompt) {
+          if (
+            active.productionLoop &&
+            active.productionLoop.getState().staleCount >= MAX_STALE_PRODUCTION_ITERATIONS
+          ) {
+            this.stopActiveSession(
+              sessionId,
+              `Production workflow made no progress for ${MAX_STALE_PRODUCTION_ITERATIONS} consecutive iterations.`,
+              false,
+            );
+            break;
+          }
           // Reset turn state (same as continueSession).
           active.answerText = '';
           active.thinkingText = '';

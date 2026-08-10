@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 
 import { WorkbenchApprovalRiskLevel } from '../../shared/workbenchTask';
-import { ProductionLoopAction, ProductionLoopToolName } from '../../shared/productionLoop';
+import { ProductionLoopToolName } from '../../shared/productionLoop';
 
 const readOnlyTools = new Set(['read', 'grep', 'find', 'ls', 'skill_runtime_capabilities']);
 const internalControlTools = new Set([
@@ -34,10 +34,7 @@ export function classifyWorkbenchToolRisk(
   input: Record<string, unknown>,
 ): WorkbenchApprovalRiskLevel {
   const normalizedName = toolName.trim().toLowerCase();
-  if (
-    normalizedName === ProductionLoopToolName &&
-    input.action === ProductionLoopAction.SkipWorkflow
-  ) {
+  if (normalizedName === ProductionLoopToolName) {
     return WorkbenchApprovalRiskLevel.ReadOnly;
   }
   if (readOnlyTools.has(normalizedName) || internalControlTools.has(normalizedName)) {

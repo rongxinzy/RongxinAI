@@ -20,6 +20,7 @@ import {
   ProviderModelPiMaxTokensField,
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
+import { WorkbenchRunStatus } from '../../../shared/workbenchTask';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -437,6 +438,64 @@ describe('PiRuntimeAdapter', () => {
         expect(
           db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
         ).toEqual({ count: 1 });
+      } finally {
+        db.close();
+      }
+    });
+
+    it('does not continue after the owning workbench run is paused', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+
+      try {
+        await adapter.startSession('paused-production', 'Create and validate a release report', {
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+          type: string;
+        }) => void;
+        service.pauseRun('paused-production', 'Paused for test.');
+
+        listener({ type: 'agent_end' });
+
+        expect(mockSession.prompt).toHaveBeenCalledTimes(1);
+        expect(mockSession.abort).toHaveBeenCalledOnce();
+        expect(adapter.isSessionRunning('paused-production')).toBe(false);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('pauses production after three stale continuations', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+
+      try {
+        await adapter.startSession('stale-production', 'Create and validate a release report', {
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+          type: string;
+        }) => void;
+
+        listener({ type: 'agent_end' });
+        listener({ type: 'agent_end' });
+        listener({ type: 'agent_end' });
+
+        expect(mockSession.prompt).toHaveBeenCalledTimes(3);
+        expect(mockSession.abort).toHaveBeenCalledOnce();
+        expect(service.getCurrent('stale-production')?.runs[0].status).toBe(
+          WorkbenchRunStatus.Paused,
+        );
+        expect(adapter.isSessionRunning('stale-production')).toBe(false);
       } finally {
         db.close();
       }
@@ -1197,6 +1256,51 @@ describe('PiRuntimeAdapter', () => {
       expect(() =>
         adapter.respondToPermission('unknown', { behavior: 'deny', message: 'no' }),
       ).not.toThrow();
+    });
+
+    it('aborts the active Pi turn when a workbench approval is denied', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const requests: string[] = [];
+      adapter.on('permissionRequest', (_sessionId, request) => requests.push(request.requestId));
+
+      try {
+        await adapter.startSession('denied-workbench', 'Create and validate a release report', {
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        const detail = service.getCurrent('denied-workbench');
+        const authorization = service.authorizeToolCall({
+          sessionId: 'denied-workbench',
+          runId: detail!.task.activeRunId!,
+          toolCallId: 'write-call',
+          toolName: 'write',
+          toolInput: { path: 'release.md', content: 'draft' },
+          autoApprove: false,
+        });
+        await vi.waitFor(() => expect(requests).toHaveLength(1));
+
+        adapter.respondToPermission(requests[0], {
+          behavior: 'deny',
+          message: 'Do not write this file.',
+        });
+
+        await expect(authorization).resolves.toEqual({
+          allow: false,
+          reason: 'Do not write this file.',
+        });
+        expect(mockSession.abortBash).toHaveBeenCalledOnce();
+        expect(mockSession.abort).toHaveBeenCalledOnce();
+        expect(adapter.isSessionRunning('denied-workbench')).toBe(false);
+        expect(service.getCurrent('denied-workbench')?.runs[0].status).toBe(
+          WorkbenchRunStatus.Paused,
+        );
+      } finally {
+        db.close();
+      }
     });
 
     it('appends the AskUserQuestion policy when a custom system prompt is configured', async () => {
