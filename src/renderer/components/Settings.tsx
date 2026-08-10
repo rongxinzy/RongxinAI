@@ -71,6 +71,7 @@ import {
 } from '../services/encryption';
 import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
+import { reconcileDefaultModelConfig } from '../services/modelConfigReconciliation';
 import { getSettingsSaveErrorMessage } from '../services/settingsSave';
 import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
@@ -2126,6 +2127,7 @@ const Settings: React.FC<SettingsProps> = ({
           baseUrl: primaryProvider.baseUrl,
         },
         providers: normalizedProviders, // Save all providers configuration
+        model: reconcileDefaultModelConfig(configService.getConfig(), normalizedProviders),
         theme,
         language,
         useSystemProxy,
