@@ -99,7 +99,7 @@ export function CoworkModelPicker({
           />
           <CommandList>
             {models.length === 0 ? (
-              <CommandGroup heading={i18nService.t('serverModels')}>
+              <CommandGroup heading={i18nService.t('availableModels')}>
                 <CommandItem disabled value={i18nService.t('modelSelectorNone')}>
                   {i18nService.t('modelSelectorNone')}
                 </CommandItem>
@@ -107,7 +107,7 @@ export function CoworkModelPicker({
             ) : matchingModels.length === 0 ? (
               <CommandEmpty>{i18nService.t('modelSelectorNoMatches')}</CommandEmpty>
             ) : (
-              <CommandGroup heading={i18nService.t('serverModels')}>
+              <CommandGroup heading={i18nService.t('availableModels')}>
                 {matchingModels.map(model => (
                   <CommandItem
                     key={model.id}

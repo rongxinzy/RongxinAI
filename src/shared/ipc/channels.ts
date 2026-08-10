@@ -308,14 +308,14 @@ export const ImInstanceIpc = {
 } as const;
 export type ImInstanceIpc = (typeof ImInstanceIpc)[keyof typeof ImInstanceIpc];
 
-// ─── Auth ───────────────────────────────────────────────────────────────────
-export const AuthIpc = {
-  Login: 'auth:login',
+// ─── Community Auth ─────────────────────────────────────────────────────────
+export const CommunityAuthIpc = {
+  Login: 'auth:communityLogin',
   GetCommunityUser: 'auth:getCommunityUser',
-  CommunityLogout: 'auth:communityLogout',
-  Callback: 'auth:callback',
+  Logout: 'auth:communityLogout',
+  Callback: 'auth:communityCallback',
 } as const;
-export type AuthIpc = (typeof AuthIpc)[keyof typeof AuthIpc];
+export type CommunityAuthIpc = (typeof CommunityAuthIpc)[keyof typeof CommunityAuthIpc];
 
 // ─── Feishu Install ─────────────────────────────────────────────────────────
 export const FeishuInstallIpc = {

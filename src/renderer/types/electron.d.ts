@@ -346,22 +346,6 @@ import type { Platform } from '@shared/platform';
 
 import type { Agent } from './agent';
 
-interface CreditItem {
-  type: 'subscription' | 'boost' | 'free';
-  label: string;
-  labelEn: string;
-  creditsRemaining: number;
-  expiresAt: string | null;
-}
-
-interface ProfileSummaryData {
-  id: number;
-  nickname: string;
-  avatarUrl: string | null;
-  totalCreditsRemaining: number;
-  creditItems: CreditItem[];
-}
-
 interface IElectronAPI {
   platform: string;
   arch: string;
@@ -1264,10 +1248,16 @@ interface IElectronAPI {
     }>;
   };
   auth: {
-    login: () => Promise<{ success: boolean; error?: string }>;
+    communityLogin: () => Promise<{ success: boolean; error?: string }>;
     getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
     communityLogout: () => Promise<{ success: boolean }>;
-    onCallback: (callback: (data: { code?: string; community?: boolean; success?: boolean; user?: any; error?: string }) => void) => () => void;
+    onCommunityCallback: (
+      callback: (data: {
+        success: boolean;
+        user?: { id: string; email: string; name: string };
+        error?: string;
+      }) => void,
+    ) => () => void;
   };
   enterprise: {
     getConfig: () => Promise<{
@@ -1279,12 +1269,6 @@ interface IElectronAPI {
   };
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
-  };
-  auth: {
-    login: () => Promise<{ success: boolean; error?: string }>;
-    getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
-    communityLogout: () => Promise<{ success: boolean }>;
-    onCallback: (callback: (data: { code?: string; community?: boolean; success?: boolean; user?: any; error?: string }) => void) => () => void;
   };
   qwen: Record<string, never>;
   feishu: {

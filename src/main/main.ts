@@ -51,7 +51,7 @@ import {
 } from '../shared/cowork/sessionExperts';
 import {
   ApiIpc,
-  AuthIpc,
+  CommunityAuthIpc,
   CoworkPermissionIpc,
   CoworkQueueIpc,
   CoworkSessionIpc,
@@ -3091,7 +3091,7 @@ if (!gotTheLock) {
   ipcMain.handle('app:getVersion', () => app.getVersion());
   ipcMain.handle('app:getSystemLocale', () => app.getLocale());
 
-  // ── Auth IPC handlers ──
+  // ── Community auth IPC handlers ──
 
   type CommunityAuthSession = {
     accessToken: string;
@@ -3127,12 +3127,12 @@ if (!gotTheLock) {
 
   const clearCommunitySession = () => getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
 
-  ipcMain.handle('auth:getCommunityUser', () => {
+  ipcMain.handle(CommunityAuthIpc.GetCommunityUser, () => {
     const session = getCommunitySession();
     return session ? { success: true, user: session.user } : { success: false };
   });
 
-  ipcMain.handle('auth:communityLogout', () => {
+  ipcMain.handle(CommunityAuthIpc.Logout, () => {
     clearCommunitySession();
     return { success: true };
   });
@@ -3165,8 +3165,7 @@ if (!gotTheLock) {
         refreshToken: payload.refresh_token,
         user: { id: payload.user.id, email: payload.user.email },
       });
-      mainWindow?.webContents.send(AuthIpc.Callback, {
-        community: true,
+      mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: true,
         user: { id: payload.user.id, email: payload.user.email, name: payload.user.email },
       });
@@ -3175,15 +3174,14 @@ if (!gotTheLock) {
       mainWindow?.focus();
     } catch (error) {
       console.warn('[CommunityAuth] login callback failed:', error instanceof Error ? error.message : error);
-      mainWindow?.webContents.send(AuthIpc.Callback, {
-        community: true,
+      mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: false,
         error: '登录未完成，请重试。',
       });
     }
   }
 
-  ipcMain.handle('auth:login', async () => {
+  ipcMain.handle(CommunityAuthIpc.Login, async () => {
     try {
       if (!canPersistCommunitySession()) {
         return { success: false, error: '系统安全存储不可用，无法安全地保存登录状态。' };

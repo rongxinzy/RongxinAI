@@ -20,7 +20,6 @@ import type {
 } from '../../coworkStore';
 import { t } from '../../i18n';
 import { getCommandDangerLevel, isDeleteCommand } from '../commandSafety';
-import { setCoworkProxySessionId } from '../coworkOpenAICompatProxy';
 import { LLAMACPP_OPENCLAW_MIN_CONTEXT_WINDOW } from '../llamacppOpenClawBinding';
 import { formatCorrelationId } from '../logCorrelation';
 import { parsePrimaryModelRef } from '../openclawAgentModels';
@@ -1941,7 +1940,6 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
     this.rememberSessionKey(sessionId, sessionKey);
 
     this.store.updateSession(sessionId, { status: 'running' });
-    setCoworkProxySessionId(sessionId);
     await this.ensureGatewayClientReady();
     this.startChannelPolling();
 
@@ -5822,7 +5820,6 @@ export class OpenClawChannelGateway extends EventEmitter implements CoworkRuntim
       });
     }
     this.activeTurns.delete(sessionId);
-    setCoworkProxySessionId(null);
     // NOTE: Do NOT clear lastSystemPromptBySession here — it must persist
     // across turns so that the system prompt is only injected on the first
     // turn of a session (or when it actually changes).  Cleanup happens in

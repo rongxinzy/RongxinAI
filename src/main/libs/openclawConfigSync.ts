@@ -822,21 +822,6 @@ const buildProviderModelCatalog = (
     ]),
   );
 
-const upsertProviderModel = (
-  providerConfig: OpenClawProviderSelection['providerConfig'],
-  model: OpenClawProviderSelection['providerConfig']['models'][number],
-): void => {
-  const existingIndex = providerConfig.models.findIndex(existing => existing.id === model.id);
-  if (existingIndex >= 0) {
-    providerConfig.models[existingIndex] = {
-      ...providerConfig.models[existingIndex],
-      ...model,
-    };
-    return;
-  }
-  providerConfig.models.push(model);
-};
-
 const readPreinstalledPluginIds = (): string[] => {
   try {
     const pkgPath = path.join(app.getAppPath(), 'package.json');

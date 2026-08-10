@@ -10,7 +10,7 @@ import {
   ApiIpc,
   AppConfigIpc,
   AppIpc,
-  AuthIpc,
+  CommunityAuthIpc,
   CoworkBootstrapIpc,
   CoworkConfigIpc,
   CoworkMemoryIpc,
@@ -820,18 +820,16 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   auth: {
-    login: () => ipcRenderer.invoke(AuthIpc.Login),
-    getCommunityUser: () => ipcRenderer.invoke(AuthIpc.GetCommunityUser),
-    communityLogout: () => ipcRenderer.invoke(AuthIpc.CommunityLogout),
-    onCallback: (
+    communityLogin: () => ipcRenderer.invoke(CommunityAuthIpc.Login),
+    getCommunityUser: () => ipcRenderer.invoke(CommunityAuthIpc.GetCommunityUser),
+    communityLogout: () => ipcRenderer.invoke(CommunityAuthIpc.Logout),
+    onCommunityCallback: (
       callback: (data: {
-        code?: string;
-        community?: boolean;
-        success?: boolean;
+        success: boolean;
         user?: { id: string; email: string; name: string };
         error?: string;
       }) => void,
-    ) => onPush(AuthIpc.Callback, callback),
+    ) => onPush(CommunityAuthIpc.Callback, callback),
   },
 
   feishu: {

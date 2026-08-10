@@ -27,8 +27,8 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
 
   useEffect(() => {
     void refreshUser();
-    const unsubscribe = window.electron.auth.onCallback(callback => {
-      if (callback.community) void refreshUser();
+    const unsubscribe = window.electron.auth.onCommunityCallback(() => {
+      void refreshUser();
     });
     return unsubscribe;
   }, [refreshUser]);
@@ -45,7 +45,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
     setError('');
     setIsStartingLogin(true);
     try {
-      const result = await window.electron.auth.login();
+      const result = await window.electron.auth.communityLogin();
       if (!result.success) setError(result.error || '无法开始登录，请稍后重试。');
       else setShowMenu(false);
     } finally {

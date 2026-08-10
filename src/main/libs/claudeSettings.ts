@@ -93,7 +93,6 @@ export function setStoreGetter(getter: () => SqliteStore | null): void {
   storeGetter = getter;
 }
 
-// Auth token getter injected from main.ts for server model provider
 let llamaCppRunningModelCache: ProviderModelConfig[] = [];
 type OllamaRuntimeModelState = {
   runtimeModelId: string;

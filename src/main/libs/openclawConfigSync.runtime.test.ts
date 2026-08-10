@@ -65,7 +65,6 @@ describe('OpenClawConfigSync runtime config output', () => {
   let stateDir: string;
 
   beforeEach(() => {
-    mockRuntimeState.serverModels = [];
     mockRuntimeState.enabledProviders = [];
     mockRuntimeState.rawApiConfig = {
       config: {
