@@ -3,13 +3,12 @@ import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import { i18nService } from '../services/i18n';
 import { workspaceService } from '../services/workspace';
 import type { RootState } from '../store';
 import { selectHasActiveChannelRun } from '../store/selectors/activitySelectors';
-import { clearActiveSkills } from '../store/slices/skillSlice';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import {
@@ -79,7 +78,6 @@ export const SidebarNavigationControls = ({
   workMode,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
-  const dispatch = useDispatch();
   const hasActiveChannelRun = useSelector((state: RootState) => selectHasActiveChannelRun(state));
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
@@ -95,7 +93,6 @@ export const SidebarNavigationControls = ({
     if (!prefersReducedMotion) iconRef.current?.startAnimation();
   };
   const handleNewConversation = () => {
-    if (workMode === WorkMode.Chat) dispatch(clearActiveSkills());
     if (workMode === WorkMode.Work) void workspaceService.clearWorkspaceSelection();
     onNewChat();
   };

@@ -39,7 +39,7 @@ import {
 import { setDraftPrompt } from './store/slices/coworkSlice';
 import { setAvailableModels, setDefaultSelectedModel } from './store/slices/modelSlice';
 import { clearSelection } from './store/slices/quickActionSlice';
-import { setActiveSkillIds } from './store/slices/skillSlice';
+import { clearActiveSkills, setActiveSkillIds } from './store/slices/skillSlice';
 import { WorkMode } from './store/workMode/constants';
 import { setWorkMode } from './store/workMode/workModeSlice';
 import type { CoworkPermissionResult } from './types/cowork';
@@ -410,7 +410,7 @@ const App: React.FC = () => {
     setIsSidebarCollapsed(prev => !prev);
   }, []);
 
-  const handleNewChat = useCallback(() => {
+  const openNewConversation = useCallback(() => {
     // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
     const shouldClearInput = mainView === 'cowork' && !currentSessionId;
     if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
@@ -426,6 +426,11 @@ const App: React.FC = () => {
     }, 0);
   }, [currentSessionId, currentWorkspaceIsHidden, dispatch, mainView]);
 
+  const handleNewChat = useCallback(() => {
+    dispatch(clearActiveSkills());
+    openNewConversation();
+  }, [dispatch, openNewConversation]);
+
   const handleTryMcp = useCallback(
     (prompt?: string) => {
       if (prompt?.trim()) {
@@ -439,18 +444,16 @@ const App: React.FC = () => {
 
   const handleCreateSkillByChat = useCallback(() => {
     dispatch(setDraftPrompt({ sessionId: '__home__', draft: i18nService.t('skillCreatorPrompt') }));
-    coworkService.clearSession();
-    dispatch(clearSelection());
-    setMainView('cowork');
-  }, [dispatch]);
+    handleNewChat();
+  }, [dispatch, handleNewChat]);
 
   const handleTrySkill = useCallback(
     (skillId: string) => {
       dispatch(setActiveSkillIds([skillId]));
       dispatch(setWorkMode(WorkMode.Work));
-      handleNewChat();
+      openNewConversation();
     },
-    [dispatch, handleNewChat],
+    [dispatch, openNewConversation],
   );
 
   const dismissToast = useCallback(() => {
