@@ -5,19 +5,27 @@ import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import {
-  buildWindowsResourcePackManifest,
-  computeWindowsResourcePackId,
-  isWindowsResourcePackReusable,
+  buildWindowsResourceBundleManifest,
+  buildWindowsResourceComponentManifest,
+  computeWindowsResourceComponentId,
+  isWindowsResourceComponentReusable,
+  sha256File,
 } from '../scripts/windows-resource-pack.cjs';
 
 const temporaryDirectories: string[] = [];
 
-function createSource() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-resource-pack-test-'));
+function createComponent(key = 'runtime') {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-resource-component-test-'));
   temporaryDirectories.push(root);
   fs.mkdirSync(path.join(root, 'nested'), { recursive: true });
   fs.writeFileSync(path.join(root, 'nested', 'runtime.exe'), 'runtime-v1');
-  return [{ label: 'runtime', dir: root, prefix: 'runtime' }];
+  return {
+    key,
+    label: key,
+    dir: root,
+    prefix: key,
+    sentinel: key + '/nested/runtime.exe',
+  };
 }
 
 afterEach(() => {
@@ -26,35 +34,54 @@ afterEach(() => {
   }
 });
 
-describe('Windows offline resource pack identity', () => {
+describe('Windows offline component identity', () => {
   test('is stable when only source mtimes change', () => {
-    const sources = createSource();
-    const before = computeWindowsResourcePackId(sources);
-    const runtimePath = path.join(sources[0].dir, 'nested', 'runtime.exe');
+    const component = createComponent();
+    const before = computeWindowsResourceComponentId(component);
+    const runtimePath = path.join(component.dir, 'nested', 'runtime.exe');
     const future = new Date(Date.now() + 60_000);
     fs.utimesSync(runtimePath, future, future);
 
-    expect(computeWindowsResourcePackId(sources)).toBe(before);
+    expect(computeWindowsResourceComponentId(component)).toBe(before);
   });
 
-  test('changes when packaged bytes change', () => {
-    const sources = createSource();
-    const before = computeWindowsResourcePackId(sources);
-    fs.writeFileSync(path.join(sources[0].dir, 'nested', 'runtime.exe'), 'runtime-v2');
+  test('changes only for a component whose packaged bytes change', () => {
+    const first = createComponent('first');
+    const second = createComponent('second');
+    const firstBefore = computeWindowsResourceComponentId(first);
+    const secondBefore = computeWindowsResourceComponentId(second);
+    fs.writeFileSync(path.join(first.dir, 'nested', 'runtime.exe'), 'runtime-v2');
 
-    expect(computeWindowsResourcePackId(sources)).not.toBe(before);
+    expect(computeWindowsResourceComponentId(first)).not.toBe(firstBefore);
+    expect(computeWindowsResourceComponentId(second)).toBe(secondBefore);
   });
 
-  test('reuses only a manifest with the same content ID and source layout', () => {
-    const sources = createSource();
-    const resourcePackId = computeWindowsResourcePackId(sources);
-    const manifestPath = path.join(sources[0].dir, 'manifest.json');
-    fs.writeFileSync(
-      manifestPath,
-      `${JSON.stringify(buildWindowsResourcePackManifest(sources, resourcePackId), null, 2)}\n`,
+  test('reuses only an archive whose manifest, size, and SHA-256 still match', () => {
+    const component = createComponent();
+    const contentId = computeWindowsResourceComponentId(component);
+    const archivePath = path.join(component.dir, 'runtime.tar');
+    const manifestPath = path.join(component.dir, 'manifest.json');
+    fs.writeFileSync(archivePath, 'archive-v1');
+    const manifest = buildWindowsResourceComponentManifest(
+      component,
+      contentId,
+      sha256File(archivePath),
+      fs.statSync(archivePath).size,
     );
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest));
 
-    expect(isWindowsResourcePackReusable(manifestPath, resourcePackId, sources)).toBe(true);
-    expect(isWindowsResourcePackReusable(manifestPath, '0'.repeat(64), sources)).toBe(false);
+    expect(
+      isWindowsResourceComponentReusable(manifestPath, archivePath, contentId, component),
+    ).toBe(true);
+    fs.writeFileSync(archivePath, 'archive-v2');
+    expect(
+      isWindowsResourceComponentReusable(manifestPath, archivePath, contentId, component),
+    ).toBe(false);
+  });
+
+  test('marks the aggregate manifest as offline and llama.cpp-free', () => {
+    const manifest = buildWindowsResourceBundleManifest([]);
+    expect(manifest.offline).toBe(true);
+    expect(manifest.excludes).toContain('llama.cpp');
   });
 });

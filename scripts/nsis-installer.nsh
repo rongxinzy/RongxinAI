@@ -94,121 +94,203 @@
   FileClose $8
 !macroend
 
-!macro customInstall
-  CreateDirectory "$APPDATA\ZhiYuanAgent"
-  CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs"
-  DetailPrint "[Installer] Checking bundled offline resources"
+!macro EnsureOfflineComponent TOKEN KEY PREFIX SENTINEL LABEL
+  DetailPrint "[Installer] Checking ${LABEL}"
   System::Call 'kernel32::GetTickCount()i .r7'
-
   SetOutPath "$PLUGINSDIR"
-  File /oname=win-resources.version "${PROJECT_DIR}\build-tar\win-resources.version"
-  FileOpen $2 "$PLUGINSDIR\win-resources.version" r
-  IfErrors ResourcePackVersionInvalid
+  File /oname=component-${KEY}.version "${PROJECT_DIR}\build-tar\windows-components\${KEY}.version"
+  File /oname=component-${KEY}.sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sha256"
+
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
+  IfErrors ComponentVersionInvalid_${TOKEN}
   FileRead $2 $R1
   FileClose $2
   StrCpy $R1 $R1 64
-  StrLen $R4 $R1
-  IntCmp $R4 64 0 ResourcePackVersionInvalid ResourcePackVersionInvalid
+  StrLen $R5 $R1
+  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
 
-  StrCpy $R2 "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\$R1"
-  IfFileExists "$R2\.complete" 0 ResourcePackCacheMiss
-  FileOpen $2 "$R2\.complete" r
-  IfErrors ResourcePackCacheMiss
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sha256" r
+  IfErrors ComponentVersionInvalid_${TOKEN}
   FileRead $2 $R4
   FileClose $2
   StrCpy $R4 $R4 64
-  StrCmp $R4 $R1 0 ResourcePackCacheMiss
-  IfFileExists "$R2\cfmind\package.json" 0 ResourcePackCacheMiss
-  IfFileExists "$R2\SKILLs\skills.config.json" 0 ResourcePackCacheMiss
-  IfFileExists "$R2\MCPs\compatibility-review.md" 0 ResourcePackCacheMiss
-  IfFileExists "$R2\python-win\python.exe" 0 ResourcePackCacheMiss
-  IfFileExists "$R2\uv-win\uv.exe" 0 ResourcePackCacheMiss
-  IfFileExists "$R2\uv-win\uvx.exe" 0 ResourcePackCacheMiss
-  IfFileExists "$R2\mingit\usr\bin\bash.exe" ResourcePackCachePortableGitReady 0
-  IfFileExists "$R2\mingit\bin\bash.exe" ResourcePackCachePortableGitReady ResourcePackCacheMiss
-  ResourcePackCachePortableGitReady:
-  DetailPrint "[Installer] Reusing unchanged offline resources"
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  FileWrite $2 "phase=resource-pack-cache-hit pack_id=$R1$\r$\n"
-  FileClose $2
-  Goto ResourcePackReady
+  StrLen $R5 $R4
+  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
 
-  ResourcePackCacheMiss:
-    DetailPrint "[Installer] Expanding bundled offline resources (first use of this version)"
+  StrCpy $R2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1"
+  IfFileExists "$R2\.complete" 0 ComponentCacheMiss_${TOKEN}
+  FileOpen $2 "$R2\.complete" r
+  IfErrors ComponentCacheMiss_${TOKEN}
+  FileRead $2 $R5
+  FileClose $2
+  StrCpy $R5 $R5 64
+  StrCmp $R5 $R1 0 ComponentCacheMiss_${TOKEN}
+  IfFileExists "$R2\${SENTINEL}" ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
+
+  ComponentCacheHit_${TOKEN}:
+    DetailPrint "[Installer] Reusing ${LABEL}"
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    FileWrite $2 "phase=resource-pack-cache-miss pack_id=$R1$\r$\n"
+    FileWrite $2 "phase=component-cache-hit component=${KEY} content_id=$R1$\r$\n"
     FileClose $2
-    StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\$R1.installing"
+    Goto ComponentReady_${TOKEN}
+
+  ComponentCacheMiss_${TOKEN}:
+    DetailPrint "[Installer] Expanding ${LABEL}"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-cache-miss component=${KEY} content_id=$R1$\r$\n"
+    FileClose $2
+    StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1.installing"
     RMDir /r "$R3"
     CreateDirectory "$R3"
-
-    ; This payload is always embedded in the installer, so cold installation is
-    ; fully offline. NSIS only expands it when the versioned cache is absent.
     SetOutPath "$PLUGINSDIR"
-    File /oname=win-resources.tar "${PROJECT_DIR}\build-tar\win-resources.tar"
-    nsExec::ExecToStack '"$SYSDIR\tar.exe" -xf "$PLUGINSDIR\win-resources.tar" -C "$R3"'
+    File /oname=component-${KEY}.tar "${PROJECT_DIR}\build-tar\windows-components\${KEY}.tar"
+
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.tar\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
     Pop $0
     Pop $1
-    StrCmp $0 "error" ResourcePackExtractFailed
-    IntCmp $0 0 ResourcePackExtracted ResourcePackExtractFailed ResourcePackExtractFailed
+    StrCmp $0 "0" 0 ComponentHashFailed_${TOKEN}
+    StrCpy $1 $1 64
+    StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
 
-  ResourcePackExtractFailed:
+    nsExec::ExecToStack '"$SYSDIR\tar.exe" -xf "$PLUGINSDIR\component-${KEY}.tar" -C "$R3"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
+    IntCmp $0 0 ComponentExtracted_${TOKEN} ComponentExtractFailed_${TOKEN} ComponentExtractFailed_${TOKEN}
+
+  ComponentHashFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    FileWrite $2 "phase=resource-pack-extract-failed pack_id=$R1 exit=$0 output=$1$\r$\n"
+    FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 actual=$1 exit=$0$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "离线运行环境展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。详细信息位于 %APPDATA%\ZhiYuanAgent\install-timing.log。"
-    Abort
+    Goto OfflineComponentInstallFailed
 
-  ResourcePackExtracted:
-    IfFileExists "$R3\cfmind\package.json" 0 ResourcePackVerificationFailed
-    IfFileExists "$R3\SKILLs\skills.config.json" 0 ResourcePackVerificationFailed
-    IfFileExists "$R3\MCPs\compatibility-review.md" 0 ResourcePackVerificationFailed
-    IfFileExists "$R3\python-win\python.exe" 0 ResourcePackVerificationFailed
-    IfFileExists "$R3\uv-win\uv.exe" 0 ResourcePackVerificationFailed
-    IfFileExists "$R3\uv-win\uvx.exe" 0 ResourcePackVerificationFailed
-    IfFileExists "$R3\mingit\usr\bin\bash.exe" ResourcePackExtractedPortableGitReady 0
-    IfFileExists "$R3\mingit\bin\bash.exe" ResourcePackExtractedPortableGitReady ResourcePackVerificationFailed
-  ResourcePackExtractedPortableGitReady:
+  ComponentExtractFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
+    FileClose $2
+    Goto OfflineComponentInstallFailed
+
+  ComponentExtracted_${TOKEN}:
+    IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
     FileOpen $2 "$R3\.complete" w
-    FileWrite $2 "$R1"
+    FileWrite $2 "$R1|$R4"
     FileClose $2
     RMDir /r "$R2"
     Rename "$R3" "$R2"
-    IfErrors ResourcePackCommitFailed
-    Delete "$PLUGINSDIR\win-resources.tar"
-    Goto ResourcePackReady
+    IfErrors ComponentCommitFailed_${TOKEN}
+    Delete "$PLUGINSDIR\component-${KEY}.tar"
+    Goto ComponentReady_${TOKEN}
 
-  ResourcePackVerificationFailed:
-    MessageBox MB_OK|MB_ICONSTOP "离线运行环境校验失败，安装包可能不完整。请重新下载安装包后重试。"
-    Abort
+  ComponentVerificationFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 健康检查失败，缺少 ${SENTINEL}。"
+    Goto OfflineComponentInstallFailed
 
-  ResourcePackCommitFailed:
-    MessageBox MB_OK|MB_ICONSTOP "无法启用离线运行环境。请确认当前用户对 %LOCALAPPDATA%\ZhiYuanAgent 有写入权限。"
-    Abort
+  ComponentCommitFailed_${TOKEN}:
+    StrCpy $R9 "无法启用 ${LABEL}，请确认当前用户对 %LOCALAPPDATA%\ZhiYuanAgent 有写入权限。"
+    Goto OfflineComponentInstallFailed
 
-  ResourcePackVersionInvalid:
-    MessageBox MB_OK|MB_ICONSTOP "安装包缺少有效的离线资源版本信息。请重新下载安装包。"
-    Abort
+  ComponentVersionInvalid_${TOKEN}:
+    StrCpy $R9 "安装包缺少 ${LABEL} 的有效版本或校验信息。"
+    Goto OfflineComponentInstallFailed
 
-  ResourcePackReady:
-    System::Call 'kernel32::GetTickCount()i .r6'
-    IntOp $5 $6 - $7
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    FileWrite $2 "phase=resource-pack-ready pack_id=$R1 elapsed_ms=$5$\r$\n"
+  ComponentReady_${TOKEN}:
+    FileOpen $2 "$PLUGINSDIR\component-targets.txt" a
+    FileWrite $2 "${KEY}|${PREFIX}|$R1$\r$\n"
     FileClose $2
+    System::Call 'kernel32::GetTickCount()i .r6'
+    IntOp $R5 $6 - $7
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 elapsed_ms=$R5$\r$\n"
+    FileClose $2
+!macroend
 
-  ; Keep application paths stable while the immutable pack remains outside the
-  ; versioned installation directory and can be reused by later upgrades.
+!macro customInstall
+  CreateDirectory "$APPDATA\ZhiYuanAgent"
+  CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+  SetOutPath "$PLUGINSDIR"
+  FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
+  FileClose $2
+  Delete "$PLUGINSDIR\component-switch-state.txt"
+
+  !insertmacro EnsureOfflineComponent OPENCLAW "openclaw" "cfmind" "cfmind\package.json" "OpenClaw 离线运行环境"
+  !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
+  !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
+  !insertmacro EnsureOfflineComponent PORTABLE_GIT "portable-git" "mingit" "mingit\usr\bin\bash.exe" "PortableGit"
+  !insertmacro EnsureOfflineComponent PYTHON "python" "python-win" "python-win\python.exe" "Python 离线运行环境"
+  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\xlsx\Scripts\python.exe" "Skill Python 离线环境"
+  !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
+
+  DetailPrint "[Installer] Activating offline component set"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
+      $$parts = $$_.Split(\"|\");\
+      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$parts[2] }\
+    });\
+    $$prepared = @();\
+    $$switched = @();\
+    try {\
+      foreach ($$row in $$rows) {\
+        $$root = Join-Path $$runtimeRoot $$row.Key;\
+        $$target = Join-Path $$root $$row.Id;\
+        $$current = Join-Path $$root \"current\";\
+        $$next = Join-Path $$root \"current.next\";\
+        $$previous = Join-Path $$root \"current.previous\";\
+        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" };\
+        foreach ($$stale in @($$next, $$previous)) {\
+          if (Test-Path -LiteralPath $$stale) {\
+            $$item = Get-Item -LiteralPath $$stale -Force;\
+            if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) { throw \"Unsafe component pointer: $$stale\" };\
+            [IO.Directory]::Delete($$stale)\
+          }\
+        };\
+        New-Item -ItemType Junction -Path $$next -Target $$target -Force | Out-Null;\
+        $$prepared += [pscustomobject]@{ Row = $$row; Current = $$current; Next = $$next; Previous = $$previous }\
+      };\
+      foreach ($$entry in $$prepared) {\
+        $$hadCurrent = Test-Path -LiteralPath $$entry.Current;\
+        Add-Content -LiteralPath $$statePath -Value ($$entry.Row.Key + \"|\" + $$hadCurrent);\
+        $$switched += [pscustomobject]@{ Entry = $$entry; HadCurrent = $$hadCurrent };\
+        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" };\
+        Rename-Item -LiteralPath $$entry.Next -NewName \"current\"\
+      }\
+    } catch {\
+      foreach ($$entry in $$prepared) {\
+        if (Test-Path -LiteralPath $$entry.Next) { [IO.Directory]::Delete($$entry.Next) }\
+      };\
+      [array]::Reverse($$switched);\
+      foreach ($$switch in $$switched) {\
+        $$entry = $$switch.Entry;\
+        if (Test-Path -LiteralPath $$entry.Previous) {\
+          if (Test-Path -LiteralPath $$entry.Current) { [IO.Directory]::Delete($$entry.Current) };\
+          Rename-Item -LiteralPath $$entry.Previous -NewName \"current\"\
+        } elseif (-not $$switch.HadCurrent -and (Test-Path -LiteralPath $$entry.Current)) {\
+          [IO.Directory]::Delete($$entry.Current)\
+        }\
+      };\
+      Remove-Item -LiteralPath $$statePath -Force -ErrorAction SilentlyContinue;\
+      throw\
+    }"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" ComponentPointersReady
+    StrCpy $R9 "离线组件原子切换失败：$1"
+    Goto OfflineComponentInstallFailed
+  ComponentPointersReady:
+
   DetailPrint "[Installer] Connecting bundled runtimes"
   SetOutPath "$INSTDIR"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$resourceRoot = \"$INSTDIR\resources\";\
-    $$packRoot = \"$R2\";\
-    $$names = @(\"cfmind\", \"SKILLs\", \"MCPs\", \"mingit\", \"python-win\", \"skill-python\", \"uv-win\");\
-    foreach ($$name in $$names) {\
-      $$link = Join-Path $$resourceRoot $$name;\
-      $$target = Join-Path $$packRoot $$name;\
-      if (-not (Test-Path $$target)) { throw \"Missing resource pack directory: $$target\" };\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1] } });\
+    foreach ($$row in $$rows) {\
+      $$link = Join-Path $$resourceRoot $$row.Prefix;\
+      $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
+      if (-not (Test-Path -LiteralPath $$target)) { throw \"Missing component target: $$target\" };\
       if (Test-Path $$link) {\
         $$existing = Get-Item -LiteralPath $$link -Force;\
         if (($$existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {\
@@ -225,19 +307,49 @@
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     FileWrite $2 "phase=runtime-link-failed exit=$0 output=$1$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "离线运行环境连接失败：$1"
-    Abort
+    StrCpy $R9 "离线运行环境连接失败：$1"
+    Goto OfflineComponentInstallFailed
   RuntimeLinksReady:
 
   DetailPrint "[Installer] Verifying bundled runtimes"
   IfFileExists "$INSTDIR\resources\python-win\python.exe" 0 InstalledRuntimeVerificationFailed
   IfFileExists "$INSTDIR\resources\uv-win\uv.exe" 0 InstalledRuntimeVerificationFailed
   IfFileExists "$INSTDIR\resources\cfmind\package.json" 0 InstalledRuntimeVerificationFailed
-  Goto InstalledRuntimeVerificationDone
+  Goto OfflineComponentsReady
   InstalledRuntimeVerificationFailed:
-    MessageBox MB_OK|MB_ICONSTOP "离线运行环境连接校验失败。请重新运行安装器。"
+    StrCpy $R9 "离线运行环境连接校验失败。请重新运行安装器。"
+    Goto OfflineComponentInstallFailed
+
+  OfflineComponentInstallFailed:
+    nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+      $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+      $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+      if (Test-Path -LiteralPath $$statePath) {\
+        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ });\
+        [array]::Reverse($$states);\
+        foreach ($$state in $$states) {\
+          $$parts = $$state.Split(\"|\");\
+          $$root = Join-Path $$runtimeRoot $$parts[0];\
+          $$current = Join-Path $$root \"current\";\
+          $$previous = Join-Path $$root \"current.previous\";\
+          if ($$parts[1] -eq \"True\") {\
+            if (Test-Path -LiteralPath $$previous) {\
+              if (Test-Path -LiteralPath $$current) { [IO.Directory]::Delete($$current) };\
+              Rename-Item -LiteralPath $$previous -NewName \"current\"\
+            }\
+          } elseif (Test-Path -LiteralPath $$current) {\
+            [IO.Directory]::Delete($$current)\
+          }\
+        }\
+      }"'
+    Pop $0
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-set-rollback reason=$R9$\r$\n"
+    FileClose $2
+    MessageBox MB_OK|MB_ICONSTOP "$R9"
     Abort
-  InstalledRuntimeVerificationDone:
+
+  OfflineComponentsReady:
 
   ; The VC runtime is bundled for offline installation, but upgrades skip it
   ; when the supported x64 redistributable is already registered.
@@ -294,6 +406,37 @@
   Pop $0
   Delete "$APPDATA\ZhiYuanAgent\old-install-path.txt"
 
+  DetailPrint "[Installer] Cleaning unused offline component versions"
+  System::Call 'kernel32::GetTickCount()i .r7'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Id = $$parts[2] } });\
+    foreach ($$row in $$rows) {\
+      $$root = Join-Path $$runtimeRoot $$row.Key;\
+      foreach ($$pointerName in @(\"current.previous\", \"current.next\")) {\
+        $$pointer = Join-Path $$root $$pointerName;\
+        if (Test-Path -LiteralPath $$pointer) {\
+          $$item = Get-Item -LiteralPath $$pointer -Force;\
+          if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
+        }\
+      };\
+      Get-ChildItem -LiteralPath $$root -Directory -ErrorAction SilentlyContinue | Where-Object { $$_.Name -ne $$row.Id -and $$_.Name -ne \"current\" } | ForEach-Object {\
+        if (($$_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$_.FullName) } else { Remove-Item -LiteralPath $$_.FullName -Recurse -Force }\
+      }\
+    };\
+    $$legacy = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
+    if (Test-Path -LiteralPath $$legacy) {\
+      $$legacyItem = Get-Item -LiteralPath $$legacy -Force;\
+      if (($$legacyItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$legacy) } else { Remove-Item -LiteralPath $$legacy -Recurse -Force }\
+    }"'
+  Pop $0
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $5 $6 - $7
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileWrite $2 "phase=component-cleanup-complete elapsed_ms=$5 exit=$0$\r$\n"
+  FileClose $2
+  Delete "$PLUGINSDIR\component-switch-state.txt"
+
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
   IfErrors InstallTimingDone
   FileRead $2 $R5
@@ -301,7 +444,7 @@
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $R6 $6 - $R5
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  FileWrite $2 "phase=install-complete total_ms=$R6 pack_id=$R1$\r$\n"
+  FileWrite $2 "phase=install-complete total_ms=$R6 component_set=ready$\r$\n"
   FileClose $2
   Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"
   InstallTimingDone:
@@ -316,7 +459,23 @@
 !macroend
 
 !macro customUnInstall
-  ; Runtime packs are application-owned immutable data. User-created Skills and
-  ; models remain under userData and follow electron-builder's uninstall choice.
-  RMDir /r "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs"
+  ; Remove component junctions before recursively deleting application-owned
+  ; immutable data. User-created Skills and models remain under userData.
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    if (Test-Path -LiteralPath $$runtimeRoot) {\
+      Get-ChildItem -LiteralPath $$runtimeRoot -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {\
+        foreach ($$pointerName in @(\"current\", \"current.next\", \"current.previous\")) {\
+          $$pointer = Join-Path $$_.FullName $$pointerName;\
+          if (Test-Path -LiteralPath $$pointer) {\
+            $$pointerItem = Get-Item -LiteralPath $$pointer -Force;\
+            if (($$pointerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
+          }\
+        }\
+      };\
+      Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force\
+    };\
+    $$legacyRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
+    if (Test-Path -LiteralPath $$legacyRoot) { Remove-Item -LiteralPath $$legacyRoot -Recurse -Force }"'
+  Pop $0
 !macroend

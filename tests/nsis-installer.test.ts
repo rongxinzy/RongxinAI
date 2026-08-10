@@ -13,18 +13,29 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('ManifestDPIAware true');
   });
 
-  test('embeds the offline resource pack but expands it only on a cache miss', () => {
+  test('embeds seven offline components but expands each only on its own cache miss', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
-    const cacheMissIndex = installerScript.indexOf('ResourcePackCacheMiss:');
+    const cacheMissIndex = installerScript.indexOf('ComponentCacheMiss_${TOKEN}:');
     const payloadIndex = installerScript.indexOf(
-      'File /oname=win-resources.tar "${PROJECT_DIR}\\build-tar\\win-resources.tar"',
+      'File /oname=component-${KEY}.tar "${PROJECT_DIR}\\build-tar\\windows-components\\${KEY}.tar"',
     );
     expect(cacheMissIndex).toBeGreaterThan(-1);
     expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
-    expect(installerScript).toContain('phase=resource-pack-cache-hit');
-    expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtime-packs\\$R1');
-    expect(installerScript).toContain('StrCmp $R4 $R1 0 ResourcePackCacheMiss');
+    expect(installerScript.match(/!insertmacro EnsureOfflineComponent /g)).toHaveLength(7);
+    expect(installerScript).toContain('phase=component-cache-hit');
+    expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
+    expect(installerScript).not.toContain('File /oname=win-resources.tar');
+  });
+
+  test('atomically switches component pointers and retains a rollback path until success', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript).toContain('current.next');
+    expect(installerScript).toContain('current.previous');
+    expect(installerScript).toContain('component-switch-state.txt');
+    expect(installerScript).toContain('phase=component-set-rollback');
+    expect(installerScript).toContain('phase=component-cleanup-complete');
   });
 
   test('records optional local inference intent without downloading in NSIS', () => {

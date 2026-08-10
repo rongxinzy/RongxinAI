@@ -3,22 +3,19 @@
 /**
  * pack-openclaw-tar.cjs
  *
- * Packs directories into a single .tar file for Windows distribution.
+ * Packs one or more directories into a .tar file for Windows distribution.
  * NSIS installs thousands of small files very slowly on NTFS; shipping one
  * tar archive and extracting it post-install is dramatically faster.
  *
- * Used by electron-builder-hooks beforePack to pack:
- *   - OpenClaw runtime (vendor/openclaw-runtime/current -> cfmind/)
- *   - SKILLs directory (SKILLs -> SKILLs/)
- *   - Python runtime (resources/python-win -> python-win/)
+ * electron-builder-hooks calls packMultipleSources once per offline component,
+ * allowing upgrades to reuse every unchanged archive independently.
  *
  * On Windows, uses the built-in tar.exe (C implementation, ~10-20x faster
  * than the JS npm tar module on NTFS).  On other platforms, falls back to
  * npm tar.
  *
  * Usage:
- *   Single dir:      node scripts/pack-openclaw-tar.cjs [sourceDir] [outputTar]
- *   Windows combined: node scripts/pack-openclaw-tar.cjs --win-combined
+ *   node scripts/pack-openclaw-tar.cjs [sourceDir] [outputTar]
  */
 
 const fs = require('fs');
@@ -335,30 +332,6 @@ function packMultipleSources(sources, outputTar) {
 
 function main() {
   const projectRoot = path.join(__dirname, '..');
-  const isWinCombined = process.argv.includes('--win-combined');
-
-  if (isWinCombined) {
-    const outputTar = path.join(projectRoot, 'build-tar', 'win-resources.tar');
-    fs.mkdirSync(path.dirname(outputTar), { recursive: true });
-
-    // Remove old tar if exists
-    if (fs.existsSync(outputTar)) fs.unlinkSync(outputTar);
-
-    const sources = [
-      { dir: path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current'), prefix: 'cfmind' },
-      { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs' },
-      { dir: path.join(projectRoot, 'resources', 'python-win'), prefix: 'python-win' },
-      { dir: path.join(projectRoot, 'resources', 'uv-win'), prefix: 'uv-win' },
-    ];
-
-    console.log(`[pack-openclaw-tar] Packing combined Windows tar: ${outputTar}`);
-    const t0 = Date.now();
-    packMultipleSources(sources, outputTar);
-    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-    const sizeMB = (fs.statSync(outputTar).size / (1024 * 1024)).toFixed(1);
-    console.log(`[pack-openclaw-tar] Done in ${elapsed}s: ${sizeMB} MB`);
-    return;
-  }
 
   // Single directory mode
   const sourceDir =

@@ -35,10 +35,12 @@ const {
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const {
-  buildWindowsResourcePackManifest,
-  computeWindowsResourcePackId,
-  getWindowsResourceSources,
-  isWindowsResourcePackReusable,
+  buildWindowsResourceBundleManifest,
+  buildWindowsResourceComponentManifest,
+  computeWindowsResourceComponentId,
+  getWindowsResourceComponents,
+  isWindowsResourceComponentReusable,
+  sha256File,
 } = require('./windows-resource-pack.cjs');
 const {
   DIST_DIFFS_EXTENSION_DIR,
@@ -626,7 +628,9 @@ async function beforePack(context) {
     );
     await ensurePortablePythonRuntime({ required: true });
     const pythonRuntimeRoot = path.join(__dirname, '..', 'resources', 'python-win');
-    const pythonRuntimeHealth = checkRuntimeHealth(pythonRuntimeRoot, { requirePip: true });
+    const pythonRuntimeHealth = checkRuntimeHealth(pythonRuntimeRoot, {
+      requirePip: true,
+    });
     if (!pythonRuntimeHealth.ok) {
       throw new Error(
         'Portable Python runtime health check failed before pack. Missing files: ' +
@@ -642,7 +646,11 @@ async function beforePack(context) {
     console.log(
       `[electron-builder-hooks] ${targetPlatform} target detected, ensuring bundled uv and uv-managed Python 3.14.6...`,
     );
-    await ensurePosixUvRuntime({ required: true, platform: targetPlatform, arch: targetArch });
+    await ensurePosixUvRuntime({
+      required: true,
+      platform: targetPlatform,
+      arch: targetArch,
+    });
     const uvHealth = checkMacUvRuntimeHealth(
       path.join(__dirname, '..', 'resources', `uv-${resourceSuffix}`),
       targetArch,
@@ -652,7 +660,11 @@ async function beforePack(context) {
       throw new Error(
         `Bundled ${targetPlatform} uv health check failed: ${uvHealth.missing.join(', ')}`,
       );
-    await ensurePosixPythonRuntime({ required: true, platform: targetPlatform, arch: targetArch });
+    await ensurePosixPythonRuntime({
+      required: true,
+      platform: targetPlatform,
+      arch: targetArch,
+    });
     const pythonHealth = checkMacPythonRuntimeHealth(
       path.join(__dirname, '..', 'resources', `python-${resourceSuffix}`),
       targetArch,
@@ -691,44 +703,62 @@ async function beforePack(context) {
   }
 
   if (isWindowsTarget(context)) {
-    // Keep the complete non-llama.cpp runtime in the offline installer, but
-    // version it by content so upgrades can reuse an already expanded pack.
+    // The installer remains fully offline, while each non-llama.cpp component
+    // gets an independent content ID so upgrades expand only changed pieces.
     const projectRoot = path.join(__dirname, '..');
-    const buildTarDir = path.join(projectRoot, 'build-tar');
-    mkdirSync(buildTarDir, { recursive: true });
+    const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
+    mkdirSync(componentsDir, { recursive: true });
+    const componentManifests = [];
 
-    const outputTar = path.join(buildTarDir, 'win-resources.tar');
-    const manifestPath = path.join(buildTarDir, 'win-resources.manifest.json');
-    const versionPath = path.join(buildTarDir, 'win-resources.version');
-    const sources = getWindowsResourceSources(projectRoot);
-
-    console.log(`[electron-builder-hooks] Packing combined Windows tar: ${outputTar}`);
-    console.log('[electron-builder-hooks] Computing deterministic Windows resource pack ID...');
-    const resourcePackId = computeWindowsResourcePackId(sources);
-    const manifest = buildWindowsResourcePackManifest(sources, resourcePackId);
-    writeFileSync(versionPath, resourcePackId, 'utf8');
-
-    const canReuseCachedTar =
-      existsSync(outputTar) &&
-      statSync(outputTar).size > 0 &&
-      isWindowsResourcePackReusable(manifestPath, resourcePackId, sources);
-
-    if (canReuseCachedTar) {
-      const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
-      console.log(
-        `[electron-builder-hooks] Using cached resource pack ${resourcePackId}: ${sizeMB} MB`,
+    for (const component of getWindowsResourceComponents(projectRoot)) {
+      const archivePath = path.join(componentsDir, `${component.key}.tar`);
+      const manifestPath = path.join(componentsDir, `${component.key}.manifest.json`);
+      const versionPath = path.join(componentsDir, `${component.key}.version`);
+      const hashPath = path.join(componentsDir, `${component.key}.sha256`);
+      const contentId = computeWindowsResourceComponentId(component);
+      const reusable = isWindowsResourceComponentReusable(
+        manifestPath,
+        archivePath,
+        contentId,
+        component,
       );
-    } else {
-      const t0 = Date.now();
-      packMultipleSources(sources, outputTar);
-      const manifestPayload = `${JSON.stringify(manifest, null, 2)}\n`;
-      writeFileSync(manifestPath, manifestPayload, 'utf8');
-      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-      const sizeMB = (statSync(outputTar).size / (1024 * 1024)).toFixed(1);
+
+      if (!reusable) {
+        const startedAt = Date.now();
+        packMultipleSources([component], archivePath);
+        console.log(
+          `[electron-builder-hooks] Packed ${component.key} ${contentId} in ${(
+            (Date.now() - startedAt) /
+            1000
+          ).toFixed(1)}s`,
+        );
+      }
+
+      const archiveSha256 = sha256File(archivePath);
+      const archiveSizeBytes = statSync(archivePath).size;
+      const manifest = buildWindowsResourceComponentManifest(
+        component,
+        contentId,
+        archiveSha256,
+        archiveSizeBytes,
+      );
+      componentManifests.push(manifest);
+      writeFileSync(versionPath, contentId, 'utf8');
+      writeFileSync(hashPath, archiveSha256, 'utf8');
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
       console.log(
-        `[electron-builder-hooks] Resource pack ${resourcePackId} packed in ${elapsed}s: ${sizeMB} MB`,
+        `[electron-builder-hooks] ${reusable ? 'Reusing' : 'Prepared'} ${component.key}: ${(
+          archiveSizeBytes /
+          (1024 * 1024)
+        ).toFixed(1)} MB`,
       );
     }
+
+    writeFileSync(
+      path.join(componentsDir, 'manifest.json'),
+      `${JSON.stringify(buildWindowsResourceBundleManifest(componentManifests), null, 2)}\n`,
+      'utf8',
+    );
   }
 
   if (!isWindowsTarget(context)) {
