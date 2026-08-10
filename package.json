@@ -56,23 +56,23 @@
     }
   },
   "engram": {
-    "version": "v1.20.0-zhiyuan.1",
+    "version": "v1.20.0-zhiyuan.3",
     "repo": "z189yis/engram-cjk",
     "runtimeAssets": {
-      "mac-x64": "engram_1.20.0-zhiyuan.1_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_1.20.0-zhiyuan.1_darwin_arm64.tar.gz",
-      "win-x64": "engram_1.20.0-zhiyuan.1_windows_amd64.zip",
-      "win-arm64": "engram_1.20.0-zhiyuan.1_windows_arm64.zip",
-      "linux-x64": "engram_1.20.0-zhiyuan.1_linux_amd64.tar.gz",
-      "linux-arm64": "engram_1.20.0-zhiyuan.1_linux_arm64.tar.gz"
+      "mac-x64": "engram_v1.20.0-zhiyuan.3_darwin_amd64.tar.gz",
+      "mac-arm64": "engram_v1.20.0-zhiyuan.3_darwin_arm64.tar.gz",
+      "win-x64": "engram_v1.20.0-zhiyuan.3_windows_amd64.zip",
+      "win-arm64": "engram_v1.20.0-zhiyuan.3_windows_arm64.zip",
+      "linux-x64": "engram_v1.20.0-zhiyuan.3_linux_amd64.tar.gz",
+      "linux-arm64": "engram_v1.20.0-zhiyuan.3_linux_arm64.tar.gz"
     },
     "runtimeChecksums": {
-      "mac-x64": "11317da3d453ba5d9af4dcae1ec29eafd840e14c0565a5aa8d43d2851e5c2bcb",
-      "mac-arm64": "3f78721060de1b924689e844188985ec780338f8f87b089c386783a76075a8b1",
-      "win-x64": "a40dbd1e09828bac6169227797f0e20306d9e0aae5f752ff520937694bded7d0",
-      "win-arm64": "b927fe5d26c117903b5b3d90bc71e0c02ef9b020e3b8afd9011b5969b1c12093",
-      "linux-x64": "c33dbc137a0c6a9e53eac6e39392990a06e5147cda5f04084cb02d68002ffd0b",
-      "linux-arm64": "83af00cc5bc3cc8a1dacdba70cb7cdad675247166be881f1341d2127933bd8a9"
+      "mac-x64": "ff850a2b67222085a14cd58f101c4bd1b129e0e6de1c1cf8cfcbe3c7dd11e93d",
+      "mac-arm64": "2fbba49e28f90f0b5b8efd2f076bc425fb902052fb84e3dc9737abd7a406987e",
+      "win-x64": "a699cbec01c2ddb4674ff2499820cc38b1d7e1b7de1de0024ec137557f5b36bc",
+      "win-arm64": "ee66b3fd4cd5326a94ed4a167d4111e3c90d839b96db4e91ceb3ab169d919525",
+      "linux-x64": "894090d3fbfaa373b2a3b4aa77a5fde11cc7345f29058b0351fef743ec9f3eb5",
+      "linux-arm64": "e84230533527e97547d34dfe7b9117a2e36810e1e364c437256c0d86017a7116"
     }
   },
   "main": "dist-electron/main.js",

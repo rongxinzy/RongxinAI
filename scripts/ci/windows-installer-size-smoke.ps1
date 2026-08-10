@@ -16,7 +16,7 @@ if (-not (Test-Path -LiteralPath $manifestPath)) {
 }
 
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$componentBytes = @($manifest.components | ForEach-Object { [int64]$_.archiveBytes } |
+$componentBytes = @($manifest.components | ForEach-Object { [int64]$_.archiveSizeBytes } |
   Measure-Object -Sum).Sum
 if ($null -eq $componentBytes -or $componentBytes -le 0) {
   throw 'Windows component manifest did not report component archive bytes'

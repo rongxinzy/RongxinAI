@@ -235,6 +235,8 @@ test("installer-related pull requests build and exercise the Windows installer",
     path.join(root, "scripts", "ci", "windows-installer-size-smoke.ps1"),
     "utf8",
   );
+  assert.match(sizeSmoke, /\$_\.archiveSizeBytes/);
+  assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
   assert.match(sizeSmoke, /1GB/);
 });
