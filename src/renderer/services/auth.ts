@@ -36,8 +36,11 @@ class AuthService {
     }
 
     // Listen for OAuth callback from protocol handler
-    this.unsubCallback = window.electron.auth.onCallback(async ({ code }) => {
-      await this.handleCallback(code);
+    this.unsubCallback = window.electron.auth.onCallback(async callback => {
+      if (callback.community) {
+        return;
+      }
+      if (callback.code) await this.handleCallback(callback.code);
     });
 
     // Listen for quota changes (e.g. after cowork session using server model)

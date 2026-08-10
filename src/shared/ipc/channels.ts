@@ -319,6 +319,8 @@ export const AuthIpc = {
   GetAccessToken: 'auth:getAccessToken',
   GetModels: 'auth:getModels',
   GetProfileSummary: 'auth:getProfileSummary',
+  GetCommunityUser: 'auth:getCommunityUser',
+  CommunityLogout: 'auth:communityLogout',
   GetPendingCallback: 'auth:getPendingCallback',
   Callback: 'auth:callback',
   QuotaChanged: 'auth:quotaChanged',

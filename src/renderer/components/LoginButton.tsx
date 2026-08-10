@@ -1,322 +1,139 @@
 import { Button } from '@shared/components/ui/button';
-import React, { useEffect, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { LogIn, LogOut, Settings, UserRound } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
-import { authService } from '../services/auth';
 import { i18nService } from '../services/i18n';
-import { RootState } from '../store';
-import type { CreditItem } from '../store/slices/authSlice';
-import UserAvatarIcon from './icons/UserAvatarIcon';
 
-const getSubscriptionBadge = (label: string) => {
-  // Determine badge style based on label
-  const isStandard = /标准|Standard/i.test(label);
-  const isAdvanced = /进阶|Advanced/i.test(label);
-  const isPro = /专业|Pro/i.test(label);
+interface CommunityUser {
+  id: string;
+  email: string;
+}
 
-  if (isPro) {
-    return {
-      bg: 'bg-linear-to-r from-amber-500 to-yellow-400',
-      text: 'text-white',
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          className="shrink-0"
-        >
-          <path d="M2 4l3 12h14l3-12-5 4-5-6-5 6z" />
-          <path d="M5 16l-1.5 4h17L19 16" />
-        </svg>
-      ),
-    };
-  }
-  if (isAdvanced) {
-    return {
-      bg: 'bg-linear-to-r from-purple-500 to-violet-400',
-      text: 'text-white',
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="shrink-0"
-        >
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-        </svg>
-      ),
-    };
-  }
-  if (isStandard) {
-    return {
-      bg: 'bg-linear-to-r from-blue-500 to-cyan-400',
-      text: 'text-white',
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="10"
-          height="10"
-          viewBox="0 0 24 24"
-          fill="currentColor"
-          className="shrink-0"
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      ),
-    };
-  }
+interface LoginButtonProps {
+  onShowSettings: () => void;
+}
 
-  return null;
-};
-
-const formatDate = (dateStr: string | null): string => {
-  if (!dateStr) return '';
-  // Format "2026-03-29" to "26.03.29"
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return dateStr;
-  return `${parts[0].slice(2)}.${parts[1]}.${parts[2]}`;
-};
-
-const formatCredits = (n: number): string => {
-  if (Number.isInteger(n)) return n.toString();
-  return n.toFixed(2);
-};
-
-const CreditItemRow: React.FC<{ item: CreditItem; isEn: boolean }> = ({ item, isEn }) => {
-  const label = isEn ? item.labelEn : item.label;
-  const badge = item.type === 'subscription' ? getSubscriptionBadge(label) : null;
-  const expiresText = item.expiresAt
-    ? `${i18nService.t('authExpiresAt')}${formatDate(item.expiresAt)}`
-    : '';
-
-  return (
-    <div className="flex flex-col gap-0.5 py-1.5 first:pt-0 last:pb-0">
-      <div className="flex items-center gap-1.5">
-        {badge ? (
-          <span
-            className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.bg} ${badge.text}`}
-          >
-            {badge.icon}
-            {label}
-          </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">{label}</span>
-        )}
-        <span className="text-xs font-medium text-foreground">
-          {formatCredits(item.creditsRemaining)}
-          {i18nService.t('authCreditsUnit')}
-        </span>
-      </div>
-      {expiresText && (
-        <span className="text-[10px] text-muted-foreground pl-0.5">{expiresText}</span>
-      )}
-    </div>
-  );
-};
-
-const UserMenu: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const user = useSelector((state: RootState) => state.auth.user);
-  const profileSummary = useSelector((state: RootState) => state.auth.profileSummary);
-  const [creditsExpanded, setCreditsExpanded] = useState(false);
-  const isEn = i18nService.getLanguage() === 'en';
-
-  useEffect(() => {
-    authService.fetchProfileSummary();
-  }, []);
-
-  const handleLogout = async () => {
-    await authService.logout();
-    onClose();
-  };
-
-  const handleSubscribe = async () => {
-    // TODO: configure your own pricing portal URL
-  };
-
-  const handleLearnMore = async () => {
-    // TODO: configure your own profile portal URL
-  };
-
-  const phoneSuffix = user?.phone ? user.phone.slice(-4) : '';
-
-  const totalCredits = profileSummary?.totalCreditsRemaining ?? 0;
-  const creditItems = profileSummary?.creditItems ?? [];
-  const hasCredits = creditItems.length > 0;
-
-  return (
-    <div className="absolute bottom-full -left-2 mb-1 w-58 bg-surface rounded-xl shadow-popover border border-border overflow-hidden z-50 popover-enter">
-      {/* Account info */}
-      <div className="px-4 py-3 border-b border-border">
-        <div className="text-sm font-medium text-foreground truncate">
-          {user?.nickname || phoneSuffix}
-        </div>
-        {phoneSuffix && (
-          <div className="text-xs text-muted-foreground mt-0.5">****{phoneSuffix}</div>
-        )}
-      </div>
-
-      {/* Credits section - collapsible */}
-      <div className="border-b border-border">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => setCreditsExpanded(!creditsExpanded)}
-          className="w-full px-4 py-2.5 flex items-center justify-between cursor-pointer hover:bg-surface-raised transition-colors h-auto"
-        >
-          <span className="text-xs text-muted-foreground">
-            {i18nService.t('authCreditsRemaining')}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-foreground">
-              {formatCredits(totalCredits)}
-              {i18nService.t('authCreditsUnit')}
-            </span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`text-muted-foreground transition-transform duration-200 ${creditsExpanded ? 'rotate-180' : ''}`}
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </div>
-        </Button>
-
-        {/* Expanded credit details */}
-        {creditsExpanded && (
-          <div className="px-4 pb-3">
-            {hasCredits ? (
-              <div className="divide-y divide-border">
-                {creditItems.map((item, idx) => (
-                  <CreditItemRow key={idx} item={item} isEn={isEn} />
-                ))}
-              </div>
-            ) : (
-              <div className="text-xs text-muted-foreground py-1">
-                {i18nService.t('authZeroCredits')}
-              </div>
-            )}
-            <Button
-              type="button"
-              variant="link"
-              onClick={handleLearnMore}
-              className="mt-2 text-xs text-primary hover:underline cursor-pointer h-auto p-0"
-            >
-              {i18nService.t('authLearnMore')}
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="py-1">
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleSubscribe}
-          className="w-full px-4 py-2 text-left text-sm text-foreground hover:bg-surface-raised transition-colors cursor-pointer h-auto justify-start"
-        >
-          {i18nService.t('authValueAddedServices')}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={handleLogout}
-          className="w-full px-4 py-2 text-left text-sm text-red-500 hover:bg-surface-raised transition-colors cursor-pointer flex items-center gap-2 h-auto justify-start"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="shrink-0"
-          >
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          {i18nService.t('authLogout')}
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-const LoginButton: React.FC = () => {
-  const { isLoggedIn, isLoading, user } = useSelector((state: RootState) => state.auth);
+const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
   const [showMenu, setShowMenu] = useState(false);
+  const [user, setUser] = useState<CommunityUser | null>(null);
+  const [isStartingLogin, setIsStartingLogin] = useState(false);
+  const [error, setError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const refreshUser = useCallback(async () => {
+    const result = await window.electron.auth.getCommunityUser();
+    setUser(result.success && result.user ? result.user : null);
+  }, []);
+
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowMenu(false);
-      }
+    void refreshUser();
+    const unsubscribe = window.electron.auth.onCallback(callback => {
+      if (callback.community) void refreshUser();
+    });
+    return unsubscribe;
+  }, [refreshUser]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setShowMenu(false);
     };
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    if (showMenu) document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
   }, [showMenu]);
 
-  if (isLoading) {
-    return null;
-  }
-
-  const handleClick = async () => {
-    if (isLoggedIn) {
-      setShowMenu(!showMenu);
-    } else {
-      await authService.login();
+  const handleLogin = async () => {
+    setError('');
+    setIsStartingLogin(true);
+    try {
+      const result = await window.electron.auth.login();
+      if (!result.success) setError(result.error || '无法开始登录，请稍后重试。');
+      else setShowMenu(false);
+    } finally {
+      setIsStartingLogin(false);
     }
   };
+
+  const handleLogout = async () => {
+    await window.electron.auth.communityLogout();
+    setUser(null);
+    setShowMenu(false);
+  };
+
+  const handleSettings = () => {
+    setShowMenu(false);
+    onShowSettings();
+  };
+
+  const accountLabel = user?.email || i18nService.t('login');
 
   return (
     <div ref={containerRef} className="relative">
       <Button
         type="button"
         variant="ghost"
-        onClick={handleClick}
-        className="inline-flex h-7 items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 cursor-pointer"
+        onClick={() => setShowMenu(open => !open)}
+        aria-expanded={showMenu}
+        aria-haspopup="menu"
+        className="inline-flex h-8 w-full items-center justify-start gap-2 rounded-lg px-2 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4"
       >
-        {isLoggedIn ? (
-          <>
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="" className="h-4 w-4 shrink-0 rounded-full" />
-            ) : (
-              <UserAvatarIcon className="h-4 w-4 shrink-0" />
-            )}
-            <span className="truncate max-w-[80px]">{i18nService.t('myAccount')}</span>
-          </>
-        ) : (
-          <>
-            <UserAvatarIcon className="h-4 w-4 shrink-0" />
-            {i18nService.t('login')}
-          </>
-        )}
+        <UserRound className="size-4 shrink-0" />
+        <span className="truncate">{accountLabel}</span>
       </Button>
-      {showMenu && <UserMenu onClose={() => setShowMenu(false)} />}
+
+      {showMenu ? (
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 z-50 mb-2 w-60 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-popover"
+        >
+          {user ? (
+            <>
+              <div className="px-2.5 py-2 text-sm font-medium text-foreground">
+                <p className="truncate">{user.email}</p>
+                <p className="mt-0.5 text-xs font-normal text-muted-foreground">知远账号</p>
+              </div>
+              <div className="my-1 h-px bg-border" />
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              role="menuitem"
+              disabled={isStartingLogin}
+              onClick={() => void handleLogin()}
+              className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm"
+            >
+              <LogIn className="size-4" />
+              {isStartingLogin ? '正在打开登录页…' : '登录知远'}
+            </Button>
+          )}
+
+          <Button
+            type="button"
+            variant="ghost"
+            role="menuitem"
+            onClick={handleSettings}
+            className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm"
+          >
+            <Settings className="size-4" />
+            {i18nService.t('settings')}
+          </Button>
+
+          {user ? (
+            <Button
+              type="button"
+              variant="ghost"
+              role="menuitem"
+              onClick={() => void handleLogout()}
+              className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm text-destructive hover:text-destructive"
+            >
+              <LogOut className="size-4" />
+              退出登录
+            </Button>
+          ) : null}
+
+          {error ? <p className="px-2.5 pb-1 pt-2 text-xs leading-5 text-destructive">{error}</p> : null}
+        </div>
+      ) : null}
     </div>
   );
 };
