@@ -2,7 +2,9 @@
 
 !macro customHeader
   ManifestDPIAware true
-  RequestExecutionLevel admin
+  ; The application and immutable runtime cache are per-user. Elevated helper
+  ; processes are used only for optional Windows-wide settings below.
+  RequestExecutionLevel user
   ShowInstDetails nevershow
 !macroend
 
@@ -233,7 +235,7 @@
 
   EnableDefenderExclusion:
     DetailPrint "[Installer] Adding user-approved Defender exclusion"
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Add-MpPreference -ExclusionPath \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\" -ErrorAction Stop"'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\"; $$command = \"Add-MpPreference -ExclusionPath ''$$runtimeRoot'' -ErrorAction Stop\"; $$process = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList @(''-NoProfile'', ''-NonInteractive'', ''-Command'', $$command) -Wait -PassThru; exit $$process.ExitCode"'
     Pop $0
     Pop $1
     StrCmp $0 "0" DefenderExclusionEnabled
@@ -281,7 +283,7 @@
   !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\xlsx\Scripts\python.exe" "Skill Python 离线环境"
   !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
 
-  DetailPrint "[Installer] Activating offline component set"
+  DetailPrint "[Installer] Activating offline components"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
@@ -336,7 +338,7 @@
   Pop $0
   Pop $1
   StrCmp $0 "0" ComponentPointersReady
-    StrCpy $R9 "离线组件原子切换失败：$1"
+    StrCpy $R9 "离线组件切换失败：$1"
     Goto OfflineComponentInstallFailed
   ComponentPointersReady:
 
@@ -421,7 +423,7 @@
   InstallVcRuntime:
     IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 VcRuntimeReady
     DetailPrint "[Installer] Installing Microsoft Visual C++ Runtime"
-    nsExec::ExecToStack '"$INSTDIR\resources\vc_redist.x64.exe" /install /quiet /norestart'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$process = Start-Process -FilePath \"$INSTDIR\resources\vc_redist.x64.exe\" -Verb RunAs -ArgumentList @(''/install'', ''/quiet'', ''/norestart'') -Wait -PassThru; exit $$process.ExitCode"'
     Pop $0
     Pop $1
     StrCmp $0 "0" VcRuntimeReady
@@ -541,7 +543,7 @@
   ; Remove only exclusions that this installer recorded as user-approved and
   ; installer-managed. Never remove an exclusion created independently.
   IfFileExists "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" 0 DefenderExclusionUninstallDone
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Remove-MpPreference -ExclusionPath \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\" -ErrorAction SilentlyContinue"'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\"; $$command = \"Remove-MpPreference -ExclusionPath ''$$runtimeRoot'' -ErrorAction SilentlyContinue\"; $$process = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList @(''-NoProfile'', ''-NonInteractive'', ''-Command'', $$command) -Wait -PassThru; exit $$process.ExitCode"'
     Pop $0
     Pop $1
     Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"

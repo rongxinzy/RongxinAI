@@ -74,6 +74,11 @@ export function getLlamaCppBackendDir(runtimeRoot: string, ref: LlamaCppBackendR
   return path.join(getLlamaCppBackendsRoot(runtimeRoot), ref.version, ref.backend);
 }
 
+function getLlamaCppBackendDownloadDir(runtimeRoot: string, ref: LlamaCppBackendRef): string {
+  assertSafeBackendRef(ref);
+  return path.join(runtimeRoot, 'downloads', sanitizePathSegment(ref.versionBackend));
+}
+
 export function getLlamaCppCurrentBackendDir(runtimeRoot: string): string {
   return path.join(runtimeRoot, 'current');
 }
@@ -599,11 +604,7 @@ export async function installLlamaCppBackend(input: {
 
   fs.mkdirSync(input.runtimeRoot, { recursive: true });
   const tempDir = fs.mkdtempSync(path.join(input.runtimeRoot, '.installing-'));
-  const downloadDir = path.join(
-    input.runtimeRoot,
-    'downloads',
-    sanitizePathSegment(input.ref.versionBackend),
-  );
+  const downloadDir = getLlamaCppBackendDownloadDir(input.runtimeRoot, input.ref);
   fs.mkdirSync(downloadDir, { recursive: true });
   const reportProgress = (progress: LlamaCppInstallProgress) => {
     input.onProgress?.({
@@ -690,6 +691,9 @@ export async function installLlamaCppBackend(input: {
       installedAt: new Date().toISOString(),
     });
     if (input.switchCurrent !== false) syncCurrentBackend(input.runtimeRoot, input.ref);
+    // Retain partial archives for a failed or cancelled resumable download, but
+    // do not keep completed archives after the backend is installed.
+    fs.rmSync(downloadDir, { recursive: true, force: true });
     reportProgress({ phase: 'done', percent: 100 });
 
     return {
@@ -750,6 +754,11 @@ export function uninstallLlamaCppBackend(input: {
     }
     const deleted = fs.existsSync(targetDir);
     fs.rmSync(targetDir, { recursive: true, force: true });
+    if (ref)
+      fs.rmSync(getLlamaCppBackendDownloadDir(input.runtimeRoot, ref), {
+        recursive: true,
+        force: true,
+      });
     return {
       success: true,
       deleted,

@@ -309,6 +309,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '4. 导入成功后，backend 会出现在当前配置列表中，可直接切换或安装使用。如果压缩包与当前机器系统、架构或显卡能力不匹配，安装或切换时会失败。',
     localInferenceImportRuntimeFailed: '导入失败',
     localInferenceRuntimeReady: '本地推理已安装就绪。',
+    localInferenceRuntimeInstalling: '正在安装…',
     localInferenceRuntimeMissing: '本地推理安装失败，请检查网络后重试。',
     localInferenceServiceNeedsBackendInstall: '请先在本地推理配置中安装 backend，然后再启动服务。',
     localInferenceServiceNeedsBackendSwitch:
@@ -3082,6 +3083,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceImportGuideInlineStepResult:
       '4. After a successful import, the backend appears in the current config list and can be switched to or installed. Installation or switching will fail if the archive does not match the current machine OS, architecture, or GPU capability.',
     localInferenceRuntimeReady: 'local inference is installed and ready.',
+    localInferenceRuntimeInstalling: 'Installing…',
     localInferenceRuntimeMissing:
       'Failed to install local inference. Check the network and try again.',
     localInferenceServiceNeedsBackendInstall:

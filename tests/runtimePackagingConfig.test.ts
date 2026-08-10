@@ -216,6 +216,7 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(workflow, /runs-on: windows-latest/);
   assert.match(workflow, /bun run dist:win:offline/);
   assert.match(workflow, /windows-runtime-smoke\.ps1/);
+  assert.match(workflow, /windows-installer-size-smoke\.ps1/);
   assert.match(workflow, /windows-installer-smoke\.ps1/);
 
   const smoke = readFileSync(
@@ -228,6 +229,13 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(smoke, /phase=component-cache-hit/);
   assert.match(smoke, /phase=defender-exclusion-skipped-silent/);
   assert.match(smoke, /'uninstall'/);
+
+  const sizeSmoke = readFileSync(
+    path.join(root, "scripts", "ci", "windows-installer-size-smoke.ps1"),
+    "utf8",
+  );
+  assert.match(sizeSmoke, /component archive bytes/);
+  assert.match(sizeSmoke, /1GB/);
 });
 
 test("DOCX smoke validator accepts the bundled Markdown converter output", () => {

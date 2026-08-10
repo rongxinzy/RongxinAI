@@ -622,6 +622,9 @@ describe('llamacpp backend manager', () => {
     const ref = toBackendRef('b9505', 'mac-arm64');
     writeInstalledBackend(runtimeRoot, ref.version, ref.backend, 'darwin');
     syncCurrentBackend(runtimeRoot, ref);
+    const downloadDir = path.join(runtimeRoot, 'downloads', ref.versionBackend.replace('/', '_'));
+    fs.mkdirSync(downloadDir, { recursive: true });
+    fs.writeFileSync(path.join(downloadDir, 'backend.tar.gz'), 'complete archive');
 
     const result = await uninstallLlamaCppBackend({
       runtimeRoot,
@@ -634,6 +637,7 @@ describe('llamacpp backend manager', () => {
     expect(result.deleted).toBe(true);
     expect(fs.existsSync(getLlamaCppBackendDir(runtimeRoot, ref))).toBe(false);
     expect(fs.existsSync(getLlamaCppCurrentBackendDir(runtimeRoot))).toBe(false);
+    expect(fs.existsSync(downloadDir)).toBe(false);
   });
 
   test('rejects CUDA companion-only archive import', async () => {
@@ -716,6 +720,9 @@ describe('llamacpp backend manager', () => {
 
     expect(result.success).toBe(true);
     expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'win32'))).toBe(true);
+    expect(
+      fs.existsSync(path.join(runtimeRoot, 'downloads', ref.versionBackend.replace('/', '_'))),
+    ).toBe(false);
     expect(
       progressEvents.some(
         progress =>

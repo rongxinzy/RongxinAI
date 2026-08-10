@@ -43,6 +43,10 @@ function isActive(progress: LlamaCppInstallProgress | null): boolean {
   );
 }
 
+function canCancel(progress: LlamaCppInstallProgress | null): boolean {
+  return Boolean(progress && ['starting', 'downloading', 'downloading-progress'].includes(progress.phase));
+}
+
 export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps) {
   const [backends, setBackends] = useState<LlamaCppBackendInfo[]>([]);
   const [selectedKey, setSelectedKey] = useState('');
@@ -54,6 +58,7 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
     sizeBytes?: number;
   }>();
   const active = isActive(progress);
+  const cancellable = canCancel(progress);
 
   const selectedBackend = useMemo(
     () => backends.find(backend => backend.versionBackend === selectedKey),
@@ -229,10 +234,14 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
               </SelectGroup>
             </SelectContent>
           </Select>
-          {active ? (
+          {active && cancellable ? (
             <Button type="button" variant="outline" size="sm" onClick={() => void cancelInstall()}>
               <X data-icon="inline-start" />
               {i18nService.t('cancel')}
+            </Button>
+          ) : active ? (
+            <Button type="button" variant="outline" size="sm" disabled>
+              {i18nService.t('localInferenceRuntimeInstalling')}
             </Button>
           ) : (
             <Button type="button" variant="outline" size="sm" onClick={() => void startInstall()}>

@@ -14,6 +14,7 @@ on:
       - "scripts/generate-nsis-brand-assets.cjs"
       - "scripts/nsis-installer.nsh"
       - "scripts/ci/windows-installer-smoke.ps1"
+      - "scripts/ci/windows-installer-size-smoke.ps1"
       - "scripts/ci/windows-runtime-smoke.ps1"
       - "scripts/windows-resource-pack.cjs"
       - "scripts/setup-python-runtime.js"
@@ -76,6 +77,12 @@ jobs:
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Check offline installer size
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-installer-size-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}
       - name: Verify embedded runtimes with a clean PATH
         shell: powershell
         run: >-

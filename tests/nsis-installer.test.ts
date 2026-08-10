@@ -28,14 +28,17 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
   });
 
-  test('atomically switches component pointers and retains a rollback path until success', () => {
+  test('uses per-user installation and rolls back pointer changes after normal failures', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
+    expect(installerScript).toContain('RequestExecutionLevel user');
+    expect(installerScript).not.toContain('RequestExecutionLevel admin');
     expect(installerScript).toContain('current.next');
     expect(installerScript).toContain('current.previous');
     expect(installerScript).toContain('component-switch-state.txt');
     expect(installerScript).toContain('phase=component-set-rollback');
     expect(installerScript).toContain('phase=component-cleanup-complete');
+    expect(installerScript).not.toContain('离线组件原子切换失败');
   });
 
   test('records optional local inference intent without downloading in NSIS', () => {
@@ -51,13 +54,10 @@ describe('NSIS offline resource and local inference flow', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
     expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1');
-    expect(installerScript).toContain(
-      'Add-MpPreference -ExclusionPath \\"$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\"',
-    );
+    expect(installerScript).toContain('Add-MpPreference -ExclusionPath');
+    expect(installerScript).toContain('Start-Process -FilePath powershell.exe -Verb RunAs');
     expect(installerScript).toContain('defender-exclusion-managed');
-    expect(installerScript).toContain(
-      'Remove-MpPreference -ExclusionPath \\"$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\"',
-    );
+    expect(installerScript).toContain('Remove-MpPreference -ExclusionPath');
     expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*compile-cache/);
     expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
   });
