@@ -229,7 +229,7 @@
   Pop $1
   StrCmp $0 "0" DefenderExclusionAlreadyActive
   IfSilent DefenderExclusionSkipped
-  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "是否允许将知远的离线运行环境加入 Microsoft Defender 排除项？$\r$\n$\r$\n这样可以减少首次解压和运行时扫描，但该目录中的文件将不再接受 Defender 实时扫描。设置会持续到卸载知远，你也可以随时在 Windows 安全中心撤销。$\r$\n$\r$\n目录：%LOCALAPPDATA%\ZhiYuanAgent\runtimes$\r$\n$\r$\n请仅在信任此安装包时选择“是”。" IDYES EnableDefenderExclusion IDNO DefenderExclusionDeclined
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1 "是否允许将知远的离线运行环境加入 Microsoft Defender 排除项？$\r$\n$\r$\n这样可以显著减少大量小文件在首次解压和后续运行时的扫描开销，但该目录中的文件将不再接受 Defender 实时扫描。设置会持续到卸载知远，你也可以随时在 Windows 安全中心撤销。$\r$\n$\r$\n目录：%LOCALAPPDATA%\ZhiYuanAgent\runtimes$\r$\n$\r$\n开源版推荐选择“是”；如不希望修改 Defender 设置，请选择“否”。" IDYES EnableDefenderExclusion IDNO DefenderExclusionDeclined
 
   EnableDefenderExclusion:
     DetailPrint "[Installer] Adding user-approved Defender exclusion"

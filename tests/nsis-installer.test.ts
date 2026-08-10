@@ -50,7 +50,7 @@ describe('NSIS offline resource and local inference flow', () => {
   test('adds only a user-approved scoped Defender exclusion and removes managed exclusions', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
-    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
+    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1');
     expect(installerScript).toContain(
       'Add-MpPreference -ExclusionPath \\"$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\"',
     );
