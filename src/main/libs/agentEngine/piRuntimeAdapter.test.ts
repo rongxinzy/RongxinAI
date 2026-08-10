@@ -957,7 +957,6 @@ describe('PiRuntimeAdapter', () => {
 
       expect(mockSession.prompt).toHaveBeenCalledWith(
         'Describe this image\n\n[image attachments were not sent because the selected model has no confirmed image support]',
-        undefined,
       );
     });
 
