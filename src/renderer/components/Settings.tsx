@@ -56,6 +56,7 @@ import {
   ModelCapabilitiesFields,
   type ModelCapabilityKey,
 } from './settings/ModelCapabilitiesFields';
+import { ProviderModelDiscoveryButton } from './settings/ProviderModelDiscoveryButton';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -72,6 +73,7 @@ import {
 import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
 import { reconcileDefaultModelConfig } from '../services/modelConfigReconciliation';
+import { mergeDiscoveredProviderModels } from '../services/providerModelDiscovery';
 import { getSettingsSaveErrorMessage } from '../services/settingsSave';
 import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
@@ -4844,16 +4846,54 @@ const Settings: React.FC<SettingsProps> = ({
                       {i18nService.t('availableModels')}
                     </h3>
                     {activeProvider !== ProviderName.LlamaCpp && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="xs"
-                        onClick={handleAddModel}
-                        className="h-auto px-0 py-0 [&_svg]:size-3.5"
-                      >
-                        <PlusCircle data-icon="inline-start" />
-                        {i18nService.t('addModel')}
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        <ProviderModelDiscoveryButton
+                          providerId={activeProvider}
+                          provider={providers[activeProvider]}
+                          baseUrl={resolveBaseUrl(
+                            activeProvider,
+                            providers[activeProvider].baseUrl,
+                            getEffectiveApiFormat(
+                              activeProvider,
+                              providers[activeProvider].apiFormat,
+                            ),
+                          )}
+                          apiFormat={getEffectiveApiFormat(
+                            activeProvider,
+                            providers[activeProvider].apiFormat,
+                          )}
+                          requiresApiKey={
+                            providerRequiresApiKey(activeProvider) &&
+                            providers[activeProvider].authType !== 'oauth'
+                          }
+                          onModelsMerge={discoveredModels =>
+                            setProviders(previous => {
+                              const merged = mergeDiscoveredProviderModels(
+                                previous[activeProvider].models ?? [],
+                                discoveredModels,
+                              );
+                              if (!merged.changed) return previous;
+                              return {
+                                ...previous,
+                                [activeProvider]: {
+                                  ...previous[activeProvider],
+                                  models: merged.models,
+                                },
+                              };
+                            })
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="xs"
+                          onClick={handleAddModel}
+                          className="h-auto px-0 py-0 [&_svg]:size-3.5"
+                        >
+                          <PlusCircle data-icon="inline-start" />
+                          {i18nService.t('addModel')}
+                        </Button>
+                      </div>
                     )}
                   </div>
 

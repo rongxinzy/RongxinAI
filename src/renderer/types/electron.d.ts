@@ -12,6 +12,10 @@ import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQue
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
+  ProviderModelDiscoveryRequest,
+  ProviderModelDiscoveryResult,
+} from '../../shared/providers';
+import type {
   LlamaCppCancelInstallResult,
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
@@ -633,6 +637,7 @@ interface IElectronAPI {
       headers: Record<string, string>;
       body?: string;
     }) => Promise<ApiResponse>;
+    fetchModels: (input: ProviderModelDiscoveryRequest) => Promise<ProviderModelDiscoveryResult>;
     stream: (options: {
       url: string;
       method: string;

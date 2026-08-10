@@ -47,6 +47,10 @@ import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
+import type {
+  ProviderModelDiscoveryRequest,
+  ProviderModelDiscoveryResult,
+} from '../shared/providers';
 import { TriageIpcChannel } from '../shared/triage';
 import { WorkspaceIpc } from '../shared/workspace';
 import {
@@ -276,6 +280,9 @@ contextBridge.exposeInMainWorld('electron', {
       headers: Record<string, string>;
       body?: string;
     }) => ipcRenderer.invoke(ApiIpc.Fetch, options),
+
+    fetchModels: (input: ProviderModelDiscoveryRequest): Promise<ProviderModelDiscoveryResult> =>
+      ipcRenderer.invoke(ApiIpc.FetchModels, input),
 
     stream: (options: {
       url: string;

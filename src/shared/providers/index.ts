@@ -1,4 +1,5 @@
 export { resolveCodingPlanBaseUrl } from './codingPlan';
+export * from './modelDiscovery';
 export type { ModelCapabilities, ProviderDef, ProviderModelDefinition } from './constants';
 export {
   ApiFormat,
