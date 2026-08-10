@@ -19,6 +19,7 @@ import { i18nService } from '../../../services/i18n';
 import { EmptyState } from '../components/Common';
 import { MarketplaceModelCard } from '../components/MarketplaceModelCard';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import { Separator } from '@shared/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -107,6 +108,12 @@ export function MarketplacePanel({
   const currentPage = page;
   const visibleModels = showAllModels ? models : installableModels;
   const hardwareSummaryParts = formatMarketplaceHardwareSummaryParts(hardwareSummary);
+  const hardwareGpuValue = hardwareSummaryParts.gpuCount > 0
+    ? `${hardwareSummaryParts.gpuCount} · ${hardwareSummaryParts.totalVramGiB}GB${hardwareSummaryParts.gpuNames.length > 0 ? ` ${hardwareSummaryParts.gpuNames.join(' / ')}` : ''}`
+    : i18nService.t('marketplaceHardwareNotDetected');
+  const hardwareMemoryValue = hardwareSummaryParts.systemMemoryGiB !== null
+    ? `${hardwareSummaryParts.systemMemoryGiB}GB`
+    : i18nService.t('marketplaceHardwareNotDetected');
 
   useEffect(() => {
     pageRef.current = 1;
@@ -268,7 +275,7 @@ export function MarketplacePanel({
         </div>
       </div>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3 rounded-lg border border-border-subtle bg-background p-1">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3 rounded-lg bg-background p-1">
       <div className="flex w-full shrink-0 flex-col gap-3 px-4 py-3">
         <div className="flex w-full flex-wrap items-stretch justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
@@ -310,13 +317,17 @@ export function MarketplacePanel({
                 </Select>
             </div>
           </div>
-          <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-success/25 bg-success/10 px-4 text-sm leading-5 text-success">
+          <div className="inline-flex h-10 w-fit min-w-0 max-w-full items-center gap-2 rounded-lg border border-success/25 bg-success/10 px-4 text-sm leading-5 text-success">
             <Monitor className="size-5 shrink-0" aria-hidden="true" />
             {hardwareSummaryReady ? (
-              <span className="inline-flex items-center gap-2">
-                <span>GPU: {hardwareSummaryParts.gpu}</span>
-                <span className="h-6 shrink-0 bg-success/60" style={{ width: '1.5px' }} aria-hidden="true" />
-                <span>内存：{hardwareSummaryParts.memory}</span>
+              <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+                <span className="min-w-0 truncate">
+                  {i18nService.t('marketplaceHardwareGpuLabel')} {hardwareGpuValue}
+                </span>
+                <Separator orientation="vertical" className="h-6 w-px bg-success/60" aria-hidden="true" />
+                <span className="shrink-0 whitespace-nowrap">
+                  {i18nService.t('marketplaceHardwareMemoryLabel')} {hardwareMemoryValue}
+                </span>
               </span>
             ) : (
               <span>{i18nService.t('marketplaceHardwareDetecting')}</span>
@@ -337,7 +348,7 @@ export function MarketplacePanel({
       ) : null}
 
       {marketplaceLoading && models.length === 0 ? (
-        <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-visible rounded-lg bg-surface p-1">
+        <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface p-1">
           <MarketplaceGridSkeleton columnCount={gridColumnCount} pageSize={MARKETPLACE_PAGE_SIZE} />
         </div>
       ) : !hasSearched ? null : visibleModels.length === 0 ? (
@@ -363,7 +374,7 @@ export function MarketplacePanel({
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col rounded-lg bg-surface p-1">
           {installedModelActions}
-          <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-visible rounded-lg bg-surface p-1">
+          <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface p-1">
             <div
               className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
               style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
