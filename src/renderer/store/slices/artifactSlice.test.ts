@@ -107,6 +107,67 @@ describe('artifact reducer', () => {
     ]);
   });
 
+  test('anchors a declared deliverable to the final answer that references the same path', () => {
+    const declared = makeArtifact({
+      id: 'declared-artifact',
+      messageId: 'declare-message-outside-page',
+      title: 'Explicit title',
+      role: ArtifactRole.Deliverable,
+      declared: true,
+    });
+    const finalAnswer = makeArtifact({
+      id: 'artifact-final-answer',
+      messageId: 'final-answer-in-current-page',
+      role: ArtifactRole.Deliverable,
+      declared: false,
+    });
+
+    let state = artifactReducer(
+      undefined,
+      addArtifact({ sessionId: 'session-1', artifact: declared }),
+    );
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: finalAnswer }));
+
+    expect(state.artifactsBySession['session-1']).toEqual([
+      expect.objectContaining({
+        id: 'declared-artifact',
+        messageId: 'final-answer-in-current-page',
+        title: 'Explicit title',
+        role: ArtifactRole.Deliverable,
+        declared: true,
+      }),
+    ]);
+  });
+
+  test('keeps the final answer anchor when persisted declaration data arrives later', () => {
+    const finalAnswer = makeArtifact({
+      id: 'artifact-final-answer',
+      messageId: 'final-answer-in-current-page',
+      role: ArtifactRole.Deliverable,
+      declared: false,
+    });
+    const declared = makeArtifact({
+      id: 'declared-artifact',
+      messageId: 'declare-message-outside-page',
+      title: 'Explicit title',
+      role: ArtifactRole.Deliverable,
+      declared: true,
+    });
+
+    let state = artifactReducer(
+      undefined,
+      addArtifact({ sessionId: 'session-1', artifact: finalAnswer }),
+    );
+    state = artifactReducer(state, addArtifact({ sessionId: 'session-1', artifact: declared }));
+
+    expect(state.artifactsBySession['session-1'][0]).toMatchObject({
+      id: 'declared-artifact',
+      messageId: 'final-answer-in-current-page',
+      title: 'Explicit title',
+      declared: true,
+    });
+  });
+
   test('keeps artifact focus mode explicit and resets it when the panel closes', () => {
     const selected = artifactReducer(undefined, selectArtifact('artifact-1'));
     const focused = artifactReducer(selected, setArtifactLayoutMode(ArtifactLayoutMode.Workspace));

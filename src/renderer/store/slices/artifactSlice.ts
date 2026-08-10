@@ -83,13 +83,22 @@ function restoreSessionView(state: ArtifactState, viewState: ArtifactSessionView
 
 function mergeArtifact(existing: Artifact, incoming: Artifact): Artifact {
   const declaredArtifact = incoming.declared ? incoming : existing.declared ? existing : null;
+  const deliveryAnchorArtifact =
+    !incoming.declared && incoming.role === ArtifactRole.Deliverable
+      ? incoming
+      : !existing.declared && existing.role === ArtifactRole.Deliverable
+        ? existing
+        : null;
   const merged = {
     ...existing,
     ...incoming,
     ...(declaredArtifact
       ? {
           id: declaredArtifact.id,
-          messageId: declaredArtifact.messageId,
+          messageId:
+            declaredArtifact.role === ArtifactRole.Deliverable && deliveryAnchorArtifact
+              ? deliveryAnchorArtifact.messageId
+              : declaredArtifact.messageId,
           type: declaredArtifact.type,
           title: declaredArtifact.title,
           fileName: declaredArtifact.fileName,
