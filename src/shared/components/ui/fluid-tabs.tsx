@@ -14,9 +14,20 @@ export interface FluidTabItem<Value extends string> {
   value: Value;
 }
 
+export const FluidTabsSize = {
+  Small: 'sm',
+  Default: 'default',
+} as const;
+
+export type FluidTabsSize = (typeof FluidTabsSize)[keyof typeof FluidTabsSize];
+
 export interface FluidTabsProps<Value extends string> {
   'aria-label': string;
   className?: string;
+  inactiveTabClassName?: string;
+  listClassName?: string;
+  showInactiveHoverIndicator?: boolean;
+  size?: FluidTabsSize;
   items: readonly FluidTabItem<Value>[];
   onValueChange: (value: Value) => void;
   value: Value;
@@ -25,10 +36,18 @@ export interface FluidTabsProps<Value extends string> {
 export function FluidTabs<Value extends string>({
   'aria-label': ariaLabel,
   className,
+  inactiveTabClassName,
+  listClassName,
+  showInactiveHoverIndicator = false,
+  size = FluidTabsSize.Small,
   items,
   onValueChange,
   value,
 }: FluidTabsProps<Value>) {
+  const sizeClasses = size === FluidTabsSize.Default
+    ? { list: 'h-10', tab: 'h-8' }
+    : { list: 'h-9', tab: 'h-7' };
+
   return (
     <TabsPrimitive.Root
       value={value}
@@ -38,7 +57,7 @@ export function FluidTabs<Value extends string>({
       <TabsPrimitive.List
         activateOnFocus
         aria-label={ariaLabel}
-        className="relative inline-flex h-9 items-center gap-0.5 rounded-lg bg-muted/80 p-1 select-none"
+        className={cn('relative inline-flex items-center gap-0.5 rounded-lg bg-muted/80 p-1 select-none', sizeClasses.list, listClassName)}
       >
         {items.map(item => {
           const isActive = item.value === value;
@@ -47,14 +66,21 @@ export function FluidTabs<Value extends string>({
               key={item.value}
               value={item.value}
               className={cn(
-                'relative z-10 flex h-7 min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-sm leading-5 font-normal whitespace-nowrap outline-none transition-colors duration-100',
+                'group relative z-10 flex min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-sm leading-5 font-medium whitespace-nowrap outline-none transition-colors duration-100',
+                sizeClasses.tab,
                 'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
                 isActive
-                  ? 'font-semibold text-foreground'
-                  : 'font-normal text-muted-foreground opacity-50 hover:text-foreground',
+                  ? 'font-medium text-foreground'
+                  : cn('font-medium text-muted-foreground opacity-50 hover:text-foreground', inactiveTabClassName),
               )}
             >
-              {isActive ? (
+              {!isActive && showInactiveHoverIndicator ? (
+                <span
+                  aria-hidden="true"
+                  data-fluid-tabs-hover-indicator="true"
+                  className="pointer-events-none absolute inset-0 rounded-md border border-border-subtle bg-surface shadow-md opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100"
+                />
+              ) : isActive ? (
                 <motion.span
                   aria-hidden="true"
                   layoutId="fluid-tabs-active-indicator"

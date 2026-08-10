@@ -85,6 +85,14 @@ describe('MarketplaceModelCard', () => {
     };
   });
 
+  test('uses a contained hover shadow inside the scroll viewport', () => {
+    const { container } = renderCard();
+    const card = container.querySelector('[data-marketplace-model-card="true"]');
+
+    expect(card).toHaveClass('hover:shadow-xl');
+    expect(card).not.toHaveClass('hover:shadow-md');
+  });
+
   test.each([
     ['excellent', '推荐运行', 'text-success'],
     ['good', '适合运行', 'text-blue-600'],
