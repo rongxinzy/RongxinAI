@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
-import { Cable, LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Cable, LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -49,7 +49,8 @@ const MCP_ICON_BY_ID: Record<string, string> = {
 const FEISHU_MCP_REGISTRY_ID = 'feishu';
 const GITHUB_MCP_REGISTRY_ID = 'github';
 const BAIDU_NETDISK_MCP_REGISTRY_ID = 'baidu-netdisk';
-const OFFICIAL_MCP_CONNECT_TIMEOUT_MS = 120_000;
+const OFFICIAL_MCP_CONNECT_TIMEOUT_MS = 60_000;
+const OFFICIAL_MCP_DIALOG_CLOSE_DELAY_MS = 2_500;
 
 const McpIcon: React.FC<{
   iconSrc?: string;
@@ -166,6 +167,8 @@ const McpManager: React.FC<McpManagerProps> = ({
   const [officialConnectEntry, setOfficialConnectEntry] = useState<McpRegistryEntry | null>(null);
   const [isOfficialConnecting, setIsOfficialConnecting] = useState(false);
   const [installingRegistryId, setInstallingRegistryId] = useState<string | null>(null);
+  const [pendingOfficialAuthorizationRegistryId, setPendingOfficialAuthorizationRegistryId] =
+    useState<string | null>(null);
   const [tokenConnectEntry, setTokenConnectEntry] = useState<McpRegistryEntry | null>(null);
   const [isTokenConnecting, setIsTokenConnecting] = useState(false);
   const [tokenConnectError, setTokenConnectError] = useState('');
@@ -508,10 +511,15 @@ const McpManager: React.FC<McpManagerProps> = ({
     officialAuthorizationRequestRef.current = requestId;
     setIsOfficialConnecting(true);
     setInstallingRegistryId(entry.id);
-    setOfficialConnectEntry(null);
+    setPendingOfficialAuthorizationRegistryId(entry.id);
     setActionError('');
     let result: { success: boolean; servers?: McpServerConfig[]; error?: string };
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const dialogCloseTimer = window.setTimeout(() => {
+      if (attempt !== officialConnectAttemptRef.current) return;
+      setIsOfficialConnecting(false);
+      setOfficialConnectEntry(null);
+    }, OFFICIAL_MCP_DIALOG_CLOSE_DELAY_MS);
     try {
       try {
         result = await Promise.race([
@@ -539,22 +547,32 @@ const McpManager: React.FC<McpManagerProps> = ({
       } finally {
         if (timeoutId) clearTimeout(timeoutId);
       }
-      if (attempt !== officialConnectAttemptRef.current) return;
-      officialAuthorizationRequestRef.current = null;
-      setIsOfficialConnecting(false);
-      setInstallingRegistryId(null);
       if (!result.success) {
+        if (attempt !== officialConnectAttemptRef.current) return;
+        officialAuthorizationRequestRef.current = null;
+        setIsOfficialConnecting(false);
+        setInstallingRegistryId(null);
+        setPendingOfficialAuthorizationRegistryId(null);
         setActionError(result.error || i18nService.t('mcpCreateFailed'));
         return;
       }
       if (result.servers) dispatch(setMcpServers(result.servers));
+      if (attempt !== officialConnectAttemptRef.current) return;
+      officialAuthorizationRequestRef.current = null;
+      setIsOfficialConnecting(false);
+      setInstallingRegistryId(null);
+      setPendingOfficialAuthorizationRegistryId(null);
+      setOfficialConnectEntry(null);
     } catch (error) {
       if (attempt === officialConnectAttemptRef.current) {
         officialAuthorizationRequestRef.current = null;
         setIsOfficialConnecting(false);
         setInstallingRegistryId(null);
+        setPendingOfficialAuthorizationRegistryId(null);
         setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
       }
+    } finally {
+      window.clearTimeout(dialogCloseTimer);
     }
   };
 
@@ -604,8 +622,7 @@ const McpManager: React.FC<McpManagerProps> = ({
         setActionError(error);
         return;
       }
-      const server = result.servers.find(item => item.registryId === entry.id);
-      const servers = server ? await mcpService.setServerEnabled(server.id, true) : result.servers;
+      const servers = result.servers;
       dispatch(setMcpServers(servers));
     } catch (error) {
       setTokenConnectError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
@@ -617,16 +634,27 @@ const McpManager: React.FC<McpManagerProps> = ({
   };
 
   const handleCloseOfficialConnect = () => {
-    officialConnectAttemptRef.current += 1;
-    const requestId = officialAuthorizationRequestRef.current;
-    officialAuthorizationRequestRef.current = null;
-    if (requestId) {
-      void mcpService.cancelAuthorize(requestId);
+    if (isOfficialConnecting && officialAuthorizationRequestRef.current) {
+      handleCancelOfficialAuthorization();
+      return;
     }
     setIsOfficialConnecting(false);
     setIsPreparingFeishuCli(false);
     setIsFeishuCliReady(false);
     setOfficialConnectEntry(null);
+  };
+
+  const handleCancelOfficialAuthorization = () => {
+    const requestId = officialAuthorizationRequestRef.current;
+    if (!requestId) return;
+
+    officialConnectAttemptRef.current += 1;
+    officialAuthorizationRequestRef.current = null;
+    setIsOfficialConnecting(false);
+    setInstallingRegistryId(null);
+    setPendingOfficialAuthorizationRegistryId(null);
+    setOfficialConnectEntry(null);
+    void mcpService.cancelAuthorize(requestId);
   };
 
   const handleCloseForm = () => {
@@ -704,13 +732,9 @@ const McpManager: React.FC<McpManagerProps> = ({
     <div className="relative flex h-full min-h-0 flex-col gap-4">
       {/* Sync overlay — blocks ALL interaction (including sidebar) while MCP bridge is refreshing */}
       {bridgeSyncing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
-          <div className="flex flex-col items-center gap-4 px-10 py-8 rounded-2xl bg-surface border border-border shadow-card">
-            <LoaderCircle className="size-8 animate-spin text-primary" />
-            <span className="text-sm text-foreground font-medium">
-              {i18nService.t('mcpBridgeSyncing') || 'Syncing MCP tools...'}
-            </span>
-          </div>
+        <div className="pointer-events-none absolute top-2 right-2 z-10 flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted-foreground shadow-sm">
+          <LoaderCircle className="size-3.5 animate-spin" />
+          <span>{i18nService.t('mcpBridgeSyncing') || 'Syncing MCP tools...'}</span>
         </div>
       )}
 
@@ -941,7 +965,24 @@ const McpManager: React.FC<McpManagerProps> = ({
                         </div>
                       </div>
                       <div className={`flex shrink-0 items-center gap-1.5 transition-opacity ${installingRegistryId === entry.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100'}`}>
-                        {installingRegistryId === entry.id ? (
+                        {pendingOfficialAuthorizationRegistryId === entry.id ? (
+                          <div className="flex items-center gap-1">
+                            <div className="flex size-7 items-center justify-center" aria-label={i18nService.t('mcpWaitingForAuthorization')}>
+                              <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-muted-foreground hover:text-foreground"
+                              aria-label={i18nService.t('cancel')}
+                              title={i18nService.t('cancel')}
+                              onClick={handleCancelOfficialAuthorization}
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          </div>
+                        ) : installingRegistryId === entry.id ? (
                           <div className="flex size-7 items-center justify-center" aria-label={i18nService.t('mcpInstall')}>
                             <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
                           </div>

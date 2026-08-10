@@ -58,7 +58,7 @@ export function McpOfficialConnectDialog({
     : requiresExternalAccess
       ? i18nService.t('mcpExternalUnavailable')
       : isConnecting
-        ? i18nService.t('mcpConnecting')
+        ? i18nService.t('mcpWaitingForAuthorization')
         : i18nService.t('mcpConnect');
   const isActionBusy = isConnecting || isPreparing;
   const handleAction = () => {
@@ -71,16 +71,16 @@ export function McpOfficialConnectDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-[38rem] gap-0 overflow-hidden p-0 sm:max-w-[38rem]" showCloseButton>
+      <DialogContent className="max-w-[26rem] gap-0 overflow-hidden p-0 sm:max-w-[26rem]" showCloseButton>
         {entry && (
           <>
-            <DialogHeader className="items-center px-6 pt-8 pb-6 text-center">
+            <DialogHeader className="items-center px-4 pt-6 pb-4 text-center">
               <div className="flex items-center">
-                <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
+                <div className="flex size-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {iconSrc ? <img src={iconSrc} alt="" className="size-full object-contain" /> : <Cable className="size-8 text-foreground" />}
                 </div>
               </div>
-              <DialogTitle className="mt-5">
+              <DialogTitle className="mt-4">
                 {title}
               </DialogTitle>
               <DialogDescription className="mt-2 text-center">
@@ -88,14 +88,14 @@ export function McpOfficialConnectDialog({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="mx-6 overflow-hidden rounded-xl border border-border bg-muted/40">
+            <div className="mx-4 overflow-hidden rounded-xl border border-border bg-muted/40">
               <ConnectInfo icon={Plug} titleKey="mcpConnectUsageTitle" bodyKey="mcpConnectUsageBody" section={locale?.connect?.usage} />
               <ConnectInfo icon={Database} titleKey="mcpConnectDataTitle" bodyKey="mcpConnectDataBody" section={locale?.connect?.data} />
               <ConnectInfo icon={Unplug} titleKey="mcpConnectControlTitle" bodyKey="mcpConnectControlBody" section={locale?.connect?.control} />
               <ConnectInfo icon={ShieldCheck} titleKey="mcpConnectAuthTitle" bodyKey="mcpConnectAuthBody" section={locale?.connect?.authorization} last />
             </div>
 
-            <div className="p-6 pt-5">
+            <div className="p-4 pt-4">
               {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
               <Button className="w-full" onClick={handleAction} disabled={isActionBusy || requiresExternalAccess}>
                 {isActionBusy && <LoaderCircle className="size-4 animate-spin" />}
@@ -123,7 +123,7 @@ function ConnectInfo({
   last?: boolean;
 }) {
   return (
-    <div className={`p-4 ${last ? '' : 'border-b border-border'}`}>
+    <div className={`p-3 ${last ? '' : 'border-b border-border'}`}>
       <div className="flex gap-3">
         <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
         <div>

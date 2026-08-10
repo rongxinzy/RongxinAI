@@ -1938,6 +1938,20 @@ const getMcpStore = () => {
   return mcpStore;
 };
 
+const MCP_BUILT_IN_DEFAULTS_DISABLED_KEY = 'mcp_builtin_defaults_disabled_v1';
+
+const ensureBuiltInMcpDefaultsDisabled = (): void => {
+  const store = getStore();
+  if (store.get<boolean>(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY)) return;
+
+  for (const server of getMcpStore().listServers()) {
+    if (server.isBuiltIn && server.enabled) {
+      getMcpStore().setEnabled(server.id, false);
+    }
+  }
+  store.set(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY, true);
+};
+
 const FEISHU_CLI_TIMEOUT_MS = 120_000;
 const FEISHU_CLI_AUTH_TIMEOUT_MS = 600_000;
 const FEISHU_MCP_REGISTRY_ID = 'feishu';
@@ -2173,6 +2187,7 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
 
   mcpInitPromise = (async (): Promise<McpToolManifestEntry[]> => {
     try {
+      ensureBuiltInMcpDefaultsDisabled();
       const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
       if (enabledServers.length === 0) {
         console.log('[McpInit] No MCP servers configured, skipping');
@@ -3510,6 +3525,7 @@ if (!gotTheLock) {
   // MCP Server IPC handlers
   ipcMain.handle(McpIpc.List, () => {
     try {
+      ensureBuiltInMcpDefaultsDisabled();
       const servers = getMcpStore().listServers();
       return { success: true, servers };
     } catch (error) {
@@ -3543,10 +3559,7 @@ if (!gotTheLock) {
           return { success: false, error: validationError };
         }
 
-        const createdServer = getMcpStore().createServer(data as McpServerFormData);
-        if (data.isBuiltIn) {
-          getMcpStore().setEnabled(createdServer.id, true);
-        }
+        getMcpStore().createServer(data as McpServerFormData);
         const servers = getMcpStore().listServers();
         // Trigger async MCP bridge refresh (don't await — let UI show DB result immediately)
         refreshMcpBridge().catch(err =>
@@ -3679,16 +3692,15 @@ if (!gotTheLock) {
         if (!existing) {
           return { success: false, error: 'MCP server not found' };
         }
-        if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
-          return { success: true, servers: getMcpStore().listServers() };
-        }
-        const validationError = await validateStoredMcpServerConfig(existing);
-        if (validationError) {
-          return { success: false, error: validationError };
-        }
-        const probeResult = await probeMcpConnection(existing);
-        if (!probeResult.success) {
-          return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
+        if (existing.registryId !== FEISHU_MCP_REGISTRY_ID) {
+          const validationError = await validateStoredMcpServerConfig(existing);
+          if (validationError) {
+            return { success: false, error: validationError };
+          }
+          const probeResult = await probeMcpConnection(existing);
+          if (!probeResult.success) {
+            return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
+          }
         }
       }
 
@@ -3832,12 +3844,11 @@ if (!gotTheLock) {
         if (!accessToken)
           return { success: false, error: 'OAuth authorization did not return an access token' };
 
-        const createdServer = getMcpStore().createServer({
+        getMcpStore().createServer({
           ...data,
           isBuiltIn: true,
           headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
         });
-        getMcpStore().setEnabled(createdServer.id, true);
         const servers = getMcpStore().listServers();
         refreshMcpBridge().catch(err =>
           console.error('[McpBridge] background refresh error:', err),
