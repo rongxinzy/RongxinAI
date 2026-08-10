@@ -1278,6 +1278,8 @@ interface IElectronAPI {
       models?: Array<{ modelId: string; modelName: string; provider: string; apiFormat: string }>;
     }>;
     getProfileSummary: () => Promise<{ success: boolean; data?: ProfileSummaryData }>;
+    getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
+    communityLogout: () => Promise<{ success: boolean }>;
     onCallback: (callback: (data: { code?: string; community?: boolean; success?: boolean; user?: any; error?: string }) => void) => () => void;
     onQuotaChanged: (callback: () => void) => () => void;
   };
@@ -1330,6 +1332,8 @@ interface IElectronAPI {
     logout: () => Promise<{ success: boolean }>;
     refreshToken: () => Promise<{ success: boolean; accessToken?: string }>;
     getAccessToken: () => Promise<string | null>;
+    getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
+    communityLogout: () => Promise<{ success: boolean }>;
     onCallback: (callback: (data: { code?: string; community?: boolean; success?: boolean; user?: any; error?: string }) => void) => () => void;
   };
   qwen: Record<string, never>;

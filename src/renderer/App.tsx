@@ -518,10 +518,6 @@ const App: React.FC = () => {
     };
   }, [showToast]);
 
-  const handleShowLogin = useCallback(() => {
-    showToast(i18nService.t('featureInDevelopment'));
-  }, [showToast]);
-
   const updateInfo = appUpdateState.info;
 
   const handleUpdateAction = useCallback(async () => {
@@ -765,7 +761,6 @@ const App: React.FC = () => {
         {toastMessage && <Toast message={toastMessage} isError={isToastError} onClose={dismissToast} />}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar
-            onShowLogin={handleShowLogin}
             onShowSettings={handleShowSettings}
             activeView={mainView}
             onShowSkills={handleShowSkills}
@@ -779,7 +774,7 @@ const App: React.FC = () => {
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
             updateEntry={!isSidebarCollapsed ? updateEntry : null}
-            hideLogin={true}
+            hideLogin={false}
             onPrefetchView={prefetchFeatureView}
           />
           <div

@@ -37,10 +37,6 @@ import {
   SidebarAnimatedSearchIcon,
   type SidebarAnimatedSearchIconHandle,
 } from './icons/SidebarAnimatedSearchIcon';
-import {
-  SidebarAnimatedSettingsIcon,
-  type SidebarAnimatedSettingsIconHandle,
-} from './icons/SidebarAnimatedSettingsIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -51,7 +47,6 @@ import { SidebarNavigationControls, type SidebarActiveView } from './SidebarNavi
 
 interface SidebarProps {
   onShowSettings: () => void;
-  onShowLogin?: () => void;
   activeView: SidebarActiveView;
   onShowSkills: () => void;
   onShowCowork: () => void;
@@ -104,7 +99,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [searchCorpus, setSearchCorpus] = useState<CoworkSessionSummary[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchIconRef = useRef<SidebarAnimatedSearchIconHandle>(null);
-  const settingsIconRef = useRef<SidebarAnimatedSettingsIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const searchControlRef = useRef<HTMLDivElement>(null);
   const [isBatchMode, setIsBatchMode] = useState(false);
@@ -701,29 +695,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <div className="space-y-1 px-3 pb-3 pt-1">
               {updateEntry}
-              <div className="flex items-center gap-1">
-                {!hideLogin && (
-                  <div className="flex-1 min-w-0">
-                    <LoginButton />
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onShowSettings()}
-                  onMouseEnter={() => {
-                    if (!prefersReducedMotion) settingsIconRef.current?.startAnimation();
+              {!hideLogin ? (
+                <LoginButton
+                  onShowSettings={() => {
                     onPrefetchView?.('settings');
+                    onShowSettings();
                   }}
-                  onFocus={() => onPrefetchView?.('settings')}
-                  onMouseLeave={() => settingsIconRef.current?.stopAnimation()}
-                  className={`inline-flex h-7 items-center justify-start! gap-2 rounded-md px-1.5 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4 ${hideLogin ? 'w-full' : 'shrink-0'}`}
-                  aria-label={i18nService.t('settings')}
-                >
-                  <SidebarAnimatedSettingsIcon ref={settingsIconRef} />
-                  {i18nService.t('settings')}
-                </Button>
-              </div>
+                />
+              ) : null}
             </div>
           )}
           {/* Batch Delete Confirmation Modal */}

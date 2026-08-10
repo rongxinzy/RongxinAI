@@ -829,6 +829,8 @@ contextBridge.exposeInMainWorld('electron', {
     getAccessToken: () => ipcRenderer.invoke(AuthIpc.GetAccessToken),
     getModels: () => ipcRenderer.invoke(AuthIpc.GetModels),
     getProfileSummary: () => ipcRenderer.invoke(AuthIpc.GetProfileSummary),
+    getCommunityUser: () => ipcRenderer.invoke(AuthIpc.GetCommunityUser),
+    communityLogout: () => ipcRenderer.invoke(AuthIpc.CommunityLogout),
     onCallback: (
       callback: (data: {
         code?: string;

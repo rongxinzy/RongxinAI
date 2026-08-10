@@ -3217,6 +3217,16 @@ if (!gotTheLock) {
 
   const clearCommunitySession = () => getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
 
+  ipcMain.handle('auth:getCommunityUser', () => {
+    const session = getCommunitySession();
+    return session ? { success: true, user: session.user } : { success: false };
+  });
+
+  ipcMain.handle('auth:communityLogout', () => {
+    clearCommunitySession();
+    return { success: true };
+  });
+
   async function completeCommunityLogin(code: string, state: string): Promise<void> {
     const pending = pendingCommunityLogin;
     pendingCommunityLogin = null;
