@@ -56,23 +56,23 @@
     }
   },
   "engram": {
-    "version": "v1.20.0",
-    "repo": "Gentleman-Programming/engram",
+    "version": "v1.20.0-zhiyuan.1",
+    "repo": "z189yis/engram-cjk",
     "runtimeAssets": {
-      "mac-x64": "engram_1.20.0_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_1.20.0_darwin_arm64.tar.gz",
-      "win-x64": "engram_1.20.0_windows_amd64.zip",
-      "win-arm64": "engram_1.20.0_windows_arm64.zip",
-      "linux-x64": "engram_1.20.0_linux_amd64.tar.gz",
-      "linux-arm64": "engram_1.20.0_linux_arm64.tar.gz"
+      "mac-x64": "engram_v1.20.0-zhiyuan.1_darwin_amd64.tar.gz",
+      "mac-arm64": "engram_v1.20.0-zhiyuan.1_darwin_arm64.tar.gz",
+      "win-x64": "engram_v1.20.0-zhiyuan.1_windows_amd64.zip",
+      "win-arm64": "engram_v1.20.0-zhiyuan.1_windows_arm64.zip",
+      "linux-x64": "engram_v1.20.0-zhiyuan.1_linux_amd64.tar.gz",
+      "linux-arm64": "engram_v1.20.0-zhiyuan.1_linux_arm64.tar.gz"
     },
     "runtimeChecksums": {
-      "mac-x64": "3b9015dcfcdd9f823eb7ad0b590b1dbc4c25bb5d81dda3f84e623709815afe80",
-      "mac-arm64": "2363d5012f23e58878f86c3ddcc1f63cfe9dcf3eec7f413e70eaafcbb9d394cc",
-      "win-x64": "c945c47d58367f943642cb8451fa45f208174407839f1dda33a975a05d6e465b",
-      "win-arm64": "eb93c6d7d5a4020ddcf1ff956909f3e90694f6447519433316b10f964f8f37b5",
-      "linux-x64": "7dc3003318e303bee269a4772144f3ce01c8ec700bfd524aaec76770acd389ca",
-      "linux-arm64": "7eb815910a76ae6cfa9a5d0161d3701e293dcca71f7743cffa62e236e5af59af"
+      "mac-x64": "PENDING",
+      "mac-arm64": "PENDING",
+      "win-x64": "PENDING",
+      "win-arm64": "PENDING",
+      "linux-x64": "PENDING",
+      "linux-arm64": "PENDING"
     }
   },
   "main": "dist-electron/main.js",

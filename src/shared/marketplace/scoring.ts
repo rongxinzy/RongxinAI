@@ -166,15 +166,33 @@ export function withMarketplaceScore(model: MarketplaceModel, context: Marketpla
   return { ...model, score: result.score, fit: result.fit };
 }
 
-export function formatMarketplaceHardwareSummary(hardware?: MarketplaceHardwareProfile): string {
-  if (!hardware) return '设备信息不可用';
+export type MarketplaceHardwareSummaryParts = {
+  gpu: string;
+  memory: string;
+};
+
+export function formatMarketplaceHardwareSummaryParts(
+  hardware?: MarketplaceHardwareProfile,
+): MarketplaceHardwareSummaryParts {
+  if (!hardware) return { gpu: '未检测到', memory: '未检测到' };
+  const gpuNames = [...new Set(
+    hardware.gpuNames
+      .map(name => name.replace(/^NVIDIA\s+/i, '').trim())
+      .filter(Boolean),
+  )];
+  const gpuModel = gpuNames.length > 0 ? ` ${gpuNames.join(' / ')}` : '';
   const gpu = hardware.gpuCount
-    ? `${hardware.gpuCount} GPU · ${Math.round(hardware.totalVramMiB / 1024)}GB 显存`
-    : '未检测到GPU';
+    ? `${hardware.gpuCount} · ${Math.round(hardware.totalVramMiB / 1024)}GB${gpuModel}`
+    : '未检测到';
   const memory = hardware.systemMemoryMiB
-    ? `${Math.round(hardware.systemMemoryMiB / 1024)}GB 内存`
-    : '系统内存未检测到';
-  return `${gpu} · ${memory}`;
+    ? `${Math.round(hardware.systemMemoryMiB / 1024)}GB`
+    : '未检测到';
+  return { gpu, memory };
+}
+
+export function formatMarketplaceHardwareSummary(hardware?: MarketplaceHardwareProfile): string {
+  const { gpu, memory } = formatMarketplaceHardwareSummaryParts(hardware);
+  return `GPU: ${gpu} | 内存：${memory}`;
 }
 
 export function formatMarketplaceStars(stars?: number): string {

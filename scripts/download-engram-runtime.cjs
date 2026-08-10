@@ -21,6 +21,16 @@ function readRuntimeConfig(rootDir) {
   if (!packageJson.engram?.version || !packageJson.engram?.repo) {
     throw new Error('package.json is missing the pinned memory runtime configuration.');
   }
+  // Fork 运行时校验：ZhiYuan 使用带 -zhiyuan 后缀的 fork 标签。
+  // 防呆——若配置回退到上游裸版本号（v1.20.0 无后缀），说明配置被
+  // 误改或 fork 发布未完成，此时应显式失败而不是静默下载上游二进制。
+  const version = packageJson.engram.version;
+  if (!/^v\d+\.\d+\.\d+-zhiyuan\.\d+$/.test(version)) {
+    throw new Error(
+      `Unsupported memory runtime version "${version}": expected a fork tag like v1.20.0-zhiyuan.1. ` +
+        'Publish the fork release first, then update package.json engram.version and runtimeChecksums.',
+    );
+  }
   return packageJson.engram;
 }
 
@@ -62,7 +72,11 @@ function downloadWithAgent(url, destination, proxyUrl) {
           response.pipe(fs.createWriteStream(destination));
           response.on('end', resolve);
           response.on('error', reject);
-        } else if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+        } else if (
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          response.headers.location
+        ) {
           // Follow a single redirect (GitHub release URLs redirect to objects.githubusercontent.com).
           const nextUrl = new URL(response.headers.location, url).toString();
           reject(new Error(`Redirect to ${nextUrl} is not supported in proxy mode.`));
@@ -173,53 +187,149 @@ async function extractZipArchive(archivePath, destination) {
   await extractZip(archivePath, { dir: destination });
 }
 
-async function main() {
-  const rootDir = path.resolve(__dirname, '..');
-  const targetId = process.argv[2]?.trim() || resolveHostTargetId();
-  const config = readRuntimeConfig(rootDir);
+function readBuildInfo(buildInfoPath) {
+  try {
+    return JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function runtimeMatchesConfig(buildInfo, config, targetId, assetName, checksum) {
+  return (
+    buildInfo?.target === targetId &&
+    buildInfo?.version === config.version &&
+    buildInfo?.repo === config.repo &&
+    buildInfo?.assetName === assetName &&
+    buildInfo?.checksum === checksum
+  );
+}
+
+function replaceDirectoryAtomically(stagedDirectory, targetDirectory, fileSystem = fs) {
+  const parentDirectory = path.dirname(targetDirectory);
+  const backupDirectory = path.join(
+    parentDirectory,
+    `.${path.basename(targetDirectory)}.backup-${crypto.randomUUID()}`,
+  );
+  const hadTarget = fileSystem.existsSync(targetDirectory);
+
+  try {
+    if (hadTarget) fileSystem.renameSync(targetDirectory, backupDirectory);
+    fileSystem.renameSync(stagedDirectory, targetDirectory);
+  } catch (error) {
+    if (fileSystem.existsSync(targetDirectory)) {
+      fileSystem.rmSync(targetDirectory, { recursive: true, force: true });
+    }
+    if (hadTarget && fileSystem.existsSync(backupDirectory)) {
+      fileSystem.renameSync(backupDirectory, targetDirectory);
+    }
+    throw error;
+  }
+
+  if (hadTarget) fileSystem.rmSync(backupDirectory, { recursive: true, force: true });
+}
+
+async function prepareRuntimeDirectory(options) {
+  const { rootDir, runtimeRoot, targetId, executableName, config, assetName, checksum } = options;
+  const downloadRuntime = options.downloadRuntime ?? download;
+  const extractRuntime = options.extractRuntime ?? extract;
+  const temporaryRoot = options.temporaryRoot ?? os.tmpdir();
+  const temporaryDirectory = fs.mkdtempSync(
+    path.join(temporaryRoot, 'zhiyuan-memory-runtime-download-'),
+  );
+  const stagedDirectory = fs.mkdtempSync(path.join(runtimeRoot, `.${targetId}.staging-`));
+
+  try {
+    const archivePath = path.join(temporaryDirectory, assetName);
+    const extractDirectory = path.join(temporaryDirectory, 'extract');
+    const url = `https://github.com/${config.repo}/releases/download/${config.version}/${assetName}`;
+    fs.mkdirSync(extractDirectory, { recursive: true });
+    await downloadRuntime(url, archivePath);
+    const actualChecksum = sha256(archivePath);
+    if (actualChecksum !== checksum) {
+      throw new Error(`Memory runtime checksum mismatch for ${assetName}.`);
+    }
+    await extractRuntime(archivePath, extractDirectory);
+    const sourceExecutable = findExecutable(extractDirectory, executableName);
+    if (!sourceExecutable) throw new Error(`Archive does not contain ${executableName}.`);
+
+    fs.copyFileSync(sourceExecutable, path.join(stagedDirectory, executableName));
+    if (process.platform !== 'win32') {
+      fs.chmodSync(path.join(stagedDirectory, executableName), 0o755);
+    }
+    fs.copyFileSync(
+      path.join(rootDir, 'third_party', 'engram.LICENSE'),
+      path.join(stagedDirectory, 'LICENSE'),
+    );
+    fs.writeFileSync(
+      path.join(stagedDirectory, 'runtime-build-info.json'),
+      `${JSON.stringify({ target: targetId, version: config.version, repo: config.repo, assetName, checksum }, null, 2)}\n`,
+    );
+    return stagedDirectory;
+  } catch (error) {
+    fs.rmSync(stagedDirectory, { recursive: true, force: true });
+    throw error;
+  } finally {
+    fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
+async function ensureMemoryRuntime(rootDir, targetId, options = {}) {
+  const config = options.config ?? readRuntimeConfig(rootDir);
   const assetName = config.runtimeAssets?.[targetId];
   const checksum = config.runtimeChecksums?.[targetId];
   if (!assetName || !checksum) throw new Error(`Unsupported memory runtime target: ${targetId}`);
+  if (!/^[a-f0-9]{64}$/i.test(checksum)) {
+    throw new Error(`Memory runtime checksum is not finalized for ${targetId}.`);
+  }
 
   const executableName = targetId.startsWith('win-') ? 'engram.exe' : 'engram';
   const runtimeRoot = path.join(rootDir, 'vendor', 'engram-runtime');
   const targetDirectory = path.join(runtimeRoot, targetId);
   const targetExecutable = path.join(targetDirectory, executableName);
-  if (!fs.existsSync(targetExecutable)) {
-    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-memory-runtime-'));
+  const buildInfo = readBuildInfo(path.join(targetDirectory, 'runtime-build-info.json'));
+  const cacheIsValid =
+    fs.existsSync(targetExecutable) &&
+    runtimeMatchesConfig(buildInfo, config, targetId, assetName, checksum);
+
+  fs.mkdirSync(runtimeRoot, { recursive: true });
+  if (!cacheIsValid) {
+    console.log(`[MemoryRuntime] Downloading and verifying ${assetName}.`);
+    const stagedDirectory = await prepareRuntimeDirectory({
+      ...options,
+      rootDir,
+      runtimeRoot,
+      targetId,
+      executableName,
+      config,
+      assetName,
+      checksum,
+    });
     try {
-      const archivePath = path.join(temporaryDirectory, assetName);
-      const extractDirectory = path.join(temporaryDirectory, 'extract');
-      const url = `https://github.com/${config.repo}/releases/download/${config.version}/${assetName}`;
-      console.log(`[MemoryRuntime] Downloading ${assetName}.`);
-      await download(url, archivePath);
-      const actualChecksum = sha256(archivePath);
-      if (actualChecksum !== checksum) {
-        throw new Error(`Memory runtime checksum mismatch for ${assetName}.`);
-      }
-      fs.mkdirSync(extractDirectory, { recursive: true });
-      await extract(archivePath, extractDirectory);
-      const sourceExecutable = findExecutable(extractDirectory, executableName);
-      if (!sourceExecutable) throw new Error(`Archive does not contain ${executableName}.`);
-      fs.mkdirSync(targetDirectory, { recursive: true });
-      fs.copyFileSync(sourceExecutable, targetExecutable);
-      if (process.platform !== 'win32') fs.chmodSync(targetExecutable, 0o755);
-      fs.copyFileSync(
-        path.join(rootDir, 'third_party', 'engram.LICENSE'),
-        path.join(targetDirectory, 'LICENSE'),
-      );
-      fs.writeFileSync(
-        path.join(targetDirectory, 'runtime-build-info.json'),
-        `${JSON.stringify({ target: targetId, version: config.version, assetName, checksum }, null, 2)}\n`,
-      );
-    } finally {
-      fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+      replaceDirectoryAtomically(stagedDirectory, targetDirectory);
+    } catch (error) {
+      fs.rmSync(stagedDirectory, { recursive: true, force: true });
+      throw error;
     }
   }
 
   const currentDirectory = path.join(runtimeRoot, 'current');
-  fs.rmSync(currentDirectory, { recursive: true, force: true });
-  fs.cpSync(targetDirectory, currentDirectory, { recursive: true });
+  const stagedCurrentDirectory = fs.mkdtempSync(path.join(runtimeRoot, '.current.staging-'));
+  try {
+    fs.cpSync(targetDirectory, stagedCurrentDirectory, { recursive: true });
+    replaceDirectoryAtomically(stagedCurrentDirectory, currentDirectory);
+  } catch (error) {
+    fs.rmSync(stagedCurrentDirectory, { recursive: true, force: true });
+    throw error;
+  }
+
+  return targetDirectory;
+}
+
+async function main() {
+  const rootDir = path.resolve(__dirname, '..');
+  const targetId = process.argv[2]?.trim() || resolveHostTargetId();
+  await ensureMemoryRuntime(rootDir, targetId);
   console.log(`[MemoryRuntime] Runtime ready for ${targetId}.`);
 }
 
@@ -230,4 +340,12 @@ if (require.main === module) {
   });
 }
 
-module.exports = { resolveHostTargetId, readRuntimeConfig, sha256 };
+module.exports = {
+  ensureMemoryRuntime,
+  readBuildInfo,
+  readRuntimeConfig,
+  replaceDirectoryAtomically,
+  resolveHostTargetId,
+  runtimeMatchesConfig,
+  sha256,
+};

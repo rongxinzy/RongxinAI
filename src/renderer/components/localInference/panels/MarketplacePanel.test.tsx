@@ -93,7 +93,7 @@ function renderPanel(overrides: Partial<Parameters<typeof MarketplacePanel>[0]> 
 const lastSearchCall = (onSearch: ReturnType<typeof vi.fn>) =>
   onSearch.mock.calls.at(-1)?.[0] as MarketplaceSearchParams;
 
-describe('MarketplacePanel result grid and count consistency', () => {
+describe('MarketplacePanel result grid', () => {
   test('first visit does not auto-search (delegated to the recommendations hook)', () => {
     // The panel is presentation-only; the parent's useMarketplaceRecommendations
     // owns the first featured load. The panel must not fire its own request,
@@ -108,8 +108,6 @@ describe('MarketplacePanel result grid and count consistency', () => {
     const models = [makeModel('alpha'), makeModel('beta'), makeModel('gamma')];
     renderPanel({ hasSearched: true, models });
 
-    // Count must equal the rendered cards — never the raw server total.
-    expect(screen.getByText('共 3 个模型')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(3);
   });
 
@@ -122,21 +120,19 @@ describe('MarketplacePanel result grid and count consistency', () => {
     expect(screen.getAllByText('安装')).toHaveLength(MARKETPLACE_PAGE_SIZE + 2);
   });
 
-  test('shows the complete server result count instead of the current page size', () => {
+  test('does not render the server result count in the header', () => {
     const models = Array.from({ length: MARKETPLACE_PAGE_SIZE }, (_, index) =>
       makeModel(`model-${index}`),
     );
     renderPanel({ hasSearched: true, models, totalCount: 3318 });
 
-    expect(screen.getByText(/3318/)).toBeInTheDocument();
+    expect(screen.queryByText(/3318/)).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /\u5b89\u88c5/ })).toHaveLength(MARKETPLACE_PAGE_SIZE);
   });
-  test('shows the rendered card count instead of the unfiltered server total', () => {
-    // The visible count must match the cards that remain after local filtering.
+  test('does not render a rendered card count in the header', () => {
     const models = [makeModel('alpha'), makeModel('beta')];
     renderPanel({ hasSearched: true, models });
 
-    expect(screen.getByText('共 2 个模型')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(2);
   });
 
@@ -157,8 +153,6 @@ describe('MarketplacePanel result grid and count consistency', () => {
     ];
     renderPanel({ hasSearched: true, models });
 
-    // One installed model is excluded, so the visible count is one.
-    expect(screen.getByText('共 2 个模型')).toBeInTheDocument();
     expect(screen.getAllByText('安装')).toHaveLength(2);
   });
 
