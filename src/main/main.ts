@@ -97,6 +97,7 @@ import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges'
 import type { CoworkPromptLanguage } from './coworkLanguagePrompt';
 import { composeCoworkSystemPrompt } from './coworkPrompt/composer';
 import { reconcileWorkSessionRuntimeState } from './coworkSessionRuntimeState';
+import { resolveCoworkContinuationSkillState } from './coworkSessionSkills';
 import {
   type CoworkExecutionMode,
   type CoworkMessageType,
@@ -4288,27 +4289,24 @@ if (!gotTheLock) {
           });
         }
 
-        // Persist active skill selection to session record
-        if (options.activeSkillIds !== undefined) {
+        const continuationSkillState = resolveCoworkContinuationSkillState({
+          activeSkillIds: options.activeSkillIds,
+          savedSkillIds: existingSession?.activeSkillIds,
+          expertSkillIds: (existingSession?.experts || []).flatMap(expert => expert.skillIds),
+        });
+
+        // Persist explicit selections, including [] when the user clears session skills.
+        if (continuationSkillState.sessionSkillIds !== undefined) {
           try {
             store.updateSession(options.sessionId, {
-              activeSkillIds: options.activeSkillIds,
+              activeSkillIds: continuationSkillState.sessionSkillIds,
             });
           } catch (error) {
             console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
           }
         }
 
-        const runtimeSkillIds = [
-          ...new Set([
-            // A continuation normally arrives after the input cleared its
-            // one-shot skill chips. Preserve the session's saved workflow
-            // skills in that case so controlled academic research resumes
-            // with the same state and completion gates.
-            ...(options.activeSkillIds ?? existingSession?.activeSkillIds ?? []),
-            ...(existingSession?.experts || []).flatMap(expert => expert.skillIds),
-          ]),
-        ];
+        const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
 
         const runtimeSystemPrompt = existingSession
           ? existingSession.systemPrompt

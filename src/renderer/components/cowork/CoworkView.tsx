@@ -1235,7 +1235,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         sessionId: currentSession.id,
         prompt,
         systemPrompt: currentSession.systemPrompt || combinedSystemPrompt,
-        activeSkillIds: sessionSkillIds.length > 0 ? sessionSkillIds : undefined,
+        activeSkillIds: sessionSkillIds,
         expertIds,
         permissionMode: sessionPermissionMode,
         goalMode,

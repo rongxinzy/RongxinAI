@@ -38,12 +38,7 @@ import {
   setDefaultSelectedModel,
   setSelectedModel,
 } from '../../store/slices/modelSlice';
-import {
-  clearActiveSkills,
-  setActiveSkillIds,
-  setSkills,
-  toggleActiveSkill,
-} from '../../store/slices/skillSlice';
+import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
@@ -640,20 +635,16 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       dispatch(setDraftPrompt({ sessionId: draftKey, draft: '' }));
       dispatch(clearDraftAttachments(draftKey));
       setImageVisionHint(false);
-      const submittedSkillIds = [...activeSkillIds];
-      const submission = onSubmit(
+      const result = await onSubmit(
         finalPrompt,
         skillPrompt,
         imageAtts.length > 0 ? imageAtts : undefined,
         selectedExpertIds,
         goalMode,
       );
-      dispatch(clearActiveSkills());
-      const result = await submission;
       if (result === false) {
         // Submission rejected — restore the prompt so the user can retry.
         setValue(finalPrompt);
-        dispatch(setActiveSkillIds(submittedSkillIds));
       }
     }, [
       value,
