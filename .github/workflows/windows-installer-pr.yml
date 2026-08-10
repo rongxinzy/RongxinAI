@@ -1,0 +1,100 @@
+name: Windows installer gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/windows-installer-pr.yml"
+      - "bun.lock"
+      - "package.json"
+      - "electron-builder.json"
+      - "build/icons/**"
+      - "build/installer-assets/**"
+      - "scripts/electron-builder-hooks.cjs"
+      - "scripts/generate-nsis-brand-assets.cjs"
+      - "scripts/nsis-installer.nsh"
+      - "scripts/ci/windows-installer-smoke.ps1"
+      - "scripts/ci/windows-runtime-smoke.ps1"
+      - "scripts/windows-resource-pack.cjs"
+      - "scripts/setup-python-runtime.js"
+      - "scripts/setup-skill-python-runtime.js"
+      - "scripts/setup-uv-runtime.js"
+      - "scripts/*openclaw*.cjs"
+      - "scripts/*engram*.cjs"
+      - "MCPs/**"
+      - "SKILLs/**"
+      - "resources/vc_redist.x64.exe"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-installer-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  package-and-install:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            ~/AppData/Local/pnpm/store
+            vendor/openclaw-runtime/win-x64
+            vendor/openclaw-plugins
+            vendor/engram-runtime
+          key: windows-installer-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            windows-installer-node24-bun1.3.14-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up offline Windows runtimes
+        run: |
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+          bun run engram:runtime:win-x64
+      - name: Build complete offline installer
+        run: bun run dist:win:offline
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Verify embedded runtimes with a clean PATH
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-runtime-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}
+      - name: Verify cold install, cache-hit upgrade, and uninstall
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-installer-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}
+      - name: Upload installer diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-installer-diagnostics
+          path: |
+            release/*.exe
+            ~/AppData/Roaming/ZhiYuanAgent/install-timing.log
+          if-no-files-found: ignore
+          retention-days: 7
