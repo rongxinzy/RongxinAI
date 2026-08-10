@@ -37,6 +37,12 @@ test('mounts ActiveSkillBadge inside the prompt toolbar', () => {
   expect(badge).toBeLessThan(toolsClose);
 });
 
+test('keeps active skills attached after submitting within a session', () => {
+  expect(source).not.toContain('dispatch(clearActiveSkills())');
+  expect(source).not.toContain('submittedSkillIds');
+  expect(source).not.toContain('dispatch(setActiveSkillIds(');
+});
+
 test('does not reintroduce the PR #184 textarea-token implementation', () => {
   // ResizeObserver-driven width measurement for the inline tokens.
   expect(source).not.toContain('skillTokensRef');
