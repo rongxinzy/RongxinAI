@@ -20,7 +20,11 @@ import {
   ProviderModelPiMaxTokensField,
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
-import { WorkbenchRunStatus } from '../../../shared/workbenchTask';
+import {
+  WorkbenchContractKind,
+  WorkbenchRunStatus,
+  WorkbenchTaskStatus,
+} from '../../../shared/workbenchTask';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -1141,6 +1145,54 @@ describe('PiRuntimeAdapter', () => {
       expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
         'workflow_state',
       );
+    });
+
+    it('starts a fresh generic task after a shortcut approval is denied', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const workspaceRoot = createTemporaryWorkspace();
+
+      try {
+        await adapter.startSession('denied-shortcut', 'Create a 10-page presentation', {
+          skillIds: ['presentation-studio'],
+          sessionMode: 'work',
+          workspaceRoot,
+        });
+        const first = service.getCurrent('denied-shortcut')!;
+        const authorization = service.authorizeToolCall({
+          sessionId: 'denied-shortcut',
+          runId: first.task.activeRunId!,
+          toolCallId: 'write-call',
+          toolName: 'write',
+          toolInput: { path: 'slides.md', content: 'draft' },
+          autoApprove: false,
+        });
+        const approval = service.getDetail(first.task.id)?.approvals[0];
+        service.respondToApproval({ approvalId: approval!.id, approved: false });
+        await authorization;
+
+        await adapter.continueSession('denied-shortcut', 'Hello', {
+          skillIds: ['presentation-studio'],
+          sessionMode: 'work',
+          workspaceRoot,
+        });
+
+        const current = service.getCurrent('denied-shortcut')!;
+        expect(current.task.id).not.toBe(first.task.id);
+        expect(current.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
+        expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
+        const greetingOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
+      } finally {
+        db.close();
+      }
     });
 
     it('should recreate the session when expert tool topology changes', async () => {

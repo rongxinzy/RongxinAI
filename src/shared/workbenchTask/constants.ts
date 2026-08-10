@@ -126,6 +126,7 @@ export const WorkbenchRunEventType = {
   VerificationStarted: 'verification_started',
   VerificationFinished: 'verification_finished',
   RunPaused: 'run_paused',
+  RunCancelled: 'run_cancelled',
   RunFailed: 'run_failed',
   RecoveryRequired: 'recovery_required',
   HarnessProfiled: 'harness_profiled',
