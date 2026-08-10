@@ -52,6 +52,12 @@ export interface ProductionObservedToolResult {
   createdAt: number;
 }
 
+export interface ProductionAvailableVerifierEvidence {
+  evidenceRef: string;
+  toolName: string;
+  outputSummary: string;
+}
+
 export interface ProductionInspectionEvidence {
   artifacts: ProductionArtifactEvidence[];
   verifiers: ProductionVerifierEvidence[];

@@ -70,9 +70,11 @@ const prepareProductionDelivery = (
     output: 'Completion contract passed.',
     isError: false,
   });
+  const evidenceRef = service.productionLoop.getAvailableVerifierEvidence(runId)[0]?.evidenceRef;
+  if (!evidenceRef) throw new Error('Verifier evidence missing in test setup.');
   service.productionLoop.startInspection(runId, {
     artifacts: [{ kind: 'result', reference: 'final-answer' }],
-    verifiers: [{ name: 'completion_contract', toolCallId: 'completion-contract-check' }],
+    verifiers: [{ name: 'completion_contract', evidenceRef }],
   });
   service.productionLoop.requestCritique(runId);
   service.productionLoop.recordCriticStart(runId, 'critic');

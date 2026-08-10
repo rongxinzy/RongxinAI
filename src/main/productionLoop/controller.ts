@@ -18,9 +18,11 @@ interface DownstreamCompletionWorkflow {
   readonly goal: string;
   resumeForPrompt?(prompt: string): void;
   requestCompletion(reason: string): string;
-  onAgentEnd(
-    signal: PiAgentLoopEndSignal,
-  ): { shouldFinish: boolean; reason?: string; nextPrompt?: string };
+  onAgentEnd(signal: PiAgentLoopEndSignal): {
+    shouldFinish: boolean;
+    reason?: string;
+    nextPrompt?: string;
+  };
 }
 
 const isStandaloneProductionReviewer = (args: unknown): boolean => {
@@ -60,6 +62,11 @@ export class ProductionLoopController {
     return structuredClone(this.state);
   }
 
+  getAvailableVerifierEvidence() {
+    this.refresh();
+    return this.service.getAvailableVerifierEvidence(this.state.runId);
+  }
+
   startRun(input: {
     taskId: string;
     runId: string;
@@ -82,7 +89,7 @@ export class ProductionLoopController {
       phaseInstruction,
       'The plan must include acceptance criteria, expected artifacts, and deterministic verifiers.',
       'After commit_plan, read the returned state and use each generated plan item ID with update_plan_item.',
-      'After execution, call start_inspection with every required artifact and the successful tool call ID for each deterministic verifier, then request_critique and delegate a read-only review to the production-reviewer subagent.',
+      'After execution, call production_loop get_state, then call start_inspection with every required artifact and the exact evidenceRef shown for each successful deterministic verifier. Never guess evidence references.',
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',
       'Call agent_loop done only after the production loop reports ready_to_deliver.',
@@ -117,7 +124,9 @@ export class ProductionLoopController {
     return this.update(this.service.updatePlanItem(this.state.runId, itemId, status));
   }
 
-  startInspection(input: Parameters<ProductionLoopService['startInspection']>[1]): ProductionLoopState {
+  startInspection(
+    input: Parameters<ProductionLoopService['startInspection']>[1],
+  ): ProductionLoopState {
     return this.update(this.service.startInspection(this.state.runId, input));
   }
 
@@ -194,9 +203,11 @@ export class ProductionLoopController {
       : 'Delivery requested. End the turn so deterministic verification can run.';
   }
 
-  onAgentEnd(
-    signal: PiAgentLoopEndSignal,
-  ): { shouldFinish: boolean; reason?: string; nextPrompt?: string } {
+  onAgentEnd(signal: PiAgentLoopEndSignal): {
+    shouldFinish: boolean;
+    reason?: string;
+    nextPrompt?: string;
+  } {
     this.refresh();
     if (this.state.skip) {
       return { shouldFinish: true, reason: this.state.skip.reason };
@@ -280,12 +291,7 @@ export class ProductionLoopController {
     return this.getState();
   }
 
-  recordToolResult(
-    toolCallId: string,
-    toolName: string,
-    output: string,
-    isError: boolean,
-  ): void {
+  recordToolResult(toolCallId: string, toolName: string, output: string, isError: boolean): void {
     this.update(
       this.service.recordToolResult(this.state.runId, {
         toolCallId,

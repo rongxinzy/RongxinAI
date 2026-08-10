@@ -12,15 +12,28 @@ import { buildProductionLoopTool } from './tool';
 const state = {
   phase: ProductionLoopPhase.Plan,
   status: ProductionLoopStatus.Active,
+  acceptanceCriteria: ['Artifact exists'],
+  expectedArtifacts: [{ kind: 'file', description: 'report.md', required: true }],
+  expectedVerifiers: [{ name: 'artifact_check', deterministic: true }],
   planItems: [{ id: 'item-1', title: 'Build', status: ProductionPlanItemStatus.Pending }],
   critic: { requested: false },
   deliveryReason: null,
 };
 
+const availableVerifierEvidence = [
+  {
+    evidenceRef: 'ev-1234',
+    toolName: 'bash',
+    outputSummary: 'checks passed',
+  },
+];
+
 const createTool = () => {
   const controller = {
     getState: vi.fn(() => state),
+    getAvailableVerifierEvidence: vi.fn(() => availableVerifierEvidence),
     commitPlan: vi.fn(),
+    startInspection: vi.fn(),
     updatePlanItem: vi.fn(),
     skipWorkflow: vi.fn(),
   } as unknown as ProductionLoopController;
@@ -47,7 +60,7 @@ test('publishes concrete nested schemas for model-generated plans', () => {
     'name',
     'deterministic',
   ]);
-  expect(parameters.properties.verifierEvidence.items?.required).toEqual(['name', 'toolCallId']);
+  expect(parameters.properties.verifierEvidence.items?.required).toEqual(['name', 'evidenceRef']);
 });
 
 test('normalizes a plan payload before passing it to the controller', async () => {
@@ -82,7 +95,40 @@ test('returns model-visible state with generated plan item IDs', async () => {
 
   const output = await tool.execute('call', { action: ProductionLoopAction.GetState });
 
-  expect(JSON.parse(output.content[0].text)).toEqual(state);
+  expect(JSON.parse(output.content[0].text)).toEqual({
+    ...state,
+    availableVerifierEvidence,
+  });
+});
+
+test('passes model-visible evidence references into inspection', async () => {
+  const { controller, tool } = createTool();
+
+  await tool.execute('call', {
+    action: ProductionLoopAction.StartInspection,
+    artifactEvidence: [{ kind: 'file', reference: 'report.md' }],
+    verifierEvidence: [{ name: 'artifact_check', evidenceRef: 'ev-1234' }],
+  });
+
+  expect(controller.startInspection).toHaveBeenCalledWith({
+    artifacts: [{ kind: 'file', reference: 'report.md' }],
+    verifiers: [{ name: 'artifact_check', evidenceRef: 'ev-1234' }],
+  });
+});
+
+test('returns available evidence when inspection validation fails', async () => {
+  const { controller, tool } = createTool();
+  vi.mocked(controller.startInspection).mockImplementation(() => {
+    throw new Error('Passing deterministic verifier evidence is missing for: artifact_check');
+  });
+
+  const output = await tool.execute('call', {
+    action: ProductionLoopAction.StartInspection,
+    verifierEvidence: [{ name: 'artifact_check', evidenceRef: 'ev-invalid' }],
+  });
+
+  expect(output.content[0].text).toContain('ev-1234');
+  expect(output.content[0].text).toContain('checks passed');
 });
 
 test('returns controller validation errors without advancing the tool state', async () => {

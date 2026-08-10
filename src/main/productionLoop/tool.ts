@@ -55,13 +55,13 @@ const artifactEvidence = (value: unknown): ProductionArtifactEvidence[] =>
       })
     : [];
 
-const verifierEvidence = (value: unknown): Array<{ name: string; toolCallId: string }> =>
+const verifierEvidence = (value: unknown): Array<{ name: string; evidenceRef: string }> =>
   Array.isArray(value)
     ? value.flatMap(entry => {
         if (!entry || typeof entry !== 'object') return [];
         const raw = entry as Record<string, unknown>;
-        return typeof raw.name === 'string' && typeof raw.toolCallId === 'string'
-          ? [{ name: raw.name, toolCallId: raw.toolCallId }]
+        return typeof raw.name === 'string' && typeof raw.evidenceRef === 'string'
+          ? [{ name: raw.name, evidenceRef: raw.evidenceRef }]
           : [];
       })
     : [];
@@ -74,9 +74,13 @@ export function buildProductionLoopTool(
     return JSON.stringify({
       phase: state.phase,
       status: state.status,
+      acceptanceCriteria: state.acceptanceCriteria,
+      expectedArtifacts: state.expectedArtifacts,
+      expectedVerifiers: state.expectedVerifiers,
       planItems: state.planItems,
       critic: state.critic,
       deliveryReason: state.deliveryReason,
+      availableVerifierEvidence: controller.getAvailableVerifierEvidence(),
     });
   };
   const result = (text: string): ProductionLoopToolResult => ({
@@ -152,14 +156,14 @@ export function buildProductionLoopTool(
           type: 'array',
           minItems: 1,
           description:
-            'Map each deterministic verifier name to the successful tool call that ran it in the current workflow revision.',
+            'Map each deterministic verifier name to an exact evidenceRef returned by get_state for the current workflow revision.',
           items: {
             type: 'object',
             properties: {
               name: { type: 'string' },
-              toolCallId: { type: 'string' },
+              evidenceRef: { type: 'string' },
             },
-            required: ['name', 'toolCallId'],
+            required: ['name', 'evidenceRef'],
             additionalProperties: false,
           },
         },
@@ -254,7 +258,12 @@ export function buildProductionLoopTool(
             return result(`Unknown production_loop action: ${String(params.action || '')}`);
         }
       } catch (error) {
-        return result(error instanceof Error ? error.message : String(error));
+        const message = error instanceof Error ? error.message : String(error);
+        return result(
+          params.action === ProductionLoopAction.StartInspection
+            ? `${message}\nCurrent inspection state:\n${stateForModel()}`
+            : message,
+        );
       }
     },
   };
