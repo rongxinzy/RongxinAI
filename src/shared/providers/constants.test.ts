@@ -8,16 +8,15 @@ describe('ProviderName constants', () => {
     expect(ProviderName.DeepSeek).toBe('deepseek');
     expect(ProviderName.LlamaCpp).toBe('llamacpp');
     expect(ProviderName.Custom).toBe('custom');
-    expect(ProviderName.ZhiyuanServer).toBe('zhiyuan-server');
   });
 });
 
 describe('ProviderRegistry', () => {
-  test('providerIds returns 17 providers (no custom)', () => {
+  test('providerIds returns 17 providers (no custom or legacy server)', () => {
     const ids = ProviderRegistry.providerIds;
     expect(ids.length).toBe(17);
     expect(ids).not.toContain(ProviderName.Custom);
-    expect(ids).not.toContain(ProviderName.ZhiyuanServer);
+    expect(ids).not.toContain('zhiyuan-server');
   });
 
   test('get returns definition for known provider', () => {

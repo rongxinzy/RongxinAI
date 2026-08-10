@@ -15,8 +15,6 @@ vi.mock('electron', () => ({
 }));
 
 const mockRuntimeState = vi.hoisted(() => ({
-  proxyPort: null as number | null,
-  serverModels: [] as Array<{ modelId: string; supportsImage?: boolean }>,
   enabledProviders: [] as Array<{
     providerName: string;
     baseURL: string;
@@ -43,7 +41,6 @@ const mockRuntimeState = vi.hoisted(() => ({
 }));
 
 vi.mock('./claudeSettings', () => ({
-  getAllServerModelMetadata: () => mockRuntimeState.serverModels,
   resolveAllEnabledProviderConfigs: () => mockRuntimeState.enabledProviders,
   resolveAllProviderApiKeys: () => ({}),
   resolveRawApiConfig: () => mockRuntimeState.rawApiConfig,
@@ -58,10 +55,6 @@ vi.mock('./openclawLocalExtensions', () => ({
   },
 }));
 
-vi.mock('./openclawTokenProxy', () => ({
-  getOpenClawTokenProxyPort: () => mockRuntimeState.proxyPort,
-}));
-
 vi.mock('./openaiCodexAuth', () => ({
   readOpenAICodexAuthFile: () => ({ accountId: 'acct-test' }),
 }));
@@ -72,8 +65,6 @@ describe('OpenClawConfigSync runtime config output', () => {
   let stateDir: string;
 
   beforeEach(() => {
-    mockRuntimeState.proxyPort = null;
-    mockRuntimeState.serverModels = [];
     mockRuntimeState.enabledProviders = [];
     mockRuntimeState.rawApiConfig = {
       config: {
@@ -233,90 +224,6 @@ describe('OpenClawConfigSync runtime config output', () => {
     expect(config.agents.defaults.models).toBeUndefined();
     expect(config.agents.defaults.workspace).toBe(path.join(stateDir, 'workspace-main'));
     expect(config.agents.defaults.cwd).toBe(path.resolve(tmpDir));
-  });
-
-  test('merges all server models into existing zhiyuan provider and updates image input', async () => {
-    mockRuntimeState.proxyPort = 56646;
-    mockRuntimeState.serverModels = [
-      { modelId: 'qwen3.5-plus', supportsImage: true },
-      { modelId: 'qwen3.6-plus', supportsImage: true },
-      { modelId: 'deepseek-v3.2', supportsImage: false },
-    ];
-    mockRuntimeState.rawApiConfig = {
-      config: {
-        baseURL: 'https://api.zhiyuan.local/proxy/v1',
-        apiKey: 'access-token',
-        model: 'qwen3.5-plus',
-        apiType: 'openai',
-      },
-      providerMetadata: {
-        providerName: 'zhiyuan-server',
-        codingPlanEnabled: false,
-        supportsImage: false,
-        modelName: 'Qwen3.5 Plus',
-      },
-    };
-
-    const { OpenClawConfigSync } = await import('./openclawConfigSync');
-
-    const sync = new OpenClawConfigSync({
-      engineManager: {
-        getConfigPath: () => configPath,
-        getGatewayToken: () => 'gateway-token',
-        getStateDir: () => stateDir,
-        getBaseDir: () => tmpDir,
-      } as never,
-      getCoworkConfig: () => ({
-        workingDirectory: tmpDir,
-        systemPrompt: '',
-        executionMode: 'local',
-        agentEngine: 'openclaw',
-        memoryEnabled: false,
-        memoryImplicitUpdateEnabled: false,
-        memoryLlmJudgeEnabled: false,
-        memoryGuardLevel: 'balanced',
-        memoryUserMemoriesMaxItems: 100,
-        skipMissedJobs: false,
-      }),
-      isEnterprise: () => false,
-      getTelegramInstances: () => [],
-      getDiscordOpenClawConfig: () => null,
-      getDingTalkInstances: () => [],
-      getFeishuInstances: () => [],
-      getQQInstances: () => [],
-      getWecomConfig: () => null,
-      getWecomInstances: () => [],
-      getPopoInstances: () => [],
-      getNeteaseBeeChanConfig: () => null,
-      getWeixinConfig: () => null,
-      getIMSettings: () => null,
-      getSkillsList: () => [],
-      getAgents: () => [],
-    });
-
-    const result = sync.sync('server-models-updated');
-    expect(result.ok).toBe(true);
-
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    const provider = config.models.providers['zhiyuan-server'];
-    expect(provider.baseUrl).toBe('http://127.0.0.1:56646/v1');
-    expect(provider.models).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          id: 'qwen3.5-plus',
-          input: ['text', 'image'],
-        }),
-        expect.objectContaining({
-          id: 'qwen3.6-plus',
-          input: ['text', 'image'],
-        }),
-        expect.objectContaining({
-          id: 'deepseek-v3.2',
-          input: ['text'],
-        }),
-      ]),
-    );
-    expect(provider.models).toHaveLength(3);
   });
 
   test('clears stale plugins.load.paths when current third-party extensions dir is unavailable', async () => {

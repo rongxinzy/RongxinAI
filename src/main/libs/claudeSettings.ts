@@ -93,25 +93,6 @@ export function setStoreGetter(getter: () => SqliteStore | null): void {
   storeGetter = getter;
 }
 
-// Auth token getter injected from main.ts for server model provider
-let authTokensGetter: (() => { accessToken: string; refreshToken: string } | null) | null = null;
-
-export function setAuthTokensGetter(
-  getter: () => { accessToken: string; refreshToken: string } | null,
-): void {
-  authTokensGetter = getter;
-}
-
-// Server base URL getter injected from main.ts
-let serverBaseUrlGetter: (() => string) | null = null;
-
-export function setServerBaseUrlGetter(getter: () => string): void {
-  serverBaseUrlGetter = getter;
-}
-
-// Cached server model metadata (populated when auth:getModels is called)
-// Keyed by modelId → { supportsImage }
-let serverModelMetadataCache: Map<string, { supportsImage?: boolean }> = new Map();
 let llamaCppRunningModelCache: ProviderModelConfig[] = [];
 type OllamaRuntimeModelState = {
   runtimeModelId: string;
@@ -120,44 +101,6 @@ type OllamaRuntimeModelState = {
   detectedCapabilities?: Partial<ModelCapabilities>;
 };
 let ollamaRuntimeModelCache = new Map<string, OllamaRuntimeModelState>();
-
-const serializeServerModelMetadata = (
-  models: Array<{ modelId: string; supportsImage?: boolean }>,
-): string =>
-  JSON.stringify(
-    models
-      .map(model => ({
-        modelId: model.modelId,
-        supportsImage: model.supportsImage,
-      }))
-      .sort((a, b) => a.modelId.localeCompare(b.modelId)),
-  );
-
-export function updateServerModelMetadata(
-  models: Array<{ modelId: string; supportsImage?: boolean }>,
-): boolean {
-  const previous = serializeServerModelMetadata(getAllServerModelMetadata());
-  const nextCache = new Map(models.map(m => [m.modelId, { supportsImage: m.supportsImage }]));
-  const next = serializeServerModelMetadata(
-    Array.from(nextCache.entries()).map(([modelId, meta]) => ({
-      modelId,
-      supportsImage: meta.supportsImage,
-    })),
-  );
-  serverModelMetadataCache = nextCache;
-  return previous !== next;
-}
-
-export function clearServerModelMetadata(): void {
-  serverModelMetadataCache.clear();
-}
-
-export function getAllServerModelMetadata(): Array<{ modelId: string; supportsImage?: boolean }> {
-  return Array.from(serverModelMetadataCache.entries()).map(([modelId, meta]) => ({
-    modelId,
-    supportsImage: meta.supportsImage,
-  }));
-}
 
 function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
   return JSON.stringify(
@@ -262,26 +205,6 @@ export function getLlamaCppModelOpenClawEligibility(
   return eligibility ? { ...eligibility } : undefined;
 }
 
-function buildServerFallbackModels(
-  effectiveModelId: string,
-): NonNullable<LocalProviderConfig['models']> {
-  const models = getAllServerModelMetadata().map(model => ({
-    id: model.modelId,
-    name: model.modelId,
-    supportsImage: model.supportsImage,
-  }));
-
-  if (!models.some(model => model.id === effectiveModelId)) {
-    const cachedMeta = serverModelMetadataCache.get(effectiveModelId);
-    models.unshift({
-      id: effectiveModelId,
-      name: effectiveModelId,
-      supportsImage: cachedMeta?.supportsImage,
-    });
-  }
-
-  return models;
-}
 
 function normalizeProviderModels(
   providerName: string,
@@ -454,35 +377,6 @@ function shouldUseOpenAICodexOAuth(
   return readOpenAICodexAuthFile() !== null;
 }
 
-function tryZhiyuanServerFallback(modelId?: string): MatchedProvider | null {
-  const tokens = authTokensGetter?.();
-  const serverBaseUrl = serverBaseUrlGetter?.();
-  if (!tokens?.accessToken || !serverBaseUrl) return null;
-  const effectiveModelId = modelId?.trim() || '';
-  if (!effectiveModelId) return null;
-  const baseURL = `${serverBaseUrl}/api/proxy/v1`;
-  const cachedMeta = serverModelMetadataCache.get(effectiveModelId);
-  console.log('[ClaudeSettings] zhiyuan-server fallback activated:', {
-    baseURL,
-    modelId: effectiveModelId,
-    supportsImage: cachedMeta?.supportsImage,
-  });
-  return {
-    providerName: ProviderName.ZhiyuanServer,
-    providerConfig: {
-      enabled: true,
-      apiKey: tokens.accessToken,
-      baseUrl: baseURL,
-      apiFormat: 'openai',
-      models: buildServerFallbackModels(effectiveModelId),
-    },
-    modelId: effectiveModelId,
-    apiFormat: 'openai',
-    baseURL,
-    supportsImage: cachedMeta?.supportsImage,
-  };
-}
-
 function buildLlamaCppRunningProviderConfig(
   appConfig: AppConfig,
   modelId: string,
@@ -527,8 +421,6 @@ function resolveMatchedProviderFromSelection(
     (providerConfig as any).authType === 'oauth' &&
     !(providerConfig as any).oauthAccessToken
   ) {
-    const serverFallback = tryZhiyuanServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: 'MiniMax OAuth mode selected but login not completed.' };
   }
 
@@ -542,8 +434,6 @@ function resolveMatchedProviderFromSelection(
   }
 
   if (!baseURL) {
-    const serverFallback = tryZhiyuanServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: `Provider ${providerName} is missing base URL.` };
   }
 
@@ -560,8 +450,6 @@ function resolveMatchedProviderFromSelection(
     !hasApiKey &&
     !hasOAuthCreds
   ) {
-    const serverFallback = tryZhiyuanServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
     return {
       matched: null,
       error: `Provider ${providerName} requires API key for Anthropic-compatible mode.`,
@@ -572,8 +460,6 @@ function resolveMatchedProviderFromSelection(
     model => model.id.toLowerCase() === modelId.toLowerCase(),
   );
   if (!matchedModel) {
-    const serverFallback = tryZhiyuanServerFallback(modelId);
-    if (serverFallback) return { matched: serverFallback };
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
 
@@ -623,12 +509,6 @@ function resolveMatchedProviderForModelRef(
   const modelId = normalizedRef.slice(slashIndex + 1).trim();
   if (!modelId) {
     return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
-  }
-
-  if (providerName === ProviderName.ZhiyuanServer) {
-    const serverMatch = tryZhiyuanServerFallback(modelId);
-    if (serverMatch) return { matched: serverMatch };
-    return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
 
   if (providerName === ProviderName.LlamaCpp) {
@@ -739,8 +619,6 @@ function resolveMatchedProvider(appConfig: AppConfig): {
   if (!modelId) {
     const fallback = resolveFallbackModel();
     if (!fallback) {
-      const serverFallback = tryZhiyuanServerFallback(configuredModelId);
-      if (serverFallback) return { matched: serverFallback };
       return { matched: null, error: 'No available model configured in enabled providers.' };
     }
     modelId = fallback.modelId;
@@ -748,14 +626,6 @@ function resolveMatchedProvider(appConfig: AppConfig): {
 
   let providerEntry: [string, LocalProviderConfig] | undefined;
   const preferredProviderName = appConfig.model?.defaultModelProvider?.trim();
-
-  // Handle zhiyuan-server provider: dynamically construct from auth tokens
-  if (preferredProviderName === ProviderName.ZhiyuanServer) {
-    const serverMatch = tryZhiyuanServerFallback(modelId);
-    if (serverMatch) {
-      return { matched: serverMatch };
-    }
-  }
 
   if (preferredProviderName === ProviderName.LlamaCpp) {
     const runningProviderConfig = buildLlamaCppRunningProviderConfig(appConfig, modelId);
@@ -793,8 +663,6 @@ function resolveMatchedProvider(appConfig: AppConfig): {
       modelId = fallback.modelId;
       providerEntry = [fallback.providerName, fallback.providerConfig];
     } else {
-      const serverFallback = tryZhiyuanServerFallback(modelId);
-      if (serverFallback) return { matched: serverFallback };
       return { matched: null, error: `No enabled provider found for model: ${modelId}` };
     }
   }
@@ -1042,16 +910,6 @@ export function resolveRawApiConfigForModelRef(modelRef: string): ApiConfigResol
 export function resolveAllProviderApiKeys(): Record<string, string> {
   const result: Record<string, string> = {};
 
-  // zhiyuan-server token is now managed by the token proxy
-  // (openclawTokenProxy.ts) — no longer injected as an env var.
-
-  // zhiyuan-server: uses auth accessToken
-  const tokens = authTokensGetter?.();
-  const serverBaseUrl = serverBaseUrlGetter?.();
-  if (tokens?.accessToken && serverBaseUrl) {
-    result.SERVER = tokens.accessToken;
-  }
-
   // All configured custom providers
   const sqliteStore = getStore();
   if (!sqliteStore) return result;
@@ -1116,8 +974,6 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
   for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
     if (!isProviderEnabled(providerName, providerConfig)) continue;
-    if (providerName === ProviderName.ZhiyuanServer) continue;
-
     // When minimax is in OAuth mode, use oauthAccessToken and oauthBaseUrl
     // (independent from the user's manually entered apiKey/baseUrl).
     // This must come before the apiKey emptiness check below.

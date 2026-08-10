@@ -10,7 +10,7 @@ import {
   ApiIpc,
   AppConfigIpc,
   AppIpc,
-  AuthIpc,
+  CommunityAuthIpc,
   CoworkBootstrapIpc,
   CoworkConfigIpc,
   CoworkMemoryIpc,
@@ -820,27 +820,16 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   auth: {
-    login: (loginUrl?: string) => ipcRenderer.invoke(AuthIpc.Login, { loginUrl }),
-    exchange: (code: string) => ipcRenderer.invoke(AuthIpc.Exchange, { code }),
-    getUser: () => ipcRenderer.invoke(AuthIpc.GetUser),
-    getQuota: () => ipcRenderer.invoke(AuthIpc.GetQuota),
-    logout: () => ipcRenderer.invoke(AuthIpc.Logout),
-    refreshToken: () => ipcRenderer.invoke(AuthIpc.RefreshToken),
-    getAccessToken: () => ipcRenderer.invoke(AuthIpc.GetAccessToken),
-    getModels: () => ipcRenderer.invoke(AuthIpc.GetModels),
-    getProfileSummary: () => ipcRenderer.invoke(AuthIpc.GetProfileSummary),
-    getCommunityUser: () => ipcRenderer.invoke(AuthIpc.GetCommunityUser),
-    communityLogout: () => ipcRenderer.invoke(AuthIpc.CommunityLogout),
-    onCallback: (
+    communityLogin: () => ipcRenderer.invoke(CommunityAuthIpc.Login),
+    getCommunityUser: () => ipcRenderer.invoke(CommunityAuthIpc.GetCommunityUser),
+    communityLogout: () => ipcRenderer.invoke(CommunityAuthIpc.Logout),
+    onCommunityCallback: (
       callback: (data: {
-        code?: string;
-        community?: boolean;
-        success?: boolean;
+        success: boolean;
         user?: { id: string; email: string; name: string };
         error?: string;
       }) => void,
-    ) => onPush(AuthIpc.Callback, callback),
-    onQuotaChanged: (callback: () => void) => onPushVoid(AuthIpc.QuotaChanged, callback),
+    ) => onPush(CommunityAuthIpc.Callback, callback),
   },
 
   feishu: {

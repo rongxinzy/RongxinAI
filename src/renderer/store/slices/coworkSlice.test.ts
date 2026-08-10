@@ -93,11 +93,11 @@ test('updateCurrentSessionModelOverride only patches the active session', () => 
     coworkReducer(undefined, addSession(session)),
     updateCurrentSessionModelOverride({
       sessionId: 'session-1',
-      modelOverride: 'zhiyuan-server/qwen3.6-plus',
+      modelOverride: 'deepseek/qwen3.6-plus',
     }),
   );
 
-  expect(activeState.currentSession?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
+  expect(activeState.currentSession?.modelOverride).toBe('deepseek/qwen3.6-plus');
   expect(activeState.currentSession?.updatedAt).toBe(1);
 
   const ignoredState = coworkReducer(
@@ -108,7 +108,7 @@ test('updateCurrentSessionModelOverride only patches the active session', () => 
     }),
   );
 
-  expect(ignoredState.currentSession?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
+  expect(ignoredState.currentSession?.modelOverride).toBe('deepseek/qwen3.6-plus');
 });
 
 test('changing a session permission mode preserves pending approvals from every session', () => {

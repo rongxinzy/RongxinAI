@@ -3,7 +3,6 @@ import { configureStore } from '@reduxjs/toolkit';
 import agentReducer from './slices/agentSlice';
 import artifactReducer from './slices/artifactSlice';
 import activityReducer from './slices/activitySlice';
-import authReducer from './slices/authSlice';
 import coworkReducer from './slices/coworkSlice';
 import imReducer from './slices/imSlice';
 import mcpReducer from './slices/mcpSlice';
@@ -24,7 +23,6 @@ export const store = configureStore({
     quickAction: quickActionReducer,
     scheduledTask: scheduledTaskReducer,
     agent: agentReducer,
-    auth: authReducer,
     artifact: artifactReducer,
     activity: activityReducer,
     workspace: workspaceReducer,

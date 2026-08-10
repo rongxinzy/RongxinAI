@@ -136,14 +136,14 @@ test('patchSession uses the persisted IM channel session key after runtime cache
     persistedSessionKey: 'agent:main:feishu:dm:ou_123',
   });
 
-  await adapter.patchSession('session-1', { model: 'zhiyuan-server/qwen3.6-plus' });
+  await adapter.patchSession('session-1', { model: 'deepseek/qwen3.6-plus' });
 
   expect(requests).toEqual([
     {
       method: 'sessions.patch',
       params: {
         key: 'agent:main:feishu:dm:ou_123',
-        model: 'zhiyuan-server/qwen3.6-plus',
+        model: 'deepseek/qwen3.6-plus',
       },
     },
   ]);
@@ -156,7 +156,7 @@ test('patchSession rejects IM channel sessions when the real OpenClaw key is mis
   });
 
   await expect(
-    adapter.patchSession('session-1', { model: 'zhiyuan-server/qwen3.6-plus' }),
+    adapter.patchSession('session-1', { model: 'deepseek/qwen3.6-plus' }),
   ).rejects.toThrow('Cannot patch IM channel session because the OpenClaw session key is missing.');
 
   expect(requests).toHaveLength(0);
@@ -246,7 +246,7 @@ function createRunTurnAdapter(
         ? {
             id: 'main',
             name: 'Main',
-            model: options.agentModel ?? 'zhiyuan-server/qwen3.5-plus',
+            model: options.agentModel ?? 'deepseek/qwen3.5-plus',
           }
         : null,
     updateAgent: () => {},
@@ -329,7 +329,7 @@ function createRunTurnAdapter(
 }
 
 test('continueSession patches a session override before chat.send even when the model cache matches', async () => {
-  const model = 'zhiyuan-server/qwen3.6-plus';
+  const model = 'deepseek/qwen3.6-plus';
   const { adapter, requests } = createRunTurnAdapter({
     sessionModelOverride: model,
     cachedModel: model,
@@ -374,7 +374,7 @@ test('continueSession does not mark text from an errored turn as final', async (
 });
 
 test('continueSession waits for an in-flight model patch before chat.send', async () => {
-  const model = 'zhiyuan-server/qwen3.6-plus';
+  const model = 'deepseek/qwen3.6-plus';
   const { adapter, requests, firstModelPatchStarted, releaseFirstModelPatch } =
     createRunTurnAdapter({
       sessionModelOverride: model,

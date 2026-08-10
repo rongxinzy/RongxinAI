@@ -871,36 +871,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     sendMessageShortcut: '发送消息',
     shortcutConflict: '快捷键 "{0}" 已被 "{1}" 使用',
     close: '关闭',
-    loginNotAvailable: '登录功能暂未开放',
     collapse: '收起',
     expand: '展开',
     featureInDevelopment: '正在开发中',
-
-    // 认证相关
-    authDailyQuota: '今日额度',
-    authCreditsQuota: '积分额度',
-    authTopUp: '充值',
-    authSubscribe: '订阅',
-    authCurrentPlan: '当前套餐',
-    authLogout: '退出登录',
-    authLoginRequired: '请先登录后再开始对话。',
-    authLoginRequiredBtn: '登录',
-    authQuotaExhausted:
-      '今日免费额度已用完。您可以登录知远智能体 Portal 购买套餐或积分包继续使用，或在设置中配置自己的 API Key。',
-    authTopUpLink: '充值',
-    authSettingsLink: '设置',
-    authLoginToChat: '登录后即可开始聊天',
-    authFreeLabel: 'Free',
-    authCreditsRemaining: '剩余额度',
-    authCreditsUnit: '积分',
-    authExpiresAt: '有效期至',
-    authLearnMore: '了解更多',
-    authValueAddedServices: '增值服务',
-    authZeroCredits: '0积分',
-    planFree: '免费',
-    planStandard: '标准',
-    planAdvanced: '进阶',
-    planPro: '专业',
 
     // 错误信息
     failedToLoadSettings: '加载设置失败',
@@ -1063,7 +1036,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // 模型选择
     selectModel: '选择模型',
     searchModels: '搜索模型...',
-    serverModels: '可选模型',
     modelSelectorNone: '无',
     modelSelectorNoMatches: '无匹配模型',
 
@@ -1099,8 +1071,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkModelSettingsTitle: '模型设置',
     coworkModelSettingsHint: '知远智能体 使用模型设置中的当前模型与提供商配置。',
     coworkModelSettingsAction: '前往模型设置',
-    modelGroupServer: '套餐模型',
-    modelGroupUser: '自定义模型',
     modelSelectorNoModels: '请先在设置中配置模型',
     coworkApiConfigTitle: 'API 配置',
     coworkApiConfigHint:
@@ -3728,36 +3698,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     sendMessageShortcut: 'Send Message',
     shortcutConflict: 'Shortcut "{0}" is already used by "{1}"',
     close: 'Close',
-    loginNotAvailable: 'Login is not available yet',
     collapse: 'Collapse',
     expand: 'Expand',
     featureInDevelopment: 'In development',
-
-    // Auth
-    authDailyQuota: 'Daily Quota',
-    authCreditsQuota: 'Credits',
-    authTopUp: 'Top Up',
-    authSubscribe: 'Subscribe',
-    authCurrentPlan: 'Current Plan',
-    authLogout: 'Log Out',
-    authLoginRequired: 'Please log in to start a conversation.',
-    authLoginRequiredBtn: 'Log In',
-    authQuotaExhausted:
-      'Daily free quota exhausted. Visit ZhiYuan Agent Portal to purchase a plan or credits, or configure your own API Key in Settings.',
-    authTopUpLink: 'Top Up',
-    authSettingsLink: 'Settings',
-    authLoginToChat: 'Log in to start chatting',
-    authFreeLabel: 'Free',
-    authCreditsRemaining: 'Credits Remaining',
-    authCreditsUnit: 'credits',
-    authExpiresAt: 'Expires',
-    authLearnMore: 'Learn More',
-    authValueAddedServices: 'Premium Services',
-    authZeroCredits: '0 credits',
-    planFree: 'Free',
-    planStandard: 'Standard',
-    planAdvanced: 'Advanced',
-    planPro: 'Pro',
 
     // Error Messages
     failedToLoadSettings: 'Failed to load settings',
@@ -3924,7 +3867,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Model Selection
     selectModel: 'Select model',
     searchModels: 'Search models...',
-    serverModels: 'Available models',
     modelSelectorNone: 'None',
     modelSelectorNoMatches: 'No matching models',
 
@@ -3961,8 +3903,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkModelSettingsHint:
       'ZhiYuan Agent uses the current model and provider configuration from Model Settings.',
     coworkModelSettingsAction: 'Go to Model Settings',
-    modelGroupServer: 'Plan Models',
-    modelGroupUser: 'Custom Models',
     modelSelectorNoModels: 'Please configure models in settings first',
     coworkApiConfigTitle: 'API Configuration',
     coworkApiConfigHint:

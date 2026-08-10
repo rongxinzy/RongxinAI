@@ -372,7 +372,6 @@ class ApiService {
     if (
       normalizedHint &&
       (ProviderRegistry.get(normalizedHint) !== undefined ||
-        normalizedHint === ProviderName.ZhiyuanServer ||
         normalizedHint === ProviderName.LlamaCpp ||
         normalizedHint === ProviderName.Custom ||
         normalizedHint.startsWith('custom_'))

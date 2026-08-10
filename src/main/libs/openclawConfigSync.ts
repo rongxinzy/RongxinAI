@@ -24,7 +24,6 @@ import type {
 import { OpenClawSessionKeepAlive } from '../openclawSessionPolicy/constants';
 import { buildOpenClawSessionConfig } from '../openclawSessionPolicy/store';
 import {
-  getAllServerModelMetadata,
   resolveAllEnabledProviderConfigs,
   resolveAllProviderApiKeys,
   resolveRawApiConfig,
@@ -63,7 +62,6 @@ import {
   hasBundledOpenClawExtension,
   resolveOpenClawExtensionPluginId,
 } from './openclawLocalExtensions';
-import { getOpenClawTokenProxyPort } from './openclawTokenProxy';
 import { isSystemProxyEnabled } from './systemProxy';
 
 export type McpBridgeConfig = {
@@ -568,19 +566,6 @@ type ProviderDescriptor = {
 };
 
 const PROVIDER_REGISTRY: Record<string, ProviderDescriptor> = {
-  [ProviderName.ZhiyuanServer]: {
-    providerId: OpenClawProviderId.ZhiyuanServer,
-    resolveApi: () => OpenClawApiConst.OpenAICompletions as OpenClawProviderApi,
-    normalizeBaseUrl: url => {
-      const proxyPort = getOpenClawTokenProxyPort();
-      return proxyPort ? `http://127.0.0.1:${proxyPort}/v1` : stripChatCompletionsSuffix(url);
-    },
-    resolveApiKey: () => {
-      const proxyPort = getOpenClawTokenProxyPort();
-      return proxyPort ? '${ZHIYUAN_PROXY_TOKEN}' : `\${${providerApiKeyEnvVar('server')}}`;
-    },
-  },
-
   [ProviderName.Moonshot]: {
     providerId: OpenClawProviderId.Moonshot,
     resolveApi: ({ apiType, baseURL }) => mapApiTypeToOpenClawApi(apiType, undefined, baseURL),
@@ -836,21 +821,6 @@ const buildProviderModelCatalog = (
       },
     ]),
   );
-
-const upsertProviderModel = (
-  providerConfig: OpenClawProviderSelection['providerConfig'],
-  model: OpenClawProviderSelection['providerConfig']['models'][number],
-): void => {
-  const existingIndex = providerConfig.models.findIndex(existing => existing.id === model.id);
-  if (existingIndex >= 0) {
-    providerConfig.models[existingIndex] = {
-      ...providerConfig.models[existingIndex],
-      ...model,
-    };
-    return;
-  }
-  providerConfig.models.push(model);
-};
 
 const readPreinstalledPluginIds = (): string[] => {
   try {
@@ -1134,45 +1104,6 @@ export class OpenClawConfigSync {
         }
       }
 
-      const proxyPort = getOpenClawTokenProxyPort();
-      if (proxyPort) {
-        const serverModels = getAllServerModelMetadata();
-        const providerId = OpenClawProviderId.ZhiyuanServer;
-
-        if (serverModels.length > 0 || !allProvidersMap[providerId]) {
-          const firstServerModelId = serverModels[0]?.modelId || modelId;
-          const firstServerSel = buildProviderSelection({
-            apiKey: 'proxy-managed',
-            baseURL: `http://127.0.0.1:${proxyPort}/v1`,
-            modelId: firstServerModelId,
-            apiType: 'openai',
-            providerName: ProviderName.ZhiyuanServer,
-            supportsImage: serverModels[0]?.supportsImage,
-          });
-          const zhiyuanProviderConfig = allProvidersMap[providerId] ?? {
-            ...firstServerSel.providerConfig,
-            models: [] as typeof firstServerSel.providerConfig.models,
-          };
-          allProvidersMap[providerId] = zhiyuanProviderConfig;
-
-          if (serverModels.length === 0) {
-            upsertProviderModel(zhiyuanProviderConfig, firstServerSel.providerConfig.models[0]);
-          } else {
-            for (const sm of serverModels) {
-              const serverSel = buildProviderSelection({
-                apiKey: 'proxy-managed',
-                baseURL: `http://127.0.0.1:${proxyPort}/v1`,
-                modelId: sm.modelId,
-                apiType: 'openai',
-                providerName: ProviderName.ZhiyuanServer,
-                supportsImage: sm.supportsImage,
-                modelName: sm.modelId,
-              });
-              upsertProviderModel(zhiyuanProviderConfig, serverSel.providerConfig.models[0]);
-            }
-          }
-        }
-      }
     }
 
     const sandboxMode = mapExecutionModeToSandboxMode(

@@ -8,7 +8,6 @@ const models: Model[] = [
   { id: 'gpt-4o', name: 'GPT-4o', providerKey: 'openai' },
   { id: 'claude-sonnet-4', name: 'Claude Sonnet 4', providerKey: 'anthropic' },
   { id: 'deepseek-v3.2', name: 'DeepSeek', providerKey: 'anthropic' },
-  { id: 'deepseek-v3.2', name: 'DeepSeek Server', providerKey: 'openai', isServerModel: true },
 ];
 
 const visionModel: Model = {
@@ -91,15 +90,15 @@ describe('resolveAgentModelSelection', () => {
     expect(result.hasInvalidExplicitModel).toBe(false);
   });
 
-  test('silently falls back when agent model is an ambiguous bare id', () => {
+  test('resolves a bare agent model when one configured provider matches', () => {
     const result = resolveAgentModelSelection({
       agentModel: 'deepseek-v3.2',
       availableModels: models,
       fallbackModel: models[0],
     });
 
-    expect(result.selectedModel?.id).toBe('gpt-4o');
-    expect(result.usesFallback).toBe(true);
+    expect(result.selectedModel?.id).toBe('deepseek-v3.2');
+    expect(result.usesFallback).toBe(false);
     expect(result.hasInvalidExplicitModel).toBe(false);
   });
 

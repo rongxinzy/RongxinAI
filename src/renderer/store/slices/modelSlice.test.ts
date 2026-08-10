@@ -3,24 +3,15 @@ import { describe, expect, test } from 'vitest';
 import type { Model } from './modelSlice';
 import modelReducer, {
   clearAgentSelectedModel,
-  clearServerModels,
   selectAgentSelectedModel,
   setAvailableModels,
   setDefaultSelectedModel,
   setSelectedModel,
-  setServerModels,
 } from './modelSlice';
 
 const modelA: Model = { id: 'gpt-4o', name: 'GPT-4o', providerKey: 'openai' };
 const modelB: Model = { id: 'glm-5.1', name: 'GLM 5.1', providerKey: 'zhipu' };
 const modelC: Model = { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', providerKey: 'anthropic' };
-const serverModel: Model = {
-  id: 'server-model',
-  name: 'Server Model',
-  providerKey: 'zhiyuan-server',
-  isServerModel: true,
-};
-
 function makeState(overrides?: Partial<ReturnType<typeof modelReducer>>) {
   const base = modelReducer(undefined, { type: 'init' });
   return { ...base, ...overrides };
@@ -93,33 +84,6 @@ describe('setAvailableModels', () => {
     state = modelReducer(state, setAvailableModels([updatedModelA, modelB]));
 
     expect(state.defaultSelectedModel.supportsImage).toBe(true);
-  });
-});
-
-describe('setServerModels / clearServerModels', () => {
-  test('setServerModels syncs per-agent models', () => {
-    let state = modelReducer(
-      undefined,
-      setSelectedModel({ agentId: 'agent-1', model: serverModel }),
-    );
-    const updatedServerModel: Model = { ...serverModel, supportsImage: true };
-    state = modelReducer(state, setServerModels([updatedServerModel]));
-
-    expect(state.selectedModelByAgent['agent-1'].supportsImage).toBe(true);
-  });
-
-  test('clearServerModels removes server model entries from per-agent map', () => {
-    let state = modelReducer(
-      undefined,
-      setSelectedModel({ agentId: 'agent-1', model: serverModel }),
-    );
-    // Ensure there's at least one non-server model available
-    state = modelReducer(state, setAvailableModels([modelA]));
-    state = modelReducer(state, setServerModels([serverModel]));
-    state = modelReducer(state, clearServerModels());
-
-    // serverModel no longer available → per-agent entry removed
-    expect(state.selectedModelByAgent['agent-1']).toBeUndefined();
   });
 });
 

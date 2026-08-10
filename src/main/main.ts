@@ -51,7 +51,7 @@ import {
 } from '../shared/cowork/sessionExperts';
 import {
   ApiIpc,
-  AuthIpc,
+  CommunityAuthIpc,
   CoworkPermissionIpc,
   CoworkQueueIpc,
   CoworkSessionIpc,
@@ -144,8 +144,6 @@ import {
 } from './libs/agentEngine';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
-  clearServerModelMetadata,
-  getAllServerModelMetadata,
   getCurrentApiConfig,
   getLlamaCppModelContextWindow,
   getLlamaCppModelOpenClawEligibility,
@@ -154,10 +152,7 @@ import {
   resolveAllProviderApiKeys,
   resolveCurrentApiConfig,
   resolveRawApiConfig,
-  setAuthTokensGetter,
-  setServerBaseUrlGetter,
   setStoreGetter,
-  updateServerModelMetadata,
 } from './libs/claudeSettings';
 import {
   clearCopilotTokenState,
@@ -173,7 +168,7 @@ import {
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
 import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
-import { getServerApiBaseUrl, refreshEndpointsTestMode } from './libs/endpoints';
+import { refreshEndpointsTestMode } from './libs/endpoints';
 import {
   mergeEnterpriseOpenclawConfig,
   resolveEnterpriseConfigPath,
@@ -224,7 +219,6 @@ import {
   updateMemoryEntry,
   writeBootstrapFile,
 } from './libs/openclawMemoryFile';
-import { startOpenClawTokenProxy, stopOpenClawTokenProxy } from './libs/openclawTokenProxy';
 import { migrateMainAgentWorkspace } from './libs/openclawWorkspaceMigration';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
@@ -1275,31 +1269,14 @@ const bootstrapOpenClawEngine = async (
   return promise;
 };
 
-// Module-level handle so ensureOpenClawRunningForCowork can await any in-flight
-// proactive token refresh before syncing config to the gateway.
-let pendingTokenRefresh: Promise<string | null> | null = null;
-
 const ensureOpenClawRunningForCowork = async () => {
   const manager = getOpenClawEngineManager();
   const status = manager.getStatus();
   if (status.phase === 'running') {
-    // Token proxy handles dynamic token injection — no need to restart
-    // the gateway for token changes. Just wait for any in-flight refresh.
-    if (pendingTokenRefresh) {
-      console.log('[OpenClaw] ensureRunning: awaiting pending token refresh before proceeding');
-      await pendingTokenRefresh.catch(() => {});
-    }
     return manager.getStatus();
   }
   if (status.phase === 'starting') {
     return status;
-  }
-
-  // Wait for any in-flight token refresh so that the gateway starts with
-  // a fresh token rather than the stale one that triggered the refresh.
-  if (pendingTokenRefresh) {
-    console.log('[OpenClaw] ensureRunning: awaiting pending token refresh before gateway start');
-    await pendingTokenRefresh.catch(() => {});
   }
 
   // Ensure MCP bridge is started and config is synced before launching the gateway,
@@ -1352,36 +1329,6 @@ const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
   const explicitWorkingDirectory = options.cwd?.trim();
   if (explicitWorkingDirectory) return explicitWorkingDirectory;
   return getCoworkStore().getConfig().workingDirectory.trim();
-};
-
-const isZhiyuanServerModelRef = (modelRef: string): boolean => {
-  const normalized = modelRef.trim();
-  if (!normalized) return false;
-
-  const parsed = parsePrimaryModelRef(normalized);
-  if (parsed) {
-    return parsed.providerId === ProviderName.ZhiyuanServer;
-  }
-
-  return getAllServerModelMetadata().some(model => model.modelId === normalized);
-};
-
-const shouldRefreshServerQuotaForSession = (sessionId: string): boolean => {
-  const session = getCoworkStore().getSession(sessionId);
-  const sessionModelRef = session?.modelOverride?.trim();
-  if (sessionModelRef) {
-    return isZhiyuanServerModelRef(sessionModelRef);
-  }
-
-  const agentModelRef = session?.agentId
-    ? getAgentManager().getAgent(session.agentId)?.model?.trim()
-    : '';
-  if (agentModelRef) {
-    return isZhiyuanServerModelRef(agentModelRef);
-  }
-
-  const apiConfig = resolveCurrentApiConfig();
-  return apiConfig.providerMetadata?.providerName === ProviderName.ZhiyuanServer;
 };
 
 const getOpenClawConfigSync = (): OpenClawConfigSync => {
@@ -1885,17 +1832,6 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
       if (win.isDestroyed()) return;
       win.webContents.send(CoworkStreamIpc.Complete, { sessionId, claudeSessionId });
     });
-    try {
-      if (shouldRefreshServerQuotaForSession(sessionId)) {
-        const windows = BrowserWindow.getAllWindows();
-        windows.forEach(win => {
-          if (win.isDestroyed()) return;
-          win.webContents.send(AuthIpc.QuotaChanged);
-        });
-      }
-    } catch {
-      // ignore
-    }
   });
 
   runtime.on('error', (sessionId: string, error: import('../common/coworkError').CoworkError) => {
@@ -2904,12 +2840,7 @@ if (!gotTheLock) {
   const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
 
-  // Buffer for legacy deep link auth code received before renderer is ready
-  let pendingAuthCode: string | null = null;
-
-  /**
-   * Parse a zhiyuan:// deep link and send (or buffer) the auth code.
-   */
+  /** Parse a zhiyuan:// deep link for the pending community login. */
   const handleDeepLink = (url: string) => {
     try {
       const parsed = new URL(url);
@@ -2920,13 +2851,7 @@ if (!gotTheLock) {
           void completeCommunityLogin(code, state);
           return;
         }
-        if (code) {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            mainWindow.webContents.send('auth:callback', { code });
-          } else {
-            pendingAuthCode = code;
-          }
-        }
+        console.warn('[CommunityAuth] Ignoring unexpected auth callback');
       }
     } catch (e) {
       console.error('[Main] Failed to parse deep link:', e);
@@ -2938,21 +2863,6 @@ if (!gotTheLock) {
     fn(`[Renderer][${tag}] ${message}`);
   });
 
-  // Helper: returns server base URL or sends error if not configured
-  const requireServerUrl = (): string | null => {
-    const url = getServerApiBaseUrl();
-    if (!url) {
-      console.warn('[Auth] Server API base URL not configured. Set ZHIYUAN_SERVER_API_BASE_URL.');
-    }
-    return url || null;
-  };
-
-  // Allow renderer to retrieve a buffered auth code on init
-  ipcMain.handle('auth:getPendingCallback', () => {
-    const code = pendingAuthCode;
-    pendingAuthCode = null;
-    return code;
-  });
 
   // macOS: handle open-url event for deep links
   app.on('open-url', (event, url) => {
@@ -3181,7 +3091,7 @@ if (!gotTheLock) {
   ipcMain.handle('app:getVersion', () => app.getVersion());
   ipcMain.handle('app:getSystemLocale', () => app.getLocale());
 
-  // ── Auth IPC handlers ──
+  // ── Community auth IPC handlers ──
 
   type CommunityAuthSession = {
     accessToken: string;
@@ -3217,12 +3127,12 @@ if (!gotTheLock) {
 
   const clearCommunitySession = () => getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
 
-  ipcMain.handle('auth:getCommunityUser', () => {
+  ipcMain.handle(CommunityAuthIpc.GetCommunityUser, () => {
     const session = getCommunitySession();
     return session ? { success: true, user: session.user } : { success: false };
   });
 
-  ipcMain.handle('auth:communityLogout', () => {
+  ipcMain.handle(CommunityAuthIpc.Logout, () => {
     clearCommunitySession();
     return { success: true };
   });
@@ -3255,8 +3165,7 @@ if (!gotTheLock) {
         refreshToken: payload.refresh_token,
         user: { id: payload.user.id, email: payload.user.email },
       });
-      mainWindow?.webContents.send(AuthIpc.Callback, {
-        community: true,
+      mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: true,
         user: { id: payload.user.id, email: payload.user.email, name: payload.user.email },
       });
@@ -3265,115 +3174,14 @@ if (!gotTheLock) {
       mainWindow?.focus();
     } catch (error) {
       console.warn('[CommunityAuth] login callback failed:', error instanceof Error ? error.message : error);
-      mainWindow?.webContents.send(AuthIpc.Callback, {
-        community: true,
+      mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: false,
         error: '登录未完成，请重试。',
       });
     }
   }
 
-  /**
-   * Helper: Persist auth tokens into the kv store.
-   */
-  const saveAuthTokens = (accessToken: string, refreshToken: string) => {
-    getStore().set('auth_tokens', { accessToken, refreshToken });
-  };
-
-  const getAuthTokens = (): { accessToken: string; refreshToken: string } | null => {
-    return getStore().get<{ accessToken: string; refreshToken: string }>('auth_tokens') || null;
-  };
-
-  const clearAuthTokens = () => {
-    getStore().delete('auth_tokens');
-  };
-
-  /**
-   * Helper: Fetch with Bearer token, auto-refresh on 401 and retry once.
-   */
-  const fetchWithAuth = async (url: string, options?: RequestInit): Promise<Response> => {
-    const tokens = getAuthTokens();
-    if (!tokens) throw new Error('No auth tokens');
-
-    const doFetch = (accessToken: string) =>
-      net.fetch(url, {
-        ...options,
-        headers: {
-          ...(options?.headers as Record<string, string>),
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-    let resp = await doFetch(tokens.accessToken);
-
-    if (resp.status === 401 && tokens.refreshToken) {
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return resp;
-      const refreshResp = await net.fetch(`${serverBaseUrl}/api/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-      });
-      if (refreshResp.ok) {
-        const refreshBody = (await refreshResp.json()) as {
-          code: number;
-          data: { accessToken: string; refreshToken?: string };
-        };
-        if (refreshBody.code === 0 && refreshBody.data) {
-          saveAuthTokens(
-            refreshBody.data.accessToken,
-            refreshBody.data.refreshToken || tokens.refreshToken,
-          );
-          resp = await doFetch(refreshBody.data.accessToken);
-        }
-      }
-    }
-
-    return resp;
-  };
-
-  /**
-   * Normalize quota data from various server response formats into a unified shape.
-   */
-  const normalizeQuota = (raw: Record<string, unknown>) => {
-    let creditsLimit = 0;
-    let creditsUsed = 0;
-    let planName = t('authPlanFree');
-    let subscriptionStatus = 'free';
-
-    if (typeof raw.freeCreditsTotal === 'number') {
-      // Free user format from /api/user/quota
-      creditsLimit = raw.freeCreditsTotal as number;
-      creditsUsed = (raw.freeCreditsUsed as number) || 0;
-      planName = (raw.planName as string) || t('authPlanFree');
-      subscriptionStatus = (raw.subscriptionStatus as string) || 'free';
-    } else if (typeof raw.monthlyCreditsLimit === 'number') {
-      // Paid user format from /api/user/quota
-      creditsLimit = raw.monthlyCreditsLimit as number;
-      creditsUsed = (raw.monthlyCreditsUsed as number) || 0;
-      planName = (raw.planName as string) || t('authPlanStandard');
-      subscriptionStatus = (raw.subscriptionStatus as string) || 'active';
-    } else if (typeof raw.dailyCreditsLimit === 'number') {
-      // Legacy exchange format
-      creditsLimit = raw.dailyCreditsLimit as number;
-      creditsUsed = (raw.dailyCreditsUsed as number) || 0;
-      planName = (raw.planName as string) || t('authPlanFree');
-      subscriptionStatus = (raw.subscriptionStatus as string) || 'free';
-    } else if (typeof raw.creditsLimit === 'number') {
-      // Already normalized
-      return raw;
-    }
-
-    return {
-      planName,
-      subscriptionStatus,
-      creditsLimit,
-      creditsUsed,
-      creditsRemaining: Math.max(0, creditsLimit - creditsUsed),
-    };
-  };
-
-  ipcMain.handle('auth:login', async () => {
+  ipcMain.handle(CommunityAuthIpc.Login, async () => {
     try {
       if (!canPersistCommunitySession()) {
         return { success: false, error: '系统安全存储不可用，无法安全地保存登录状态。' };
@@ -3404,212 +3212,6 @@ if (!gotTheLock) {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to open login',
       };
-    }
-  });
-
-  ipcMain.handle('auth:exchange', async (_event, { code }: { code: string }) => {
-    try {
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl)
-        return { success: false, error: 'Server not configured. Set ZHIYUAN_SERVER_API_BASE_URL.' };
-      const resp = await net.fetch(`${serverBaseUrl}/api/auth/exchange`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ authCode: code }),
-      });
-      if (!resp.ok) {
-        return { success: false, error: `Exchange failed: ${resp.status}` };
-      }
-      const body = (await resp.json()) as {
-        code: number;
-        message?: string;
-        data: {
-          accessToken: string;
-          refreshToken: string;
-          user: Record<string, unknown>;
-          quota: Record<string, unknown>;
-        };
-      };
-      if (body.code !== 0 || !body.data) {
-        return { success: false, error: body.message || 'Exchange failed' };
-      }
-      saveAuthTokens(body.data.accessToken, body.data.refreshToken);
-      console.log('[Auth] exchange user data:', JSON.stringify(body.data.user));
-      return { success: true, user: body.data.user, quota: normalizeQuota(body.data.quota) };
-    } catch (error) {
-      console.error('[Auth] exchange failed:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Exchange failed' };
-    }
-  });
-
-  ipcMain.handle('auth:getUser', async () => {
-    try {
-      const tokens = getAuthTokens();
-      if (!tokens) return { success: false };
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return { success: false };
-      // Fetch user profile
-      const profileResp = await fetchWithAuth(`${serverBaseUrl}/api/user/profile`);
-      if (!profileResp.ok) return { success: false };
-      const profileBody = (await profileResp.json()) as {
-        code: number;
-        data: Record<string, unknown>;
-      };
-      if (profileBody.code !== 0 || !profileBody.data) return { success: false };
-      // Fetch quota separately
-      const quotaResp = await fetchWithAuth(`${serverBaseUrl}/api/user/quota`);
-      let quota = null;
-      if (quotaResp.ok) {
-        const quotaBody = (await quotaResp.json()) as {
-          code: number;
-          data: Record<string, unknown>;
-        };
-        if (quotaBody.code === 0 && quotaBody.data) {
-          quota = normalizeQuota(quotaBody.data);
-        }
-      }
-      console.log('[Auth] getUser profile data:', JSON.stringify(profileBody.data));
-      return { success: true, user: profileBody.data, quota };
-    } catch {
-      return { success: false };
-    }
-  });
-
-  ipcMain.handle('auth:getQuota', async () => {
-    try {
-      const tokens = getAuthTokens();
-      if (!tokens) return { success: false };
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return { success: false };
-      const resp = await fetchWithAuth(`${serverBaseUrl}/api/user/quota`);
-      if (!resp.ok) return { success: false };
-      const body = (await resp.json()) as { code: number; data: Record<string, unknown> };
-      if (body.code !== 0 || !body.data) return { success: false };
-      return { success: true, quota: normalizeQuota(body.data) };
-    } catch {
-      return { success: false };
-    }
-  });
-
-  ipcMain.handle('auth:getProfileSummary', async () => {
-    try {
-      const tokens = getAuthTokens();
-      if (!tokens) return { success: false };
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return { success: false };
-      const resp = await fetchWithAuth(`${serverBaseUrl}/api/user/profile-summary`);
-      if (!resp.ok) return { success: false };
-      const body = (await resp.json()) as { code: number; data: Record<string, unknown> };
-      if (body.code !== 0 || !body.data) return { success: false };
-      return { success: true, data: body.data };
-    } catch {
-      return { success: false };
-    }
-  });
-
-  ipcMain.handle('auth:logout', async () => {
-    try {
-      const tokens = getAuthTokens();
-      if (tokens) {
-        const serverBaseUrl = requireServerUrl();
-        if (serverBaseUrl) {
-          await net
-            .fetch(`${serverBaseUrl}/api/auth/logout`, {
-              method: 'POST',
-              headers: { Authorization: `Bearer ${tokens.accessToken}` },
-            })
-            .catch(() => {
-              /* best-effort */
-            });
-        }
-      }
-      clearAuthTokens();
-      clearCommunitySession();
-      clearServerModelMetadata();
-      return { success: true };
-    } catch {
-      clearAuthTokens();
-      clearCommunitySession();
-      clearServerModelMetadata();
-      return { success: true };
-    }
-  });
-
-  ipcMain.handle('auth:refreshToken', async () => {
-    try {
-      const tokens = getAuthTokens();
-      if (!tokens?.refreshToken) return { success: false };
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return { success: false };
-      const resp = await net.fetch(`${serverBaseUrl}/api/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-      });
-      if (!resp.ok) return { success: false };
-      const body = (await resp.json()) as {
-        code: number;
-        data: { accessToken: string; refreshToken?: string };
-      };
-      if (body.code !== 0 || !body.data) return { success: false };
-      saveAuthTokens(body.data.accessToken, body.data.refreshToken || tokens.refreshToken);
-      return { success: true, accessToken: body.data.accessToken };
-    } catch {
-      return { success: false };
-    }
-  });
-
-  ipcMain.handle('auth:getAccessToken', async () => {
-    const tokens = getAuthTokens();
-    return tokens?.accessToken || null;
-  });
-
-  ipcMain.handle('auth:getModels', async () => {
-    try {
-      const tokens = getAuthTokens();
-      if (!tokens) {
-        console.log('[Auth:getModels] No auth tokens available');
-        return { success: false };
-      }
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return { success: false };
-      const url = `${serverBaseUrl}/api/models/available`;
-      console.log('[Auth:getModels] Fetching:', url);
-      const resp = await fetchWithAuth(url);
-      console.log('[Auth:getModels] Response status:', resp.status);
-      if (!resp.ok) {
-        console.log('[Auth:getModels] Response not ok:', resp.status, resp.statusText);
-        return { success: false };
-      }
-      const data = (await resp.json()) as {
-        code: number;
-        data: Array<{
-          modelId: string;
-          modelName: string;
-          provider: string;
-          apiFormat: string;
-          supportsImage?: boolean;
-        }>;
-      };
-      console.log('[Auth:getModels] Response data:', JSON.stringify(data).slice(0, 500));
-      if (data.code !== 0) return { success: false };
-      // Cache server model metadata for use in OpenClaw config sync (supportsImage, etc.)
-      const serverModelsChanged = updateServerModelMetadata(data.data);
-      // Re-sync so the gateway picks up the correct supportsImage values for server models.
-      // This IPC can run after normal chat completion when the renderer refreshes quota/model
-      // state, so server model updates must not force a hard gateway restart.
-      if (serverModelsChanged) {
-        syncOpenClawConfig({
-          reason: 'server-models-updated',
-          restartGatewayIfRunning: false,
-        }).catch(() => {});
-      } else {
-        console.debug('[Auth:getModels] server model metadata unchanged, skipping config sync');
-      }
-      return { success: true, models: data.data };
-    } catch (e) {
-      console.error('[Auth:getModels] Error:', e);
-      return { success: false };
     }
   });
 
@@ -7828,8 +7430,6 @@ if (!gotTheLock) {
       console.error('Failed to stop OpenAI compatibility proxy:', error);
     });
 
-    stopOpenClawTokenProxy();
-
     // Stop skill services.
     const skillServices = getSkillServiceManager();
     await skillServices.stopAll();
@@ -8043,78 +7643,6 @@ if (!gotTheLock) {
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
       userDataPath: app.getPath('userData'),
     });
-    // Inject auth getters for zhiyuan-server provider routing
-    // The getter proactively triggers a background token refresh when the
-    // accessToken is within 5 minutes of expiry, so that the SDK always
-    // gets a fresh token without blocking.
-    //
-    // refreshOnce() is the single entry-point for all token refresh paths
-    // (proactive, proxy 401/403 retry). It deduplicates concurrent calls via
-    // pendingTokenRefresh so that rolling refresh tokens are never consumed twice.
-    const refreshOnce = async (reason: string): Promise<string | null> => {
-      if (pendingTokenRefresh) {
-        return pendingTokenRefresh;
-      }
-      let resolvedToken: string | null = null;
-      pendingTokenRefresh = (async () => {
-        try {
-          const tokens = getAuthTokens();
-          if (!tokens?.refreshToken) return null;
-          const serverBaseUrl = requireServerUrl();
-          if (!serverBaseUrl) return null;
-          const resp = await net.fetch(`${serverBaseUrl}/api/auth/refresh`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-          });
-          if (resp.ok) {
-            const body = (await resp.json()) as {
-              code: number;
-              data: { accessToken: string; refreshToken?: string };
-            };
-            if (body.code === 0 && body.data) {
-              saveAuthTokens(body.data.accessToken, body.data.refreshToken || tokens.refreshToken);
-              console.log(`[Auth] token refresh succeeded (reason: ${reason})`);
-              resolvedToken = body.data.accessToken;
-              // Token proxy handles fresh tokens dynamically — no need
-              // to restart the gateway on token refresh.
-              syncOpenClawConfig({
-                reason: `token-refresh:${reason}`,
-                restartGatewayIfRunning: false,
-              }).catch(err => {
-                console.warn('[Auth] post-refresh OpenClaw config sync failed:', err);
-              });
-            }
-          }
-        } catch (err) {
-          console.warn(`[Auth] token refresh failed (reason: ${reason}):`, err);
-        } finally {
-          pendingTokenRefresh = null;
-        }
-        return resolvedToken;
-      })();
-      return pendingTokenRefresh;
-    };
-
-    setAuthTokensGetter(() => {
-      const tokens = getAuthTokens();
-      if (!tokens) return null;
-      // Check if accessToken is close to expiry and trigger background refresh
-      try {
-        const payload = JSON.parse(
-          Buffer.from(tokens.accessToken.split('.')[1], 'base64').toString(),
-        );
-        const expiresAt = payload.exp * 1000;
-        if (expiresAt - Date.now() < 5 * 60 * 1000) {
-          void refreshOnce('proactive'); // fire-and-forget
-        }
-      } catch {
-        /* unable to parse JWT, return token as-is */
-      }
-      return tokens;
-    });
-    setServerBaseUrlGetter(() => getServerApiBaseUrl());
-
     // Initialize Copilot token manager and restore token state if available
     initCopilotTokenManager(getStore);
     const storedGithubToken = getStore().get('github_copilot_github_token') as string | undefined;
@@ -8136,34 +7664,6 @@ if (!gotTheLock) {
         });
     }
 
-    registerProxyTokenRefresher('zhiyuan-server', async () => {
-      const tokens = getAuthTokens();
-      if (!tokens?.refreshToken) return null;
-      const serverBaseUrl = requireServerUrl();
-      if (!serverBaseUrl) return null;
-      try {
-        const resp = await net.fetch(`${serverBaseUrl}/api/auth/refresh`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refreshToken: tokens.refreshToken }),
-        });
-        if (resp.ok) {
-          const body = (await resp.json()) as {
-            code: number;
-            data: { accessToken: string; refreshToken?: string };
-          };
-          if (body.code === 0 && body.data) {
-            saveAuthTokens(body.data.accessToken, body.data.refreshToken || tokens.refreshToken);
-            console.log('[Auth] proxy token refresh succeeded');
-            return body.data.accessToken;
-          }
-        }
-      } catch (err) {
-        console.warn('[Auth] proxy token refresh failed:', err);
-      }
-      return null;
-    });
-
     registerProxyTokenRefresher('github-copilot', async () => {
       try {
         const { refreshCopilotTokenNow } = await import('./libs/copilotTokenManager.js');
@@ -8174,21 +7674,6 @@ if (!gotTheLock) {
         return null;
       }
     });
-
-    // Start the lightweight token proxy before OpenClaw config sync so that
-    // zhiyuan-server provider can use the proxy URL in its config.
-    profiler.mark('openClawTokenProxy');
-    try {
-      await startOpenClawTokenProxy({
-        getAuthTokens,
-        refreshToken: refreshOnce,
-        getServerBaseUrl: getServerApiBaseUrl,
-      });
-      console.log('[Main] OpenClaw token proxy started');
-    } catch (err) {
-      console.warn('[Main] OpenClaw token proxy failed to start (non-fatal):', err);
-    }
-    profiler.measure('openClawTokenProxy');
 
     // Enterprise config sync — must run before openclawConfigSync
     profiler.mark('enterpriseConfigSync');

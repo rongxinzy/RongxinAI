@@ -20,7 +20,7 @@ describe('buildAgentEntry', () => {
         description: '',
         systemPrompt: '',
         identity: '',
-        model: 'zhiyuan-server/deepseek-v3.2',
+        model: 'deepseek/deepseek-v3.2',
         workingDirectory: '',
         icon: '',
         skillIds: [],
@@ -37,7 +37,7 @@ describe('buildAgentEntry', () => {
     expect(result).toMatchObject({
       id: 'main',
       default: true,
-      model: { primary: 'zhiyuan-server/deepseek-v3.2' },
+      model: { primary: 'deepseek/deepseek-v3.2' },
     });
   });
 
@@ -256,10 +256,10 @@ describe('buildManagedAgentEntries', () => {
 
 describe('parsePrimaryModelRef', () => {
   test('parses provider-qualified primary model refs', () => {
-    expect(parsePrimaryModelRef('zhiyuan-server/deepseek-v3.2')).toEqual({
-      providerId: 'zhiyuan-server',
+    expect(parsePrimaryModelRef('deepseek/deepseek-v3.2')).toEqual({
+      providerId: 'deepseek',
       modelId: 'deepseek-v3.2',
-      primaryModel: 'zhiyuan-server/deepseek-v3.2',
+      primaryModel: 'deepseek/deepseek-v3.2',
     });
   });
 
@@ -270,7 +270,7 @@ describe('parsePrimaryModelRef', () => {
 
 describe('resolveManagedSessionModelTarget', () => {
   const availableProviders = {
-    'zhiyuan-server': { models: [{ id: 'qwen3.5-plus' }, { id: 'deepseek-v3.2' }] },
+    'deepseek': { models: [{ id: 'qwen3.5-plus' }, { id: 'deepseek-v3.2' }] },
     minimax: { models: [{ id: 'MiniMax-M2.7' }] },
   };
 
@@ -278,13 +278,13 @@ describe('resolveManagedSessionModelTarget', () => {
     expect(
       resolveManagedSessionModelTarget({
         agentModel: '',
-        fallbackPrimaryModel: 'zhiyuan-server/qwen3.5-plus',
+        fallbackPrimaryModel: 'deepseek/qwen3.5-plus',
         availableProviders,
       }),
     ).toEqual({
-      providerId: 'zhiyuan-server',
+      providerId: 'deepseek',
       modelId: 'qwen3.5-plus',
-      primaryModel: 'zhiyuan-server/qwen3.5-plus',
+      primaryModel: 'deepseek/qwen3.5-plus',
     });
   });
 
@@ -292,7 +292,7 @@ describe('resolveManagedSessionModelTarget', () => {
     expect(
       resolveManagedSessionModelTarget({
         agentModel: 'minimax/MiniMax-M2.7',
-        fallbackPrimaryModel: 'zhiyuan-server/qwen3.5-plus',
+        fallbackPrimaryModel: 'deepseek/qwen3.5-plus',
         availableProviders,
       }),
     ).toEqual({
@@ -306,13 +306,13 @@ describe('resolveManagedSessionModelTarget', () => {
     expect(
       resolveManagedSessionModelTarget({
         agentModel: 'deepseek-v3.2',
-        fallbackPrimaryModel: 'zhiyuan-server/qwen3.5-plus',
+        fallbackPrimaryModel: 'deepseek/qwen3.5-plus',
         availableProviders,
       }),
     ).toEqual({
-      providerId: 'zhiyuan-server',
+      providerId: 'deepseek',
       modelId: 'deepseek-v3.2',
-      primaryModel: 'zhiyuan-server/deepseek-v3.2',
+      primaryModel: 'deepseek/deepseek-v3.2',
     });
   });
 
@@ -320,14 +320,14 @@ describe('resolveManagedSessionModelTarget', () => {
     expect(
       resolveManagedSessionModelTarget({
         agentModel: 'unknown-model',
-        fallbackPrimaryModel: 'zhiyuan-server/qwen3.5-plus',
+        fallbackPrimaryModel: 'deepseek/qwen3.5-plus',
         availableProviders,
-        currentProviderId: 'zhiyuan-server',
+        currentProviderId: 'deepseek',
       }),
     ).toEqual({
-      providerId: 'zhiyuan-server',
+      providerId: 'deepseek',
       modelId: 'unknown-model',
-      primaryModel: 'zhiyuan-server/unknown-model',
+      primaryModel: 'deepseek/unknown-model',
     });
   });
 });
@@ -338,13 +338,13 @@ describe('resolveQualifiedAgentModelRef', () => {
       resolveQualifiedAgentModelRef({
         agentModel: 'deepseek-v3.2',
         availableProviders: {
-          'zhiyuan-server': { models: [{ id: 'deepseek-v3.2' }] },
+          'deepseek': { models: [{ id: 'deepseek-v3.2' }] },
           minimax: { models: [{ id: 'MiniMax-M2.7' }] },
         },
       }),
     ).toEqual({
       status: 'qualified',
-      primaryModel: 'zhiyuan-server/deepseek-v3.2',
+      primaryModel: 'deepseek/deepseek-v3.2',
     });
   });
 
@@ -354,13 +354,13 @@ describe('resolveQualifiedAgentModelRef', () => {
         agentModel: 'deepseek-v3.2',
         availableProviders: {
           anthropic: { models: [{ id: 'deepseek-v3.2' }] },
-          'zhiyuan-server': { models: [{ id: 'deepseek-v3.2' }] },
+          'deepseek': { models: [{ id: 'deepseek-v3.2' }] },
         },
       }),
     ).toEqual({
       status: 'ambiguous',
       modelId: 'deepseek-v3.2',
-      providerIds: ['anthropic', 'zhiyuan-server'],
+      providerIds: ['anthropic', 'deepseek'],
     });
   });
 
@@ -383,7 +383,7 @@ describe('resolveQualifiedAgentModelRef', () => {
       resolveQualifiedAgentModelRef({
         agentModel: 'llamacpp/qwen-local',
         availableProviders: {
-          'zhiyuan-server': { models: [{ id: 'deepseek-v3.2' }] },
+          'deepseek': { models: [{ id: 'deepseek-v3.2' }] },
         },
       }),
     ).toEqual({
