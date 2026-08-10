@@ -59,20 +59,20 @@
     "version": "v1.20.0-zhiyuan.1",
     "repo": "z189yis/engram-cjk",
     "runtimeAssets": {
-      "mac-x64": "engram_v1.20.0-zhiyuan.1_darwin_amd64.tar.gz",
-      "mac-arm64": "engram_v1.20.0-zhiyuan.1_darwin_arm64.tar.gz",
-      "win-x64": "engram_v1.20.0-zhiyuan.1_windows_amd64.zip",
-      "win-arm64": "engram_v1.20.0-zhiyuan.1_windows_arm64.zip",
-      "linux-x64": "engram_v1.20.0-zhiyuan.1_linux_amd64.tar.gz",
-      "linux-arm64": "engram_v1.20.0-zhiyuan.1_linux_arm64.tar.gz"
+      "mac-x64": "engram_1.20.0-zhiyuan.1_darwin_amd64.tar.gz",
+      "mac-arm64": "engram_1.20.0-zhiyuan.1_darwin_arm64.tar.gz",
+      "win-x64": "engram_1.20.0-zhiyuan.1_windows_amd64.zip",
+      "win-arm64": "engram_1.20.0-zhiyuan.1_windows_arm64.zip",
+      "linux-x64": "engram_1.20.0-zhiyuan.1_linux_amd64.tar.gz",
+      "linux-arm64": "engram_1.20.0-zhiyuan.1_linux_arm64.tar.gz"
     },
     "runtimeChecksums": {
-      "mac-x64": "PENDING",
-      "mac-arm64": "PENDING",
-      "win-x64": "PENDING",
-      "win-arm64": "PENDING",
-      "linux-x64": "PENDING",
-      "linux-arm64": "PENDING"
+      "mac-x64": "11317da3d453ba5d9af4dcae1ec29eafd840e14c0565a5aa8d43d2851e5c2bcb",
+      "mac-arm64": "3f78721060de1b924689e844188985ec780338f8f87b089c386783a76075a8b1",
+      "win-x64": "a40dbd1e09828bac6169227797f0e20306d9e0aae5f752ff520937694bded7d0",
+      "win-arm64": "b927fe5d26c117903b5b3d90bc71e0c02ef9b020e3b8afd9011b5969b1c12093",
+      "linux-x64": "c33dbc137a0c6a9e53eac6e39392990a06e5147cda5f04084cb02d68002ffd0b",
+      "linux-arm64": "83af00cc5bc3cc8a1dacdba70cb7cdad675247166be881f1341d2127933bd8a9"
     }
   },
   "main": "dist-electron/main.js",

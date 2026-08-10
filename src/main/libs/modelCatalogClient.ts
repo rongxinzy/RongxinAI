@@ -93,8 +93,7 @@ export class ModelCatalogClient {
     if (params.task && params.task !== 'all') url.searchParams.set('task', params.task);
     if (params.size && params.size !== 'all') url.searchParams.set('size', params.size);
     if (params.tags?.length) url.searchParams.set('tags', params.tags.join(','));
-    // Device fit is computed from live local hardware and must never be sent to
-    // the cloud catalogue as if it were a server-side model property.
+    if (params.device) url.searchParams.set('device', params.device);
     if (params.limit) url.searchParams.set('limit', String(params.limit));
     if (params.cursor) url.searchParams.set('cursor', params.cursor);
     if (params.sortby) url.searchParams.set('sortby', params.sortby);

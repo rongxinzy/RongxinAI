@@ -384,6 +384,7 @@ function searchCacheKey(params: MarketplaceSearchParams): string {
     params.limit ?? '',
     params.pageNumber ?? '',
     params.cursor ?? '',
+    params.device ?? '',
     params.sortby ?? '',
     params.featuredOnly ? 'featured' : '',
     params.fit ?? '',
