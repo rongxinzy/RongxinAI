@@ -16,7 +16,7 @@ const EXECUTION_REQUEST_PATTERN =
 const MULTI_STEP_PATTERN =
   /\b(?:multi[- ]step|end[- ]to[- ]end|first.+then|and then)\b|(?:多步骤|完整流程|端到端|先.+再|然后)/i;
 
-export interface ProductionLoopEntryInput {
+export interface ProductionWorkflowEntryInput {
   sessionMode?: CoworkSessionModeValue;
   prompt: string;
   goalMode?: boolean;
@@ -26,25 +26,25 @@ export interface ProductionLoopEntryInput {
   resumeRun?: boolean;
 }
 
-export const shouldEnableProductionLoop = (input: ProductionLoopEntryInput): boolean => {
-  if (input.sessionMode !== CoworkSessionMode.Work) return false;
-  if (input.goalMode || input.skillIds?.length || input.resumeRun) return true;
+export const shouldEnableProductionWorkflow = (input: ProductionWorkflowEntryInput): boolean => {
+  if (input.sessionMode === CoworkSessionMode.Chat) return false;
+  if (input.goalMode || input.resumeRun) return true;
 
   const prompt = input.prompt.replace(/\s+/g, ' ').trim();
   if (!prompt) return false;
   const intentPrompt = prompt.replace(/^(?:hi|hello|hey|你好|您好|嗨)[,，!！\s]+/i, '');
+  if (SIMPLE_CONVERSATION_PATTERN.test(prompt)) return false;
   if (EXECUTION_REQUEST_PATTERN.test(intentPrompt) || MULTI_STEP_PATTERN.test(intentPrompt)) {
     return true;
   }
-  if (SIMPLE_CONVERSATION_PATTERN.test(prompt)) return false;
   if (
     prompt.length <= MAX_LIGHTWEIGHT_PROMPT_LENGTH &&
     (INFORMATION_REQUEST_PATTERN.test(intentPrompt) || LIGHTWEIGHT_TASK_PATTERN.test(intentPrompt))
   ) {
     return false;
   }
-  if (input.expertIds?.length || input.imageAttachmentCount) return true;
+  if (input.skillIds?.length || input.expertIds?.length || input.imageAttachmentCount) return true;
 
-  // Ambiguous Work requests retain the production gate.
+  // Ambiguous Work requests retain the workflow gate.
   return true;
 };

@@ -300,6 +300,7 @@ describe('PiRuntimeAdapter', () => {
 
         expect(mockSession.prompt).toHaveBeenLastCalledWith(
           expect.stringContaining('workflow continuation'),
+          { streamingBehavior: 'followUp' },
         );
       } finally {
         fs.rmSync(workspaceRoot, { recursive: true, force: true });
@@ -312,11 +313,15 @@ describe('PiRuntimeAdapter', () => {
       adapter.on('permissionRequest', onPermissionRequest);
       adapter.on('complete', onComplete);
 
-      await adapter.startSession('generic-work-skill', 'Analyze this codebase', {
-        skillIds: ['code-review'],
-        sessionMode: 'work',
-        workspaceRoot: createTemporaryWorkspace(),
-      });
+      await adapter.startSession(
+        'generic-work-skill',
+        'Analyze this codebase, write a review report, and verify the findings',
+        {
+          skillIds: ['code-review'],
+          sessionMode: 'work',
+          workspaceRoot: createTemporaryWorkspace(),
+        },
+      );
 
       expect(mockSession.prompt).toHaveBeenCalledWith(
         expect.stringContaining('Loop started. Iteration 1. Goal:'),
@@ -353,6 +358,7 @@ describe('PiRuntimeAdapter', () => {
       await Promise.resolve();
       expect(mockSession.prompt).toHaveBeenLastCalledWith(
         expect.stringContaining('has not received explicit user acceptance'),
+        { streamingBehavior: 'followUp' },
       );
       expect(onComplete).not.toHaveBeenCalled();
 
@@ -378,14 +384,14 @@ describe('PiRuntimeAdapter', () => {
       expect(onComplete).toHaveBeenCalledOnce();
     });
 
-    it('registers the production loop only for nontrivial Work sessions', async () => {
+    it('registers the production workflow only for nontrivial Work turns', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
       adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
 
       try {
-        await adapter.startSession('production-work', 'Build', {
+        await adapter.startSession('production-work', 'Create and validate a release report', {
           sessionMode: 'work',
           workspaceRoot: createTemporaryWorkspace(),
         });
@@ -393,7 +399,12 @@ describe('PiRuntimeAdapter', () => {
           sessionMode: 'work',
           workspaceRoot: createTemporaryWorkspace(),
         });
-        await adapter.startSession('production-chat', 'Chat', {
+        await adapter.startSession('production-light', '你好', {
+          sessionMode: 'work',
+          skillIds: ['presentation-studio'],
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        await adapter.startSession('production-chat', 'Create and validate a release report', {
           sessionMode: 'chat',
           workspaceRoot: createTemporaryWorkspace(),
         });
@@ -404,22 +415,34 @@ describe('PiRuntimeAdapter', () => {
         const simpleOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
-        const chatOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
+        const lightOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        const chatOptions = mockCreateAgentSession.mock.calls[3]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
         expect(workOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
         expect(simpleOptions.customTools?.map(tool => tool.name) || []).not.toContain(
           'production_loop',
         );
+        expect(lightOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
+        expect(lightOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+          'workflow_state',
+        );
         expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
           'production_loop',
         );
+        expect(
+          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
+        ).toEqual({ count: 1 });
       } finally {
         db.close();
       }
     });
 
-    it('rebuilds the production loop topology when follow-up complexity changes', async () => {
+    it('rebuilds the production workflow topology when follow-up complexity changes', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -1008,19 +1031,56 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('uses the durable acceptance loop when an arbitrary skill is added to a Work session', async () => {
+    it('keeps a lightweight turn outside the durable loop when a skill is added', async () => {
       const workspaceRoot = createTemporaryWorkspace();
       await adapter.startSession('dynamic-skill', 'First', { sessionMode: 'work', workspaceRoot });
 
-      await adapter.continueSession('dynamic-skill', 'Use code review', {
+      await adapter.continueSession('dynamic-skill', 'Read package.json', {
         skillIds: ['code-review'],
         sessionMode: 'work',
         workspaceRoot,
       });
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
       expect(mockSession.abort).toHaveBeenCalledOnce();
-      expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('Persistent Work execution'),
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Read package.json');
+      const recreatedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(recreatedOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+        'work_acceptance',
+      );
+    });
+
+    it('removes completed production controllers before a greeting in the same session', async () => {
+      const workspaceRoot = createTemporaryWorkspace();
+      await adapter.startSession('production-to-greeting', 'Create a 10-page PPT', {
+        skillIds: ['presentation-studio'],
+        sessionMode: 'work',
+        workspaceRoot,
+      });
+      const activeSessions = (
+        adapter as unknown as {
+          activeSessions: Map<string, { agentLoop: { stop(): void } }>;
+        }
+      ).activeSessions;
+      activeSessions.get('production-to-greeting')?.agentLoop.stop();
+
+      await adapter.continueSession('production-to-greeting', '你好', {
+        skillIds: ['presentation-studio'],
+        sessionMode: 'work',
+        workspaceRoot,
+      });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      const greetingOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+        'production_loop',
+      );
+      expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+        'workflow_state',
       );
     });
 
@@ -1979,6 +2039,7 @@ describe('PiRuntimeAdapter', () => {
       failedAttempt('429 Too Many Requests: overloaded');
       listener!({ type: 'auto_retry_start' });
       successfulTurn('Recovered answer');
+      listener!({ type: 'auto_retry_end', success: true, attempt: 1 });
       listener!({ type: 'agent_settled' });
 
       expect(errors).toHaveLength(0);
@@ -1997,7 +2058,16 @@ describe('PiRuntimeAdapter', () => {
       for (let attempt = 0; attempt < 3; attempt++) {
         listener!({ type: 'turn_start' });
         failedAttempt('429 Too Many Requests: overloaded');
-        listener!({ type: attempt < 2 ? 'auto_retry_start' : 'auto_retry_end' });
+        if (attempt < 2) {
+          listener!({ type: 'auto_retry_start', attempt: attempt + 1 });
+        } else {
+          listener!({
+            type: 'auto_retry_end',
+            success: false,
+            attempt: attempt + 1,
+            finalError: '429 Too Many Requests: overloaded',
+          });
+        }
       }
       listener!({ type: 'agent_settled' });
 
@@ -2042,7 +2112,12 @@ describe('PiRuntimeAdapter', () => {
 
       listener!({ type: 'turn_start' });
       failedAttempt('429 Too Many Requests: overloaded');
-      listener!({ type: 'auto_retry_end' });
+      listener!({
+        type: 'auto_retry_end',
+        success: false,
+        attempt: 3,
+        finalError: '429 Too Many Requests: overloaded',
+      });
 
       // No continuation prompt beyond the initial startSession prompt.
       expect(mockSession.prompt).toHaveBeenCalledTimes(1);
