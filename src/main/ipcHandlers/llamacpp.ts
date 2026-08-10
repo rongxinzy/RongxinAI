@@ -360,10 +360,31 @@ export function registerLlamaCppIpcHandlers(
   });
 
   const activeInstalls = new Map<string, AbortController>();
+  type RuntimeInstallResult = Awaited<ReturnType<LlamaCppManager['installRuntime']>>;
+  let runtimeInstallController: AbortController | null = null;
+  let activeRuntimeInstall: Promise<RuntimeInstallResult> | null = null;
+  const runRuntimeInstall = (
+    install: (signal: AbortSignal) => Promise<RuntimeInstallResult>,
+  ): Promise<RuntimeInstallResult> => {
+    if (activeRuntimeInstall) return activeRuntimeInstall;
+    const controller = new AbortController();
+    runtimeInstallController = controller;
+    const installPromise = install(controller.signal).finally(() => {
+      if (activeRuntimeInstall === installPromise) activeRuntimeInstall = null;
+      if (runtimeInstallController === controller) runtimeInstallController = null;
+    });
+    activeRuntimeInstall = installPromise;
+    return installPromise;
+  };
 
   ipcMain.handle(LlamaCppIpcChannel.Status, async () => manager.detect());
-  ipcMain.handle(LlamaCppIpcChannel.Install, async () => {
-    return await manager.installRuntime();
+  ipcMain.handle(LlamaCppIpcChannel.Install, async () =>
+    runRuntimeInstall(signal => manager.installRuntime({ signal })),
+  );
+  ipcMain.handle(LlamaCppIpcChannel.CancelRuntimeInstall, async () => {
+    const cancelled = Boolean(runtimeInstallController && !runtimeInstallController.signal.aborted);
+    runtimeInstallController?.abort();
+    return { success: true as const, cancelled };
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
@@ -371,6 +392,11 @@ export function registerLlamaCppIpcHandlers(
     return await manager.listRuntimeDevices(ref ?? undefined);
   });
   ipcMain.handle(LlamaCppIpcChannel.ListBackends, async () => manager.listBackends());
+  ipcMain.handle(LlamaCppIpcChannel.GetBackendDownloadSize, async (_event, input: unknown) => {
+    const ref = sanitizeLlamaCppBackendRef(input);
+    if (!ref) return { success: false, error: 'Invalid llama.cpp backend selection.' };
+    return await manager.getBackendDownloadSize(ref);
+  });
   ipcMain.handle(LlamaCppIpcChannel.GetBackendSelection, async () => manager.getBackendSelection());
   ipcMain.handle(LlamaCppIpcChannel.SetBackendSelection, async (_event, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
@@ -381,12 +407,12 @@ export function registerLlamaCppIpcHandlers(
         error: 'Invalid llama.cpp backend selection.',
       };
     }
-    return await manager.setBackendSelection(ref);
+    return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
   });
   ipcMain.handle(LlamaCppIpcChannel.InstallBackend, async (_event, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);
-    if (!ref) return await manager.installRuntime();
-    return await manager.setBackendSelection(ref);
+    if (!ref) return await runRuntimeInstall(signal => manager.installRuntime({ signal }));
+    return await runRuntimeInstall(signal => manager.setBackendSelection(ref, { signal }));
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallBackend, async (_event, input: unknown) => {
     const ref = sanitizeLlamaCppBackendRef(input);

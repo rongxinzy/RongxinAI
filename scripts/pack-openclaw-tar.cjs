@@ -391,4 +391,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { packSingleSource, packMultipleSources };
+module.exports = { packSingleSource, packMultipleSources, shouldExclude };

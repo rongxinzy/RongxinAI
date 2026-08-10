@@ -226,6 +226,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigRestartHint: '当前服务正在运行，保存后需要重启本地推理才会应用。',
     localInferenceServiceConfigStartHint: '保存后下次启动本地推理时应用。',
     localInferenceInstall: '安装本地推理',
+    localInferenceRuntimeCardTitle: '本地推理运行环境',
+    localInferenceRuntimeCardDescription:
+      '可选组件，不影响知远的其他功能。选择后在应用内下载、校验和安装。',
+    localInferenceRuntimeDownloadSize: '预计下载 {size}',
+    localInferenceRuntimeDownloadSizeUnknown: '大小待服务器确认',
+    localInferenceRuntimeRetry: '重试',
     localInferenceImportRuntime: '从本地导入...',
     localInferenceImportRuntimeTooltip:
       '选择本地推理 backend 主包压缩包（zip 或 tar.gz），或选择已解压的完整目录，导入到知远智能体 管理的 backend 目录。',
@@ -2990,6 +2996,12 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigStartHint:
       'Saved values apply the next time local inference starts.',
     localInferenceInstall: 'Install local inference',
+    localInferenceRuntimeCardTitle: 'Local inference runtime',
+    localInferenceRuntimeCardDescription:
+      'Optional and independent from the rest of the app. Download, verification, and installation run here.',
+    localInferenceRuntimeDownloadSize: 'Estimated download {size}',
+    localInferenceRuntimeDownloadSizeUnknown: 'Size pending server metadata',
+    localInferenceRuntimeRetry: 'Retry',
     localInferenceImportRuntime: 'Import from local...',
     localInferenceImportRuntimeTooltip:
       'Select a local inference backend archive (zip or tar.gz), or a fully extracted backend directory, to import into the backend directory managed by ZhiYuan Agent.',

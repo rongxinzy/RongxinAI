@@ -64,6 +64,12 @@ $oldPath = $env:PATH
 try {
   New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
   Invoke-Checked $systemTar @('-xf', $TarPath, '-C', $smokeRoot) 'Windows resource tar extraction'
+  if (Test-Path -LiteralPath (Join-Path $smokeRoot 'llamacpp-backends')) {
+    throw 'The offline core resource pack must not bundle llama.cpp backends'
+  }
+  if (Test-Path -LiteralPath (Join-Path $smokeRoot 'llamacpp-nsis-helper')) {
+    throw 'The offline core resource pack must not bundle the retired NSIS llama.cpp helper'
+  }
 
   $resourcesRoot = $smokeRoot
   $bash = Join-Path $resourcesRoot 'mingit\usr\bin\bash.exe'

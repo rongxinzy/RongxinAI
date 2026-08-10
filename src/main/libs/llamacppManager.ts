@@ -35,6 +35,7 @@ import {
   listLlamaCppBackends,
   readCurrentBackendRef,
   recommendLlamaCppBackend,
+  resolveLlamaCppBackendDownloadSize,
   syncCurrentBackend,
   uninstallLlamaCppBackend,
 } from './llamacppBackendManager';
@@ -340,7 +341,9 @@ export class LlamaCppManager extends EventEmitter {
     return this.status;
   }
 
-  async installRuntime(): Promise<LlamaCppRuntimeInstallResult> {
+  async installRuntime(
+    options: { signal?: AbortSignal } = {},
+  ): Promise<LlamaCppRuntimeInstallResult> {
     this.emit('install-progress', {
       phase: 'starting',
       modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -417,11 +420,12 @@ export class LlamaCppManager extends EventEmitter {
       hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
       manifest,
       switchCurrent: false,
+      signal: options.signal,
       onProgress: progress => {
         this.emit('install-progress', {
+          ...progress,
           modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
           modelName: ref.versionBackend,
-          ...progress,
         } satisfies LlamaCppInstallProgress);
       },
     });
@@ -491,10 +495,10 @@ export class LlamaCppManager extends EventEmitter {
         error: result.error,
       });
       this.emit('install-progress', {
-        phase: 'failed',
+        phase: result.cancelled ? 'cancelled' : 'failed',
         modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
         modelName: ref.versionBackend,
-        error: 'error' in result ? result.error : undefined,
+        error: result.cancelled ? undefined : 'error' in result ? result.error : undefined,
       } satisfies LlamaCppInstallProgress);
     }
     return result;
@@ -520,11 +524,27 @@ export class LlamaCppManager extends EventEmitter {
     }
   }
 
+  async getBackendDownloadSize(
+    ref: LlamaCppBackendRef,
+  ): Promise<{ success: boolean; sizeBytes?: number; error?: string }> {
+    try {
+      const sizeBytes = await resolveLlamaCppBackendDownloadSize({ ref });
+      return sizeBytes === undefined
+        ? { success: false, error: 'Backend download size is unavailable.' }
+        : { success: true, sizeBytes };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
   async getBackendSelection(): Promise<LlamaCppBackendRef | undefined> {
     return readCurrentBackendRef(getUserLlamaCppRuntimeRoot());
   }
 
-  async setBackendSelection(ref: LlamaCppBackendRef): Promise<LlamaCppRuntimeInstallResult> {
+  async setBackendSelection(
+    ref: LlamaCppBackendRef,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<LlamaCppRuntimeInstallResult> {
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     const installedExecutablePath = getLlamaCppBackendExecutablePath(
       runtimeRoot,
@@ -561,7 +581,7 @@ export class LlamaCppManager extends EventEmitter {
         },
       };
     }
-    const result = fs.existsSync(installedExecutablePath)
+    const result: LlamaCppRuntimeInstallResult = fs.existsSync(installedExecutablePath)
       ? (() => {
           return {
             success: true,
@@ -586,11 +606,12 @@ export class LlamaCppManager extends EventEmitter {
             arch: process.arch,
             hasNvidiaGpu,
             switchCurrent: false,
+            signal: options.signal,
             onProgress: progress => {
               this.emit('install-progress', {
+                ...progress,
                 modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
                 modelName: ref.versionBackend,
-                ...progress,
               } satisfies LlamaCppInstallProgress);
             },
           });
@@ -642,10 +663,10 @@ export class LlamaCppManager extends EventEmitter {
       } satisfies LlamaCppInstallProgress);
     } else {
       this.emit('install-progress', {
-        phase: 'failed',
+        phase: result.cancelled ? 'cancelled' : 'failed',
         modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
         modelName: ref.versionBackend,
-        error: 'error' in result ? result.error : undefined,
+        error: result.cancelled ? undefined : 'error' in result ? result.error : undefined,
       } satisfies LlamaCppInstallProgress);
     }
     return result;

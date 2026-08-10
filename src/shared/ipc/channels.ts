@@ -245,6 +245,7 @@ export const AppIpc = {
   SetPreventSleep: 'app:setPreventSleep',
   GetVersion: 'app:getVersion',
   GetSystemLocale: 'app:getSystemLocale',
+  ConsumePendingLocalInferenceInstall: 'app:consumePendingLocalInferenceInstall',
   Relaunch: 'app:relaunch',
 } as const;
 export type AppIpc = (typeof AppIpc)[keyof typeof AppIpc];

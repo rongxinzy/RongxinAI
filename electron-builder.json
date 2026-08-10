@@ -63,11 +63,6 @@
       "to": "modelscope.tokens.local.json"
     },
     {
-      "from": "MCPs",
-      "to": "MCPs",
-      "filter": ["**/*"]
-    },
-    {
       "from": "vendor/engram-runtime/current",
       "to": "memory",
       "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
@@ -100,6 +95,11 @@
       "NSAppleEventsUsageDescription": "知远需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
     },
     "extraResources": [
+      {
+        "from": "MCPs",
+        "to": "MCPs",
+        "filter": ["**/*"]
+      },
       {
         "from": "SKILLs",
         "to": "SKILLs",
@@ -194,10 +194,6 @@
     "requestedExecutionLevel": "asInvoker",
     "extraResources": [
       {
-        "from": "build-tar/win-resources.tar",
-        "to": "win-resources.tar"
-      },
-      {
         "from": "resources/vc_redist.x64.exe",
         "to": "vc_redist.x64.exe"
       }
@@ -215,6 +211,11 @@
     "category": "Utility",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "extraResources": [
+      {
+        "from": "MCPs",
+        "to": "MCPs",
+        "filter": ["**/*"]
+      },
       {
         "from": "resources/uv-linux",
         "to": "uv-linux",

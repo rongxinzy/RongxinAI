@@ -1,7 +1,6 @@
 import crypto from 'crypto';
 import extractZip from 'extract-zip';
 import fs from 'fs';
-import { DownloaderHelper } from 'node-downloader-helper';
 import os from 'os';
 import path from 'path';
 import * as tar from 'tar';
@@ -25,12 +24,18 @@ import { readBundledLlamaCppBackendManifest } from './llamacppBackendResources';
 import { listLlamaCppRuntimeDevices } from './llamacppManager';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
 import { copyDirectoryContents, resolveLlamaCppExecutableName } from './llamacppRuntimeInstaller';
+import {
+  DownloadCancelledError,
+  downloadFileWithResume,
+  throwIfDownloadCancelled,
+} from './resumableDownload';
 
 const DEFAULT_RUNTIME_VERSION = 'b9518';
 const DEFAULT_RELEASE_BASE_URL = 'https://rongxinai.krli.org/llamacpp';
 const GITHUB_RELEASE_BASE_URL = 'https://github.com/ggml-org/llama.cpp/releases/download';
 const BUILD_INFO_FILE = 'runtime-build-info.json';
 let hasLoggedManifestFallback = false;
+const backendDownloadSizeCache = new Map<string, number>();
 
 type LlamaCppBackendRootManifest = {
   schemaVersion: 1;
@@ -336,6 +341,7 @@ export async function listLlamaCppBackends(input: {
       recommended: recommended?.versionBackend === ref.versionBackend,
       current: selection?.versionBackend === ref.versionBackend,
       source: 'manifest' as const,
+      downloadSizeBytes: getBackendDownloadSizeBytes(entry),
     };
   });
   const remoteKeys = new Set(remoteInfos.map(info => info.versionBackend));
@@ -360,6 +366,79 @@ export async function listLlamaCppBackends(input: {
     selection,
     recommended,
   };
+}
+
+function getBackendDownloadSizeBytes(entry: LlamaCppBackendManifestEntry): number | undefined {
+  const archiveSize = (archive?: {
+    size?: number;
+    parts?: LlamaCppBackendArchivePart[];
+  }): number | undefined => {
+    if (!archive) return undefined;
+    if (
+      archive.parts?.length &&
+      archive.parts.every(part => typeof part.size === 'number' && Number.isFinite(part.size))
+    ) {
+      return archive.parts.reduce((sum, part) => sum + (part.size ?? 0), 0);
+    }
+    return Number.isFinite(archive.size) ? archive.size : undefined;
+  };
+  const sizes = [archiveSize(entry.archive), ...(entry.companions ?? []).map(archiveSize)];
+  if (sizes.some(size => size === undefined)) return undefined;
+  return (sizes as number[]).reduce((sum, size) => sum + size, 0);
+}
+
+export async function resolveLlamaCppBackendDownloadSize(input: {
+  ref: LlamaCppBackendRef;
+  manifest?: LlamaCppBackendManifest;
+}): Promise<number | undefined> {
+  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
+  const entry = findManifestEntry(manifest, input.ref);
+  if (!entry) return undefined;
+  const declaredSize = getBackendDownloadSizeBytes(entry);
+  if (declaredSize !== undefined) return declaredSize;
+
+  const archives = [entry.archive, ...(entry.companions ?? [])].filter(
+    (archive): archive is NonNullable<typeof archive> => Boolean(archive),
+  );
+  const archiveSizes = await Promise.all(
+    archives.map(async archive => {
+      if (archive.parts?.length) {
+        const partSizes = await Promise.all(
+          archive.parts.map(part =>
+            resolveRemoteContentLength(resolvePartUrl(part, manifest), part.size),
+          ),
+        );
+        return partSizes.every((size): size is number => size !== undefined)
+          ? partSizes.reduce((sum, size) => sum + size, 0)
+          : undefined;
+      }
+      return resolveRemoteContentLength(resolveArchiveUrl(archive, manifest), archive.size);
+    }),
+  );
+  return archiveSizes.every((size): size is number => size !== undefined)
+    ? archiveSizes.reduce((sum, size) => sum + size, 0)
+    : undefined;
+}
+
+async function resolveRemoteContentLength(
+  url: string,
+  declaredSize?: number,
+): Promise<number | undefined> {
+  if (typeof declaredSize === 'number' && Number.isFinite(declaredSize)) return declaredSize;
+  const cached = backendDownloadSizeCache.get(url);
+  if (cached !== undefined) return cached;
+  try {
+    const response = await fetch(url, {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
+    });
+    const size = Number(response.headers.get('content-length'));
+    if (!response.ok || !Number.isFinite(size) || size <= 0) return undefined;
+    backendDownloadSizeCache.set(url, size);
+    return size;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getLlamaCppBackendCompatibilityError(input: {
@@ -483,6 +562,7 @@ export async function installLlamaCppBackend(input: {
   hasNvidiaGpu: boolean;
   manifest?: LlamaCppBackendManifest;
   switchCurrent?: boolean;
+  signal?: AbortSignal;
   onProgress?: BackendInstallProgressReporter;
 }): Promise<LlamaCppRuntimeInstallResult> {
   const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
@@ -517,7 +597,14 @@ export async function installLlamaCppBackend(input: {
     };
   }
 
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-backend-'));
+  fs.mkdirSync(input.runtimeRoot, { recursive: true });
+  const tempDir = fs.mkdtempSync(path.join(input.runtimeRoot, '.installing-'));
+  const downloadDir = path.join(
+    input.runtimeRoot,
+    'downloads',
+    sanitizePathSegment(input.ref.versionBackend),
+  );
+  fs.mkdirSync(downloadDir, { recursive: true });
   const reportProgress = (progress: LlamaCppInstallProgress) => {
     input.onProgress?.({
       modelId: input.ref.versionBackend,
@@ -526,15 +613,24 @@ export async function installLlamaCppBackend(input: {
     });
   };
   try {
+    throwIfDownloadCancelled(input.signal);
     if (!entry.archive) throw new Error(`Backend ${input.ref.versionBackend} has no archive.`);
     reportProgress({ phase: 'downloading' });
-    const archivePath = await downloadArchive(entry.archive, manifest, tempDir, progress => {
-      reportProgress(progress);
-    });
+    const archivePath = await downloadArchive(
+      entry.archive,
+      manifest,
+      downloadDir,
+      progress => {
+        reportProgress(progress);
+      },
+      input.signal,
+    );
+    throwIfDownloadCancelled(input.signal);
     const extractDir = path.join(tempDir, 'extract-main');
     fs.mkdirSync(extractDir, { recursive: true });
     reportProgress({ phase: 'installing', message: 'extracting' });
     await extractArchive(archivePath, extractDir);
+    throwIfDownloadCancelled(input.signal);
 
     const executableName = resolveLlamaCppExecutableName(input.platform);
     const extractedExecutable = findExecutablePath(extractDir, executableName);
@@ -548,9 +644,16 @@ export async function installLlamaCppBackend(input: {
 
     for (const companion of entry.companions ?? []) {
       reportProgress({ phase: 'downloading' });
-      const companionPath = await downloadArchive(companion, manifest, tempDir, progress => {
-        reportProgress(progress);
-      });
+      const companionPath = await downloadArchive(
+        companion,
+        manifest,
+        downloadDir,
+        progress => {
+          reportProgress(progress);
+        },
+        input.signal,
+      );
+      throwIfDownloadCancelled(input.signal);
       const companionExtractDir = path.join(
         tempDir,
         `extract-${sanitizePathSegment(companion.assetName)}`,
@@ -558,6 +661,7 @@ export async function installLlamaCppBackend(input: {
       fs.mkdirSync(companionExtractDir, { recursive: true });
       reportProgress({ phase: 'installing', message: 'extracting' });
       await extractArchive(companionPath, companionExtractDir);
+      throwIfDownloadCancelled(input.signal);
       copyDirectoryContents(
         findRuntimePayloadDirectory(companionExtractDir),
         getManagedBackendBinDir(backendDir),
@@ -602,6 +706,10 @@ export async function installLlamaCppBackend(input: {
     };
   } catch (error) {
     fs.rmSync(backendDir, { recursive: true, force: true });
+    if (error instanceof DownloadCancelledError || input.signal?.aborted) {
+      reportProgress({ phase: 'cancelled' });
+      return { ...failedInstall('Download cancelled.'), cancelled: true };
+    }
     reportProgress({
       phase: 'failed',
       error: error instanceof Error ? error.message : String(error),
@@ -1098,13 +1206,15 @@ async function downloadArchive(
     assetName: string;
     url?: string;
     sha256?: string;
+    size?: number;
     parts?: LlamaCppBackendArchivePart[];
   },
   manifest: LlamaCppBackendManifest,
-  tempDir: string,
+  downloadDir: string,
   onProgress?: BackendInstallProgressReporter,
+  signal?: AbortSignal,
 ): Promise<string> {
-  const outputPath = path.join(tempDir, archive.assetName.replace(/\.part-[a-z]+$/i, ''));
+  const outputPath = path.join(downloadDir, archive.assetName.replace(/\.part-[a-z]+$/i, ''));
   if (archive.parts && archive.parts.length > 0) {
     const partTotals = new Map<string, number>();
     const partCompleted = new Map<string, number>();
@@ -1112,22 +1222,28 @@ async function downloadArchive(
       [...entries.values()].reduce((sum, value) => sum + value, 0);
     const buffers: Buffer[] = [];
     for (const part of archive.parts) {
-      const partPath = path.join(tempDir, part.assetName);
-      await downloadFile(resolvePartUrl(part, manifest), partPath, (completed, total, speed) => {
-        if (typeof total === 'number' && total > 0) partTotals.set(part.assetName, total);
-        partCompleted.set(part.assetName, completed);
-        onProgress?.({
-          phase: 'downloading-progress',
-          completed: sumPartValues(partCompleted),
-          total: partTotals.size > 0 ? sumPartValues(partTotals) : undefined,
-          percent:
-            partTotals.size > 0 && sumPartValues(partTotals) > 0
-              ? Math.round((sumPartValues(partCompleted) / sumPartValues(partTotals)) * 100)
-              : undefined,
-          speed,
-          targetPath: outputPath,
-        });
-      });
+      const partPath = path.join(downloadDir, part.assetName);
+      await downloadFile(
+        resolvePartUrl(part, manifest),
+        partPath,
+        part.size,
+        (completed, total, speed) => {
+          if (typeof total === 'number' && total > 0) partTotals.set(part.assetName, total);
+          partCompleted.set(part.assetName, completed);
+          onProgress?.({
+            phase: 'downloading-progress',
+            completed: sumPartValues(partCompleted),
+            total: partTotals.size > 0 ? sumPartValues(partTotals) : undefined,
+            percent:
+              partTotals.size > 0 && sumPartValues(partTotals) > 0
+                ? Math.round((sumPartValues(partCompleted) / sumPartValues(partTotals)) * 100)
+                : undefined,
+            speed,
+            targetPath: outputPath,
+          });
+        },
+        signal,
+      );
       if (part.sha256) verifySha256(partPath, part.sha256);
       buffers.push(fs.readFileSync(partPath));
     }
@@ -1136,6 +1252,7 @@ async function downloadArchive(
     await downloadFile(
       resolveArchiveUrl(archive, manifest),
       outputPath,
+      archive.size,
       (completed, total, speed) => {
         onProgress?.({
           phase: 'downloading-progress',
@@ -1149,6 +1266,7 @@ async function downloadArchive(
           targetPath: outputPath,
         });
       },
+      signal,
     );
   }
   if (archive.sha256) verifySha256(outputPath, archive.sha256);
@@ -1174,10 +1292,12 @@ function resolvePartUrl(
 async function downloadFile(
   url: string,
   outputPath: string,
+  expectedSize?: number,
   onProgress?: (completed: number, total?: number, speed?: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (url.startsWith('file:')) {
-    await copyLocalFileWithProgress(fileURLToPath(url), outputPath, onProgress);
+    await copyLocalFileWithProgress(fileURLToPath(url), outputPath, onProgress, signal);
     return;
   }
 
@@ -1187,59 +1307,29 @@ async function downloadFile(
   const errors: string[] = [];
   for (const attemptUrl of urls) {
     try {
-      await downloadFileWithHelper(attemptUrl, outputPath, onProgress);
+      await downloadFileWithResume({
+        url: attemptUrl,
+        outputPath,
+        expectedSize,
+        onProgress,
+        signal,
+      });
       return;
     } catch (error) {
+      if (error instanceof DownloadCancelledError || signal?.aborted) throw error;
       errors.push(`${error instanceof Error ? error.message : String(error)} (${attemptUrl})`);
     }
   }
   throw new Error(`Download failed: ${errors.join('; ')}`);
 }
 
-async function downloadFileWithHelper(
-  url: string,
-  outputPath: string,
-  onProgress?: (completed: number, total?: number, speed?: number) => void,
-): Promise<void> {
-  const outputDir = path.dirname(outputPath);
-  fs.mkdirSync(outputDir, { recursive: true });
-  fs.rmSync(`${outputPath}.download`, { force: true });
-
-  const downloader = new DownloaderHelper(url, outputDir, {
-    fileName: path.basename(outputPath),
-    headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
-    override: true,
-    removeOnFail: false,
-    resumeIfFileExists: true,
-    resumeOnIncomplete: true,
-    resumeOnIncompleteMaxRetry: 3,
-    retry: { maxRetries: 3, delay: 1000 },
-  });
-
-  downloader.on('progress.throttled', stats => {
-    onProgress?.(
-      stats.downloaded,
-      stats.total > 0 ? stats.total : undefined,
-      stats.speed > 0 ? stats.speed : undefined,
-    );
-  });
-  downloader.on('end', stats => {
-    onProgress?.(
-      stats.downloadedSize,
-      stats.totalSize && stats.totalSize > 0 ? stats.totalSize : undefined,
-      undefined,
-    );
-  });
-  downloader.on('error', () => undefined);
-
-  await downloader.start();
-}
-
 async function copyLocalFileWithProgress(
   sourcePath: string,
   outputPath: string,
   onProgress?: (completed: number, total?: number, speed?: number) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfDownloadCancelled(signal);
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   const tempPath = `${outputPath}.download`;
   fs.rmSync(tempPath, { force: true });
@@ -1275,12 +1365,16 @@ async function copyLocalFileWithProgress(
   });
 
   fs.renameSync(tempPath, outputPath);
+  throwIfDownloadCancelled(signal);
   onProgress?.(completed, total, undefined);
 }
 
 function verifySha256(filePath: string, expected: string): void {
   const actual = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
   if (actual.toLowerCase() !== expected.toLowerCase()) {
+    // A completed but corrupt cache entry cannot be resumed safely. Removing it
+    // lets the next retry start clean instead of failing forever on the same file.
+    fs.rmSync(filePath, { force: true });
     throw new Error(`SHA256 mismatch for ${path.basename(filePath)}.`);
   }
 }

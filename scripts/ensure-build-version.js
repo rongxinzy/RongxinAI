@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const version = process.env.APP_BUILD_VERSION;
-const variant = process.env.ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE;
+const variant = process.env.ZHIYUAN_UPDATE_VARIANT;
 if (!version && !variant) process.exit(0);
 
 const pkgPath = path.join(__dirname, '..', 'package.json');
@@ -22,7 +22,7 @@ let content = fs.readFileSync(pkgPath, 'utf8');
 // Replace only the first top-level "version" field.
 if (version) content = content.replace(/("version"\s*:\s*)"[^"]+"/, `$1"${version}"`);
 
-if (variant === 'lite' || variant === 'full') {
+if (variant) {
   if (/"zhiyuanUpdateVariant"\s*:/.test(content)) {
     content = content.replace(/("zhiyuanUpdateVariant"\s*:\s*)"[^"]+"/, `$1"${variant}"`);
   } else {

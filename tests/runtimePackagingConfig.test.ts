@@ -38,9 +38,12 @@ test('each desktop target keeps the private document and Python toolchain resour
   );
 
   // Windows puts large resources in a tar consumed by the NSIS installer.
-  const hooks = readFileSync(path.join(root, 'scripts', 'electron-builder-hooks.cjs'), 'utf8');
+  const windowsResourcePack = readFileSync(
+    path.join(root, 'scripts', 'windows-resource-pack.cjs'),
+    'utf8',
+  );
   for (const resource of ['mingit', 'python-win', 'skill-python', 'uv-win']) {
-    assert.match(hooks, new RegExp(`prefix: '${resource}'`));
+    assert.match(windowsResourcePack, new RegExp(`prefix: '${resource}'`));
   }
 });
 

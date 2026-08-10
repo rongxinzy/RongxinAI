@@ -101,6 +101,7 @@ export type LlamaCppBackendInfo = LlamaCppBackendRef & {
   recommended: boolean;
   current: boolean;
   source: 'manifest' | 'local';
+  downloadSizeBytes?: number;
 };
 
 export type LlamaCppBackendListResult = {
@@ -108,6 +109,12 @@ export type LlamaCppBackendListResult = {
   backends: LlamaCppBackendInfo[];
   selection?: LlamaCppBackendRef;
   recommended?: LlamaCppBackendRef;
+  error?: string;
+};
+
+export type LlamaCppBackendDownloadSizeResult = {
+  success: boolean;
+  sizeBytes?: number;
   error?: string;
 };
 
@@ -136,6 +143,7 @@ export type LlamaCppRuntimeInstallPlan =
 
 export type LlamaCppRuntimeInstallResult = {
   success: boolean;
+  cancelled?: boolean;
   plan: LlamaCppRuntimeInstallPlan;
   executablePath?: string;
   backend?: LlamaCppBackendRef;

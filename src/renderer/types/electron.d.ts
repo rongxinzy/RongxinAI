@@ -477,6 +477,7 @@ interface IElectronAPI {
   llamacpp: {
     status: () => Promise<LlamaCppStatusSnapshot>;
     install: () => Promise<LlamaCppRuntimeInstallResult>;
+    cancelRuntimeInstall: () => Promise<LlamaCppCancelInstallResult>;
     importRuntime: () => Promise<LlamaCppRuntimeImportResult>;
     fetchWindowsRuntimeManifest: (url: string) => Promise<unknown | null>;
     listRuntimeDevices: (
@@ -484,6 +485,9 @@ interface IElectronAPI {
     ) => Promise<LlamaCppRuntimeListDevicesResult>;
     getRuntimeCapabilities: () => Promise<LlamaCppRuntimeCapabilities>;
     listBackends: () => Promise<import('../../shared/llamacpp').LlamaCppBackendListResult>;
+    getBackendDownloadSize: (
+      input: import('../../shared/llamacpp').LlamaCppBackendRef,
+    ) => Promise<import('../../shared/llamacpp').LlamaCppBackendDownloadSizeResult>;
     getBackendSelection: () => Promise<
       import('../../shared/llamacpp').LlamaCppBackendRef | undefined
     >;
@@ -1003,6 +1007,7 @@ interface IElectronAPI {
   appInfo: {
     getVersion: () => Promise<string>;
     getSystemLocale: () => Promise<string>;
+    consumePendingLocalInferenceInstall: () => Promise<string | null>;
     relaunch: () => Promise<void>;
   };
   appUpdate: {
