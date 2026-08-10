@@ -138,6 +138,7 @@ function buildWindowsResourceComponentManifest(
   contentId,
   archiveSha256,
   archiveSizeBytes,
+  sentinelSha256,
 ) {
   return {
     version: WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION,
@@ -149,6 +150,7 @@ function buildWindowsResourceComponentManifest(
     archive: component.key + '.tar',
     archiveSha256,
     archiveSizeBytes,
+    sentinelSha256,
   };
 }
 

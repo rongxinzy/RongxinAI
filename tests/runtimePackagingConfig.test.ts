@@ -213,6 +213,7 @@ test("installer-related pull requests build and exercise the Windows installer",
   );
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /paths:/);
+  assert.match(workflow, /"scripts\/\*\*"/);
   assert.match(workflow, /runs-on: windows-latest/);
   assert.match(workflow, /bun run dist:win:offline/);
   assert.match(workflow, /windows-runtime-smoke\.ps1/);

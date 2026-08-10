@@ -715,6 +715,7 @@ async function beforePack(context) {
       const manifestPath = path.join(componentsDir, `${component.key}.manifest.json`);
       const versionPath = path.join(componentsDir, `${component.key}.version`);
       const hashPath = path.join(componentsDir, `${component.key}.sha256`);
+      const sentinelHashPath = path.join(componentsDir, `${component.key}.sentinel-sha256`);
       const contentId = computeWindowsResourceComponentId(component);
       const reusable = isWindowsResourceComponentReusable(
         manifestPath,
@@ -736,15 +737,22 @@ async function beforePack(context) {
 
       const archiveSha256 = sha256File(archivePath);
       const archiveSizeBytes = statSync(archivePath).size;
+      const sentinelPath = path.join(
+        component.dir,
+        component.sentinel.slice(component.prefix.length + 1),
+      );
+      const sentinelSha256 = sha256File(sentinelPath);
       const manifest = buildWindowsResourceComponentManifest(
         component,
         contentId,
         archiveSha256,
         archiveSizeBytes,
+        sentinelSha256,
       );
       componentManifests.push(manifest);
       writeFileSync(versionPath, contentId, 'utf8');
       writeFileSync(hashPath, archiveSha256, 'utf8');
+      writeFileSync(sentinelHashPath, sentinelSha256, 'utf8');
       writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
       console.log(
         `[electron-builder-hooks] ${reusable ? 'Reusing' : 'Prepared'} ${component.key}: ${(

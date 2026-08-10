@@ -102,6 +102,7 @@
   SetOutPath "$PLUGINSDIR"
   File /oname=component-${KEY}.version "${PROJECT_DIR}\build-tar\windows-components\${KEY}.version"
   File /oname=component-${KEY}.sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sha256"
+  File /oname=component-${KEY}.sentinel-sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sentinel-sha256"
 
   FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
   IfErrors ComponentVersionInvalid_${TOKEN}
@@ -119,6 +120,14 @@
   StrLen $R5 $R4
   IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
 
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sentinel-sha256" r
+  IfErrors ComponentVersionInvalid_${TOKEN}
+  FileRead $2 $R6
+  FileClose $2
+  StrCpy $R6 $R6 64
+  StrLen $R5 $R6
+  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
+
   StrCpy $R2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1"
   IfFileExists "$R2\.complete" 0 ComponentCacheMiss_${TOKEN}
   FileOpen $2 "$R2\.complete" r
@@ -127,7 +136,13 @@
   FileClose $2
   StrCpy $R5 $R5 64
   StrCmp $R5 $R1 0 ComponentCacheMiss_${TOKEN}
-  IfFileExists "$R2\${SENTINEL}" ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
+  IfFileExists "$R2\${SENTINEL}" 0 ComponentCacheMiss_${TOKEN}
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R2\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 ComponentCacheMiss_${TOKEN}
+  StrCpy $1 $1 64
+  StrCmp $1 $R6 ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
 
   ComponentCacheHit_${TOKEN}:
     DetailPrint "[Installer] Reusing ${LABEL}"
@@ -176,6 +191,12 @@
 
   ComponentExtracted_${TOKEN}:
     IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" 0 ComponentVerificationFailed_${TOKEN}
+    StrCpy $1 $1 64
+    StrCmp $1 $R6 0 ComponentVerificationFailed_${TOKEN}
     FileOpen $2 "$R3\.complete" w
     FileWrite $2 "$R1|$R4"
     FileClose $2
@@ -186,7 +207,7 @@
     Goto ComponentReady_${TOKEN}
 
   ComponentVerificationFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 健康检查失败，缺少 ${SENTINEL}。"
+    StrCpy $R9 "${LABEL} 健康检查失败，${SENTINEL} 缺失或校验不匹配。"
     Goto OfflineComponentInstallFailed
 
   ComponentCommitFailed_${TOKEN}:

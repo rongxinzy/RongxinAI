@@ -24,6 +24,8 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
     expect(installerScript.match(/!insertmacro EnsureOfflineComponent /g)).toHaveLength(7);
     expect(installerScript).toContain('phase=component-cache-hit');
+    expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
+    expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
   });

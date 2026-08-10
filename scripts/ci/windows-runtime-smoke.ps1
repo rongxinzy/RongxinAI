@@ -85,7 +85,15 @@ try {
       throw "Size mismatch for Windows component $($component.key)"
     }
     Invoke-Checked $systemTar @('-xf', $archivePath, '-C', $smokeRoot) "Windows component extraction: $($component.key)"
-    Assert-Path (Join-Path $smokeRoot $component.sentinel) "Windows component sentinel $($component.key)"
+    $sentinelPath = Join-Path $smokeRoot $component.sentinel
+    Assert-Path $sentinelPath "Windows component sentinel $($component.key)"
+    if ($component.sentinelSha256 -notmatch '^[0-9a-f]{64}$') {
+      throw "Missing sentinel SHA-256 for Windows component $($component.key)"
+    }
+    $sentinelHash = (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($sentinelHash -ne $component.sentinelSha256) {
+      throw "Sentinel SHA-256 mismatch for Windows component $($component.key)"
+    }
   }
 
   $resourcesRoot = $smokeRoot

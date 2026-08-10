@@ -125,6 +125,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
   );
+  useEffect(() => {
+    if (installRequestId) setActiveTab('models');
+  }, [installRequestId]);
   const [tabDirection, setTabDirection] = useState(1);
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);

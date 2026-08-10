@@ -109,10 +109,12 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
     async (preferredBackend?: LlamaCppBackendInfo) => {
       if (active) return;
       setError(undefined);
-      setProgress({ phase: 'starting', modelId: RUNTIME_PROGRESS_KEY });
       try {
         const backend = preferredBackend ?? selectedBackend ?? (await loadMetadata());
-        if (backend) await loadDownloadSize(backend);
+        setProgress({ phase: 'starting', modelId: RUNTIME_PROGRESS_KEY });
+        // Metadata is optional presentation data. Do not put a network HEAD
+        // request in front of the cancellable runtime install IPC.
+        if (backend) void loadDownloadSize(backend);
         const result = backend
           ? await window.electron.llamacpp.installBackend(backend)
           : await window.electron.llamacpp.install();

@@ -67,6 +67,7 @@ describe('Windows offline component identity', () => {
       contentId,
       sha256File(archivePath),
       fs.statSync(archivePath).size,
+      sha256File(path.join(component.dir, 'nested', 'runtime.exe')),
     );
     fs.writeFileSync(manifestPath, JSON.stringify(manifest));
 
@@ -77,6 +78,23 @@ describe('Windows offline component identity', () => {
     expect(
       isWindowsResourceComponentReusable(manifestPath, archivePath, contentId, component),
     ).toBe(false);
+  });
+
+  test('records a digest for the component health-check file', () => {
+    const component = createComponent();
+    const archivePath = path.join(component.dir, 'runtime.tar');
+    fs.writeFileSync(archivePath, 'archive-v1');
+    const manifest = buildWindowsResourceComponentManifest(
+      component,
+      computeWindowsResourceComponentId(component),
+      sha256File(archivePath),
+      fs.statSync(archivePath).size,
+      sha256File(path.join(component.dir, 'nested', 'runtime.exe')),
+    );
+
+    expect(manifest.sentinelSha256).toBe(
+      sha256File(path.join(component.dir, 'nested', 'runtime.exe')),
+    );
   });
 
   test('marks the aggregate manifest as offline and llama.cpp-free', () => {
