@@ -1801,6 +1801,63 @@ describe('PiRuntimeAdapter', () => {
       });
     });
 
+    it('does not mark intermediate loop answers as final', async () => {
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
+
+      await adapter.startSession('test', 'Produce two iterations');
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{
+          name: string;
+          execute: (toolCallId: string, params: Record<string, unknown>) => Promise<unknown>;
+        }>;
+      };
+      const loopTool = sessionOptions.customTools?.find(tool => tool.name === PiAgentLoopToolName);
+      await loopTool!.execute('loop-start', {
+        action: PiAgentLoopAction.Start,
+        mode: PiAgentLoopMode.Passes,
+        passes: 2,
+      });
+
+      driveAssistantTurn('First iteration answer');
+      await loopTool!.execute('loop-next-1', {
+        action: PiAgentLoopAction.Next,
+        summary: 'First iteration complete',
+      });
+      listener!({ type: 'agent_end' });
+
+      expect(
+        updates.some(
+          update =>
+            update.content === 'First iteration answer' && update.metadata?.isFinalAnswer === true,
+        ),
+      ).toBe(false);
+
+      driveAssistantTurn('Second iteration answer');
+      await loopTool!.execute('loop-next-2', {
+        action: PiAgentLoopAction.Next,
+        summary: 'Second iteration complete',
+      });
+      listener!({ type: 'agent_end' });
+
+      const finalAnswers = updates.filter(update => update.metadata?.isFinalAnswer === true);
+      expect(finalAnswers).toHaveLength(1);
+      expect(finalAnswers[0].content).toBe('Second iteration answer');
+      expect(
+        new Set(
+          updates
+            .filter(update => update.content.endsWith('iteration answer'))
+            .map(update => update.messageId),
+        ).size,
+      ).toBe(2);
+    });
+
     it('should preserve the latest answer across a trailing thinking-only internal turn', async () => {
       const updates: Array<{
         messageId: string;
