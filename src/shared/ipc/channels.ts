@@ -311,19 +311,9 @@ export type ImInstanceIpc = (typeof ImInstanceIpc)[keyof typeof ImInstanceIpc];
 // ─── Auth ───────────────────────────────────────────────────────────────────
 export const AuthIpc = {
   Login: 'auth:login',
-  Exchange: 'auth:exchange',
-  GetUser: 'auth:getUser',
-  GetQuota: 'auth:getQuota',
-  Logout: 'auth:logout',
-  RefreshToken: 'auth:refreshToken',
-  GetAccessToken: 'auth:getAccessToken',
-  GetModels: 'auth:getModels',
-  GetProfileSummary: 'auth:getProfileSummary',
   GetCommunityUser: 'auth:getCommunityUser',
   CommunityLogout: 'auth:communityLogout',
-  GetPendingCallback: 'auth:getPendingCallback',
   Callback: 'auth:callback',
-  QuotaChanged: 'auth:quotaChanged',
 } as const;
 export type AuthIpc = (typeof AuthIpc)[keyof typeof AuthIpc];
 

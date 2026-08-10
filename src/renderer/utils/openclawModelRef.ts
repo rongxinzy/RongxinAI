@@ -2,12 +2,9 @@ import { OpenClawProviderId, ProviderName, ProviderRegistry } from '@shared/prov
 
 import type { Model } from '../store/slices/modelSlice';
 
-type ModelRefInput = Pick<Model, 'id' | 'providerKey' | 'openClawProviderId' | 'isServerModel'>;
+type ModelRefInput = Pick<Model, 'id' | 'providerKey' | 'openClawProviderId'>;
 
 function resolveModelOpenClawProviderId(model: ModelRefInput): string {
-  if (model.isServerModel) {
-    return OpenClawProviderId.ZhiyuanServer;
-  }
   return (
     model.openClawProviderId || ProviderRegistry.getOpenClawProviderId(model.providerKey ?? '')
   );

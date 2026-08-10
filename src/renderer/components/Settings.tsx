@@ -180,9 +180,7 @@ const CUSTOM_PROVIDER_KEYS = [
 const OFFICIAL_WEBSITE_URL = 'https://www.rongxzyai.com';
 
 const providerKeys = [
-  ...Object.values(ProviderName).filter(
-    id => id !== ProviderName.Custom && id !== ProviderName.ZhiyuanServer,
-  ),
+  ...Object.values(ProviderName).filter(id => id !== ProviderName.Custom),
   ...CUSTOM_PROVIDER_KEYS,
 ] as const;
 

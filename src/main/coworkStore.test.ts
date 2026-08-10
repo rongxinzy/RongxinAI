@@ -549,12 +549,12 @@ test('updateSession can patch model override without refreshing the session upda
 
   store.updateSession(
     sid,
-    { modelOverride: 'zhiyuan-server/qwen3.6-plus' },
+    { modelOverride: 'deepseek/qwen3.6-plus' },
     { touchUpdatedAt: false },
   );
 
   const session = store.getSession(sid);
-  expect(session?.modelOverride).toBe('zhiyuan-server/qwen3.6-plus');
+  expect(session?.modelOverride).toBe('deepseek/qwen3.6-plus');
   expect(session?.updatedAt).toBe(1000);
 });
 

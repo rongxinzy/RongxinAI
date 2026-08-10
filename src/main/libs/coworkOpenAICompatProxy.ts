@@ -2608,18 +2608,6 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   const upstreamAPIType = resolveUpstreamAPIType(upstreamConfig.provider);
   const openAIRequest = anthropicToOpenAI(parsedRequestBody);
 
-  // Inject session_id and user_message for zhiyuan-server logging only.
-  // Strict providers (e.g. Gemini) reject unknown payload fields.
-  if (upstreamConfig.provider === 'zhiyuan-server') {
-    if (currentCoworkSessionId) {
-      openAIRequest.session_id = currentCoworkSessionId;
-    }
-    const extractedUserMessage = extractLastUserMessageText(parsedRequestBody);
-    if (extractedUserMessage) {
-      openAIRequest.user_message = extractedUserMessage;
-    }
-  }
-
   if (!openAIRequest.model) {
     openAIRequest.model = upstreamConfig.model;
   }

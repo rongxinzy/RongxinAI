@@ -15,8 +15,6 @@ export interface Model {
   capabilities?: Partial<ModelCapabilities>;
   supportsThinkingToggle?: boolean;
   contextWindow?: number;
-  isServerModel?: boolean;
-  serverApiFormat?: string;
   llamaCppOpenClawEligibility?: LlamaCppOpenClawEligibility;
   llamaCppRuntimeContextWindow?: number;
   llamaCppTrainedContextWindow?: number;
@@ -135,34 +133,13 @@ const modelSlice = createSlice({
       delete state.selectedModelByAgent[action.payload];
     },
     setAvailableModels: (state, action: PayloadAction<Model[]>) => {
-      const serverModels = state.availableModels.filter(m => m.isServerModel);
-      state.availableModels = [...serverModels, ...action.payload];
+      state.availableModels = action.payload;
       availableModels = state.availableModels;
       if (state.availableModels.length > 0) {
         const matchedModel = state.availableModels.find(m =>
           isSameModelIdentity(m, state.defaultSelectedModel),
         );
         state.defaultSelectedModel = matchedModel ?? state.availableModels[0];
-      }
-      syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
-    },
-    setServerModels: (state, action: PayloadAction<Model[]>) => {
-      const userModels = state.availableModels.filter(m => !m.isServerModel);
-      state.availableModels = [...action.payload, ...userModels];
-      availableModels = state.availableModels;
-      if (state.availableModels.length > 0) {
-        const matchedModel = state.availableModels.find(m =>
-          isSameModelIdentity(m, state.defaultSelectedModel),
-        );
-        state.defaultSelectedModel = matchedModel ?? state.availableModels[0];
-      }
-      syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
-    },
-    clearServerModels: state => {
-      state.availableModels = state.availableModels.filter(m => !m.isServerModel);
-      availableModels = state.availableModels;
-      if (state.defaultSelectedModel.isServerModel && state.availableModels.length > 0) {
-        state.defaultSelectedModel = state.availableModels[0];
       }
       syncSelectedModelByAgent(state.selectedModelByAgent, state.availableModels);
     },
@@ -174,7 +151,5 @@ export const {
   setDefaultSelectedModel,
   clearAgentSelectedModel,
   setAvailableModels,
-  setServerModels,
-  clearServerModels,
 } = modelSlice.actions;
 export default modelSlice.reducer;

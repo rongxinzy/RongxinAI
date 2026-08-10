@@ -820,15 +820,7 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   auth: {
-    login: (loginUrl?: string) => ipcRenderer.invoke(AuthIpc.Login, { loginUrl }),
-    exchange: (code: string) => ipcRenderer.invoke(AuthIpc.Exchange, { code }),
-    getUser: () => ipcRenderer.invoke(AuthIpc.GetUser),
-    getQuota: () => ipcRenderer.invoke(AuthIpc.GetQuota),
-    logout: () => ipcRenderer.invoke(AuthIpc.Logout),
-    refreshToken: () => ipcRenderer.invoke(AuthIpc.RefreshToken),
-    getAccessToken: () => ipcRenderer.invoke(AuthIpc.GetAccessToken),
-    getModels: () => ipcRenderer.invoke(AuthIpc.GetModels),
-    getProfileSummary: () => ipcRenderer.invoke(AuthIpc.GetProfileSummary),
+    login: () => ipcRenderer.invoke(AuthIpc.Login),
     getCommunityUser: () => ipcRenderer.invoke(AuthIpc.GetCommunityUser),
     communityLogout: () => ipcRenderer.invoke(AuthIpc.CommunityLogout),
     onCallback: (
@@ -840,7 +832,6 @@ contextBridge.exposeInMainWorld('electron', {
         error?: string;
       }) => void,
     ) => onPush(AuthIpc.Callback, callback),
-    onQuotaChanged: (callback: () => void) => onPushVoid(AuthIpc.QuotaChanged, callback),
   },
 
   feishu: {

@@ -46,7 +46,6 @@ export const ProviderName = {
   LlamaCpp: 'llamacpp',
   Ollama: 'ollama',
   Custom: 'custom',
-  ZhiyuanServer: 'zhiyuan-server',
   Copilot: 'github-copilot',
 } as const;
 export type ProviderName = (typeof ProviderName)[keyof typeof ProviderName];
@@ -54,7 +53,6 @@ export type ProviderName = (typeof ProviderName)[keyof typeof ProviderName];
 // ─── OpenClaw Provider ID ───────────────────────────────────────────────
 // OpenClaw gateway provider identifiers. May differ from ProviderName.
 export const OpenClawProviderId = {
-  ZhiyuanServer: 'zhiyuan-server',
   Moonshot: 'moonshot',
   Google: 'google',
   Anthropic: 'anthropic',

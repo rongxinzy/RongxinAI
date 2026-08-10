@@ -21,7 +21,6 @@ import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig } from './config';
 import { apiService } from './services/api';
-import { authService } from './services/auth';
 import {
   collectAvailableModels,
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
@@ -203,20 +202,14 @@ const App: React.FC = () => {
         themeService.initialize();
         mark('themeService done');
 
-        // Enterprise/i18n/auth only depend on configService.init and are
-        // independent of each other, so run them in parallel. Model
-        // resolution must run AFTER authService.init: it reads the merged
-        // model list (including server models) to pick the configured
-        // default, and racing it against setServerModels can pin a local
-        // model for logged-in users.
-        mark('enterprise/i18n/auth init begin');
+        // Enterprise and i18n only depend on config initialization.
+        mark('enterprise/i18n init begin');
         const [entConfig] = await Promise.all([
           window.electron.enterprise.getConfig(),
           waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
-          authService.init(),
         ]);
         setEnterpriseConfig(entConfig);
-        mark('enterprise/i18n/auth init done');
+        mark('enterprise/i18n init done');
 
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
 

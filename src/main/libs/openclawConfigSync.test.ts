@@ -17,7 +17,7 @@ describe('providerApiKeyEnvVar', () => {
   });
 
   test('replaces hyphens and special chars with underscores', () => {
-    expect(providerApiKeyEnvVar(ProviderName.ZhiyuanServer)).toBe('ZHIYUAN_APIKEY_ZHIYUAN_SERVER');
+    expect(providerApiKeyEnvVar(ProviderName.DeepSeek)).toBe('ZHIYUAN_APIKEY_DEEPSEEK');
     expect(providerApiKeyEnvVar('my.provider')).toBe('ZHIYUAN_APIKEY_MY_PROVIDER');
   });
 

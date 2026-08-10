@@ -4,7 +4,6 @@ import {
   SelectContent,
   SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectSeparator,
   SelectTrigger,
   SelectValue,
@@ -84,9 +83,6 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
     );
   }
 
-  const serverModels = availableModels.filter(m => m.isServerModel);
-  const userModels = availableModels.filter(m => !m.isServerModel);
-  const hasBothGroups = serverModels.length > 0 && userModels.length > 0;
   const currentKey = selectedModel ? getModelIdentityKey(selectedModel) : '__default__';
   const triggerLabel = selectedModel?.name ?? defaultLabel ?? '';
   const side: 'top' | 'bottom' =
@@ -140,22 +136,8 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
               </SelectItem>
             </SelectGroup>
           ) : null}
-          {defaultLabel && hasBothGroups ? <SelectSeparator /> : null}
-          {hasBothGroups ? (
-            <>
-              <SelectGroup>
-                <SelectLabel>{i18nService.t('modelGroupServer')}</SelectLabel>
-                {serverModels.map(renderModelItem)}
-              </SelectGroup>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>{i18nService.t('modelGroupUser')}</SelectLabel>
-                {userModels.map(renderModelItem)}
-              </SelectGroup>
-            </>
-          ) : (
-            <SelectGroup>{availableModels.map(renderModelItem)}</SelectGroup>
-          )}
+          {defaultLabel ? <SelectSeparator /> : null}
+          <SelectGroup>{availableModels.map(renderModelItem)}</SelectGroup>
         </SelectContent>
       </Select>
     </div>

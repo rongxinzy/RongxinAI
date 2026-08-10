@@ -1264,24 +1264,10 @@ interface IElectronAPI {
     }>;
   };
   auth: {
-    login: (loginUrl?: string) => Promise<{ success: boolean; error?: string }>;
-    exchange: (
-      code: string,
-    ) => Promise<{ success: boolean; user?: any; quota?: any; error?: string }>;
-    getUser: () => Promise<{ success: boolean; user?: any; quota?: any }>;
-    getQuota: () => Promise<{ success: boolean; quota?: any }>;
-    logout: () => Promise<{ success: boolean }>;
-    refreshToken: () => Promise<{ success: boolean; accessToken?: string }>;
-    getAccessToken: () => Promise<string | null>;
-    getModels: () => Promise<{
-      success: boolean;
-      models?: Array<{ modelId: string; modelName: string; provider: string; apiFormat: string }>;
-    }>;
-    getProfileSummary: () => Promise<{ success: boolean; data?: ProfileSummaryData }>;
+    login: () => Promise<{ success: boolean; error?: string }>;
     getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
     communityLogout: () => Promise<{ success: boolean }>;
     onCallback: (callback: (data: { code?: string; community?: boolean; success?: boolean; user?: any; error?: string }) => void) => () => void;
-    onQuotaChanged: (callback: () => void) => () => void;
   };
   enterprise: {
     getConfig: () => Promise<{
@@ -1295,43 +1281,7 @@ interface IElectronAPI {
     send: (status: 'online' | 'offline') => void;
   };
   auth: {
-    login: (loginUrl?: string) => Promise<{ success: boolean; error?: string }>;
-    exchange: (code: string) => Promise<{
-      success: boolean;
-      user?: import('../store/slices/authSlice').UserProfile;
-      quota?: {
-        planName: string;
-        subscriptionStatus: string;
-        creditsLimit: number;
-        creditsUsed: number;
-        creditsRemaining: number;
-      };
-      error?: string;
-    }>;
-    getUser: () => Promise<{
-      success: boolean;
-      user?: import('../store/slices/authSlice').UserProfile;
-      quota?: {
-        planName: string;
-        subscriptionStatus: string;
-        creditsLimit: number;
-        creditsUsed: number;
-        creditsRemaining: number;
-      };
-    }>;
-    getQuota: () => Promise<{
-      success: boolean;
-      quota?: {
-        planName: string;
-        subscriptionStatus: string;
-        creditsLimit: number;
-        creditsUsed: number;
-        creditsRemaining: number;
-      };
-    }>;
-    logout: () => Promise<{ success: boolean }>;
-    refreshToken: () => Promise<{ success: boolean; accessToken?: string }>;
-    getAccessToken: () => Promise<string | null>;
+    login: () => Promise<{ success: boolean; error?: string }>;
     getCommunityUser: () => Promise<{ success: boolean; user?: { id: string; email: string } }>;
     communityLogout: () => Promise<{ success: boolean }>;
     onCallback: (callback: (data: { code?: string; community?: boolean; success?: boolean; user?: any; error?: string }) => void) => () => void;
