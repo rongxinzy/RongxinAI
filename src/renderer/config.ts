@@ -4,6 +4,9 @@ import { WorkMode, type WorkMode as WorkModeValue } from './store/workMode/const
 
 // 配置类型定义
 export interface AppConfig {
+  migrations?: {
+    providerModelCatalog: number;
+  };
   // API 配置
   api: {
     key: string;
@@ -78,6 +81,9 @@ const buildDefaultProviders = (): AppConfig['providers'] => {
 
 // 默认配置
 export const defaultConfig: AppConfig = {
+  migrations: {
+    providerModelCatalog: 1,
+  },
   api: {
     key: '',
     baseUrl: 'https://api.deepseek.com/anthropic',
