@@ -8,6 +8,8 @@
 
 @plugin '@tailwindcss/typography';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ── Tailwind v4 theme configuration ── */
 @theme {
   /* Typography scale extension (arithmetic series, 2px step — see DESIGN.md) */
