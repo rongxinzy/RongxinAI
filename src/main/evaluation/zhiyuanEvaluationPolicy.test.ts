@@ -99,12 +99,17 @@ describe('createZhiyuanEvaluationPolicy', () => {
       result: { content: [{ type: 'text', text: 'checks passed' }] },
       isError: false,
     });
+    const inspectionState = (await productionTool.execute('state', {
+      action: ProductionLoopAction.GetState,
+    })) as { content: Array<{ text: string }> };
+    const evidenceRef = JSON.parse(inspectionState.content[0].text).availableVerifierEvidence[0]
+      .evidenceRef as string;
     await productionTool.execute('inspect', {
       action: ProductionLoopAction.StartInspection,
       verifierEvidence: [
         {
           name: 'official benchmark scorer',
-          toolCallId: 'benchmark-check',
+          evidenceRef,
         },
       ],
     });
@@ -192,12 +197,17 @@ describe('createZhiyuanEvaluationPolicy', () => {
       result: { content: [{ type: 'text', text: 'checks passed' }] },
       isError: false,
     });
+    const inspectionState = (await productionTool.execute('state', {
+      action: ProductionLoopAction.GetState,
+    })) as { content: Array<{ text: string }> };
+    const evidenceRef = JSON.parse(inspectionState.content[0].text).availableVerifierEvidence[0]
+      .evidenceRef as string;
     await productionTool.execute('inspect', {
       action: ProductionLoopAction.StartInspection,
       verifierEvidence: [
         {
           name: 'official benchmark scorer',
-          toolCallId: 'benchmark-check',
+          evidenceRef,
         },
       ],
     });

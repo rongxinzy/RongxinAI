@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 
 import { HarnessActivationType } from '../../shared/harness';
 import {
@@ -8,6 +8,7 @@ import {
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
+  type ProductionAvailableVerifierEvidence,
   type ProductionCriticFinding,
   type ProductionCriticExecution,
   type ProductionArtifactEvidence,
@@ -27,7 +28,12 @@ import type { ProductionLoopMeasurement, ProductionLoopStore } from './ports';
 import { assertProductionLoopTransition } from './stateMachine';
 
 const MAX_CRITIC_OUTPUT_LENGTH = 8_000;
+const MAX_MODEL_EVIDENCE_SUMMARY_LENGTH = 300;
+const MAX_MODEL_VERIFIER_EVIDENCE = 32;
 export const MAX_OBSERVED_TOOL_RESULTS = 256;
+
+const createEvidenceRef = (runId: string, toolCallId: string): string =>
+  `ev-${createHash('sha256').update(`${runId}\0${toolCallId}`).digest('hex').slice(0, 16)}`;
 
 interface CriticPayload {
   verdict: ProductionCriticVerdict;
@@ -77,7 +83,9 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
   }
   try {
     const parsed = parseJsonRecord(output);
-    if (!Object.values(ProductionCriticVerdict).includes(parsed.verdict as ProductionCriticVerdict)) {
+    if (
+      !Object.values(ProductionCriticVerdict).includes(parsed.verdict as ProductionCriticVerdict)
+    ) {
       throw new Error('Critic verdict is missing or invalid.');
     }
     if (!Array.isArray(parsed.findings)) {
@@ -92,7 +100,9 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
       if (typeof raw.summary !== 'string' || !raw.summary.trim()) {
         throw new Error('Critic finding summary is required.');
       }
-      if (!Object.values(ProductionCriticSeverity).includes(raw.severity as ProductionCriticSeverity)) {
+      if (
+        !Object.values(ProductionCriticSeverity).includes(raw.severity as ProductionCriticSeverity)
+      ) {
         throw new Error('Critic finding severity is invalid.');
       }
       if (raw.evidence !== undefined && typeof raw.evidence !== 'string') {
@@ -139,6 +149,20 @@ export class ProductionLoopService {
     const state = this.repository.get(runId);
     if (!state) throw new Error(`Production loop not found: ${runId}`);
     return state;
+  }
+
+  getAvailableVerifierEvidence(runId: string): ProductionAvailableVerifierEvidence[] {
+    const state = this.getState(runId);
+    return (state.observedToolResults ?? [])
+      .filter(result => !result.isError && result.progressVersion === state.progressVersion)
+      .slice(-MAX_MODEL_VERIFIER_EVIDENCE)
+      .map(result => ({
+        evidenceRef: createEvidenceRef(runId, result.toolCallId),
+        toolName: result.toolName,
+        outputSummary:
+          result.output.trim().slice(0, MAX_MODEL_EVIDENCE_SUMMARY_LENGTH) ||
+          `Tool ${result.toolName} completed successfully.`,
+      }));
   }
 
   beginRun(input: {
@@ -317,7 +341,7 @@ export class ProductionLoopService {
     runId: string,
     input: {
       artifacts: ProductionArtifactEvidence[];
-      verifiers: Array<{ name: string; toolCallId: string }>;
+      verifiers: Array<{ name: string; evidenceRef: string }>;
     },
   ): ProductionLoopState {
     return this.mutate(runId, state => {
@@ -332,10 +356,13 @@ export class ProductionLoopService {
       const observedToolResults = state.observedToolResults ?? [];
       const verifiers = input.verifiers.flatMap(verifier => {
         const name = verifier.name.trim();
-        const toolCallId = verifier.toolCallId.trim();
-        const observed = observedToolResults.find(result => result.toolCallId === toolCallId);
+        const evidenceRef = verifier.evidenceRef.trim();
+        const observed = observedToolResults.find(
+          result => createEvidenceRef(runId, result.toolCallId) === evidenceRef,
+        );
         if (
           !name ||
+          !evidenceRef ||
           !observed ||
           observed.isError ||
           observed.progressVersion !== state.progressVersion
@@ -345,10 +372,9 @@ export class ProductionLoopService {
         return [
           {
             name,
-            toolCallId,
+            toolCallId: observed.toolCallId,
             toolName: observed.toolName,
-            evidence:
-              observed.output.trim() || `Tool ${observed.toolName} completed successfully.`,
+            evidence: observed.output.trim() || `Tool ${observed.toolName} completed successfully.`,
           },
         ];
       });
@@ -361,8 +387,7 @@ export class ProductionLoopService {
       }
       const failedVerifier = state.expectedVerifiers.find(
         expected =>
-          expected.deterministic &&
-          !verifiers.some(verifier => verifier.name === expected.name),
+          expected.deterministic && !verifiers.some(verifier => verifier.name === expected.name),
       );
       if (failedVerifier) {
         throw new Error(

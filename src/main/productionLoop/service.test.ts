@@ -73,14 +73,20 @@ const recordVerifier = (runId: string, isError = false) => {
     output: isError ? 'Verifier failed.' : 'report.md exists and is valid.',
     isError,
   });
-  return toolCallId;
+  return {
+    toolCallId,
+    evidenceRef: isError
+      ? undefined
+      : service.getAvailableVerifierEvidence(runId).at(-1)?.evidenceRef,
+  };
 };
 
 const startInspection = (runId: string) => {
-  const toolCallId = recordVerifier(runId);
+  const { evidenceRef } = recordVerifier(runId);
+  if (!evidenceRef) throw new Error('Verifier evidence missing in test setup.');
   return service.startInspection(runId, {
     artifacts: [{ kind: 'file', reference: 'report.md' }],
-    verifiers: [{ name: 'artifact_verifier', toolCallId }],
+    verifiers: [{ name: 'artifact_verifier', evidenceRef }],
   });
 };
 
@@ -109,18 +115,21 @@ test('requires deterministic verifier and artifact evidence before inspection', 
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  const successfulToolCallId = recordVerifier(run.id);
+  const successfulEvidence = recordVerifier(run.id);
+  if (!successfulEvidence.evidenceRef) throw new Error('Verifier evidence missing in test setup.');
   expect(() =>
     service.startInspection(run.id, {
       artifacts: [],
-      verifiers: [{ name: 'artifact_verifier', toolCallId: successfulToolCallId }],
+      verifiers: [{ name: 'artifact_verifier', evidenceRef: successfulEvidence.evidenceRef }],
     }),
   ).toThrow('artifact evidence');
-  const failedToolCallId = recordVerifier(run.id, true);
+  const failedEvidence = recordVerifier(run.id, true);
   expect(() =>
     service.startInspection(run.id, {
       artifacts: [{ kind: 'file', reference: 'report.md' }],
-      verifiers: [{ name: 'artifact_verifier', toolCallId: failedToolCallId }],
+      verifiers: [
+        { name: 'artifact_verifier', evidenceRef: failedEvidence.evidenceRef ?? 'ev-failed' },
+      ],
     }),
   ).toThrow('Passing deterministic verifier evidence');
 
@@ -131,6 +140,10 @@ test('requires deterministic verifier and artifact evidence before inspection', 
     toolName: 'bash',
     evidence: 'report.md exists and is valid.',
   });
+  expect(inspecting.inspections[0].verifiers[0].toolCallId).toBe(
+    service.repository.get(run.id)?.observedToolResults.at(-1)?.toolCallId,
+  );
+  expect(inspecting.inspections[0].verifiers[0].toolCallId).not.toContain('ev-');
 });
 
 test('retains only the latest observed tool results', () => {
@@ -164,6 +177,7 @@ test('retains only the latest observed tool results', () => {
     toolCallId: 'tool-2',
     output: 'updated-result',
   });
+  expect(service.getAvailableVerifierEvidence(run.id)).toHaveLength(32);
 });
 
 test('persists plan, critic rejection, revision, and delivery readiness', () => {
@@ -172,7 +186,12 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
   for (const item of planned.planItems) {
     service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
   }
-  const firstInspection = startInspection(run.id);
+  const firstEvidence = recordVerifier(run.id);
+  if (!firstEvidence.evidenceRef) throw new Error('Verifier evidence missing in test setup.');
+  service.startInspection(run.id, {
+    artifacts: [{ kind: 'file', reference: 'report.md' }],
+    verifiers: [{ name: 'artifact_verifier', evidenceRef: firstEvidence.evidenceRef }],
+  });
   service.requestCritique(run.id);
   service.recordCriticStart(run.id, 'review-1');
   const rejected = service.recordCriticResult(
@@ -198,7 +217,7 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
       verifiers: [
         {
           name: 'artifact_verifier',
-          toolCallId: firstInspection.inspections[0].verifiers[0].toolCallId,
+          evidenceRef: firstEvidence.evidenceRef,
         },
       ],
     }),
