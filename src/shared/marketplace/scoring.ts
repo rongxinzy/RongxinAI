@@ -167,32 +167,36 @@ export function withMarketplaceScore(model: MarketplaceModel, context: Marketpla
 }
 
 export type MarketplaceHardwareSummaryParts = {
-  gpu: string;
-  memory: string;
+  gpuCount: number;
+  totalVramGiB: number;
+  gpuNames: string[];
+  systemMemoryGiB: number | null;
 };
 
 export function formatMarketplaceHardwareSummaryParts(
   hardware?: MarketplaceHardwareProfile,
 ): MarketplaceHardwareSummaryParts {
-  if (!hardware) return { gpu: '未检测到', memory: '未检测到' };
+  if (!hardware) {
+    return {
+      gpuCount: 0,
+      totalVramGiB: 0,
+      gpuNames: [],
+      systemMemoryGiB: null,
+    };
+  }
   const gpuNames = [...new Set(
     hardware.gpuNames
       .map(name => name.replace(/^NVIDIA\s+/i, '').trim())
       .filter(Boolean),
   )];
-  const gpuModel = gpuNames.length > 0 ? ` ${gpuNames.join(' / ')}` : '';
-  const gpu = hardware.gpuCount
-    ? `${hardware.gpuCount} · ${Math.round(hardware.totalVramMiB / 1024)}GB${gpuModel}`
-    : '未检测到';
-  const memory = hardware.systemMemoryMiB
-    ? `${Math.round(hardware.systemMemoryMiB / 1024)}GB`
-    : '未检测到';
-  return { gpu, memory };
-}
-
-export function formatMarketplaceHardwareSummary(hardware?: MarketplaceHardwareProfile): string {
-  const { gpu, memory } = formatMarketplaceHardwareSummaryParts(hardware);
-  return `GPU: ${gpu} | 内存：${memory}`;
+  return {
+    gpuCount: hardware.gpuCount,
+    totalVramGiB: Math.round(hardware.totalVramMiB / 1024),
+    gpuNames,
+    systemMemoryGiB: hardware.systemMemoryMiB
+      ? Math.round(hardware.systemMemoryMiB / 1024)
+      : null,
+  };
 }
 
 export function formatMarketplaceStars(stars?: number): string {

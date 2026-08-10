@@ -6,6 +6,7 @@ import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { MARKETPLACE_PAGE_SIZE } from '../constants';
+import { i18nService } from '../../../services/i18n';
 
 import type {
   MarketplaceModel,
@@ -118,6 +119,27 @@ describe('MarketplacePanel result grid', () => {
     renderPanel({ hasSearched: true, models });
 
     expect(screen.getAllByText('安装')).toHaveLength(MARKETPLACE_PAGE_SIZE + 2);
+  });
+
+  test('keeps the model result viewport scrollable while pagination stays outside it', () => {
+    const { container } = renderPanel({
+      hasSearched: true,
+      models: [makeModel('alpha')],
+      totalCount: 2,
+      hasNextPage: true,
+    });
+    const viewport = container.querySelector('.overflow-y-auto');
+    const pagination = screen.getByText(/1\s*\/\s*1/);
+
+    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable');
+    expect(viewport).not.toContainElement(pagination);
+  });
+
+  test('uses the same constrained viewport for the loading skeleton', () => {
+    const { container } = renderPanel({ hasSearched: true, marketplaceLoading: true });
+    const viewport = container.querySelector('.overflow-y-auto');
+
+    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable');
   });
 
   test('does not render the server result count in the header', () => {
@@ -295,6 +317,35 @@ describe('MarketplacePanel search and filters', () => {
 
     expect(screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).toBeEnabled();
   });
+
+  test('renders localized hardware summary with an integer-width separator', () => {
+    const previousLanguage = i18nService.getLanguage();
+    i18nService.setLanguage('en', { persist: false });
+
+    try {
+      const { container } = renderPanel({
+        hasSearched: true,
+        models: [makeModel('alpha')],
+        hardwareSummaryReady: true,
+        hardwareSummary: {
+          totalVramMiB: 8192,
+          freeVramMiB: 7000,
+          gpuCount: 1,
+          gpuNames: ['NVIDIA RTX 4060'],
+          systemMemoryMiB: 65536,
+          freeSystemMemoryMiB: 48000,
+          isDualGpu: false,
+        },
+      });
+
+      expect(screen.getByText('GPU: 1 · 8GB RTX 4060')).toBeInTheDocument();
+      expect(screen.getByText('Memory: 64GB')).toBeInTheDocument();
+      expect(container.querySelector('[data-slot="separator"]')).toHaveClass('w-px');
+    } finally {
+      i18nService.setLanguage(previousLanguage, { persist: false });
+    }
+  });
+
   test('hides the stale result count while a new search is loading', () => {
     // The reported flicker: while the skeleton is showing, the count still
     // displayed the previous page's 7 models, then the fresh result rendered.
