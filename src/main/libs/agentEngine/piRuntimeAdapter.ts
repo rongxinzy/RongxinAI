@@ -1909,7 +1909,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
-        this.markFinalAnswer(sessionId, active);
         const clearActivity = active.toolActivityTracker.clear();
         if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
         // Failed attempt (deferred error pending): do not continue the agent
@@ -1937,6 +1936,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             });
           break;
         }
+        this.markFinalAnswer(sessionId, active);
         active.isRunning = false;
         // Pi versions differ in whether they emit agent_settled after agent_end.
         // Drain queued Work follow-ups here so completion never leaves them stuck.
