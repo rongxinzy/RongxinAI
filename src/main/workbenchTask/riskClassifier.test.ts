@@ -31,18 +31,12 @@ test('idempotency hashing is stable across object key order', () => {
   );
 });
 
-test('only skip_workflow bypasses production loop approval', () => {
-  expect(
-    classifyWorkbenchToolRisk(ProductionLoopToolName, {
-      action: ProductionLoopAction.SkipWorkflow,
-      reason: 'Simple information request',
-    }),
-  ).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
-  expect(
-    classifyWorkbenchToolRisk(ProductionLoopToolName, {
-      action: ProductionLoopAction.CommitPlan,
-    }),
-  ).toBe(WorkbenchApprovalRiskLevel.Unknown);
+test('all production loop control actions bypass user approval', () => {
+  for (const action of Object.values(ProductionLoopAction)) {
+    expect(classifyWorkbenchToolRisk(ProductionLoopToolName, { action })).toBe(
+      WorkbenchApprovalRiskLevel.ReadOnly,
+    );
+  }
 });
 
 test('only explicitly read-only shell commands qualify for allow-all auto approval', () => {

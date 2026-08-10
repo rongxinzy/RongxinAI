@@ -479,6 +479,24 @@ test('agent end does not verify a run paused by a denied approval', async () => 
   }
 });
 
+test('reports only running workbench runs as eligible for continuation', () => {
+  const { db, service } = createService();
+  try {
+    const { run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'write',
+      contract: chatContract,
+    });
+
+    expect(service.isRunRunning(run.id)).toBe(true);
+    service.pauseRun('session', 'Paused for test.');
+    expect(service.isRunRunning(run.id)).toBe(false);
+    expect(service.isRunRunning('missing-run')).toBe(false);
+  } finally {
+    db.close();
+  }
+});
+
 test('pausing a run expires and resolves its pending approval', async () => {
   const { db, service } = createService();
   try {

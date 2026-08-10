@@ -65,3 +65,6 @@ export const ProductionLoopAction = {
 export type ProductionLoopAction = (typeof ProductionLoopAction)[keyof typeof ProductionLoopAction];
 
 export const ProductionLoopToolName = 'production_loop';
+
+/** Stop automatic continuation after repeated turns make no production progress. */
+export const MAX_STALE_PRODUCTION_ITERATIONS = 3;
