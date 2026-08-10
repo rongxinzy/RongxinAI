@@ -51,6 +51,7 @@ import {
 } from '../shared/cowork/sessionExperts';
 import {
   ApiIpc,
+  AppIpc,
   CommunityAuthIpc,
   CoworkPermissionIpc,
   CoworkQueueIpc,
@@ -198,6 +199,7 @@ import { getNvidiaSmiSnapshot } from './libs/nvidiaSmi';
 import { getSystemMemorySnapshot } from './libs/systemMemory';
 import { OllamaManager } from './libs/ollamaManager';
 import { parsePrimaryModelRef, resolveQualifiedAgentModelRef } from './libs/openclawAgentModels';
+import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenceInstall';
 import {
   buildManagedSessionKey,
   DEFAULT_MANAGED_AGENT_ID,
@@ -3089,8 +3091,11 @@ if (!gotTheLock) {
     },
   );
 
-  ipcMain.handle('app:getVersion', () => app.getVersion());
-  ipcMain.handle('app:getSystemLocale', () => app.getLocale());
+  ipcMain.handle(AppIpc.GetVersion, () => app.getVersion());
+  ipcMain.handle(AppIpc.GetSystemLocale, () => app.getLocale());
+  ipcMain.handle(AppIpc.ConsumePendingLocalInferenceInstall, () =>
+    consumePendingLocalInferenceInstall(app.getPath('userData')),
+  );
 
   // ── Community auth IPC handlers ──
 

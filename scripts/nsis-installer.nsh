@@ -1,549 +1,572 @@
 !include "FileFunc.nsh"
 
-!macro GetTimestamp OUTVAR
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "[DateTime]::Now.ToString(\"yyyy-MM-dd HH:mm:ss.fff\")"'
-  Pop $0
-  Pop ${OUTVAR}
-  StrCmp $0 "0" +2
-    StrCpy ${OUTVAR} "unknown-time"
-!macroend
-
 !macro customHeader
-  ; Keep the assisted installer from being bitmap-scaled by Windows on high-DPI displays.
   ManifestDPIAware true
-
-  ; Request admin privileges for script execution (tar extract, etc.)
-  ; This does NOT change the default install path — just ensures UAC elevation.
-  RequestExecutionLevel admin
-
-  ; Keep details hidden (electron-builder template overrides ShowInstDetails
-  ; at compile time).  Timing is displayed via a summary MessageBox at the end.
+  ; The application and immutable runtime cache are per-user. Elevated helper
+  ; processes are used only for optional Windows-wide settings below.
+  RequestExecutionLevel user
   ShowInstDetails nevershow
 !macroend
 
-; Keep the maintained electron-builder installer flow, while adding a concise
-; Chinese welcome page before its standard installation-mode and directory pages.
 !macro customWelcomePage
   !define MUI_WELCOMEPAGE_TITLE "欢迎使用知远智能体"
-  !define MUI_WELCOMEPAGE_TEXT "知远智能体是面向真实工作的 AI 工作台。安装程序将为你准备本地运行环境和内置智能体能力。$\r$\n$\r$\n点击“下一步”继续。"
+  !define MUI_WELCOMEPAGE_TEXT "知远智能体是面向真实工作的 AI 工作台。安装程序将为你准备完整的离线运行环境；本地推理组件可在应用启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
   !insertmacro MUI_PAGE_WELCOME
 !macroend
 
 !macro customInit
-  ; Route DetailPrint output to the status bar (always visible, unlike the
-  ; details pane which electron-builder hides at compile time).
   SetDetailsPrint textonly
-
-  ; ── Capture total install start tick (persisted to file for cross-macro access) ──
+  CreateDirectory "$APPDATA\ZhiYuanAgent"
   System::Call 'kernel32::GetTickCount()i .r9'
   FileOpen $8 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" w
-  FileWrite $8 "$r9"
+  FileWrite $8 "$9"
   FileClose $8
-
-  CreateDirectory "$APPDATA\ZhiYuanAgent"
-  ; Clear timing summary file for this install session
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" w
-  FileClose $R9
-
-  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" w
-  !insertmacro GetTimestamp $8
-  FileWrite $9 "$8 phase=custom-init-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
-  FileClose $9
-
-  ; ── Kill every process that might hold file handles in the install dir ──
-  ;
-  ; 1. 知远.exe — the main app AND the OpenClaw gateway (ELECTRON_RUN_AS_NODE)
-  ; 2. node.exe whose binary lives inside the 知远 install tree
-  ;    (Web Search bridge server, MCP servers spawned with detached:true)
-  ;
-  ; Stop-Process -Force is equivalent to taskkill /F — the processes have no
-  ; chance to run before-quit cleanup, so file handles may linger briefly as
-  ; "ghost handles" in the Windows kernel. We poll until no matching process
-  ; remains before proceeding.
+  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" w
+  FileWrite $8 "phase=custom-init-start tick_ms=$9 instdir=$INSTDIR$\r$\n"
+  FileClose $8
 
   DetailPrint "[Installer] Stopping running 知远 processes"
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
     Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
     for ($$i = 0; $$i -lt 15; $$i++) {\
-      $$procs = @();\
-      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" };\
-      if ($$procs.Count -eq 0) { break };\
+      $$appProcesses = @(Get-Process -Name 知远 -ErrorAction SilentlyContinue);\
+      $$nodeProcesses = @(Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" });\
+      if (($$appProcesses.Count + $$nodeProcesses.Count) -eq 0) { break };\
       Start-Sleep -Milliseconds 500;\
     }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $9 "$8 phase=process-stop-complete exit=$0 elapsed_ms=$5$\r$\n"
-  FileClose $9
-  DetailPrint "Stop processes: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Stop 知远 processes: $5 ms$\r$\n"
-  FileClose $R9
+  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileWrite $8 "phase=process-stop-complete elapsed_ms=$5 exit=$0$\r$\n"
+  FileClose $8
 
-  ; ── Clean stale openclaw-weixin session data ──
-  ; On reinstall, old bot tokens cause the ilink server to reject new QR logins
-  ; because it still considers the old session active. Remove stale accounts
-  ; from both possible state directories so the fresh install starts clean.
-  DetailPrint "[Installer] Clearing stale Weixin session data"
+  DetailPrint "[Installer] Migrating user-created Skills"
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$dirs = @(\
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$source = \"$INSTDIR\resources\SKILLs\";\
+    $$destination = \"$APPDATA\ZhiYuanAgent\SKILLs\";\
+    $$config = Join-Path $$source \"skills.config.json\";\
+    $$weixinAccounts = @(\
       (Join-Path $$env:USERPROFILE \".openclaw\openclaw-weixin\accounts\"),\
       (Join-Path $$env:APPDATA \"ZhiYuanAgent\openclaw\state\openclaw-weixin\accounts\")\
     );\
-    foreach ($$d in $$dirs) {\
-      if (Test-Path $$d) {\
-        Remove-Item -Path $$d -Recurse -Force -ErrorAction SilentlyContinue;\
-        Write-Output \"[Installer] Removed stale Weixin accounts: $$d\";\
-      }\
-    }"'
-  Pop $0
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $9 "$8 phase=weixin-cleanup-complete exit=$0 elapsed_ms=$5$\r$\n"
-  FileClose $9
-  DetailPrint "Clear Weixin sessions: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Clear stale Weixin sessions: $5 ms$\r$\n"
-  FileClose $R9
-
-  ; ── Backup user-created skills to AppData before extraction overwrites them ──
-  ; Copy non-bundled skills to %APPDATA%\ZhiYuanAgent\skills-backup\ so they are
-  ; preserved when NSIS extracts the new version over the existing install.
-  ; The backup is restored in customInstall after extraction completes.
-  ;
-  ; Quoting note: paths use \"..\" (backslash-escaped quote) — NOT $\"..$\" —
-  ; because $\"..$\" produces raw quotes that Windows CRT argv parsing consumes,
-  ; leaving the path unquoted and causing PowerShell method calls to fail.
-  DetailPrint "[Installer] Backing up user-created skills"
-  System::Call 'kernel32::GetTickCount()i .r7'
-  ClearErrors
-  FileOpen $R0 "$APPDATA\ZhiYuanAgent\skill-migrate.log" w
-  IfErrors BackupLogOpenFailed
-    !insertmacro GetTimestamp $8
-    FileWrite $R0 "$8 phase=backup-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
-    Goto BackupDoExec
-  BackupLogOpenFailed:
-    StrCpy $R0 ""
-  BackupDoExec:
-
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$src    = \"$INSTDIR\resources\SKILLs\";\
-    $$backup = \"$APPDATA\ZhiYuanAgent\skills-backup\";\
-    $$config = \"$$src\skills.config.json\";\
-    if (Test-Path $$backup) { Remove-Item -Path $$backup -Recurse -Force -ErrorAction SilentlyContinue };\
-    if (Test-Path $$src) {\
+    foreach ($$directory in $$weixinAccounts) {\
+      if (Test-Path $$directory) { Remove-Item -Path $$directory -Recurse -Force -ErrorAction SilentlyContinue }\
+    };\
+    if (Test-Path $$source) {\
+      New-Item -ItemType Directory -Path $$destination -Force | Out-Null;\
       $$bundled = @(try {\
         if (Test-Path $$config) {\
           (Get-Content $$config -Raw | ConvertFrom-Json).defaults.PSObject.Properties.Name\
         }\
       } catch { });\
-      $$userSkills = @(Get-ChildItem -Path $$src -Directory | Where-Object { $$bundled -notcontains $$_.Name });\
-      if ($$userSkills.Count -gt 0) {\
-        New-Item -ItemType Directory -Path $$backup -Force | Out-Null;\
-        $$userSkills | ForEach-Object {\
-          Copy-Item -Path $$_.FullName -Destination (Join-Path $$backup $$_.Name) -Recurse -Force\
+      Get-ChildItem -Path $$source -Directory | Where-Object { $$bundled -notcontains $$_.Name } | ForEach-Object {\
+        $$target = Join-Path $$destination $$_.Name;\
+        if (-not (Test-Path $$target)) { Copy-Item -Path $$_.FullName -Destination $$target -Recurse -Force }\
+      };\
+    }"'
+  Pop $0
+  Pop $1
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $5 $6 - $7
+  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileWrite $8 "phase=skill-migration-complete elapsed_ms=$5 exit=$0 output=$1$\r$\n"
+  FileClose $8
+
+  ; Rename the old application quickly. Its directory junctions do not copy the
+  ; shared resource pack, and physical cleanup is delayed until installation ends.
+  DetailPrint "[Installer] Detaching previous application version"
+  System::Call 'kernel32::GetTickCount()i .r7'
+  IfFileExists "$INSTDIR\*.*" 0 OldInstallDetachDone
+    System::Call 'kernel32::GetTickCount()i .r4'
+    StrCpy $3 "$INSTDIR.old.$4"
+    Rename "$INSTDIR" "$3"
+    IfErrors OldInstallDetachDone
+    FileOpen $8 "$APPDATA\ZhiYuanAgent\old-install-path.txt" w
+    FileWrite $8 "$3"
+    FileClose $8
+  OldInstallDetachDone:
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $5 $6 - $7
+  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileWrite $8 "phase=old-install-detached elapsed_ms=$5 path=$3$\r$\n"
+  FileClose $8
+!macroend
+
+!macro EnsureOfflineComponent TOKEN KEY PREFIX SENTINEL LABEL
+  DetailPrint "[Installer] Checking ${LABEL}"
+  System::Call 'kernel32::GetTickCount()i .r7'
+  SetOutPath "$PLUGINSDIR"
+  File /oname=component-${KEY}.version "${PROJECT_DIR}\build-tar\windows-components\${KEY}.version"
+  File /oname=component-${KEY}.sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sha256"
+  File /oname=component-${KEY}.sentinel-sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sentinel-sha256"
+
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
+  IfErrors ComponentVersionInvalid_${TOKEN}
+  FileRead $2 $R1
+  FileClose $2
+  StrCpy $R1 $R1 64
+  StrLen $R5 $R1
+  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
+
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sha256" r
+  IfErrors ComponentVersionInvalid_${TOKEN}
+  FileRead $2 $R4
+  FileClose $2
+  StrCpy $R4 $R4 64
+  StrLen $R5 $R4
+  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
+
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sentinel-sha256" r
+  IfErrors ComponentVersionInvalid_${TOKEN}
+  FileRead $2 $R6
+  FileClose $2
+  StrCpy $R6 $R6 64
+  StrLen $R5 $R6
+  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
+
+  StrCpy $R2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1"
+  IfFileExists "$R2\.complete" 0 ComponentCacheMiss_${TOKEN}
+  FileOpen $2 "$R2\.complete" r
+  IfErrors ComponentCacheMiss_${TOKEN}
+  FileRead $2 $R5
+  FileClose $2
+  StrCpy $R5 $R5 64
+  StrCmp $R5 $R1 0 ComponentCacheMiss_${TOKEN}
+  IfFileExists "$R2\${SENTINEL}" 0 ComponentCacheMiss_${TOKEN}
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R2\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 ComponentCacheMiss_${TOKEN}
+  StrCpy $1 $1 64
+  StrCmp $1 $R6 ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
+
+  ComponentCacheHit_${TOKEN}:
+    DetailPrint "[Installer] Reusing ${LABEL}"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-cache-hit component=${KEY} content_id=$R1$\r$\n"
+    FileClose $2
+    Goto ComponentReady_${TOKEN}
+
+  ComponentCacheMiss_${TOKEN}:
+    DetailPrint "[Installer] Expanding ${LABEL}"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-cache-miss component=${KEY} content_id=$R1$\r$\n"
+    FileClose $2
+    StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1.installing"
+    RMDir /r "$R3"
+    CreateDirectory "$R3"
+    SetOutPath "$PLUGINSDIR"
+    File /oname=component-${KEY}.tar "${PROJECT_DIR}\build-tar\windows-components\${KEY}.tar"
+
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.tar\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" 0 ComponentHashFailed_${TOKEN}
+    StrCpy $1 $1 64
+    StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
+
+    nsExec::ExecToStack '"$SYSDIR\tar.exe" -xf "$PLUGINSDIR\component-${KEY}.tar" -C "$R3"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
+    IntCmp $0 0 ComponentExtracted_${TOKEN} ComponentExtractFailed_${TOKEN} ComponentExtractFailed_${TOKEN}
+
+  ComponentHashFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 actual=$1 exit=$0$\r$\n"
+    FileClose $2
+    Goto OfflineComponentInstallFailed
+
+  ComponentExtractFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
+    FileClose $2
+    Goto OfflineComponentInstallFailed
+
+  ComponentExtracted_${TOKEN}:
+    IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" 0 ComponentVerificationFailed_${TOKEN}
+    StrCpy $1 $1 64
+    StrCmp $1 $R6 0 ComponentVerificationFailed_${TOKEN}
+    FileOpen $2 "$R3\.complete" w
+    FileWrite $2 "$R1|$R4"
+    FileClose $2
+    RMDir /r "$R2"
+    Rename "$R3" "$R2"
+    IfErrors ComponentCommitFailed_${TOKEN}
+    Delete "$PLUGINSDIR\component-${KEY}.tar"
+    Goto ComponentReady_${TOKEN}
+
+  ComponentVerificationFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 健康检查失败，${SENTINEL} 缺失或校验不匹配。"
+    Goto OfflineComponentInstallFailed
+
+  ComponentCommitFailed_${TOKEN}:
+    StrCpy $R9 "无法启用 ${LABEL}，请确认当前用户对 %LOCALAPPDATA%\ZhiYuanAgent 有写入权限。"
+    Goto OfflineComponentInstallFailed
+
+  ComponentVersionInvalid_${TOKEN}:
+    StrCpy $R9 "安装包缺少 ${LABEL} 的有效版本或校验信息。"
+    Goto OfflineComponentInstallFailed
+
+  ComponentReady_${TOKEN}:
+    FileOpen $2 "$PLUGINSDIR\component-targets.txt" a
+    FileWrite $2 "${KEY}|${PREFIX}|$R1$\r$\n"
+    FileClose $2
+    System::Call 'kernel32::GetTickCount()i .r6'
+    IntOp $R5 $6 - $7
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 elapsed_ms=$R5$\r$\n"
+    FileClose $2
+!macroend
+
+!macro customInstall
+  CreateDirectory "$APPDATA\ZhiYuanAgent"
+  CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+  SetOutPath "$PLUGINSDIR"
+  FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
+  FileClose $2
+  Delete "$PLUGINSDIR\component-switch-state.txt"
+
+  ; Defender exclusion is optional and requires explicit, informed consent.
+  ; Keep the scope limited to the immutable component cache; never exclude
+  ; user-created Skills, OpenClaw state, model data, or the full install tree.
+  DetailPrint "[Installer] Checking Microsoft Defender exclusion"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    try {\
+      $$excluded = @((Get-MpPreference -ErrorAction Stop).ExclusionPath);\
+      if ($$excluded -contains $$runtimeRoot) { exit 0 }\
+    } catch { };\
+    exit 3"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" DefenderExclusionAlreadyActive
+  IfSilent DefenderExclusionSkipped
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1 "是否允许将知远的离线运行环境加入 Microsoft Defender 排除项？$\r$\n$\r$\n这样可以显著减少大量小文件在首次解压和后续运行时的扫描开销，但该目录中的文件将不再接受 Defender 实时扫描。设置会持续到卸载知远，你也可以随时在 Windows 安全中心撤销。$\r$\n$\r$\n目录：%LOCALAPPDATA%\ZhiYuanAgent\runtimes$\r$\n$\r$\n开源版推荐选择“是”；如不希望修改 Defender 设置，请选择“否”。" IDYES EnableDefenderExclusion IDNO DefenderExclusionDeclined
+
+  EnableDefenderExclusion:
+    DetailPrint "[Installer] Adding user-approved Defender exclusion"
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\"; $$command = \"Add-MpPreference -ExclusionPath ''$$runtimeRoot'' -ErrorAction Stop\"; $$process = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList @(''-NoProfile'', ''-NonInteractive'', ''-Command'', $$command) -Wait -PassThru; exit $$process.ExitCode"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" DefenderExclusionEnabled
+      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
+      FileClose $2
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加，可能被组织策略阻止。知远仍会继续安装。"
+      Goto DefenderExclusionDone
+
+  DefenderExclusionEnabled:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" w
+    FileWrite $2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+    FileClose $2
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-enabled path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
+    FileClose $2
+    Goto DefenderExclusionDone
+
+  DefenderExclusionAlreadyActive:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-already-active path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
+    FileClose $2
+    Goto DefenderExclusionDone
+
+  DefenderExclusionDeclined:
+    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-declined$\r$\n"
+    FileClose $2
+    Goto DefenderExclusionDone
+
+  DefenderExclusionSkipped:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-skipped-silent$\r$\n"
+    FileClose $2
+
+  DefenderExclusionDone:
+
+  !insertmacro EnsureOfflineComponent OPENCLAW "openclaw" "cfmind" "cfmind\package.json" "OpenClaw 离线运行环境"
+  !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
+  !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
+  !insertmacro EnsureOfflineComponent PORTABLE_GIT "portable-git" "mingit" "mingit\usr\bin\bash.exe" "PortableGit"
+  !insertmacro EnsureOfflineComponent PYTHON "python" "python-win" "python-win\python.exe" "Python 离线运行环境"
+  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\xlsx\Scripts\python.exe" "Skill Python 离线环境"
+  !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
+
+  DetailPrint "[Installer] Activating offline components"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
+      $$parts = $$_.Split(\"|\");\
+      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$parts[2] }\
+    });\
+    $$prepared = @();\
+    $$switched = @();\
+    try {\
+      foreach ($$row in $$rows) {\
+        $$root = Join-Path $$runtimeRoot $$row.Key;\
+        $$target = Join-Path $$root $$row.Id;\
+        $$current = Join-Path $$root \"current\";\
+        $$next = Join-Path $$root \"current.next\";\
+        $$previous = Join-Path $$root \"current.previous\";\
+        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" };\
+        foreach ($$stale in @($$next, $$previous)) {\
+          if (Test-Path -LiteralPath $$stale) {\
+            $$item = Get-Item -LiteralPath $$stale -Force;\
+            if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0) { throw \"Unsafe component pointer: $$stale\" };\
+            [IO.Directory]::Delete($$stale)\
+          }\
+        };\
+        New-Item -ItemType Junction -Path $$next -Target $$target -Force | Out-Null;\
+        $$prepared += [pscustomobject]@{ Row = $$row; Current = $$current; Next = $$next; Previous = $$previous }\
+      };\
+      foreach ($$entry in $$prepared) {\
+        $$hadCurrent = Test-Path -LiteralPath $$entry.Current;\
+        Add-Content -LiteralPath $$statePath -Value ($$entry.Row.Key + \"|\" + $$hadCurrent);\
+        $$switched += [pscustomobject]@{ Entry = $$entry; HadCurrent = $$hadCurrent };\
+        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" };\
+        Rename-Item -LiteralPath $$entry.Next -NewName \"current\"\
+      }\
+    } catch {\
+      foreach ($$entry in $$prepared) {\
+        if (Test-Path -LiteralPath $$entry.Next) { [IO.Directory]::Delete($$entry.Next) }\
+      };\
+      [array]::Reverse($$switched);\
+      foreach ($$switch in $$switched) {\
+        $$entry = $$switch.Entry;\
+        if (Test-Path -LiteralPath $$entry.Previous) {\
+          if (Test-Path -LiteralPath $$entry.Current) { [IO.Directory]::Delete($$entry.Current) };\
+          Rename-Item -LiteralPath $$entry.Previous -NewName \"current\"\
+        } elseif (-not $$switch.HadCurrent -and (Test-Path -LiteralPath $$entry.Current)) {\
+          [IO.Directory]::Delete($$entry.Current)\
+        }\
+      };\
+      Remove-Item -LiteralPath $$statePath -Force -ErrorAction SilentlyContinue;\
+      throw\
+    }"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" ComponentPointersReady
+    StrCpy $R9 "离线组件切换失败：$1"
+    Goto OfflineComponentInstallFailed
+  ComponentPointersReady:
+
+  DetailPrint "[Installer] Connecting bundled runtimes"
+  SetOutPath "$INSTDIR"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$resourceRoot = \"$INSTDIR\resources\";\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1] } });\
+    foreach ($$row in $$rows) {\
+      $$link = Join-Path $$resourceRoot $$row.Prefix;\
+      $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
+      if (-not (Test-Path -LiteralPath $$target)) { throw \"Missing component target: $$target\" };\
+      if (Test-Path $$link) {\
+        $$existing = Get-Item -LiteralPath $$link -Force;\
+        if (($$existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {\
+          [IO.Directory]::Delete($$link);\
+        } else {\
+          Remove-Item -LiteralPath $$link -Recurse -Force;\
+        }\
+      };\
+      New-Item -ItemType Junction -Path $$link -Target $$target -Force | Out-Null;\
+    }"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" RuntimeLinksReady
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=runtime-link-failed exit=$0 output=$1$\r$\n"
+    FileClose $2
+    StrCpy $R9 "离线运行环境连接失败：$1"
+    Goto OfflineComponentInstallFailed
+  RuntimeLinksReady:
+
+  DetailPrint "[Installer] Verifying bundled runtimes"
+  IfFileExists "$INSTDIR\resources\python-win\python.exe" 0 InstalledRuntimeVerificationFailed
+  IfFileExists "$INSTDIR\resources\uv-win\uv.exe" 0 InstalledRuntimeVerificationFailed
+  IfFileExists "$INSTDIR\resources\cfmind\package.json" 0 InstalledRuntimeVerificationFailed
+  Goto OfflineComponentsReady
+  InstalledRuntimeVerificationFailed:
+    StrCpy $R9 "离线运行环境连接校验失败。请重新运行安装器。"
+    Goto OfflineComponentInstallFailed
+
+  OfflineComponentInstallFailed:
+    nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+      $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+      $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+      if (Test-Path -LiteralPath $$statePath) {\
+        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ });\
+        [array]::Reverse($$states);\
+        foreach ($$state in $$states) {\
+          $$parts = $$state.Split(\"|\");\
+          $$root = Join-Path $$runtimeRoot $$parts[0];\
+          $$current = Join-Path $$root \"current\";\
+          $$previous = Join-Path $$root \"current.previous\";\
+          if ($$parts[1] -eq \"True\") {\
+            if (Test-Path -LiteralPath $$previous) {\
+              if (Test-Path -LiteralPath $$current) { [IO.Directory]::Delete($$current) };\
+              Rename-Item -LiteralPath $$previous -NewName \"current\"\
+            }\
+          } elseif (Test-Path -LiteralPath $$current) {\
+            [IO.Directory]::Delete($$current)\
+          }\
+        }\
+      }"'
+    Pop $0
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-set-rollback reason=$R9$\r$\n"
+    FileClose $2
+    MessageBox MB_OK|MB_ICONSTOP "$R9"
+    Abort
+
+  OfflineComponentsReady:
+
+  ; The VC runtime is bundled for offline installation, but upgrades skip it
+  ; when the supported x64 redistributable is already registered.
+  DetailPrint "[Installer] Checking Microsoft Visual C++ Runtime"
+  SetRegView 64
+  ClearErrors
+  ReadRegDWORD $0 HKLM "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" "Installed"
+  IfErrors InstallVcRuntime
+  IntCmp $0 1 VcRuntimeReady InstallVcRuntime InstallVcRuntime
+  InstallVcRuntime:
+    IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 VcRuntimeReady
+    DetailPrint "[Installer] Installing Microsoft Visual C++ Runtime"
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$process = Start-Process -FilePath \"$INSTDIR\resources\vc_redist.x64.exe\" -Verb RunAs -ArgumentList @(''/install'', ''/quiet'', ''/norestart'') -Wait -PassThru; exit $$process.ExitCode"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" VcRuntimeReady
+    StrCmp $0 "1638" VcRuntimeReady
+    StrCmp $0 "3010" VcRuntimeReady
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
+  VcRuntimeReady:
+
+  ; Local inference remains optional. The installer records only an intent;
+  ; download, verification, extraction, cancellation and retry happen in-app.
+  IfSilent LocalInferencePromptDone 0
+  Delete "$APPDATA\ZhiYuanAgent\pending-local-inference-install"
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "是否在启动知远后安装本地推理组件？$\r$\n$\r$\n知远会根据硬件推荐 CPU 或 NVIDIA CUDA 后端，需额外下载约 16 MB–621 MB。下载将在应用内显示进度并可取消；选择“否”不影响其他功能。" IDYES RecordLocalInferenceIntent IDNO LocalInferencePromptDone
+  RecordLocalInferenceIntent:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\pending-local-inference-install" w
+    FileWrite $2 "$R1"
+    FileClose $2
+  LocalInferencePromptDone:
+
+  ; Cleanup begins only after core application and runtime links are ready, so
+  ; it no longer competes with resource expansion on slow disks.
+  DetailPrint "[Installer] Scheduling previous version cleanup"
+  ; Remove known junctions explicitly before recursive deletion. This prevents
+  ; an old installation cleanup from ever walking into an immutable shared pack.
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    $$names = @("cfmind", "SKILLs", "MCPs", "mingit", "python-win", "skill-python", "uv-win");\
+    Get-ChildItem -Path "$INSTDIR.old*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {\
+      $$oldResources = Join-Path $$_.FullName "resources";\
+      foreach ($$name in $$names) {\
+        $$link = Join-Path $$oldResources $$name;\
+        if (Test-Path -LiteralPath $$link) {\
+          $$item = Get-Item -LiteralPath $$link -Force;\
+          if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {\
+            [IO.Directory]::Delete($$link)\
+          }\
         }\
       }\
     }"'
   Pop $0
-  Pop $1
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-
-  StrCmp $R0 "" BackupSkipCloseLog
-    !insertmacro GetTimestamp $8
-    FileWrite $R0 "$8 phase=backup-end exit=$0 elapsed_ms=$5$\r$\n"
-    FileWrite $R0 "$8 phase=backup-output text=$1$\r$\n"
-    FileClose $R0
-  BackupSkipCloseLog:
-  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $9 "$8 phase=skill-backup-complete exit=$0 elapsed_ms=$5$\r$\n"
-  FileClose $9
-  DetailPrint "Backup user skills: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Backup user skills: $5 ms$\r$\n"
-  FileClose $R9
-
-  ; ── Remove old installation directory ──
-  ; Rename $INSTDIR so the old uninstaller exe disappears from its registered
-  ; path — electron-builder cannot invoke it and the "app cannot be closed"
-  ; dialog (present in old uninstallers that lack customUnInit) is never shown.
-  ; User skills are already safe in the AppData backup above, so skill
-  ; preservation does not depend on this rename succeeding.
-  ;
-  ; Important: never reuse a fixed "$INSTDIR.old" path. If a previous async
-  ; delete leaves that directory behind, Rename fails immediately and the old
-  ; uninstaller remains in place. Instead, schedule cleanup of any stale
-  ; *.old* dirs, then rename to a unique per-run suffix and schedule deletion
-  ; of that unique directory in the background so the installer UI can appear
-  ; immediately after the rename succeeds.
-  DetailPrint "[Installer] Removing previous installation directory"
-  System::Call 'kernel32::GetTickCount()i .r7'
-  IfFileExists "$INSTDIR\*.*" 0 SkipOldDirRemoval
-    nsExec::ExecToLog 'cmd /c for /d %D in ("$INSTDIR.old*") do @start "" /b cmd /c rd /s /q "%~fD"'
-    Pop $0
-    System::Call 'kernel32::GetTickCount()i .r4'
-    StrCpy $3 "$INSTDIR.old.$4"
-    Rename "$INSTDIR" "$3"
-    IfErrors 0 RenameOK
-      Goto SkipOldDirRemoval
-    RenameOK:
-      nsExec::ExecToLog 'cmd /c start "" /b cmd /c rd /s /q "$3"'
-      Pop $0
-  SkipOldDirRemoval:
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  FileOpen $9 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $9 "$8 phase=old-install-cleanup-complete elapsed_ms=$5 renamed_path=$3 cleanup_mode=async$\r$\n"
-  FileClose $9
-  DetailPrint "Remove previous install: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Remove previous installation: $5 ms$\r$\n"
-  FileClose $R9
-!macroend
-
-!macro customInstall
-  ; ─── Install Timing Log ───
-  ; Write timestamps to help diagnose slow installation phases.
-  ; Log file: %APPDATA%\ZhiYuanAgent\install-timing.log
-
-  CreateDirectory "$APPDATA\ZhiYuanAgent"
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=nsis-extract-complete$\r$\n"
-  FileClose $2
-  DetailPrint "[Installer] Preparing installation steps"
-
-  ; ─── Extract combined resource archive (win-resources.tar) ───
-  ; All large resource directories (cfmind/, SKILLs/, python-win/, uv-win/) are packed
-  ; into a single tar file. NSIS 7z extracts one large file almost instantly;
-  ; we then unpack the tar here using Windows native tar.exe (C implementation).
-  ; tar.exe is built into Windows 10 1803+ — Electron 40 requires Windows 10+,
-  ; so it is always available. Native C tar is ~3-5x faster than JS tar and
-  ; eliminates the 2-5s Electron cold-start overhead.
-
-  ; ─── Windows Defender Exclusion (optional, best-effort) ───
-  ; Add exclusions before tar extraction so Defender does not slow down the
-  ; expansion of large resource trees.
-  CreateDirectory "$INSTDIR\resources\cfmind"
-  CreateDirectory "$INSTDIR\resources\python-win"
-  CreateDirectory "$INSTDIR\resources\uv-win"
-  CreateDirectory "$INSTDIR\resources\SKILLs"
-  DetailPrint "[Installer] Preparing resource directories"
-  DetailPrint "[Installer] Adding Windows Defender exclusions before extraction"
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
-  FileClose $2
-  System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
+  nsExec::ExecToLog 'cmd /c for /d %D in ("$INSTDIR.old*") do @start "" /b cmd /c rd /s /q "%~fD"'
   Pop $0
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=defender-exclusion-complete exit=$0 elapsed_ms=$5$\r$\n"
-  FileClose $2
-  DetailPrint "Defender exclusions: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Defender exclusions: $5 ms$\r$\n"
-  FileClose $R9
+  Delete "$APPDATA\ZhiYuanAgent\old-install-path.txt"
 
-  ; ── Native tar extraction ──
-  DetailPrint "[Installer] Extracting bundled resources (native tar)"
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=tar-extract-start tar=$INSTDIR\resources\win-resources.tar dest=$INSTDIR\resources$\r$\n"
-  FileClose $2
+  DetailPrint "[Installer] Cleaning unused offline component versions"
   System::Call 'kernel32::GetTickCount()i .r7'
-
-  nsExec::ExecToLog 'tar -xf "$INSTDIR\resources\win-resources.tar" -C "$INSTDIR\resources"'
-  Pop $0
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-
-  ; Diagnostic: log raw exit code with brackets to reveal trailing whitespace
-  StrLen $4 $0
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=tar-extract-raw-exit exit_raw=[$0] exit_len=$4$\r$\n"
-  FileClose $2
-
-  ; "error" = nsExec couldn't start the process (check before IntCmp, which
-  ; converts non-numeric strings to 0 and would misidentify "error" as success)
-  StrCmp $0 "error" TarExtractProcessFailed
-  ; IntCmp tolerates trailing whitespace/CR that StrCmp would reject
-  IntCmp $0 0 TarExtractOK TarExtractNonZero TarExtractNonZero
-
-  TarExtractProcessFailed:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=process-start-failed$\r$\n"
-    FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed: could not start tar.exe (exit=$0). This may be caused by antivirus software or a heavily stripped Windows installation. See %APPDATA%\ZhiYuanAgent\install-timing.log for details."
-    Goto TarExtractOK
-
-  TarExtractNonZero:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=tar-extract-error exit=$0 elapsed_ms=$5 reason=nonzero-exit$\r$\n"
-    FileClose $2
-    MessageBox MB_OK|MB_ICONEXCLAMATION "Resource extraction failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-timing.log for details."
-  TarExtractOK:
-
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=tar-extract-complete exit=$0 elapsed_ms=$5$\r$\n"
-  FileClose $2
-  DetailPrint "Extract resources: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Extract bundled resources: $5 ms$\r$\n"
-  FileClose $R9
-  Delete "$INSTDIR\resources\win-resources.tar"
-
-  DetailPrint "[Installer] Verifying bundled runtimes"
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$python = Join-Path \"$INSTDIR\resources\python-win\" \"python.exe\";\
-    $$uv = Join-Path \"$INSTDIR\resources\uv-win\" \"uv.exe\";\
-    $$uvx = Join-Path \"$INSTDIR\resources\uv-win\" \"uvx.exe\";\
-    if (-not (Test-Path $$python)) { Write-Output \"missing:python\"; exit 10 };\
-    if (-not (Test-Path $$uv)) { Write-Output \"missing:uv\"; exit 11 };\
-    if (-not (Test-Path $$uvx)) { Write-Output \"missing:uvx\"; exit 12 };\
-    Write-Output \"ok\""'
-  Pop $0
-  Pop $1
-  StrCmp $0 "0" RuntimeVerifyDone
-    MessageBox MB_OK|MB_ICONSTOP "Bundled runtime verification failed: $1"
-    Abort
-  RuntimeVerifyDone:
-
-  DetailPrint "[Installer] Installing llama.cpp backend"
-  IfFileExists "$INSTDIR\resources\llamacpp-backends\manifest.json" LlamaCppBackendResourcesPresent LlamaCppBackendResourcesMissing
-
-  LlamaCppBackendResourcesMissing:
-    IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendManifestMissing LlamaCppBackendInstallSkip
-
-  LlamaCppBackendInstallSkip:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=no-bundled-resources$\r$\n"
-    FileClose $2
-    DetailPrint "[Installer] Skipping llama.cpp backend installation"
-    Goto LlamaCppBackendInstallDone
-
-  LlamaCppBackendManifestMissing:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-manifest$\r$\n"
-    FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend manifest is missing from the installer resources. Please reinstall 知远 with a valid installer package."
-    Abort
-
-  LlamaCppBackendResourcesPresent:
-    StrCpy $R8 ""
-    IfSilent LlamaCppBackendInstallDeferred 0
-    MessageBox MB_OKCANCEL|MB_ICONQUESTION "本地推理运行时包含未签名的程序文件。知远智能体需要创建本机证书并仅签名这些文件，以便正常运行。$\r$\n$\r$\n点击“确定”继续安装并启用本地推理；点击“取消”将跳过本地推理，App 仍可正常安装。证书不会上传，也不会用于其他应用。" IDOK LlamaCppBackendLocalSigningConfirmed IDCANCEL LlamaCppBackendLocalSigningCancelled
-
-  LlamaCppBackendLocalSigningConfirmed:
-    StrCpy $R8 "--local-signing-confirmed"
-    Goto LlamaCppBackendInstallRun
-
-  LlamaCppBackendInstallDeferred:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=silent-no-local-signing-confirmation$\r$\n"
-    FileClose $2
-    DetailPrint "[Installer] Skipping local inference runtime installation during unattended update"
-    Goto LlamaCppBackendInstallDone
-
-  LlamaCppBackendLocalSigningCancelled:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-skipped reason=user-declined-local-signing$\r$\n"
-    FileClose $2
-    DetailPrint "[Installer] Skipping local inference runtime installation because local signing was declined"
-    Goto LlamaCppBackendInstallDone
-
-  LlamaCppBackendInstallRun:
-    IfFileExists "$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs" LlamaCppBackendInstallExecute LlamaCppBackendHelperMissing
-
-  LlamaCppBackendHelperMissing:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=llamacpp-backend-install-error reason=missing-helper$\r$\n"
-    FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installer helper is missing from the installer resources. Please reinstall 知远 with a valid installer package."
-    Abort
-
-  LlamaCppBackendInstallExecute:
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=llamacpp-backend-install-start helper=$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs manifest=$INSTDIR\resources\llamacpp-backends\manifest.json local_signing_arg=$R8$\r$\n"
-  FileClose $2
-  System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "\
-    $$env:ELECTRON_RUN_AS_NODE = \"1\";\
-    $$electron = \"$INSTDIR\知远.exe\";\
-    $$helper = \"$INSTDIR\resources\llamacpp-nsis-helper\install-llamacpp-backend-nsis.cjs\";\
-    $$manifest = \"$INSTDIR\resources\llamacpp-backends\manifest.json\";\
-    $$resources = \"$INSTDIR\resources\llamacpp-backends\";\
-    $$appData = \"$APPDATA\ZhiYuanAgent\";\
-    $$log = \"$APPDATA\ZhiYuanAgent\install-llamacpp.log\";\
-    if (-not (Test-Path $$electron)) { Write-Output \"missing:electron-runtime\"; exit 20 };\
-    if (-not (Test-Path $$helper)) { Write-Output \"missing:llamacpp-helper\"; exit 21 };\
-    if (-not (Test-Path $$manifest)) { Write-Output \"missing:llamacpp-manifest\"; exit 22 };\
-    & $$electron $$helper --manifest $$manifest --resources-dir $$resources --app-data-dir $$appData --log-path $$log $R8;\
-    if ($$LASTEXITCODE -eq $$null) { exit 0 };\
-    exit $$LASTEXITCODE"'
-  Pop $0
-  Pop $1
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=llamacpp-backend-install-complete exit=$0 elapsed_ms=$5 output=$1$\r$\n"
-  FileClose $2
-  DetailPrint "Install llama.cpp backend: $5 ms"
-  FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-  FileWrite $R9 "  Install llama.cpp backend: $5 ms$\r$\n"
-  FileClose $R9
-  StrCmp $0 "error" LlamaCppBackendInstallFailed
-  IntCmp $0 0 LlamaCppBackendInstallDone LlamaCppBackendInstallNonZero LlamaCppBackendInstallNonZero
-
-  LlamaCppBackendInstallNonZero:
-    IntCmp $0 31 LlamaCppBackendLocalSigningFailed 0 0
-    IntCmp $0 16 LlamaCppBackendInstallNetworkFailed LlamaCppBackendInstallFailed LlamaCppBackendInstallFailed
-
-  LlamaCppBackendLocalSigningFailed:
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend local signing failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-llamacpp.log and %APPDATA%\ZhiYuanAgent\install-timing.log for details."
-    Abort
-
-  LlamaCppBackendInstallNetworkFailed:
-    MessageBox MB_OK|MB_ICONSTOP "The llama.cpp backend download failed after automatic resume/retry. Please check your network, proxy, or firewall settings and run the installer again. See %APPDATA%\ZhiYuanAgent\install-llamacpp.log for details."
-    Abort
-
-  LlamaCppBackendInstallFailed:
-    MessageBox MB_OK|MB_ICONSTOP "llama.cpp backend installation failed (exit code $0). See %APPDATA%\ZhiYuanAgent\install-llamacpp.log and %APPDATA%\ZhiYuanAgent\install-timing.log for details."
-    Abort
-
-  LlamaCppBackendInstallDone:
-
-  IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 SkipVcRedistInstall
-    DetailPrint "[Installer] Installing bundled dependency: Microsoft Visual C++ Runtime"
-    DetailPrint "[Installer] Installing Microsoft Visual C++ Redistributable"
-    nsExec::ExecToStack '"$INSTDIR\resources\vc_redist.x64.exe" /install /quiet /norestart'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" SkipVcRedistInstall
-    StrCmp $0 "1638" SkipVcRedistInstall
-    StrCmp $0 "3010" SkipVcRedistInstall
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Redistributable installation did not complete successfully. llama.cpp local inference may be unavailable until the runtime is installed manually."
-  SkipVcRedistInstall:
-
-  ; ── Restore user-created skills from AppData backup ──
-  ; The backup was created in customInit before extraction began. Restore any
-  ; skills not already present in the new install, then clean up the backup.
-  IfFileExists "$APPDATA\ZhiYuanAgent\skills-backup\*.*" 0 SkipSkillRestore
-    DetailPrint "[Installer] Restoring user-created skills"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=skill-restore-start$\r$\n"
-    FileClose $2
-    System::Call 'kernel32::GetTickCount()i .r7'
-
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-      $$backup    = \"$APPDATA\ZhiYuanAgent\skills-backup\";\
-      $$newSkills = \"$INSTDIR\resources\SKILLs\";\
-      Get-ChildItem -Path $$backup -Directory | ForEach-Object {\
-        $$target = Join-Path $$newSkills $$_.Name;\
-        if (-not (Test-Path $$target)) {\
-          Copy-Item -Path $$_.FullName -Destination $$target -Recurse -Force\
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Id = $$parts[2] } });\
+    foreach ($$row in $$rows) {\
+      $$root = Join-Path $$runtimeRoot $$row.Key;\
+      foreach ($$pointerName in @(\"current.previous\", \"current.next\")) {\
+        $$pointer = Join-Path $$root $$pointerName;\
+        if (Test-Path -LiteralPath $$pointer) {\
+          $$item = Get-Item -LiteralPath $$pointer -Force;\
+          if (($$item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
         }\
       };\
-      Remove-Item -Path $$backup -Recurse -Force -ErrorAction SilentlyContinue"'
-    Pop $0
-    Pop $1
-    System::Call 'kernel32::GetTickCount()i .r6'
-    IntOp $5 $6 - $7
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=skill-restore-complete exit=$0 elapsed_ms=$5$\r$\n"
-    FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
-    FileClose $2
-    DetailPrint "Restore user skills: $5 ms"
-    FileOpen $R9 "$APPDATA\ZhiYuanAgent\install-timing-summary.txt" a
-    FileWrite $R9 "  Restore user skills: $5 ms$\r$\n"
-    FileClose $R9
-  SkipSkillRestore:
-
-  ; ── Total install time & summary MessageBox ──
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
-  IfErrors TotalTimeSkip
-  FileRead $2 $R1
-  FileClose $2
-  System::Call 'kernel32::GetTickCount()i .r7'
-  IntOp $R2 $R7 - $R1
-  StrCpy $R3 ""
-  IntCmp $R2 1000 TotalLessThan1s TotalLessThan1s TotalInSeconds
-  TotalLessThan1s:
-    StrCpy $R3 "$R2 ms"
-    Goto TotalTimeDone
-  TotalInSeconds:
-    IntOp $R4 $R2 / 100
-    IntOp $R5 $R4 % 10
-    IntOp $R4 $R4 / 10
-    StrCpy $R3 "$R4.$R5 s"
-  TotalTimeDone:
-  Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"
-  Delete "$APPDATA\ZhiYuanAgent\install-timing-summary.txt"
-  DetailPrint "Total: $R3"
-  TotalTimeSkip:
-
+      Get-ChildItem -LiteralPath $$root -Directory -ErrorAction SilentlyContinue | Where-Object { $$_.Name -ne $$row.Id -and $$_.Name -ne \"current\" } | ForEach-Object {\
+        if (($$_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$_.FullName) } else { Remove-Item -LiteralPath $$_.FullName -Recurse -Force }\
+      }\
+    };\
+    $$legacy = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
+    if (Test-Path -LiteralPath $$legacy) {\
+      $$legacyItem = Get-Item -LiteralPath $$legacy -Force;\
+      if (($$legacyItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$legacy) } else { Remove-Item -LiteralPath $$legacy -Recurse -Force }\
+    }"'
+  Pop $0
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $5 $6 - $7
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $2 "$8 phase=install-complete total_ms=$R2$\r$\n"
+  FileWrite $2 "phase=component-cleanup-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $2
+  Delete "$PLUGINSDIR\component-switch-state.txt"
+
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
+  IfErrors InstallTimingDone
+  FileRead $2 $R5
+  FileClose $2
+  System::Call 'kernel32::GetTickCount()i .r6'
+  IntOp $R6 $6 - $R5
+  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileWrite $2 "phase=install-complete total_ms=$R6 component_set=ready$\r$\n"
+  FileClose $2
+  Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"
+  InstallTimingDone:
   DetailPrint "Installation complete"
 !macroend
 
 !macro customUnInit
-  ; Kill all running app instances (main app + OpenClaw gateway + detached
-  ; node.exe services) before the uninstaller's built-in process check.
-  ; Without this, the uninstaller detects the OpenClaw gateway process
-  ; (also named 知远.exe) and shows an "app cannot be closed" dialog
-  ; where even "Retry" never succeeds — because the gateway has no UI window
-  ; for the user to close.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Stop-Process -Name 知远 -Force -ErrorAction SilentlyContinue;\
-    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue;\
-    for ($$i = 0; $$i -lt 15; $$i++) {\
-      $$procs = @();\
-      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process -Name 知远 -ErrorAction SilentlyContinue;\
-      $$procs += Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" };\
-      if ($$procs.Count -eq 0) { break };\
-      Start-Sleep -Milliseconds 500;\
-    }"'
+    Get-Process node -ErrorAction SilentlyContinue | Where-Object { $$_.Path -like \"*ZhiYuanAgent*\" -or $$_.Path -like \"*知远*\" } | Stop-Process -Force -ErrorAction SilentlyContinue"'
   Pop $0
 !macroend
 
 !macro customUnInstall
-  ; ─── Remove Windows Defender Exclusion on uninstall ───
-  ; Clean up the exclusions we added during installation.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\cfmind$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\uv-win$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\",$\"$APPDATA\ZhiYuanAgent\openclaw\state\.compile-cache$\" -ErrorAction SilentlyContinue } catch {}"'
+  ; Remove component junctions before recursively deleting application-owned
+  ; immutable data. User-created Skills and models remain under userData.
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    if (Test-Path -LiteralPath $$runtimeRoot) {\
+      Get-ChildItem -LiteralPath $$runtimeRoot -Directory -Force -ErrorAction SilentlyContinue | ForEach-Object {\
+        foreach ($$pointerName in @(\"current\", \"current.next\", \"current.previous\")) {\
+          $$pointer = Join-Path $$_.FullName $$pointerName;\
+          if (Test-Path -LiteralPath $$pointer) {\
+            $$pointerItem = Get-Item -LiteralPath $$pointer -Force;\
+            if (($$pointerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
+          }\
+        }\
+      };\
+      Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force\
+    };\
+    $$legacyRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
+    if (Test-Path -LiteralPath $$legacyRoot) { Remove-Item -LiteralPath $$legacyRoot -Recurse -Force }"'
   Pop $0
-  Pop $1
+
+  ; Remove only exclusions that this installer recorded as user-approved and
+  ; installer-managed. Never remove an exclusion created independently.
+  IfFileExists "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" 0 DefenderExclusionUninstallDone
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\"; $$command = \"Remove-MpPreference -ExclusionPath ''$$runtimeRoot'' -ErrorAction SilentlyContinue\"; $$process = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList @(''-NoProfile'', ''-NonInteractive'', ''-Command'', $$command) -Wait -PassThru; exit $$process.ExitCode"'
+    Pop $0
+    Pop $1
+    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+  DefenderExclusionUninstallDone:
 !macroend

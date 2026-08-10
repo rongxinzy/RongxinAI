@@ -102,6 +102,7 @@ const App: React.FC = () => {
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
   const [mcpOpenMarketplace, setMcpOpenMarketplace] = useState(false);
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
+  const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [isInitialized, setIsInitialized] = useState(false);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -321,6 +322,24 @@ const App: React.FC = () => {
       setHasMountedLocalInference(true);
     }
   }, [mainView]);
+
+  useEffect(() => {
+    let active = true;
+    void window.electron.appInfo
+      .consumePendingLocalInferenceInstall()
+      .then(requestId => {
+        if (!active || !requestId) return;
+        setShowSettings(false);
+        setLocalInferenceInstallRequestId(requestId);
+        setMainView('localInference');
+      })
+      .catch(error => {
+        console.warn('[Renderer] Failed to read local inference installer request:', error);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Network status monitoring
   useEffect(() => {
@@ -787,6 +806,7 @@ const App: React.FC = () => {
                   <LazyChunkErrorBoundary resetKey={mainView}>
                     <React.Suspense fallback={null}>
                       <LocalInferenceView
+                        installRequestId={localInferenceInstallRequestId}
                         isSidebarCollapsed={isSidebarCollapsed}
                         isVisible={mainView === 'localInference'}
                         onToggleSidebar={handleToggleSidebar}

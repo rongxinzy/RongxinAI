@@ -172,10 +172,13 @@ contextBridge.exposeInMainWorld('electron', {
   llamacpp: {
     status: () => ipcRenderer.invoke(LlamaCppIpcChannel.Status),
     install: () => ipcRenderer.invoke(LlamaCppIpcChannel.Install),
+    cancelRuntimeInstall: () => ipcRenderer.invoke(LlamaCppIpcChannel.CancelRuntimeInstall),
     uninstallRuntime: () => ipcRenderer.invoke(LlamaCppIpcChannel.UninstallRuntime),
     listRuntimeDevices: (input?: unknown) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.ListRuntimeDevices, input),
     listBackends: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListBackends),
+    getBackendDownloadSize: (input: unknown) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.GetBackendDownloadSize, input),
     getBackendSelection: () => ipcRenderer.invoke(LlamaCppIpcChannel.GetBackendSelection),
     setBackendSelection: (input: unknown) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.SetBackendSelection, input),
@@ -659,6 +662,8 @@ contextBridge.exposeInMainWorld('electron', {
   appInfo: {
     getVersion: () => ipcRenderer.invoke(AppIpc.GetVersion),
     getSystemLocale: () => ipcRenderer.invoke(AppIpc.GetSystemLocale),
+    consumePendingLocalInferenceInstall: () =>
+      ipcRenderer.invoke(AppIpc.ConsumePendingLocalInferenceInstall),
     relaunch: () => ipcRenderer.invoke(AppIpc.Relaunch),
   },
 

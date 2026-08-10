@@ -1,6 +1,6 @@
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-  [string]$TarPath = ''
+  [string]$ComponentsDir = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -51,10 +51,18 @@ if ($osVersion.Major -ne 10) {
   throw "This gate requires a Windows 10/11-compatible host; detected $osVersion"
 }
 
-if (-not $TarPath) {
-  $TarPath = Join-Path $ProjectRoot 'build-tar\win-resources.tar'
+if (-not $ComponentsDir) {
+  $ComponentsDir = Join-Path $ProjectRoot 'build-tar\windows-components'
 }
-Assert-Path $TarPath 'Windows resource tar'
+$componentManifestPath = Join-Path $ComponentsDir 'manifest.json'
+Assert-Path $componentManifestPath 'Windows component manifest'
+$componentManifest = Get-Content -LiteralPath $componentManifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($componentManifest.offline -ne $true) {
+  throw 'Windows component manifest must declare offline=true'
+}
+if (@($componentManifest.components).Count -ne 7) {
+  throw "Windows component manifest must contain exactly 7 components"
+}
 
 $systemTar = Join-Path $env:SystemRoot 'System32\tar.exe'
 Assert-Path $systemTar 'Windows system tar.exe'
@@ -63,7 +71,30 @@ $smokeRoot = Join-Path $env:TEMP ("zhiyuan-runtime-smoke-{0}-{1}" -f $PID, [guid
 $oldPath = $env:PATH
 try {
   New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
-  Invoke-Checked $systemTar @('-xf', $TarPath, '-C', $smokeRoot) 'Windows resource tar extraction'
+  foreach ($component in @($componentManifest.components)) {
+    if ($component.key -match 'llama' -or $component.prefix -match 'llama') {
+      throw "The offline component manifest must not include llama.cpp: $($component.key)"
+    }
+    $archivePath = Join-Path $ComponentsDir $component.archive
+    Assert-Path $archivePath "Windows component archive $($component.key)"
+    $actualHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualHash -ne $component.archiveSha256) {
+      throw "SHA-256 mismatch for Windows component $($component.key)"
+    }
+    if ((Get-Item -LiteralPath $archivePath).Length -ne $component.archiveSizeBytes) {
+      throw "Size mismatch for Windows component $($component.key)"
+    }
+    Invoke-Checked $systemTar @('-xf', $archivePath, '-C', $smokeRoot) "Windows component extraction: $($component.key)"
+    $sentinelPath = Join-Path $smokeRoot $component.sentinel
+    Assert-Path $sentinelPath "Windows component sentinel $($component.key)"
+    if ($component.sentinelSha256 -notmatch '^[0-9a-f]{64}$') {
+      throw "Missing sentinel SHA-256 for Windows component $($component.key)"
+    }
+    $sentinelHash = (Get-FileHash -LiteralPath $sentinelPath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($sentinelHash -ne $component.sentinelSha256) {
+      throw "Sentinel SHA-256 mismatch for Windows component $($component.key)"
+    }
+  }
 
   $resourcesRoot = $smokeRoot
   $bash = Join-Path $resourcesRoot 'mingit\usr\bin\bash.exe'

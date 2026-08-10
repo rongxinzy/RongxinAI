@@ -1,6 +1,7 @@
 export const LlamaCppIpcChannel = {
   Status: 'llamacpp:status',
   Install: 'llamacpp:install',
+  CancelRuntimeInstall: 'llamacpp:runtime:install:cancel',
   UninstallRuntime: 'llamacpp:runtime:uninstall',
   Start: 'llamacpp:start',
   Stop: 'llamacpp:stop',
@@ -23,6 +24,7 @@ export const LlamaCppIpcChannel = {
   ImportRuntime: 'llamacpp:import-runtime',
   ListRuntimeDevices: 'llamacpp:runtime:list-devices',
   ListBackends: 'llamacpp:backends:list',
+  GetBackendDownloadSize: 'llamacpp:backends:download-size',
   GetBackendSelection: 'llamacpp:backends:selection:get',
   SetBackendSelection: 'llamacpp:backends:selection:set',
   InstallBackend: 'llamacpp:backends:install',

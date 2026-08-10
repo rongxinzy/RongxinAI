@@ -1,17 +1,14 @@
 #!/usr/bin/env node
 
 /**
- * Windows 安装后资源 tar 解压脚本
+ * 旧版 Windows 安装后资源 tar 解压脚本（仅保留兼容性）
  *
  * 由 NSIS installer.nsh 的 customInstall 宏调用。
  * 通过 知远.exe (ELECTRON_RUN_AS_NODE=1 模式) 执行。
  *
  * 用法: 知远.exe <本脚本路径> <tarPath> <destDir>
  *
- * 效果:
- *   输入: $INSTDIR/resources/win-resources.tar
- *   输出: $INSTDIR/resources/cfmind/, SKILLs/, python-win/
- *   tar 文件由 NSIS 脚本在解压后删除
+ * 当前 NSIS 安装器直接使用系统 tar.exe 解压独立组件归档，不再调用本脚本。
  *
  * 依赖: 从 app.asar 内加载 tar npm 包 (Electron 内置 ASAR 透明读取支持)
  */

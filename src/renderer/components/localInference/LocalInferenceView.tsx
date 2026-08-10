@@ -27,6 +27,7 @@ import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelecto
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
+import { RuntimeInstallCard } from './components/RuntimeInstallCard';
 import {
   LOCAL_INFERENCE_PROGRESS_DISMISS_MS,
   MARKETPLACE_PREFETCH_PAGE_COUNT,
@@ -69,6 +70,7 @@ import {
 } from './utils/sessionState';
 
 interface LocalInferenceViewProps {
+  installRequestId?: string;
   isSidebarCollapsed?: boolean;
   isVisible?: boolean;
   onToggleSidebar?: () => void;
@@ -107,6 +109,7 @@ function hasMarketplaceNextPage(result: MarketplaceSearchResult): boolean {
 let cachedStatus: OllamaStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
+  installRequestId,
   isSidebarCollapsed,
   isVisible = true,
   onToggleSidebar,
@@ -122,6 +125,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
   );
+  useEffect(() => {
+    if (installRequestId) setActiveTab('models');
+  }, [installRequestId]);
   const [tabDirection, setTabDirection] = useState(1);
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
   const [localModels, setLocalModels] = useState<OllamaModel[]>([]);
@@ -984,6 +990,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   : 'w-full space-y-4 px-6 py-4'
               }
             >
+              {activeTab === 'models' ? (
+                <RuntimeInstallCard installRequestId={installRequestId} />
+              ) : null}
               {activeTab === 'models' ? (
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Button

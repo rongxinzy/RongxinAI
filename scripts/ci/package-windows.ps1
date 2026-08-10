@@ -133,71 +133,7 @@ if (-not $isRelease) {
   Write-Host "Release build: version=$packageVersion"
 }
 
-# 优先从 Runner 本地缓存目录同步 llama.cpp backend 资源到 build/win-lite 与 build/win-full，
-# 使 electron-builder-hooks 既能使用 CI cache，也能在本地开发/Runner 直接读取下载目录。
-$llamaCppBackendDownloadDir = if ($env:ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR) {
-  $env:ZHIYUAN_WIN_LLAMACPP_BACKEND_DOWNLOAD_DIR
-} else {
-  'C:\ci-cache'
-}
-
-function Sync-BackendResourceDirectory {
-  param(
-    [Parameter(Mandatory = $true)][string]$SourceName,
-    [Parameter(Mandatory = $true)][string]$SourceDir,
-    [Parameter(Mandatory = $true)][string]$TargetDir
-  )
-  if (-not (Test-Path $SourceDir)) {
-    if (Test-Path $TargetDir) {
-      Write-Host "Using cached $SourceName from $TargetDir"
-    } else {
-      Write-Warning "Missing $SourceName source: $SourceDir does not exist and no cache at $TargetDir"
-    }
-    return
-  }
-
-  Write-Host "Syncing $SourceName from $SourceDir -> $TargetDir"
-  Remove-DirectoryIfExists $TargetDir
-  New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
-
-  # 优先尝试硬链接以节省空间和复制时间，跨盘或失败时回退到 robocopy。
-  $sourceItems = Get-ChildItem $SourceDir
-  foreach ($item in $sourceItems) {
-    $targetItem = Join-Path $TargetDir $item.Name
-    if ($item.PSIsContainer) {
-      try {
-        New-Item -ItemType Junction -Path $targetItem -Target $item.FullName -Force | Out-Null
-      } catch {
-        & robocopy $item.FullName $targetItem /E /NFL /NDL /NJH /NJS /nc /ns /np
-        if ($LASTEXITCODE -ge 8) {
-          Write-Error "robocopy failed for $targetItem with exit code $LASTEXITCODE"
-          exit 1
-        }
-      }
-    } else {
-      try {
-        New-Item -ItemType HardLink -Path $targetItem -Target $item.FullName -Force | Out-Null
-      } catch {
-        Copy-Item $item.FullName $targetItem -Force
-      }
-    }
-  }
-}
-
-Sync-BackendResourceDirectory -SourceName 'win-lite' `
-  -SourceDir (Join-Path $llamaCppBackendDownloadDir 'win-lite') `
-  -TargetDir 'build\win-lite'
-Sync-BackendResourceDirectory -SourceName 'win-full' `
-  -SourceDir (Join-Path $llamaCppBackendDownloadDir 'win-full') `
-  -TargetDir 'build\win-full'
-
-# 根据环境变量选择 lite / full 打包命令，默认 lite。
-$llamaCppBackendBundleMode = if ($env:ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE) {
-  $env:ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE
-} else {
-  'lite'
-}
-$distWinCommand = "dist:win:$llamaCppBackendBundleMode"
+$distWinCommand = 'dist:win:offline'
 
 # 完整 Windows 打包流程由 npm run dist:win:* 编排：
 # 应用构建、OpenClaw 运行时、技能构建以及 electron-builder NSIS 输出。
@@ -232,8 +168,8 @@ if ($builderExit -ne 0) {
 
 $exe = Get-ChildItem -Path 'release' -Filter '*.exe' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($exe) {
-  # 区分 lite / full 文件名，避免两个 job 产物覆盖。
-  $bundleSuffix = if ($llamaCppBackendBundleMode -eq 'full') { 'full' } else { 'lite' }
+  # 保留 lite 发布通道名称，安装包本身是完整的非 llama.cpp 离线包。
+  $bundleSuffix = 'lite'
   $baseName = [System.IO.Path]::GetFileNameWithoutExtension($exe.Name)
   $extension = $exe.Extension
   $newName = "$baseName-$bundleSuffix$extension"

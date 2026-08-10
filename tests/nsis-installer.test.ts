@@ -6,49 +6,71 @@ import { describe, expect, test } from 'vitest';
 const installerScriptPath = path.resolve('scripts/nsis-installer.nsh');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
 
-describe('NSIS local inference runtime signing flow', () => {
+describe('NSIS offline resource and local inference flow', () => {
   test('declares the installer as DPI-aware for high-DPI displays', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
     expect(installerScript).toContain('ManifestDPIAware true');
   });
 
-  test('requires interactive confirmation before invoking the runtime helper', () => {
+  test('embeds seven offline components but expands each only on its own cache miss', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
-    const confirmationIndex = installerScript.indexOf(
-      'MessageBox MB_OKCANCEL|MB_ICONQUESTION "本地推理运行时包含未签名的程序文件。',
-    );
-    const helperInvocationIndex = installerScript.indexOf('LlamaCppBackendInstallExecute:');
 
-    expect(confirmationIndex).toBeGreaterThan(-1);
-    expect(helperInvocationIndex).toBeGreaterThan(confirmationIndex);
-    expect(installerScript).toContain('StrCpy $R8 "--local-signing-confirmed"');
-    expect(installerScript).toContain('Goto LlamaCppBackendInstallRun');
-    expect(installerScript).toContain('点击“取消”将跳过本地推理，App 仍可正常安装。');
+    const cacheMissIndex = installerScript.indexOf('ComponentCacheMiss_${TOKEN}:');
+    const payloadIndex = installerScript.indexOf(
+      'File /oname=component-${KEY}.tar "${PROJECT_DIR}\\build-tar\\windows-components\\${KEY}.tar"',
+    );
+    expect(cacheMissIndex).toBeGreaterThan(-1);
+    expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
+    expect(installerScript.match(/!insertmacro EnsureOfflineComponent /g)).toHaveLength(7);
+    expect(installerScript).toContain('phase=component-cache-hit');
+    expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
+    expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
+    expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
+    expect(installerScript).not.toContain('File /oname=win-resources.tar');
   });
 
-  test('continues app installation when local signing is declined', () => {
+  test('uses per-user installation and rolls back pointer changes after normal failures', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
-    const cancellationBlock = installerScript.slice(
-      installerScript.indexOf('LlamaCppBackendLocalSigningCancelled:'),
-      installerScript.indexOf('LlamaCppBackendInstallRun:'),
-    );
 
-    expect(cancellationBlock).toContain(
-      'phase=llamacpp-backend-install-skipped reason=user-declined-local-signing',
-    );
-    expect(cancellationBlock).toContain('Goto LlamaCppBackendInstallDone');
-    expect(cancellationBlock).not.toContain('Abort');
+    expect(installerScript).toContain('RequestExecutionLevel user');
+    expect(installerScript).not.toContain('RequestExecutionLevel admin');
+    expect(installerScript).toContain('current.next');
+    expect(installerScript).toContain('current.previous');
+    expect(installerScript).toContain('component-switch-state.txt');
+    expect(installerScript).toContain('phase=component-set-rollback');
+    expect(installerScript).toContain('phase=component-cleanup-complete');
+    expect(installerScript).not.toContain('离线组件原子切换失败');
   });
 
-  test('does not silently authorize local signing during unattended updates', () => {
+  test('records optional local inference intent without downloading in NSIS', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
-    expect(installerScript).toContain('IfSilent LlamaCppBackendInstallDeferred 0');
-    expect(installerScript).toContain(
-      'phase=llamacpp-backend-install-skipped reason=silent-no-local-signing-confirmation',
+    expect(installerScript).toContain('pending-local-inference-install');
+    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
+    expect(installerScript).not.toContain('install-llamacpp-backend-nsis.cjs');
+    expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
+  });
+
+  test('adds only a user-approved scoped Defender exclusion and removes managed exclusions', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1');
+    expect(installerScript).toContain('Add-MpPreference -ExclusionPath');
+    expect(installerScript).toContain('Start-Process -FilePath powershell.exe -Verb RunAs');
+    expect(installerScript).toContain('defender-exclusion-managed');
+    expect(installerScript).toContain('Remove-MpPreference -ExclusionPath');
+    expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*compile-cache/);
+    expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
+  });
+
+  test('delays old version cleanup until runtime links are ready', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript.indexOf('Scheduling previous version cleanup')).toBeGreaterThan(
+      installerScript.indexOf('RuntimeLinksReady:'),
     );
-    expect(installerScript).not.toContain('IfSilent LlamaCppBackendLocalSigningConfirmed 0');
+    expect(installerScript).toContain('Get-ChildItem -Path "$INSTDIR.old*"');
   });
 });
 

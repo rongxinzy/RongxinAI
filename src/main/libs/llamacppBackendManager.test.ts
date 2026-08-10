@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import http from 'http';
 import os from 'os';
@@ -33,6 +34,7 @@ import {
   listLlamaCppBackends,
   readCurrentBackendRef,
   recommendLlamaCppBackend,
+  resolveLlamaCppBackendDownloadSize,
   syncCurrentBackend,
   toBackendRef,
   uninstallLlamaCppBackend,
@@ -583,11 +585,46 @@ describe('llamacpp backend manager', () => {
     }
   });
 
+  test('reports the exact combined backend and companion download size', async () => {
+    const size = await resolveLlamaCppBackendDownloadSize({
+      ref: toBackendRef('b9518', 'win-x64-cuda-12'),
+      manifest: {
+        schemaVersion: 1,
+        defaultVersion: 'b9518',
+        backends: [
+          {
+            version: 'b9518',
+            backend: 'win-x64-cuda-12',
+            platform: 'win32',
+            arch: 'x64',
+            accelerator: 'cuda',
+            cudaMajor: '12',
+            archive: { assetName: 'backend.zip', size: 100 },
+            companions: [
+              {
+                assetName: 'cuda.zip',
+                parts: [
+                  { assetName: 'cuda.part-a', size: 20 },
+                  { assetName: 'cuda.part-b', size: 30 },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(size).toBe(150);
+  });
+
   test('uninstalls the selected backend and clears current', async () => {
     const runtimeRoot = createRuntimeRoot();
     const ref = toBackendRef('b9505', 'mac-arm64');
     writeInstalledBackend(runtimeRoot, ref.version, ref.backend, 'darwin');
     syncCurrentBackend(runtimeRoot, ref);
+    const downloadDir = path.join(runtimeRoot, 'downloads', ref.versionBackend.replace('/', '_'));
+    fs.mkdirSync(downloadDir, { recursive: true });
+    fs.writeFileSync(path.join(downloadDir, 'backend.tar.gz'), 'complete archive');
 
     const result = await uninstallLlamaCppBackend({
       runtimeRoot,
@@ -600,6 +637,7 @@ describe('llamacpp backend manager', () => {
     expect(result.deleted).toBe(true);
     expect(fs.existsSync(getLlamaCppBackendDir(runtimeRoot, ref))).toBe(false);
     expect(fs.existsSync(getLlamaCppCurrentBackendDir(runtimeRoot))).toBe(false);
+    expect(fs.existsSync(downloadDir)).toBe(false);
   });
 
   test('rejects CUDA companion-only archive import', async () => {
@@ -683,6 +721,9 @@ describe('llamacpp backend manager', () => {
     expect(result.success).toBe(true);
     expect(fs.existsSync(getLlamaCppCurrentExecutablePath(runtimeRoot, 'win32'))).toBe(true);
     expect(
+      fs.existsSync(path.join(runtimeRoot, 'downloads', ref.versionBackend.replace('/', '_'))),
+    ).toBe(false);
+    expect(
       progressEvents.some(
         progress =>
           progress.phase === 'downloading-progress' && progress.total === archiveBytes.length,
@@ -718,7 +759,10 @@ describe('llamacpp backend manager', () => {
           platform: 'win32' as const,
           arch: 'x64',
           accelerator: 'cpu' as const,
-          archive: { assetName: 'llama-b9518-bin-win-cpu-x64.zip' },
+          archive: {
+            assetName: 'llama-b9518-bin-win-cpu-x64.zip',
+            size: archiveBytes.length,
+          },
         },
       ],
     };
@@ -726,19 +770,12 @@ describe('llamacpp backend manager', () => {
     const progressEvents: any[] = [];
 
     try {
-      const originalMkdtempSync = fs.mkdtempSync;
-      const installTempDir = originalMkdtempSync(
-        path.join(os.tmpdir(), 'llamacpp-backend-resume-'),
-      );
-      tempDirs.push(installTempDir);
+      const downloadDir = path.join(runtimeRoot, 'downloads', 'b9518_win-x64');
+      fs.mkdirSync(downloadDir, { recursive: true });
       fs.writeFileSync(
-        path.join(installTempDir, 'llama-b9518-bin-win-cpu-x64.zip'),
+        path.join(downloadDir, 'llama-b9518-bin-win-cpu-x64.zip'),
         archiveBytes.subarray(0, partialSize),
       );
-      const mkdtempSpy = vi.spyOn(fs, 'mkdtempSync').mockImplementation((prefix, options) => {
-        if (String(prefix).includes('llamacpp-backend-')) return installTempDir;
-        return originalMkdtempSync(prefix, options);
-      });
       const result = await installLlamaCppBackend({
         runtimeRoot,
         ref,
@@ -750,8 +787,6 @@ describe('llamacpp backend manager', () => {
           progressEvents.push(progress);
         },
       });
-      mkdtempSpy.mockRestore();
-
       expect(result.success).toBe(true);
       const downloadEvents = progressEvents.filter(
         progress => progress.phase === 'downloading-progress',
@@ -777,6 +812,68 @@ describe('llamacpp backend manager', () => {
       expect(server.requests.some(request => request.range === `bytes=${partialSize}-`)).toBe(true);
     } finally {
       vi.restoreAllMocks();
+      await server.close();
+    }
+  });
+
+  test('removes a corrupt completed download so retry can recover', async () => {
+    const runtimeRoot = createRuntimeRoot();
+    const ref = toBackendRef('b9518', 'win-x64');
+    const sourceArchive = path.join(runtimeRoot, 'source.zip');
+    await createBackendZipArchive(sourceArchive, [
+      { name: 'build/bin/llama-server.exe', content: 'binary' },
+      { name: 'build/bin/ggml.dll', content: 'dll' },
+    ]);
+    const archiveBytes = fs.readFileSync(sourceArchive);
+    fs.rmSync(sourceArchive, { force: true });
+    const server = await createArchiveServer({ archiveBytes });
+    const assetName = 'llama-b9518-bin-win-cpu-x64.zip';
+    const manifest = {
+      schemaVersion: 1 as const,
+      defaultVersion: 'b9518',
+      releaseBaseUrl: server.baseUrl,
+      backends: [
+        {
+          version: 'b9518',
+          backend: 'win-x64',
+          platform: 'win32' as const,
+          arch: 'x64',
+          accelerator: 'cpu' as const,
+          archive: {
+            assetName,
+            size: archiveBytes.length,
+            sha256: crypto.createHash('sha256').update(archiveBytes).digest('hex'),
+          },
+        },
+      ],
+    };
+    const downloadPath = path.join(runtimeRoot, 'downloads', 'b9518_win-x64', assetName);
+    fs.mkdirSync(path.dirname(downloadPath), { recursive: true });
+    fs.writeFileSync(downloadPath, Buffer.alloc(archiveBytes.length));
+
+    try {
+      const first = await installLlamaCppBackend({
+        runtimeRoot,
+        ref,
+        platform: 'win32',
+        arch: 'x64',
+        hasNvidiaGpu: false,
+        manifest,
+      });
+      expect(first.success).toBe(false);
+      expect(fs.existsSync(downloadPath)).toBe(false);
+
+      const second = await installLlamaCppBackend({
+        runtimeRoot,
+        ref,
+        platform: 'win32',
+        arch: 'x64',
+        hasNvidiaGpu: false,
+        manifest,
+      });
+      expect(second.success).toBe(true);
+      expect(server.requests.some(request => request.method === 'GET')).toBe(true);
+    } finally {
       await server.close();
     }
   });
