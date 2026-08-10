@@ -94,6 +94,7 @@ function marketplacePageCacheKey(params: MarketplaceSearchParams): string {
     task: params.task ?? 'all',
     size: params.size ?? 'all',
     limit: params.limit ?? 0,
+    device: params.device ?? '',
     sortby: params.sortby ?? 'asc',
     featuredOnly: params.featuredOnly ?? false,
     fit: params.fit ?? 'all',

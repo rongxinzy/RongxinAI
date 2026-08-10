@@ -3,6 +3,7 @@ import os from 'os';
 import path from 'path';
 import { afterEach, expect, test, vi } from 'vitest';
 
+import { MarketplaceDeviceProfile } from '../../shared/marketplace';
 import { MarketplaceService } from './marketplaceService';
 
 const tempDirs: string[] = [];
@@ -223,6 +224,27 @@ test('MarketplaceService keeps the all-model cache separate from recommendations
     'Qwen/All-8B-GGUF',
   ]);
 });
+
+test('MarketplaceService forwards device profiles and isolates their caches', async () => {
+  const requestedUrls: string[] = [];
+  const fetchMock = vi.fn(async (url: string) => {
+    requestedUrls.push(url);
+    return Response.json({ models: [verifiedModel()], totalCount: 1 });
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+    cacheDir: createTempDir(),
+  });
+
+  await service.search({ query: 'qwen', device: MarketplaceDeviceProfile.Base });
+  await service.search({ query: 'qwen', device: MarketplaceDeviceProfile.Pro });
+
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  expect(new URL(requestedUrls[0]).searchParams.get('device')).toBe(MarketplaceDeviceProfile.Base);
+  expect(new URL(requestedUrls[1]).searchParams.get('device')).toBe(MarketplaceDeviceProfile.Pro);
+});
+
 test('MarketplaceService uses the search API for default recommendations', async () => {
   const fetchMock = vi.fn(async (url: string) => {
     expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&sortby=asc');

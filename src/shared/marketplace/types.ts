@@ -1,3 +1,5 @@
+import type { MarketplaceDeviceProfile } from './constants';
+
 export type MarketplaceSource = 'modelscope-gguf';
 
 export type MarketplaceTaskFilter = 'all' | 'chat' | 'reasoning' | 'embedding' | 'code' | 'vision';
@@ -123,6 +125,7 @@ export type MarketplaceSearchParams = {
   limit?: number;
   pageNumber?: number;
   cursor?: string;
+  device?: MarketplaceDeviceProfile;
   sortby?: MarketplaceSortOrder;
   featuredOnly?: boolean;
   fit?: 'all' | 'recommended' | 'excellent' | 'compatible' | 'unsupported';

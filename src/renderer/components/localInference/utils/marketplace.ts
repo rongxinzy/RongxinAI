@@ -30,6 +30,7 @@ export function buildMarketplaceSearchParams(input: {
   pageNumber?: number;
   task?: MarketplaceSearchParams['task'];
   size?: MarketplaceSearchParams['size'];
+  device?: MarketplaceSearchParams['device'];
   fit?: MarketplaceSearchParams['fit'];
   sortby?: MarketplaceSearchParams['sortby'];
   minStars?: number;
@@ -44,6 +45,7 @@ export function buildMarketplaceSearchParams(input: {
     return {
       limit,
       pageNumber: input.pageNumber,
+      device: input.device,
       // Empty marketplace browsing uses the full catalogue and local fit scoring.
       // Task categories add their own catalogue filter.
       featuredOnly: input.featuredOnly ?? false,
@@ -59,6 +61,7 @@ export function buildMarketplaceSearchParams(input: {
     query,
     limit,
     pageNumber: input.pageNumber,
+    device: input.device,
     task: input.task,
     size: input.size,
     fit: input.fit,

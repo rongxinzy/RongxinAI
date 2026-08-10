@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
+import { MarketplaceDeviceProfile } from '../../shared/marketplace';
 import { ModelCatalogClient } from './modelCatalogClient';
 
 const VERIFIED_SHA = 'a'.repeat(64);
@@ -31,12 +32,19 @@ test('uses the search endpoint without sending the legacy featured query', async
   });
 
   const client = new ModelCatalogClient('https://catalog.example.test', fetchMock);
-  await client.search({ featuredOnly: true, limit: 8, pageNumber: 2, cursor: 'opaque cursor' });
+  await client.search({
+    device: MarketplaceDeviceProfile.Pro,
+    featuredOnly: true,
+    limit: 8,
+    pageNumber: 2,
+    cursor: 'opaque cursor',
+  });
 
   const url = new URL(requestedUrl);
   expect(url.pathname).toBe('/v1/catalog/search');
   expect(url.searchParams.get('limit')).toBe('8');
   expect(url.searchParams.has('page')).toBe(false);
   expect(url.searchParams.get('cursor')).toBe('opaque cursor');
+  expect(url.searchParams.get('device')).toBe(MarketplaceDeviceProfile.Pro);
   expect(url.searchParams.has('featured')).toBe(false);
 });

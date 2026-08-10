@@ -1,4 +1,6 @@
 import { expect, test } from 'vitest';
+
+import { MarketplaceDeviceProfile } from '../../../shared/marketplace';
 import {
   buildMarketplaceSearchParams,
   filterMarketplaceModelsForDevice,
@@ -119,6 +121,20 @@ test('marketplace browse modes carry their result context into server pagination
     limit: MARKETPLACE_PAGE_SIZE,
     pageNumber: 2,
     task: 'code',
+  });
+});
+
+test('marketplace search params preserve the selected device profile', () => {
+  expect(
+    buildMarketplaceSearchParams({
+      query: 'qwen',
+      device: MarketplaceDeviceProfile.Pro,
+      pageNumber: 2,
+    }),
+  ).toMatchObject({
+    query: 'qwen',
+    device: MarketplaceDeviceProfile.Pro,
+    pageNumber: 2,
   });
 });
 
