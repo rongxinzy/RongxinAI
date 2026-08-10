@@ -29,6 +29,7 @@ import {
 const hoisted = vi.hoisted(() => {
   const mockSession = {
     prompt: vi.fn().mockResolvedValue(undefined),
+    sendUserMessage: vi.fn().mockResolvedValue(undefined),
     steer: vi.fn().mockResolvedValue(undefined),
     abort: vi.fn().mockResolvedValue(undefined),
     abortBash: vi.fn(),
@@ -914,6 +915,50 @@ describe('PiRuntimeAdapter', () => {
 
     it('should throw on empty prompt with no images', async () => {
       await expect(adapter.startSession('test', '')).rejects.toThrow('Prompt is required.');
+    });
+
+    it('forwards image attachments to vision-capable models', async () => {
+      mockResolveRawApiConfig.mockReturnValueOnce({
+        config: {
+          apiKey: 'sk-vision',
+          baseURL: 'https://api.moonshot.cn/v1',
+          model: 'kimi-k2.6',
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: 'moonshot',
+          codingPlanEnabled: false,
+          supportsImage: true,
+          capabilities: { imageInput: ModelCapabilityStatus.Supported },
+        },
+      });
+
+      await adapter.startSession('vision', 'Describe this image', {
+        imageAttachments: [
+          { name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' },
+        ],
+      });
+
+      expect(mockSession.sendUserMessage).toHaveBeenCalledWith(
+        [
+          { type: 'text', text: 'Describe this image' },
+          { type: 'image', mimeType: 'image/png', data: 'aW1hZ2U=' },
+        ],
+        undefined,
+      );
+    });
+
+    it('keeps an image attachment as a text hint for non-vision models', async () => {
+      await adapter.startSession('text-only', 'Describe this image', {
+        imageAttachments: [
+          { name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' },
+        ],
+      });
+
+      expect(mockSession.prompt).toHaveBeenCalledWith(
+        'Describe this image\n\n[image attachments were not sent because the selected model has no confirmed image support]',
+        undefined,
+      );
     });
 
     it('should replace existing session with same id', async () => {

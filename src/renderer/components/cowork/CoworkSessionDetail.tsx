@@ -46,6 +46,7 @@ import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
+  CoworkFileAttachment,
   CoworkMessage,
   CoworkMessageMetadata,
   CoworkPermissionRequest,
@@ -119,6 +120,7 @@ interface CoworkSessionDetailProps {
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
   ) => boolean | void | Promise<boolean | void>;
   onStop: () => void;

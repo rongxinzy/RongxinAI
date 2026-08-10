@@ -4194,6 +4194,9 @@ if (!gotTheLock) {
           });
           messageMetadata.imageAttachments = options.imageAttachments;
         }
+        if (options.fileAttachments?.length) {
+          messageMetadata.fileAttachments = options.fileAttachments;
+        }
         coworkStoreInstance.addMessage(session.id, {
           type: 'user',
           content: options.prompt,
@@ -4224,6 +4227,7 @@ if (!gotTheLock) {
             goalMode: options.goalMode,
             autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
+            fileAttachments: options.fileAttachments,
             agentId: options.agentId,
             expertIds: expertSnapshots.map(expert => expert.expertId),
             modelOverride: options.modelOverride,
@@ -4280,6 +4284,7 @@ if (!gotTheLock) {
         expertIds?: string[];
         permissionMode?: CoworkPermissionMode;
         imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+        fileAttachments?: Array<{ name: string; path: string; extension: string }>;
       },
     ) => {
       try {
@@ -4363,6 +4368,7 @@ if (!gotTheLock) {
                 : CoworkSessionMode.Work,
             goalMode: options.goalMode,
             imageAttachments: options.imageAttachments,
+            fileAttachments: options.fileAttachments,
             workspaceRoot: existingSession?.cwd,
             agentId: existingSession?.agentId,
             expertIds: existingSession?.experts.map(expert => expert.expertId),

@@ -125,6 +125,10 @@ import type {
 /** Minimal type for the Pi AgentSession — only the methods used by this adapter. */
 interface PiSession {
   prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
+  sendUserMessage?(
+    content: string | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
+    options?: { deliverAs?: 'steer' | 'followUp' },
+  ): Promise<void>;
   steer(text: string): Promise<void>;
   abort(): Promise<void>;
   abortBash(): void;
@@ -198,6 +202,7 @@ interface ActivePiSession {
   piSession: PiSession;
   abortController: AbortController;
   modelRuntime: PiModelRuntime | null;
+  capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
   requestedSystemPrompt: string;
@@ -317,6 +322,55 @@ type PiResolvedModel = {
     apiKey?: string;
   };
 };
+
+function preparePiPrompt(
+  text: string,
+  attachments: PiStartOptions['imageAttachments'] | undefined,
+  capabilities: ModelCapabilities,
+): {
+  content: string | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
+  hasImages: boolean;
+} {
+  if (!attachments?.length) return { content: text, hasImages: false };
+  if (capabilities.imageInput === ModelCapabilityStatus.Supported) {
+    const images = attachments
+      .filter(item => item.base64Data && item.mimeType.startsWith('image/'))
+      .map(item => ({ type: 'image' as const, data: item.base64Data, mimeType: item.mimeType }));
+    if (images.length > 0) {
+      return {
+        content: [{ type: 'text', text }, ...images],
+        hasImages: true,
+      };
+    }
+  }
+  const hint = '[image attachments were not sent because the selected model has no confirmed image support]';
+  return { content: text.trim() ? `${text}\n\n${hint}` : hint, hasImages: false };
+}
+
+async function sendPiPrompt(
+  session: PiSession,
+  text: string,
+  attachments: PiStartOptions['imageAttachments'] | undefined,
+  capabilities: ModelCapabilities,
+  streamingBehavior?: 'steer' | 'followUp',
+): Promise<void> {
+  const prepared = preparePiPrompt(text, attachments, capabilities);
+  if (prepared.hasImages) {
+    if (!session.sendUserMessage) {
+      throw new Error('The installed agent runtime cannot send image attachments.');
+    }
+    await session.sendUserMessage(
+      prepared.content,
+      streamingBehavior ? { deliverAs: streamingBehavior } : undefined,
+    );
+    return;
+  }
+  if (streamingBehavior) {
+    await session.prompt(prepared.content as string, { streamingBehavior });
+  } else {
+    await session.prompt(prepared.content as string);
+  }
+}
 
 let _piModules: PiModules | null = null;
 
@@ -810,6 +864,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         piSession: session,
         abortController,
         modelRuntime: resolvedModel.modelRuntime,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Unknown,
+          imageInput: ModelCapabilityStatus.Unknown,
+          videoInput: ModelCapabilityStatus.Unknown,
+          audioInput: ModelCapabilityStatus.Unknown,
+          documentInput: ModelCapabilityStatus.Unknown,
+          reasoning: ModelCapabilityStatus.Unknown,
+          ...resolvedModel.capabilities,
+        },
         harnessModelProfile,
         requestedSystemPrompt: basePrompt,
         requestedSkillIds: resourceState.skillIds,
@@ -881,7 +944,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // open. Do not revive an aborted Pi turn when that question resolves.
       if (abortController.signal.aborted) return;
 
-      await session.prompt(initialPrompt);
+      await sendPiPrompt(
+        session,
+        initialPrompt,
+        options.imageAttachments,
+        active.capabilities,
+        undefined,
+      );
     } catch (error) {
       // A stopped turn can immediately restart from the first queued follow-up.
       // Its eventual abort rejection must not delete that replacement session.
@@ -1079,10 +1148,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         content: prompt,
         timestamp: Date.now(),
         metadata:
-          options.skillIds?.length || options._queueDelivery
+            options.skillIds?.length || options._queueDelivery || options.imageAttachments?.length || options.fileAttachments?.length
             ? {
                 ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
                 ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
+                ...(options.imageAttachments?.length
+                  ? { imageAttachments: options.imageAttachments }
+                  : {}),
+                ...(options.fileAttachments?.length
+                  ? { fileAttachments: options.fileAttachments }
+                  : {}),
               }
             : undefined,
       };
@@ -1132,14 +1207,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         prompt,
       );
       if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;
-      const promptOptions = options._streamingBehavior
-        ? { streamingBehavior: options._streamingBehavior }
-        : undefined;
-      if (promptOptions) {
-        await active.piSession.prompt(nextPrompt, promptOptions);
-      } else {
-        await active.piSession.prompt(nextPrompt);
-      }
+      await sendPiPrompt(
+        active.piSession,
+        nextPrompt,
+        options.imageAttachments,
+        active.capabilities,
+        options._streamingBehavior,
+      );
     } catch (error) {
       active.isRunning = false;
       if (active.abortController.signal.aborted) {
@@ -1162,6 +1236,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const model = resolvedModel.model;
       await active.piSession.setModel(model);
       active.modelRuntime = resolvedModel.modelRuntime;
+      active.capabilities = {
+        ...active.capabilities,
+        ...resolvedModel.capabilities,
+      };
       const reasoning = resolvedModel.model.reasoning;
       active.harnessModelProfile = {
         provider: resolvedModel.providerName,

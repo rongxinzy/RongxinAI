@@ -40,6 +40,14 @@ declare module '@earendil-works/pi-coding-agent' {
   export function createAgentSession(options?: Record<string, unknown>): Promise<{
     session: {
       prompt(text: string): Promise<void>;
+      sendUserMessage(
+        content:
+          | string
+          | Array<
+              { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
+            >,
+        options?: { deliverAs?: 'steer' | 'followUp' },
+      ): Promise<void>;
       steer(text: string): Promise<void>;
       abort(): Promise<void>;
       reload(): Promise<void>;

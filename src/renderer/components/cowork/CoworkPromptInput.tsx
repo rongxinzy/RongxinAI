@@ -40,7 +40,7 @@ import {
 } from '../../store/slices/modelSlice';
 import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
-import { CoworkImageAttachment } from '../../types/cowork';
+import { CoworkFileAttachment, CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import ActiveSkillBadge from '../skills/ActiveSkillBadge';
@@ -157,6 +157,7 @@ interface CoworkPromptInputProps {
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,
   ) => boolean | void | Promise<boolean | void>;
@@ -565,6 +566,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         })),
       });
       const imageAtts: CoworkImageAttachment[] = [];
+      const fileAtts: CoworkFileAttachment[] = [];
       for (const attachment of attachments) {
         if (attachment.isImage && attachment.dataUrl) {
           const extracted = extractBase64FromDataUrl(attachment.dataUrl);
@@ -590,6 +592,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             isImage: attachment.isImage,
             hasDataUrl: !!attachment.dataUrl,
           });
+        } else {
+          const dotIndex = attachment.name.lastIndexOf('.');
+          fileAtts.push({
+            name: attachment.name,
+            path: attachment.path,
+            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
+          });
         }
       }
 
@@ -607,7 +616,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         .join('\n');
       const finalPrompt = trimmedValue
         ? attachmentLines
-          ? `${trimmedValue}\n\n${attachmentLines}`
+          ? `${attachmentLines}\n\n${trimmedValue}`
           : trimmedValue
         : attachmentLines;
 
@@ -640,6 +649,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         finalPrompt,
         skillPrompt,
         imageAtts.length > 0 ? imageAtts : undefined,
+        fileAtts.length > 0 ? fileAtts : undefined,
         selectedExpertIds,
         goalMode,
       );
