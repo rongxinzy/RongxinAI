@@ -228,7 +228,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                 <DropdownMenuItem onClick={() => void onTogglePin(!task.pinned)}>
                   <Pin className="h-3.5 w-3.5" /> {pinLabel}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => void onShare()}>
+                <DropdownMenuItem className="hidden" onClick={() => void onShare()}>
                   <Share className="h-3.5 w-3.5" /> {i18nService.t('coworkShareSession')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
