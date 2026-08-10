@@ -16,6 +16,7 @@ import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
 } from '../cowork/toolActivity';
+import { ApiFormat, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,40 @@ export const ApiFetchSchema = {
     body: z.string().optional(),
   }),
   output: z.object({ status: z.number(), data: z.unknown() }).passthrough(),
+};
+
+export const ProviderModelDiscoverySchema = {
+  input: z.object({
+    baseUrl: z.string().url(),
+    apiKey: z.string().optional(),
+    apiFormat: z.enum([ApiFormat.OpenAI, ApiFormat.Anthropic, ApiFormat.Gemini]),
+  }),
+  output: z.union([
+    z.object({
+      success: z.literal(true),
+      models: z.array(
+        z.object({
+          id: z.string().min(1),
+          displayName: z.string().optional(),
+          ownedBy: z.string().optional(),
+        }),
+      ),
+    }),
+    z.object({
+      success: z.literal(false),
+      code: z.enum([
+        ProviderModelDiscoveryErrorCode.InvalidConfig,
+        ProviderModelDiscoveryErrorCode.Authentication,
+        ProviderModelDiscoveryErrorCode.EndpointNotFound,
+        ProviderModelDiscoveryErrorCode.Timeout,
+        ProviderModelDiscoveryErrorCode.UnsupportedFormat,
+        ProviderModelDiscoveryErrorCode.ResponseTooLarge,
+        ProviderModelDiscoveryErrorCode.Network,
+        ProviderModelDiscoveryErrorCode.Http,
+      ]),
+      error: z.string(),
+    }),
+  ]),
 };
 
 export const ApiStreamSchema = {

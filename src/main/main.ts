@@ -130,6 +130,7 @@ import { getLlamaCppServiceConfig, registerLlamaCppIpcHandlers } from './ipcHand
 import { registerMarketplaceIpcHandlers } from './ipcHandlers/marketplace';
 import { getOllamaServiceConfig, registerOllamaIpcHandlers } from './ipcHandlers/ollama';
 import { registerOpenClawBridgeIpcHandlers } from './ipcHandlers/openClawBridge';
+import { registerProviderModelDiscoveryIpcHandler } from './ipcHandlers/providerModelDiscovery';
 import {
   getCronJobService,
   initCronJobServiceManager,
@@ -7674,6 +7675,7 @@ if (!gotTheLock) {
       getModelsDir: () => getLlamaCppManager().getModelsDir(),
       userDataPath: app.getPath('userData'),
     });
+    registerProviderModelDiscoveryIpcHandler();
     // Initialize Copilot token manager and restore token state if available
     initCopilotTokenManager(getStore);
     const storedGithubToken = getStore().get('github_copilot_github_token') as string | undefined;
