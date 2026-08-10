@@ -169,7 +169,12 @@ import {
   startCoworkOpenAICompatProxy,
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
-import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
+import {
+  generateSessionTitle,
+  getSkillsRoot,
+  probeCoworkModelReadiness,
+} from './libs/coworkUtil';
+import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import {
   mergeEnterpriseOpenclawConfig,
@@ -1945,6 +1950,13 @@ const getLocalFeishuCliCommand = (): string | null => {
   return fs.existsSync(command) ? command : null;
 };
 
+const decodeFeishuCliOutput = (chunks: Buffer[]): string => {
+  const bytes = Buffer.concat(chunks);
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  if (!utf8.includes('\uFFFD')) return utf8;
+  return new TextDecoder('gb18030', { fatal: false }).decode(bytes);
+};
+
 const runFeishuCliCommand = (
   command: string,
   args: string[],
@@ -1957,9 +1969,10 @@ const runFeishuCliCommand = (
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       cwd,
-      shell: process.platform === 'win32',
+      shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
+      env: { ...process.env, ...(args[0]?.toLowerCase().endsWith('npm-cli.js') ? { ELECTRON_RUN_AS_NODE: '1' } : {}) },
     });
-    let output = '';
+    const outputChunks: Buffer[] = [];
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
     const abort = () => {
@@ -1982,12 +1995,8 @@ const runFeishuCliCommand = (
       child.kill();
       reject(new Error(`Feishu CLI command timed out after ${timeoutMs}ms`));
     }, timeoutMs);
-    child.stdout.on('data', chunk => {
-      output += String(chunk);
-    });
-    child.stderr.on('data', chunk => {
-      output += String(chunk);
-    });
+    child.stdout.on('data', chunk => outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    child.stderr.on('data', chunk => outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     child.once('error', error => {
       if (settled) return;
       settled = true;
@@ -2000,11 +2009,12 @@ const runFeishuCliCommand = (
       settled = true;
       finish();
       if (timer) clearTimeout(timer);
+      const output = decodeFeishuCliOutput(outputChunks).trim();
       if (code === 0) {
         resolve(output);
         return;
       }
-      reject(new Error(output.trim() || `${command} exited with code ${code ?? 'unknown'}`));
+      reject(new Error(output || `${command} exited with code ${code ?? 'unknown'}`));
     });
   });
 
@@ -2017,10 +2027,17 @@ const prepareFeishuCli = async (): Promise<void> => {
   if (!cliCommand) {
     const cliRoot = getFeishuCliRoot();
     fs.mkdirSync(cliRoot, { recursive: true });
-    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, [
+      'install',
+      '--prefix',
+      cliRoot,
+      '--no-save',
+      '@larksuite/cli',
+    ]);
+    if (!bundledNpm) throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
     await runFeishuCliCommand(
-      npmCommand,
-      ['install', '--prefix', cliRoot, '--no-save', '@larksuite/cli'],
+      bundledNpm.command,
+      bundledNpm.args,
       cliRoot,
     );
     cliCommand = await findFeishuCliCommand();

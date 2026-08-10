@@ -27,6 +27,7 @@ import {
 import { appendPythonRuntimeToEnv, getBundledPythonRoot, getUserPythonRoot } from './pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 import { findBundledUvExecutable } from './uvRuntime';
+import { NpmCli, resolveBundledNpmRuntime } from './npmRuntime';
 
 export interface McpToolManifestEntry {
   server: string;
@@ -320,9 +321,8 @@ function isUvCommand(normalized: string): 'uv' | 'uvx' | null {
 /**
  * Resolve a stdio MCP server command/args/env for the current platform.
  *
- * On packaged builds, node/npx/npm commands are resolved in this order:
- * 1. Use system-installed Node.js if available (avoids Electron stdin quirks)
- * 2. Fall back to Electron runtime with ELECTRON_RUN_AS_NODE=1
+ * node/npx/npm commands use the app-bundled runtime. npm/npx never depend on
+ * a user-installed Node.js environment.
  */
 export async function resolveStdioCommand(server: McpServerRecord): Promise<ResolvedStdioCommand> {
   const stdioCommand = server.command || '';
@@ -334,7 +334,7 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
 
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
-  if (['win32', 'darwin', 'linux'].includes(process.platform) && app.isPackaged && effectiveCommand) {
+  if (['win32', 'darwin', 'linux'].includes(process.platform) && effectiveCommand) {
     const managedRuntimeEnv = configureUvForManagedPython(
       appendUvRuntimeToEnv(appendPythonRuntimeToEnv({ ...(stdioEnv || {}) })),
     );
@@ -374,9 +374,11 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
 
     if (nodeCommandType) {
       const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
-      const npmBinDir = enhancedEnv.ZHIYUAN_NPM_BIN_DIR;
-      const npxCliJs = npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '';
-      const npmCliJs = npmBinDir ? path.join(npmBinDir, 'npm-cli.js') : '';
+      const bundledNpm = resolveBundledNpmRuntime(
+        nodeCommandType === 'npx' ? NpmCli.Npx : NpmCli.Npm,
+        stdioArgs,
+        { ...(stdioEnv || {}), ...enhancedEnv },
+      );
 
       const withElectronNodeEnv = (
         base: Record<string, string> | undefined,
@@ -391,26 +393,30 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
         stdioEnv = withElectronNodeEnv(stdioEnv);
         shouldInjectWindowsHide = true;
         log('INFO', `"${server.name}": using bundled Electron Node runtime`);
-      } else if (nodeCommandType === 'npx' && npxCliJs && fs.existsSync(npxCliJs)) {
-        effectiveCommand = electronNodeRuntimePath;
-        effectiveArgs = [npxCliJs, ...stdioArgs];
-        stdioEnv = withElectronNodeEnv(stdioEnv);
+      } else if (nodeCommandType === 'npx' && bundledNpm) {
+        effectiveCommand = bundledNpm.command;
+        effectiveArgs = bundledNpm.args;
+        stdioEnv = withElectronNodeEnv(bundledNpm.env);
         shouldInjectWindowsHide = true;
         log('INFO', `"${server.name}": using bundled Electron + npx-cli.js`);
-      } else if (nodeCommandType === 'npm' && npmCliJs && fs.existsSync(npmCliJs)) {
-        effectiveCommand = electronNodeRuntimePath;
-        effectiveArgs = [npmCliJs, ...stdioArgs];
-        stdioEnv = withElectronNodeEnv(stdioEnv);
+      } else if (nodeCommandType === 'npm' && bundledNpm) {
+        effectiveCommand = bundledNpm.command;
+        effectiveArgs = bundledNpm.args;
+        stdioEnv = withElectronNodeEnv(bundledNpm.env);
         shouldInjectWindowsHide = true;
         log('INFO', `"${server.name}": using bundled Electron + npm-cli.js`);
       } else {
-        const systemNode = findSystemNodePath();
-        if (systemNode) {
-          effectiveCommand = systemNode;
-          log(
-            'WARN',
-            `"${server.name}": bundled ${nodeCommandType} shim is unavailable, falling back to system Node.js "${systemNode}"`,
-          );
+        if (nodeCommandType === 'npm' || nodeCommandType === 'npx') {
+          throw new Error('The bundled npm runtime is unavailable. Please reinstall the application.');
+        } else {
+          const systemNode = findSystemNodePath();
+          if (systemNode) {
+            effectiveCommand = systemNode;
+            log(
+              'WARN',
+              `"${server.name}": bundled ${nodeCommandType} shim is unavailable, falling back to system Node.js "${systemNode}"`,
+            );
+          }
         }
       }
     }

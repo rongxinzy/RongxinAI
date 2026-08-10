@@ -10,6 +10,7 @@ import path from 'path';
 import { cpRecursiveSync } from './fsCompat';
 import { t } from './i18n';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
+import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
 import { isCoreSkill } from '../shared/skills/constants';
 import {
   parseModelScopeSkillUrl,
@@ -1067,51 +1068,18 @@ const isNpmPackageSpec = (source: string): boolean => {
 };
 
 /**
- * Resolve the bundled npm-cli.js path for running npm commands.
- */
-const resolveNpmCliJs = (): string | null => {
-  const candidates = app.isPackaged
-    ? [
-        path.join(
-          process.resourcesPath,
-          'app.asar.unpacked',
-          'node_modules',
-          'npm',
-          'bin',
-          'npm-cli.js',
-        ),
-      ]
-    : [
-        path.join(app.getAppPath(), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-        path.join(process.cwd(), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-      ];
-  return candidates.find(c => fs.existsSync(c)) || null;
-};
-
-/**
  * Download and extract an npm package using `npm pack`.
  * Similar to openclaw's plugin install: npm pack 鈫?extract .tgz 鈫?return path.
  */
 const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<string> => {
-  const npmCliJs = resolveNpmCliJs();
-  const electronPath = getElectronNodeRuntimePath();
-
-  // Determine how to invoke npm
-  let npmCommand: string;
-  let npmArgs: string[];
-  if (npmCliJs) {
-    npmCommand = electronPath;
-    npmArgs = [npmCliJs, 'pack', spec, '--ignore-scripts', '--json'];
-  } else {
-    npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    npmArgs = ['pack', spec, '--ignore-scripts', '--json'];
-  }
+  const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, ['pack', spec, '--ignore-scripts', '--json']);
+  if (!bundledNpm) throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
 
   const packResult = await new Promise<{ code: number; stdout: string; stderr: string }>(
     resolve => {
-      const child = spawn(npmCommand, npmArgs, {
+      const child = spawn(bundledNpm.command, bundledNpm.args, {
         cwd: tempRoot,
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' },
+        env: bundledNpm.env,
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -3117,31 +3085,29 @@ export class SkillManager {
     console.log(`[skills]   PATH keys in env: ${JSON.stringify(pathKeys)}`);
     console.log(`[skills]   PATH (first 300 chars): ${env.PATH?.substring(0, 300)}`);
 
-    // Check if npm is available
-    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    if (!hasCommand(npmCommand, env) && !hasCommand('npm', env)) {
+    const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, ['install']);
+    if (!bundledNpm) {
       const errorMsg =
-        'npm is not available and skill cannot be repaired from bundled resources. Please install Node.js from https://nodejs.org/';
+        'Bundled npm runtime is unavailable and the skill cannot be installed. Please reinstall the application.';
       console.error(`[skills] ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
 
-    console.log(`[skills] npm is available`);
+    console.log(`[skills] bundled npm runtime is available`);
 
     // Try to install dependencies
     console.log(`[skills] Installing dependencies for ${skillId}...`);
     console.log(`[skills]   Working directory: ${skillDir}`);
 
     try {
-      // On Windows, use shell: true so cmd.exe resolves npm.cmd correctly
       const isWin = process.platform === 'win32';
-      const result = spawnSync('npm', ['install'], {
+      const result = spawnSync(bundledNpm.command, bundledNpm.args, {
         cwd: skillDir,
         encoding: 'utf-8',
         stdio: 'pipe',
         timeout: 120000, // 2 minute timeout
-        env,
-        shell: isWin,
+        env: { ...env, ...bundledNpm.env },
+        shell: false,
         windowsHide: isWin,
       });
 

@@ -566,7 +566,8 @@ const McpManager: React.FC<McpManagerProps> = ({
       await mcpService.prepareFeishuCli();
       setIsFeishuCliReady(true);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
+      console.error('[MCP] Feishu connector installation failed:', error);
+      setActionError(i18nService.t('mcpFeishuInstallFailed'));
     } finally {
       setIsPreparingFeishuCli(false);
     }

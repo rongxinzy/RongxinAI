@@ -2,13 +2,14 @@
  * Skill Services Manager - Manages background services for skills
  */
 
-import { execSync, spawn, spawnSync } from 'child_process';
+import { execFileSync, execSync, spawn, spawnSync } from 'child_process';
 import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
 import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
+import { NpmCli, resolveBundledNpmRuntime } from './libs/npmRuntime';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './libs/uvRuntime';
 
@@ -255,27 +256,37 @@ export class SkillServiceManager {
     const nodeModules = path.join(skillPath, 'node_modules');
     const distDir = path.join(skillPath, 'dist');
     const env = (this.skillEnv as NodeJS.ProcessEnv) ?? process.env;
-    const npmAvailable = this.hasCommand('npm', env);
+    const npmRuntime = resolveBundledNpmRuntime(NpmCli.Npm, [], env);
 
     const shouldInstallDeps =
       !fs.existsSync(nodeModules) || !this.isWebSearchRuntimeHealthy(skillPath);
     if (shouldInstallDeps) {
-      if (!npmAvailable) {
-        throw new Error('Web-search runtime is incomplete and npm is not available to repair it');
+      if (!npmRuntime) {
+        throw new Error('Web-search runtime is incomplete and the bundled npm runtime is unavailable');
       }
       console.log('[SkillServices] Installing/reparing web-search dependencies...');
-      execSync('npm install', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
+      execFileSync(npmRuntime.command, [...npmRuntime.args, 'install'], {
+        cwd: skillPath,
+        stdio: 'ignore',
+        env: npmRuntime.env,
+        windowsHide: process.platform === 'win32',
+      });
     }
 
     const shouldCompileDist = !fs.existsSync(distDir) || this.isWebSearchDistOutdated(skillPath);
     if (shouldCompileDist) {
-      if (!npmAvailable) {
+      if (!npmRuntime) {
         throw new Error(
-          'Web-search dist files are missing/outdated and npm is not available to rebuild them',
+          'Web-search dist files are missing/outdated and the bundled npm runtime is unavailable',
         );
       }
       console.log('[SkillServices] Compiling web-search TypeScript...');
-      execSync('npm run build', { cwd: skillPath, stdio: 'ignore', env, windowsHide: true });
+      execFileSync(npmRuntime.command, [...npmRuntime.args, 'run', 'build'], {
+        cwd: skillPath,
+        stdio: 'ignore',
+        env: npmRuntime.env,
+        windowsHide: process.platform === 'win32',
+      });
     }
 
     if (!this.isWebSearchRuntimeHealthy(skillPath)) {
