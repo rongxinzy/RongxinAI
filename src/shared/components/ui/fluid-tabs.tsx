@@ -47,11 +47,11 @@ export function FluidTabs<Value extends string>({
               key={item.value}
               value={item.value}
               className={cn(
-                'relative z-10 flex h-7 min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-[13px] leading-5 whitespace-nowrap outline-none transition-colors duration-100',
+                'relative z-10 flex h-7 min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-sm leading-5 font-normal whitespace-nowrap outline-none transition-colors duration-100',
                 'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
                 isActive
                   ? 'font-semibold text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
+                  : 'font-normal text-muted-foreground opacity-50 hover:text-foreground',
               )}
             >
               {isActive ? (

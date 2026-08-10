@@ -4,6 +4,7 @@ import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../hardware';
 import {
   createMarketplaceHardwareProfile,
   formatMarketplaceHardwareSummary,
+  formatMarketplaceHardwareSummaryParts,
   scoreMarketplaceModel,
 } from './scoring';
 import type { MarketplaceModel } from './types';
@@ -38,7 +39,11 @@ describe('marketplace device scoring', () => {
 
   it('formats hardware capacity separately from current free memory', () => {
     const profile = createMarketplaceHardwareProfile(gpuSnapshot, memorySnapshot);
-    expect(formatMarketplaceHardwareSummary(profile)).toBe('2 GPU · 16GB 显存 · 64GB 内存');
+    expect(formatMarketplaceHardwareSummary(profile)).toBe('GPU: 2 · 16GB RTX 4060 | 内存：64GB');
+    expect(formatMarketplaceHardwareSummaryParts(profile)).toEqual({
+      gpu: '2 · 16GB RTX 4060',
+      memory: '64GB',
+    });
   });
 
   it('does not render an unavailable GPU probe as zero capacity', () => {
@@ -46,7 +51,7 @@ describe('marketplace device scoring', () => {
       { source: 'nvidia-smi', available: false, checkedAt: new Date().toISOString(), gpus: [] },
       memorySnapshot,
     );
-    expect(formatMarketplaceHardwareSummary(profile)).toBe('未检测到GPU · 64GB 内存');
+    expect(formatMarketplaceHardwareSummary(profile)).toBe('GPU: 未检测到 | 内存：64GB');
   });
 
   it('keeps a memory-resident CPU fallback limited instead of claiming GPU-quality fit or no support', () => {
