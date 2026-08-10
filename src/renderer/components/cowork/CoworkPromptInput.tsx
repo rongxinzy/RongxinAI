@@ -44,6 +44,7 @@ import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toOpenClawModelRef } from '../../utils/openclawModelRef';
 import ActiveSkillBadge from '../skills/ActiveSkillBadge';
+import ActiveMcpBadge from '../mcp/ActiveMcpBadge';
 import {
   resolveAgentModelSelection,
   resolveEffectiveModel,
@@ -1240,6 +1241,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     <GoalModeChip onRemove={() => setGoalMode(false)} />
                   )}
                   <ActiveSkillBadge />
+                  <ActiveMcpBadge />
                 </>
               )}
             </PromptInputTools>

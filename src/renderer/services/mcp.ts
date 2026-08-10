@@ -7,14 +7,18 @@ import {
   McpServerConfig,
   McpServerFormData,
 } from '../types/mcp';
+import { i18nService } from './i18n';
 
 export function normalizeMcpErrorMessage(message: string): string {
   const trimmed = message.trim();
   if (!trimmed) {
-    return 'Failed to start MCP server';
+    return i18nService.t('mcpCreateFailed');
   }
 
   const lower = trimmed.toLowerCase();
+  if (lower.includes('oauth') && lower.includes('timed out')) {
+    return i18nService.t('mcpConnectTimedOut');
+  }
   const hasHtmlResponse = lower.includes('<!doctype html') || lower.includes('<html');
 
   if (hasHtmlResponse && lower.includes('streamable http')) {
@@ -30,7 +34,11 @@ export function normalizeMcpErrorMessage(message: string): string {
   }
 
   if (lower.includes('connection closed')) {
-    return 'The MCP server closed the connection unexpectedly.';
+    return i18nService.t('mcpConnectionClosed');
+  }
+
+  if (lower.includes('fetch failed') || lower.includes('network')) {
+    return i18nService.t('networkError');
   }
 
   return trimmed;
@@ -214,7 +222,10 @@ class McpService {
     data: McpServerFormData,
     requestId: string,
   ): Promise<{ success: boolean; servers?: McpServerConfig[]; error?: string }> {
-    return window.electron.mcp.authorize({ ...data, authorizationRequestId: requestId });
+    const result = await window.electron.mcp.authorize({ ...data, authorizationRequestId: requestId });
+    return result.success || !result.error
+      ? result
+      : { ...result, error: normalizeMcpErrorMessage(result.error) };
   }
 
   async cancelAuthorize(requestId: string): Promise<void> {

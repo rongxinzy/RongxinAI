@@ -126,6 +126,7 @@ const App: React.FC = () => {
   const toastTimerRef = useRef<number | null>(null);
   const toastOnCloseRef = useRef<(() => void) | null>(null);
   const hasInitialized = useRef(false);
+  const appShellRef = useRef<HTMLDivElement>(null);
   const dispatch = useDispatch();
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const currentSessionId = useSelector(selectCurrentSessionId);
@@ -248,6 +249,18 @@ const App: React.FC = () => {
 
     void initializeApp();
   }, [dispatch, waitWithTimeout]);
+
+  useEffect(() => {
+    if (!isInitialized || initError) return;
+
+    // Electron may restore focus to the first button when the window opens.
+    // Keep the initial focus on the app shell so toolbar buttons do not appear
+    // focused until the user interacts with the interface.
+    const frame = window.requestAnimationFrame(() => {
+      appShellRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [initError, isInitialized]);
 
   useEffect(() => {
     if (!isInitialized) {
@@ -772,7 +785,11 @@ const App: React.FC = () => {
 
   return (
     <TooltipProvider delay={400}>
-      <div className="h-screen overflow-hidden flex flex-col bg-surface-raised">
+      <div
+        ref={appShellRef}
+        tabIndex={-1}
+        className="h-screen overflow-hidden flex flex-col bg-surface-raised outline-none"
+      >
         {toastMessage && <Toast message={toastMessage} isError={isToastError} onClose={dismissToast} />}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar

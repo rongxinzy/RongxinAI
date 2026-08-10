@@ -1,6 +1,11 @@
-import { expect, test } from 'vitest';
+import { afterEach, expect, test } from 'vitest';
 
 import { normalizeMcpErrorMessage } from './mcp';
+import { i18nService } from './i18n';
+
+afterEach(() => {
+  i18nService.setLanguage('zh', { persist: false });
+});
 
 test('normalizeMcpErrorMessage shortens Streamable HTTP HTML responses', () => {
   const result = normalizeMcpErrorMessage(
@@ -19,7 +24,8 @@ test('normalizeMcpErrorMessage shortens generic MCP HTML responses', () => {
 });
 
 test('normalizeMcpErrorMessage shortens connection closed errors', () => {
+  i18nService.setLanguage('en', { persist: false });
   const result = normalizeMcpErrorMessage('MCP error -32000: Connection closed');
 
-  expect(result).toBe('The MCP server closed the connection unexpectedly.');
+  expect(result).toBe('The MCP server connection closed unexpectedly. Try again.');
 });

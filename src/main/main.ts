@@ -169,7 +169,12 @@ import {
   startCoworkOpenAICompatProxy,
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
-import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
+import {
+  generateSessionTitle,
+  getSkillsRoot,
+  probeCoworkModelReadiness,
+} from './libs/coworkUtil';
+import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import {
   mergeEnterpriseOpenclawConfig,
@@ -1933,6 +1938,20 @@ const getMcpStore = () => {
   return mcpStore;
 };
 
+const MCP_BUILT_IN_DEFAULTS_DISABLED_KEY = 'mcp_builtin_defaults_disabled_v1';
+
+const ensureBuiltInMcpDefaultsDisabled = (): void => {
+  const store = getStore();
+  if (store.get<boolean>(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY)) return;
+
+  for (const server of getMcpStore().listServers()) {
+    if (server.isBuiltIn && server.enabled) {
+      getMcpStore().setEnabled(server.id, false);
+    }
+  }
+  store.set(MCP_BUILT_IN_DEFAULTS_DISABLED_KEY, true);
+};
+
 const FEISHU_CLI_TIMEOUT_MS = 120_000;
 const FEISHU_CLI_AUTH_TIMEOUT_MS = 600_000;
 const FEISHU_MCP_REGISTRY_ID = 'feishu';
@@ -1943,6 +1962,13 @@ const getLocalFeishuCliCommand = (): string | null => {
   const binName = process.platform === 'win32' ? 'lark-cli.cmd' : 'lark-cli';
   const command = path.join(getFeishuCliRoot(), 'node_modules', '.bin', binName);
   return fs.existsSync(command) ? command : null;
+};
+
+const decodeFeishuCliOutput = (chunks: Buffer[]): string => {
+  const bytes = Buffer.concat(chunks);
+  const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  if (!utf8.includes('\uFFFD')) return utf8;
+  return new TextDecoder('gb18030', { fatal: false }).decode(bytes);
 };
 
 const runFeishuCliCommand = (
@@ -1957,9 +1983,10 @@ const runFeishuCliCommand = (
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       cwd,
-      shell: process.platform === 'win32',
+      shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
+      env: { ...process.env, ...(args[0]?.toLowerCase().endsWith('npm-cli.js') ? { ELECTRON_RUN_AS_NODE: '1' } : {}) },
     });
-    let output = '';
+    const outputChunks: Buffer[] = [];
     let settled = false;
     let timer: NodeJS.Timeout | null = null;
     const abort = () => {
@@ -1982,12 +2009,8 @@ const runFeishuCliCommand = (
       child.kill();
       reject(new Error(`Feishu CLI command timed out after ${timeoutMs}ms`));
     }, timeoutMs);
-    child.stdout.on('data', chunk => {
-      output += String(chunk);
-    });
-    child.stderr.on('data', chunk => {
-      output += String(chunk);
-    });
+    child.stdout.on('data', chunk => outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    child.stderr.on('data', chunk => outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     child.once('error', error => {
       if (settled) return;
       settled = true;
@@ -2000,11 +2023,12 @@ const runFeishuCliCommand = (
       settled = true;
       finish();
       if (timer) clearTimeout(timer);
+      const output = decodeFeishuCliOutput(outputChunks).trim();
       if (code === 0) {
         resolve(output);
         return;
       }
-      reject(new Error(output.trim() || `${command} exited with code ${code ?? 'unknown'}`));
+      reject(new Error(output || `${command} exited with code ${code ?? 'unknown'}`));
     });
   });
 
@@ -2017,10 +2041,17 @@ const prepareFeishuCli = async (): Promise<void> => {
   if (!cliCommand) {
     const cliRoot = getFeishuCliRoot();
     fs.mkdirSync(cliRoot, { recursive: true });
-    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, [
+      'install',
+      '--prefix',
+      cliRoot,
+      '--no-save',
+      '@larksuite/cli',
+    ]);
+    if (!bundledNpm) throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
     await runFeishuCliCommand(
-      npmCommand,
-      ['install', '--prefix', cliRoot, '--no-save', '@larksuite/cli'],
+      bundledNpm.command,
+      bundledNpm.args,
       cliRoot,
     );
     cliCommand = await findFeishuCliCommand();
@@ -2156,6 +2187,7 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
 
   mcpInitPromise = (async (): Promise<McpToolManifestEntry[]> => {
     try {
+      ensureBuiltInMcpDefaultsDisabled();
       const enabledServers = await refreshMcpOAuthHeaders(getMcpStore().getEnabledServers());
       if (enabledServers.length === 0) {
         console.log('[McpInit] No MCP servers configured, skipping');
@@ -3493,6 +3525,7 @@ if (!gotTheLock) {
   // MCP Server IPC handlers
   ipcMain.handle(McpIpc.List, () => {
     try {
+      ensureBuiltInMcpDefaultsDisabled();
       const servers = getMcpStore().listServers();
       return { success: true, servers };
     } catch (error) {
@@ -3526,10 +3559,7 @@ if (!gotTheLock) {
           return { success: false, error: validationError };
         }
 
-        const createdServer = getMcpStore().createServer(data as McpServerFormData);
-        if (data.isBuiltIn) {
-          getMcpStore().setEnabled(createdServer.id, true);
-        }
+        getMcpStore().createServer(data as McpServerFormData);
         const servers = getMcpStore().listServers();
         // Trigger async MCP bridge refresh (don't await — let UI show DB result immediately)
         refreshMcpBridge().catch(err =>
@@ -3662,16 +3692,15 @@ if (!gotTheLock) {
         if (!existing) {
           return { success: false, error: 'MCP server not found' };
         }
-        if (existing.registryId === FEISHU_MCP_REGISTRY_ID) {
-          return { success: true, servers: getMcpStore().listServers() };
-        }
-        const validationError = await validateStoredMcpServerConfig(existing);
-        if (validationError) {
-          return { success: false, error: validationError };
-        }
-        const probeResult = await probeMcpConnection(existing);
-        if (!probeResult.success) {
-          return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
+        if (existing.registryId !== FEISHU_MCP_REGISTRY_ID) {
+          const validationError = await validateStoredMcpServerConfig(existing);
+          if (validationError) {
+            return { success: false, error: validationError };
+          }
+          const probeResult = await probeMcpConnection(existing);
+          if (!probeResult.success) {
+            return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
+          }
         }
       }
 
@@ -3815,12 +3844,11 @@ if (!gotTheLock) {
         if (!accessToken)
           return { success: false, error: 'OAuth authorization did not return an access token' };
 
-        const createdServer = getMcpStore().createServer({
+        getMcpStore().createServer({
           ...data,
           isBuiltIn: true,
           headers: { ...data.headers, Authorization: `Bearer ${accessToken}` },
         });
-        getMcpStore().setEnabled(createdServer.id, true);
         const servers = getMcpStore().listServers();
         refreshMcpBridge().catch(err =>
           console.error('[McpBridge] background refresh error:', err),
