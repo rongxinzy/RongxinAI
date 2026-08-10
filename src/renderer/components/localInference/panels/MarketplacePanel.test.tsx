@@ -131,7 +131,7 @@ describe('MarketplacePanel result grid', () => {
     const viewport = container.querySelector('.overflow-y-auto');
     const pagination = screen.getByText(/1\s*\/\s*1/);
 
-    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable');
+    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable', 'px-4');
     expect(viewport).not.toContainElement(pagination);
   });
 
@@ -139,7 +139,7 @@ describe('MarketplacePanel result grid', () => {
     const { container } = renderPanel({ hasSearched: true, marketplaceLoading: true });
     const viewport = container.querySelector('.overflow-y-auto');
 
-    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable');
+    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable', 'px-4');
   });
 
   test('does not render the server result count in the header', () => {
@@ -284,6 +284,28 @@ describe('MarketplacePanel search and filters', () => {
 
     expect(screen.getByRole('combobox', { name: '\u8bbe\u5907\u9002\u914d' })).toBeInTheDocument();
   });
+
+  test('unselected task tabs provide a hover indicator and stronger text', () => {
+    renderPanel({ hasSearched: true, models: [makeModel('alpha')] });
+
+    const chatTab = screen.getByRole('tab', { name: '\u5bf9\u8bdd' });
+    expect(screen.getByRole('tablist', { name: '\u4efb\u52a1\u7c7b\u578b' })).toHaveClass(
+      'border',
+      'border-border-subtle',
+    );
+    expect(chatTab).toHaveClass(
+      'h-8',
+      'font-medium',
+      'hover:opacity-100',
+    );
+    expect(chatTab.querySelector('[data-fluid-tabs-hover-indicator="true"]')).toHaveClass(
+      'bg-surface',
+      'shadow-md',
+      'opacity-0',
+      'group-hover:opacity-100',
+    );
+  });
+
   test('switching the fit filter to "不限" re-searches the whole catalogue', async () => {
     // The reported regression: choosing the unrestricted fit ("不限") stayed on
     // the curated featured list (7 models, one page) instead of browsing the

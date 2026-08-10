@@ -18,7 +18,7 @@ import {
 import { i18nService } from '../../../services/i18n';
 import { EmptyState } from '../components/Common';
 import { MarketplaceModelCard } from '../components/MarketplaceModelCard';
-import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import { FluidTabs, FluidTabsSize } from '@shared/components/ui/fluid-tabs';
 import { Separator } from '@shared/components/ui/separator';
 import {
   Select,
@@ -236,9 +236,9 @@ export function MarketplacePanel({
   ) : null;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-2">
       <div className="flex flex-col gap-3">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-6">
           <form
             className="min-w-0 flex-1"
             onSubmit={event => {
@@ -275,13 +275,17 @@ export function MarketplacePanel({
         </div>
       </div>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3 rounded-lg bg-background p-1">
-      <div className="flex w-full shrink-0 flex-col gap-3 px-4 py-3">
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-2 rounded-lg bg-background p-1">
+      <div className="flex w-full shrink-0 flex-col gap-3 px-5 pt-1 pb-1">
         <div className="flex w-full flex-wrap items-stretch justify-between gap-x-4 gap-y-2">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
             <div className="shrink-0">
               <FluidTabs
                 className="w-fit max-w-full"
+                inactiveTabClassName="hover:opacity-100"
+                listClassName="border border-border-subtle"
+                showInactiveHoverIndicator
+                size={FluidTabsSize.Default}
                 aria-label={i18nService.t('marketplaceFilterTask')}
                 value={taskFilter}
                 onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
@@ -294,13 +298,13 @@ export function MarketplacePanel({
                 ]}
               />
             </div>
-            <div className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-muted/80 p-1">
+            <div className="inline-flex h-10 items-center gap-1 rounded-lg border border-border-subtle bg-muted/80 px-1 py-0.5">
                 <span className="px-2 text-sm leading-5 font-normal text-muted-foreground">
                   {i18nService.t('marketplaceFilterFit')}
                 </span>
                 <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-                  <SelectTrigger size="sm" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32 border-border-subtle bg-surface">
-                    <SelectValue className="font-semibold text-foreground">{fitFilterLabel}</SelectValue>
+                  <SelectTrigger size="default" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32 border-border-subtle bg-surface">
+                    <SelectValue className="font-medium text-foreground">{fitFilterLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent
                     side="bottom"
@@ -348,7 +352,7 @@ export function MarketplacePanel({
       ) : null}
 
       {marketplaceLoading && models.length === 0 ? (
-        <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface p-1">
+        <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface px-4 py-1">
           <MarketplaceGridSkeleton columnCount={gridColumnCount} pageSize={MARKETPLACE_PAGE_SIZE} />
         </div>
       ) : !hasSearched ? null : visibleModels.length === 0 ? (
@@ -374,7 +378,7 @@ export function MarketplacePanel({
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col rounded-lg bg-surface p-1">
           {installedModelActions}
-          <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface p-1">
+          <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface px-4 py-1">
             <div
               className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
               style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
