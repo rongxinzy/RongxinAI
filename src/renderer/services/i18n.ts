@@ -885,6 +885,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // 错误信息
     failedToLoadSettings: '加载设置失败',
     failedToSaveSettings: '保存设置失败',
+    settingsPartiallySaved: '基础设置已保存，但后续同步失败：{0}',
 
     // 加载状态
     loading: '加载中...',
@@ -3719,6 +3720,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Error Messages
     failedToLoadSettings: 'Failed to load settings',
     failedToSaveSettings: 'Failed to save settings',
+    settingsPartiallySaved: 'Base settings were saved, but a later sync failed: {0}',
 
     // Loading State
     loading: 'Loading...',

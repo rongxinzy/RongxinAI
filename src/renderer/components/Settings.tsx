@@ -29,7 +29,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import {
   isProviderEnabled,
@@ -59,10 +59,7 @@ import {
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
-import {
-  collectAvailableModels,
-  LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
-} from '../services/availableModels';
+import { LLAMACPP_RUNNING_MODELS_CHANGED_EVENT } from '../services/availableModels';
 import { configService } from '../services/config';
 import { coworkService } from '../services/cowork';
 import {
@@ -74,10 +71,10 @@ import {
 } from '../services/encryption';
 import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
+import { getSettingsSaveErrorMessage } from '../services/settingsSave';
 import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
 import { selectCoworkConfig } from '../store/selectors/coworkSelectors';
-import { setAvailableModels } from '../store/slices/modelSlice';
 import type {
   CoworkAgentEngine,
   CoworkMemoryStats,
@@ -722,7 +719,6 @@ const Settings: React.FC<SettingsProps> = ({
   enterpriseConfig,
   appUpdateState,
 }) => {
-  const dispatch = useDispatch();
   // 状态
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
@@ -2069,6 +2065,7 @@ const Settings: React.FC<SettingsProps> = ({
     e.preventDefault();
     setIsSaving(true);
     setError(null);
+    let appConfigSaved = false;
 
     try {
       const emailSaved = (await emailSettingsRef.current?.saveIfDirty()) ?? true;
@@ -2138,6 +2135,7 @@ const Settings: React.FC<SettingsProps> = ({
           ...configService.getConfig().app,
         },
       });
+      appConfigSaved = true;
 
       // 应用主题
       themeService.setTheme(theme);
@@ -2153,10 +2151,6 @@ const Settings: React.FC<SettingsProps> = ({
         apiKey: apiKeyToUse,
         baseUrl: baseUrlToUse,
       });
-
-      // 更新 Redux store 中的可用模型列表
-      const allModels = await collectAvailableModels(configService.getConfig());
-      dispatch(setAvailableModels(allModels));
 
       if (hasCoworkConfigChanges) {
         const updated = await coworkService.updateConfig({
@@ -2206,7 +2200,9 @@ const Settings: React.FC<SettingsProps> = ({
       didSaveRef.current = true;
       onClose();
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Failed to save settings');
+      setError(
+        getSettingsSaveErrorMessage(error, appConfigSaved, key => i18nService.t(key)),
+      );
     } finally {
       setIsSaving(false);
     }
