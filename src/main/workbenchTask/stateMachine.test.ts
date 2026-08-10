@@ -95,7 +95,12 @@ test('guards every run status transition', () => {
     ],
     [
       WorkbenchRunStatus.Verifying,
-      [WorkbenchRunStatus.Succeeded, WorkbenchRunStatus.NeedsReview, WorkbenchRunStatus.Failed],
+      [
+        WorkbenchRunStatus.Succeeded,
+        WorkbenchRunStatus.NeedsReview,
+        WorkbenchRunStatus.Failed,
+        WorkbenchRunStatus.Cancelled,
+      ],
     ],
     [WorkbenchRunStatus.Paused, []],
     [WorkbenchRunStatus.NeedsReview, [WorkbenchRunStatus.Succeeded]],

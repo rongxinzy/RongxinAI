@@ -101,23 +101,55 @@ export class WorkbenchTaskService extends EventEmitter {
     trigger?: WorkbenchRunTrigger;
     preparedRunId?: string;
   }): { task: WorkbenchTask; run: WorkbenchRun } {
+    const supersededReason = 'Superseded by a new user message.';
     const result = this.repository.transaction(() => {
       let run = input.preparedRunId ? this.repository.getRun(input.preparedRunId) : null;
-      let task = run
-        ? this.repository.getTask(run.taskId)
-        : this.repository.getActiveTaskForSession(input.sessionId);
-      if (!task) task = this.repository.createTask(input.sessionId, input.goal, input.contract);
-      if (run && run.taskId !== task.id) throw new Error('Prepared run does not belong to task.');
+      let task = run ? this.repository.getTask(run.taskId) : null;
+      let supersededTask: WorkbenchTask | null = null;
+      let expiredApprovals: WorkbenchApproval[] = [];
+      if (run) {
+        if (!task) throw new Error('Prepared run task not found.');
+        if (task.sessionId !== input.sessionId) {
+          throw new Error('Prepared run does not belong to this session.');
+        }
+      } else {
+        const activeTask = this.repository.getActiveTaskForSession(input.sessionId);
+        if (activeTask) {
+          expiredApprovals = this.expirePendingApprovalsForSession(
+            input.sessionId,
+            supersededReason,
+          );
+          if (activeTask.activeRunId) {
+            const activeRun = this.repository.getRun(activeTask.activeRunId);
+            if (activeRun && this.isRunActive(activeRun.status)) {
+              this.repository.updateRunStatus(activeRun.id, WorkbenchRunStatus.Cancelled);
+            }
+            if (activeRun) {
+              this.repository.appendRunEvent(activeRun.id, WorkbenchRunEventType.RunCancelled, {
+                reason: supersededReason,
+              });
+            }
+          }
+          supersededTask = this.repository.updateTaskStatus(
+            activeTask.id,
+            WorkbenchTaskStatus.Cancelled,
+            null,
+          );
+        }
+        task = this.repository.createTask(input.sessionId, input.goal, input.contract);
+      }
       if (!run) {
         run = this.repository.createRun(task.id, input.trigger ?? WorkbenchRunTrigger.Message);
       }
       task = this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Running, run.id);
       run = this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Running);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.RunStarted);
-      return { task, run };
+      return { task, run, supersededTask, expiredApprovals };
     });
+    this.resolvePendingApprovals(result.expiredApprovals, supersededReason);
+    if (result.supersededTask) this.emitChanged(result.supersededTask);
     this.emitChanged(result.task);
-    return result;
+    return { task: result.task, run: result.run };
   }
 
   prepareRun(
