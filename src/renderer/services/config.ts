@@ -285,8 +285,20 @@ const ADDED_PROVIDER_MODELS: Record<
   },
 };
 
-class ConfigService {
+const PROVIDER_MODEL_CATALOG_MIGRATION_VERSION = 1;
+
+export class ConfigService {
   private config: AppConfig = defaultConfig;
+  private operationQueue: Promise<void> = Promise.resolve();
+
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.operationQueue.then(operation);
+    this.operationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
 
   private async loadFromStorage() {
     const storedConfig = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
@@ -294,6 +306,9 @@ class ConfigService {
       console.warn('[ConfigService] init: no stored config found, using defaults');
     }
     if (storedConfig) {
+      const shouldMigrateProviderModels =
+        (storedConfig.migrations?.providerModelCatalog ?? 0) <
+        PROVIDER_MODEL_CATALOG_MIGRATION_VERSION;
       const mergedProviders = storedConfig.providers
         ? Object.fromEntries(
             Object.entries({
@@ -317,7 +332,7 @@ class ConfigService {
                 }
                 // Inject added models (for existing users who already have saved config)
                 const addedConfig = ADDED_PROVIDER_MODELS[providerKey];
-                if (addedConfig && mergedProvider.models) {
+                if (shouldMigrateProviderModels && addedConfig && mergedProvider.models) {
                   const addedModelsById = new Map(
                     addedConfig.models.map(model => [model.id, model]),
                   );
@@ -394,6 +409,11 @@ class ConfigService {
           ...(storedConfig.shortcuts ?? {}),
         } as AppConfig['shortcuts'],
         providers: mergedProviders as AppConfig['providers'],
+        migrations: {
+          ...defaultConfig.migrations,
+          ...storedConfig.migrations,
+          providerModelCatalog: PROVIDER_MODEL_CATALOG_MIGRATION_VERSION,
+        },
       });
       const shortcuts = this.config.shortcuts!;
       this.config.shortcuts = {
@@ -403,6 +423,9 @@ class ConfigService {
         settings:
           shortcuts.settings === 'Ctrl+,' ? defaultConfig.shortcuts!.settings : shortcuts.settings,
       };
+      if (shouldMigrateProviderModels) {
+        await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
+      }
     } else {
       this.config = defaultConfig;
     }
@@ -410,7 +433,7 @@ class ConfigService {
 
   async init() {
     try {
-      await this.loadFromStorage();
+      await this.enqueue(() => this.loadFromStorage());
     } catch (error) {
       console.error('[ConfigService] init failed:', error);
     }
@@ -418,7 +441,7 @@ class ConfigService {
 
   async reload(): Promise<AppConfig> {
     try {
-      await this.loadFromStorage();
+      await this.enqueue(() => this.loadFromStorage());
     } catch (error) {
       console.error('[ConfigService] reload failed:', error);
     }
@@ -430,23 +453,24 @@ class ConfigService {
   }
 
   async updateConfig(newConfig: Partial<AppConfig>) {
-    const normalizedProviders = normalizeProvidersConfig(
-      newConfig.providers as AppConfig['providers'] | undefined,
-    );
+    await this.enqueue(async () => {
+      const normalizedProviders = normalizeProvidersConfig(
+        newConfig.providers as AppConfig['providers'] | undefined,
+      );
 
-    // Read-modify-write: use the latest stored value as the base to avoid
-    // overwriting fields (e.g. providers) with stale in-memory defaults when
-    // only a subset of config is being updated.
-    const stored = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
-    const base = stored ?? this.config;
+      // Read only after earlier operations finish so concurrent partial updates
+      // cannot merge against the same stale snapshot and overwrite each other.
+      const stored = await localStore.getItem<AppConfig>(CONFIG_KEYS.APP_CONFIG);
+      const base = stored ?? this.config;
 
-    this.config = {
-      ...base,
-      ...newConfig,
-      ...(normalizedProviders ? { providers: normalizedProviders } : {}),
-    };
-    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
-    window.dispatchEvent(new CustomEvent('config-updated'));
+      this.config = {
+        ...base,
+        ...newConfig,
+        ...(normalizedProviders ? { providers: normalizedProviders } : {}),
+      };
+      await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
+      window.dispatchEvent(new CustomEvent('config-updated'));
+    });
   }
 
   getApiConfig() {
