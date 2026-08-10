@@ -214,6 +214,65 @@
   FileClose $2
   Delete "$PLUGINSDIR\component-switch-state.txt"
 
+  ; Defender exclusion is optional and requires explicit, informed consent.
+  ; Keep the scope limited to the immutable component cache; never exclude
+  ; user-created Skills, OpenClaw state, model data, or the full install tree.
+  DetailPrint "[Installer] Checking Microsoft Defender exclusion"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    try {\
+      $$excluded = @((Get-MpPreference -ErrorAction Stop).ExclusionPath);\
+      if ($$excluded -contains $$runtimeRoot) { exit 0 }\
+    } catch { };\
+    exit 3"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" DefenderExclusionAlreadyActive
+  IfSilent DefenderExclusionSkipped
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "是否允许将知远的离线运行环境加入 Microsoft Defender 排除项？$\r$\n$\r$\n这样可以减少首次解压和运行时扫描，但该目录中的文件将不再接受 Defender 实时扫描。设置会持续到卸载知远，你也可以随时在 Windows 安全中心撤销。$\r$\n$\r$\n目录：%LOCALAPPDATA%\ZhiYuanAgent\runtimes$\r$\n$\r$\n请仅在信任此安装包时选择“是”。" IDYES EnableDefenderExclusion IDNO DefenderExclusionDeclined
+
+  EnableDefenderExclusion:
+    DetailPrint "[Installer] Adding user-approved Defender exclusion"
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Add-MpPreference -ExclusionPath \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\" -ErrorAction Stop"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" DefenderExclusionEnabled
+      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
+      FileClose $2
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加，可能被组织策略阻止。知远仍会继续安装。"
+      Goto DefenderExclusionDone
+
+  DefenderExclusionEnabled:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" w
+    FileWrite $2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+    FileClose $2
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-enabled path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
+    FileClose $2
+    Goto DefenderExclusionDone
+
+  DefenderExclusionAlreadyActive:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-already-active path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
+    FileClose $2
+    Goto DefenderExclusionDone
+
+  DefenderExclusionDeclined:
+    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-declined$\r$\n"
+    FileClose $2
+    Goto DefenderExclusionDone
+
+  DefenderExclusionSkipped:
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=defender-exclusion-skipped-silent$\r$\n"
+    FileClose $2
+
+  DefenderExclusionDone:
+
   !insertmacro EnsureOfflineComponent OPENCLAW "openclaw" "cfmind" "cfmind\package.json" "OpenClaw 离线运行环境"
   !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
   !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
@@ -478,4 +537,13 @@
     $$legacyRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
     if (Test-Path -LiteralPath $$legacyRoot) { Remove-Item -LiteralPath $$legacyRoot -Recurse -Force }"'
   Pop $0
+
+  ; Remove only exclusions that this installer recorded as user-approved and
+  ; installer-managed. Never remove an exclusion created independently.
+  IfFileExists "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" 0 DefenderExclusionUninstallDone
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "Remove-MpPreference -ExclusionPath \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\" -ErrorAction SilentlyContinue"'
+    Pop $0
+    Pop $1
+    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+  DefenderExclusionUninstallDone:
 !macroend

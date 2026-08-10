@@ -47,11 +47,24 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
   });
 
-  test('does not modify Defender exclusions and delays old version cleanup', () => {
+  test('adds only a user-approved scoped Defender exclusion and removes managed exclusions', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
-    expect(installerScript).not.toContain('Add-MpPreference');
-    expect(installerScript).not.toContain('Remove-MpPreference');
+    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
+    expect(installerScript).toContain(
+      'Add-MpPreference -ExclusionPath \\"$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\"',
+    );
+    expect(installerScript).toContain('defender-exclusion-managed');
+    expect(installerScript).toContain(
+      'Remove-MpPreference -ExclusionPath \\"$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\"',
+    );
+    expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*compile-cache/);
+    expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
+  });
+
+  test('delays old version cleanup until runtime links are ready', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
     expect(installerScript.indexOf('Scheduling previous version cleanup')).toBeGreaterThan(
       installerScript.indexOf('RuntimeLinksReady:'),
     );
