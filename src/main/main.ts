@@ -170,11 +170,7 @@ import {
   startCoworkOpenAICompatProxy,
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
-import {
-  generateSessionTitle,
-  getSkillsRoot,
-  probeCoworkModelReadiness,
-} from './libs/coworkUtil';
+import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
 import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import {
@@ -1985,7 +1981,10 @@ const runFeishuCliCommand = (
       windowsHide: true,
       cwd,
       shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
-      env: { ...process.env, ...(args[0]?.toLowerCase().endsWith('npm-cli.js') ? { ELECTRON_RUN_AS_NODE: '1' } : {}) },
+      env: {
+        ...process.env,
+        ...(args[0]?.toLowerCase().endsWith('npm-cli.js') ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
+      },
     });
     const outputChunks: Buffer[] = [];
     let settled = false;
@@ -2010,8 +2009,12 @@ const runFeishuCliCommand = (
       child.kill();
       reject(new Error(`Feishu CLI command timed out after ${timeoutMs}ms`));
     }, timeoutMs);
-    child.stdout.on('data', chunk => outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
-    child.stderr.on('data', chunk => outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    child.stdout.on('data', chunk =>
+      outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+    );
+    child.stderr.on('data', chunk =>
+      outputChunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)),
+    );
     child.once('error', error => {
       if (settled) return;
       settled = true;
@@ -2049,12 +2052,9 @@ const prepareFeishuCli = async (): Promise<void> => {
       '--no-save',
       '@larksuite/cli',
     ]);
-    if (!bundledNpm) throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
-    await runFeishuCliCommand(
-      bundledNpm.command,
-      bundledNpm.args,
-      cliRoot,
-    );
+    if (!bundledNpm)
+      throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
+    await runFeishuCliCommand(bundledNpm.command, bundledNpm.args, cliRoot);
     cliCommand = await findFeishuCliCommand();
   }
   if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
@@ -2339,6 +2339,7 @@ const _stopMcpBridge = async (): Promise<void> => {
  * Returns a summary for the renderer to display.
  */
 let mcpBridgeRefreshPromise: Promise<{ tools: number; error?: string }> | null = null;
+let mcpBridgeRefreshPending = false;
 
 const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>): void => {
   const windows = BrowserWindow.getAllWindows();
@@ -2354,6 +2355,10 @@ const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>)
 
 const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
   if (mcpBridgeRefreshPromise) {
+    // A server setting changed while the current pass was reading the enabled
+    // list. Schedule one more pass after it completes so the bridge converges
+    // on the latest persisted configuration.
+    mcpBridgeRefreshPending = true;
     return mcpBridgeRefreshPromise;
   }
   mcpBridgeRefreshPromise = (async () => {
@@ -2412,6 +2417,10 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
     })
     .finally(() => {
       mcpBridgeRefreshPromise = null;
+      if (mcpBridgeRefreshPending) {
+        mcpBridgeRefreshPending = false;
+        void refreshMcpBridge();
+      }
     });
   return mcpBridgeRefreshPromise;
 };
@@ -2899,7 +2908,6 @@ if (!gotTheLock) {
     fn(`[Renderer][${tag}] ${message}`);
   });
 
-
   // macOS: handle open-url event for deep links
   app.on('open-url', (event, url) => {
     event.preventDefault();
@@ -3145,18 +3153,35 @@ if (!gotTheLock) {
 
   const saveCommunitySession = (value: CommunityAuthSession) => {
     if (!canPersistCommunitySession()) {
-      throw new Error('System secure storage is unavailable; the login session cannot be saved safely.');
+      throw new Error(
+        'System secure storage is unavailable; the login session cannot be saved safely.',
+      );
     }
     const encrypted = safeStorage.encryptString(JSON.stringify(value)).toString('base64');
     getStore().set(COMMUNITY_AUTH_SESSION_KEY, { version: 1, encrypted });
   };
 
   const getCommunitySession = (): CommunityAuthSession | null => {
-    const stored = getStore().get<{ version?: unknown; encrypted?: unknown }>(COMMUNITY_AUTH_SESSION_KEY);
-    if (stored?.version !== 1 || typeof stored.encrypted !== 'string' || !canPersistCommunitySession()) return null;
+    const stored = getStore().get<{ version?: unknown; encrypted?: unknown }>(
+      COMMUNITY_AUTH_SESSION_KEY,
+    );
+    if (
+      stored?.version !== 1 ||
+      typeof stored.encrypted !== 'string' ||
+      !canPersistCommunitySession()
+    )
+      return null;
     try {
-      const decoded = JSON.parse(safeStorage.decryptString(Buffer.from(stored.encrypted, 'base64'))) as CommunityAuthSession;
-      if (!decoded.accessToken || !decoded.refreshToken || !decoded.user?.id || !decoded.user?.email) throw new Error('invalid session');
+      const decoded = JSON.parse(
+        safeStorage.decryptString(Buffer.from(stored.encrypted, 'base64')),
+      ) as CommunityAuthSession;
+      if (
+        !decoded.accessToken ||
+        !decoded.refreshToken ||
+        !decoded.user?.id ||
+        !decoded.user?.email
+      )
+        throw new Error('invalid session');
       return decoded;
     } catch {
       getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
@@ -3196,7 +3221,13 @@ if (!gotTheLock) {
         refresh_token?: string;
         user?: { id?: string; email?: string };
       };
-      if (!response.ok || !payload.access_token || !payload.refresh_token || !payload.user?.id || !payload.user.email) {
+      if (
+        !response.ok ||
+        !payload.access_token ||
+        !payload.refresh_token ||
+        !payload.user?.id ||
+        !payload.user.email
+      ) {
         throw new Error('Token exchange failed');
       }
       saveCommunitySession({
@@ -3212,7 +3243,10 @@ if (!gotTheLock) {
       if (mainWindow && !mainWindow.isVisible()) mainWindow.show();
       mainWindow?.focus();
     } catch (error) {
-      console.warn('[CommunityAuth] login callback failed:', error instanceof Error ? error.message : error);
+      console.warn(
+        '[CommunityAuth] login callback failed:',
+        error instanceof Error ? error.message : error,
+      );
       mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: false,
         error: '登录未完成，请重试。',
@@ -3239,7 +3273,11 @@ if (!gotTheLock) {
         }),
       });
       const payload = (await response.json()) as { login_url?: string; error?: string };
-      if (!response.ok || !payload.login_url || !payload.login_url.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)) {
+      if (
+        !response.ok ||
+        !payload.login_url ||
+        !payload.login_url.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)
+      ) {
         return { success: false, error: payload.error || '无法开始登录，请稍后重试。' };
       }
       pendingCommunityLogin = { state, verifier, expiresAt: Date.now() + 10 * 60 * 1000 };
@@ -3698,10 +3736,10 @@ if (!gotTheLock) {
           if (validationError) {
             return { success: false, error: validationError };
           }
-          const probeResult = await probeMcpConnection(existing);
-          if (!probeResult.success) {
-            return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
-          }
+          // Enabling must remain responsive. refreshMcpBridge() immediately
+          // follows this write and performs the single authoritative OAuth
+          // refresh plus MCP initialization. Doing it here as a synchronous
+          // probe duplicated that network work and blocked the switch.
         }
       }
 

@@ -7,10 +7,8 @@
  * Effects never run during SSR, which conveniently sidesteps browser-only
  * APIs (ResizeObserver, window, etc.).
  *
- * These tests pin the design contract that PR #184 once broke: the badge
- * renders blue pill chips (`rounded-full` + `--zy-skill-blue-*` tokens) with
- * semantic shortcut labels for core skills, instead of grey `bg-muted`
- * square tokens showing the raw skill name.
+ * Skill selections are input tokens: neutral pills with semantic shortcut
+ * labels, individually removable and without a separate bulk-clear action.
  */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -26,8 +24,6 @@ vi.mock('../../services/i18n', () => {
   const translations: Record<string, string> = {
     chatSkillDeepResearch: '深度调研',
     clearSkill: '移除技能',
-    clearAll: '全部清除',
-    clearAllSkills: '清除全部技能',
   };
   return {
     i18nService: {
@@ -117,7 +113,7 @@ test('renders nothing when no skill is active and no quick action is selected', 
   expect(renderBadge(makeState())).toBe('');
 });
 
-test('renders core skills as blue pill chips with the semantic shortcut label', () => {
+test('renders core skills as neutral input tokens with the semantic shortcut label', () => {
   const html = renderBadge(
     makeState({
       skills: [makeSkill({ id: 'deep-research', name: 'deep-research-raw-name' })],
@@ -129,11 +125,11 @@ test('renders core skills as blue pill chips with the semantic shortcut label', 
   expect(html).toContain('深度调研');
   expect(html).not.toContain('deep-research-raw-name');
 
-  // Style contract: blue capsule, not the PR #184 grey square token.
+  // Style contract: the token belongs to the input content, not a blue toolbar badge.
   expect(html).toContain('rounded-full');
-  expect(html).toContain('text-(--zy-skill-blue-foreground)');
-  expect(html).toContain('hover:bg-(--zy-skill-blue-background)');
-  expect(html).not.toContain('bg-muted');
+  expect(html).toContain('bg-muted');
+  expect(html).toContain('text-foreground');
+  expect(html).not.toContain('text-(--zy-skill-blue-foreground)');
 });
 
 test('falls back to displayName then name for non-core skills', () => {
@@ -164,8 +160,7 @@ test('renders a remove button titled with the clearSkill label for every chip', 
   );
 
   expect(countRemoveButtons(html)).toBe(2);
-  // With more than one active skill a "clear all" action is also offered.
-  expect(html).toContain('title="清除全部技能"');
+  expect(html).not.toContain('全部清除');
 });
 
 test('renders the quick action skill chip when only a quick action is selected', () => {
