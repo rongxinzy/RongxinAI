@@ -9,11 +9,14 @@ import type {
   CoworkMessage,
   CoworkMessageMetadata,
 } from '../../../types/cowork';
+import { i18nService } from '../../../services/i18n';
+import { resolveSkillIconUrl } from '../../../services/skillIcon';
 import { PlusMenuSkillsIcon } from '../plusMenuIcons';
 import type { Skill } from '../../../types/skill';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
+import { findChatSkillShortcut } from '../../chat/constants';
 import { CopyButton, ReEditButton } from './CopyButton';
 import FileTypeIcon from '../../icons/fileTypes/FileTypeIcon';
 
@@ -131,13 +134,7 @@ export const UserBubble: React.FC<{
             <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
               <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
                 {messageSkills.map(skill => (
-                  <span
-                    key={skill.id}
-                    className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground"
-                  >
-                    <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{skill.name}</span>
-                  </span>
+                  <MessageSkillSummary key={skill.id} skill={skill} />
                 ))}
                 <span className="whitespace-pre-wrap wrap-break-word">{textContent}</span>
               </div>
@@ -165,3 +162,28 @@ export const UserBubble: React.FC<{
     </div>
   );
 });
+
+const MessageSkillSummary: React.FC<{ skill: Skill }> = ({ skill }) => {
+  const shortcut = findChatSkillShortcut(skill.id);
+  const label = shortcut
+    ? i18nService.t(shortcut.labelKey)
+    : skill.displayName || skill.name;
+  const ShortcutIcon = shortcut?.icon;
+
+  return (
+    <span className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground">
+      {skill.iconUrl ? (
+        <img
+          src={resolveSkillIconUrl(skill.iconUrl)}
+          alt=""
+          className="size-3.5 shrink-0 object-contain"
+        />
+      ) : ShortcutIcon ? (
+        <ShortcutIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      ) : (
+        <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+};

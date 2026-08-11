@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import type { CoworkMessage } from '../../../types/cowork';
+import type { Skill } from '../../../types/skill';
 import { i18nService } from '../../../services/i18n';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { UserBubble } from './UserBubble';
@@ -13,6 +14,20 @@ const message: CoworkMessage = {
   type: 'user',
   content: '请帮我分析这个问题',
   timestamp: 1_754_034_400_000,
+};
+
+const displayNamedSkill: Skill = {
+  id: 'minimax-docx',
+  name: 'minimax-docx',
+  displayName: '文档',
+  description: '',
+  enabled: true,
+  pinned: false,
+  isOfficial: false,
+  isBuiltIn: false,
+  updatedAt: 0,
+  prompt: '',
+  skillPath: '',
 };
 
 describe('UserBubble', () => {
@@ -48,5 +63,17 @@ describe('UserBubble', () => {
 
     expect(screen.getByLabelText(i18nService.t('copyToClipboard'))).toBeInTheDocument();
     expect(screen.queryByLabelText(i18nService.t('coworkReEdit'))).not.toBeInTheDocument();
+  });
+
+  test('uses the localized display name for skills in the message summary', () => {
+    render(
+      <UserBubble
+        message={{ ...message, metadata: { skillIds: [displayNamedSkill.id] } }}
+        skills={[displayNamedSkill]}
+      />,
+    );
+
+    expect(screen.getByText('文档')).toBeInTheDocument();
+    expect(screen.queryByText('minimax-docx')).not.toBeInTheDocument();
   });
 });
