@@ -8,7 +8,7 @@ import type { ScheduledTask, ScheduledTaskRun } from './types';
 export class PiScheduledTaskExecutor {
   constructor(private readonly runtime: PiRuntime, private readonly coworkStore: CoworkStore) {}
 
-  async execute(task: ScheduledTask, _run: ScheduledTaskRun): Promise<{ sessionId: string }> {
+  async execute(task: ScheduledTask, _run: ScheduledTaskRun): Promise<{ sessionId: string; output: string | null }> {
     const prompt = task.payload.kind === PayloadKind.SystemEvent ? task.payload.text : task.payload.message;
     if (!prompt.trim()) throw new Error(`Scheduled task ${task.id} has an empty prompt`);
     const session = this.resolveSession(task);
@@ -26,7 +26,7 @@ export class PiScheduledTaskExecutor {
     if (this.runtime.isSessionActive(session.id)) await this.runtime.continueSession(session.id, prompt, options);
     else await this.runtime.startSession(session.id, prompt, options);
     await completion;
-    return { sessionId: session.id };
+    return { sessionId: session.id, output: this.finalAssistantOutput(session.id) };
   }
 
   private resolveSession(task: ScheduledTask) {
@@ -39,6 +39,14 @@ export class PiScheduledTaskExecutor {
       `Scheduled: ${task.name}`, config.workingDirectory, config.systemPrompt,
       config.executionMode, [], task.agentId, '', 'work',
     );
+  }
+
+  private finalAssistantOutput(sessionId: string): string | null {
+    const session = this.coworkStore.getSession(sessionId, null);
+    const message = [...(session?.messages ?? [])].reverse().find(candidate =>
+      candidate.type === 'assistant' && candidate.content.trim() && !candidate.metadata?.isThinking,
+    );
+    return message?.content.trim() || null;
   }
 }
 
