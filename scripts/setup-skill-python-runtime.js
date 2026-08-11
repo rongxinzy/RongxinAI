@@ -444,6 +444,9 @@ async function ensureSkillPythonRuntimes(options = {}) {
   const skillsRoot = options.skillsRoot || SKILLS_ROOT;
   const runtimeRoot = options.runtimeRoot || RUNTIME_ROOT;
   const requirements = listRequirementFiles(skillsRoot);
+  const lockPaths = requirements.map(entry =>
+    path.join(runtimeRoot, LOCKS_DIRECTORY_NAME, `${entry.skillId}.txt`),
+  );
   const declarations = validateSkillDependencyDeclarations(skillsRoot);
   if (!declarations.ok) {
     throw new Error(`Skill dependency declarations are incomplete: ${declarations.missing.join('; ')}`);
