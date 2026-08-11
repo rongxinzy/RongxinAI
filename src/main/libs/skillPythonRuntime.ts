@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 
 const RUNTIME_DIR_NAME = 'skill-python';
+const SHARED_ENVIRONMENT_NAME = 'shared';
+const LAYERS_DIRECTORY_NAME = 'layers';
+const SKILLS_DIRECTORY_NAME = 'skills';
 
 function resolveBundledCandidates(): string[] {
   if (app.isPackaged) {
@@ -80,10 +83,15 @@ export function findSkillPythonExecutable(
   if (!expectedHash) return null;
 
   for (const root of candidateRoots()) {
-    const environmentRoot = path.join(root, skillId);
-    const manifest = readManifest(environmentRoot);
+    const skillRoot = path.join(root, SKILLS_DIRECTORY_NAME, skillId);
+    const manifest = readManifest(skillRoot);
     if (manifest?.requirementsSha256 !== expectedHash || manifest?.skillId !== skillId) continue;
-    const executable = findPythonExecutable(environmentRoot);
+    // Version 2 packages one uv-managed dependency layer instead of a full
+    // venv per Skill. The per-Skill manifest above remains the compatibility
+    // gate, so an updated Skill cannot silently run against stale packages.
+    const executable = findPythonExecutable(
+      path.join(root, LAYERS_DIRECTORY_NAME, SHARED_ENVIRONMENT_NAME),
+    );
     if (executable) return executable;
   }
   return null;

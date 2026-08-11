@@ -49,13 +49,6 @@
     $$source = \"$INSTDIR\resources\SKILLs\";\
     $$destination = \"$APPDATA\ZhiYuanAgent\SKILLs\";\
     $$config = Join-Path $$source \"skills.config.json\";\
-    $$weixinAccounts = @(\
-      (Join-Path $$env:USERPROFILE \".openclaw\openclaw-weixin\accounts\"),\
-      (Join-Path $$env:APPDATA \"ZhiYuanAgent\openclaw\state\openclaw-weixin\accounts\")\
-    );\
-    foreach ($$directory in $$weixinAccounts) {\
-      if (Test-Path $$directory) { Remove-Item -Path $$directory -Recurse -Force -ErrorAction SilentlyContinue }\
-    };\
     if (Test-Path $$source) {\
       New-Item -ItemType Directory -Path $$destination -Force | Out-Null;\
       $$bundled = @(try {\
@@ -221,9 +214,6 @@
     Goto OfflineComponentInstallFailed
 
   ComponentReady_${TOKEN}:
-    FileOpen $2 "$PLUGINSDIR\component-targets.txt" a
-    FileWrite $2 "${KEY}|${PREFIX}|$R1$\r$\n"
-    FileClose $2
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $R5 $6 - $7
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
@@ -249,8 +239,6 @@
   StrCpy $R7 $R7 64
   StrCpy $1 $1 64
   StrCmp $1 $R7 0 OfflineComponentInstallFailed
-  FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
-  FileClose $2
   Delete "$PLUGINSDIR\component-switch-state.txt"
 
   ; Defender exclusion is optional and requires explicit, informed consent.
@@ -312,12 +300,12 @@
 
   DefenderExclusionDone:
 
-  !insertmacro EnsureOfflineComponent OPENCLAW "openclaw" "cfmind" "cfmind\package.json" "OpenClaw 离线运行环境"
+  !insertmacro EnsureOfflineComponent CHANNEL_RUNTIME "channel-runtime" "channel-runtime" "channel-runtime\cc-connect-sidecar.exe" "频道离线运行环境"
   !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
   !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
   !insertmacro EnsureOfflineComponent PORTABLE_GIT "portable-git" "mingit" "mingit\usr\bin\bash.exe" "PortableGit"
   !insertmacro EnsureOfflineComponent PYTHON "python" "python-win" "python-win\python.exe" "Python 离线运行环境"
-  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\xlsx\Scripts\python.exe" "Skill Python 离线环境"
+  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\layers\shared\Scripts\python.exe" "Skill Python 依赖层"
   !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
 
   DetailPrint "[Installer] Activating offline components"
@@ -390,9 +378,12 @@
   DetailPrint "[Installer] Connecting bundled runtimes"
   SetOutPath "$INSTDIR"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = \"Stop\";\
+    Set-StrictMode -Version Latest;\
     $$resourceRoot = \"$INSTDIR\resources\";\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1] } });\
+    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
+    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Prefix = [string]$$_.prefix } });\
     foreach ($$row in $$rows) {\
       $$link = Join-Path $$resourceRoot $$row.Prefix;\
       $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
@@ -405,7 +396,7 @@
           Remove-Item -LiteralPath $$link -Recurse -Force;\
         }\
       };\
-      New-Item -ItemType Junction -Path $$link -Target $$target -Force | Out-Null;\
+      New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop | Out-Null;\
     }"'
   Pop $0
   Pop $1
@@ -420,7 +411,7 @@
   DetailPrint "[Installer] Verifying bundled runtimes"
   IfFileExists "$INSTDIR\resources\python-win\python.exe" 0 InstalledRuntimeVerificationFailed
   IfFileExists "$INSTDIR\resources\uv-win\uv.exe" 0 InstalledRuntimeVerificationFailed
-  IfFileExists "$INSTDIR\resources\cfmind\package.json" 0 InstalledRuntimeVerificationFailed
+  IfFileExists "$INSTDIR\resources\channel-runtime\cc-connect-sidecar.exe" 0 InstalledRuntimeVerificationFailed
   Goto OfflineComponentsReady
   InstalledRuntimeVerificationFailed:
     StrCpy $R9 "离线运行环境连接校验失败。请重新运行安装器。"
@@ -494,7 +485,7 @@
   ; Remove known junctions explicitly before recursive deletion. This prevents
   ; an old installation cleanup from ever walking into an immutable shared pack.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$names = @("cfmind", "SKILLs", "MCPs", "mingit", "python-win", "skill-python", "uv-win");\
+    $$names = @("channel-runtime", "SKILLs", "MCPs", "mingit", "python-win", "skill-python", "uv-win");\
     Get-ChildItem -Path "$INSTDIR.old*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {\
       $$oldResources = Join-Path $$_.FullName "resources";\
       foreach ($$name in $$names) {\
@@ -516,7 +507,8 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Id = $$parts[2] } });\
+    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
+    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Id = [string]$$_.contentId } });\
     foreach ($$row in $$rows) {\
       $$root = Join-Path $$runtimeRoot $$row.Key;\
       foreach ($$pointerName in @(\"current.previous\", \"current.next\")) {\

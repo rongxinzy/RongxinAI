@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Build isolated, relocatable Python environments for Skills that declare
- * requirements.txt. These environments are shipped with the desktop package,
- * so end users do not need Python, pip, uv, or network access for the common
- * document workflows.
+ * Build one relocatable Python dependency layer for Skills that declare
+ * requirements.txt. Each Skill keeps its own requirement fingerprint, but the
+ * wheels live in a single uv-managed environment. This prevents duplicated
+ * numpy/pandas/psycopg2 installations from inflating the offline installer.
  */
 
 'use strict';
@@ -16,7 +16,11 @@ const { spawnSync } = require('child_process');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SKILLS_ROOT = path.join(PROJECT_ROOT, 'SKILLs');
 const RUNTIME_ROOT = path.join(PROJECT_ROOT, 'resources', 'skill-python');
-const MANIFEST_VERSION = 1;
+const MANIFEST_VERSION = 2;
+const SHARED_ENVIRONMENT_NAME = 'shared';
+const LAYERS_DIRECTORY_NAME = 'layers';
+const SKILLS_DIRECTORY_NAME = 'skills';
+const LOCKS_DIRECTORY_NAME = 'locks';
 
 const IMPORT_NAME_OVERRIDES = {
   pillow: 'PIL',
@@ -309,6 +313,33 @@ function expectedManifest(entry, platform, arch, pythonVersion, uvVersion) {
     platform,
     arch,
     requirementsSha256: sha256File(entry.requirementsPath),
+    layerIds: [SHARED_ENVIRONMENT_NAME],
+    pythonVersion,
+    uvVersion,
+  };
+}
+
+function sharedEnvironmentRoot(runtimeRoot) {
+  return path.join(runtimeRoot, LAYERS_DIRECTORY_NAME, SHARED_ENVIRONMENT_NAME);
+}
+
+function skillManifestRoot(runtimeRoot, skillId) {
+  return path.join(runtimeRoot, SKILLS_DIRECTORY_NAME, skillId);
+}
+
+function requirementHashes(requirements) {
+  return Object.fromEntries(
+    requirements.map(entry => [entry.skillId, sha256File(entry.requirementsPath)]),
+  );
+}
+
+function expectedSharedManifest(requirements, platform, arch, pythonVersion, uvVersion) {
+  return {
+    version: MANIFEST_VERSION,
+    kind: 'shared-layer',
+    platform,
+    arch,
+    requirementsSha256: requirementHashes(requirements),
     pythonVersion,
     uvVersion,
   };
@@ -321,7 +352,8 @@ function manifestMatches(manifest, expected) {
     manifest.skillId === expected.skillId &&
     manifest.platform === expected.platform &&
     manifest.arch === expected.arch &&
-    manifest.requirementsSha256 === expected.requirementsSha256 &&
+    JSON.stringify(manifest.requirementsSha256) === JSON.stringify(expected.requirementsSha256) &&
+    JSON.stringify(manifest.layerIds) === JSON.stringify(expected.layerIds) &&
     manifest.pythonVersion === expected.pythonVersion &&
     manifest.uvVersion === expected.uvVersion,
   );
@@ -335,14 +367,25 @@ function checkSkillPythonRuntimeHealth(options = {}) {
   const declarations = validateSkillDependencyDeclarations(options.skillsRoot || SKILLS_ROOT);
   const missing = [...declarations.missing];
 
+  const runtimeRoot = options.runtimeRoot || RUNTIME_ROOT;
+  const sharedRoot = sharedEnvironmentRoot(runtimeRoot);
+  const lockPaths = requirements.map(entry =>
+    path.join(runtimeRoot, LOCKS_DIRECTORY_NAME, `${entry.skillId}.txt`),
+  );
+  const pythonPath = pythonExecutableForEnvironment(sharedRoot, platform);
+  const sharedManifest = readManifest(sharedRoot);
+  if (!pythonPath) missing.push('shared: python executable');
+  if (!sharedManifest || sharedManifest.version !== MANIFEST_VERSION || sharedManifest.kind !== 'shared-layer') {
+    missing.push('shared: matching runtime.json');
+  }
+  if (!isEnvironmentRelocatable(sharedRoot)) missing.push('shared: relocatable symlinks');
+
   for (const entry of requirements) {
-    const environmentRoot = path.join(options.runtimeRoot || RUNTIME_ROOT, entry.skillId);
-    const pythonPath = pythonExecutableForEnvironment(environmentRoot, platform);
+    const environmentRoot = skillManifestRoot(runtimeRoot, entry.skillId);
     const importNames = parseImportNames(entry.requirementsPath);
     const manifest = readManifest(environmentRoot);
     const requirementsSha256 = sha256File(entry.requirementsPath);
     const entryMissing = [];
-    if (!pythonPath) entryMissing.push('python executable');
     if (
       !manifest ||
       manifest.version !== MANIFEST_VERSION ||
@@ -352,9 +395,6 @@ function checkSkillPythonRuntimeHealth(options = {}) {
       manifest.requirementsSha256 !== requirementsSha256
     ) {
       entryMissing.push('matching runtime.json');
-    }
-    if (!isEnvironmentRelocatable(environmentRoot)) {
-      entryMissing.push('relocatable symlinks');
     }
     if (pythonPath) {
       const probe = probePython(pythonPath, importNames);
@@ -419,29 +459,35 @@ async function ensureSkillPythonRuntimes(options = {}) {
 
   const pythonVersion = getPythonVersion(base.pythonPath);
   const uvVersion = getUvVersion(base.uvPath);
-  fs.mkdirSync(runtimeRoot, { recursive: true });
+  const sharedRoot = sharedEnvironmentRoot(runtimeRoot);
+  const sharedExpected = expectedSharedManifest(requirements, platform, arch, pythonVersion, uvVersion);
+  const existingPython = pythonExecutableForEnvironment(sharedRoot, platform);
+  const healthyExistingLayer =
+    existingPython &&
+    isEnvironmentRelocatable(sharedRoot) &&
+    manifestMatches(readManifest(sharedRoot), sharedExpected) &&
+    lockPaths.every(lockPath => fs.existsSync(lockPath)) &&
+    requirements.every(entry => probePython(existingPython, parseImportNames(entry.requirementsPath)).ok);
 
-  for (const entry of requirements) {
-    const environmentRoot = path.join(runtimeRoot, entry.skillId);
-    const expected = expectedManifest(entry, platform, arch, pythonVersion, uvVersion);
-    const existingPython = pythonExecutableForEnvironment(environmentRoot, platform);
-    if (
-      existingPython &&
-      isEnvironmentRelocatable(environmentRoot) &&
-      manifestMatches(readManifest(environmentRoot), expected)
-    ) {
-      const probe = probePython(existingPython, parseImportNames(entry.requirementsPath));
-      if (probe.ok) {
-        console.log(
-          `[setup-skill-python-runtime] ${entry.skillId}: existing environment is healthy`,
-        );
-        continue;
-      }
+  if (!healthyExistingLayer) {
+    fs.rmSync(runtimeRoot, { recursive: true, force: true });
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(path.join(runtimeRoot, LOCKS_DIRECTORY_NAME), { recursive: true });
+    console.log('[setup-skill-python-runtime] creating shared relocatable dependency layer');
+    for (const [index, entry] of requirements.entries()) {
+      run(
+        base.uvPath,
+        [
+          'pip',
+          'compile',
+          '--generate-hashes',
+          '--output-file',
+          lockPaths[index],
+          entry.requirementsPath,
+        ],
+        { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } },
+      );
     }
-
-    fs.rmSync(environmentRoot, { recursive: true, force: true });
-    fs.mkdirSync(environmentRoot, { recursive: true });
-    console.log(`[setup-skill-python-runtime] ${entry.skillId}: creating relocatable environment`);
     run(
       base.uvPath,
       [
@@ -454,40 +500,45 @@ async function ensureSkillPythonRuntimes(options = {}) {
         '--no-python-downloads',
         '--python',
         base.pythonPath,
-        environmentRoot,
+        sharedRoot,
       ],
       { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } },
     );
-    const environmentPython = pythonExecutableForEnvironment(environmentRoot, platform);
+    const environmentPython = pythonExecutableForEnvironment(sharedRoot, platform);
     if (!environmentPython)
-      throw new Error(`${entry.skillId}: uv did not create a Python executable.`);
-    rebaseEnvironmentSymlinks(environmentRoot, base.pythonPath);
-    run(
-      base.uvPath,
-      [
-        'pip',
-        'install',
-        '--python',
-        environmentPython,
-        '--requirement',
-        entry.requirementsPath,
-        '--link-mode',
-        'copy',
-        '--no-managed-python',
-        '--no-python-downloads',
-      ],
-      { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } },
-    );
-    rebaseEnvironmentSymlinks(environmentRoot, base.pythonPath);
-    const probe = probePython(environmentPython, parseImportNames(entry.requirementsPath));
-    if (!probe.ok)
-      throw new Error(`${entry.skillId}: dependency health check failed: ${probe.detail}`);
+      throw new Error('shared layer: uv did not create a Python executable.');
+    rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
+    const installArgs = [
+      'pip',
+      'install',
+      '--python',
+      environmentPython,
+      ...lockPaths.flatMap(lockPath => ['--requirement', lockPath]),
+      '--link-mode',
+      'copy',
+      '--no-managed-python',
+      '--no-python-downloads',
+    ];
+    run(base.uvPath, installArgs, { env: { UV_NO_PROGRESS: '1', UV_PYTHON: base.pythonPath } });
+    rebaseEnvironmentSymlinks(sharedRoot, base.pythonPath);
+    for (const entry of requirements) {
+      const probe = probePython(environmentPython, parseImportNames(entry.requirementsPath));
+      if (!probe.ok)
+        throw new Error(`${entry.skillId}: dependency health check failed: ${probe.detail}`);
+    }
     fs.writeFileSync(
-      path.join(environmentRoot, 'runtime.json'),
-      `${JSON.stringify(expected, null, 2)}\n`,
+      path.join(sharedRoot, 'runtime.json'),
+      `${JSON.stringify(sharedExpected, null, 2)}\n`,
       'utf8',
     );
-    console.log(`[setup-skill-python-runtime] ${entry.skillId}: ready`);
+  }
+
+  for (const entry of requirements) {
+    const environmentRoot = skillManifestRoot(runtimeRoot, entry.skillId);
+    const expected = expectedManifest(entry, platform, arch, pythonVersion, uvVersion);
+    fs.mkdirSync(environmentRoot, { recursive: true });
+    fs.writeFileSync(path.join(environmentRoot, 'runtime.json'), `${JSON.stringify(expected, null, 2)}\n`, 'utf8');
+    console.log(`[setup-skill-python-runtime] ${entry.skillId}: linked to shared layer`);
   }
 
   const health = checkSkillPythonRuntimeHealth({ platform, arch, skillsRoot, runtimeRoot });

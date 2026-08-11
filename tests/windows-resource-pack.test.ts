@@ -8,6 +8,7 @@ import {
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
   computeWindowsResourceComponentId,
+  getWindowsResourceComponents,
   isWindowsResourceComponentReusable,
   sha256File,
 } from '../scripts/windows-resource-pack.cjs';
@@ -35,6 +36,17 @@ afterEach(() => {
 });
 
 describe('Windows offline component identity', () => {
+  test('uses cc-connect as the first of exactly seven cached components', () => {
+    const components = getWindowsResourceComponents(process.cwd());
+    expect(components).toHaveLength(7);
+    expect(components[0]).toMatchObject({
+      key: 'channel-runtime',
+      prefix: 'channel-runtime',
+      sentinel: 'channel-runtime/cc-connect-sidecar.exe',
+    });
+    expect(components.map(component => component.key)).not.toContain('openclaw');
+  });
+
   test('is stable when only source mtimes change', () => {
     const component = createComponent();
     const before = computeWindowsResourceComponentId(component);

@@ -13,11 +13,11 @@ const WINDOWS_RESOURCE_ARCHIVE_FORMAT = '7z';
 function getWindowsResourceComponents(projectRoot) {
   return [
     {
-      key: 'openclaw',
-      label: 'OpenClaw runtime',
-      dir: path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current'),
-      prefix: 'cfmind',
-      sentinel: 'cfmind/package.json',
+      key: 'channel-runtime',
+      label: 'cc-connect channel runtime',
+      dir: path.join(projectRoot, 'vendor', 'channel-runtime', 'current'),
+      prefix: 'channel-runtime',
+      sentinel: 'channel-runtime/cc-connect-sidecar.exe',
     },
     {
       key: 'skills',
@@ -52,7 +52,7 @@ function getWindowsResourceComponents(projectRoot) {
       label: 'Skill Python runtimes',
       dir: path.join(projectRoot, 'resources', 'skill-python'),
       prefix: 'skill-python',
-      sentinel: 'skill-python/xlsx/Scripts/python.exe',
+      sentinel: 'skill-python/layers/shared/Scripts/python.exe',
     },
     {
       key: 'uv',

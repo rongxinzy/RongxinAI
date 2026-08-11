@@ -43,10 +43,12 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('current.next');
     expect(installerScript).toContain('current.previous');
     expect(installerScript).toContain('component-manifest.json');
+    expect(installerScript).not.toContain('component-targets.txt');
     expect(installerScript).toContain('$$ErrorActionPreference = \\"Stop\\"');
     expect(installerScript).toContain('Set-StrictMode -Version Latest');
     expect(installerScript).toContain('Missing prepared component target:');
     expect(installerScript).toContain('New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop');
+    expect(installerScript).toContain('New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop');
     expect(installerScript).toContain('component-switch-state.txt');
     expect(installerScript).toContain('phase=component-set-rollback');
     expect(installerScript).toContain('phase=component-cleanup-complete');

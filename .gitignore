@@ -23,6 +23,7 @@ __pycache__/
 .pycache
 vendor/openclaw-runtime/
 vendor/openclaw-plugins/
+vendor/channel-runtime/
 vendor/llamacpp-runtime/
 vendor/engram-runtime/
 

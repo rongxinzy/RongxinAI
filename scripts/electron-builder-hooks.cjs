@@ -393,6 +393,70 @@ function ensureBundledOpenClawRuntime(context) {
   }
 }
 
+/**
+ * Build the deliberately trimmed cc-connect sidecar from a checked-out,
+ * immutable pi-connect revision.  The release workflow supplies
+ * ZHIYUAN_CC_CONNECT_SOURCE from that exact tag; no package build downloads a
+ * moving branch or invokes an Agent adapter.
+ */
+function ensureBundledChannelRuntime(context) {
+  const projectRoot = path.join(__dirname, '..');
+  const sourceRoot = process.env.ZHIYUAN_CC_CONNECT_SOURCE;
+  if (!sourceRoot || !existsSync(path.join(sourceRoot, 'cmd', 'zhiyuan-sidecar', 'main.go'))) {
+    throw new Error(
+      '[electron-builder-hooks] ZHIYUAN_CC_CONNECT_SOURCE must point to the fixed pi-connect release checkout containing cmd/zhiyuan-sidecar.',
+    );
+  }
+  const platform = context?.electronPlatformName;
+  const arch = resolveTargetArch(context);
+  const goArch = arch === 'x64' ? 'amd64' : arch;
+  const runtimeRoot = path.join(projectRoot, 'vendor', 'channel-runtime', 'current');
+  const binaryName = platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
+  const binaryPath = path.join(runtimeRoot, binaryName);
+  const sourceRevision = spawnSync('git', ['rev-parse', 'HEAD'], {
+    cwd: sourceRoot,
+    encoding: 'utf8',
+  });
+  if (sourceRevision.status !== 0) {
+    throw new Error('[electron-builder-hooks] Cannot resolve fixed pi-connect source revision.');
+  }
+
+  rmSync(runtimeRoot, { recursive: true, force: true });
+  mkdirSync(runtimeRoot, { recursive: true });
+  const result = spawnSync('go', ['build', '-trimpath', '-ldflags=-s -w', '-o', binaryPath, './cmd/zhiyuan-sidecar'], {
+    cwd: sourceRoot,
+    env: {
+      ...process.env,
+      GOOS: platform === 'win32' ? 'windows' : platform,
+      GOARCH: goArch,
+      CGO_ENABLED: '0',
+    },
+    encoding: 'utf8',
+  });
+  if (result.status !== 0 || !existsSync(binaryPath)) {
+    throw new Error(
+      '[electron-builder-hooks] Failed to build cc-connect channel sidecar: ' +
+        (result.error?.message || result.stderr || result.stdout || `exit ${result.status}`),
+    );
+  }
+  writeFileSync(
+    path.join(runtimeRoot, 'runtime-build-info.json'),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        sourceRepository: 'https://github.com/rongxinzy/pi-connect',
+        sourceRevision: sourceRevision.stdout.trim(),
+        target: `${platform}-${arch}`,
+        binary: binaryName,
+        sha256: sha256File(binaryPath),
+      },
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+}
+
 function findPackagedBash(appOutDir) {
   const candidates = [
     path.join(appOutDir, 'resources', 'mingit', 'bin', 'bash.exe'),
@@ -641,7 +705,7 @@ function installSkillDependencies() {
 
 async function beforePack(context) {
   configureMacAutoUpdateMetadata(context);
-  ensureBundledOpenClawRuntime(context);
+  ensureBundledChannelRuntime(context);
   // Install skill dependencies first (for all platforms)
   installSkillDependencies();
 
@@ -832,8 +896,6 @@ async function afterPack(context) {
     const appPath = path.join(context.appOutDir, `${appName}.app`);
 
     if (existsSync(appPath)) {
-      // Remove all .bin directories (symlinks) before signing to prevent codesign failures
-      removeAllBinDirsInCfmind(appPath);
       applyMacIconFix(appPath);
     } else {
       console.warn(`[electron-builder-hooks] App not found at ${appPath}, skipping icon fix`);
@@ -845,4 +907,5 @@ module.exports = {
   beforePack,
   afterPack,
   configureMacAutoUpdateMetadata,
+  ensureBundledChannelRuntime,
 };
