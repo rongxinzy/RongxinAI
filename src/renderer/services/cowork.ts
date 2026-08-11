@@ -37,7 +37,7 @@ import {
   updateSessionStatus,
   updateSessionTitle,
 } from '../store/slices/coworkSlice';
-import { clearActiveSkills, setActiveSkillIds } from '../store/slices/skillSlice';
+import { clearActiveSkills } from '../store/slices/skillSlice';
 import type {
   CoworkApiConfig,
   CoworkConfigUpdate,
@@ -749,12 +749,10 @@ class CoworkService {
       // loadSession can be called reactively (onSessionsChanged) while a task
       // is still executing; the backend may report a transitional 'idle' status
       // that would prematurely hide the stop button.
-      // Restore skill selection from session record
-      if (result.session.activeSkillIds?.length) {
-        store.dispatch(setActiveSkillIds(result.session.activeSkillIds));
-      } else {
-        store.dispatch(clearActiveSkills());
-      }
+      // Session skills describe already-sent messages. Never reattach them to
+      // the next prompt when reactive session loading runs during a stream.
+      // Re-edit explicitly restores a message's skills in CoworkSessionDetail.
+      store.dispatch(clearActiveSkills());
 
       const imResult = await cowork.remoteManaged(sessionId);
       if (requestId === this.latestLoadSessionRequestId) {
