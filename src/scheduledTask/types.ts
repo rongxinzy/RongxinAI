@@ -69,6 +69,8 @@ export interface ScheduledTask {
    *  agent. */
   agentId: string;
   sessionKey: string | null;
+  /** Changes whenever a trigger-affecting task definition changes. */
+  scheduleVersion?: string;
   state: TaskState;
   createdAt: string;
   updatedAt: string;
