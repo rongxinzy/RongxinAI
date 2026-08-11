@@ -246,6 +246,7 @@ import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { CcConnectPiBridge } from './im/ccConnectPiBridge';
+import { IMStore } from './im/imStore';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 import {
   loadOpenClawSessionPolicyConfig,
@@ -1084,6 +1085,21 @@ let imGatewayManager: IMGatewayManager | null = null;
 let ccConnectBridgeServer: CcConnectBridgeServer | null = null;
 let ccConnectSidecarManager: CcConnectSidecarManager | null = null;
 let ccConnectPiBridge: CcConnectPiBridge | null = null;
+const startCcConnectBridge = async (): Promise<void> => {
+  if (ccConnectBridgeServer) return;
+  const token = crypto.randomBytes(32).toString('base64url');
+  ccConnectPiBridge = new CcConnectPiBridge({
+    runtime: getPiRuntimeAdapter(), coworkStore: getCoworkStore(),
+    imStore: new IMStore(getStore().getDatabase()),
+    getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
+    onCronTrigger: async () => { throw new Error('cc-connect Cron is not initialized'); },
+  });
+  ccConnectBridgeServer = new CcConnectBridgeServer(token, {
+    onTurn: request => ccConnectPiBridge!.runTurn(request),
+    onCronTrigger: trigger => ccConnectPiBridge!.runCronTrigger(trigger),
+  });
+  await ccConnectBridgeServer.start();
+};
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
 let openClawEngineManager: OpenClawEngineManager | null = null;
@@ -7478,6 +7494,12 @@ if (!gotTheLock) {
         console.error('[IM Gateway] Error stopping gateways on quit:', err);
       });
     }
+    await ccConnectBridgeServer?.stop().catch(error => {
+      console.error('[cc-connect] Failed to stop bridge on quit:', error);
+    });
+    ccConnectBridgeServer = null;
+    await ccConnectSidecarManager?.stop();
+    ccConnectSidecarManager = null;
 
     if (openClawEngineManager) {
       await openClawEngineManager.stopGateway().catch(error => {
@@ -7610,6 +7632,9 @@ if (!gotTheLock) {
     console.log('[Main] initApp: store initialized');
     refreshEndpointsTestMode(store);
     sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
+    await startCcConnectBridge().catch(error =>
+      console.error('[cc-connect] Failed to start local bridge:', error),
+    );
 
     const startSqliteBackupLoop = async (): Promise<void> => {
       if (!sqliteBackupManager) return;
