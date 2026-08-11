@@ -4,8 +4,9 @@ import {
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
 import { ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
+import { MessageAction, MessageActions } from '@shared/components/ai-elements/message';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
-import { Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
+import { Info, RotateCcw, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
@@ -60,6 +61,9 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons?: boolean;
   isTurnComplete?: boolean;
   toolActivities?: CoworkToolActivity[];
+  recoverableTaskId?: string | null;
+  resumeTaskId?: string | null;
+  onResumeTask?: (interruption: CoworkSessionInterruption) => void;
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
 }> = ({
@@ -71,6 +75,9 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons = true,
   isTurnComplete = true,
   toolActivities = [],
+  recoverableTaskId,
+  resumeTaskId,
+  onResumeTask,
   expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
@@ -93,8 +100,14 @@ const TurnBlockComponent: React.FC<{
     const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
     const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
     if (!content.trim()) return null;
+    const canResume = Boolean(
+      interruption?.recoverable &&
+      interruption.taskId &&
+      interruption.taskId === recoverableTaskId &&
+      onResumeTask,
+    );
     return (
-      <div className="rounded-lg border border-border bg-background px-3 py-2">
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-background px-3 py-2">
         <div className="flex items-center gap-2">
           {isError ? (
             <TriangleAlert className="size-4 text-muted-foreground shrink-0" />
@@ -103,6 +116,18 @@ const TurnBlockComponent: React.FC<{
           )}
           <div className="text-xs whitespace-pre-wrap text-muted-foreground">{content}</div>
         </div>
+        {canResume && interruption && onResumeTask && (
+          <MessageActions>
+            <MessageAction
+              tooltip={i18nService.t('coworkResumeTaskAction')}
+              label={i18nService.t('coworkResumeTaskAction')}
+              disabled={resumeTaskId === interruption.taskId}
+              onClick={() => onResumeTask(interruption)}
+            >
+              <RotateCcw />
+            </MessageAction>
+          </MessageActions>
+        )}
       </div>
     );
   };
@@ -266,6 +291,7 @@ const TurnBlockComponent: React.FC<{
     };
 
     for (const item of visibleAssistantItems) {
+      const isInterruption = item.type === 'system' && Boolean(item.message.metadata?.interruption);
       const isAnswer =
         item.type === 'assistant' &&
         !item.message.metadata?.isThinking &&
@@ -276,8 +302,8 @@ const TurnBlockComponent: React.FC<{
         item.type === 'tool_result' ||
         item.type === 'system';
 
-      if (isAnswer) {
-        flush(true);
+      if (isAnswer || isInterruption) {
+        flush(isAnswer);
         result.push({
           items: [item],
           followedByAnswer: false,
@@ -306,9 +332,16 @@ const TurnBlockComponent: React.FC<{
   const visibleGroups = groups.filter(group => !isEmptyAnswerGroup(group));
   const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems, isTurnComplete);
   const finalAnswerItem = finalAnswerIndex >= 0 ? visibleAssistantItems[finalAnswerIndex] : null;
+  const interruptionItems = visibleAssistantItems.filter(
+    item => item.type === 'system' && Boolean(item.message.metadata?.interruption),
+  );
   const executionItems =
     finalAnswerIndex >= 0
-      ? visibleAssistantItems.filter((_, index) => index !== finalAnswerIndex)
+      ? visibleAssistantItems.filter(
+          (item, index) =>
+            index !== finalAnswerIndex &&
+            !(item.type === 'system' && Boolean(item.message.metadata?.interruption)),
+        )
       : [];
   const executionSummary = getExecutionSummary(executionItems);
   const latestToolActivity = toolActivities[toolActivities.length - 1];
@@ -338,7 +371,9 @@ const TurnBlockComponent: React.FC<{
   ) => {
     const firstItem = group.items[0];
     const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
-    if (isAnswerItem) {
+    const isInterruptionItem =
+      firstItem?.type === 'system' && Boolean(firstItem.message.metadata?.interruption);
+    if (isAnswerItem || isInterruptionItem) {
       return renderItem(firstItem, 0, isFinalAnswer);
     }
 
@@ -386,15 +421,16 @@ const TurnBlockComponent: React.FC<{
                 })}
               </ExecutionSummary>
             )}
-            {finalAnswerItem
-              ? renderItem(finalAnswerItem, finalAnswerIndex, true)
-              : visibleGroups.map((group, index) =>
-                  renderExecutionGroup(
-                    group,
-                    `turn-group-${index}`,
-                    index === lastAnswerGroupIndex,
-                  ),
-                )}
+            {finalAnswerItem ? (
+              <>
+                {renderItem(finalAnswerItem, finalAnswerIndex, true)}
+                {interruptionItems.map((item, index) => renderItem(item, index, false))}
+              </>
+            ) : (
+              visibleGroups.map((group, index) =>
+                renderExecutionGroup(group, `turn-group-${index}`, index === lastAnswerGroupIndex),
+              )
+            )}
             {toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup && (
               <ChainOfThought key="transient-working-summary" defaultOpen={false}>
                 <ChainOfThoughtHeader icon={Wrench}>

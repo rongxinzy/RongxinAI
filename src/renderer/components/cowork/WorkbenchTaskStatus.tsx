@@ -277,7 +277,9 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
               label={i18nService.t('workbenchTaskResume')}
               disabled={busy}
               onClick={() =>
-                void runAction(() => window.electron.workbenchTask.resume(detail.task.id))
+                void runAction(() =>
+                  window.electron.workbenchTask.resume({ taskId: detail.task.id }),
+                )
               }
             />
           )}

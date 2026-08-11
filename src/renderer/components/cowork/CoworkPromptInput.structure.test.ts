@@ -78,3 +78,8 @@ test('keeps text editing mounted while a target session context is pending', () 
   expect(source).toContain('disabled={sessionContextPending}');
   expect(source).toContain('sessionContextPending ||');
 });
+
+test('allows an empty amendment only while an explicit task resume context is active', () => {
+  expect(source).toContain('!trimmedValue && attachments.length === 0 && !resumeTaskActive');
+  expect(source).toContain('<ResumeTaskContextBadge onCancel={onCancelTaskResume} />');
+});

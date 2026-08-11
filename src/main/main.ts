@@ -7694,26 +7694,28 @@ if (!gotTheLock) {
       .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
-      startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun) => {
+      startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun, resumeInput) => {
         const session = getCoworkStore().getSession(task.sessionId);
         if (!session) throw new Error('Cowork session not found.');
         const config = getCoworkStore().getConfig();
-        await getPiRuntimeAdapter().continueSession(
-          session.id,
-          'Continue the current task from its persisted state and verify the result.',
-          {
-            systemPrompt: session.systemPrompt,
-            skillIds: session.activeSkillIds,
-            sessionMode: session.mode,
-            workspaceRoot: session.cwd,
-            agentId: session.agentId,
-            expertIds: session.experts.map(expert => expert.expertId),
-            modelOverride: session.modelOverride,
-            autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
-            _workbenchRunId: run.id,
-            _skipUserMessage: true,
-          },
-        );
+        const amendment = resumeInput?.amendment?.trim() ?? '';
+        const prompt =
+          amendment || 'Continue the current task from its persisted state and verify the result.';
+        await getPiRuntimeAdapter().continueSession(session.id, prompt, {
+          systemPrompt: session.systemPrompt,
+          skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
+          sessionMode: session.mode,
+          workspaceRoot: session.cwd,
+          agentId: session.agentId,
+          expertIds: resumeInput?.expertIds ?? session.experts.map(expert => expert.expertId),
+          modelOverride: session.modelOverride,
+          autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
+          goalMode: resumeInput?.goalMode,
+          imageAttachments: resumeInput?.imageAttachments,
+          fileAttachments: resumeInput?.fileAttachments,
+          _workbenchRunId: run.id,
+          _skipUserMessage: !amendment,
+        });
       },
     });
     registerMemoryIpcHandlers({ getService: getProjectMemoryService });

@@ -123,6 +123,24 @@ export interface WorkbenchTaskActionResult {
   error?: string;
 }
 
+export interface WorkbenchTaskResumeInput {
+  taskId: string;
+  amendment?: string;
+  skillIds?: string[];
+  expertIds?: string[];
+  goalMode?: boolean;
+  imageAttachments?: Array<{
+    name: string;
+    mimeType: string;
+    base64Data: string;
+  }>;
+  fileAttachments?: Array<{
+    name: string;
+    path: string;
+    extension: string;
+  }>;
+}
+
 export interface WorkbenchApprovalResponseInput {
   approvalId: string;
   approved: boolean;
