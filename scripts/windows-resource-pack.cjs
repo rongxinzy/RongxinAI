@@ -6,7 +6,9 @@ const path = require('path');
 
 const { shouldExclude } = require('./pack-openclaw-tar.cjs');
 
-const WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION = 3;
+const WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION = 4;
+const WINDOWS_RESOURCE_ARCHIVE_EXTENSION = '.7z';
+const WINDOWS_RESOURCE_ARCHIVE_FORMAT = '7z';
 
 function getWindowsResourceComponents(projectRoot) {
   return [
@@ -147,7 +149,8 @@ function buildWindowsResourceComponentManifest(
     prefix: component.prefix,
     sentinel: component.sentinel,
     contentId,
-    archive: component.key + '.tar',
+    archive: component.key + WINDOWS_RESOURCE_ARCHIVE_EXTENSION,
+    archiveFormat: WINDOWS_RESOURCE_ARCHIVE_FORMAT,
     archiveSha256,
     archiveSizeBytes,
     sentinelSha256,
@@ -164,7 +167,8 @@ function isWindowsResourceComponentReusable(manifestPath, archivePath, contentId
       saved.prefix === component.prefix &&
       saved.sentinel === component.sentinel &&
       saved.contentId === contentId &&
-      saved.archive === component.key + '.tar' &&
+      saved.archive === component.key + WINDOWS_RESOURCE_ARCHIVE_EXTENSION &&
+      saved.archiveFormat === WINDOWS_RESOURCE_ARCHIVE_FORMAT &&
       typeof saved.archiveSha256 === 'string' &&
       saved.archiveSha256 === sha256File(archivePath) &&
       saved.archiveSizeBytes === fs.statSync(archivePath).size
@@ -185,6 +189,8 @@ function buildWindowsResourceBundleManifest(componentManifests) {
 
 module.exports = {
   WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION,
+  WINDOWS_RESOURCE_ARCHIVE_EXTENSION,
+  WINDOWS_RESOURCE_ARCHIVE_FORMAT,
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
   computeWindowsResourceComponentId,

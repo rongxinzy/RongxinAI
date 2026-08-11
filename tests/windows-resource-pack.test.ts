@@ -59,7 +59,7 @@ describe('Windows offline component identity', () => {
   test('reuses only an archive whose manifest, size, and SHA-256 still match', () => {
     const component = createComponent();
     const contentId = computeWindowsResourceComponentId(component);
-    const archivePath = path.join(component.dir, 'runtime.tar');
+    const archivePath = path.join(component.dir, 'runtime.7z');
     const manifestPath = path.join(component.dir, 'manifest.json');
     fs.writeFileSync(archivePath, 'archive-v1');
     const manifest = buildWindowsResourceComponentManifest(
@@ -82,7 +82,7 @@ describe('Windows offline component identity', () => {
 
   test('records a digest for the component health-check file', () => {
     const component = createComponent();
-    const archivePath = path.join(component.dir, 'runtime.tar');
+    const archivePath = path.join(component.dir, 'runtime.7z');
     fs.writeFileSync(archivePath, 'archive-v1');
     const manifest = buildWindowsResourceComponentManifest(
       component,
@@ -95,6 +95,8 @@ describe('Windows offline component identity', () => {
     expect(manifest.sentinelSha256).toBe(
       sha256File(path.join(component.dir, 'nested', 'runtime.exe')),
     );
+    expect(manifest.archive).toBe('runtime.7z');
+    expect(manifest.archiveFormat).toBe('7z');
   });
 
   test('marks the aggregate manifest as offline and llama.cpp-free', () => {

@@ -1,16 +1,19 @@
 'use strict';
 
 const path = require('path');
+const os = require('os');
 const {
   existsSync,
   readdirSync,
   statSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   cpSync,
   lstatSync,
   writeFileSync,
+  symlinkSync,
 } = require('fs');
 const { spawnSync } = require('child_process');
 const asar = require('@electron/asar');
@@ -33,7 +36,6 @@ const {
   checkSkillPythonRuntimeHealth,
 } = require('./setup-skill-python-runtime.js');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
-const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
 const {
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
@@ -82,6 +84,53 @@ function resolveTargetArch(context) {
   if (process.arch === 'arm64') return 'arm64';
   if (process.arch === 'ia32') return 'ia32';
   return 'x64';
+}
+
+function resolveWindows7zaPath() {
+  const sevenZipPath = path.join(
+    __dirname,
+    '..',
+    'node_modules',
+    '7zip-bin',
+    'win',
+    'x64',
+    '7za.exe',
+  );
+  if (!existsSync(sevenZipPath)) {
+    throw new Error(
+      '[electron-builder-hooks] Missing bundled Windows 7za.exe. Run bun install before packaging.',
+    );
+  }
+  return sevenZipPath;
+}
+
+function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
+  const stagingRoot = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-component-7z-'));
+  const stagedPrefix = path.join(stagingRoot, component.prefix);
+  try {
+    // A junction keeps the archive layout stable without copying a multi-hundred-MB
+    // component into a temporary staging directory.  The archive is created from
+    // the relative prefix only, so it never contains an absolute build-machine path.
+    symlinkSync(component.dir, stagedPrefix, 'junction');
+    const result = spawnSync(
+      sevenZipPath,
+      ['a', '-t7z', '-mx=9', '-m0=lzma2', '-ms=off', '-mmt=on', archivePath, component.prefix],
+      {
+        cwd: stagingRoot,
+        encoding: 'utf8',
+      },
+    );
+    if (result.error || result.status !== 0) {
+      throw new Error(
+        '[electron-builder-hooks] Failed to create ' +
+          component.key +
+          ' .7z archive: ' +
+          (result.error?.message || result.stderr || result.stdout || `exit ${result.status}`),
+      );
+    }
+  } finally {
+    rmSync(stagingRoot, { recursive: true, force: true });
+  }
 }
 
 function resolveOpenClawRuntimeTargetId(context) {
@@ -708,10 +757,13 @@ async function beforePack(context) {
     const projectRoot = path.join(__dirname, '..');
     const componentsDir = path.join(projectRoot, 'build-tar', 'windows-components');
     mkdirSync(componentsDir, { recursive: true });
+    const sevenZipPath = resolveWindows7zaPath();
+    const sevenZipSha256 = sha256File(sevenZipPath);
+    writeFileSync(path.join(componentsDir, '7za.sha256'), sevenZipSha256, 'utf8');
     const componentManifests = [];
 
     for (const component of getWindowsResourceComponents(projectRoot)) {
-      const archivePath = path.join(componentsDir, `${component.key}.tar`);
+      const archivePath = path.join(componentsDir, `${component.key}.7z`);
       const manifestPath = path.join(componentsDir, `${component.key}.manifest.json`);
       const versionPath = path.join(componentsDir, `${component.key}.version`);
       const hashPath = path.join(componentsDir, `${component.key}.sha256`);
@@ -726,7 +778,7 @@ async function beforePack(context) {
 
       if (!reusable) {
         const startedAt = Date.now();
-        packMultipleSources([component], archivePath);
+        packWindowsResourceComponent7z(component, archivePath, sevenZipPath);
         console.log(
           `[electron-builder-hooks] Packed ${component.key} ${contentId} in ${(
             (Date.now() - startedAt) /

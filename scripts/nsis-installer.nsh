@@ -160,16 +160,18 @@
     RMDir /r "$R3"
     CreateDirectory "$R3"
     SetOutPath "$PLUGINSDIR"
-    File /oname=component-${KEY}.tar "${PROJECT_DIR}\build-tar\windows-components\${KEY}.tar"
+    SetCompress off
+    File /oname=component-${KEY}.7z "${PROJECT_DIR}\build-tar\windows-components\${KEY}.7z"
+    SetCompress auto
 
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.tar\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.7z\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
     Pop $0
     Pop $1
     StrCmp $0 "0" 0 ComponentHashFailed_${TOKEN}
     StrCpy $1 $1 64
     StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
 
-    nsExec::ExecToStack '"$SYSDIR\tar.exe" -xf "$PLUGINSDIR\component-${KEY}.tar" -C "$R3"'
+    nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
     Pop $0
     Pop $1
     StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
@@ -203,7 +205,7 @@
     RMDir /r "$R2"
     Rename "$R3" "$R2"
     IfErrors ComponentCommitFailed_${TOKEN}
-    Delete "$PLUGINSDIR\component-${KEY}.tar"
+    Delete "$PLUGINSDIR\component-${KEY}.7z"
     Goto ComponentReady_${TOKEN}
 
   ComponentVerificationFailed_${TOKEN}:
@@ -233,6 +235,20 @@
   CreateDirectory "$APPDATA\ZhiYuanAgent"
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
   SetOutPath "$PLUGINSDIR"
+  File /oname=7za.exe "${PROJECT_DIR}\node_modules\7zip-bin\win\x64\7za.exe"
+  File /oname=7za.sha256 "${PROJECT_DIR}\build-tar\windows-components\7za.sha256"
+  File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\7za.exe\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 OfflineComponentInstallFailed
+  FileOpen $2 "$PLUGINSDIR\7za.sha256" r
+  IfErrors OfflineComponentInstallFailed
+  FileRead $2 $R7
+  FileClose $2
+  StrCpy $R7 $R7 64
+  StrCpy $1 $1 64
+  StrCmp $1 $R7 0 OfflineComponentInstallFailed
   FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
   FileClose $2
   Delete "$PLUGINSDIR\component-switch-state.txt"
@@ -306,22 +322,29 @@
 
   DetailPrint "[Installer] Activating offline components"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = \"Stop\";\
+    Set-StrictMode -Version Latest;\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
-      $$parts = $$_.Split(\"|\");\
-      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$parts[2] }\
-    });\
+    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
+    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Prefix = [string]$$_.prefix; Id = [string]$$_.contentId } });\
     $$prepared = @();\
     $$switched = @();\
     try {\
+      if ($$rows.Count -ne 7) { throw \"Invalid component manifest: expected 7 components, got $$($$rows.Count)\" };\
+      if (@($$rows.Key | Sort-Object -Unique).Count -ne 7) { throw \"Invalid component manifest: duplicate component key\" };\
       foreach ($$row in $$rows) {\
+        if ([string]::IsNullOrWhiteSpace($$row.Key) -or [string]::IsNullOrWhiteSpace($$row.Prefix) -or $$row.Id -notmatch \"^[a-f0-9]{64}$$\") { throw \"Invalid component manifest entry\" };\
         $$root = Join-Path $$runtimeRoot $$row.Key;\
         $$target = Join-Path $$root $$row.Id;\
+        $$complete = Join-Path $$target \".complete\";\
+        if (-not (Test-Path -LiteralPath $$target) -or -not (Test-Path -LiteralPath $$complete)) { throw \"Missing prepared component target: $$target\" };\
+        $$completeId = (Get-Content -LiteralPath $$complete -Raw).Substring(0, 64);\
+        if ($$completeId -ne $$row.Id) { throw \"Prepared component id mismatch: $$($$row.Key)\" };\
         $$current = Join-Path $$root \"current\";\
         $$next = Join-Path $$root \"current.next\";\
         $$previous = Join-Path $$root \"current.previous\";\
-        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" };\
+        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" -ErrorAction Stop };\
         foreach ($$stale in @($$next, $$previous)) {\
           if (Test-Path -LiteralPath $$stale) {\
             $$item = Get-Item -LiteralPath $$stale -Force;\
@@ -329,15 +352,16 @@
             [IO.Directory]::Delete($$stale)\
           }\
         };\
-        New-Item -ItemType Junction -Path $$next -Target $$target -Force | Out-Null;\
+        New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop | Out-Null;\
+        if (-not (Test-Path -LiteralPath $$next)) { throw \"Failed to prepare component junction: $$next\" };\
         $$prepared += [pscustomobject]@{ Row = $$row; Current = $$current; Next = $$next; Previous = $$previous }\
       };\
       foreach ($$entry in $$prepared) {\
         $$hadCurrent = Test-Path -LiteralPath $$entry.Current;\
         Add-Content -LiteralPath $$statePath -Value ($$entry.Row.Key + \"|\" + $$hadCurrent);\
         $$switched += [pscustomobject]@{ Entry = $$entry; HadCurrent = $$hadCurrent };\
-        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" };\
-        Rename-Item -LiteralPath $$entry.Next -NewName \"current\"\
+        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" -ErrorAction Stop };\
+        Rename-Item -LiteralPath $$entry.Next -NewName \"current\" -ErrorAction Stop\
       }\
     } catch {\
       foreach ($$entry in $$prepared) {\
