@@ -58,6 +58,7 @@ import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
+import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -190,6 +191,8 @@ interface CoworkPromptInputProps {
   onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
   isDirectChat?: boolean;
   topAccessory?: React.ReactNode;
+  resumeTaskActive?: boolean;
+  onCancelTaskResume?: () => void;
 }
 
 const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
@@ -221,6 +224,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       onLocalThinkingEnabledChange,
       isDirectChat = false,
       topAccessory,
+      resumeTaskActive = false,
+      onCancelTaskResume,
     } = props;
     const dispatch = useDispatch();
     const controller = usePromptInputController();
@@ -509,7 +514,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
       const trimmedValue = value.trim();
       if (
-        (!trimmedValue && attachments.length === 0) ||
+        (!trimmedValue && attachments.length === 0 && !resumeTaskActive) ||
         (isStreaming && !canQueueWhileStreaming) ||
         disabled ||
         sessionContextPending ||
@@ -666,6 +671,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       selectedExpertIds,
       goalMode,
       canQueueWhileStreaming,
+      resumeTaskActive,
     ]);
 
     const handleManageSkills = useCallback(() => {
@@ -1138,8 +1144,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               {i18nService.t('coworkDropFileHint')}
             </div>
           )}
-          {attachments.length > 0 && (
+          {(resumeTaskActive || attachments.length > 0) && (
             <PromptInputHeader className="max-h-[136px] items-start gap-2 overflow-y-auto px-2.5 pt-2">
+              {resumeTaskActive && onCancelTaskResume && (
+                <ResumeTaskContextBadge onCancel={onCancelTaskResume} />
+              )}
               {attachments.map(attachment => (
                 <AttachmentCard
                   key={attachment.path}
