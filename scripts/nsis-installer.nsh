@@ -577,8 +577,10 @@
 !macroend
 
 !macro customUnInstall
-  ; Remove component junctions before recursively deleting application-owned
-  ; immutable data. User-created Skills and models remain under userData.
+  ; Remove component junctions before detaching application-owned immutable
+  ; data. User-created Skills and models remain under userData. Deleting the
+  ; expanded runtime tree synchronously can take longer than the uninstaller
+  ; itself, so rename it atomically and reclaim it in the background.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     if (Test-Path -LiteralPath $$runtimeRoot) {\
@@ -590,12 +592,43 @@
             if (($$pointerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
           }\
         }\
-      };\
-      Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force\
-    };\
-    $$legacyRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
-    if (Test-Path -LiteralPath $$legacyRoot) { Remove-Item -LiteralPath $$legacyRoot -Recurse -Force }"'
+      }\
+    }"'
   Pop $0
+
+  nsExec::ExecToLog 'cmd /c for /d %D in ("$LOCALAPPDATA\ZhiYuanAgent\runtimes.uninstall.*") do @start "" /b cmd /d /c rd /s /q "%~fD"'
+  Pop $0
+  StrCpy $3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+  IfFileExists "$3\*.*" 0 RuntimeCleanupDone
+    System::Call 'kernel32::GetTickCount()i .r4'
+    StrCpy $4 "$3.uninstall.$4"
+    ClearErrors
+    Rename "$3" "$4"
+    IfErrors RuntimeCleanupDetachFailed
+      nsExec::ExecToLog 'cmd /c start "" /b cmd /d /c rd /s /q "$4"'
+      Pop $0
+      Goto RuntimeCleanupDone
+    RuntimeCleanupDetachFailed:
+      DetailPrint "[Uninstaller] Could not detach the offline runtime cache"
+  RuntimeCleanupDone:
+  RMDir "$3"
+
+  nsExec::ExecToLog 'cmd /c for /d %D in ("$LOCALAPPDATA\ZhiYuanAgent\runtime-packs.uninstall.*") do @start "" /b cmd /d /c rd /s /q "%~fD"'
+  Pop $0
+  StrCpy $3 "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs"
+  IfFileExists "$3\*.*" 0 LegacyRuntimeCleanupDone
+    System::Call 'kernel32::GetTickCount()i .r4'
+    StrCpy $4 "$3.uninstall.$4"
+    ClearErrors
+    Rename "$3" "$4"
+    IfErrors LegacyRuntimeCleanupDetachFailed
+      nsExec::ExecToLog 'cmd /c start "" /b cmd /d /c rd /s /q "$4"'
+      Pop $0
+      Goto LegacyRuntimeCleanupDone
+    LegacyRuntimeCleanupDetachFailed:
+      DetailPrint "[Uninstaller] Could not detach the legacy runtime cache"
+  LegacyRuntimeCleanupDone:
+  RMDir "$3"
 
   ; Remove only exclusions that this installer recorded as user-approved and
   ; installer-managed. Never remove an exclusion created independently.

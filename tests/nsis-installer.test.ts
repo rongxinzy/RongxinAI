@@ -98,6 +98,17 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(installerScript).toContain('Get-ChildItem -Path "$INSTDIR.old*"');
   });
+
+  test('detaches expanded runtime caches before deleting them asynchronously', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const uninstallBlock = installerScript.slice(installerScript.indexOf('!macro customUnInstall'));
+
+    expect(uninstallBlock).toContain('StrCpy $3 "$LOCALAPPDATA\\ZhiYuanAgent\\runtimes"');
+    expect(uninstallBlock).toContain('StrCpy $4 "$3.uninstall.$4"');
+    expect(uninstallBlock).toContain('Rename "$3" "$4"');
+    expect(uninstallBlock).toContain('cmd /d /c rd /s /q "$4"');
+    expect(uninstallBlock).not.toContain('Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force');
+  });
 });
 
 describe('NSIS visual assets', () => {

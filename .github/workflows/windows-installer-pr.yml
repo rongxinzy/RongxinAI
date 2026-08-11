@@ -28,7 +28,7 @@ env:
 jobs:
   package-and-install:
     runs-on: windows-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -84,6 +84,15 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-installer-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
+      - name: Collect installer diagnostics
+        if: ${{ failure() }}
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Path installer-diagnostics -Force | Out-Null
+          $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
+          if (Test-Path -LiteralPath $timingLog) {
+            Copy-Item -LiteralPath $timingLog -Destination installer-diagnostics\install-timing.log -Force
+          }
       - name: Upload installer diagnostics
         if: ${{ failure() }}
         uses: actions/upload-artifact@v6
@@ -91,6 +100,6 @@ jobs:
           name: windows-installer-diagnostics
           path: |
             release/*.exe
-            ~/AppData/Roaming/ZhiYuanAgent/install-timing.log
+            installer-diagnostics/install-timing.log
           if-no-files-found: ignore
           retention-days: 7
