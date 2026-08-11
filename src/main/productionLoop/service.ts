@@ -135,6 +135,23 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
   }
 };
 
+const resumePlanItemStatus = (status: ProductionPlanItemStatus): ProductionPlanItemStatus =>
+  status === ProductionPlanItemStatus.InProgress ? ProductionPlanItemStatus.Pending : status;
+
+const resolveInitialPhase = (
+  previous: ProductionLoopState | null,
+  prototypeRequired: boolean,
+): ProductionLoopPhase => {
+  if (!previous) {
+    return prototypeRequired ? ProductionLoopPhase.Explore : ProductionLoopPhase.Plan;
+  }
+  if (previous.planItems.length > 0) return ProductionLoopPhase.Execute;
+  if (prototypeRequired && previous.prototypes.length === 0) {
+    return ProductionLoopPhase.Explore;
+  }
+  return ProductionLoopPhase.Plan;
+};
+
 export class ProductionLoopService {
   readonly repository: ProductionLoopStore;
 
@@ -176,13 +193,14 @@ export class ProductionLoopService {
     if (existing) return existing;
     const previous = this.repository.getLatestForTask(input.taskId, input.runId);
     const now = Date.now();
+    const progressBaseline = previous?.progressVersion ?? 0;
     return this.repository.create({
       version: 1,
       taskId: input.taskId,
       runId: input.runId,
       workflowKind: input.workflowKind,
-      goal: input.goal,
-      phase: input.prototypeRequired ? ProductionLoopPhase.Explore : ProductionLoopPhase.Plan,
+      goal: previous?.goal ?? input.goal,
+      phase: resolveInitialPhase(previous, input.prototypeRequired),
       status: ProductionLoopStatus.Active,
       prototypeRequired: input.prototypeRequired,
       prototypes: previous?.prototypes ?? [],
@@ -194,8 +212,10 @@ export class ProductionLoopService {
       observedToolResults: [],
       inspections: [],
       planItems:
-        previous?.planItems.map(item => ({ ...item, status: ProductionPlanItemStatus.Pending })) ??
-        [],
+        previous?.planItems.map(item => ({
+          ...item,
+          status: resumePlanItemStatus(item.status),
+        })) ?? [],
       critic: {
         requested: false,
         toolCallId: null,
@@ -208,8 +228,8 @@ export class ProductionLoopService {
       recoveries: [],
       skip: null,
       deliveryReason: null,
-      progressVersion: 0,
-      lastObservedProgressVersion: 0,
+      progressVersion: progressBaseline,
+      lastObservedProgressVersion: progressBaseline,
       staleCount: 0,
       createdAt: now,
       updatedAt: now,
