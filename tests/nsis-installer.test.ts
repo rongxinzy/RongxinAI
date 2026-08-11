@@ -5,6 +5,7 @@ import { describe, expect, test } from 'vitest';
 
 const installerScriptPath = path.resolve('scripts/nsis-installer.nsh');
 const elevatedActionsScriptPath = path.resolve('scripts/nsis-elevated-actions.ps1');
+const offlineComponentsPath = path.resolve('scripts/nsis-offline-components.json');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
 
 describe('NSIS offline resource and local inference flow', () => {
@@ -44,17 +45,44 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('离线组件原子切换失败');
   });
 
-  test('keeps component content IDs out of the combined NSIS target rows', () => {
+  test('uses an embedded component manifest instead of NSIS-generated routing rows', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const offlineComponents = JSON.parse(fs.readFileSync(offlineComponentsPath, 'utf8'));
 
-    expect(installerScript).toContain('FileWrite $2 "${KEY}|${PREFIX}$\\r$\\n"');
-    expect(installerScript).not.toContain('${KEY}|${PREFIX}|$R1');
+    expect(installerScript).toContain(
+      'File /oname=component-targets.json "${PROJECT_DIR}\\scripts\\nsis-offline-components.json"',
+    );
+    expect(installerScript).not.toContain('component-targets.txt');
+    expect(installerScript).not.toContain('FileWrite $2 "${KEY}|${PREFIX}');
     expect(installerScript).toContain('Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop');
     expect(installerScript).toContain('^[0-9a-f]{64}\\z');
     expect(installerScript).not.toContain('^[0-9a-f]{64}$$');
     expect(installerScript).toContain(
       'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
     );
+    expect(offlineComponents).toEqual([
+      { key: 'openclaw', prefix: 'cfmind' },
+      { key: 'skills', prefix: 'SKILLs' },
+      { key: 'mcps', prefix: 'MCPs' },
+      { key: 'portable-git', prefix: 'mingit' },
+      { key: 'python', prefix: 'python-win' },
+      { key: 'skill-python', prefix: 'skill-python' },
+      { key: 'uv', prefix: 'uv-win' },
+    ]);
+  });
+
+  test('does not show a blocking failure dialog during silent installs', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const failureBlock = installerScript.slice(
+      installerScript.indexOf('OfflineComponentInstallFailed:'),
+      installerScript.indexOf('OfflineComponentsReady:'),
+    );
+
+    expect(failureBlock).toContain('IfSilent OfflineComponentInstallFailedSilent 0');
+    expect(failureBlock.indexOf('IfSilent OfflineComponentInstallFailedSilent 0')).toBeLessThan(
+      failureBlock.indexOf('MessageBox MB_OK|MB_ICONSTOP'),
+    );
+    expect(failureBlock).toContain('SetErrorLevel 1');
   });
 
   test('records optional local inference intent without downloading in NSIS', () => {

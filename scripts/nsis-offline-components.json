@@ -1,0 +1,9 @@
+[
+  { "key": "openclaw", "prefix": "cfmind" },
+  { "key": "skills", "prefix": "SKILLs" },
+  { "key": "mcps", "prefix": "MCPs" },
+  { "key": "portable-git", "prefix": "mingit" },
+  { "key": "python", "prefix": "python-win" },
+  { "key": "skill-python", "prefix": "skill-python" },
+  { "key": "uv", "prefix": "uv-win" }
+]
