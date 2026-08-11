@@ -103,3 +103,17 @@ export function getCcConnectScopedConversationId(
   }
   return `cc-connect:${Buffer.from(JSON.stringify([account, conversation])).toString('base64url')}`;
 }
+
+/** Recover the account and native conversation only from our own scoped key. */
+export function parseCcConnectScopedConversationId(value: string): [string, string] {
+  if (!value.startsWith('cc-connect:')) throw new Error('invalid cc-connect conversation id');
+  try {
+    const decoded = JSON.parse(Buffer.from(value.slice('cc-connect:'.length), 'base64url').toString('utf8'));
+    if (!Array.isArray(decoded) || decoded.length !== 2 || decoded.some(item => typeof item !== 'string' || !item.trim())) {
+      throw new Error('invalid cc-connect conversation id');
+    }
+    return [decoded[0], decoded[1]];
+  } catch {
+    throw new Error('invalid cc-connect conversation id');
+  }
+}

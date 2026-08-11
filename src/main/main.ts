@@ -257,7 +257,7 @@ import { getLogFilePath, getRecentMainLogEntries, initLogger } from './logger';
 import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { OpenClawSessionIpc } from './openclawSession/constants';
-import { CcConnectPiBridge } from './im/ccConnectPiBridge';
+import { CcConnectPiBridge, parseCcConnectScopedConversationId } from './im/ccConnectPiBridge';
 import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandler';
 import { IMStore } from './im/imStore';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
@@ -1152,8 +1152,7 @@ const startCcConnectBridge = async (): Promise<void> => {
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
     detectScheduledTaskRequest: createIMScheduledTaskRequestDetector({ getLLMConfig: getScheduledTaskDetectorConfig }),
     createScheduledTask: async ({ sessionId, message, request }) => {
-      const decoded = JSON.parse(Buffer.from(message.conversationId.slice('cc-connect:'.length), 'base64url').toString('utf8')) as [string, string];
-      const [accountId, destination] = decoded;
+      const [accountId, destination] = parseCcConnectScopedConversationId(message.conversationId);
       const task = await getCanonicalScheduledTaskService().addJob({
         name: request.taskName, description: '', enabled: true,
         schedule: { kind: 'at', at: request.scheduleAt }, sessionTarget: 'isolated', wakeMode: 'now',
