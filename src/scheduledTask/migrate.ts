@@ -1,32 +1,21 @@
 /**
- * One-time migration: move scheduled tasks from legacy SQLite tables
- * (used in the non-openclaw release) into the OpenClaw gateway via CronJobService.
- *
- * Safe to call multiple times — a kv flag prevents re-running.
+ * One-time import of pre-canonical SQLite scheduler data. It never contacts an
+ * Agent runtime: SQLite remains the sole authority for Tasks and Runs.
  */
 
 import type Database from 'better-sqlite3';
-import fs from 'fs';
-import path from 'path';
 
 import {
   DefaultAgentId,
   DeliveryMode,
-  GatewayStatus,
-  MigrationKey,
   PayloadKind,
   ScheduleKind,
   SessionTarget,
   TaskStatus,
   WakeMode,
 } from './constants';
-import type { CronJobService } from './cronJobService';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { Schedule, ScheduledTaskDelivery, ScheduledTaskInput } from './types';
-
-// ---------------------------------------------------------------------------
-// Legacy types (main branch schema — never changed, only removed)
-// ---------------------------------------------------------------------------
 
 interface LegacySchedule {
   type: 'at' | 'interval' | 'cron';
@@ -39,35 +28,31 @@ interface LegacyTaskRow {
   id: string;
   name: string;
   description: string;
-  enabled: number; // 0 | 1
+  enabled: number;
   schedule_json: string;
   prompt: string;
-  notify_platforms_json: string; // JSON string of string[]
+  notify_platforms_json: string;
 }
 
-// ---------------------------------------------------------------------------
-// Converters
-// ---------------------------------------------------------------------------
+interface LegacyRunRow {
+  id: string;
+  task_id: string;
+  session_id: string | null;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  duration_ms: number | null;
+  error: string | null;
+}
 
 function formatLocalTimezoneOffset(): string {
   const offsetMinutes = -new Date().getTimezoneOffset();
   const sign = offsetMinutes >= 0 ? '+' : '-';
   const absMinutes = Math.abs(offsetMinutes);
-  const hours = Math.floor(absMinutes / 60)
-    .toString()
-    .padStart(2, '0');
-  const minutes = (absMinutes % 60).toString().padStart(2, '0');
-  return `${sign}${hours}:${minutes}`;
+  return `${sign}${Math.floor(absMinutes / 60).toString().padStart(2, '0')}:${(absMinutes % 60).toString().padStart(2, '0')}`;
 }
 
-/**
- * Ensure a datetime string has an explicit timezone offset.
- * Legacy `at` datetimes were stored as local time without offset (e.g. "2026-03-17T21:30:00").
- * The OpenClaw gateway interprets offset-less strings as UTC, causing an 8-hour drift
- * for users in UTC+8.  Append the local timezone offset when missing.
- */
 function ensureTimezoneOffset(datetime: string): string {
-  // Already has an offset (+HH:MM, -HH:MM) or trailing 'Z'
   if (/(?:Z|[+-]\d{2}:\d{2})\s*$/.test(datetime)) return datetime;
   return `${datetime}${formatLocalTimezoneOffset()}`;
 }
@@ -75,116 +60,36 @@ function ensureTimezoneOffset(datetime: string): string {
 function convertSchedule(legacy: LegacySchedule, preservePastAt = false): Schedule | null {
   if (legacy.type === 'at') {
     if (!legacy.datetime) return null;
-    const withTz = ensureTimezoneOffset(legacy.datetime);
-    // The old gateway cannot register past one-time tasks. Canonical SQLite
-    // keeps them so the UI/audit history does not silently lose user data.
-    if (!preservePastAt && new Date(withTz).getTime() <= Date.now()) return null;
-    return { kind: ScheduleKind.At, at: withTz };
+    const at = ensureTimezoneOffset(legacy.datetime);
+    if (!preservePastAt && new Date(at).getTime() <= Date.now()) return null;
+    return { kind: ScheduleKind.At, at };
   }
   if (legacy.type === 'interval') {
-    const ms = legacy.intervalMs;
-    if (!ms || ms <= 0) return null;
-    return { kind: ScheduleKind.Every, everyMs: ms };
+    return legacy.intervalMs && legacy.intervalMs > 0
+      ? { kind: ScheduleKind.Every, everyMs: legacy.intervalMs }
+      : null;
   }
-  if (legacy.type === 'cron') {
-    if (!legacy.expression) return null;
-    return { kind: ScheduleKind.Cron, expr: legacy.expression };
-  }
-  return null;
-}
-
-/**
- * One-time import from the pre-OpenClaw tables into the canonical scheduler.
- * It never contacts a runtime and is safe to retry: legacy ids are preserved.
- */
-export async function migrateLegacyScheduledTasksToCanonical(deps: {
-  db: Database.Database;
-  getKv: (key: string) => unknown;
-  setKv: (key: string, value: string) => void;
-  store: SqliteScheduledTaskStore;
-}): Promise<void> {
-  const { db, getKv, setKv, store } = deps;
-  const key = 'scheduled_tasks_migrated_to_canonical_v1';
-  if (getKv(key) === 'true') return;
-  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'").get();
-  if (!exists) { setKv(key, 'true'); return; }
-  const rows = db.prepare('SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks').all() as LegacyTaskRow[];
-  for (const row of rows) {
-    let legacy: LegacySchedule;
-    try { legacy = JSON.parse(row.schedule_json) as LegacySchedule; } catch { continue; }
-    const schedule = convertSchedule(legacy, true);
-    if (!schedule) continue;
-    const input: ScheduledTaskInput = {
-      name: row.name, description: row.description ?? '', enabled: row.enabled === 1,
-      schedule, sessionTarget: SessionTarget.Isolated, wakeMode: WakeMode.NextHeartbeat,
-      payload: { kind: PayloadKind.AgentTurn, message: row.prompt },
-      delivery: convertDelivery(row.notify_platforms_json ?? '[]'), agentId: DefaultAgentId,
-    };
-    store.importLegacy(row.id, input);
-  }
-  setKv(key, 'true');
-}
-
-/** Imports pre-OpenClaw Run history into the canonical SQLite Run table. */
-export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
-  db: Database.Database;
-  getKv: (key: string) => unknown;
-  setKv: (key: string, value: string) => void;
-  store: SqliteScheduledTaskStore;
-}): Promise<void> {
-  const { db, getKv, setKv, store } = deps;
-  const key = 'scheduled_task_runs_migrated_to_canonical_v1';
-  if (getKv(key) === 'true') return;
-  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'").get();
-  if (!exists) { setKv(key, 'true'); return; }
-  const rows = db.prepare('SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs').all() as LegacyRunRow[];
-  for (const row of rows) {
-    store.importLegacyRun({ id: row.id, taskId: row.task_id, sessionId: row.session_id,
-      sessionKey: null, status: row.status === 'success' ? TaskStatus.Success : row.status === 'error' ? TaskStatus.Error : TaskStatus.Skipped,
-      startedAt: row.started_at, finishedAt: row.finished_at, durationMs: row.duration_ms, error: row.error });
-  }
-  setKv(key, 'true');
+  return legacy.expression ? { kind: ScheduleKind.Cron, expr: legacy.expression } : null;
 }
 
 function convertDelivery(platformsJson: string): ScheduledTaskDelivery {
-  let platforms: string[] = [];
-  try {
-    platforms = JSON.parse(platformsJson);
-  } catch {
-    // ignore
-  }
-  if (!Array.isArray(platforms) || platforms.length === 0) {
-    return { mode: DeliveryMode.None };
-  }
-  // New format supports one delivery target — use the first platform as channel.
-  return { mode: DeliveryMode.Announce, channel: platforms[0] };
+  let platforms: unknown;
+  try { platforms = JSON.parse(platformsJson); } catch { return { mode: DeliveryMode.None }; }
+  return Array.isArray(platforms) && typeof platforms[0] === 'string'
+    ? { mode: DeliveryMode.Announce, channel: platforms[0] }
+    : { mode: DeliveryMode.None };
 }
 
 function rowToInput(row: LegacyTaskRow): ScheduledTaskInput | null {
-  let legacySchedule: LegacySchedule;
-  try {
-    legacySchedule = JSON.parse(row.schedule_json);
-  } catch {
-    console.warn(`[MigrateScheduledTasks] Skipping task "${row.name}" — invalid schedule_json`);
-    return null;
-  }
-
-  const schedule = convertSchedule(legacySchedule);
-  if (!schedule) {
-    console.warn(
-      `[MigrateScheduledTasks] Skipping task "${row.name}" — cannot convert schedule`,
-      legacySchedule,
-    );
-    return null;
-  }
-
+  let legacy: LegacySchedule;
+  try { legacy = JSON.parse(row.schedule_json) as LegacySchedule; } catch { return null; }
+  const schedule = convertSchedule(legacy, true);
+  if (!schedule) return null;
   return {
     name: row.name,
     description: row.description ?? '',
     enabled: row.enabled === 1,
     schedule,
-    // 旧任务都带有 prompt，使用 isolated session + agentTurn。
-    // main session 仅支持 systemEvent payload，不适用于迁移场景。
     sessionTarget: SessionTarget.Isolated,
     wakeMode: WakeMode.NextHeartbeat,
     payload: { kind: PayloadKind.AgentTurn, message: row.prompt },
@@ -193,255 +98,49 @@ function rowToInput(row: LegacyTaskRow): ScheduledTaskInput | null {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-interface MigrationDeps {
-  /** Raw Database instance for reading legacy tables. */
+/** Imports legacy task records without creating runtime jobs. */
+export async function migrateLegacyScheduledTasksToCanonical(deps: {
   db: Database.Database;
-  /** Reads a value from the app kv store. */
   getKv: (key: string) => unknown;
-  /** Writes a value to the app kv store. */
   setKv: (key: string, value: string) => void;
-  /** CronJobService (already constructed, gateway not necessarily ready yet). */
-  cronJobService: CronJobService;
-}
-
-export async function migrateScheduledTasksToOpenclaw(deps: MigrationDeps): Promise<void> {
-  const { db, getKv, setKv, cronJobService } = deps;
-
-  // 1. Idempotency guard
-  if (getKv(MigrationKey.TasksToOpenclaw) === 'true') return;
-
-  // 2. Check if the legacy table exists (new installs won't have it)
-  try {
-    const tableExists = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'")
-      .get() as { name: string } | undefined;
-    if (!tableExists) {
-      setKv(MigrationKey.TasksToOpenclaw, 'true');
-      return;
-    }
-  } catch (err) {
-    console.warn('[MigrateScheduledTasks] Could not check legacy table existence, skipping:', err);
-    return;
-  }
-
-  let rows: LegacyTaskRow[] = [];
-  try {
-    rows = db
-      .prepare(
-        'SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks',
-      )
-      .all() as LegacyTaskRow[];
-    if (!rows.length) {
-      setKv(MigrationKey.TasksToOpenclaw, 'true');
-      return;
-    }
-  } catch (err) {
-    console.warn('[MigrateScheduledTasks] Failed to read legacy tasks, skipping migration:', err);
-    return;
-  }
-
-  console.log(`[MigrateScheduledTasks] Migrating ${rows.length} task(s) to OpenClaw gateway...`);
-
-  // 4. Push each task to the OpenClaw gateway
-  let succeeded = 0;
-  let skipped = 0;
-  let gatewayErrors = 0;
+  store: SqliteScheduledTaskStore;
+}): Promise<void> {
+  const key = 'scheduled_tasks_migrated_to_canonical_v1';
+  if (deps.getKv(key) === 'true') return;
+  const exists = deps.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'").get();
+  if (!exists) { deps.setKv(key, 'true'); return; }
+  const rows = deps.db.prepare('SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks').all() as LegacyTaskRow[];
   for (const row of rows) {
     const input = rowToInput(row);
-    if (!input) {
-      skipped++;
-      continue;
-    }
-
-    try {
-      await cronJobService.addJob(input);
-      console.log(`[MigrateScheduledTasks] Migrated task: "${row.name}"`);
-      succeeded++;
-    } catch (err) {
-      console.error(`[MigrateScheduledTasks] Failed to migrate task "${row.name}":`, err);
-      gatewayErrors++;
-    }
+    if (input) deps.store.importLegacy(row.id, input);
   }
-
-  console.log(
-    `[MigrateScheduledTasks] Done. succeeded=${succeeded}, skipped=${skipped}, gatewayErrors=${gatewayErrors}`,
-  );
-
-  // 5. Mark as done only when there are no gateway errors.
-  // Skipped tasks (invalid schedule etc.) are unrecoverable and don't block completion.
-  // Gateway errors may be transient, so we leave the flag unset to allow a retry on next launch.
-  if (gatewayErrors === 0) {
-    setKv(MigrationKey.TasksToOpenclaw, 'true');
-  }
+  deps.setKv(key, 'true');
 }
 
-// ---------------------------------------------------------------------------
-// Run history migration: SQLite scheduled_task_runs → OpenClaw JSONL files
-// ---------------------------------------------------------------------------
-
-const RUN_HISTORY_MIGRATION_KEY = MigrationKey.RunsToOpenclaw;
-
-interface LegacyRunRow {
-  id: string;
-  task_id: string;
-  session_id: string | null;
-  status: string; // 'success' | 'error' | 'running'
-  started_at: string; // ISO string
-  finished_at: string | null; // ISO string
-  duration_ms: number | null;
-  error: string | null;
-}
-
-function toGatewayStatus(status: string): GatewayStatus {
-  if (status === 'success') return GatewayStatus.Ok;
-  if (status === 'error') return GatewayStatus.Error;
-  return GatewayStatus.Skipped;
-}
-
-interface RunHistoryMigrationDeps {
+/** Imports legacy Run history without writing OpenClaw JSONL state. */
+export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
   db: Database.Database;
   getKv: (key: string) => unknown;
   setKv: (key: string, value: string) => void;
-  /** Path to {userData}/openclaw/state — used to locate cron/runs/. */
-  openclawStateDir: string;
-}
-
-export async function migrateScheduledTaskRunsToOpenclaw(
-  deps: RunHistoryMigrationDeps,
-): Promise<void> {
-  const { db, getKv, setKv, openclawStateDir } = deps;
-
-  // 1. Idempotency guard
-  if (getKv(RUN_HISTORY_MIGRATION_KEY) === 'true') return;
-
-  try {
-    const tableExists = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'")
-      .get() as { name: string } | undefined;
-    if (!tableExists) {
-      setKv(RUN_HISTORY_MIGRATION_KEY, 'true');
-      return;
-    }
-  } catch (err) {
-    console.warn('[MigrateRunHistory] Could not check legacy tables, skipping:', err);
-    return;
+  store: SqliteScheduledTaskStore;
+}): Promise<void> {
+  const key = 'scheduled_task_runs_migrated_to_canonical_v1';
+  if (deps.getKv(key) === 'true') return;
+  const exists = deps.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'").get();
+  if (!exists) { deps.setKv(key, 'true'); return; }
+  const rows = deps.db.prepare('SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs').all() as LegacyRunRow[];
+  for (const row of rows) {
+    deps.store.importLegacyRun({
+      id: row.id,
+      taskId: row.task_id,
+      sessionId: row.session_id,
+      sessionKey: null,
+      status: row.status === 'success' ? TaskStatus.Success : row.status === 'error' ? TaskStatus.Error : TaskStatus.Skipped,
+      startedAt: row.started_at,
+      finishedAt: row.finished_at,
+      durationMs: row.duration_ms,
+      error: row.error,
+    });
   }
-
-  let runs: LegacyRunRow[] = [];
-  try {
-    runs = db
-      .prepare(
-        'SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs ORDER BY started_at ASC',
-      )
-      .all() as LegacyRunRow[];
-    if (!runs.length) {
-      setKv(RUN_HISTORY_MIGRATION_KEY, 'true');
-      return;
-    }
-  } catch (err) {
-    console.warn('[MigrateRunHistory] Failed to read legacy runs:', err);
-    return;
-  }
-
-  const taskIdToName = new Map<string, string>();
-  try {
-    const taskRows = db.prepare('SELECT id, name FROM scheduled_tasks').all() as Array<{
-      id: string;
-      name: string;
-    }>;
-    for (const row of taskRows) {
-      if (row.id && row.name) taskIdToName.set(row.id, row.name);
-    }
-  } catch {
-    // Non-fatal: names will be omitted if the table is unavailable
-  }
-
-  console.log(`[MigrateRunHistory] Migrating ${runs.length} run(s) to OpenClaw cron/runs/...`);
-
-  // 4. Ensure runs directory exists
-  const runsDir = path.join(openclawStateDir, 'cron', 'runs');
-  try {
-    fs.mkdirSync(runsDir, { recursive: true });
-  } catch (err) {
-    console.warn('[MigrateRunHistory] Failed to create runs directory:', err);
-    return;
-  }
-
-  let succeeded = 0;
-  let skipped = 0;
-
-  // 5. Group runs by task_id (used as-is for the JSONL filename)
-  const runsByTaskId = new Map<string, LegacyRunRow[]>();
-  for (const run of runs) {
-    let arr = runsByTaskId.get(run.task_id);
-    if (!arr) {
-      arr = [];
-      runsByTaskId.set(run.task_id, arr);
-    }
-    arr.push(run);
-  }
-
-  for (const [taskId, taskRuns] of runsByTaskId.entries()) {
-    const jsonlPath = path.join(runsDir, `${taskId}.jsonl`);
-
-    // Collect existing timestamps to avoid duplicates on re-run
-    const existingTs = new Set<number>();
-    try {
-      const existing = fs.readFileSync(jsonlPath, 'utf-8');
-      for (const line of existing.split('\n')) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const entry = JSON.parse(trimmed) as { ts?: number };
-          if (typeof entry.ts === 'number') existingTs.add(entry.ts);
-        } catch {
-          /* ignore malformed lines */
-        }
-      }
-    } catch {
-      /* file doesn't exist yet — that's fine */
-    }
-
-    const lines: string[] = [];
-    for (const run of taskRuns) {
-      const startedMs = new Date(run.started_at).getTime();
-      const finishedMs = run.finished_at ? new Date(run.finished_at).getTime() : startedMs;
-
-      if (existingTs.has(finishedMs)) {
-        skipped++;
-        continue;
-      }
-
-      const entry: Record<string, unknown> = {
-        ts: finishedMs,
-        jobId: taskId,
-        action: 'finished',
-        status: toGatewayStatus(run.status),
-        runAtMs: startedMs,
-      };
-      if (typeof run.duration_ms === 'number') entry['durationMs'] = run.duration_ms;
-      if (run.error) entry['error'] = run.error;
-      if (run.session_id) entry['sessionId'] = run.session_id;
-      const jobName = taskIdToName.get(taskId);
-      if (jobName) entry['summary'] = jobName;
-
-      lines.push(JSON.stringify(entry));
-      succeeded++;
-    }
-
-    if (lines.length > 0) {
-      try {
-        fs.appendFileSync(jsonlPath, lines.join('\n') + '\n', 'utf-8');
-      } catch (err) {
-        console.error(`[MigrateRunHistory] Failed to write runs for task ${taskId}:`, err);
-      }
-    }
-  }
-
-  console.log(`[MigrateRunHistory] Done. succeeded=${succeeded}, skipped=${skipped}`);
-  setKv(RUN_HISTORY_MIGRATION_KEY, 'true');
+  deps.setKv(key, 'true');
 }

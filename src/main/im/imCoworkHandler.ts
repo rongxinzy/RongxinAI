@@ -738,7 +738,7 @@ export class IMCoworkHandler extends EventEmitter {
     reply?: string,
     error?: string,
   ): void {
-    // Background delivery is an outbound Cron result. CronJobService owns the
+    // Background delivery is an outbound scheduled-task result. The canonical scheduler owns the
     // Cron activity lifecycle; do not project this accumulator as a second run.
     if (accumulator.backgroundDelivery) return;
     const conversation =

@@ -1597,7 +1597,7 @@ const hasActiveGatewayWorkloads = (): boolean => {
   try {
     if (getCronJobService()?.hasRunningJobs()) return true;
   } catch {
-    // CronJobService may not be initialized yet.
+    // The canonical scheduler may not be initialized yet.
   }
   return false;
 };
@@ -7571,7 +7571,7 @@ if (!gotTheLock) {
           getCronJobService().startPolling();
         } catch (err) {
           console.warn(
-            '[Main] CronJobService not available yet, will start polling when OpenClaw is ready:',
+            '[Main] Canonical scheduler not available yet:',
             err,
           );
         }
@@ -7662,7 +7662,7 @@ if (!gotTheLock) {
     try {
       getCronJobService().stopPolling();
     } catch {
-      // CronJobService may not have been initialized — safe to ignore.
+      // The canonical scheduler may not have been initialized — safe to ignore.
     }
 
     sqliteBackupManager?.stopPeriodicBackupLoop();
@@ -8042,7 +8042,7 @@ if (!gotTheLock) {
         try {
           getCronJobService().startPolling();
         } catch (err) {
-          console.warn('[Main] CronJobService not available after OpenClaw startup:', err);
+          console.warn('[Main] Canonical scheduler not available after startup:', err);
         }
       })
       .catch(error => {
