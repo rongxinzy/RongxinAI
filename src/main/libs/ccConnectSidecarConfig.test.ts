@@ -24,6 +24,11 @@ test('serializes only a ZhiYuan bridge project and disables upstream control pla
 
 test('rejects remote control planes, unsupported platforms, and unsafe option keys', () => {
   expect(() => serializeCcConnectSidecarConfig({ ...base, bridgeUrl: 'http://10.0.0.1:1234', projects: [] })).toThrow('loopback');
+  expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [] })).toThrow('exactly one project');
+  expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [
+    { accountId: 'a', platform: 'qq', options: {} },
+    { accountId: 'b', platform: 'qq', options: {} },
+  ] })).toThrow('exactly one project');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [{ accountId: 'a', platform: 'slack', options: {} }] })).toThrow('Unsupported');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [{ accountId: 'a', platform: 'qq', options: { 'bad.key': 'x' } }] })).toThrow('Unsafe');
 });

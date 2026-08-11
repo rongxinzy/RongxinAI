@@ -18,7 +18,7 @@ test('sends only authenticated trigger registration without a task payload', asy
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as { port: number }).port;
   await new CcConnectCronClient(`http://127.0.0.1:${port}`, 'secret').upsert({
-    taskId: 't', scheduleVersion: 'v1', schedule: { kind: ScheduleKind.Every, everyMs: 60_000 },
+    accountId: 'account-a', taskId: 't', scheduleVersion: 'v1', schedule: { kind: ScheduleKind.Every, everyMs: 60_000 },
   });
   expect(JSON.parse(body)).toEqual({ taskId: 't', scheduleVersion: 'v1', schedule: { kind: 'every', everyMs: 60_000 } });
 });

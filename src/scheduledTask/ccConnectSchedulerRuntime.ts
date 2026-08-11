@@ -6,7 +6,7 @@ import type { ScheduledTask, ScheduledTaskRun } from './types';
 
 type TriggerClient = {
   upsert(task: CcConnectCronTask): Promise<void>;
-  remove(taskId: string): Promise<void>;
+  remove(task: CcConnectCronTask): Promise<void>;
 };
 
 /**
@@ -26,16 +26,17 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async register(task: ScheduledTask): Promise<void> {
     if (!task.enabled) {
-      await this.removeProjection(task.id);
+      await this.removeProjection(task);
       return;
     }
     const scheduleVersion = task.scheduleVersion;
     if (!scheduleVersion) throw new Error(`Scheduled task ${task.id} has no scheduleVersion`);
-    await this.client.upsert({ taskId: task.id, scheduleVersion, schedule: task.schedule });
+    await this.client.upsert({ accountId: task.delivery.accountId ?? 'default', taskId: task.id, scheduleVersion, schedule: task.schedule });
   }
 
   async remove(taskId: string): Promise<void> {
-    await this.removeProjection(taskId);
+    const task = this.store.get(taskId);
+    if (task) await this.removeProjection(task);
   }
 
   async runNow(taskId: string): Promise<void> {
@@ -71,8 +72,8 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     }
   }
 
-  private async removeProjection(taskId: string): Promise<void> {
-    try { await this.client.remove(taskId); }
+  private async removeProjection(task: ScheduledTask): Promise<void> {
+    try { await this.client.remove({ accountId: task.delivery.accountId ?? 'default', taskId: task.id, scheduleVersion: task.scheduleVersion ?? '', schedule: task.schedule }); }
     catch (error) {
       // A restarted sidecar has no in-memory registration; its 404 is already
       // the desired state and must not prevent the canonical mutation.

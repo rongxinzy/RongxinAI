@@ -1,6 +1,7 @@
 import type { Schedule } from './types';
 
 export type CcConnectCronTask = {
+  accountId: string;
   taskId: string;
   scheduleVersion: string;
   schedule: Schedule;
@@ -11,11 +12,14 @@ export class CcConnectCronClient {
   constructor(private readonly baseUrl: string, private readonly token: string) {}
 
   async upsert(task: CcConnectCronTask): Promise<void> {
-    await this.request('/v1/cc-connect/cron/tasks', { method: 'POST', body: JSON.stringify(task) });
+    // accountId selects the local sidecar process and is never part of the
+    // sidecar protocol. The process is already bound to that one account.
+    const { accountId: _accountId, ...payload } = task;
+    await this.request('/v1/cc-connect/cron/tasks', { method: 'POST', body: JSON.stringify(payload) });
   }
 
-  async remove(taskId: string): Promise<void> {
-    await this.request(`/v1/cc-connect/cron/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
+  async remove(task: Pick<CcConnectCronTask, 'taskId'>): Promise<void> {
+    await this.request(`/v1/cc-connect/cron/tasks/${encodeURIComponent(task.taskId)}`, { method: 'DELETE' });
   }
 
   async reconcile(tasks: readonly CcConnectCronTask[]): Promise<void> {

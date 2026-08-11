@@ -32,6 +32,12 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
   assertLoopbackUrl(config.bridgeUrl);
   assertNonEmpty('bridgeToken', config.bridgeToken);
   assertLoopbackListen(config.cronControlListen);
+  // Each process owns exactly one authenticated channel account and one cron
+  // control port. A multi-project config would make those projects compete for
+  // the same listener inside the sidecar.
+  if (config.projects.length !== 1) {
+    throw new Error('cc-connect sidecar config must contain exactly one project');
+  }
 
   const seenAccounts = new Set<string>();
   const lines = [

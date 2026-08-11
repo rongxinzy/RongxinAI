@@ -1095,12 +1095,12 @@ let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
 let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
 let deferredCcConnectCronClient: DeferredCcConnectCronClient | null = null;
 let ccConnectBridgeToken: string | null = null;
-const attachCcConnectCronControl = async (baseUrl: string): Promise<void> => {
+const attachCcConnectCronControl = async (accountId: string, baseUrl: string): Promise<void> => {
   if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
   getCanonicalScheduledTaskService();
   const client = new CcConnectCronClient(baseUrl, ccConnectBridgeToken);
   await client.healthCheck();
-  await deferredCcConnectCronClient!.attach(client);
+  await deferredCcConnectCronClient!.attach(accountId, client);
 };
 const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!canonicalScheduledTaskService) {

@@ -19,7 +19,7 @@ function setup() {
 test('projects only schedules and executes a claimed trigger once', async () => {
   const { store, task, client, execute, runtime } = setup();
   await runtime.register(task);
-  expect(client.upsert).toHaveBeenCalledWith({ taskId: task.id, scheduleVersion: task.scheduleVersion, schedule: task.schedule });
+  expect(client.upsert).toHaveBeenCalledWith({ accountId: 'default', taskId: task.id, scheduleVersion: task.scheduleVersion, schedule: task.schedule });
   const trigger = { taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' };
   await runtime.handleTrigger(trigger);
   await runtime.handleTrigger(trigger);
@@ -31,7 +31,7 @@ test('disabled tasks delete their sidecar projection and never execute', async (
   const { store, task, client, execute, runtime } = setup();
   const disabled = store.update(task.id, { enabled: false });
   await runtime.register(disabled);
-  expect(client.remove).toHaveBeenCalledWith(task.id);
+  expect(client.remove).toHaveBeenCalledWith({ accountId: 'default', taskId: task.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
   await runtime.handleTrigger({ taskId: task.id, scheduleVersion: disabled.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
   expect(execute).not.toHaveBeenCalled();
 });
