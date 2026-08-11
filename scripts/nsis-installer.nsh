@@ -220,7 +220,9 @@
 
   ComponentReady_${TOKEN}:
     FileOpen $2 "$PLUGINSDIR\component-targets.txt" a
-    FileWrite $2 "${KEY}|${PREFIX}|$R1$\r$\n"
+    ; Keep the 64-character content ID in its dedicated version file. Combining
+    ; it with the routing fields can split the skill-python row in NSIS builds.
+    FileWrite $2 "${KEY}|${PREFIX}$\r$\n"
     FileClose $2
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $R5 $6 - $7
@@ -310,7 +312,11 @@
     $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
     $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
       $$parts = $$_.Split(\"|\");\
-      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$parts[2] }\
+      if ($$parts.Count -ne 2 -or -not $$parts[0] -or -not $$parts[1]) { throw \"Invalid component target row: $$_\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
+      $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
+      if ($$id -notmatch \"^[0-9a-f]{64}$$\") { throw \"Invalid component content ID for \" + $$parts[0] };\
+      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$id }\
     });\
     $$prepared = @();\
     $$switched = @();\
@@ -329,15 +335,16 @@
             [IO.Directory]::Delete($$stale)\
           }\
         };\
-        New-Item -ItemType Junction -Path $$next -Target $$target -Force | Out-Null;\
+        if (-not (Test-Path -LiteralPath $$target -PathType Container)) { throw \"Missing component version: $$target\" };\
+        New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop | Out-Null;\
         $$prepared += [pscustomobject]@{ Row = $$row; Current = $$current; Next = $$next; Previous = $$previous }\
       };\
       foreach ($$entry in $$prepared) {\
         $$hadCurrent = Test-Path -LiteralPath $$entry.Current;\
         Add-Content -LiteralPath $$statePath -Value ($$entry.Row.Key + \"|\" + $$hadCurrent);\
         $$switched += [pscustomobject]@{ Entry = $$entry; HadCurrent = $$hadCurrent };\
-        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" };\
-        Rename-Item -LiteralPath $$entry.Next -NewName \"current\"\
+        if ($$hadCurrent) { Rename-Item -LiteralPath $$entry.Current -NewName \"current.previous\" -ErrorAction Stop };\
+        Rename-Item -LiteralPath $$entry.Next -NewName \"current\" -ErrorAction Stop\
       }\
     } catch {\
       foreach ($$entry in $$prepared) {\
@@ -492,7 +499,14 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Id = $$parts[2] } });\
+    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
+      $$parts = $$_.Split(\"|\");\
+      if ($$parts.Count -ne 2 -or -not $$parts[0]) { throw \"Invalid component target row: $$_\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
+      $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
+      if ($$id -notmatch \"^[0-9a-f]{64}$$\") { throw \"Invalid component content ID for \" + $$parts[0] };\
+      [pscustomobject]@{ Key = $$parts[0]; Id = $$id }\
+    });\
     foreach ($$row in $$rows) {\
       $$root = Join-Path $$runtimeRoot $$row.Key;\
       foreach ($$pointerName in @(\"current.previous\", \"current.next\")) {\

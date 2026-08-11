@@ -43,6 +43,20 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('离线组件原子切换失败');
   });
 
+  test('keeps component content IDs out of the combined NSIS target rows', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript).toContain('FileWrite $2 "${KEY}|${PREFIX}$\\r$\\n"');
+    expect(installerScript).not.toContain('${KEY}|${PREFIX}|$R1');
+    expect(installerScript).toContain(
+      'Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop',
+    );
+    expect(installerScript).toContain('^[0-9a-f]{64}$$');
+    expect(installerScript).toContain(
+      'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
+    );
+  });
+
   test('records optional local inference intent without downloading in NSIS', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
