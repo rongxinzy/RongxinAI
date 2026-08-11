@@ -1,7 +1,9 @@
 import { Button } from '@shared/components/ui/button';
+import { Button21st } from '@shared/components/ui/button-21st';
 import {
   Card,
   CardContent,
+  CardFooter,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -14,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
-import { CheckCircle2, Download, RotateCcw, X } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
+import { Download, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -24,10 +27,15 @@ import type {
 } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
 import { InstallProgressBar } from './Common';
+import { BreathingDot } from './BreathingDot';
 import { formatBytes, formatInstallProgressSummary } from '../utils/progress';
 
 const RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const handledInstallerRequests = new Set<string>();
+
+function formatCompactBytes(value: number): string {
+  return formatBytes(value).replace(' ', '');
+}
 
 type RuntimeInstallCardProps = {
   installRequestId?: string;
@@ -53,10 +61,7 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
   const [status, setStatus] = useState<LlamaCppStatusSnapshot | null>(null);
   const [progress, setProgress] = useState<LlamaCppInstallProgress | null>(null);
   const [error, setError] = useState<string>();
-  const [resolvedDownloadSize, setResolvedDownloadSize] = useState<{
-    backendKey: string;
-    sizeBytes?: number;
-  }>();
+  const [resolvedDownloadSizes, setResolvedDownloadSizes] = useState<Record<string, number>>({});
   const active = isActive(progress);
   const cancellable = canCancel(progress);
 
@@ -91,18 +96,14 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
   }, []);
 
   const loadDownloadSize = useCallback(async (backend: LlamaCppBackendInfo): Promise<void> => {
-    if (backend.downloadSizeBytes !== undefined) {
-      setResolvedDownloadSize({
-        backendKey: backend.versionBackend,
-        sizeBytes: backend.downloadSizeBytes,
-      });
-      return;
-    }
-    const result = await window.electron.llamacpp.getBackendDownloadSize(backend);
-    setResolvedDownloadSize({
-      backendKey: backend.versionBackend,
-      sizeBytes: result.success ? result.sizeBytes : undefined,
-    });
+    const sizeBytes =
+      backend.downloadSizeBytes ??
+      (await window.electron.llamacpp.getBackendDownloadSize(backend)).sizeBytes;
+    if (sizeBytes === undefined) return;
+    setResolvedDownloadSizes(current => ({
+      ...current,
+      [backend.versionBackend]: sizeBytes,
+    }));
   }, []);
 
   const startInstall = useCallback(
@@ -169,24 +170,28 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
   }, [installRequestId, loadMetadata, startInstall]);
 
   useEffect(() => {
-    if (!selectedBackend) return;
-    void loadDownloadSize(selectedBackend);
-  }, [loadDownloadSize, selectedBackend]);
+    if (backends.length === 0) return;
+    void Promise.all(backends.map(backend => loadDownloadSize(backend)));
+  }, [backends, loadDownloadSize]);
 
   const summary = progress ? formatInstallProgressSummary(progress) : null;
   const ready = isInstalled(status);
-  const backendLabel =
-    selectedBackend?.versionBackend ?? i18nService.t('localInferenceBackendNone');
-  const selectedDownloadSize =
-    selectedBackend?.downloadSizeBytes ??
-    (resolvedDownloadSize?.backendKey === selectedBackend?.versionBackend
-      ? resolvedDownloadSize?.sizeBytes
-      : undefined);
-  const sizeLabel = selectedDownloadSize
-    ? i18nService
-        .t('localInferenceRuntimeDownloadSize')
-        .replace('{size}', formatBytes(selectedDownloadSize))
-    : i18nService.t('localInferenceRuntimeDownloadSizeUnknown');
+  const serviceRunning = status?.status === 'running';
+  const serviceProgramAvailable = ready || Boolean(status?.executablePath);
+  const serviceStatusLabel = serviceRunning
+    ? i18nService.t('localInferenceRuntimeServiceRunning')
+    : serviceProgramAvailable
+      ? i18nService.t('localInferenceRuntimeServiceNotRunning')
+      : i18nService.t('localInferenceRuntimeServiceUnavailable');
+  const serviceStatusColor = serviceRunning
+    ? 'var(--zy-success)'
+    : serviceProgramAvailable
+      ? 'var(--zy-warning)'
+      : 'var(--zy-text-muted)';
+  const runtimeBackendLabel =
+    status?.versionBackend?.trim() ||
+    selectedBackend?.versionBackend ||
+    i18nService.t('localInferenceBackendNone');
 
   const cancelInstall = async () => {
     setProgress(current => ({
@@ -197,82 +202,117 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
   };
 
   return (
-    <Card className="gap-3 border-primary/20 bg-primary/[0.03]">
-      <CardHeader className="grid-cols-[1fr_auto] px-0">
+    <Card className="relative gap-2 border-primary/20 bg-primary/[0.03]">
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className="absolute right-4 top-4 inline-flex">
+              <BreathingDot color={serviceStatusColor} duration={2} label={serviceStatusLabel} />
+            </span>
+          }
+        />
+        <TooltipContent side="bottom" align="end">
+          {serviceStatusLabel}
+        </TooltipContent>
+      </Tooltip>
+      <CardHeader className="gap-3 px-0">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2">
-            {ready ? (
-              <CheckCircle2 className="size-4 text-emerald-500" />
-            ) : (
+            {!ready ? (
               <Download className="size-4" />
-            )}
+            ) : null}
             {i18nService.t('localInferenceRuntimeCardTitle')}
           </CardTitle>
-          <CardDescription className="mt-1">
-            {ready
-              ? i18nService.t('localInferenceRuntimeReady')
-              : i18nService.t('localInferenceRuntimeCardDescription')}
-          </CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="-mx-4 w-auto px-1.5">
           <Select
             value={selectedKey}
             onValueChange={value => setSelectedKey(value ?? '')}
             disabled={active || backends.length === 0}
           >
-            <SelectTrigger className="max-w-64">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder={i18nService.t('localInferenceBackendNone')} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent
+              alignItemWithTrigger={false}
+              side="bottom"
+              sideOffset={4}
+              collisionAvoidance={{
+                side: 'none',
+                align: 'shift',
+                fallbackAxisSide: 'none',
+              }}
+            >
               <SelectGroup>
-                {backends.map(backend => (
-                  <SelectItem key={backend.versionBackend} value={backend.versionBackend}>
-                    {backend.versionBackend}
-                    {backend.recommended
-                      ? ` · ${i18nService.t('localInferenceBackendRecommendedLabel')}`
-                      : ''}
-                  </SelectItem>
-                ))}
+                {backends.map(backend => {
+                  const downloadSize =
+                    backend.downloadSizeBytes ?? resolvedDownloadSizes[backend.versionBackend];
+                  return (
+                    <SelectItem key={backend.versionBackend} value={backend.versionBackend}>
+                      {backend.versionBackend}
+                      {downloadSize !== undefined
+                        ? ` · ${formatCompactBytes(downloadSize)}`
+                        : ''}
+                      {backend.recommended ? (
+                        <>
+                          <span> · </span>
+                          <span className="font-semibold text-foreground">
+                            {i18nService.t('localInferenceBackendRecommendedLabel')}
+                          </span>
+                        </>
+                      ) : null}
+                    </SelectItem>
+                  );
+                })}
               </SelectGroup>
             </SelectContent>
           </Select>
-          {active && cancellable ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => void cancelInstall()}>
-              <X data-icon="inline-start" />
-              {i18nService.t('cancel')}
-            </Button>
-          ) : active ? (
-            <Button type="button" variant="outline" size="sm" disabled>
-              {i18nService.t('localInferenceRuntimeInstalling')}
-            </Button>
-          ) : (
-            <Button type="button" variant="outline" size="sm" onClick={() => void startInstall()}>
-              {error ? (
-                <RotateCcw data-icon="inline-start" />
-              ) : (
-                <Download data-icon="inline-start" />
-              )}
-              {error
-                ? i18nService.t('localInferenceRuntimeRetry')
-                : i18nService.t('localInferenceBackendUpdate')}
-            </Button>
-          )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-2 px-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-          <span>{backendLabel}</span>
-          <span>{sizeLabel}</span>
-        </div>
-        {progress ? <InstallProgressBar progress={progress} /> : null}
-        {summary ? (
-          <div className="text-xs text-muted-foreground">
-            {summary.phase ? `${summary.phase} · ` : ''}
-            {summary.primary}
-          </div>
-        ) : null}
-        {error ? <div className="text-xs text-destructive">{error}</div> : null}
-      </CardContent>
+      {progress || summary || error ? (
+        <CardContent className="space-y-2 px-0">
+          {progress ? <InstallProgressBar progress={progress} /> : null}
+          {summary ? (
+            <div className="text-xs text-muted-foreground">
+              {summary.phase ? `${summary.phase} · ` : ''}
+              {summary.primary}
+            </div>
+          ) : null}
+          {error ? <div className="text-xs text-destructive">{error}</div> : null}
+        </CardContent>
+      ) : null}
+      <CardFooter className="justify-between border-0 bg-transparent p-0 pb-2">
+        <CardDescription>
+          {ready
+            ? i18nService
+                .t('localInferenceRuntimeReadyWithBackend')
+                .replace('{backend}', runtimeBackendLabel)
+            : i18nService.t('localInferenceRuntimeNotInstalledMessage')}
+        </CardDescription>
+        {active && cancellable ? (
+          <Button type="button" variant="outline" size="sm" onClick={() => void cancelInstall()}>
+            <X data-icon="inline-start" />
+            {i18nService.t('cancel')}
+          </Button>
+        ) : active ? (
+          <Button type="button" variant="outline" size="sm" disabled>
+            {i18nService.t('localInferenceRuntimeInstalling')}
+          </Button>
+        ) : (
+          <Button21st
+            type="button"
+            variant="primary"
+            size="sm"
+            className="-mr-2.5 h-8 min-w-16 px-3"
+            onClick={() => void startInstall()}
+          >
+            {error ? <RotateCcw data-icon="inline-start" /> : <Download data-icon="inline-start" />}
+            {error
+              ? i18nService.t('localInferenceRuntimeRetry')
+              : i18nService.t('localInferenceBackendUpdate')}
+          </Button21st>
+        )}
+      </CardFooter>
     </Card>
   );
 }

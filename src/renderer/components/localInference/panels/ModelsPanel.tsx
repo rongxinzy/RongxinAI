@@ -20,7 +20,6 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/component
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { ArrowRight, Box, Clock3, Ellipsis, Settings2, Trash2 } from 'lucide-react';
-import { motion, useReducedMotion } from 'motion/react';
 import {
   type ComponentType,
   type CSSProperties,
@@ -90,9 +89,7 @@ const MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG = 1;
 const MODEL_CARD_MIN_WIDTH = 280;
 const MODEL_GRID_COLUMN_GAP = 12;
 const MODEL_GRID_TWO_COLUMN_MIN_WIDTH = MODEL_CARD_MIN_WIDTH * 2 + MODEL_GRID_COLUMN_GAP;
-const modelCardActionClassName =
-  'relative z-20 transition-[opacity,transform] duration-200 ease-out group-hover/card:translate-x-0 group-hover/card:opacity-100 group-hover/card:pointer-events-auto';
-const modelCardHiddenActionClassName = 'pointer-events-none translate-x-1 opacity-0';
+const modelCardActionClassName = 'relative z-20';
 type ModelCardTag = {
   label: string;
 };
@@ -458,10 +455,6 @@ function ModelCard({
   onOpenLaunchLog,
 }: ModelCardProps) {
   const isRunning = Boolean(runningModel);
-  const reduceMotion = useReducedMotion();
-  const hoverTransition = reduceMotion
-    ? { duration: 0 }
-    : { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const };
   const buttonsDisabled = loading || unloading;
   const displayName = getModelDisplayName(model.name);
   const provider = resolveLocalModelProvider(model);
@@ -480,15 +473,9 @@ function ModelCard({
   };
 
   return (
-    <motion.div
+    <div
       data-local-inference-model-card-frame="true"
-      className="relative h-full w-full transform-gpu"
-      whileHover={
-        reduceMotion || loadingModel || unloading || dragging
-          ? undefined
-          : { scale: 1.02, zIndex: 1 }
-      }
-      transition={{ scale: hoverTransition }}
+      className="relative z-0 h-full w-full rounded-xl transition-[box-shadow,z-index] duration-200 hover:z-20 hover:shadow-xl hover:shadow-foreground/20 focus-within:z-20"
     >
       <Card
         size="sm"
@@ -641,7 +628,6 @@ function ModelCard({
           <div
             className={cn(
               modelCardActionClassName,
-              !isRunning && modelCardHiddenActionClassName,
               'absolute bottom-4 right-4',
             )}
           >
@@ -675,7 +661,7 @@ function ModelCard({
           </div>
         </CardHeader>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 
