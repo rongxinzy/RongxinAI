@@ -1,5 +1,5 @@
 import { TaskStatus } from './constants';
-import type { CcConnectCronTask } from './ccConnectCronClient';
+import { SchedulerClockAccount, type CcConnectCronTask } from './ccConnectCronClient';
 import type { SchedulerRuntime } from './schedulerRuntime';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { ScheduledTask, ScheduledTaskRun } from './types';
@@ -31,7 +31,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     }
     const scheduleVersion = task.scheduleVersion;
     if (!scheduleVersion) throw new Error(`Scheduled task ${task.id} has no scheduleVersion`);
-    await this.client.upsert({ accountId: task.delivery.accountId ?? 'default', taskId: task.id, scheduleVersion, schedule: task.schedule });
+    await this.client.upsert({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion, schedule: task.schedule });
   }
 
   async remove(taskId: string): Promise<void> {
@@ -53,7 +53,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async handleTrigger(input: { accountId: string; taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void> {
     const task = this.store.get(input.taskId);
-    if (!task || (task.delivery.accountId ?? 'default') !== input.accountId) return;
+    if (!task || input.accountId !== SchedulerClockAccount) return;
     const run = this.store.claimTrigger(input);
     if (!run) return; // disabled/stale/duplicate triggers are intentionally harmless.
     await this.executeAndFinish(task, run);
@@ -73,7 +73,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   }
 
   private async removeProjection(task: ScheduledTask): Promise<void> {
-    try { await this.client.remove({ accountId: task.delivery.accountId ?? 'default', taskId: task.id, scheduleVersion: task.scheduleVersion ?? '', schedule: task.schedule }); }
+    try { await this.client.remove({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: task.scheduleVersion ?? '', schedule: task.schedule }); }
     catch (error) {
       // A restarted sidecar has no in-memory registration; its 404 is already
       // the desired state and must not prevent the canonical mutation.

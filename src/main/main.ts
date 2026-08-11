@@ -32,7 +32,7 @@ import {
 } from '../scheduledTask/migrate';
 import { CanonicalScheduledTaskService } from '../scheduledTask/canonicalScheduledTaskService';
 import { CcConnectSchedulerRuntime } from '../scheduledTask/ccConnectSchedulerRuntime';
-import { CcConnectCronClient } from '../scheduledTask/ccConnectCronClient';
+import { CcConnectCronClient, SchedulerClockAccount } from '../scheduledTask/ccConnectCronClient';
 import { DeferredCcConnectCronClient } from '../scheduledTask/deferredCcConnectCronClient';
 import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
@@ -1197,7 +1197,7 @@ const startCanonicalSchedulerClock = async (): Promise<void> => {
   const manager = new CcConnectSidecarManager(executable, path.join(sidecarRoot, 'config.toml'));
   manager.on('error', error => console.error('[Scheduler] cc-connect sidecar error:', error));
   manager.on('exit', ({ code, signal }) => {
-    deferredCcConnectCronClient?.detach('default');
+    deferredCcConnectCronClient?.detach(SchedulerClockAccount);
     ccConnectSidecarManager = null;
     console.warn(`[Scheduler] cc-connect sidecar exited (code=${code}, signal=${signal})`);
     scheduleCanonicalSchedulerClockRestart();
@@ -1209,9 +1209,9 @@ const startCanonicalSchedulerClock = async (): Promise<void> => {
       bridgeUrl: ccConnectBridgeUrl,
       bridgeToken: ccConnectBridgeToken,
       cronControlListen: `127.0.0.1:${port}`,
-      accountId: 'default',
+      accountId: SchedulerClockAccount,
     }));
-    await waitForCcConnectCronControl('default', `http://127.0.0.1:${port}`);
+  await waitForCcConnectCronControl(SchedulerClockAccount, `http://127.0.0.1:${port}`);
     schedulerClockRestartAttempts = 0;
   } catch (error) {
     ccConnectSidecarManager = null;

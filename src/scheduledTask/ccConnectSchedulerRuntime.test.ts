@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { DeliveryMode, PayloadKind, ScheduleKind, SessionTarget, WakeMode } from './constants';
 import { CcConnectSchedulerRuntime } from './ccConnectSchedulerRuntime';
+import { SchedulerClockAccount } from './ccConnectCronClient';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 
 function setup() {
@@ -19,8 +20,8 @@ function setup() {
 test('projects only schedules and executes a claimed trigger once', async () => {
   const { store, task, client, execute, runtime } = setup();
   await runtime.register(task);
-  expect(client.upsert).toHaveBeenCalledWith({ accountId: 'default', taskId: task.id, scheduleVersion: task.scheduleVersion, schedule: task.schedule });
-  const trigger = { accountId: 'default', taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' };
+  expect(client.upsert).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: task.scheduleVersion, schedule: task.schedule });
+  const trigger = { accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' };
   await runtime.handleTrigger(trigger);
   await runtime.handleTrigger(trigger);
   expect(execute).toHaveBeenCalledTimes(1);
@@ -35,22 +36,31 @@ test('rebuilds the complete trigger projection from canonical SQLite tasks', asy
     wakeMode: WakeMode.NextHeartbeat, payload: { kind: PayloadKind.AgentTurn, message: 'run' },
     delivery: { mode: DeliveryMode.None }, agentId: 'main' });
   await runtime.reconcile([disabled, second]);
-  expect(client.remove).toHaveBeenCalledWith({ accountId: 'default', taskId: disabled.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
-  expect(client.upsert).toHaveBeenCalledWith({ accountId: 'default', taskId: second.id, scheduleVersion: second.scheduleVersion, schedule: second.schedule });
+  expect(client.remove).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: disabled.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
+  expect(client.upsert).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: second.id, scheduleVersion: second.scheduleVersion, schedule: second.schedule });
 });
 
 test('disabled tasks delete their sidecar projection and never execute', async () => {
   const { store, task, client, execute, runtime } = setup();
   const disabled = store.update(task.id, { enabled: false });
   await runtime.register(disabled);
-  expect(client.remove).toHaveBeenCalledWith({ accountId: 'default', taskId: task.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
-  await runtime.handleTrigger({ accountId: 'default', taskId: task.id, scheduleVersion: disabled.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
+  expect(client.remove).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
+  await runtime.handleTrigger({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: disabled.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
   expect(execute).not.toHaveBeenCalled();
 });
 
-test('rejects a trigger from a different channel account before it claims a Run', async () => {
+test('rejects a trigger that did not originate from the scheduler clock before it claims a Run', async () => {
   const { store, task, execute, runtime } = setup();
   await runtime.handleTrigger({ accountId: 'other-account', taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
   expect(execute).not.toHaveBeenCalled();
   expect(store.listRuns(task.id)).toHaveLength(0);
+});
+
+test('uses the scheduler clock for a task delivered through a non-default channel account', async () => {
+  const { store, task, client, execute, runtime } = setup();
+  const routed = store.update(task.id, { delivery: { mode: DeliveryMode.Announce, channel: 'telegram', accountId: 'telegram-work', to: '42' } });
+  await runtime.register(routed);
+  expect(client.upsert).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: routed.id, scheduleVersion: routed.scheduleVersion, schedule: routed.schedule });
+  await runtime.handleTrigger({ accountId: SchedulerClockAccount, taskId: routed.id, scheduleVersion: routed.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
+  expect(execute).toHaveBeenCalledOnce();
 });

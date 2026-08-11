@@ -1,5 +1,8 @@
 import type { Schedule } from './types';
 
+/** Internal project identity for the credential-free canonical scheduler clock. */
+export const SchedulerClockAccount = '__zhiyuan_scheduler__';
+
 export type CcConnectCronTask = {
   accountId: string;
   taskId: string;
