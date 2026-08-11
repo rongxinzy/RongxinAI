@@ -2,10 +2,7 @@ import { useSelector } from 'react-redux';
 
 import { ArtifactLayoutMode, selectPanelWidth } from '@/store/slices/artifactSlice';
 
-import {
-  ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
-  clampArtifactPanelWidth,
-} from './artifactPanelResize';
+import { clampArtifactPanelWidth } from './artifactPanelResize';
 
 interface ArtifactPanelFallbackProps {
   layoutMode: ArtifactLayoutMode;
@@ -28,8 +25,7 @@ export const ArtifactPanelFallback: React.FC<ArtifactPanelFallbackProps> = ({
   const isWorkspace = layoutMode === ArtifactLayoutMode.Workspace;
   const width = isWorkspace
     ? '100%'
-    : clampArtifactPanelWidth(storedWidth, minPanelWidth, maxPanelWidth) +
-      ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH;
+    : clampArtifactPanelWidth(storedWidth, minPanelWidth, maxPanelWidth);
   return (
     <div
       className={`h-full animate-pulse bg-muted/30 ${isWorkspace ? 'flex-1' : 'shrink-0'}`}

@@ -1,4 +1,3 @@
-import { cn } from '@shared/lib/utils';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
@@ -157,13 +156,9 @@ const ArtifactPanelResizeHandle: React.FC<ArtifactPanelResizeHandleProps> = ({
       aria-valuemax={Math.round(maxWidth)}
       aria-valuemin={Math.round(minWidth)}
       aria-valuenow={Math.round(currentWidth)}
-      className={cn(
-        'group relative z-10 w-3 shrink-0 cursor-col-resize touch-none outline-none',
-        'after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-border-subtle after:transition-colors after:duration-150',
-        'hover:after:bg-border focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-        isResizing && 'after:bg-foreground',
-      )}
+      className="absolute inset-y-0 left-0 z-10 w-3 cursor-col-resize touch-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       data-artifact-resize-handle=""
+      data-resizing={isResizing ? '' : undefined}
       onKeyDown={handleKeyDown}
       onLostPointerCapture={completeResize}
       onPointerDown={handlePointerDown}
