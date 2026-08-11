@@ -26,9 +26,13 @@ import { pathToFileURL } from 'url';
 import type { OpenClawSessionPatch } from '../common/openclawSession';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import {
-  migrateScheduledTaskRunsToOpenclaw,
-  migrateScheduledTasksToOpenclaw,
+  migrateLegacyScheduledTasksToCanonical,
 } from '../scheduledTask/migrate';
+import { CanonicalScheduledTaskService } from '../scheduledTask/canonicalScheduledTaskService';
+import { CcConnectSchedulerRuntime } from '../scheduledTask/ccConnectSchedulerRuntime';
+import { DeferredCcConnectCronClient } from '../scheduledTask/deferredCcConnectCronClient';
+import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
+import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import {
   APP_UPDATE_POLL_INTERVAL_MS,
@@ -1085,6 +1089,23 @@ let imGatewayManager: IMGatewayManager | null = null;
 let ccConnectBridgeServer: CcConnectBridgeServer | null = null;
 let ccConnectSidecarManager: CcConnectSidecarManager | null = null;
 let ccConnectPiBridge: CcConnectPiBridge | null = null;
+let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
+let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
+let deferredCcConnectCronClient: DeferredCcConnectCronClient | null = null;
+const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
+  if (!canonicalScheduledTaskService) {
+    const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
+    deferredCcConnectCronClient = new DeferredCcConnectCronClient();
+    const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
+    canonicalSchedulerRuntime = new CcConnectSchedulerRuntime(
+      taskStore,
+      deferredCcConnectCronClient,
+      executor.execute.bind(executor),
+    );
+    canonicalScheduledTaskService = new CanonicalScheduledTaskService(taskStore, canonicalSchedulerRuntime);
+  }
+  return canonicalScheduledTaskService;
+};
 const startCcConnectBridge = async (): Promise<void> => {
   if (ccConnectBridgeServer) return;
   const token = crypto.randomBytes(32).toString('base64url');
@@ -1092,7 +1113,7 @@ const startCcConnectBridge = async (): Promise<void> => {
     runtime: getPiRuntimeAdapter(), coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
-    onCronTrigger: async () => { throw new Error('cc-connect Cron is not initialized'); },
+    onCronTrigger: async trigger => getCanonicalScheduledTaskService() && canonicalSchedulerRuntime!.handleTrigger(trigger),
   });
   ccConnectBridgeServer = new CcConnectBridgeServer(token, {
     onTurn: request => ccConnectPiBridge!.runTurn(request),
@@ -5651,9 +5672,10 @@ if (!gotTheLock) {
     },
   );
 
-  // ==================== Scheduled Task IPC Handlers (OpenClaw) ====================
+  // ==================== Scheduled Task IPC Handlers (canonical SQLite + Pi) ====================
 
   initCronJobServiceManager({
+    getScheduledTaskService: getCanonicalScheduledTaskService,
     getOpenClawChannelGateway: () => openClawChannelGateway,
   });
   initScheduledTaskHelpers({
@@ -7444,24 +7466,15 @@ if (!gotTheLock) {
           );
         }
 
-        // One-time migration: move tasks from legacy SQLite tables to OpenClaw gateway.
-        migrateScheduledTasksToOpenclaw({
+        // One-time migration: import legacy SQLite task records into the
+        // canonical scheduler. No task is sent to OpenClaw.
+        migrateLegacyScheduledTasksToCanonical({
           db: getStore().getDatabase(),
           getKv: key => getStore().get(key),
           setKv: (key, value) => getStore().set(key, value),
-          cronJobService: getCronJobService(),
+          store: new SqliteScheduledTaskStore(getStore().getDatabase()),
         }).catch(err => {
-          console.warn('[Main] Scheduled tasks migration failed:', err);
-        });
-
-        // One-time migration: copy legacy run history to OpenClaw cron/runs/ JSONL files.
-        migrateScheduledTaskRunsToOpenclaw({
-          db: getStore().getDatabase(),
-          getKv: key => getStore().get(key),
-          setKv: (key, value) => getStore().set(key, value),
-          openclawStateDir: getOpenClawEngineManager().getStateDir(),
-        }).catch(err => {
-          console.warn('[Main] Scheduled task run history migration failed:', err);
+          console.warn('[Main] Canonical scheduled-task migration failed:', err);
         });
       })();
     });
