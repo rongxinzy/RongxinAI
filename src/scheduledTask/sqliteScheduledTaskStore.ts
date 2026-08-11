@@ -220,7 +220,7 @@ export class SqliteScheduledTaskStore {
         .run(TaskStatus.Error, finishedAt, durationMs, error, row.id);
       const task = this.get(row.task_id);
       if (task) {
-        const state = { ...task.state, runningAtMs: null, lastRunAtMs: Date.parse(finishedAt), lastStatus: TaskStatus.Error as TaskStatus, lastError: error, lastDurationMs: durationMs, consecutiveErrors: task.state.consecutiveErrors + 1 };
+        const state: TaskState = { ...task.state, runningAtMs: null, lastRunAtMs: Date.parse(finishedAt), lastStatus: TaskStatus.Error, lastError: error, lastDurationMs: durationMs, consecutiveErrors: task.state.consecutiveErrors + 1 };
         this.db.prepare('UPDATE zhiyuan_scheduled_tasks SET state_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), finishedAt, task.id);
       }
     }

@@ -1,4 +1,5 @@
 import type { CoworkStore } from '../main/coworkStore';
+import type { CoworkError } from '../common/coworkError';
 import type { PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
 
 import { PayloadKind, SessionTarget } from './constants';
@@ -55,7 +56,7 @@ function waitForPiCompletion(runtime: PiRuntime, sessionId: string, timeoutSecon
   return new Promise<void>((resolve, reject) => {
     const cleanup = () => { runtime.off('complete', onComplete); runtime.off('error', onError); clearTimeout(timer); };
     const onComplete = (id: string) => { if (id === sessionId) { cleanup(); resolve(); } };
-    const onError = (id: string, error: Error) => { if (id === sessionId) { cleanup(); reject(error); } };
+    const onError = (id: string, error: CoworkError) => { if (id === sessionId) { cleanup(); reject(new Error(error.message)); } };
     const timer = setTimeout(() => { cleanup(); runtime.stopSession(sessionId); reject(new Error(`Scheduled task Pi run timed out after ${timeoutMs}ms`)); }, timeoutMs);
     runtime.on('complete', onComplete);
     runtime.on('error', onError);
