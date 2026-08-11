@@ -118,10 +118,6 @@ jobs:
             runtime_target: linux-x64
     runs-on: ${{ matrix.runner }}
     environment: release
-    env:
-      # OpenClaw reads CLAWHUB_TOKEN; map the repository secret without
-      # exposing its name or value in the build command line.
-      CLAWHUB_TOKEN: ${{ secrets.CLAW_HUB }}
     steps:
       - uses: actions/checkout@v6
         with:

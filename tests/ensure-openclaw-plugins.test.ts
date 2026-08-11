@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 const {
@@ -9,6 +13,7 @@ const {
   retryPluginInstall,
   resolveGitPackSpec,
   resolvePluginInstallSource,
+  verifyPackageIntegrity,
 } = require('../scripts/ensure-openclaw-plugins.cjs');
 
 describe('ensure-openclaw-plugins', () => {
@@ -152,5 +157,41 @@ describe('ensure-openclaw-plugins', () => {
       installSpec: '/tmp/local-plugin',
       pinnedDisplaySpec: '/tmp/local-plugin',
     });
+  });
+
+  test('packs pinned npm packages instead of resolving them through ClawHub', () => {
+    expect(
+      resolvePluginInstallSource({
+        id: 'openclaw-lark',
+        npm: '@larksuite/openclaw-lark',
+        version: '2026.4.8',
+        integrity: 'sha512-test',
+      }),
+    ).toEqual({
+      kind: 'packed',
+      packSpec: '@larksuite/openclaw-lark@2026.4.8',
+      pinnedDisplaySpec: '@larksuite/openclaw-lark@2026.4.8',
+      integrity: 'sha512-test',
+    });
+  });
+
+  test('accepts the pinned sha512 digest and rejects changed package bytes', () => {
+    const testDir = mkdtempSync(join(tmpdir(), 'openclaw-plugin-integrity-'));
+    const packagePath = join(testDir, 'plugin.tgz');
+
+    try {
+      writeFileSync(packagePath, 'trusted plugin bytes');
+      const integrity = `sha512-${createHash('sha512')
+        .update('trusted plugin bytes')
+        .digest('base64')}`;
+
+      expect(() => verifyPackageIntegrity(packagePath, integrity)).not.toThrow();
+      writeFileSync(packagePath, 'changed plugin bytes');
+      expect(() => verifyPackageIntegrity(packagePath, integrity)).toThrow(
+        'Plugin package integrity mismatch',
+      );
+    } finally {
+      rmSync(testDir, { recursive: true, force: true });
+    }
   });
 });

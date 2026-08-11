@@ -4,9 +4,11 @@
  * Ensure preinstalled OpenClaw plugins are downloaded and placed into the
  * runtime extensions directory.
  *
- * Uses the OpenClaw CLI (`openclaw plugins install`) to handle downloading,
- * dependency resolution, and proper module setup for each plugin declared in
- * package.json ("openclaw.plugins").
+ * Downloads exact npm packages directly from their registry, verifies their
+ * repository-pinned SRI digest, then uses the OpenClaw CLI
+ * (`openclaw plugins install`) for its security scan, dependency resolution,
+ * and proper module setup. This keeps release builds independent from the
+ * availability of the ClawHub catalog.
  *
  * Flow per plugin:
  *   1. Checks a local cache in vendor/openclaw-plugins/{id}/
@@ -19,6 +21,7 @@
  */
 
 const { spawnSync } = require('child_process');
+const { createHash, timingSafeEqual } = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -281,6 +284,19 @@ function npmPack(packSpec, registry, outputDir) {
   return path.join(outputDir, tgzName);
 }
 
+function verifyPackageIntegrity(packagePath, expectedIntegrity) {
+  const match = /^sha512-([A-Za-z0-9+/]+={0,2})$/.exec(expectedIntegrity || '');
+  if (!match) {
+    throw new Error('Plugin package integrity must be a sha512 SRI value');
+  }
+
+  const expected = Buffer.from(match[1], 'base64');
+  const actual = createHash('sha512').update(fs.readFileSync(packagePath)).digest();
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
+    throw new Error(`Plugin package integrity mismatch for ${path.basename(packagePath)}`);
+  }
+}
+
 function gitCloneAndPack(spec, version, outputDir) {
   const parsed = parseGitSpec(spec, version);
   if (!parsed) {
@@ -399,7 +415,7 @@ function gitCloneAndPack(spec, version, outputDir) {
 }
 
 function resolvePluginInstallSource(plugin) {
-  const { npm: npmSpec, version, registry } = plugin;
+  const { npm: npmSpec, version, registry, integrity } = plugin;
 
   if (registry) {
     return {
@@ -407,6 +423,7 @@ function resolvePluginInstallSource(plugin) {
       packSpec: `${npmSpec}@${version}`,
       pinnedDisplaySpec: `${npmSpec}@${version}`,
       registry,
+      ...(integrity ? { integrity } : {}),
     };
   }
 
@@ -427,9 +444,10 @@ function resolvePluginInstallSource(plugin) {
   }
 
   return {
-    kind: 'direct',
-    installSpec: `${npmSpec}@${version}`,
+    kind: 'packed',
+    packSpec: `${npmSpec}@${version}`,
     pinnedDisplaySpec: `${npmSpec}@${version}`,
+    integrity,
   };
 }
 
@@ -460,6 +478,9 @@ function main() {
           'Each plugin must have "id", "npm", and "version" fields.',
       );
     }
+    if (!isGitSpec(plugin.npm) && !isLocalPathSpec(plugin.npm) && !plugin.integrity) {
+      die(`Registry plugin ${plugin.id} must declare a pinned sha512 integrity value.`);
+    }
   }
 
   const forceInstall = process.env.OPENCLAW_FORCE_PLUGIN_INSTALL === '1';
@@ -481,7 +502,7 @@ function main() {
   log(`Processing ${plugins.length} plugin(s)...`);
 
   for (const plugin of plugins) {
-    const { id, npm: npmSpec, version, optional } = plugin;
+    const { id, npm: npmSpec, version, integrity, optional } = plugin;
     const cacheDir = path.join(pluginCacheBase, id);
     const installInfoPath = path.join(cacheDir, 'plugin-install-info.json');
     const targetDir = path.join(runtimeExtensionsDir, id);
@@ -492,7 +513,12 @@ function main() {
     let needsDownload = true;
     if (!forceInstall && fs.existsSync(installInfoPath)) {
       const info = readJsonFile(installInfoPath);
-      if (info && info.version === version && info.npmSpec === npmSpec) {
+      if (
+        info &&
+        info.version === version &&
+        info.npmSpec === npmSpec &&
+        info.integrity === integrity
+      ) {
         log(`Cache hit (version=${version}), skipping download.`);
         needsDownload = false;
       } else {
@@ -518,7 +544,11 @@ function main() {
           if (source.registry) {
             log(`  Packing from custom registry: ${source.registry}`);
           }
-          installSpec = npmPack(source.packSpec, source.registry, stagingDir);
+          installSpec = retryPluginInstall(
+            () => npmPack(source.packSpec, source.registry, stagingDir),
+            { label: `Plugin ${id} package download` },
+          );
+          verifyPackageIntegrity(installSpec, source.integrity);
         } else {
           installSpec = source.installSpec;
         }
@@ -586,6 +616,7 @@ function main() {
               pluginId: id,
               npmSpec,
               version,
+              integrity,
               installedAt: new Date().toISOString(),
             },
             null,
@@ -894,4 +925,5 @@ module.exports = {
   retryPluginInstall,
   resolveGitPackSpec,
   resolvePluginInstallSource,
+  verifyPackageIntegrity,
 };
