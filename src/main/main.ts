@@ -26,6 +26,7 @@ import { pathToFileURL } from 'url';
 import type { OpenClawSessionPatch } from '../common/openclawSession';
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
 import {
+  migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
 } from '../scheduledTask/migrate';
 import { CanonicalScheduledTaskService } from '../scheduledTask/canonicalScheduledTaskService';
@@ -7485,6 +7486,14 @@ if (!gotTheLock) {
           store: new SqliteScheduledTaskStore(getStore().getDatabase()),
         }).catch(err => {
           console.warn('[Main] Canonical scheduled-task migration failed:', err);
+        });
+        migrateLegacyScheduledTaskRunsToCanonical({
+          db: getStore().getDatabase(),
+          getKv: key => getStore().get(key),
+          setKv: (key, value) => getStore().set(key, value),
+          store: new SqliteScheduledTaskStore(getStore().getDatabase()),
+        }).catch(err => {
+          console.warn('[Main] Canonical scheduled-task Run migration failed:', err);
         });
       })();
     });

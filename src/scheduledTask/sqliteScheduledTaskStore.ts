@@ -150,6 +150,15 @@ export class SqliteScheduledTaskStore {
       status: result.status, startedAt: row.started_at, finishedAt, durationMs, error: result.error ?? null };
   }
 
+  /** Imports immutable historical Run data without invoking a runtime. */
+  importLegacyRun(run: ScheduledTaskRun): void {
+    this.db.prepare(`INSERT OR IGNORE INTO zhiyuan_scheduled_task_runs
+      (id, task_id, schedule_version, scheduled_at, session_id, session_key, status, started_at, finished_at, duration_ms, error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(run.id, run.taskId, 'legacy', run.startedAt, run.sessionId, run.sessionKey, run.status,
+        run.startedAt, run.finishedAt, run.durationMs, run.error);
+  }
+
   listRuns(taskId: string): ScheduledTaskRun[] {
     return (this.db.prepare('SELECT * FROM zhiyuan_scheduled_task_runs WHERE task_id = ? ORDER BY started_at DESC').all(taskId) as RunRow[])
       .map(row => this.runFromRow(row));

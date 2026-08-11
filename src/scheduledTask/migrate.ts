@@ -17,6 +17,7 @@ import {
   PayloadKind,
   ScheduleKind,
   SessionTarget,
+  TaskStatus,
   WakeMode,
 } from './constants';
 import type { CronJobService } from './cronJobService';
@@ -120,6 +121,27 @@ export async function migrateLegacyScheduledTasksToCanonical(deps: {
       delivery: convertDelivery(row.notify_platforms_json ?? '[]'), agentId: DefaultAgentId,
     };
     store.importLegacy(row.id, input);
+  }
+  setKv(key, 'true');
+}
+
+/** Imports pre-OpenClaw Run history into the canonical SQLite Run table. */
+export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
+  db: Database.Database;
+  getKv: (key: string) => unknown;
+  setKv: (key: string, value: string) => void;
+  store: SqliteScheduledTaskStore;
+}): Promise<void> {
+  const { db, getKv, setKv, store } = deps;
+  const key = 'scheduled_task_runs_migrated_to_canonical_v1';
+  if (getKv(key) === 'true') return;
+  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'").get();
+  if (!exists) { setKv(key, 'true'); return; }
+  const rows = db.prepare('SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs').all() as LegacyRunRow[];
+  for (const row of rows) {
+    store.importLegacyRun({ id: row.id, taskId: row.task_id, sessionId: row.session_id,
+      sessionKey: null, status: row.status === 'success' ? TaskStatus.Success : row.status === 'error' ? TaskStatus.Error : TaskStatus.Skipped,
+      startedAt: row.started_at, finishedAt: row.finished_at, durationMs: row.duration_ms, error: row.error });
   }
   setKv(key, 'true');
 }
