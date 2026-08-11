@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 const installerScriptPath = path.resolve('scripts/nsis-installer.nsh');
+const elevatedActionsScriptPath = path.resolve('scripts/nsis-elevated-actions.ps1');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
 
 describe('NSIS offline resource and local inference flow', () => {
@@ -48,10 +49,9 @@ describe('NSIS offline resource and local inference flow', () => {
 
     expect(installerScript).toContain('FileWrite $2 "${KEY}|${PREFIX}$\\r$\\n"');
     expect(installerScript).not.toContain('${KEY}|${PREFIX}|$R1');
-    expect(installerScript).toContain(
-      'Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop',
-    );
-    expect(installerScript).toContain('^[0-9a-f]{64}$$');
+    expect(installerScript).toContain('Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop');
+    expect(installerScript).toContain('^[0-9a-f]{64}\\z');
+    expect(installerScript).not.toContain('^[0-9a-f]{64}$$');
     expect(installerScript).toContain(
       'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
     );
@@ -68,14 +68,26 @@ describe('NSIS offline resource and local inference flow', () => {
 
   test('adds only a user-approved scoped Defender exclusion and removes managed exclusions', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const elevatedActionsScript = fs.readFileSync(elevatedActionsScriptPath, 'utf8');
 
     expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1');
-    expect(installerScript).toContain('Add-MpPreference -ExclusionPath');
-    expect(installerScript).toContain('Start-Process -FilePath powershell.exe -Verb RunAs');
+    expect(installerScript).toContain('ExecShellWait "runas"');
+    expect(installerScript).toContain('-ExecutionPolicy Bypass -File');
+    expect(installerScript).toContain('!insertmacro RunElevatedAction ADD_DEFENDER');
+    expect(installerScript).toContain('!insertmacro RunElevatedAction INSTALL_VC');
+    expect(installerScript).toContain('!insertmacro RunElevatedAction REMOVE_DEFENDER');
     expect(installerScript).toContain('defender-exclusion-managed');
-    expect(installerScript).toContain('Remove-MpPreference -ExclusionPath');
-    expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*compile-cache/);
-    expect(installerScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
+    expect(installerScript).not.toContain("''");
+    expect(installerScript).not.toContain('Start-Process -FilePath powershell.exe -Verb RunAs');
+    expect(elevatedActionsScript).toContain('Add-MpPreference -ExclusionPath $Target');
+    expect(elevatedActionsScript).toContain('Remove-MpPreference -ExclusionPath $Target');
+    expect(elevatedActionsScript).toContain('-ArgumentList @(');
+    expect(elevatedActionsScript).toContain("'/install'");
+    expect(elevatedActionsScript).toContain("'/quiet'");
+    expect(elevatedActionsScript).toContain("'/norestart'");
+    expect(elevatedActionsScript).toContain('$exitCode -notin @(0, 1638, 3010)');
+    expect(elevatedActionsScript).not.toMatch(/Add-MpPreference[^\n]*compile-cache/);
+    expect(elevatedActionsScript).not.toMatch(/Add-MpPreference[^\n]*app\.asar\.unpacked/);
   });
 
   test('delays old version cleanup until runtime links are ready', () => {
