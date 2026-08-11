@@ -5,12 +5,14 @@ import {
   addArtifact,
   activateSessionArtifactView,
   ArtifactLayoutMode,
+  ArtifactPanelView,
   closePanel,
   selectArtifact,
   selectSessionSelectedArtifact,
   selectSelectedArtifact,
   setActiveArtifactProjection,
   setArtifactLayoutMode,
+  setPanelView,
   setPanelWidth,
 } from './artifactSlice';
 import artifactReducer from './artifactSlice';
@@ -31,6 +33,17 @@ const makeArtifact = (overrides: Partial<Artifact> = {}): Artifact => ({
 });
 
 describe('artifact reducer', () => {
+  test('returns to the file list without clearing the selected artifact', () => {
+    let state = artifactReducer(undefined, selectArtifact('artifact-1'));
+
+    expect(state.panelView).toBe(ArtifactPanelView.Preview);
+
+    state = artifactReducer(state, setPanelView(ArtifactPanelView.Files));
+
+    expect(state.panelView).toBe(ArtifactPanelView.Files);
+    expect(state.selectedArtifactId).toBe('artifact-1');
+  });
+
   test('promotes a path-backed intermediate artifact when the final answer references it', () => {
     const intermediate = makeArtifact({ content: 'cached binary data' });
     const deliverable = makeArtifact({
