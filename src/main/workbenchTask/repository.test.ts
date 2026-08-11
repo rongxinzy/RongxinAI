@@ -62,6 +62,25 @@ test('increments attempts and run event sequences while enforcing uniqueness', (
   }
 });
 
+test('lists task history for one session in newest-first order', () => {
+  const { db, repository } = createRepository();
+  try {
+    const first = repository.createTask('session', 'first goal', contract);
+    const second = repository.createTask('session', 'second goal', contract);
+    repository.createTask('other-session', 'unrelated goal', contract);
+
+    db.prepare('UPDATE workbench_tasks SET created_at = ? WHERE id = ?').run(1, first.id);
+    db.prepare('UPDATE workbench_tasks SET created_at = ? WHERE id = ?').run(2, second.id);
+
+    expect(repository.listTasksForSession('session').map(task => task.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
 test('deduplicates identical artifact evidence within a run', () => {
   const { db, repository } = createRepository();
   try {

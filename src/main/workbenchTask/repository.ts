@@ -164,6 +164,13 @@ export class WorkbenchTaskRepository {
     return row ? this.mapTask(row) : null;
   }
 
+  listTasksForSession(sessionId: string): WorkbenchTask[] {
+    const rows = this.db
+      .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
+      .all(sessionId) as TaskRow[];
+    return rows.map(row => this.mapTask(row));
+  }
+
   getActiveTaskForSession(sessionId: string): WorkbenchTask | null {
     const rows = this.db
       .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
