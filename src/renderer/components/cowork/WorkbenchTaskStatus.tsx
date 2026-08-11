@@ -17,6 +17,7 @@ import {
   type WorkbenchApprovalResponseInput,
   type WorkbenchTaskActionResult,
   type WorkbenchTaskDetail,
+  type WorkbenchTask,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
 import type { AppDispatch } from '../../store';
@@ -64,12 +65,19 @@ function WorkbenchTaskActionButton({
 export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [detail, setDetail] = useState<WorkbenchTaskDetail | null>(null);
+  const [auditDetail, setAuditDetail] = useState<WorkbenchTaskDetail | null>(null);
+  const [taskHistory, setTaskHistory] = useState<WorkbenchTask[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
 
   const applyDetail = useCallback(
     (nextDetail: WorkbenchTaskDetail | null) => {
       setDetail(nextDetail);
+      setAuditDetail(current => {
+        if (!nextDetail) return null;
+        return !current || current.task.id === nextDetail.task.id ? nextDetail : current;
+      });
       const projectedRun = getProjectedRun(nextDetail);
       dispatch(
         setActiveArtifactProjection({
@@ -93,13 +101,54 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
     }
   }, [applyDetail, sessionId]);
 
+  const loadTaskHistory = useCallback(async () => {
+    setAuditLoading(true);
+    try {
+      const result = await window.electron.workbenchTask.listForSession(sessionId);
+      if (!result.success) throw new Error(result.error);
+      setTaskHistory(result.tasks ?? []);
+    } catch (error) {
+      console.error('[WorkbenchTask] Failed to load task audit history:', error);
+      toast.error(i18nService.t('workbenchTaskHistoryLoadFailed'));
+    } finally {
+      setAuditLoading(false);
+    }
+  }, [sessionId]);
+
+  const selectAuditTask = useCallback(async (taskId: string) => {
+    setAuditLoading(true);
+    try {
+      const result = await window.electron.workbenchTask.getDetail(taskId);
+      if (!result.success || !result.detail) throw new Error(result.error);
+      setAuditDetail(result.detail);
+    } catch (error) {
+      console.error('[WorkbenchTask] Failed to load historical task detail:', error);
+      toast.error(i18nService.t('workbenchTaskLoadFailed'));
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (!nextOpen) return;
+      setAuditDetail(detail);
+      void loadTaskHistory();
+    },
+    [detail, loadTaskHistory],
+  );
+
   useEffect(() => {
     applyDetail(null);
+    setTaskHistory([]);
     void load();
     return window.electron.workbenchTask.onChanged(event => {
-      if (event.sessionId === sessionId) void load();
+      if (event.sessionId !== sessionId) return;
+      void load();
+      void loadTaskHistory();
     });
-  }, [applyDetail, load, sessionId]);
+  }, [applyDetail, load, loadTaskHistory, sessionId]);
 
   const activeRun = useMemo(() => getProjectedRun(detail), [detail]);
   const canAccept =
@@ -112,12 +161,15 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
     detail?.task.status === WorkbenchTaskStatus.Completed;
 
   const runAction = useCallback(
-    async (action: () => Promise<WorkbenchTaskActionResult>) => {
+    async (action: () => Promise<WorkbenchTaskActionResult>, updateCurrent = true) => {
       setBusy(true);
       try {
         const result = await action();
         if (!result.success) throw new Error(result.error);
-        if (result.detail) applyDetail(result.detail);
+        if (result.detail) {
+          if (updateCurrent) applyDetail(result.detail);
+          else setAuditDetail(result.detail);
+        }
       } catch (error) {
         console.error('[WorkbenchTask] Task action failed:', error);
         toast.error(i18nService.t('workbenchTaskActionFailed'));
@@ -130,12 +182,12 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
 
   const respondToApproval = useCallback(
     (input: WorkbenchApprovalResponseInput) => {
-      void runAction(() => window.electron.workbenchTask.respondToApproval(input));
+      void runAction(() => window.electron.workbenchTask.respondToApproval(input), false);
     },
     [runAction],
   );
 
-  if (!detail) return null;
+  if (!detail || !auditDetail) return null;
 
   return (
     <>
@@ -148,7 +200,7 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
                   variant="ghost"
                   size="sm"
                   aria-label={i18nService.t('workbenchTaskDetails')}
-                  onClick={() => setOpen(true)}
+                  onClick={() => handleOpenChange(true)}
                 >
                   <ClipboardCheck data-icon="inline-start" />
                   <Badge variant={statusBadgeVariant(detail.task.status)}>
@@ -195,10 +247,13 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
       </TooltipProvider>
 
       <WorkbenchTaskAuditSheet
-        detail={detail}
+        detail={auditDetail}
+        tasks={taskHistory}
         open={open}
         busy={busy}
-        onOpenChange={setOpen}
+        loading={auditLoading}
+        onOpenChange={handleOpenChange}
+        onSelectTask={taskId => void selectAuditTask(taskId)}
         onRespondToApproval={respondToApproval}
       />
     </>
