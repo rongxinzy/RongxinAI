@@ -61,6 +61,7 @@ import {
   buildProjectMemoryContextSafe,
   type ProjectMemoryService,
 } from '../../memory/projectMemoryService';
+import type { SessionSummaryService } from '../../memory/sessionSummaryService';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -469,6 +470,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private mcpServerManager: McpServerManager | null = null;
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
+  private sessionSummaryService: SessionSummaryService | null = null;
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
 
@@ -477,6 +479,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setProjectMemoryService(service: ProjectMemoryService): void {
     this.projectMemoryService = service;
+  }
+  setSessionSummaryService(service: SessionSummaryService): void {
+    this.sessionSummaryService = service;
   }
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
     if (this.workbenchTaskService && this.workbenchApprovalListener) {
@@ -2139,6 +2144,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 : active.agentLoop.getState().done,
             workflowSnapshot,
           });
+        }
+        if (this.sessionSummaryService) {
+          void this.sessionSummaryService
+            .rollup({ sessionId, workingDirectory: active.workspaceRoot })
+            .catch(error => {
+              console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
+            });
         }
         this.emit('complete', sessionId, null);
         break;
