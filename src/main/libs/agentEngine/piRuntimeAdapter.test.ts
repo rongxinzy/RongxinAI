@@ -1190,6 +1190,7 @@ describe('PiRuntimeAdapter', () => {
       }));
       adapter.setWorkbenchTaskService({
         beginRun,
+        updateRunContext: vi.fn(),
         on: vi.fn(),
         off: vi.fn(),
       } as unknown as WorkbenchTaskService);
@@ -1208,6 +1209,7 @@ describe('PiRuntimeAdapter', () => {
       adapter.setWorkbenchTaskService({
         beginRun,
         authorizeToolCall,
+        updateRunContext: vi.fn(),
         on: vi.fn(),
         off: vi.fn(),
       } as unknown as WorkbenchTaskService);
