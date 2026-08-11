@@ -1106,6 +1106,9 @@ const attachCcConnectCronControl = async (accountId: string, baseUrl: string): P
   const client = new CcConnectCronClient(baseUrl, ccConnectBridgeToken);
   await client.healthCheck();
   await deferredCcConnectCronClient!.attach(accountId, client);
+  // The sidecar intentionally has no durable task state. Rebuild its complete
+  // trigger projection from SQLite after every successful control-plane attach.
+  await canonicalSchedulerRuntime!.reconcile(await getCanonicalScheduledTaskService().listJobs());
 };
 const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!canonicalScheduledTaskService) {
