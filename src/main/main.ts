@@ -258,6 +258,7 @@ import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { CcConnectPiBridge } from './im/ccConnectPiBridge';
+import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandler';
 import { IMStore } from './im/imStore';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 import {
@@ -1108,6 +1109,13 @@ let ccConnectBridgeToken: string | null = null;
 let ccConnectBridgeUrl: string | null = null;
 let schedulerClockRestartTimer: NodeJS.Timeout | null = null;
 let schedulerClockRestartAttempts = 0;
+const getScheduledTaskDetectorConfig = async (): Promise<{ apiKey: string; baseUrl: string; model?: string; provider?: string } | null> => {
+  const config = getStore().get<any>('app_config');
+  for (const [provider, value] of Object.entries(config?.providers ?? {}) as Array<[string, any]>) {
+    if (value?.enabled && value.apiKey) return { apiKey: value.apiKey, baseUrl: value.baseUrl, model: value.models?.[0]?.id, provider };
+  }
+  return config?.api?.key ? { apiKey: config.api.key, baseUrl: config.api.baseUrl, model: config.model?.defaultModel } : null;
+};
 const attachCcConnectCronControl = async (accountId: string, baseUrl: string): Promise<void> => {
   if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
   getCanonicalScheduledTaskService();
@@ -1142,6 +1150,19 @@ const startCcConnectBridge = async (): Promise<void> => {
     runtime: getPiRuntimeAdapter(), coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
+    detectScheduledTaskRequest: createIMScheduledTaskRequestDetector({ getLLMConfig: getScheduledTaskDetectorConfig }),
+    createScheduledTask: async ({ sessionId, message, request }) => {
+      const decoded = JSON.parse(Buffer.from(message.conversationId.slice('cc-connect:'.length), 'base64url').toString('utf8')) as [string, string];
+      const [accountId, destination] = decoded;
+      const task = await getCanonicalScheduledTaskService().addJob({
+        name: request.taskName, description: '', enabled: true,
+        schedule: { kind: 'at', at: request.scheduleAt }, sessionTarget: 'isolated', wakeMode: 'now',
+        payload: { kind: 'agentTurn', message: request.payloadText },
+        delivery: { mode: 'announce', channel: message.platform, to: destination, accountId },
+        agentId: DEFAULT_MANAGED_AGENT_ID,
+      });
+      return { id: task.id, name: task.name, agentId: task.agentId, sessionKey: task.sessionKey, payloadText: request.payloadText, scheduleAt: request.scheduleAt };
+    },
     onCronTrigger: async trigger => getCanonicalScheduledTaskService() && canonicalSchedulerRuntime!.handleTrigger({
       accountId: trigger.project,
       taskId: trigger.taskId,
