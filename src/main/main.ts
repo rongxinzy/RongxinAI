@@ -5692,7 +5692,6 @@ if (!gotTheLock) {
 
   initCronJobServiceManager({
     getScheduledTaskService: getCanonicalScheduledTaskService,
-    getOpenClawChannelGateway: () => openClawChannelGateway,
   });
   initScheduledTaskHelpers({
     getIMGatewayManager: () => ({
