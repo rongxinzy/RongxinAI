@@ -141,6 +141,7 @@ export const WorkbenchTaskIpc = {
   GetCurrent: 'workbenchTask:getCurrent',
   GetDetail: 'workbenchTask:getDetail',
   ListForSession: 'workbenchTask:listForSession',
+  ExportAudit: 'workbenchTask:exportAudit',
   Resume: 'workbenchTask:resume',
   Retry: 'workbenchTask:retry',
   Accept: 'workbenchTask:accept',

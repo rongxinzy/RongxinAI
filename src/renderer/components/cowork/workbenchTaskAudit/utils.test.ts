@@ -16,7 +16,13 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
 import { WorkbenchTaskRunFilter } from './constants';
-import { filterTaskDetailByRun, formatJson, getProjectedRun, getRunAttempt } from './utils';
+import {
+  filterTaskDetailByRun,
+  formatJson,
+  getProjectedRun,
+  getRunAttempt,
+  resolveArtifactFilePath,
+} from './utils';
 
 const createRun = (id: string, attempt: number): WorkbenchRun => ({
   id,
@@ -26,6 +32,7 @@ const createRun = (id: string, attempt: number): WorkbenchRun => ({
   trigger: WorkbenchRunTrigger.Message,
   startedAt: 1,
   endedAt: 2,
+  context: null,
   verificationResult: null,
   failure: null,
   createdAt: 1,
@@ -67,6 +74,39 @@ test('attributes audit records to their run attempt', () => {
 
   expect(getRunAttempt(runs, 'run-1')).toBe(1);
   expect(getRunAttempt(runs, 'missing')).toBeNull();
+});
+
+test('resolves file artifact references against the owning run workspace', () => {
+  const run = createRun('run-1', 1);
+  run.context = {
+    model: 'gpt-5',
+    provider: 'openai',
+    reasoningProfile: 'high',
+    workspaceRoot: 'D:/workspace',
+    skillIds: [],
+  };
+  const artifact = {
+    id: 'artifact-1',
+    taskId: run.taskId,
+    runId: run.id,
+    kind: WorkbenchArtifactKind.File,
+    mimeType: 'text/plain',
+    reference: 'output/report.txt',
+    contentHash: 'hash',
+    provenance: WorkbenchArtifactProvenance.Workspace,
+    verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+    metadata: {},
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  expect(resolveArtifactFilePath(artifact, [run])).toBe('D:/workspace/output/report.txt');
+  expect(resolveArtifactFilePath({ ...artifact, reference: 'C:/result.txt' }, [run])).toBe(
+    'C:/result.txt',
+  );
+  expect(
+    resolveArtifactFilePath({ ...artifact, kind: WorkbenchArtifactKind.Evidence }, [run]),
+  ).toBeNull();
 });
 
 test('formats structured audit data for readable disclosure', () => {

@@ -53,6 +53,7 @@ import type {
   WorkbenchApprovalResponseInput,
   WorkbenchTaskActionResult,
   WorkbenchTaskChangedEvent,
+  WorkbenchTaskExportResult,
   WorkbenchTaskListResult,
 } from '../../shared/workbenchTask';
 import type {
@@ -956,6 +957,7 @@ interface IElectronAPI {
     getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
     getDetail: (taskId: string) => Promise<WorkbenchTaskActionResult>;
     listForSession: (sessionId: string) => Promise<WorkbenchTaskListResult>;
+    exportAudit: (taskId: string) => Promise<WorkbenchTaskExportResult>;
     resume: (
       input: import('../../shared/workbenchTask').WorkbenchTaskResumeInput,
     ) => Promise<WorkbenchTaskActionResult>;

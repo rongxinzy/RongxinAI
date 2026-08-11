@@ -16,6 +16,7 @@ import {
   type WorkbenchApprovalResponseInput,
   type WorkbenchJsonObject,
   type WorkbenchRun,
+  type WorkbenchRunContext,
   type WorkbenchTask,
   type WorkbenchTaskChangedEvent,
   type WorkbenchTaskContract,
@@ -204,6 +205,13 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     this.emitChanged(result.task);
     return result;
+  }
+
+  updateRunContext(runId: string, context: WorkbenchRunContext): WorkbenchRun {
+    const run = this.repository.updateRunContext(runId, context);
+    const task = this.repository.getTask(run.taskId);
+    if (task) this.emitChanged(task);
+    return run;
   }
 
   completeRun(input: {

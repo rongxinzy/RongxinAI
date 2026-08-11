@@ -135,6 +135,40 @@ function RunAuditItem({ run, defaultOpen }: { run: WorkbenchRun; defaultOpen: bo
               {i18nService.t('workbenchTaskNoVerification')}
             </span>
           )}
+          {run.context && (
+            <section className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-foreground">
+                {i18nService.t('workbenchTaskRunContext')}
+              </span>
+              <dl className="grid grid-cols-1 gap-2 rounded-md bg-muted px-3 py-2 text-xs sm:grid-cols-2">
+                <RunContextItem
+                  label={i18nService.t('workbenchTaskModel')}
+                  value={run.context.model}
+                />
+                <RunContextItem
+                  label={i18nService.t('workbenchTaskProvider')}
+                  value={run.context.provider}
+                />
+                <RunContextItem
+                  label={i18nService.t('workbenchTaskReasoningProfile')}
+                  value={run.context.reasoningProfile}
+                />
+                <RunContextItem
+                  label={i18nService.t('workbenchTaskSkills')}
+                  value={
+                    run.context.skillIds.length > 0
+                      ? run.context.skillIds.join(', ')
+                      : i18nService.t('workbenchTaskNoSkills')
+                  }
+                />
+                <RunContextItem
+                  className="sm:col-span-2"
+                  label={i18nService.t('workbenchTaskWorkspace')}
+                  value={run.context.workspaceRoot}
+                />
+              </dl>
+            </section>
+          )}
           {run.failure && (
             <AuditJsonDisclosure
               label={i18nService.t('workbenchTaskFailureDetails')}
@@ -145,5 +179,22 @@ function RunAuditItem({ run, defaultOpen }: { run: WorkbenchRun; defaultOpen: bo
         </div>
       </CollapsibleContent>
     </Collapsible>
+  );
+}
+
+function RunContextItem({
+  className,
+  label,
+  value,
+}: {
+  className?: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className={className}>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="break-all font-mono text-foreground">{value}</dd>
+    </div>
   );
 }

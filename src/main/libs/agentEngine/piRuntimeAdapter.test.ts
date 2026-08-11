@@ -490,6 +490,51 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('records non-sensitive runtime context on initial and reused workbench runs', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const workspaceRoot = createTemporaryWorkspace();
+
+      try {
+        await adapter.startSession('audited-runtime', 'Summarize the report', {
+          sessionMode: 'chat',
+          workspaceRoot,
+          skillIds: ['documents'],
+        });
+
+        expect(service.getCurrent('audited-runtime')?.runs[0].context).toEqual({
+          model: 'qwen-local',
+          provider: 'llamacpp',
+          reasoningProfile: 'default',
+          workspaceRoot,
+          skillIds: ['documents'],
+        });
+
+        service.pauseRun('audited-runtime', 'Paused for the next turn.');
+        await adapter.continueSession('audited-runtime', 'Summarize the appendix', {
+          sessionMode: 'chat',
+          skillIds: ['documents'],
+        });
+
+        const tasks = service.listForSession('audited-runtime');
+        expect(tasks).toHaveLength(2);
+        for (const task of tasks) {
+          expect(service.getDetail(task.id)?.runs[0].context).toEqual({
+            model: 'qwen-local',
+            provider: 'llamacpp',
+            reasoningProfile: 'default',
+            workspaceRoot,
+            skillIds: ['documents'],
+          });
+        }
+      } finally {
+        db.close();
+      }
+    });
+
     it('restores the production gate from the owning task on an explicit resume', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
