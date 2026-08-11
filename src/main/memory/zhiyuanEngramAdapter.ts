@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import {
   EngramMemoryScope,
   EngramObservationType,
+  type EngramSearchMatchMode as EngramSearchMatchModeValue,
   type EngramMemoryScope as EngramMemoryScopeValue,
   type EngramObservationType as EngramObservationTypeValue,
 } from './constants';
@@ -30,6 +31,7 @@ export class ZhiYuanEngramAdapter {
     project: string;
     scope?: EngramMemoryScopeValue;
     limit?: number;
+    matchMode?: EngramSearchMatchModeValue;
   }): Promise<EngramObservation[]> {
     const connection = await this.getConnection();
     if (!connection) return [];
@@ -39,9 +41,29 @@ export class ZhiYuanEngramAdapter {
       scope: input.scope ?? EngramMemoryScope.Project,
       limit: String(Math.min(Math.max(input.limit ?? 8, 1), 20)),
     });
+    if (input.matchMode) params.set('match_mode', input.matchMode);
     const observations = await this.request<EngramObservation[] | null>(
       connection,
       `/search?${params.toString()}`,
+    );
+    return Array.isArray(observations) ? observations : [];
+  }
+
+  async recent(input: {
+    project: string;
+    scope?: EngramMemoryScopeValue;
+    limit?: number;
+  }): Promise<EngramObservation[]> {
+    const connection = await this.getConnection();
+    if (!connection) return [];
+    const params = new URLSearchParams({
+      project: input.project,
+      scope: input.scope ?? EngramMemoryScope.Project,
+      limit: String(Math.min(Math.max(input.limit ?? 8, 1), 20)),
+    });
+    const observations = await this.request<EngramObservation[] | null>(
+      connection,
+      `/observations/recent?${params.toString()}`,
     );
     return Array.isArray(observations) ? observations : [];
   }

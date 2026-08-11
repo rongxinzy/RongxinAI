@@ -13,9 +13,10 @@ import {
   type MemorySensitivity as MemorySensitivityValue,
   type MemorySourceKind as MemorySourceKindValue,
 } from '../../shared/memory';
-import { MemoryOutboxOperation } from './constants';
+import { EngramSearchMatchMode, MemoryOutboxOperation } from './constants';
 import type { ProjectIdentity } from './projectIdentity';
 import { resolveProjectIdentity } from './projectIdentity';
+import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
 import type { MemoryOutboxItem } from './repository';
 import { MemoryRepository } from './repository';
 import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
@@ -68,23 +69,39 @@ export class ProjectMemoryService {
 
   async recallProject(input: { workingDirectory: string; query: string; limit?: number }) {
     const project = this.resolveIdentity(input.workingDirectory);
-    const observations = await this.adapter.recall({
+    return await this.recallScope({
       query: input.query,
-      project: project.id,
+      projectId: project.id,
       scope: MemoryScope.Project,
       limit: input.limit,
     });
-    return this.filterRecallable(project.id, observations);
   }
 
   async recallPersonal(input: { query: string; limit?: number }) {
-    const observations = await this.adapter.recall({
+    return await this.recallScope({
       query: input.query,
-      project: PERSONAL_MEMORY_PROJECT_ID,
+      projectId: PERSONAL_MEMORY_PROJECT_ID,
       scope: MemoryScope.Personal,
       limit: input.limit,
     });
-    return this.filterRecallable(PERSONAL_MEMORY_PROJECT_ID, observations);
+  }
+
+  listRecallableMemories(input: {
+    workingDirectory: string;
+    query?: string;
+    limit?: number;
+  }): ManagedMemoryRecord[] {
+    const project = this.resolveIdentity(input.workingDirectory);
+    const limit = Math.min(Math.max(input.limit ?? 12, 1), 20);
+    return this.repository
+      .listManaged({ status: MemoryLifecycleStatus.Active, query: input.query })
+      .filter(
+        memory =>
+          (memory.scope === MemoryScope.Project && memory.projectId === project.id) ||
+          (memory.scope === MemoryScope.Personal &&
+            memory.projectId === PERSONAL_MEMORY_PROJECT_ID),
+      )
+      .slice(0, limit);
   }
 
   async buildProjectContext(input: {
@@ -323,6 +340,54 @@ export class ProjectMemoryService {
   async retryPendingOutbox(limit = 20): Promise<number> {
     this.repository.makePendingAvailable();
     return await this.drainOutbox(limit);
+  }
+
+  private async recallScope(input: {
+    query: string;
+    projectId: string;
+    scope: typeof MemoryScope.Project | typeof MemoryScope.Personal;
+    limit?: number;
+  }) {
+    const plan = planRecallQuery(input.query);
+    if (!plan.exactQuery) return [];
+    const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
+    let observations = this.filterRecallable(
+      input.projectId,
+      await this.adapter.recall({
+        query: plan.exactQuery,
+        project: input.projectId,
+        scope: input.scope,
+        limit,
+        matchMode: EngramSearchMatchMode.All,
+      }),
+    );
+    if (observations.length === 0 && plan.broadQuery) {
+      observations = this.filterRecallable(
+        input.projectId,
+        await this.adapter.recall({
+          query: plan.broadQuery,
+          project: input.projectId,
+          scope: input.scope,
+          limit,
+          matchMode: EngramSearchMatchMode.Any,
+        }),
+      );
+    }
+    if (observations.length === 0 && plan.explicitMemoryIntent) {
+      observations = this.filterRecallable(
+        input.projectId,
+        await this.adapter.recent({ project: input.projectId, scope: input.scope, limit }),
+      );
+    }
+    const unique = [
+      ...new Map(observations.map(observation => [observation.id, observation])).values(),
+    ];
+    if (unique.length === 0) return [];
+    const metadata = this.repository.getRecallMetadata(
+      input.projectId,
+      unique.map(observation => observation.id),
+    );
+    return rankRecallResults(plan.exactQuery, unique, metadata).slice(0, limit);
   }
 
   private filterRecallable<T extends { id: number }>(projectId: string, observations: T[]): T[] {

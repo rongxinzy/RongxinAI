@@ -55,12 +55,21 @@ export type MemorySourceKind = MemorySourceKindValue;
 
 export const PiMemoryAction = {
   Recall: 'recall',
+  List: 'list',
   Save: 'save',
   ProposePersonal: 'propose_personal',
   SessionSummary: 'session_summary',
 } as const;
 
 export type PiMemoryAction = (typeof PiMemoryAction)[keyof typeof PiMemoryAction];
+
+export const EngramSearchMatchMode = {
+  All: 'all',
+  Any: 'any',
+} as const;
+
+export type EngramSearchMatchMode =
+  (typeof EngramSearchMatchMode)[keyof typeof EngramSearchMatchMode];
 
 export const EngramEnvironment = {
   BinaryPath: 'ZHIYUAN_ENGRAM_BIN',
