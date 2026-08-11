@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { cn } from '@shared/lib/utils';
 import { X } from 'lucide-react';
 import React from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -32,7 +33,7 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
   const ShortcutIcon = shortcut?.icon;
 
   return (
-    <span className="inline-flex h-6 items-center gap-1.5 rounded-full pl-1.5 pr-1 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)">
+    <span className="inline-flex h-7 items-center gap-1 rounded-full bg-muted px-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised">
       {skill?.iconUrl ? (
         <img src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="size-3.5 object-contain" />
       ) : ShortcutIcon ? (
@@ -40,7 +41,7 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
       ) : (
         <PlusMenuSkillsIcon className="size-3.5" />
       )}
-      <span className="max-w-24 truncate">{label}</span>
+      <span className="max-w-40 truncate">{label}</span>
       <Button
         type="button"
         variant="ghost"
@@ -48,7 +49,7 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
         onClick={onRemove}
         aria-label={`${i18nService.t('clearSkill')} ${label}`}
         title={i18nService.t('clearSkill')}
-        className="ml-0.5 size-4 rounded-full hover:bg-(--zy-skill-blue-foreground)/10 aria-expanded:bg-(--zy-skill-blue-foreground)/10 dark:hover:bg-(--zy-skill-blue-foreground)/10"
+        className="size-4 rounded-full hover:bg-background"
       >
         <X />
       </Button>
@@ -56,7 +57,11 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
   );
 };
 
-const ActiveSkillBadge: React.FC = () => {
+interface ActiveSkillBadgeProps {
+  className?: string;
+}
+
+const ActiveSkillBadge: React.FC<ActiveSkillBadgeProps> = ({ className }) => {
   const dispatch = useDispatch();
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const skills = useSelector((state: RootState) => state.skill.skills);
@@ -79,11 +84,6 @@ const ActiveSkillBadge: React.FC = () => {
     dispatch(toggleActiveSkill(skillId));
   };
 
-  const handleClearAll = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    dispatch(clearActiveSkills());
-  };
-
   const handleRemoveQuickAction = (e: React.MouseEvent) => {
     e.stopPropagation();
     dispatch(clearSelection());
@@ -91,7 +91,7 @@ const ActiveSkillBadge: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
+    <div className={cn('flex items-center gap-1', className)}>
       {showQuickActionFallback && quickActionSkillId && (
         <SkillChip
           skillId={quickActionSkillId}
@@ -107,17 +107,6 @@ const ActiveSkillBadge: React.FC = () => {
           onRemove={e => handleRemoveSkill(e, skill.id)}
         />
       ))}
-      {activeSkills.length > 1 && (
-        <Button
-          type="button"
-          variant="link"
-          onClick={handleClearAll}
-          className="text-xs text-primary hover:text-primary-hover transition-colors px-0"
-          title={i18nService.t('clearAllSkills')}
-        >
-          {i18nService.t('clearAll')}
-        </Button>
-      )}
     </div>
   );
 };

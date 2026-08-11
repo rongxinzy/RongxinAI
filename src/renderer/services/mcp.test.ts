@@ -23,6 +23,16 @@ test('normalizeMcpErrorMessage shortens generic MCP HTML responses', () => {
   expect(result).toBe('The target URL is not a valid MCP endpoint.');
 });
 
+test('normalizeMcpErrorMessage preserves the authentication cause', () => {
+  i18nService.setLanguage('en', { persist: false });
+
+  const result = normalizeMcpErrorMessage(
+    'Streamable HTTP error: Error POSTing to endpoint: {"message":"Invalid Credentials"}',
+  );
+
+  expect(result).toBe('MCP authorization has expired. Reconnect and try again.');
+});
+
 test('normalizeMcpErrorMessage shortens connection closed errors', () => {
   i18nService.setLanguage('en', { persist: false });
   const result = normalizeMcpErrorMessage('MCP error -32000: Connection closed');

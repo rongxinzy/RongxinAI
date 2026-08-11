@@ -14,12 +14,12 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
 import { Cable, Plus, Target } from 'lucide-react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { i18nService } from '../../services/i18n';
-import { mcpService } from '../../services/mcp';
+import { mcpService, normalizeMcpErrorMessage } from '../../services/mcp';
 import { skillService } from '../../services/skill';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
@@ -72,6 +72,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   const [mcpLoading, setMcpLoading] = useState(false);
   const [pendingServerId, setPendingServerId] = useState<string | null>(null);
   const [serverIcons, setServerIcons] = useState<Record<string, string>>({});
+  const awaitingBridgeSyncRef = useRef(false);
 
   const skills = useSelector((state: RootState) => state.skill.skills);
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
@@ -90,7 +91,6 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
       ),
     [mcpServers],
   );
-
   const availableExperts = useMemo(
     () =>
       agents.filter(
@@ -143,20 +143,30 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
     let cancelled = false;
 
     const loadServerIcons = async () => {
-      const marketplace = await mcpService.fetchMarketplace();
-      if (!marketplace || cancelled) return;
+      try {
+        const marketplace = await mcpService.fetchMarketplace();
+        if (!marketplace || cancelled) return;
 
-      const iconEntries = marketplace.registry.filter(
-        entry => requestedIds.includes(entry.id) && entry.iconPath,
-      );
-      const loadedIcons = await Promise.all(
-        iconEntries.map(async entry => [entry.id, await mcpService.loadIcon(entry.iconPath!)] as const),
-      );
-      if (cancelled) return;
+        const iconEntries = marketplace.registry.filter(
+          entry => requestedIds.includes(entry.id) && entry.iconPath,
+        );
+        const loadedIcons = await Promise.all(
+          iconEntries.map(async entry => {
+            try {
+              return [entry.id, await mcpService.loadIcon(entry.iconPath!)] as const;
+            } catch {
+              return [entry.id, undefined] as const;
+            }
+          }),
+        );
+        if (cancelled) return;
 
-      setServerIcons(
-        Object.fromEntries(loadedIcons.flatMap(([id, icon]) => (icon ? [[id, icon]] : []))),
-      );
+        setServerIcons(
+          Object.fromEntries(loadedIcons.flatMap(([id, icon]) => (icon ? [[id, icon]] : []))),
+        );
+      } catch {
+        // Connector choices remain usable when a marketplace logo is unavailable.
+      }
     };
 
     void loadServerIcons();
@@ -165,14 +175,29 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
     };
   }, [open, serverRegistryIdsKey]);
 
+  useEffect(() => {
+    return mcpService.onBridgeSyncDone(({ error }) => {
+      if (!awaitingBridgeSyncRef.current) return;
+      awaitingBridgeSyncRef.current = false;
+      if (!error) return;
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: `${i18nService.t('mcpBridgeSyncError')}: ${normalizeMcpErrorMessage(error)}`,
+        }),
+      );
+    });
+  }, []);
+
   const handleToggleServer = useCallback(
     async (serverId: string, enabled: boolean) => {
       if (pendingServerId) return;
       setPendingServerId(serverId);
+      awaitingBridgeSyncRef.current = true;
       try {
         const updatedServers = await mcpService.setServerEnabled(serverId, enabled);
         dispatch(setMcpServers(updatedServers));
       } catch (error) {
+        awaitingBridgeSyncRef.current = false;
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
             detail: error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
@@ -232,9 +257,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
           >
             <DropdownMenuGroup className="max-h-80 overflow-y-auto overscroll-contain">
               {enabledSkills.length === 0 ? (
-                <DropdownMenuItem disabled>
-                  {i18nService.t('noSkillsAvailable')}
-                </DropdownMenuItem>
+                <DropdownMenuItem disabled>{i18nService.t('noSkillsAvailable')}</DropdownMenuItem>
               ) : (
                 enabledSkills.map(skill => {
                   const description =
@@ -340,7 +363,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                 <DropdownMenuItem
                   key={server.id}
                   closeOnClick={false}
-                  disabled={pendingServerId === server.id}
+                  disabled={pendingServerId !== null}
                   onClick={() => {
                     void handleToggleServer(server.id, !server.enabled);
                   }}
@@ -356,10 +379,14 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                   )}
                   <span className="truncate">{server.name}</span>
                   <Switch
-                    size="sm"
                     checked={server.enabled}
-                    className="pointer-events-none ml-auto"
+                    disabled={pendingServerId !== null}
+                    className="ml-auto"
                     aria-label={server.name}
+                    onClick={event => event.stopPropagation()}
+                    onCheckedChange={checked => {
+                      void handleToggleServer(server.id, checked);
+                    }}
                   />
                 </DropdownMenuItem>
               ))
