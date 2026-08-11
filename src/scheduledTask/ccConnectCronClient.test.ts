@@ -22,3 +22,15 @@ test('sends only authenticated trigger registration without a task payload', asy
   });
   expect(JSON.parse(body)).toEqual({ taskId: 't', scheduleVersion: 'v1', schedule: { kind: 'every', everyMs: 60_000 } });
 });
+
+test('checks the authenticated sidecar control-plane health route', async () => {
+  const server = http.createServer((req, res) => {
+    expect(req.url).toBe('/v1/cc-connect/cron/health');
+    expect(req.headers.authorization).toBe('Bearer secret');
+    res.writeHead(204).end();
+  });
+  servers.push(server);
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as { port: number }).port;
+  await expect(new CcConnectCronClient(`http://127.0.0.1:${port}`, 'secret').healthCheck()).resolves.toBeUndefined();
+});

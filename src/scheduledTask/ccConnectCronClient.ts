@@ -22,6 +22,10 @@ export class CcConnectCronClient {
     for (const task of tasks) await this.upsert(task);
   }
 
+  async healthCheck(): Promise<void> {
+    await this.request('/v1/cc-connect/cron/health', { method: 'GET' });
+  }
+
   private async request(path: string, init: RequestInit): Promise<void> {
     const response = await fetch(new URL(path, this.baseUrl), {
       ...init,

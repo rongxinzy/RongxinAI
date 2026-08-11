@@ -30,6 +30,7 @@ import {
 } from '../scheduledTask/migrate';
 import { CanonicalScheduledTaskService } from '../scheduledTask/canonicalScheduledTaskService';
 import { CcConnectSchedulerRuntime } from '../scheduledTask/ccConnectSchedulerRuntime';
+import { CcConnectCronClient } from '../scheduledTask/ccConnectCronClient';
 import { DeferredCcConnectCronClient } from '../scheduledTask/deferredCcConnectCronClient';
 import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
@@ -1092,6 +1093,14 @@ let ccConnectPiBridge: CcConnectPiBridge | null = null;
 let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
 let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
 let deferredCcConnectCronClient: DeferredCcConnectCronClient | null = null;
+let ccConnectBridgeToken: string | null = null;
+const attachCcConnectCronControl = async (baseUrl: string): Promise<void> => {
+  if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
+  getCanonicalScheduledTaskService();
+  const client = new CcConnectCronClient(baseUrl, ccConnectBridgeToken);
+  await client.healthCheck();
+  await deferredCcConnectCronClient!.attach(client);
+};
 const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!canonicalScheduledTaskService) {
     const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
@@ -1109,6 +1118,7 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
 const startCcConnectBridge = async (): Promise<void> => {
   if (ccConnectBridgeServer) return;
   const token = crypto.randomBytes(32).toString('base64url');
+  ccConnectBridgeToken = token;
   ccConnectPiBridge = new CcConnectPiBridge({
     runtime: getPiRuntimeAdapter(), coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
