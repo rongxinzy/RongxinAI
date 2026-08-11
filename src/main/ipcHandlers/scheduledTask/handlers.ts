@@ -6,12 +6,12 @@ import {
   PayloadKind as STPayloadKind,
   SessionTarget as STSessionTarget,
 } from '../../../scheduledTask/constants';
-import type { CronJobService } from '../../../scheduledTask/cronJobService';
+import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { PlatformRegistry } from '../../../shared/platform';
 import { listScheduledTaskChannels } from './helpers';
 
 export interface ScheduledTaskHandlerDeps {
-  getCronJobService: () => CronJobService;
+  getCronJobService: () => ScheduledTaskService;
   getIMGatewayManager: () => {
     getIMStore: () =>
       | {
