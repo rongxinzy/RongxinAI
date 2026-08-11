@@ -1441,12 +1441,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     cause: CoworkInterruptionCause,
   ): CoworkSessionInterruption {
     const task = this.workbenchTaskService?.getCurrent(sessionId)?.task ?? null;
+    const resumableTask = task?.contract.kind === WorkbenchContractKind.Chat ? null : task;
     const interruption: CoworkSessionInterruption = {
       sessionId,
       interruptionId: randomUUID(),
       cause,
-      taskId: task?.id ?? null,
-      recoverable: task?.status === WorkbenchTaskStatus.Paused,
+      taskId: resumableTask?.id ?? null,
+      recoverable: resumableTask?.status === WorkbenchTaskStatus.Paused,
     };
     const seed: CoworkMessage = {
       id: randomUUID(),
@@ -2143,7 +2144,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.workbenchTaskService &&
           !this.workbenchTaskService.isRunRunning(active.workbenchRunId)
         ) {
-          this.stopActiveSession(sessionId, 'The workbench run is no longer active.', false);
+          this.stopActiveSession(
+            sessionId,
+            'The workbench run is no longer active.',
+            false,
+            CoworkInterruptionCause.RuntimePaused,
+          );
           break;
         }
         // Agent loop: when the finished iteration signaled "next", continue
