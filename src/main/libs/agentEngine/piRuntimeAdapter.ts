@@ -644,6 +644,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         harnessVersion: HarnessVersion,
       };
       if (workbenchRunId && this.workbenchTaskService) {
+        this.workbenchTaskService.updateRunContext(workbenchRunId, {
+          model: harnessModelProfile.model,
+          provider: harnessModelProfile.provider,
+          reasoningProfile: harnessModelProfile.reasoningProfile,
+          workspaceRoot,
+          skillIds: resourceState.skillIds ?? [],
+        });
         this.workbenchTaskService.measurement?.recordModelProfile(
           workbenchRunId,
           harnessModelProfile,
@@ -1137,6 +1144,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workbench.run.id,
         active.harnessModelProfile,
       );
+      this.workbenchTaskService.updateRunContext(workbench.run.id, {
+        model: active.harnessModelProfile.model,
+        provider: active.harnessModelProfile.provider,
+        reasoningProfile: active.harnessModelProfile.reasoningProfile,
+        workspaceRoot: active.workspaceRoot,
+        skillIds: requestedSkillIds ?? [],
+      });
       if (productionWorkflowEnabled && workbench.task?.id) {
         active.productionLoop?.startRun({
           taskId: workbench.task.id,

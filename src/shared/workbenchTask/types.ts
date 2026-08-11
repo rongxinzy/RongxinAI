@@ -49,6 +49,14 @@ export interface WorkbenchTask {
   completedAt: number | null;
 }
 
+export interface WorkbenchRunContext {
+  model: string;
+  provider: string;
+  reasoningProfile: string;
+  workspaceRoot: string;
+  skillIds: string[];
+}
+
 export interface WorkbenchRun {
   id: string;
   taskId: string;
@@ -57,6 +65,7 @@ export interface WorkbenchRun {
   trigger: WorkbenchRunTrigger;
   startedAt: number | null;
   endedAt: number | null;
+  context: WorkbenchRunContext | null;
   verificationResult: WorkbenchVerificationResult | null;
   failure: WorkbenchJsonObject | null;
   createdAt: number;
@@ -134,6 +143,13 @@ export interface WorkbenchTaskActionResult {
 export interface WorkbenchTaskListResult {
   success: boolean;
   tasks?: WorkbenchTask[];
+  error?: string;
+}
+
+export interface WorkbenchTaskExportResult {
+  success: boolean;
+  path?: string;
+  canceled?: boolean;
   error?: string;
 }
 

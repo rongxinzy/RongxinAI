@@ -1,4 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
+import { Button } from '@shared/components/ui/button';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import {
   Select,
@@ -15,7 +16,9 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { Download } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import type {
   WorkbenchApprovalResponseInput,
@@ -60,6 +63,7 @@ export function WorkbenchTaskAuditSheet({
 }: WorkbenchTaskAuditSheetProps) {
   const task = detail.task;
   const [runFilter, setRunFilter] = useState<string>(WorkbenchTaskRunFilter.All);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     setRunFilter(WorkbenchTaskRunFilter.All);
@@ -70,11 +74,49 @@ export function WorkbenchTaskAuditSheet({
     [detail, runFilter],
   );
 
+  const exportAudit = async () => {
+    setExporting(true);
+    try {
+      const result = await window.electron.workbenchTask.exportAudit(task.id);
+      if (!result.success) {
+        toast.error(
+          i18nService
+            .t('workbenchTaskExportFailed')
+            .replace('{error}', result.error || i18nService.t('unknownError')),
+        );
+      } else if (!result.canceled) {
+        toast.success(i18nService.t('workbenchTaskExported'));
+      }
+    } catch (error) {
+      toast.error(
+        i18nService
+          .t('workbenchTaskExportFailed')
+          .replace('{error}', error instanceof Error ? error.message : String(error)),
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-3xl">
         <SheetHeader>
-          <SheetTitle>{i18nService.t('workbenchTaskDetails')}</SheetTitle>
+          <div className="flex items-center gap-2">
+            <SheetTitle className="min-w-0 flex-1">
+              {i18nService.t('workbenchTaskDetails')}
+            </SheetTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={exporting}
+              onClick={() => void exportAudit()}
+            >
+              <Download data-icon="inline-start" />
+              {i18nService.t('workbenchTaskExport')}
+            </Button>
+          </div>
           <SheetDescription>{i18nService.t('workbenchTaskDetailsDescription')}</SheetDescription>
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-4">
