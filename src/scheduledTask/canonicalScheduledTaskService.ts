@@ -34,6 +34,11 @@ export class CanonicalScheduledTaskService implements ScheduledTaskService {
   async listAllRuns(limit = 20, offset = 0, filter?: RunFilter): Promise<ScheduledTaskRunWithName[]> {
     return filterRuns(this.store.listRunsWithName(), filter).slice(offset, offset + limit);
   }
+  getJobNameSync(jobId: string): string | null { return this.store.get(jobId)?.name ?? null; }
+  hasRunningJobs(): boolean { return this.store.list().some(task => task.state.runningAtMs !== null); }
+  /** State is pushed by the sidecar; no runtime polling is needed. */
+  startPolling(): void {}
+  stopPolling(): void {}
 }
 
 function filterRuns<T extends ScheduledTaskRun>(runs: readonly T[], filter?: RunFilter): T[] {

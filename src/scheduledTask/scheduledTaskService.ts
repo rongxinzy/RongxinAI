@@ -13,4 +13,8 @@ export interface ScheduledTaskService {
   listRuns(taskId: string, limit?: number, offset?: number, filter?: RunFilter): Promise<ScheduledTaskRun[]>;
   countRuns(taskId: string): Promise<number>;
   listAllRuns(limit?: number, offset?: number, filter?: RunFilter): Promise<ScheduledTaskRunWithName[]>;
+  getJobNameSync(jobId: string): string | null;
+  hasRunningJobs(): boolean;
+  startPolling(): void;
+  stopPolling(): void;
 }
