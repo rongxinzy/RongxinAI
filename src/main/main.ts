@@ -34,6 +34,9 @@ import { CanonicalScheduledTaskService } from '../scheduledTask/canonicalSchedul
 import { CcConnectSchedulerRuntime } from '../scheduledTask/ccConnectSchedulerRuntime';
 import { CcConnectCronClient, SchedulerClockAccount } from '../scheduledTask/ccConnectCronClient';
 import { DeferredCcConnectCronClient } from '../scheduledTask/deferredCcConnectCronClient';
+import { CcConnectDeliveryClient } from '../scheduledTask/ccConnectDeliveryClient';
+import { CcConnectDeliveryTransport } from '../scheduledTask/ccConnectDeliveryTransport';
+import { ScheduledTaskDeliveryDispatcher } from '../scheduledTask/deliveryDispatcher';
 import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
 import { AgentIpcChannel } from '../shared/agent/constants';
@@ -191,7 +194,8 @@ import {
 } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
-import { serializeCcConnectCronSidecarConfig } from './libs/ccConnectSidecarConfig';
+import { serializeCcConnectCronSidecarConfig, serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
+import { listCcConnectAccountConfigs } from './libs/ccConnectAccountConfig';
 import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
 import { LlamaCppOpenClawEligibilityReason } from './libs/llamacppOpenClawBinding';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
@@ -1092,10 +1096,13 @@ const activeMcpAuthorizations = new Map<string, AbortController>();
 let imGatewayManager: IMGatewayManager | null = null;
 let ccConnectBridgeServer: CcConnectBridgeServer | null = null;
 let ccConnectSidecarManager: CcConnectSidecarManager | null = null;
+const ccConnectChannelSidecarManagers = new Map<string, CcConnectSidecarManager>();
+const ccConnectChannelRestartTimers = new Map<string, NodeJS.Timeout>();
 let ccConnectPiBridge: CcConnectPiBridge | null = null;
 let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
 let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
 let deferredCcConnectCronClient: DeferredCcConnectCronClient | null = null;
+let ccConnectDeliveryTransport: CcConnectDeliveryTransport | null = null;
 let ccConnectBridgeToken: string | null = null;
 let ccConnectBridgeUrl: string | null = null;
 let schedulerClockRestartTimer: NodeJS.Timeout | null = null;
@@ -1114,11 +1121,13 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
   if (!canonicalScheduledTaskService) {
     const taskStore = new SqliteScheduledTaskStore(getStore().getDatabase());
     deferredCcConnectCronClient = new DeferredCcConnectCronClient();
+    ccConnectDeliveryTransport = new CcConnectDeliveryTransport(new IMStore(getStore().getDatabase()));
     const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
     canonicalSchedulerRuntime = new CcConnectSchedulerRuntime(
       taskStore,
       deferredCcConnectCronClient,
       executor.execute.bind(executor),
+      new ScheduledTaskDeliveryDispatcher(taskStore, ccConnectDeliveryTransport),
     );
     canonicalScheduledTaskService = new CanonicalScheduledTaskService(taskStore, canonicalSchedulerRuntime);
   }
@@ -1183,6 +1192,25 @@ const waitForCcConnectCronControl = async (accountId: string, baseUrl: string): 
   throw lastError instanceof Error ? lastError : new Error('cc-connect cron control did not become ready');
 };
 
+const waitForCcConnectDeliveryControl = async (accountId: string, baseUrl: string): Promise<void> => {
+  if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      const client = new CcConnectDeliveryClient(baseUrl, ccConnectBridgeToken);
+      // Health is shared with the trigger-only control plane. Channel processes
+      // are delivery transports, never canonical scheduler clocks.
+      await new CcConnectCronClient(baseUrl, ccConnectBridgeToken).healthCheck();
+      ccConnectDeliveryTransport?.attach(accountId, client);
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(`cc-connect delivery control did not become ready for ${accountId}`);
+};
+
 /** Starts the credential-free canonical scheduler clock used by default tasks. */
 const startCanonicalSchedulerClock = async (): Promise<void> => {
   if (ccConnectSidecarManager) return;
@@ -1218,6 +1246,51 @@ const startCanonicalSchedulerClock = async (): Promise<void> => {
     await manager.stop();
     throw error;
   }
+};
+
+const startCcConnectChannelSidecar = async (account: ReturnType<typeof listCcConnectAccountConfigs>[number]): Promise<void> => {
+  if (ccConnectChannelSidecarManagers.has(account.accountId)) return;
+  if (!ccConnectBridgeToken || !ccConnectBridgeUrl) throw new Error('cc-connect bridge is not initialized');
+  const executable = resolveCcConnectSidecarExecutable();
+  if (!executable) return;
+  const port = await findAvailableLoopbackPort();
+  const sidecarRoot = path.join(app.getPath('userData'), 'cc-connect', 'accounts', account.accountId);
+  const manager = new CcConnectSidecarManager(executable, path.join(sidecarRoot, 'config.toml'));
+  manager.on('error', error => console.error(`[cc-connect] ${account.accountId} sidecar error:`, error));
+  manager.on('exit', ({ code, signal }) => {
+    ccConnectChannelSidecarManagers.delete(account.accountId);
+    ccConnectDeliveryTransport?.detach(account.accountId);
+    console.warn(`[cc-connect] ${account.accountId} sidecar exited (code=${code}, signal=${signal})`);
+    if (!ccConnectBridgeServer || ccConnectChannelRestartTimers.has(account.accountId)) return;
+    const timer = setTimeout(() => {
+      ccConnectChannelRestartTimers.delete(account.accountId);
+      void startCcConnectChannelSidecar(account).catch(error =>
+        console.error(`[cc-connect] Failed to restart ${account.accountId} sidecar:`, error),
+      );
+    }, 1_000);
+    ccConnectChannelRestartTimers.set(account.accountId, timer);
+  });
+  ccConnectChannelSidecarManagers.set(account.accountId, manager);
+  try {
+    await manager.start(serializeCcConnectSidecarConfig({
+      dataDir: sidecarRoot,
+      bridgeUrl: ccConnectBridgeUrl,
+      bridgeToken: ccConnectBridgeToken,
+      cronControlListen: `127.0.0.1:${port}`,
+      projects: [account],
+    }));
+    await waitForCcConnectDeliveryControl(account.accountId, `http://127.0.0.1:${port}`);
+  } catch (error) {
+    ccConnectChannelSidecarManagers.delete(account.accountId);
+    ccConnectDeliveryTransport?.detach(account.accountId);
+    await manager.stop();
+    throw error;
+  }
+};
+
+const startCcConnectChannelSidecars = async (): Promise<void> => {
+  const accounts = listCcConnectAccountConfigs(new IMStore(getStore().getDatabase()));
+  await Promise.all(accounts.map(account => startCcConnectChannelSidecar(account)));
 };
 
 const scheduleCanonicalSchedulerClockRestart = (): void => {
@@ -7632,6 +7705,10 @@ if (!gotTheLock) {
     schedulerClockRestartTimer = null;
     await ccConnectSidecarManager?.stop();
     ccConnectSidecarManager = null;
+    for (const timer of ccConnectChannelRestartTimers.values()) clearTimeout(timer);
+    ccConnectChannelRestartTimers.clear();
+    await Promise.all(Array.from(ccConnectChannelSidecarManagers.values(), manager => manager.stop()));
+    ccConnectChannelSidecarManagers.clear();
 
     if (openClawEngineManager) {
       await openClawEngineManager.stopGateway().catch(error => {
@@ -7769,6 +7846,9 @@ if (!gotTheLock) {
     );
     await startCanonicalSchedulerClock().catch(error =>
       console.error('[Scheduler] Failed to start canonical cc-connect clock:', error),
+    );
+    await startCcConnectChannelSidecars().catch(error =>
+      console.error('[cc-connect] Failed to start channel sidecars:', error),
     );
 
     const startSqliteBackupLoop = async (): Promise<void> => {

@@ -1,5 +1,6 @@
 import { TaskStatus } from './constants';
 import { SchedulerClockAccount, type CcConnectCronTask } from './ccConnectCronClient';
+import type { ScheduledTaskDeliveryDispatcher } from './deliveryDispatcher';
 import type { SchedulerRuntime } from './schedulerRuntime';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { ScheduledTask, ScheduledTaskRun } from './types';
@@ -17,7 +18,8 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   constructor(
     private readonly store: SqliteScheduledTaskStore,
     private readonly client: TriggerClient,
-    private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<{ sessionId?: string | null }>,
+    private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<{ sessionId?: string | null; output?: string | null }>,
+    private readonly deliveryDispatcher?: ScheduledTaskDeliveryDispatcher,
   ) {}
 
   async reconcile(tasks: readonly ScheduledTask[]): Promise<void> {
@@ -62,7 +64,14 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   private async executeAndFinish(task: ScheduledTask, run: ScheduledTaskRun): Promise<void> {
     try {
       const result = await this.execute(task, run);
-      this.store.finishRun(run.id, { status: TaskStatus.Success, sessionId: result.sessionId ?? null });
+      const completedRun = this.store.finishRun(run.id, { status: TaskStatus.Success, sessionId: result.sessionId ?? null });
+      // Delivery is independently durable and best effort: a channel failure
+      // must not turn a Pi-successful Run into an execution failure.
+      try {
+        await this.deliveryDispatcher?.dispatch(task, completedRun, result.output ?? null);
+      } catch (error) {
+        console.error(`[Scheduler] Failed to persist Delivery for run ${run.id}:`, error);
+      }
     } catch (error) {
       this.store.finishRun(run.id, {
         status: TaskStatus.Error,

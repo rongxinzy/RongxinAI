@@ -54,6 +54,10 @@ interface StoredConversationReplyRoute {
   accountId?: string;
 }
 
+interface StoredCcConnectSessionRoute {
+  sessionKey: string;
+}
+
 interface SessionMappingRow {
   im_conversation_id: string;
   platform: string;
@@ -1276,6 +1280,22 @@ export class IMStore {
     this.setConfigValue(`conversation_reply_route:${platform}:${normalizedConversationId}`, route);
   }
 
+  /** Keeps the sidecar-native reply key separate from legacy gateway mappings. */
+  getCcConnectSessionKey(accountId: string, platform: string, conversationId: string): string | null {
+    const route = this.getConfigValue<StoredCcConnectSessionRoute>(
+      ccConnectSessionRouteKey(accountId, platform, conversationId),
+    );
+    return route?.sessionKey?.trim() || null;
+  }
+
+  setCcConnectSessionKey(accountId: string, platform: string, conversationId: string, sessionKey: string): void {
+    const normalizedSessionKey = sessionKey.trim();
+    if (!normalizedSessionKey) return;
+    this.setConfigValue(ccConnectSessionRouteKey(accountId, platform, conversationId), {
+      sessionKey: normalizedSessionKey,
+    });
+  }
+
   // ==================== Session Mapping Operations ====================
 
   /**
@@ -1478,4 +1498,10 @@ export class IMStore {
       lastActiveAt: row.last_active_at,
     }));
   }
+}
+
+function ccConnectSessionRouteKey(accountId: string, platform: string, conversationId: string): string {
+  const values = [accountId, platform, conversationId].map(value => value.trim());
+  if (values.some(value => !value)) throw new Error('cc-connect session route identity is required');
+  return `cc_connect_session_route:${Buffer.from(JSON.stringify(values)).toString('base64url')}`;
 }

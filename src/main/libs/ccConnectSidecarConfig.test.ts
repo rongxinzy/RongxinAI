@@ -23,6 +23,13 @@ test('serializes only a ZhiYuan bridge project and disables upstream control pla
   expect(config).not.toContain('command');
 });
 
+test('accepts qqbot, the cc-connect QQ adapter identifier', () => {
+  expect(() => serializeCcConnectSidecarConfig({
+    ...base,
+    projects: [{ accountId: 'qq-primary', platform: 'qqbot', options: { app_id: 'id', app_secret: 'secret' } }],
+  })).not.toThrow();
+});
+
 test('rejects remote control planes, unsupported platforms, and unsafe option keys', () => {
   expect(() => serializeCcConnectSidecarConfig({ ...base, bridgeUrl: 'http://10.0.0.1:1234', projects: [] })).toThrow('loopback');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [] })).toThrow('exactly one project');

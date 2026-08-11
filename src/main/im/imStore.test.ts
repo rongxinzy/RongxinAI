@@ -168,6 +168,18 @@ test('IMStore persists conversation reply routes by platform and conversation ID
   expect(db.writeCount >= 2).toBeTruthy();
 });
 
+test('IMStore persists cc-connect native session routes separately by account', () => {
+  const db = new FakeDb();
+  const store = new IMStore(db as unknown as ConstructorParameters<typeof IMStore>[0]);
+
+  store.setCcConnectSessionKey('telegram-a', 'telegram', '42', 'telegram:42');
+  store.setCcConnectSessionKey('telegram-b', 'telegram', '42', 'telegram:42:other-bot');
+
+  expect(store.getCcConnectSessionKey('telegram-a', 'telegram', '42')).toBe('telegram:42');
+  expect(store.getCcConnectSessionKey('telegram-b', 'telegram', '42')).toBe('telegram:42:other-bot');
+  expect(store.getCcConnectSessionKey('telegram-a', 'telegram', '43')).toBe(null);
+});
+
 test('IMStore persists OpenClaw session keys in IM session mappings', () => {
   const db = new FakeDb();
   const store = new IMStore(db as unknown as ConstructorParameters<typeof IMStore>[0]);

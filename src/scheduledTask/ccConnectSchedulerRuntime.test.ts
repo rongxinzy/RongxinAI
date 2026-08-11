@@ -64,3 +64,12 @@ test('uses the scheduler clock for a task delivered through a non-default channe
   await runtime.handleTrigger({ accountId: SchedulerClockAccount, taskId: routed.id, scheduleVersion: routed.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
   expect(execute).toHaveBeenCalledOnce();
 });
+
+test('persists delivery separately after Pi completes without changing Run success', async () => {
+  const { store, task, client } = setup();
+  const dispatch = vi.fn(async () => { throw new Error('sidecar offline'); });
+  const runtime = new CcConnectSchedulerRuntime(store, client, async () => ({ sessionId: 'pi-run', output: 'done' }), { dispatch } as never);
+  await runtime.runNow(task.id);
+  expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ id: task.id }), expect.objectContaining({ status: 'success' }), 'done');
+  expect(store.listRuns(task.id)[0]).toMatchObject({ status: 'success' });
+});

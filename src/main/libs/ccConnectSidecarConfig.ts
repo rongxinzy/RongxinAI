@@ -1,7 +1,7 @@
 import net from 'node:net';
 
 const SUPPORTED_PLATFORMS = new Set([
-  'telegram', 'discord', 'dingtalk', 'feishu', 'qq', 'wecom', 'weixin',
+  'telegram', 'discord', 'dingtalk', 'feishu', 'qq', 'qqbot', 'wecom', 'weixin',
 ]);
 
 type TomlValue = string | number | boolean | readonly string[];

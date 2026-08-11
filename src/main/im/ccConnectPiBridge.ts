@@ -8,18 +8,20 @@ import { IMCoworkHandler } from "./imCoworkHandler";
 import type { IMStore } from "./imStore";
 import type { IMMessage, Platform } from "./types";
 
-const SUPPORTED_PLATFORMS = new Set<Platform>([
+const SUPPORTED_PLATFORMS = new Set<string>([
   "telegram",
   "discord",
   "dingtalk",
   "feishu",
   "qq",
+  "qqbot",
   "wecom",
   "weixin",
 ]);
 
 export class CcConnectPiBridge {
   private readonly handler: IMCoworkHandler;
+  private readonly imStore: IMStore;
 
   constructor(options: {
     runtime: PiRuntimeAdapter;
@@ -29,6 +31,7 @@ export class CcConnectPiBridge {
     onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
   }) {
     this.onCronTrigger = options.onCronTrigger;
+    this.imStore = options.imStore;
     this.handler = new IMCoworkHandler({
       coworkRuntime: options.runtime,
       coworkStore: options.coworkStore,
@@ -42,21 +45,29 @@ export class CcConnectPiBridge {
   ) => Promise<void>;
 
   async runTurn(request: CcConnectTurnRequest): Promise<{ content: string }> {
-    if (!SUPPORTED_PLATFORMS.has(request.message.platform as Platform)) {
+    if (!SUPPORTED_PLATFORMS.has(request.message.platform)) {
       throw new Error(
         `Unsupported cc-connect platform: ${request.message.platform}`,
       );
     }
+    const platform = request.message.platform === 'qqbot' ? 'qq' : request.message.platform as Platform;
+    const conversationId = getCcConnectScopedConversationId(
+      request.project,
+      request.message.channelId,
+    );
+    this.imStore.setCcConnectSessionKey(
+      request.project,
+      request.message.platform,
+      request.message.channelId,
+      request.message.sessionKey,
+    );
     const message: IMMessage = {
-      platform: request.message.platform as Platform,
+      platform,
       messageId: request.message.messageId,
       // cc-connect project names are generated from the stable ChannelAccount
       // id. Scope the persisted Pi session by that id so two bots in the same
       // platform conversation can never resume one another's session.
-      conversationId: getCcConnectScopedConversationId(
-        request.project,
-        request.message.channelId,
-      ),
+      conversationId,
       senderId: request.message.userId,
       senderName: request.message.userName,
       groupName: request.message.chatName,
