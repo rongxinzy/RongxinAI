@@ -31,3 +31,13 @@ test('claims each scheduled trigger once and persists its completed Run', () => 
   expect(complete).toMatchObject({ status: 'success', sessionId: 'pi-session' });
   expect(store.listRuns(task.id)).toHaveLength(1);
 });
+
+test('keeps a legacy id stable when importing canonical task records', () => {
+  const store = new SqliteScheduledTaskStore(new Database(':memory:'));
+  const input = { name: 'legacy', description: '', enabled: false,
+    schedule: { kind: ScheduleKind.At, at: '2020-01-01T00:00:00.000Z' },
+    sessionTarget: SessionTarget.Isolated, wakeMode: WakeMode.NextHeartbeat,
+    payload: { kind: PayloadKind.AgentTurn, message: 'saved' }, delivery: { mode: DeliveryMode.None }, agentId: 'main' } as const;
+  expect(store.importLegacy('legacy-id', input).id).toBe('legacy-id');
+  expect(store.importLegacy('legacy-id', { ...input, name: 'ignored' }).name).toBe('legacy');
+});

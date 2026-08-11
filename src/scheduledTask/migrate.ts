@@ -20,6 +20,7 @@ import {
   WakeMode,
 } from './constants';
 import type { CronJobService } from './cronJobService';
+import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { Schedule, ScheduledTaskDelivery, ScheduledTaskInput } from './types';
 
 // ---------------------------------------------------------------------------
@@ -70,13 +71,13 @@ function ensureTimezoneOffset(datetime: string): string {
   return `${datetime}${formatLocalTimezoneOffset()}`;
 }
 
-function convertSchedule(legacy: LegacySchedule): Schedule | null {
+function convertSchedule(legacy: LegacySchedule, preservePastAt = false): Schedule | null {
   if (legacy.type === 'at') {
     if (!legacy.datetime) return null;
     const withTz = ensureTimezoneOffset(legacy.datetime);
-    // Skip one-time tasks whose scheduled time is already in the past —
-    // the gateway rejects them and they would never fire anyway.
-    if (new Date(withTz).getTime() <= Date.now()) return null;
+    // The old gateway cannot register past one-time tasks. Canonical SQLite
+    // keeps them so the UI/audit history does not silently lose user data.
+    if (!preservePastAt && new Date(withTz).getTime() <= Date.now()) return null;
     return { kind: ScheduleKind.At, at: withTz };
   }
   if (legacy.type === 'interval') {
@@ -89,6 +90,38 @@ function convertSchedule(legacy: LegacySchedule): Schedule | null {
     return { kind: ScheduleKind.Cron, expr: legacy.expression };
   }
   return null;
+}
+
+/**
+ * One-time import from the pre-OpenClaw tables into the canonical scheduler.
+ * It never contacts a runtime and is safe to retry: legacy ids are preserved.
+ */
+export async function migrateLegacyScheduledTasksToCanonical(deps: {
+  db: Database.Database;
+  getKv: (key: string) => unknown;
+  setKv: (key: string, value: string) => void;
+  store: SqliteScheduledTaskStore;
+}): Promise<void> {
+  const { db, getKv, setKv, store } = deps;
+  const key = 'scheduled_tasks_migrated_to_canonical_v1';
+  if (getKv(key) === 'true') return;
+  const exists = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'").get();
+  if (!exists) { setKv(key, 'true'); return; }
+  const rows = db.prepare('SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks').all() as LegacyTaskRow[];
+  for (const row of rows) {
+    let legacy: LegacySchedule;
+    try { legacy = JSON.parse(row.schedule_json) as LegacySchedule; } catch { continue; }
+    const schedule = convertSchedule(legacy, true);
+    if (!schedule) continue;
+    const input: ScheduledTaskInput = {
+      name: row.name, description: row.description ?? '', enabled: row.enabled === 1,
+      schedule, sessionTarget: SessionTarget.Isolated, wakeMode: WakeMode.NextHeartbeat,
+      payload: { kind: PayloadKind.AgentTurn, message: row.prompt },
+      delivery: convertDelivery(row.notify_platforms_json ?? '[]'), agentId: DefaultAgentId,
+    };
+    store.importLegacy(row.id, input);
+  }
+  setKv(key, 'true');
 }
 
 function convertDelivery(platformsJson: string): ScheduledTaskDelivery {

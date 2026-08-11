@@ -56,9 +56,20 @@ export class SqliteScheduledTaskStore {
   }
 
   create(input: ScheduledTaskInput): ScheduledTask {
+    return this.createWithId(randomUUID(), input);
+  }
+
+  /** Imports a legacy task with its stable id so existing Run history remains addressable. */
+  importLegacy(id: string, input: ScheduledTaskInput): ScheduledTask {
+    const existing = this.get(id);
+    if (existing) return existing;
+    return this.createWithId(id, input);
+  }
+
+  private createWithId(id: string, input: ScheduledTaskInput): ScheduledTask {
     const now = new Date().toISOString();
     const task = this.toTask({
-      id: randomUUID(), name: input.name, description: input.description, enabled: input.enabled,
+      id, name: input.name, description: input.description, enabled: input.enabled,
       schedule: input.schedule, sessionTarget: input.sessionTarget, wakeMode: input.wakeMode,
       payload: input.payload, delivery: input.delivery ?? { mode: DeliveryMode.None },
       agentId: input.agentId, sessionKey: input.sessionKey ?? null, state: initialState(),
