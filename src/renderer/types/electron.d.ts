@@ -617,6 +617,7 @@ interface IElectronAPI {
         categoryId: string;
         tags: Array<{ en: string; zh: string }>;
         quickPrompts: Array<{ en: string; zh: string }>;
+        workflow: string[];
         path: string;
       }>;
       error?: string;
