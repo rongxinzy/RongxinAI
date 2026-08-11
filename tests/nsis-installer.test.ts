@@ -4,6 +4,7 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 
 const installerScriptPath = path.resolve('scripts/nsis-installer.nsh');
+const installerSmokeScriptPath = path.resolve('scripts/ci/windows-installer-smoke.ps1');
 const elevatedActionsScriptPath = path.resolve('scripts/nsis-elevated-actions.ps1');
 const offlineComponentsPath = path.resolve('scripts/nsis-offline-components.json');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
@@ -152,6 +153,19 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(uninstallBlock).toContain('Rename "$3" "$4"');
     expect(uninstallBlock).toContain('cmd /d /c rd /s /q "$4"');
     expect(uninstallBlock).not.toContain('Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force');
+  });
+
+  test('waits for the spawned NSIS uninstaller to remove managed roots', () => {
+    const smokeScript = fs.readFileSync(installerSmokeScriptPath, 'utf8');
+
+    expect(smokeScript).toContain('function Wait-ForUninstallCompletion');
+    expect(smokeScript).toContain("$_.Name -like 'Un_*.exe'");
+    expect(smokeScript).toContain('Wait-ForUninstallCompletion $installRoot $runtimeRoot 300');
+    expect(
+      smokeScript.indexOf('Wait-ForUninstallCompletion $installRoot $runtimeRoot 300'),
+    ).toBeGreaterThan(
+      smokeScript.indexOf("Invoke-Installer $uninstallers[0].FullName 'uninstall'"),
+    );
   });
 });
 
