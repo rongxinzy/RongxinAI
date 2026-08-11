@@ -20,6 +20,7 @@ import Toast from './components/Toast';
 import AppUpdateBadge from './components/update/AppUpdateBadge';
 import WindowTitleBar from './components/window/WindowTitleBar';
 import { defaultConfig } from './config';
+import { agentService } from './services/agent';
 import { apiService } from './services/api';
 import {
   collectAvailableModels,
@@ -488,6 +489,16 @@ const App: React.FC = () => {
     [dispatch, openNewConversation],
   );
 
+  const handleChatWithExpert = useCallback(
+    async (agentId: string) => {
+      agentService.switchAgent(agentId);
+      await coworkService.loadSessions(agentId);
+      dispatch(setWorkMode(WorkMode.Work));
+      openNewConversation();
+    },
+    [dispatch, openNewConversation],
+  );
+
   const dismissToast = useCallback(() => {
     if (toastTimerRef.current) {
       window.clearTimeout(toastTimerRef.current);
@@ -879,6 +890,7 @@ const App: React.FC = () => {
                       readOnly={enterpriseConfig?.ui?.skills === 'readonly'}
                       onCreateSkillByChat={handleCreateSkillByChat}
                       onTrySkill={handleTrySkill}
+                      onChatWithExpert={handleChatWithExpert}
                       onUseMcp={handleTryMcp}
                       initialTab={expertInitialTab}
                     />
