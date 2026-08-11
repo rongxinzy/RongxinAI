@@ -86,6 +86,8 @@ export type PiStartOptions = {
   _piPromptOverride?: string;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
+  /** Internal: production workflow policy inherited from the owning task. */
+  _productionWorkflowEnabled?: boolean;
 };
 
 export type PiContinueOptions = {
@@ -105,6 +107,8 @@ export type PiContinueOptions = {
   autoApprove?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
+  /** Internal: production workflow policy inherited from the owning task. */
+  _productionWorkflowEnabled?: boolean;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
   /** Internal: marks a queued follow-up in the persisted transcript. */
