@@ -17,6 +17,10 @@ export class CcConnectCronClient {
     await this.request(`/v1/cc-connect/cron/tasks/${encodeURIComponent(taskId)}`, { method: 'DELETE' });
   }
 
+  async reconcile(tasks: readonly CcConnectCronTask[]): Promise<void> {
+    for (const task of tasks) await this.upsert(task);
+  }
+
   private async request(path: string, init: RequestInit): Promise<void> {
     const response = await fetch(new URL(path, this.baseUrl), {
       ...init,
