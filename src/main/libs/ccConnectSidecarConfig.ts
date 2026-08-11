@@ -22,6 +22,11 @@ export type CcConnectSidecarConfig = {
   projects: readonly CcConnectSidecarProject[];
 };
 
+export type CcConnectCronSidecarConfig = Omit<CcConnectSidecarConfig, 'projects'> & {
+  /** Stable internal account id used to authorize scheduler triggers. */
+  accountId: string;
+};
+
 /**
  * Produces the only configuration format accepted by the ZhiYuan cc-connect
  * sidecar.  Deliberately do not expose upstream providers, commands, Web UI,
@@ -83,6 +88,34 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
   }
 
   return `${lines.join('\n')}\n`;
+}
+
+/**
+ * A credential-free sidecar used only as the canonical scheduler clock.  It
+ * has no channel platform blocks, hence cannot receive or send user messages.
+ */
+export function serializeCcConnectCronSidecarConfig(config: CcConnectCronSidecarConfig): string {
+  assertNonEmpty('accountId', config.accountId);
+  assertNonEmpty('dataDir', config.dataDir);
+  assertLoopbackUrl(config.bridgeUrl);
+  assertNonEmpty('bridgeToken', config.bridgeToken);
+  assertLoopbackListen(config.cronControlListen);
+  return [
+    `data_dir = ${tomlString(config.dataDir)}`,
+    '',
+    '[webhook]', 'enabled = false', '',
+    '[bridge]', 'enabled = false', '',
+    '[management]', 'enabled = false', '',
+    '[[projects]]',
+    `name = ${tomlString(config.accountId)}`,
+    '[projects.agent]',
+    'type = "zhiyuan-bridge"',
+    '[projects.agent.options]',
+    `bridge_url = ${tomlString(config.bridgeUrl)}`,
+    `bridge_token = ${tomlString(config.bridgeToken)}`,
+    `cron_control_listen = ${tomlString(config.cronControlListen)}`,
+    '',
+  ].join('\n');
 }
 
 function assertNonEmpty(name: string, value: string): void {

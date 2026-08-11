@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { spawn } from 'child_process';
+import * as nodeNet from 'node:net';
 import type { WebContents } from 'electron';
 import {
   app,
@@ -190,6 +191,7 @@ import {
 } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
+import { serializeCcConnectCronSidecarConfig } from './libs/ccConnectSidecarConfig';
 import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
 import { LlamaCppOpenClawEligibilityReason } from './libs/llamacppOpenClawBinding';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
@@ -1095,6 +1097,9 @@ let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
 let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
 let deferredCcConnectCronClient: DeferredCcConnectCronClient | null = null;
 let ccConnectBridgeToken: string | null = null;
+let ccConnectBridgeUrl: string | null = null;
+let schedulerClockRestartTimer: NodeJS.Timeout | null = null;
+let schedulerClockRestartAttempts = 0;
 const attachCcConnectCronControl = async (accountId: string, baseUrl: string): Promise<void> => {
   if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
   getCanonicalScheduledTaskService();
@@ -1135,7 +1140,94 @@ const startCcConnectBridge = async (): Promise<void> => {
     onTurn: request => ccConnectPiBridge!.runTurn(request),
     onCronTrigger: trigger => ccConnectPiBridge!.runCronTrigger(trigger),
   });
-  await ccConnectBridgeServer.start();
+  ccConnectBridgeUrl = await ccConnectBridgeServer.start();
+};
+
+const findAvailableLoopbackPort = async (): Promise<number> => new Promise((resolve, reject) => {
+  const server = nodeNet.createServer();
+  server.once('error', reject);
+  server.listen(0, '127.0.0.1', () => {
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      server.close();
+      reject(new Error('Unable to reserve a cc-connect cron control port'));
+      return;
+    }
+    server.close(error => error ? reject(error) : resolve(address.port));
+  });
+});
+
+const resolveCcConnectSidecarExecutable = (): string | null => {
+  const binary = process.platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
+  const candidates = [
+    path.join(process.resourcesPath, 'channel-runtime', binary),
+    path.join(app.getAppPath(), 'vendor', 'channel-runtime', 'current', binary),
+  ];
+  return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
+};
+
+const waitForCcConnectCronControl = async (accountId: string, baseUrl: string): Promise<void> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    try {
+      await attachCcConnectCronControl(accountId, baseUrl);
+      return;
+    } catch (error) {
+      lastError = error;
+      await new Promise(resolve => setTimeout(resolve, 250));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('cc-connect cron control did not become ready');
+};
+
+/** Starts the credential-free canonical scheduler clock used by default tasks. */
+const startCanonicalSchedulerClock = async (): Promise<void> => {
+  if (ccConnectSidecarManager) return;
+  if (!ccConnectBridgeToken || !ccConnectBridgeUrl) throw new Error('cc-connect bridge is not initialized');
+  const executable = resolveCcConnectSidecarExecutable();
+  if (!executable) {
+    console.warn('[Scheduler] cc-connect sidecar is not bundled; canonical scheduler clock is unavailable');
+    return;
+  }
+  const port = await findAvailableLoopbackPort();
+  const sidecarRoot = path.join(app.getPath('userData'), 'cc-connect', 'scheduler-default');
+  const manager = new CcConnectSidecarManager(executable, path.join(sidecarRoot, 'config.toml'));
+  manager.on('error', error => console.error('[Scheduler] cc-connect sidecar error:', error));
+  manager.on('exit', ({ code, signal }) => {
+    deferredCcConnectCronClient?.detach('default');
+    ccConnectSidecarManager = null;
+    console.warn(`[Scheduler] cc-connect sidecar exited (code=${code}, signal=${signal})`);
+    scheduleCanonicalSchedulerClockRestart();
+  });
+  ccConnectSidecarManager = manager;
+  try {
+    await manager.start(serializeCcConnectCronSidecarConfig({
+      dataDir: sidecarRoot,
+      bridgeUrl: ccConnectBridgeUrl,
+      bridgeToken: ccConnectBridgeToken,
+      cronControlListen: `127.0.0.1:${port}`,
+      accountId: 'default',
+    }));
+    await waitForCcConnectCronControl('default', `http://127.0.0.1:${port}`);
+    schedulerClockRestartAttempts = 0;
+  } catch (error) {
+    ccConnectSidecarManager = null;
+    await manager.stop();
+    throw error;
+  }
+};
+
+const scheduleCanonicalSchedulerClockRestart = (): void => {
+  if (schedulerClockRestartTimer || !ccConnectBridgeServer) return;
+  const delayMs = Math.min(30_000, 1_000 * 2 ** schedulerClockRestartAttempts);
+  schedulerClockRestartAttempts = Math.min(schedulerClockRestartAttempts + 1, 5);
+  schedulerClockRestartTimer = setTimeout(() => {
+    schedulerClockRestartTimer = null;
+    void startCanonicalSchedulerClock().catch(error => {
+      console.error('[Scheduler] Failed to restart canonical cc-connect clock:', error);
+      scheduleCanonicalSchedulerClockRestart();
+    });
+  }, delayMs);
 };
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
@@ -7534,6 +7626,8 @@ if (!gotTheLock) {
       console.error('[cc-connect] Failed to stop bridge on quit:', error);
     });
     ccConnectBridgeServer = null;
+    if (schedulerClockRestartTimer) clearTimeout(schedulerClockRestartTimer);
+    schedulerClockRestartTimer = null;
     await ccConnectSidecarManager?.stop();
     ccConnectSidecarManager = null;
 
@@ -7670,6 +7764,9 @@ if (!gotTheLock) {
     sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
     await startCcConnectBridge().catch(error =>
       console.error('[cc-connect] Failed to start local bridge:', error),
+    );
+    await startCanonicalSchedulerClock().catch(error =>
+      console.error('[Scheduler] Failed to start canonical cc-connect clock:', error),
     );
 
     const startSqliteBackupLoop = async (): Promise<void> => {

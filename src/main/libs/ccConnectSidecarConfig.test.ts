@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { serializeCcConnectSidecarConfig } from './ccConnectSidecarConfig';
+import { serializeCcConnectCronSidecarConfig, serializeCcConnectSidecarConfig } from './ccConnectSidecarConfig';
 
 const base = {
   dataDir: 'C:\\Users\\test\\AppData\\Local\\ZhiYuanAgent\\cc-connect',
@@ -31,4 +31,12 @@ test('rejects remote control planes, unsupported platforms, and unsafe option ke
   ] })).toThrow('exactly one project');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [{ accountId: 'a', platform: 'slack', options: {} }] })).toThrow('Unsupported');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [{ accountId: 'a', platform: 'qq', options: { 'bad.key': 'x' } }] })).toThrow('Unsafe');
+});
+
+test('serializes a credential-free scheduler clock without channel platforms', () => {
+  const config = serializeCcConnectCronSidecarConfig({ ...base, accountId: 'default' });
+  expect(config).toContain('name = "default"');
+  expect(config).toContain('cron_control_listen = "127.0.0.1:0"');
+  expect(config).not.toContain('[[projects.platforms]]');
+  expect(config).not.toContain('[projects.platforms.options]');
 });
