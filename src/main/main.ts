@@ -5821,7 +5821,6 @@ if (!gotTheLock) {
           coworkSessionId,
         ),
     }),
-    getOpenClawChannelGateway: () => openClawChannelGateway,
   });
 
   // ==================== Permissions IPC Handlers ====================

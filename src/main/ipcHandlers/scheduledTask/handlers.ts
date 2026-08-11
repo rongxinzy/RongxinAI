@@ -41,14 +41,10 @@ export interface ScheduledTaskHandlerDeps {
       coworkSessionId: string,
     ) => Promise<void>;
   } | null;
-  getOpenClawChannelGateway: () => {
-    getGatewayClient: () => unknown;
-    fetchSessionByKey: (sessionKey: string) => Promise<unknown>;
-  } | null;
 }
 
 /**
- * Normalizes an announce-mode delivery payload for OpenClaw native delivery.
+ * Normalizes an announce-mode delivery payload for local channel delivery.
  * Mutates `normalizedInput` in place: sets sessionTarget, converts SystemEvent
  * payloads to AgentTurn, strips IM subtype prefixes from delivery.to, and primes
  * the DingTalk reply route when needed.
@@ -100,7 +96,7 @@ async function applyAnnounceDeliveryNormalization(
 }
 
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {
-  const { getCronJobService, getIMGatewayManager, getOpenClawChannelGateway } = deps;
+  const { getCronJobService, getIMGatewayManager } = deps;
 
   ipcMain.handle(ScheduledTaskIpc.List, async () => {
     try {
@@ -200,8 +196,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
   });
 
   ipcMain.handle(ScheduledTaskIpc.Stop, async (_event, _id: string) => {
-    // OpenClaw doesn't expose a direct stop API for running cron jobs
-    // The job will complete or timeout on its own
+    // A claimed Pi Run is allowed to finish or time out on its own.
     return { success: true, result: false };
   });
 
@@ -261,9 +256,9 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
   ipcMain.handle(ScheduledTaskIpc.ResolveSession, async (_event, sessionKey: string) => {
     try {
       if (!sessionKey) return { success: true, session: null };
-      // Fetch session history from OpenClaw (returns transient session, not persisted)
-      const session = await getOpenClawChannelGateway()?.fetchSessionByKey(sessionKey);
-      return { success: true, session: session ?? null };
+      // Canonical Runs store their Pi session id directly. There is no remote
+      // scheduler session authority to query by an opaque legacy session key.
+      return { success: true, session: null };
     } catch (error) {
       return {
         success: false,

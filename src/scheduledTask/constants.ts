@@ -80,14 +80,6 @@ export const TaskStatus = {
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
-// ─── Gateway Status (OpenClaw wire format) ────────────────────────────────���─
-export const GatewayStatus = {
-  Ok: 'ok',
-  Error: 'error',
-  Skipped: 'skipped',
-} as const;
-export type GatewayStatus = (typeof GatewayStatus)[keyof typeof GatewayStatus];
-
 // ─── Default Agent ID ───────────────────────────────────────────────────────
 export const DefaultAgentId = 'main' as const;
 
@@ -96,7 +88,7 @@ export const RunBehavior = {
   newSession: 'Creates a new session on each trigger',
   uiSession: 'Runs within the associated UI session',
   imSession: (platform: string) => `Triggers and delivers results via ${platform}`,
-  sessionKey: 'Runs with explicit OpenClaw session key',
+  sessionKey: 'Runs with an explicit managed session key',
 } as const;
 
 // ─── IPC Channels ───────────────────────────────────────────────────────────
@@ -119,10 +111,4 @@ export const IpcChannel = {
   StatusUpdate: 'scheduledTask:statusUpdate',
   RunUpdate: 'scheduledTask:runUpdate',
   Refresh: 'scheduledTask:refresh',
-} as const;
-
-// ─── Migration Keys ─────────────────────────────────────────────────────────
-export const MigrationKey = {
-  TasksToOpenclaw: 'scheduled_tasks_migrated_to_openclaw_v1',
-  RunsToOpenclaw: 'scheduled_task_runs_migrated_to_openclaw_v1',
 } as const;

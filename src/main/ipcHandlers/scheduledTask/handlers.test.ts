@@ -22,10 +22,6 @@ test('task-list handler delegates to the canonical scheduler service', async () 
   registerScheduledTaskHandlers({
     getCronJobService: () => ({ listJobs }) as unknown as ScheduledTaskService,
     getIMGatewayManager: () => null,
-    getOpenClawChannelGateway: () => ({
-      getGatewayClient: () => null,
-      fetchSessionByKey: async () => null,
-    }),
   });
   const listHandler = electronMocks.handlers.get(IpcChannel.List);
 

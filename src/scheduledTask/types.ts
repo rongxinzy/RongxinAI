@@ -125,8 +125,8 @@ export interface ScheduledTaskChannelOption {
    *  account identity such as appKey:accid. */
   accountId?: string;
   /** Optional account identifier used only when querying local conversation
-   *  mappings. Some plugins persist a different routing-safe account prefix
-   *  than the delivery-time accountId expected by OpenClaw. */
+   *  mappings. Some adapters persist a different routing-safe account prefix
+   *  than the delivery-time accountId. */
   filterAccountId?: string;
 }
 
