@@ -70,6 +70,18 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+      - name: Check out the fixed cc-connect sidecar source
+        uses: actions/checkout@v6
+        with:
+          repository: rongxinzy/pi-connect
+          ref: 76b0f9bda604f95470d87054c4a99bf617556303
+          path: .sidecars/pi-connect
+          persist-credentials: false
+      - name: Set up Go for the fixed cc-connect sidecar
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: .sidecars/pi-connect/go.mod
+          cache-dependency-path: .sidecars/pi-connect/go.sum
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
@@ -124,6 +136,7 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Windows
         if: ${{ matrix.platform == 'windows' }}
@@ -131,12 +144,14 @@ jobs:
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}\\.sidecars\\pi-connect
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build Linux
         if: ${{ matrix.platform == 'linux' }}
         run: bun run dist:linux
         env:
           NODE_OPTIONS: '--max-old-space-size=4096'
+          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ matrix.platform == 'windows' }}

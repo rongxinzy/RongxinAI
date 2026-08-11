@@ -30,6 +30,10 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
     expect(installerScript).toContain('SetCompress off');
     expect(installerScript).toContain('SetCompress auto');
+    expect(installerScript).toContain('l -slt');
+    expect(installerScript).toContain('Unsafe archive entry:');
+    expect(installerScript).toContain('Archive contains link metadata');
+    expect(installerScript).toContain('phase=component-archive-unsafe');
     expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');

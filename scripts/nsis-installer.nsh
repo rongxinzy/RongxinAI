@@ -164,6 +164,28 @@
     StrCpy $1 $1 64
     StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
 
+    ; Do not rely on 7za extraction alone to reject hostile archive names.  The
+    ; archive is produced by our build, but it is also an installer input and
+    ; must remain safe if it is corrupted or replaced.  The first `Path =` in
+    ; `7za l -slt` describes the archive itself; every later path must be a
+    ; regular entry under this component's declared prefix.
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+      $$ErrorActionPreference = \"Stop\";\
+      Set-StrictMode -Version Latest;\
+      $$lines = & \"$PLUGINSDIR\7za.exe\" l -slt \"$PLUGINSDIR\component-${KEY}.7z\";\
+      if ($$LASTEXITCODE -ne 0) { throw \"7za list failed: $$LASTEXITCODE\" };\
+      $$paths = @($$lines | Where-Object { $$_ -match \"^Path = \" } | ForEach-Object { $$_.Substring(7) });\
+      if ($$paths.Count -lt 2) { throw \"Archive has no entries\" };\
+      $$entries = @($$paths | Select-Object -Skip 1);\
+      foreach ($$entry in $$entries) {\
+        if ([string]::IsNullOrWhiteSpace($$entry) -or $$entry -match \"^(?:[A-Za-z]:|[\\\\/])\" -or $$entry -match \"(^|[\\\\/])\\.\\.([\\\\/]|$$)\" -or $$entry -match \":\") { throw \"Unsafe archive entry: $$entry\" };\
+        if (-not ($$entry -eq \"${PREFIX}\" -or $$entry -like \"${PREFIX}\\*\" -or $$entry -like \"${PREFIX}/*\")) { throw \"Unexpected archive entry: $$entry\" }\
+      };\
+      if (@($$lines | Where-Object { $$_ -match \"^(Symbolic Link|Hard Link|Reparse Point) = \" }).Count -gt 0) { throw \"Archive contains link metadata\" }"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
+
     nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
     Pop $0
     Pop $1
@@ -181,6 +203,13 @@
     StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
+    FileClose $2
+    Goto OfflineComponentInstallFailed
+
+  ComponentArchiveUnsafe_${TOKEN}:
+    StrCpy $R9 "${LABEL} 归档包含不安全的文件路径或链接元数据。"
+    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    FileWrite $2 "phase=component-archive-unsafe component=${KEY} exit=$0 output=$1$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
 
