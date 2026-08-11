@@ -3,6 +3,12 @@
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
 
+!macro OpenTimingLogForAppend HANDLE
+  ; NSIS append mode preserves existing data but starts at offset zero.
+  FileOpen ${HANDLE} "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileSeek ${HANDLE} 0 END
+!macroend
+
 !macro ExtractElevatedActionScript
   SetOutPath "$PLUGINSDIR"
   File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
@@ -61,7 +67,7 @@
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $8
   FileWrite $8 "phase=process-stop-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $8
 
@@ -94,7 +100,7 @@
   Pop $1
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $8
   FileWrite $8 "phase=skill-migration-complete elapsed_ms=$5 exit=$0 output=$1$\r$\n"
   FileClose $8
 
@@ -113,7 +119,7 @@
   OldInstallDetachDone:
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $8
   FileWrite $8 "phase=old-install-detached elapsed_ms=$5 path=$3$\r$\n"
   FileClose $8
 !macroend
@@ -168,14 +174,14 @@
 
   ComponentCacheHit_${TOKEN}:
     DetailPrint "[Installer] Reusing ${LABEL}"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-cache-hit component=${KEY} content_id=$R1$\r$\n"
     FileClose $2
     Goto ComponentReady_${TOKEN}
 
   ComponentCacheMiss_${TOKEN}:
     DetailPrint "[Installer] Expanding ${LABEL}"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-cache-miss component=${KEY} content_id=$R1$\r$\n"
     FileClose $2
     StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1.installing"
@@ -199,14 +205,14 @@
 
   ComponentHashFailed_${TOKEN}:
     StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 actual=$1 exit=$0$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
 
   ComponentExtractFailed_${TOKEN}:
     StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
@@ -243,7 +249,7 @@
   ComponentReady_${TOKEN}:
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $R5 $6 - $7
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 elapsed_ms=$R5$\r$\n"
     FileClose $2
 !macroend
@@ -280,7 +286,7 @@
     !insertmacro RunElevatedAction ADD_DEFENDER add-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
     StrCmp $0 "0" DefenderExclusionEnabled
       Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
       FileClose $2
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加。可能是你取消了管理员授权，或系统安全策略不允许修改。知远仍会继续安装。"
@@ -290,26 +296,26 @@
     FileOpen $2 "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" w
     FileWrite $2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
     FileClose $2
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-enabled path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
     FileClose $2
     Goto DefenderExclusionDone
 
   DefenderExclusionAlreadyActive:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-already-active path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
     FileClose $2
     Goto DefenderExclusionDone
 
   DefenderExclusionDeclined:
     Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-declined$\r$\n"
     FileClose $2
     Goto DefenderExclusionDone
 
   DefenderExclusionSkipped:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-skipped-silent$\r$\n"
     FileClose $2
 
@@ -410,7 +416,7 @@
   Pop $0
   Pop $1
   StrCmp $0 "0" RuntimeLinksReady
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=runtime-link-failed exit=$0 output=$1$\r$\n"
     FileClose $2
     StrCpy $R9 "离线运行环境连接失败：$1"
@@ -449,7 +455,7 @@
         }\
       }"'
     Pop $0
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-set-rollback reason=$R9$\r$\n"
     FileClose $2
     IfSilent OfflineComponentInstallFailedSilent 0
@@ -475,7 +481,7 @@
     StrCmp $0 "0" VcRuntimeReady
     StrCmp $0 "1638" VcRuntimeReady
     StrCmp $0 "3010" VcRuntimeReady
-      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=vc-runtime-install-failed exit=$0 output=$1$\r$\n"
       FileClose $2
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
@@ -549,7 +555,7 @@
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $2
   FileWrite $2 "phase=component-cleanup-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $2
   Delete "$PLUGINSDIR\component-switch-state.txt"
@@ -560,7 +566,7 @@
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $R6 $6 - $R5
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $2
   FileWrite $2 "phase=install-complete total_ms=$R6 component_set=ready$\r$\n"
   FileClose $2
   Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"

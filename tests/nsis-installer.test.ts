@@ -85,6 +85,22 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(failureBlock).toContain('SetErrorLevel 1');
   });
 
+  test('seeks to the end before appending installer timing records', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript).toContain(
+      '!macro OpenTimingLogForAppend HANDLE\n' +
+        '  ; NSIS append mode preserves existing data but starts at offset zero.\n' +
+        '  FileOpen ${HANDLE} "$APPDATA\\ZhiYuanAgent\\install-timing.log" a\n' +
+        '  FileSeek ${HANDLE} 0 END\n' +
+        '!macroend',
+    );
+    expect(installerScript).not.toMatch(
+      /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
+    );
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(18);
+  });
+
   test('records optional local inference intent without downloading in NSIS', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
