@@ -1,4 +1,5 @@
 import type { CoworkError } from '../../common/coworkError';
+import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ChannelRunSummary } from '../../shared/channelRun/constants';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
@@ -9,6 +10,7 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
+import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
   ProviderModelDiscoveryRequest,
   ProviderModelDiscoveryResult,
@@ -127,6 +129,7 @@ interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: 'auto' | 'local' | 'sandbox';
+  agentEngine: 'openclaw' | 'pi';
   memoryEnabled: boolean;
   memoryImplicitUpdateEnabled: boolean;
   memoryLlmJudgeEnabled: boolean;
@@ -141,6 +144,7 @@ interface CoworkConfig {
   embeddingVectorWeight: number;
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
+  openClawSessionPolicy: OpenClawSessionPolicyConfig;
 }
 
 type CoworkConfigUpdate = Partial<
@@ -148,6 +152,7 @@ type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
+    | 'agentEngine'
     | 'memoryEnabled'
     | 'memoryImplicitUpdateEnabled'
     | 'memoryLlmJudgeEnabled'
@@ -200,6 +205,18 @@ interface CoworkApiConfig {
   baseURL: string;
   model: string;
   apiType?: 'anthropic' | 'openai';
+}
+
+interface OpenClawEngineStatus {
+  phase: OpenClawEnginePhase;
+  version: string | null;
+  progressPercent?: number;
+  message?: string;
+  canRetry: boolean;
+}
+
+interface OpenClawSessionPolicyConfig {
+  keepAlive: '1d' | '7d' | '30d' | '365d';
 }
 
 interface WindowState {
@@ -641,6 +658,52 @@ interface IElectronAPI {
   saveApiConfig: (config: CoworkApiConfig) => Promise<{ success: boolean; error?: string }>;
   generateSessionTitle: (userInput: string | null) => Promise<string>;
   getRecentCwds: (limit?: number) => Promise<string[]>;
+  openclaw: {
+    bridge: {
+      respondToAskUser: (options: {
+        requestId: string;
+        result: CoworkPermissionResult;
+      }) => Promise<{ success: boolean; error?: string }>;
+      onAskUser: (
+        callback: (data: {
+          sessionId: string;
+          request: Omit<CoworkPermissionRequest, 'origin'>;
+        }) => void,
+      ) => () => void;
+      onAskUserDismiss: (callback: (data: { requestId: string }) => void) => () => void;
+    };
+    engine: {
+      getStatus: () => Promise<{ success: boolean; status?: OpenClawEngineStatus; error?: string }>;
+      install: () => Promise<{ success: boolean; status?: OpenClawEngineStatus; error?: string }>;
+      retryInstall: () => Promise<{
+        success: boolean;
+        status?: OpenClawEngineStatus;
+        error?: string;
+      }>;
+      restartGateway: () => Promise<{
+        success: boolean;
+        status?: OpenClawEngineStatus;
+        error?: string;
+      }>;
+      onProgress: (callback: (status: OpenClawEngineStatus) => void) => () => void;
+    };
+    sessionPolicy: {
+      get: () => Promise<{
+        success: boolean;
+        config?: OpenClawSessionPolicyConfig;
+        error?: string;
+      }>;
+      set: (
+        config: OpenClawSessionPolicyConfig,
+      ) => Promise<{ success: boolean; config?: OpenClawSessionPolicyConfig; error?: string }>;
+    };
+    session: {
+      patch: (options: {
+        sessionId: string;
+        patch: OpenClawSessionPatch;
+      }) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
+    };
+  };
   appEvents: {
     onOpenSettings: (callback: () => void) => () => void;
     onNewTask: (callback: () => void) => () => void;
@@ -709,6 +772,7 @@ interface IElectronAPI {
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -724,6 +788,7 @@ interface IElectronAPI {
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -766,10 +831,6 @@ interface IElectronAPI {
       sessionId: string;
       title: string;
     }) => Promise<{ success: boolean; error?: string }>;
-    updateSessionModel: (options: {
-      sessionId: string;
-      modelOverride: string;
-    }) => Promise<{ success: boolean; session?: CoworkSession | null; error?: string }>;
     getSession: (
       sessionId: string,
     ) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
@@ -996,6 +1057,44 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; result?: IMConnectivityTestResult; error?: string }>;
     getStatus: () => Promise<{ success: boolean; status?: IMGatewayStatus; error?: string }>;
     getLocalIp: () => Promise<string>;
+    getOpenClawConfigSchema: () => Promise<{
+      success: boolean;
+      result?: {
+        schema: Record<string, unknown>;
+        uiHints: Record<string, Record<string, unknown>>;
+      };
+      error?: string;
+    }>;
+    weixinQrLoginStart: () => Promise<{
+      success: boolean;
+      qrDataUrl?: string;
+      message: string;
+      sessionKey?: string;
+    }>;
+    weixinQrLoginWait: (
+      accountId?: string,
+    ) => Promise<{ success: boolean; connected: boolean; message: string; accountId?: string }>;
+
+    listPairingRequests: (platform: string) => Promise<{
+      success: boolean;
+      requests: Array<{
+        id: string;
+        code: string;
+        createdAt: string;
+        lastSeenAt: string;
+        meta?: Record<string, string>;
+      }>;
+      allowFrom: string[];
+      error?: string;
+    }>;
+    approvePairingCode: (
+      platform: string,
+      code: string,
+    ) => Promise<{ success: boolean; error?: string }>;
+    rejectPairingRequest: (
+      platform: string,
+      code: string,
+    ) => Promise<{ success: boolean; error?: string }>;
     addQQInstance: (
       name: string,
     ) => Promise<{ success: boolean; instance?: QQInstanceConfig; error?: string }>;
@@ -1186,6 +1285,19 @@ interface IElectronAPI {
   qwen: Record<string, never>;
   feishu: {
     install: {
+      qrcode: (isLark: boolean) => Promise<{
+        url: string;
+        deviceCode: string;
+        interval: number;
+        expireIn: number;
+      }>;
+      poll: (deviceCode: string) => Promise<{
+        done: boolean;
+        appId?: string;
+        appSecret?: string;
+        domain?: string;
+        error?: string;
+      }>;
       verify: (
         appId: string,
         appSecret: string,
@@ -1272,11 +1384,11 @@ interface IMGatewayConfig {
   qq: QQMultiInstanceConfig;
   discord: DiscordMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
-  weixin: WeixinChannelConfig;
+  weixin: WeixinOpenClawConfig;
   settings: IMSettings;
 }
 
-interface DingTalkChannelConfig {
+interface DingTalkOpenClawConfig {
   enabled: boolean;
   clientId: string;
   clientSecret: string;
@@ -1291,7 +1403,7 @@ interface DingTalkChannelConfig {
   debug: boolean;
 }
 
-interface DingTalkInstanceConfig extends DingTalkChannelConfig {
+interface DingTalkInstanceConfig extends DingTalkOpenClawConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -1309,24 +1421,24 @@ interface DingTalkMultiInstanceStatus {
   instances: DingTalkInstanceStatus[];
 }
 
-interface FeishuChannelGroupConfig {
+interface FeishuOpenClawGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-interface FeishuChannelFooterConfig {
+interface FeishuOpenClawFooterConfig {
   status?: boolean;
   elapsed?: boolean;
 }
 
-interface FeishuChannelBlockStreamingCoalesceConfig {
+interface FeishuOpenClawBlockStreamingCoalesceConfig {
   minChars?: number;
   maxChars?: number;
   idleMs?: number;
 }
 
-interface FeishuChannelConfig {
+interface FeishuOpenClawConfig {
   enabled: boolean;
   appId: string;
   appSecret: string;
@@ -1335,18 +1447,18 @@ interface FeishuChannelConfig {
   allowFrom: string[];
   groupPolicy: 'allowlist' | 'open' | 'disabled';
   groupAllowFrom: string[];
-  groups: Record<string, FeishuChannelGroupConfig>;
+  groups: Record<string, FeishuOpenClawGroupConfig>;
   historyLimit: number;
   streaming: boolean;
   replyMode: 'auto' | 'static' | 'streaming';
   blockStreaming: boolean;
-  footer: FeishuChannelFooterConfig;
-  blockStreamingCoalesce?: FeishuChannelBlockStreamingCoalesceConfig;
+  footer: FeishuOpenClawFooterConfig;
+  blockStreamingCoalesce?: FeishuOpenClawBlockStreamingCoalesceConfig;
   mediaMaxMb: number;
   debug: boolean;
 }
 
-interface FeishuInstanceConfig extends FeishuChannelConfig {
+interface FeishuInstanceConfig extends FeishuOpenClawConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -1364,20 +1476,20 @@ interface FeishuMultiInstanceStatus {
   instances: FeishuInstanceStatus[];
 }
 
-interface TelegramChannelGroupConfig {
+interface TelegramOpenClawGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-interface TelegramChannelConfig {
+interface TelegramOpenClawConfig {
   enabled: boolean;
   botToken: string;
   dmPolicy: 'pairing' | 'allowlist' | 'open' | 'disabled';
   allowFrom: string[];
   groupPolicy: 'allowlist' | 'open' | 'disabled';
   groupAllowFrom: string[];
-  groups: Record<string, TelegramChannelGroupConfig>;
+  groups: Record<string, TelegramOpenClawGroupConfig>;
   historyLimit: number;
   replyToMode: 'off' | 'first' | 'all';
   linkPreview: boolean;
@@ -1389,7 +1501,7 @@ interface TelegramChannelConfig {
   debug: boolean;
 }
 
-interface TelegramInstanceConfig extends TelegramChannelConfig {
+interface TelegramInstanceConfig extends TelegramOpenClawConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -1407,20 +1519,20 @@ interface TelegramMultiInstanceStatus {
   instances: TelegramInstanceStatus[];
 }
 
-interface DiscordChannelGuildConfig {
+interface DiscordOpenClawGuildConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-interface DiscordChannelConfig {
+interface DiscordOpenClawConfig {
   enabled: boolean;
   botToken: string;
   dmPolicy: 'pairing' | 'allowlist' | 'open' | 'disabled';
   allowFrom: string[];
   groupPolicy: 'allowlist' | 'open' | 'disabled';
   groupAllowFrom: string[];
-  guilds: Record<string, DiscordChannelGuildConfig>;
+  guilds: Record<string, DiscordOpenClawGuildConfig>;
   historyLimit: number;
   streaming: 'off' | 'partial' | 'block' | 'progress';
   mediaMaxMb: number;
@@ -1490,7 +1602,7 @@ interface WecomMultiInstanceStatus {
   instances: WecomInstanceStatus[];
 }
 
-interface WeixinChannelConfig {
+interface WeixinOpenClawConfig {
   enabled: boolean;
   accountId: string;
   dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled';
@@ -1583,7 +1695,7 @@ interface DiscordGatewayStatus {
   lastOutboundAt: number | null;
 }
 
-interface DiscordInstanceConfig extends DiscordChannelConfig {
+interface DiscordInstanceConfig extends DiscordOpenClawConfig {
   instanceId: string;
   instanceName: string;
 }

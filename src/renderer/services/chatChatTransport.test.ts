@@ -199,6 +199,44 @@ test('only uses messages before the latest user turn as history', async () => {
   expect(capturedHistory?.map(m => m.content)).toEqual(['hi', 'thinking...', 'hello']);
 });
 
+test('forwards image file parts to the direct chat API', async () => {
+  vi.mocked(apiService.chatWithWebSearch).mockResolvedValue({ content: 'ok' });
+  const transport = new ChatChatTransport({});
+  await transport.sendMessages({
+    trigger: 'submit-message',
+    chatId: 'chat-1',
+    messageId: undefined,
+    messages: [
+      {
+        id: 'u1',
+        role: 'user',
+        parts: [
+          { type: 'text', text: 'What is this?' },
+          {
+            type: 'file',
+            mediaType: 'image/png',
+            url: 'data:image/png;base64,aW1hZ2U=',
+            filename: 'screen.png',
+          },
+        ],
+      },
+    ],
+    abortSignal: undefined,
+  });
+
+  const [message] = vi.mocked(apiService.chatWithWebSearch).mock.calls.at(-1) ?? [];
+  expect(message).toMatchObject({
+    content: 'What is this?',
+    images: [
+      {
+        name: 'screen.png',
+        type: 'image/png',
+        dataUrl: 'data:image/png;base64,aW1hZ2U=',
+      },
+    ],
+  });
+});
+
 test('passes the request id and abort signal through the native tool loop', async () => {
   vi.mocked(apiService.chatWithWebSearch).mockImplementation(
     () => new Promise<{ content: string }>(() => {}),

@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 
 import type {
   CoworkImageAttachment,
+  CoworkFileAttachment,
   CoworkMessage,
   CoworkMessageMetadata,
 } from '../../../types/cowork';
@@ -14,6 +15,7 @@ import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
 import { CopyButton, ReEditButton } from './CopyButton';
+import FileTypeIcon from '../../icons/fileTypes/FileTypeIcon';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -49,42 +51,45 @@ export const UserBubble: React.FC<{
   const messageSkills = messageSkillIds
     .map(id => skills.find(s => s.id === id))
     .filter((s): s is NonNullable<typeof s> => s !== undefined);
-  const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ??
-    []) as CoworkImageAttachment[];
+  const imageAttachments = useMemo(
+    () =>
+      ((message.metadata as CoworkMessageMetadata)?.imageAttachments ??
+        []) as CoworkImageAttachment[],
+    [message.metadata],
+  );
+  const fileAttachments = useMemo(
+    () =>
+      ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
+        []) as CoworkFileAttachment[],
+    [message.metadata],
+  );
+  const textContent = useMemo(() => {
+    if (fileAttachments.length === 0) return displayContent;
+    const filePaths = new Set(fileAttachments.map(file => file.path));
+    return displayContent
+      .split(/\r?\n/)
+      .filter(line => !Array.from(filePaths).some(path => line.includes(path)))
+      .join('\n')
+      .replace(/^\n+|\n+$/g, '');
+  }, [displayContent, fileAttachments]);
+  const hasTextContent = Boolean(textContent.trim()) || messageSkills.length > 0;
 
   return (
     <div
-      className="py-2 px-4 focus:outline-none"
+      className="w-full py-2 px-4 focus:outline-none"
       tabIndex={0}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
       onBlur={handleBlur}
     >
-      <div className="max-w-5xl min-w-[320px] mx-auto">
-        <Message from="user" className="ml-auto items-end">
-          <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
-            <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
-              {messageSkills.map(skill => (
-                <span
-                  key={skill.id}
-                  className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground"
-                >
-                  <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{skill.name}</span>
-                </span>
-              ))}
-              <span className="whitespace-pre-wrap wrap-break-word">{displayContent}</span>
-            </div>
-          </MessageContent>
-        </Message>
-
+      <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end">
         {imageAttachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-end mt-2">
+          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
             {imageAttachments.map((img, idx) => (
               <Button
                 key={idx}
                 variant="ghost"
-                className="block max-w-[200px] rounded-lg overflow-hidden border border-border hover:border-primary/50 p-0"
+                className="block h-auto w-auto min-h-0 shrink-0 cursor-zoom-in rounded-lg p-0 shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50"
                 onClick={() =>
                   setExpandedImage({
                     src: `data:${img.mimeType};base64,${img.base64Data}`,
@@ -96,11 +101,48 @@ export const UserBubble: React.FC<{
                 <img
                   src={`data:${img.mimeType};base64,${img.base64Data}`}
                   alt={img.name || 'image'}
-                  className="max-h-32 object-cover"
+                  className="block h-40 w-auto max-w-80 rounded-lg border border-border object-contain"
                 />
               </Button>
             ))}
           </div>
+        )}
+
+        {fileAttachments.length > 0 && (
+          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
+            {fileAttachments.map(file => (
+              <div
+                key={file.path}
+                className="flex h-20 w-64 shrink-0 items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4"
+                title={file.path}
+              >
+                <FileTypeIcon fileName={file.name} className="h-12 w-12 shrink-0" />
+                <div className="min-w-0">
+                  <div className="truncate text-base text-foreground">{file.name}</div>
+                  <div className="truncate text-sm text-muted-foreground">{file.extension}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {hasTextContent && (
+          <Message from="user" className="ml-auto items-end">
+            <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
+              <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
+                {messageSkills.map(skill => (
+                  <span
+                    key={skill.id}
+                    className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground"
+                  >
+                    <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{skill.name}</span>
+                  </span>
+                ))}
+                <span className="whitespace-pre-wrap wrap-break-word">{textContent}</span>
+              </div>
+            </MessageContent>
+          </Message>
         )}
 
         <div

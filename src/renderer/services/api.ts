@@ -620,7 +620,7 @@ class ApiService {
 
   /** Native provider tool loop; the gateway credential stays in the main process. */
   async chatWithWebSearch(
-    message: string,
+    message: string | ChatUserMessageInput,
     onProgress?: (content: string, reasoning?: string) => void,
     history: ChatMessagePayload[] = [],
     options: DirectChatRequestOptions = {},
@@ -679,7 +679,11 @@ class ApiService {
     ]
       .filter(Boolean)
       .join('\n');
-    const userMessage: ChatMessagePayload = { role: 'user', content: message };
+    const userMessage: ChatMessagePayload = {
+      role: 'user',
+      content: typeof message === 'string' ? message : message.content,
+      ...(typeof message === 'string' || !message.images?.length ? {} : { images: message.images }),
+    };
 
     if (apiFormat === 'anthropic') {
       const messages = [...history.filter(item => item.role !== 'system'), userMessage]
@@ -700,7 +704,15 @@ class ApiService {
       const contents = [...history.filter(item => item.role !== 'system'), userMessage].map(
         item => ({
           role: item.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: item.content }],
+          parts: [
+            ...(item.content ? [{ text: item.content }] : []),
+            ...(item.images ?? []).flatMap(image => {
+              const payload = this.extractImageData(image);
+              return payload
+                ? [{ inline_data: { mime_type: payload.mimeType, data: payload.data } }]
+                : [];
+            }),
+          ],
         }),
       );
       return this.runGeminiWebSearchLoop(
@@ -735,7 +747,7 @@ class ApiService {
         .filter(item => item.role !== 'system')
         .map(item => this.formatOpenAIMessage(item, supportsImages))
         .filter(Boolean),
-      { role: 'user', content: message },
+      ...[this.formatOpenAIMessage(userMessage, supportsImages)].filter(Boolean),
     ];
     return this.runOpenAIWebSearchLoop(
       messages,
