@@ -140,6 +140,7 @@ export type WorkbenchRunEventType =
 export const WorkbenchTaskIpc = {
   GetCurrent: 'workbenchTask:getCurrent',
   GetDetail: 'workbenchTask:getDetail',
+  ListForSession: 'workbenchTask:listForSession',
   Resume: 'workbenchTask:resume',
   Retry: 'workbenchTask:retry',
   Accept: 'workbenchTask:accept',

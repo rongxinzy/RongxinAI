@@ -38,6 +38,11 @@ export function registerWorkbenchTaskIpcHandlers(options: {
       : { success: false, error: 'Workbench task not found.' };
   });
 
+  ipcMain.handle(WorkbenchTaskIpc.ListForSession, (_event, sessionId: string) => ({
+    success: true,
+    tasks: service.listForSession(sessionId),
+  }));
+
   const startRun = async (
     taskId: string,
     trigger: WorkbenchRunTrigger,

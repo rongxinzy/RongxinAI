@@ -131,6 +131,12 @@ export interface WorkbenchTaskActionResult {
   error?: string;
 }
 
+export interface WorkbenchTaskListResult {
+  success: boolean;
+  tasks?: WorkbenchTask[];
+  error?: string;
+}
+
 export interface WorkbenchTaskResumeInput {
   taskId: string;
   amendment?: string;

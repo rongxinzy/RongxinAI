@@ -53,6 +53,7 @@ import type {
   WorkbenchApprovalResponseInput,
   WorkbenchTaskActionResult,
   WorkbenchTaskChangedEvent,
+  WorkbenchTaskListResult,
 } from '../../shared/workbenchTask';
 import type {
   OllamaCancelPullResult,
@@ -954,6 +955,7 @@ interface IElectronAPI {
   workbenchTask: {
     getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
     getDetail: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    listForSession: (sessionId: string) => Promise<WorkbenchTaskListResult>;
     resume: (
       input: import('../../shared/workbenchTask').WorkbenchTaskResumeInput,
     ) => Promise<WorkbenchTaskActionResult>;
