@@ -3,6 +3,12 @@
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
 
+!macro OpenTimingLogForAppend HANDLE
+  ; NSIS append mode preserves existing data but starts at offset zero.
+  FileOpen ${HANDLE} "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  FileSeek ${HANDLE} 0 END
+!macroend
+
 !macro ExtractElevatedActionScript
   SetOutPath "$PLUGINSDIR"
   File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
@@ -61,7 +67,7 @@
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $8
   FileWrite $8 "phase=process-stop-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $8
 
@@ -94,7 +100,7 @@
   Pop $1
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $8
   FileWrite $8 "phase=skill-migration-complete elapsed_ms=$5 exit=$0 output=$1$\r$\n"
   FileClose $8
 
@@ -113,7 +119,7 @@
   OldInstallDetachDone:
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $8 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $8
   FileWrite $8 "phase=old-install-detached elapsed_ms=$5 path=$3$\r$\n"
   FileClose $8
 !macroend
@@ -168,14 +174,14 @@
 
   ComponentCacheHit_${TOKEN}:
     DetailPrint "[Installer] Reusing ${LABEL}"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-cache-hit component=${KEY} content_id=$R1$\r$\n"
     FileClose $2
     Goto ComponentReady_${TOKEN}
 
   ComponentCacheMiss_${TOKEN}:
     DetailPrint "[Installer] Expanding ${LABEL}"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-cache-miss component=${KEY} content_id=$R1$\r$\n"
     FileClose $2
     StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1.installing"
@@ -199,14 +205,14 @@
 
   ComponentHashFailed_${TOKEN}:
     StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 actual=$1 exit=$0$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
 
   ComponentExtractFailed_${TOKEN}:
     StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
@@ -241,14 +247,9 @@
     Goto OfflineComponentInstallFailed
 
   ComponentReady_${TOKEN}:
-    FileOpen $2 "$PLUGINSDIR\component-targets.txt" a
-    ; Keep the 64-character content ID in its dedicated version file. Combining
-    ; it with the routing fields can split the skill-python row in NSIS builds.
-    FileWrite $2 "${KEY}|${PREFIX}$\r$\n"
-    FileClose $2
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $R5 $6 - $7
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 elapsed_ms=$R5$\r$\n"
     FileClose $2
 !macroend
@@ -258,8 +259,9 @@
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
   SetOutPath "$PLUGINSDIR"
   !insertmacro ExtractElevatedActionScript
-  FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
-  FileClose $2
+  ; Embed the routing table as a compile-time asset. Building it incrementally
+  ; with NSIS FileWrite can split the skill-python key on Windows runners.
+  File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
   Delete "$PLUGINSDIR\component-switch-state.txt"
 
   ; Defender exclusion is optional and requires explicit, informed consent.
@@ -284,7 +286,7 @@
     !insertmacro RunElevatedAction ADD_DEFENDER add-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
     StrCmp $0 "0" DefenderExclusionEnabled
       Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
       FileClose $2
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加。可能是你取消了管理员授权，或系统安全策略不允许修改。知远仍会继续安装。"
@@ -294,26 +296,26 @@
     FileOpen $2 "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" w
     FileWrite $2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
     FileClose $2
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-enabled path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
     FileClose $2
     Goto DefenderExclusionDone
 
   DefenderExclusionAlreadyActive:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-already-active path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
     FileClose $2
     Goto DefenderExclusionDone
 
   DefenderExclusionDeclined:
     Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-declined$\r$\n"
     FileClose $2
     Goto DefenderExclusionDone
 
   DefenderExclusionSkipped:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=defender-exclusion-skipped-silent$\r$\n"
     FileClose $2
 
@@ -331,13 +333,13 @@
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
-      $$parts = $$_.Split(\"|\");\
-      if ($$parts.Count -ne 2 -or -not $$parts[0] -or -not $$parts[1]) { throw \"Invalid component target row: $$_\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
+    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
+    $$rows = @($$rows | ForEach-Object {\
+      if ($$_.key -notmatch \"^[a-z0-9-]+\z\" -or $$_.prefix -notmatch \"^[A-Za-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$_.key + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$parts[0] };\
-      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$id }\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$_.key };\
+      [pscustomobject]@{ Key = $$_.key; Prefix = $$_.prefix; Id = $$id }\
     });\
     $$prepared = @();\
     $$switched = @();\
@@ -396,7 +398,7 @@
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$resourceRoot = \"$INSTDIR\resources\";\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1] } });\
+    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
     foreach ($$row in $$rows) {\
       $$link = Join-Path $$resourceRoot $$row.Prefix;\
       $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
@@ -414,7 +416,7 @@
   Pop $0
   Pop $1
   StrCmp $0 "0" RuntimeLinksReady
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=runtime-link-failed exit=$0 output=$1$\r$\n"
     FileClose $2
     StrCpy $R9 "离线运行环境连接失败：$1"
@@ -453,10 +455,13 @@
         }\
       }"'
     Pop $0
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+    !insertmacro OpenTimingLogForAppend $2
     FileWrite $2 "phase=component-set-rollback reason=$R9$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "$R9"
+    IfSilent OfflineComponentInstallFailedSilent 0
+      MessageBox MB_OK|MB_ICONSTOP "$R9"
+    OfflineComponentInstallFailedSilent:
+    SetErrorLevel 1
     Abort
 
   OfflineComponentsReady:
@@ -476,7 +481,7 @@
     StrCmp $0 "0" VcRuntimeReady
     StrCmp $0 "1638" VcRuntimeReady
     StrCmp $0 "3010" VcRuntimeReady
-      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      !insertmacro OpenTimingLogForAppend $2
       FileWrite $2 "phase=vc-runtime-install-failed exit=$0 output=$1$\r$\n"
       FileClose $2
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
@@ -521,13 +526,13 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
-      $$parts = $$_.Split(\"|\");\
-      if ($$parts.Count -ne 2 -or -not $$parts[0]) { throw \"Invalid component target row: $$_\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
+    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
+    $$rows = @($$rows | ForEach-Object {\
+      if ($$_.key -notmatch \"^[a-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$_.key + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$parts[0] };\
-      [pscustomobject]@{ Key = $$parts[0]; Id = $$id }\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$_.key };\
+      [pscustomobject]@{ Key = $$_.key; Id = $$id }\
     });\
     foreach ($$row in $$rows) {\
       $$root = Join-Path $$runtimeRoot $$row.Key;\
@@ -550,7 +555,7 @@
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $2
   FileWrite $2 "phase=component-cleanup-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $2
   Delete "$PLUGINSDIR\component-switch-state.txt"
@@ -561,7 +566,7 @@
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $R6 $6 - $R5
-  FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+  !insertmacro OpenTimingLogForAppend $2
   FileWrite $2 "phase=install-complete total_ms=$R6 component_set=ready$\r$\n"
   FileClose $2
   Delete "$APPDATA\ZhiYuanAgent\install-start-tick.txt"
@@ -577,8 +582,13 @@
 !macroend
 
 !macro customUnInstall
-  ; Remove component junctions before recursively deleting application-owned
-  ; immutable data. User-created Skills and models remain under userData.
+  ; Remove component junctions before detaching application-owned immutable
+  ; data. User-created Skills and models remain under userData. Deleting the
+  ; expanded runtime tree synchronously can take longer than the uninstaller
+  ; itself, so rename it atomically and reclaim it in the background.
+  ; Keep both the uninstaller and spawned cleanup commands outside $INSTDIR so
+  ; electron-builder's final RMDir can remove the now-empty application root.
+  SetOutPath "$TEMP"
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     if (Test-Path -LiteralPath $$runtimeRoot) {\
@@ -590,12 +600,43 @@
             if (($$pointerItem.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { [IO.Directory]::Delete($$pointer) }\
           }\
         }\
-      };\
-      Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force\
-    };\
-    $$legacyRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtime-packs\";\
-    if (Test-Path -LiteralPath $$legacyRoot) { Remove-Item -LiteralPath $$legacyRoot -Recurse -Force }"'
+      }\
+    }"'
   Pop $0
+
+  nsExec::ExecToLog 'cmd /c for /d %D in ("$LOCALAPPDATA\ZhiYuanAgent\runtimes.uninstall.*") do @start "" /b cmd /d /c rd /s /q "%~fD"'
+  Pop $0
+  StrCpy $3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+  IfFileExists "$3\*.*" 0 RuntimeCleanupDone
+    System::Call 'kernel32::GetTickCount()i .r4'
+    StrCpy $4 "$3.uninstall.$4"
+    ClearErrors
+    Rename "$3" "$4"
+    IfErrors RuntimeCleanupDetachFailed
+      nsExec::ExecToLog 'cmd /c start "" /b cmd /d /c rd /s /q "$4"'
+      Pop $0
+      Goto RuntimeCleanupDone
+    RuntimeCleanupDetachFailed:
+      DetailPrint "[Uninstaller] Could not detach the offline runtime cache"
+  RuntimeCleanupDone:
+  RMDir "$3"
+
+  nsExec::ExecToLog 'cmd /c for /d %D in ("$LOCALAPPDATA\ZhiYuanAgent\runtime-packs.uninstall.*") do @start "" /b cmd /d /c rd /s /q "%~fD"'
+  Pop $0
+  StrCpy $3 "$LOCALAPPDATA\ZhiYuanAgent\runtime-packs"
+  IfFileExists "$3\*.*" 0 LegacyRuntimeCleanupDone
+    System::Call 'kernel32::GetTickCount()i .r4'
+    StrCpy $4 "$3.uninstall.$4"
+    ClearErrors
+    Rename "$3" "$4"
+    IfErrors LegacyRuntimeCleanupDetachFailed
+      nsExec::ExecToLog 'cmd /c start "" /b cmd /d /c rd /s /q "$4"'
+      Pop $0
+      Goto LegacyRuntimeCleanupDone
+    LegacyRuntimeCleanupDetachFailed:
+      DetailPrint "[Uninstaller] Could not detach the legacy runtime cache"
+  LegacyRuntimeCleanupDone:
+  RMDir "$3"
 
   ; Remove only exclusions that this installer recorded as user-approved and
   ; installer-managed. Never remove an exclusion created independently.
