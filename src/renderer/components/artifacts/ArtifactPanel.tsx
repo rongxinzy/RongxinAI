@@ -320,7 +320,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         className={`non-draggable bg-background flex flex-col h-full overflow-hidden ${
           layoutMode === ArtifactLayoutMode.Workspace || isFullscreen
             ? 'fixed inset-0 z-200 w-screen border-0'
-            : 'relative min-w-0 flex-1 border-l border-border'
+            : 'relative min-w-0 flex-1'
         }`}
       >
         {/* Floating file list overlay */}
