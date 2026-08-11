@@ -1,9 +1,4 @@
-import {
-  QueueItem,
-  QueueItemContent,
-  QueueItemIndicator,
-  type QueueTodo,
-} from '@shared/components/ai-elements/queue';
+import { QueueItem, QueueItemContent, type QueueTodo } from '@shared/components/ai-elements/queue';
 import { Button } from '@shared/components/ui/button';
 import {
   Collapsible,
@@ -13,7 +8,7 @@ import {
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { CircleCheck } from 'lucide-react';
+import { Circle, CircleAlert, CircleCheck } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -65,6 +60,24 @@ export function TodoQueue({ isDismissing = false, todos }: TodoQueueProps) {
   const title = i18nService.t('coworkTodosTitle');
   const motionDuration = prefersReducedMotion ? 0 : 0.22;
 
+  const renderIndicator = (todo: QueueTodo) => {
+    if (todo.status === 'in_progress') {
+      return <Spinner className="size-4 shrink-0 text-muted-foreground" />;
+    }
+    if (todo.status === 'blocked') {
+      return (
+        <CircleAlert
+          aria-label={i18nService.t('coworkTodoBlocked')}
+          className="size-4 shrink-0 text-muted-foreground"
+        />
+      );
+    }
+    if (todo.status === 'completed') {
+      return <CircleCheck aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />;
+    }
+    return <Circle aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />;
+  };
+
   return (
     <div
       ref={containerRef}
@@ -103,28 +116,30 @@ export function TodoQueue({ isDismissing = false, todos }: TodoQueueProps) {
               </Button>
             }
           />
-          <CollapsibleContent className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-200 ease-out motion-reduce:transition-none data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+          <CollapsibleContent className="max-h-64 overflow-hidden [&[hidden]:not([hidden='until-found'])]:hidden">
             <motion.div
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: motionDuration, ease: 'easeOut' }}
               className="px-2 pb-2"
             >
-              <ScrollArea className="max-h-64">
+              <ScrollArea className="max-h-64 [&_[data-slot=scroll-area-viewport]]:max-h-64">
                 <ul>
                   {todos.map(todo => (
                     <QueueItem key={todo.id} className="px-2 py-1.5">
                       <div className="flex items-center gap-2">
-                        <QueueItemIndicator
-                          completed={todo.status === 'completed'}
-                          className="mt-0"
-                        />
-                        <QueueItemContent
-                          completed={todo.status === 'completed'}
-                          className="line-clamp-none"
-                        >
-                          {todo.title}
-                        </QueueItemContent>
+                        {renderIndicator(todo)}
+                        <div className="min-w-0 flex-1">
+                          <QueueItemContent
+                            completed={todo.status === 'completed'}
+                            className="line-clamp-none"
+                          >
+                            {todo.title}
+                          </QueueItemContent>
+                          {todo.description && (
+                            <p className="text-xs text-muted-foreground">{todo.description}</p>
+                          )}
+                        </div>
                       </div>
                     </QueueItem>
                   ))}
