@@ -19,5 +19,17 @@ export class CcConnectSidecarManager extends EventEmitter {
     this.child.on('exit', (code, signal) => { this.child = null; this.emit('exit', { code, signal }); });
     this.child.on('error', error => this.emit('error', error));
   }
-  async stop(): Promise<void> { const child = this.child; this.child = null; if (child) child.kill(); }
+  async stop(): Promise<void> {
+    const child = this.child;
+    if (!child) return;
+    await new Promise<void>(resolve => {
+      const done = () => resolve();
+      child.once('exit', done);
+      // A process may already have exited between the null check and kill.
+      if (!child.kill()) {
+        child.off('exit', done);
+        resolve();
+      }
+    });
+  }
 }
