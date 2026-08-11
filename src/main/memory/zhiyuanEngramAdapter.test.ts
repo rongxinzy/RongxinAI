@@ -66,6 +66,35 @@ test('normalizes the runtime null search response after the last memory is forgo
   await expect(adapter.recall({ query: 'decision', project: 'project-a' })).resolves.toEqual([]);
 });
 
+test('forwards the requested match mode and supports bounded recent observations', async () => {
+  const urls: URL[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL) => {
+      urls.push(new URL(url));
+      return new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }),
+  );
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+
+  await adapter.recall({
+    query: '项目 数据库',
+    project: 'project-a',
+    matchMode: 'any',
+  });
+  await adapter.recent({ project: 'project-a', scope: EngramMemoryScope.Project, limit: 99 });
+
+  expect(urls[0].searchParams.get('match_mode')).toBe('any');
+  expect(urls[1].pathname).toBe('/observations/recent');
+  expect(urls[1].searchParams.get('limit')).toBe('20');
+});
+
 test('redacts explicit private blocks before a candidate can be persisted', () => {
   expect(redactPrivateBlocks('keep <private>secret-token</private> this')).toBe(
     'keep [REDACTED] this',
