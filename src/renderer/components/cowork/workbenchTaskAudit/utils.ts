@@ -14,6 +14,7 @@ import {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
   type WorkbenchRun,
+  type WorkbenchArtifact,
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
@@ -171,6 +172,17 @@ export const formatJson = (value: unknown): string =>
 
 export const getRunAttempt = (runs: WorkbenchRun[], runId: string): number | null =>
   runs.find(run => run.id === runId)?.attempt ?? null;
+
+export const resolveArtifactFilePath = (
+  artifact: WorkbenchArtifact,
+  runs: WorkbenchRun[],
+): string | null => {
+  if (artifact.kind !== WorkbenchArtifactKind.File) return null;
+  if (/^(?:[A-Za-z]:[\\/]|\\\\|\/)/.test(artifact.reference)) return artifact.reference;
+  const workspaceRoot = runs.find(run => run.id === artifact.runId)?.context?.workspaceRoot;
+  if (!workspaceRoot) return null;
+  return `${workspaceRoot.replace(/[\\/]+$/, '')}/${artifact.reference.replace(/^[\\/]+/, '')}`;
+};
 
 export const getProjectedRun = (detail: WorkbenchTaskDetail | null): WorkbenchRun | null =>
   detail?.runs.find(run => run.id === detail.task.activeRunId) ?? detail?.runs[0] ?? null;
