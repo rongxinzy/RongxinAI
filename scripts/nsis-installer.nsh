@@ -241,11 +241,6 @@
     Goto OfflineComponentInstallFailed
 
   ComponentReady_${TOKEN}:
-    FileOpen $2 "$PLUGINSDIR\component-targets.txt" a
-    ; Keep the 64-character content ID in its dedicated version file. Combining
-    ; it with the routing fields can split the skill-python row in NSIS builds.
-    FileWrite $2 "${KEY}|${PREFIX}$\r$\n"
-    FileClose $2
     System::Call 'kernel32::GetTickCount()i .r6'
     IntOp $R5 $6 - $7
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
@@ -258,8 +253,9 @@
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
   SetOutPath "$PLUGINSDIR"
   !insertmacro ExtractElevatedActionScript
-  FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
-  FileClose $2
+  ; Embed the routing table as a compile-time asset. Building it incrementally
+  ; with NSIS FileWrite can split the skill-python key on Windows runners.
+  File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
   Delete "$PLUGINSDIR\component-switch-state.txt"
 
   ; Defender exclusion is optional and requires explicit, informed consent.
@@ -331,13 +327,13 @@
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
-      $$parts = $$_.Split(\"|\");\
-      if ($$parts.Count -ne 2 -or -not $$parts[0] -or -not $$parts[1]) { throw \"Invalid component target row: $$_\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
+    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
+    $$rows = @($$rows | ForEach-Object {\
+      if ($$_.key -notmatch \"^[a-z0-9-]+\z\" -or $$_.prefix -notmatch \"^[A-Za-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$_.key + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$parts[0] };\
-      [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$id }\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$_.key };\
+      [pscustomobject]@{ Key = $$_.key; Prefix = $$_.prefix; Id = $$id }\
     });\
     $$prepared = @();\
     $$switched = @();\
@@ -396,7 +392,7 @@
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$resourceRoot = \"$INSTDIR\resources\";\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object { $$parts = $$_.Split(\"|\"); [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1] } });\
+    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
     foreach ($$row in $$rows) {\
       $$link = Join-Path $$resourceRoot $$row.Prefix;\
       $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
@@ -456,7 +452,10 @@
     FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
     FileWrite $2 "phase=component-set-rollback reason=$R9$\r$\n"
     FileClose $2
-    MessageBox MB_OK|MB_ICONSTOP "$R9"
+    IfSilent OfflineComponentInstallFailedSilent 0
+      MessageBox MB_OK|MB_ICONSTOP "$R9"
+    OfflineComponentInstallFailedSilent:
+    SetErrorLevel 1
     Abort
 
   OfflineComponentsReady:
@@ -521,13 +520,13 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @(Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.txt\" | Where-Object { $$_ } | ForEach-Object {\
-      $$parts = $$_.Split(\"|\");\
-      if ($$parts.Count -ne 2 -or -not $$parts[0]) { throw \"Invalid component target row: $$_\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
+    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
+    $$rows = @($$rows | ForEach-Object {\
+      if ($$_.key -notmatch \"^[a-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$_.key + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$parts[0] };\
-      [pscustomobject]@{ Key = $$parts[0]; Id = $$id }\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$_.key };\
+      [pscustomobject]@{ Key = $$_.key; Id = $$id }\
     });\
     foreach ($$row in $$rows) {\
       $$root = Join-Path $$runtimeRoot $$row.Key;\
