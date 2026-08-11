@@ -1,4 +1,3 @@
-export const ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH = 12;
 export const ARTIFACT_PANEL_KEYBOARD_RESIZE_STEP = 32;
 
 export function clampArtifactPanelWidth(value: number, minWidth: number, maxWidth: number): number {
