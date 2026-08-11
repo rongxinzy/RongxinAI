@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
-import { Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
+import { ArrowLeft, Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -9,14 +9,17 @@ import type { RootState } from '@/store';
 import {
   addArtifact,
   ArtifactLayoutMode,
+  ArtifactPanelView,
   closePanel,
   MIN_PANEL_WIDTH,
   selectActiveTab,
   selectArtifactLayoutMode,
   selectArtifact,
+  selectPanelView,
   selectSessionSelectedArtifact,
   setActiveTab,
   setArtifactLayoutMode,
+  setPanelView,
 } from '@/store/slices/artifactSlice';
 import type { ArtifactActiveTab } from '@/store/slices/artifactSlice';
 import {
@@ -86,6 +89,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     selectSessionSelectedArtifact(state, sessionId),
   );
   const activeTab = useSelector(selectActiveTab);
+  const panelView = useSelector(selectPanelView);
   const layoutMode = useSelector(selectArtifactLayoutMode);
   const selectedArtifactId = useSelector((state: RootState) => state.artifact.selectedArtifactId);
   const [showFileList, setShowFileList] = useState(false);
@@ -339,7 +343,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           </div>
         )}
 
-        {selectedArtifact ? (
+        {selectedArtifact && panelView === ArtifactPanelView.Preview ? (
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Header: file list toggle + filename + type + actions */}
             <div
@@ -347,6 +351,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 isMac && isTopLevelPanel ? 'pl-20 pr-3' : 'px-3'
               }`}
             >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => dispatch(setPanelView(ArtifactPanelView.Files))}
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                title={t('back')}
+                aria-label={t('back')}
+              >
+                <ArrowLeft />
+              </Button>
               <span className="text-sm font-medium truncate">
                 {selectedArtifact.fileName || selectedArtifact.title}
               </span>
