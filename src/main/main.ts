@@ -1098,6 +1098,7 @@ let ccConnectBridgeServer: CcConnectBridgeServer | null = null;
 let ccConnectSidecarManager: CcConnectSidecarManager | null = null;
 const ccConnectChannelSidecarManagers = new Map<string, CcConnectSidecarManager>();
 const ccConnectChannelRestartTimers = new Map<string, NodeJS.Timeout>();
+let ccConnectChannelSidecarsStopping = false;
 let ccConnectPiBridge: CcConnectPiBridge | null = null;
 let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
 let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
@@ -1261,7 +1262,7 @@ const startCcConnectChannelSidecar = async (account: ReturnType<typeof listCcCon
     ccConnectChannelSidecarManagers.delete(account.accountId);
     ccConnectDeliveryTransport?.detach(account.accountId);
     console.warn(`[cc-connect] ${account.accountId} sidecar exited (code=${code}, signal=${signal})`);
-    if (!ccConnectBridgeServer || ccConnectChannelRestartTimers.has(account.accountId)) return;
+    if (ccConnectChannelSidecarsStopping || !ccConnectBridgeServer || ccConnectChannelRestartTimers.has(account.accountId)) return;
     const timer = setTimeout(() => {
       ccConnectChannelRestartTimers.delete(account.accountId);
       void startCcConnectChannelSidecar(account).catch(error =>
@@ -1291,6 +1292,17 @@ const startCcConnectChannelSidecar = async (account: ReturnType<typeof listCcCon
 const startCcConnectChannelSidecars = async (): Promise<void> => {
   const accounts = listCcConnectAccountConfigs(new IMStore(getStore().getDatabase()));
   await Promise.all(accounts.map(account => startCcConnectChannelSidecar(account)));
+};
+
+/** Re-read account settings without ever starting the legacy OpenClaw channels. */
+const reconcileCcConnectChannelSidecars = async (): Promise<void> => {
+  ccConnectChannelSidecarsStopping = true;
+  for (const timer of ccConnectChannelRestartTimers.values()) clearTimeout(timer);
+  ccConnectChannelRestartTimers.clear();
+  await Promise.all(Array.from(ccConnectChannelSidecarManagers.values(), manager => manager.stop()));
+  ccConnectChannelSidecarManagers.clear();
+  ccConnectChannelSidecarsStopping = false;
+  await startCcConnectChannelSidecars();
 };
 
 const scheduleCanonicalSchedulerClockRestart = (): void => {
@@ -6053,9 +6065,7 @@ if (!gotTheLock) {
   // persisted to DB via im:config:set (without syncGateway flag).
   ipcMain.handle('im:config:sync', async () => {
     try {
-      if (getOpenClawEngineManager().getStatus().phase === 'running') {
-        scheduleImConfigSync();
-      }
+      await reconcileCcConnectChannelSidecars();
       return { success: true };
     } catch (error) {
       return {
@@ -6070,7 +6080,7 @@ if (!gotTheLock) {
       // Persist enabled state
       const manager = getIMGatewayManager();
       manager.setConfig({ [platform]: { enabled: true } });
-      await manager.startGateway(platform);
+      await reconcileCcConnectChannelSidecars();
       return { success: true };
     } catch (error) {
       return {
@@ -6085,7 +6095,7 @@ if (!gotTheLock) {
       // Persist disabled state
       const manager = getIMGatewayManager();
       manager.setConfig({ [platform]: { enabled: false } });
-      await manager.stopGateway(platform);
+      await reconcileCcConnectChannelSidecars();
       return { success: true };
     } catch (error) {
       return {
@@ -7705,6 +7715,7 @@ if (!gotTheLock) {
     schedulerClockRestartTimer = null;
     await ccConnectSidecarManager?.stop();
     ccConnectSidecarManager = null;
+    ccConnectChannelSidecarsStopping = true;
     for (const timer of ccConnectChannelRestartTimers.values()) clearTimeout(timer);
     ccConnectChannelRestartTimers.clear();
     await Promise.all(Array.from(ccConnectChannelSidecarManagers.values(), manager => manager.stop()));
@@ -8240,11 +8251,11 @@ if (!gotTheLock) {
       handleDeepLink(coldStartDeepLink);
     }
 
-    // Auto-reconnect IM bots that were enabled before restart
-    getIMGatewayManager()
-      .startAllEnabled()
+    // Enabled account records are owned by cc-connect. Do not start OpenClaw
+    // gateways here: a release must never run both channel stacks.
+    reconcileCcConnectChannelSidecars()
       .catch(error => {
-        console.error('[IM] Failed to auto-start enabled gateways:', error);
+        console.error('[cc-connect] Failed to auto-start enabled channel sidecars:', error);
       });
 
     // Reconnect OpenClaw gateway WS after system wake from sleep/suspend
