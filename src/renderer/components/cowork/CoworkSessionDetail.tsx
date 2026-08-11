@@ -54,7 +54,6 @@ import type {
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
-import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
@@ -378,10 +377,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const updateArtifactPanelMaxWidth = useCallback(() => {
     const contentWidth = contentRowRef.current?.clientWidth ?? 0;
     if (contentWidth <= 0) return;
-    const nextMaxWidth = Math.max(
-      MIN_PANEL_WIDTH,
-      contentWidth - ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
-    );
+    const nextMaxWidth = Math.max(MIN_PANEL_WIDTH, contentWidth);
     setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
   }, []);
 

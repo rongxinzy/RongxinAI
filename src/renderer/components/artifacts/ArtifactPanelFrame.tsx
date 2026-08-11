@@ -11,11 +11,7 @@ import {
 import type { Artifact } from '@/types/artifact';
 
 import ArtifactPanel from './ArtifactPanel';
-import {
-  ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
-  clampArtifactPanelWidth,
-  isArtifactPanelAtMaximum,
-} from './artifactPanelResize';
+import { clampArtifactPanelWidth, isArtifactPanelAtMaximum } from './artifactPanelResize';
 
 interface ArtifactPanelFrameProps {
   sessionId: string | null;
@@ -50,7 +46,7 @@ const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
       const nextWidth = clampArtifactPanelWidth(width, minPanelWidth, maxPanelWidth);
       transientPanelWidthRef.current = nextWidth;
       if (frameRef.current) {
-        frameRef.current.style.width = `${nextWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH}px`;
+        frameRef.current.style.width = `${nextWidth}px`;
       }
     },
     [maxPanelWidth, minPanelWidth],
@@ -70,11 +66,10 @@ const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
     [dispatch, maxPanelWidth, minPanelWidth],
   );
 
-  const renderedFrameWidth =
-    (transientPanelWidthRef.current ?? panelWidth) + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH;
+  const renderedFrameWidth = transientPanelWidthRef.current ?? panelWidth;
   const frameStyle: React.CSSProperties = {
     width: isWorkspace ? '100%' : isVisible ? renderedFrameWidth : 0,
-    maxWidth: isWorkspace ? 'none' : maxPanelWidth + ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
+    maxWidth: isWorkspace ? 'none' : maxPanelWidth,
   };
 
   return (
@@ -91,7 +86,7 @@ const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
       )}
       style={frameStyle}
     >
-      <div className="flex h-full w-full">
+      <div className="relative flex h-full w-full">
         <ArtifactPanel
           sessionId={sessionId}
           artifacts={artifacts}
