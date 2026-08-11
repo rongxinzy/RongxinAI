@@ -953,7 +953,9 @@ interface IElectronAPI {
   workbenchTask: {
     getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
     getDetail: (taskId: string) => Promise<WorkbenchTaskActionResult>;
-    resume: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    resume: (
+      input: import('../../shared/workbenchTask').WorkbenchTaskResumeInput,
+    ) => Promise<WorkbenchTaskActionResult>;
     retry: (taskId: string) => Promise<WorkbenchTaskActionResult>;
     accept: (taskId: string) => Promise<WorkbenchTaskActionResult>;
     respondToApproval: (

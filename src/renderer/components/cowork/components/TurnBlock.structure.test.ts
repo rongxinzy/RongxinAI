@@ -17,10 +17,20 @@ test('settles execution counts after an answer or when the turn reaches a termin
   expect(source).toMatch(
     /const isAnswer =\s*item\.type === 'assistant' &&\s*!item\.message\.metadata\?\.isThinking &&\s*hasText\(item\.message\.content\);/,
   );
-  expect(source).toContain('flush(true);');
+  expect(source).toContain('flush(isAnswer);');
   expect(source).toContain(
     'const showCompletedSummary = group.followedByAnswer || isTurnComplete;',
   );
+});
+
+test('keeps recoverable interruptions outside reasoning and exposes a message action', () => {
+  expect(source).toContain(
+    "item.type === 'system' && Boolean(item.message.metadata?.interruption)",
+  );
+  expect(source).toContain('interruption.taskId === recoverableTaskId');
+  expect(source).toContain('<MessageAction');
+  expect(source).toContain("i18nService.t('coworkResumeTaskAction')");
+  expect(source).toContain('onClick={() => onResumeTask(interruption)}');
 });
 
 test('keeps active tool details in the total summary without adding a child row', () => {

@@ -608,7 +608,8 @@ contextBridge.exposeInMainWorld('electron', {
   workbenchTask: {
     getCurrent: (sessionId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.GetCurrent, sessionId),
     getDetail: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.GetDetail, taskId),
-    resume: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Resume, taskId),
+    resume: (input: import('../shared/workbenchTask').WorkbenchTaskResumeInput) =>
+      ipcRenderer.invoke(WorkbenchTaskIpc.Resume, input),
     retry: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Retry, taskId),
     accept: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Accept, taskId),
     respondToApproval: (input: WorkbenchApprovalResponseInput) =>

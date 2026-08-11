@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
@@ -96,6 +97,7 @@ import {
   toAbsolutePathFromCwd,
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
+import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
 import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
@@ -136,6 +138,9 @@ interface CoworkSessionDetailProps {
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
   inlinePermission?: CoworkPermissionRequest | null;
   onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
+  resumeTaskId?: string | null;
+  onResumeTask?: (interruption: CoworkSessionInterruption) => void;
+  onCancelTaskResume?: () => void;
 }
 
 const NAV_SCROLL_LOCK_DURATION = 800;
@@ -200,6 +205,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onRespondToInlineQuestion,
   inlinePermission,
   onRespondToInlinePermission,
+  resumeTaskId,
+  onResumeTask,
+  onCancelTaskResume,
 }) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
@@ -214,7 +222,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
 
   const sessionId = currentSession?.id;
+  const recoverableTaskId = useRecoverableWorkbenchTaskId(sessionId);
   const [gatewaySessionId, setGatewaySessionId] = useState<string | null>(null);
+
+  const handleResumeTask = useCallback(
+    (interruption: CoworkSessionInterruption) => {
+      onResumeTask?.(interruption);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
+    },
+    [onResumeTask],
+  );
 
   useEffect(() => {
     if (sessionId) {
@@ -1085,6 +1102,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 toolActivities={isLastTurn ? toolActivities : undefined}
                 showCopyButtons={!isStreaming || !isLastTurn}
                 isTurnComplete={!isStreaming || !isLastTurn}
+                recoverableTaskId={recoverableTaskId}
+                resumeTaskId={resumeTaskId}
+                onResumeTask={onResumeTask ? handleResumeTask : undefined}
                 expandToolResults={isExportingImage}
               />
             </div>
@@ -1586,6 +1606,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 showLocalThinkingToggle={isDirectChat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
+                resumeTaskActive={Boolean(resumeTaskId)}
+                onCancelTaskResume={onCancelTaskResume}
                 sessionId={displayedSessionId ?? currentSession?.id}
               />
               <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">

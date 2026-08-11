@@ -64,6 +64,7 @@ import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 import { useUnmanagedWorkingDirectory } from './useUnmanagedWorkingDirectory';
+import { useTaskResumeContext } from './hooks/useTaskResumeContext';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -178,6 +179,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
   const currentSession = useSelector(selectCurrentSession);
+  const taskResume = useTaskResumeContext(currentSession?.id);
   const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
   const directChatModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
@@ -879,6 +881,16 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     goalMode = false,
   ) => {
     if (!currentSession) return;
+    if (taskResume.interruption) {
+      return taskResume.resume({
+        amendment: prompt,
+        skillIds: [...activeSkillIds],
+        expertIds,
+        goalMode,
+        imageAttachments,
+        fileAttachments,
+      });
+    }
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
 
     // Work keeps the prompt editable while Pi is running. Normal input during
@@ -1497,6 +1509,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onRespondToInlineQuestion={onRespondToInlineQuestion}
           inlinePermission={inlinePermission}
           onRespondToInlinePermission={onRespondToInlinePermission}
+          resumeTaskId={taskResume.interruption?.taskId}
+          onResumeTask={taskResume.select}
+          onCancelTaskResume={taskResume.cancel}
         />
       </div>
     );
