@@ -45,6 +45,12 @@ class FakeRepository {
     return new Map();
   }
 
+  findActiveTopic() {
+    return null;
+  }
+
+  supersedeActiveTopic() {}
+
   createLink(input: Record<string, unknown>) {
     this.links.push(input);
     return String(input.id);
@@ -147,7 +153,7 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
 test('enforces the project context token budget', async () => {
   const adapter = {
     recall: vi.fn(async (input: { scope: string }) =>
-      input.scope === EngramMemoryScope.Personal
+      input.scope !== EngramMemoryScope.Project
         ? []
         : [
             { id: 1, title: 'First', content: 'A'.repeat(40) },
@@ -244,4 +250,80 @@ test('lists only the current project and confirmed personal memories', () => {
   expect(
     service.listRecallableMemories({ workingDirectory: 'alpha' }).map(memory => memory.id),
   ).toEqual(['project-current', 'personal']);
+});
+
+test('stores rolling session summaries with a 30 day expiration', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-08-11T00:00:00.000Z'));
+  const repository = new FakeRepository();
+  const adapter = {
+    saveCandidate: vi.fn(input => ({ id: 'candidate-summary', ...input })),
+    confirmMemory: vi.fn(async () => 21),
+    discardCandidate: vi.fn(),
+  };
+  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+
+  await expect(
+    service.saveSessionSummary({
+      sessionId: 'session-1',
+      workingDirectory: 'alpha',
+      summary: 'Session objective: fix recall',
+    }),
+  ).resolves.toBe(21);
+
+  expect(repository.items[0].payload).toMatchObject({
+    scope: EngramMemoryScope.Session,
+    topicKey: 'session/session-1',
+    expiresAt: '2026-09-10T00:00:00.000Z',
+  });
+  vi.useRealTimers();
+});
+
+test('injects session recall under its own context budget', async () => {
+  const adapter = {
+    recall: vi.fn(async (input: { scope: string }) =>
+      input.scope === EngramMemoryScope.Session
+        ? [
+            {
+              id: 31,
+              title: 'Session summary',
+              content: 'The previous session fixed CJK recall.',
+              updated_at: '2026-08-11T00:00:00.000Z',
+            },
+          ]
+        : [],
+    ),
+  };
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    adapter as never,
+    identityFor,
+  );
+
+  await expect(
+    service.buildProjectContext({ workingDirectory: 'alpha', query: 'CJK recall' }),
+  ).resolves.toContain('Session:\n- [memory:31]');
+});
+
+test('counts CJK characters conservatively against context budgets', async () => {
+  const adapter = {
+    recall: vi.fn(async (input: { scope: string }) =>
+      input.scope === EngramMemoryScope.Project
+        ? [{ id: 41, title: '中文', content: '记'.repeat(80) }]
+        : [],
+    ),
+  };
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    adapter as never,
+    identityFor,
+  );
+
+  await expect(
+    service.buildProjectContext({
+      workingDirectory: 'alpha',
+      query: 'budget',
+      tokenBudget: 30,
+    }),
+  ).resolves.toBe('');
 });
