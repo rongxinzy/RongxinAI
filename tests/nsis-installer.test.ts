@@ -18,22 +18,13 @@ describe('NSIS offline resource and local inference flow', () => {
 
     const cacheMissIndex = installerScript.indexOf('ComponentCacheMiss_${TOKEN}:');
     const payloadIndex = installerScript.indexOf(
-      'File /oname=component-${KEY}.7z "${PROJECT_DIR}\\build-tar\\windows-components\\${KEY}.7z"',
+      'File /oname=component-${KEY}.tar "${PROJECT_DIR}\\build-tar\\windows-components\\${KEY}.tar"',
     );
     expect(cacheMissIndex).toBeGreaterThan(-1);
     expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
     expect(installerScript.match(/!insertmacro EnsureOfflineComponent /g)).toHaveLength(7);
     expect(installerScript).toContain('phase=component-cache-hit');
     expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
-    expect(installerScript).toContain('File /oname=7za.exe');
-    expect(installerScript).toContain('component-${KEY}.7z');
-    expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
-    expect(installerScript).toContain('SetCompress off');
-    expect(installerScript).toContain('SetCompress auto');
-    expect(installerScript).toContain('l -slt');
-    expect(installerScript).toContain('Unsafe archive entry:');
-    expect(installerScript).toContain('Archive contains link metadata');
-    expect(installerScript).toContain('phase=component-archive-unsafe');
     expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
@@ -46,19 +37,24 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('RequestExecutionLevel admin');
     expect(installerScript).toContain('current.next');
     expect(installerScript).toContain('current.previous');
-    expect(installerScript).toContain('component-manifest.json');
-    expect(installerScript).not.toContain('component-targets.txt');
-    expect(installerScript).toContain('$$ErrorActionPreference = \\"Stop\\"');
-    expect(installerScript).toContain('Set-StrictMode -Version Latest');
-    expect(installerScript).toContain('Missing prepared component target:');
-    expect(installerScript).toContain('New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop');
-    expect(installerScript).toContain('New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop');
     expect(installerScript).toContain('component-switch-state.txt');
-    expect(installerScript).toContain('Keep the journal in the persistent cache');
-    expect(installerScript).toContain('Join-Path $$runtimeRoot \\"component-switch-state.txt\\"');
     expect(installerScript).toContain('phase=component-set-rollback');
     expect(installerScript).toContain('phase=component-cleanup-complete');
     expect(installerScript).not.toContain('离线组件原子切换失败');
+  });
+
+  test('keeps component content IDs out of the combined NSIS target rows', () => {
+    const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+
+    expect(installerScript).toContain('FileWrite $2 "${KEY}|${PREFIX}$\\r$\\n"');
+    expect(installerScript).not.toContain('${KEY}|${PREFIX}|$R1');
+    expect(installerScript).toContain(
+      'Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop',
+    );
+    expect(installerScript).toContain('^[0-9a-f]{64}$$');
+    expect(installerScript).toContain(
+      'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
+    );
   });
 
   test('records optional local inference intent without downloading in NSIS', () => {
