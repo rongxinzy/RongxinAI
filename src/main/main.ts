@@ -7858,10 +7858,6 @@ if (!gotTheLock) {
     await startCanonicalSchedulerClock().catch(error =>
       console.error('[Scheduler] Failed to start canonical cc-connect clock:', error),
     );
-    await startCcConnectChannelSidecars().catch(error =>
-      console.error('[cc-connect] Failed to start channel sidecars:', error),
-    );
-
     const startSqliteBackupLoop = async (): Promise<void> => {
       if (!sqliteBackupManager) return;
       await sqliteBackupManager.startPeriodicBackupLoop(() => getStore().getDatabase());
