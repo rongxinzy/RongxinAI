@@ -23,6 +23,7 @@ import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchContractKind,
+  WorkbenchRunTrigger,
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
@@ -314,7 +315,7 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('runs an arbitrary selected Work skill through a durable acceptance loop by default', async () => {
+    it('runs an explicit production request through a durable acceptance loop', async () => {
       const onPermissionRequest = vi.fn();
       const onComplete = vi.fn();
       adapter.on('permissionRequest', onPermissionRequest);
@@ -395,7 +396,8 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
-      adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
 
       try {
         await adapter.startSession('production-work', 'Create and validate a release report', {
@@ -444,6 +446,49 @@ describe('PiRuntimeAdapter', () => {
         expect(
           db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
         ).toEqual({ count: 1 });
+        expect(
+          service.getCurrent('production-work')?.task.contract.metadata?.productionWorkflowEnabled,
+        ).toBe(true);
+        expect(
+          service.getCurrent('production-simple')?.task.contract.metadata
+            ?.productionWorkflowEnabled,
+        ).toBe(false);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('restores the production gate from the owning task on an explicit resume', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const workspaceRoot = createTemporaryWorkspace();
+
+      try {
+        await adapter.startSession('resume-production', 'Create and validate a release report', {
+          sessionMode: 'work',
+          workspaceRoot,
+        });
+        const originalTask = service.getCurrent('resume-production')!.task;
+        await adapter.stopSession('resume-production');
+        const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
+
+        await adapter.continueSession('resume-production', 'Continue', {
+          sessionMode: 'work',
+          workspaceRoot,
+          _workbenchRunId: prepared.run.id,
+          _productionWorkflowEnabled:
+            originalTask.contract.metadata?.productionWorkflowEnabled === true,
+          _skipUserMessage: true,
+        });
+
+        const resumedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(service.getCurrent('resume-production')?.task.id).toBe(originalTask.id);
       } finally {
         db.close();
       }

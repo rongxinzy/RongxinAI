@@ -591,10 +591,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionMode: options.sessionMode,
         prompt,
         goalMode: options.goalMode,
-        skillIds: resourceState.skillIds,
-        expertIds: normalizeExpertIds(options.expertIds),
-        imageAttachmentCount: options.imageAttachments?.length,
-        resumeRun: Boolean(options._workbenchRunId),
+        inheritedProductionWorkflow: options._productionWorkflowEnabled,
       });
       const workbenchContract = this.createWorkbenchContract(
         options.sessionMode,
@@ -1031,10 +1028,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionMode: requestedSessionMode,
       prompt,
       goalMode: nextGoalMode,
-      skillIds: requestedSkillIds,
-      expertIds: requestedExpertIds,
-      imageAttachmentCount: options.imageAttachments?.length,
-      resumeRun: Boolean(options._workbenchRunId),
+      inheritedProductionWorkflow: options._productionWorkflowEnabled,
     });
     const productionWorkflowTopologyChanged =
       productionWorkflowEnabled !== active.productionWorkflowEnabled;
@@ -2835,7 +2829,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               ? WorkbenchContractKind.Shortcut
               : WorkbenchContractKind.GenericWork,
       requiresUserAcceptance: sessionMode !== 'chat' && !research && !(managedWorkflow && shortcut),
-      metadata: skillIds?.length ? { skillIds } : undefined,
+      metadata: {
+        productionWorkflowEnabled: managedWorkflow,
+        ...(skillIds?.length ? { skillIds } : {}),
+      },
     };
   }
 }
