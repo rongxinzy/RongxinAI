@@ -7714,6 +7714,7 @@ if (!gotTheLock) {
           imageAttachments: resumeInput?.imageAttachments,
           fileAttachments: resumeInput?.fileAttachments,
           _workbenchRunId: run.id,
+          _productionWorkflowEnabled: task.contract.metadata?.productionWorkflowEnabled === true,
           _skipUserMessage: !amendment,
         });
       },
