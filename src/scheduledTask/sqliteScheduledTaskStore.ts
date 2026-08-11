@@ -203,6 +203,15 @@ export class SqliteScheduledTaskStore {
       .map(row => this.deliveryFromRow(row));
   }
 
+  finishDelivery(id: string, result: Pick<ScheduledTaskDeliveryRecord, 'status' | 'deliveredAt' | 'receiptId' | 'error'>): ScheduledTaskDeliveryRecord {
+    const row = this.db.prepare('SELECT * FROM zhiyuan_scheduled_task_deliveries WHERE id = ?').get(id) as DeliveryRow | undefined;
+    if (!row) throw new Error(`Scheduled task delivery not found: ${id}`);
+    this.db.prepare(`UPDATE zhiyuan_scheduled_task_deliveries
+      SET status = ?, delivered_at = ?, receipt_id = ?, error = ? WHERE id = ?`)
+      .run(result.status, result.deliveredAt, result.receiptId, result.error, id);
+    return this.deliveryFromRow({ ...row, status: result.status, delivered_at: result.deliveredAt, receipt_id: result.receiptId, error: result.error });
+  }
+
   listRunsWithName(): ScheduledTaskRunWithName[] {
     const rows = this.db.prepare(`SELECT r.*, t.name FROM zhiyuan_scheduled_task_runs r
       JOIN zhiyuan_scheduled_tasks t ON t.id = r.task_id ORDER BY r.started_at DESC`).all() as Array<RunRow & { name: string }>;
