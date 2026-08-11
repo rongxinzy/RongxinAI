@@ -52,5 +52,6 @@ test('blocks routes outside the product memory capability boundary', async () =>
 
   expect(response.status).toBe(404);
   expect(isAllowedEngramRequest('GET', '/search')).toBe(true);
+  expect(isAllowedEngramRequest('GET', '/observations/recent')).toBe(true);
   expect(isAllowedEngramRequest('POST', '/conflicts/judge')).toBe(false);
 });
