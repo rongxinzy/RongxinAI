@@ -50,7 +50,13 @@ export class CcConnectPiBridge {
     const message: IMMessage = {
       platform: request.message.platform as Platform,
       messageId: request.message.messageId,
-      conversationId: request.message.channelId,
+      // cc-connect project names are generated from the stable ChannelAccount
+      // id. Scope the persisted Pi session by that id so two bots in the same
+      // platform conversation can never resume one another's session.
+      conversationId: getCcConnectScopedConversationId(
+        request.project,
+        request.message.channelId,
+      ),
       senderId: request.message.userId,
       senderName: request.message.userName,
       groupName: request.message.chatName,
@@ -67,4 +73,17 @@ export class CcConnectPiBridge {
   async runCronTrigger(trigger: CcConnectCronTrigger): Promise<void> {
     await this.onCronTrigger(trigger);
   }
+}
+
+/** Stable, unambiguous storage key for a cc-connect account conversation. */
+export function getCcConnectScopedConversationId(
+  accountId: string,
+  conversationId: string,
+): string {
+  const account = accountId.trim();
+  const conversation = conversationId.trim();
+  if (!account || !conversation) {
+    throw new Error('cc-connect accountId and conversationId are required');
+  }
+  return `cc-connect:${Buffer.from(JSON.stringify([account, conversation])).toString('base64url')}`;
 }
