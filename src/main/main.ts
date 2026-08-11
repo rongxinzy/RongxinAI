@@ -1124,7 +1124,12 @@ const startCcConnectBridge = async (): Promise<void> => {
     runtime: getPiRuntimeAdapter(), coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
-    onCronTrigger: async trigger => getCanonicalScheduledTaskService() && canonicalSchedulerRuntime!.handleTrigger(trigger),
+    onCronTrigger: async trigger => getCanonicalScheduledTaskService() && canonicalSchedulerRuntime!.handleTrigger({
+      accountId: trigger.project,
+      taskId: trigger.taskId,
+      scheduleVersion: trigger.scheduleVersion,
+      scheduledAt: trigger.scheduledAt,
+    }),
   });
   ccConnectBridgeServer = new CcConnectBridgeServer(token, {
     onTurn: request => ccConnectPiBridge!.runTurn(request),

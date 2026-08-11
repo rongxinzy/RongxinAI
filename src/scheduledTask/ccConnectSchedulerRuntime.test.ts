@@ -20,7 +20,7 @@ test('projects only schedules and executes a claimed trigger once', async () => 
   const { store, task, client, execute, runtime } = setup();
   await runtime.register(task);
   expect(client.upsert).toHaveBeenCalledWith({ accountId: 'default', taskId: task.id, scheduleVersion: task.scheduleVersion, schedule: task.schedule });
-  const trigger = { taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' };
+  const trigger = { accountId: 'default', taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' };
   await runtime.handleTrigger(trigger);
   await runtime.handleTrigger(trigger);
   expect(execute).toHaveBeenCalledTimes(1);
@@ -32,6 +32,13 @@ test('disabled tasks delete their sidecar projection and never execute', async (
   const disabled = store.update(task.id, { enabled: false });
   await runtime.register(disabled);
   expect(client.remove).toHaveBeenCalledWith({ accountId: 'default', taskId: task.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
-  await runtime.handleTrigger({ taskId: task.id, scheduleVersion: disabled.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
+  await runtime.handleTrigger({ accountId: 'default', taskId: task.id, scheduleVersion: disabled.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
   expect(execute).not.toHaveBeenCalled();
+});
+
+test('rejects a trigger from a different channel account before it claims a Run', async () => {
+  const { store, task, execute, runtime } = setup();
+  await runtime.handleTrigger({ accountId: 'other-account', taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
+  expect(execute).not.toHaveBeenCalled();
+  expect(store.listRuns(task.id)).toHaveLength(0);
 });

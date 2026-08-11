@@ -51,11 +51,11 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     await this.executeAndFinish(task, run);
   }
 
-  async handleTrigger(input: { taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void> {
+  async handleTrigger(input: { accountId: string; taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void> {
+    const task = this.store.get(input.taskId);
+    if (!task || (task.delivery.accountId ?? 'default') !== input.accountId) return;
     const run = this.store.claimTrigger(input);
     if (!run) return; // disabled/stale/duplicate triggers are intentionally harmless.
-    const task = this.store.get(input.taskId);
-    if (!task) return;
     await this.executeAndFinish(task, run);
   }
 

@@ -6,7 +6,7 @@ export interface SchedulerRuntime {
   register(task: ScheduledTask): Promise<void>;
   remove(taskId: string): Promise<void>;
   runNow(taskId: string): Promise<void>;
-  handleTrigger(input: { taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void>;
+  handleTrigger(input: { accountId: string; taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void>;
 }
 
 export interface ScheduledTaskStore {
