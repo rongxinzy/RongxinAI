@@ -257,6 +257,7 @@
   File /oname=7za.exe "${PROJECT_DIR}\node_modules\7zip-bin\win\x64\7za.exe"
   File /oname=7za.sha256 "${PROJECT_DIR}\build-tar\windows-components\7za.sha256"
   File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
+  File /oname=recover-component-switch.ps1 "${PROJECT_DIR}\scripts\installer\recover-component-switch.ps1"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\7za.exe\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
   Pop $0
   Pop $1
@@ -269,21 +270,8 @@
   StrCpy $1 $1 64
   StrCmp $1 $R7 0 OfflineComponentInstallFailed
   ; Keep the journal in the persistent cache: $PLUGINSDIR is deleted after a forced quit.
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$ErrorActionPreference = \"Stop\";\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
-    if (-not (Test-Path -LiteralPath $$statePath)) { exit 0 };\
-    $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ -match \"^[^=|]+\\|(?:True|False)$$\" });\
-    [array]::Reverse($$states);\
-    foreach ($$state in $$states) {\
-      $$parts = $$state.Split(\"|\"); $$root = Join-Path $$runtimeRoot $$parts[0];\
-      $$current = Join-Path $$root \"current\"; $$next = Join-Path $$root \"current.next\"; $$previous = Join-Path $$root \"current.previous\";\
-      if ($$parts[1] -eq \"True\" -and (Test-Path -LiteralPath $$previous)) {\
-        if (Test-Path -LiteralPath $$current) { [IO.Directory]::Delete($$current) }; Rename-Item -LiteralPath $$previous -NewName \"current\" -ErrorAction Stop\
-      } elseif ($$parts[1] -eq \"False\" -and (Test-Path -LiteralPath $$current)) { [IO.Directory]::Delete($$current) };\
-      if (Test-Path -LiteralPath $$next) { [IO.Directory]::Delete($$next) }\
-    }; Remove-Item -LiteralPath $$statePath -Force -ErrorAction Stop"'
+  ; A separate script avoids NSIS macro expansion corrupting PowerShell quotes.
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\recover-component-switch.ps1" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes"'
   Pop $0
   Pop $1
   StrCmp $0 "0" 0 OfflineComponentInstallFailed
