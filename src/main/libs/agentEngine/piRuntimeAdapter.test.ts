@@ -210,6 +210,7 @@ import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
+import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import type { CoworkStore } from '../../coworkStore';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
@@ -268,6 +269,19 @@ describe('PiRuntimeAdapter', () => {
         sessionId: 'summary-session',
         workingDirectory: '/workspace/project',
       });
+    });
+
+    it('registers raw conversation search as a separate tool', async () => {
+      adapter.setConversationHistoryService({ search: vi.fn(() => []) } as never);
+
+      await adapter.startSession('history-session', 'Find the previous decision');
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools: Array<{ name: string }>;
+      };
+
+      expect(sessionOptions.customTools.map(tool => tool.name)).toContain(
+        CONVERSATION_HISTORY_TOOL_NAME,
+      );
     });
 
     it('initializes a controlled persistent run for academic research', async () => {

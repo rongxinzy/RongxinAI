@@ -55,6 +55,8 @@ import {
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
+import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
+import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import {
@@ -471,6 +473,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
+  private conversationHistoryService: ConversationHistoryService | null = null;
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
 
@@ -482,6 +485,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setSessionSummaryService(service: SessionSummaryService): void {
     this.sessionSummaryService = service;
+  }
+  setConversationHistoryService(service: ConversationHistoryService): void {
+    this.conversationHistoryService = service;
   }
   setWorkbenchTaskService(service: WorkbenchTaskService): void {
     if (this.workbenchTaskService && this.workbenchApprovalListener) {
@@ -693,6 +699,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           buildPiProjectMemoryTool({
             service: this.projectMemoryService,
             sessionId,
+            workingDirectory: workspaceRoot,
+          }),
+        );
+      }
+      if (this.conversationHistoryService) {
+        customTools.push(
+          buildPiConversationHistoryTool({
+            service: this.conversationHistoryService,
             workingDirectory: workspaceRoot,
           }),
         );
