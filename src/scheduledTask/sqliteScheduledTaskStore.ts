@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3';
 import { DeliveryMode, TaskStatus } from './constants';
 import type {
   ScheduledTask,
+  ScheduledTaskDeliveryRecord,
   ScheduledTaskInput,
   ScheduledTaskRun,
   ScheduledTaskRunWithName,
@@ -21,6 +22,11 @@ type RunRow = {
   id: string; task_id: string; schedule_version: string; scheduled_at: string | null;
   session_id: string | null; session_key: string | null; status: string; started_at: string;
   finished_at: string | null; duration_ms: number | null; error: string | null;
+};
+type DeliveryRow = {
+  id: string; run_id: string; task_id: string; mode: string; channel: string | null;
+  destination: string | null; account_id: string | null; status: string; attempted_at: string;
+  delivered_at: string | null; receipt_id: string | null; error: string | null;
 };
 
 const initialState = (): TaskState => ({
@@ -52,6 +58,14 @@ export class SqliteScheduledTaskStore {
       );
       CREATE INDEX IF NOT EXISTS idx_zhiyuan_scheduled_task_runs_task_started
         ON zhiyuan_scheduled_task_runs(task_id, started_at DESC);
+      CREATE TABLE IF NOT EXISTS zhiyuan_scheduled_task_deliveries (
+        id TEXT PRIMARY KEY, run_id TEXT NOT NULL, task_id TEXT NOT NULL,
+        mode TEXT NOT NULL, channel TEXT, destination TEXT, account_id TEXT,
+        status TEXT NOT NULL, attempted_at TEXT NOT NULL, delivered_at TEXT,
+        receipt_id TEXT, error TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_zhiyuan_scheduled_task_deliveries_run
+        ON zhiyuan_scheduled_task_deliveries(run_id, attempted_at DESC);
     `);
   }
 
@@ -96,6 +110,7 @@ export class SqliteScheduledTaskStore {
   remove(id: string): void {
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM zhiyuan_scheduled_task_runs WHERE task_id = ?').run(id);
+      this.db.prepare('DELETE FROM zhiyuan_scheduled_task_deliveries WHERE task_id = ?').run(id);
       this.db.prepare('DELETE FROM zhiyuan_scheduled_tasks WHERE id = ?').run(id);
     })();
   }
@@ -169,6 +184,25 @@ export class SqliteScheduledTaskStore {
       .map(row => this.runFromRow(row));
   }
 
+  createDelivery(input: Omit<ScheduledTaskDeliveryRecord, 'id' | 'attemptedAt'> & { attemptedAt?: string }): ScheduledTaskDeliveryRecord {
+    const delivery: ScheduledTaskDeliveryRecord = {
+      ...input,
+      id: randomUUID(),
+      attemptedAt: input.attemptedAt ?? new Date().toISOString(),
+    };
+    this.db.prepare(`INSERT INTO zhiyuan_scheduled_task_deliveries
+      (id, run_id, task_id, mode, channel, destination, account_id, status, attempted_at, delivered_at, receipt_id, error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(delivery.id, delivery.runId, delivery.taskId, delivery.mode, delivery.channel, delivery.to,
+        delivery.accountId, delivery.status, delivery.attemptedAt, delivery.deliveredAt, delivery.receiptId, delivery.error);
+    return delivery;
+  }
+
+  listDeliveries(runId: string): ScheduledTaskDeliveryRecord[] {
+    return (this.db.prepare('SELECT * FROM zhiyuan_scheduled_task_deliveries WHERE run_id = ? ORDER BY attempted_at DESC').all(runId) as DeliveryRow[])
+      .map(row => this.deliveryFromRow(row));
+  }
+
   listRunsWithName(): ScheduledTaskRunWithName[] {
     const rows = this.db.prepare(`SELECT r.*, t.name FROM zhiyuan_scheduled_task_runs r
       JOIN zhiyuan_scheduled_tasks t ON t.id = r.task_id ORDER BY r.started_at DESC`).all() as Array<RunRow & { name: string }>;
@@ -223,6 +257,14 @@ export class SqliteScheduledTaskStore {
     return { id: row.id, taskId: row.task_id, sessionId: row.session_id, sessionKey: row.session_key,
       status: row.status as TaskStatus, startedAt: row.started_at, finishedAt: row.finished_at,
       durationMs: row.duration_ms, error: row.error };
+  }
+  private deliveryFromRow(row: DeliveryRow): ScheduledTaskDeliveryRecord {
+    return {
+      id: row.id, runId: row.run_id, taskId: row.task_id, mode: row.mode as DeliveryMode,
+      channel: row.channel, to: row.destination, accountId: row.account_id,
+      status: row.status as ScheduledTaskDeliveryRecord['status'], attemptedAt: row.attempted_at,
+      deliveredAt: row.delivered_at, receiptId: row.receipt_id, error: row.error,
+    };
   }
 }
 

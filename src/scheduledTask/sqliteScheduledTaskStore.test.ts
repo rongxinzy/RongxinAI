@@ -32,6 +32,20 @@ test('claims each scheduled trigger once and persists its completed Run', () => 
   expect(store.listRuns(task.id)).toHaveLength(1);
 });
 
+test('persists Delivery attempts beside the canonical Run', () => {
+  const store = new SqliteScheduledTaskStore(new Database(':memory:'));
+  const task = createTask(store);
+  const run = store.claimTrigger({ taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' })!;
+  const delivery = store.createDelivery({
+    runId: run.id, taskId: task.id, mode: DeliveryMode.Announce,
+    channel: 'telegram', to: '42', accountId: 'telegram-work', status: 'success',
+    deliveredAt: '2026-08-11T06:00:01.000Z', receiptId: 'delivery-42', error: null,
+  });
+  expect(store.listDeliveries(run.id)).toEqual([delivery]);
+  store.remove(task.id);
+  expect(store.listDeliveries(run.id)).toEqual([]);
+});
+
 test('keeps a legacy id stable when importing canonical task records', () => {
   const store = new SqliteScheduledTaskStore(new Database(':memory:'));
   const input = { name: 'legacy', description: '', enabled: false,

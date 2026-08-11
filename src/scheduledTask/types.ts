@@ -93,6 +93,22 @@ export interface ScheduledTaskRunWithName extends ScheduledTaskRun {
   taskPayload?: string;
 }
 
+/** Immutable result of one attempt to deliver a completed canonical Run. */
+export interface ScheduledTaskDeliveryRecord {
+  id: string;
+  runId: string;
+  taskId: string;
+  mode: DeliveryMode;
+  channel: string | null;
+  to: string | null;
+  accountId: string | null;
+  status: 'pending' | 'success' | 'error' | 'skipped';
+  attemptedAt: string;
+  deliveredAt: string | null;
+  receiptId: string | null;
+  error: string | null;
+}
+
 export interface ScheduledTaskInput {
   name: string;
   description: string;
