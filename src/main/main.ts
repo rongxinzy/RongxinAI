@@ -7690,6 +7690,10 @@ if (!gotTheLock) {
     if (resetCount > 0) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
     }
+    const recoveredScheduledRuns = new SqliteScheduledTaskStore(getStore().getDatabase()).recoverInterruptedRuns();
+    if (recoveredScheduledRuns > 0) {
+      console.warn(`[Scheduler] marked ${recoveredScheduledRuns} interrupted Run(s) as failed`);
+    }
     const recoveredWorkbenchTasks = getWorkbenchTaskService().recoverInterruptedState();
     if (recoveredWorkbenchTasks > 0) {
       console.log(

@@ -41,3 +41,12 @@ test('keeps a legacy id stable when importing canonical task records', () => {
   expect(store.importLegacy('legacy-id', input).id).toBe('legacy-id');
   expect(store.importLegacy('legacy-id', { ...input, name: 'ignored' }).name).toBe('legacy');
 });
+
+test('recovers interrupted running Runs as visible errors', () => {
+  const store = new SqliteScheduledTaskStore(new Database(':memory:'));
+  const task = createTask(store);
+  const run = store.claimTrigger({ taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' })!;
+  expect(store.recoverInterruptedRuns()).toBe(1);
+  expect(store.listRuns(task.id)[0]).toMatchObject({ id: run.id, status: 'error', error: 'Scheduler interrupted before Pi completion' });
+  expect(store.get(task.id)?.state.runningAtMs).toBeNull();
+});

@@ -120,11 +120,16 @@ export class SqliteScheduledTaskStore {
       durationMs: null, error: null,
     };
     try {
-      this.db.prepare(`INSERT INTO zhiyuan_scheduled_task_runs
+      this.db.transaction(() => {
+        this.db.prepare(`INSERT INTO zhiyuan_scheduled_task_runs
         (id, task_id, schedule_version, scheduled_at, session_id, session_key, status, started_at, finished_at, duration_ms, error)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(run.id, run.taskId, input.scheduleVersion, input.scheduledAt, run.sessionId, run.sessionKey,
           run.status, run.startedAt, null, null, null);
+        const state = { ...task.state, runningAtMs: Date.parse(run.startedAt) };
+        this.db.prepare('UPDATE zhiyuan_scheduled_tasks SET state_json = ?, updated_at = ? WHERE id = ?')
+          .run(JSON.stringify(state), run.startedAt, task.id);
+      })();
     } catch (error) {
       if (String(error).includes('UNIQUE constraint failed')) return null;
       throw error;
@@ -168,6 +173,24 @@ export class SqliteScheduledTaskStore {
     const rows = this.db.prepare(`SELECT r.*, t.name FROM zhiyuan_scheduled_task_runs r
       JOIN zhiyuan_scheduled_tasks t ON t.id = r.task_id ORDER BY r.started_at DESC`).all() as Array<RunRow & { name: string }>;
     return rows.map(row => ({ ...this.runFromRow(row), taskName: row.name }));
+  }
+
+  /** Makes crash-interrupted execution visible instead of leaving a permanent running Run. */
+  recoverInterruptedRuns(): number {
+    const finishedAt = new Date().toISOString();
+    const rows = this.db.prepare("SELECT * FROM zhiyuan_scheduled_task_runs WHERE status = 'running'").all() as RunRow[];
+    for (const row of rows) {
+      const durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(row.started_at));
+      const error = 'Scheduler interrupted before Pi completion';
+      this.db.prepare('UPDATE zhiyuan_scheduled_task_runs SET status = ?, finished_at = ?, duration_ms = ?, error = ? WHERE id = ?')
+        .run(TaskStatus.Error, finishedAt, durationMs, error, row.id);
+      const task = this.get(row.task_id);
+      if (task) {
+        const state = { ...task.state, runningAtMs: null, lastRunAtMs: Date.parse(finishedAt), lastStatus: TaskStatus.Error as TaskStatus, lastError: error, lastDurationMs: durationMs, consecutiveErrors: task.state.consecutiveErrors + 1 };
+        this.db.prepare('UPDATE zhiyuan_scheduled_tasks SET state_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(state), finishedAt, task.id);
+      }
+    }
+    return rows.length;
   }
 
   private insert(task: ScheduledTask): void {
