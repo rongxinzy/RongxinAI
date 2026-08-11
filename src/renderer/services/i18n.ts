@@ -1278,6 +1278,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkApiConfigSaveFailed: '保存 API 配置失败',
     coworkApiConfigLoadFailed: '加载 API 配置失败',
     coworkStatusIdle: '已停止',
+    coworkInterruptionUserStop: '已停止本次执行。你可以继续发送消息。',
+    coworkInterruptionApprovalDenied: '已拒绝该操作，当前任务已暂停。',
+    coworkInterruptionRuntimePaused: '执行已暂停，请检查任务状态后继续。',
     coworkStatusRunning: '运行中',
     coworkStatusCompleted: '已完成',
     coworkStatusError: '错误',
@@ -4155,6 +4158,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkApiConfigSaveFailed: 'Failed to save API configuration',
     coworkApiConfigLoadFailed: 'Failed to load API configuration',
     coworkStatusIdle: 'Idle',
+    coworkInterruptionUserStop: 'This run was stopped. You can continue sending messages.',
+    coworkInterruptionApprovalDenied: 'The action was denied and the current task was paused.',
+    coworkInterruptionRuntimePaused:
+      'The run was paused. Review the task status before continuing.',
     coworkStatusRunning: 'Running',
     coworkStatusCompleted: 'Completed',
     coworkStatusError: 'Error',
@@ -4884,7 +4891,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpFeishuLoginTitle: 'Sign in to Feishu',
     mcpFeishuSubtitle:
       'Connect Feishu through its official CLI to use calendars, documents, Bitable, chat, and more.',
-    mcpFeishuInstallFailed: 'Could not install the Feishu connector. Check your network and Node.js setup, then try again.',
+    mcpFeishuInstallFailed:
+      'Could not install the Feishu connector. Check your network and Node.js setup, then try again.',
     mcpConfigureTitle: 'Configure {name}',
     mcpGithubConfigureSubtitle:
       'Connect GitHub to access the repositories, issues, and pull requests you authorize.',

@@ -11,6 +11,10 @@ import React from 'react';
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
+import {
+  CoworkInterruptionCause,
+  type CoworkSessionInterruption,
+} from '../../../../shared/cowork/interruption';
 import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 import { i18nService } from '../../../services/i18n';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
@@ -34,6 +38,18 @@ import { ExecutionSummary } from './ExecutionSummary';
 import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
+
+const getInterruptionMessage = (interruption: CoworkSessionInterruption): string => {
+  switch (interruption.cause) {
+    case CoworkInterruptionCause.ApprovalDenied:
+      return i18nService.t('coworkInterruptionApprovalDenied');
+    case CoworkInterruptionCause.RuntimePaused:
+      return i18nService.t('coworkInterruptionRuntimePaused');
+    case CoworkInterruptionCause.UserStop:
+    default:
+      return i18nService.t('coworkInterruptionUserStop');
+  }
+};
 
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
@@ -60,17 +76,20 @@ const TurnBlockComponent: React.FC<{
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
   const renderSystemMessage = (message: CoworkMessage) => {
+    const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
     const isError = !hasText(message.content) && typeof message.metadata?.error === 'string';
     const errorKind = message.metadata?.errorKind as CoworkErrorKind | undefined;
     const i18nKey = isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
     const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
-    const rawContent = i18nMessage
-      ? i18nMessage
-      : hasText(message.content)
-        ? message.content
-        : typeof message.metadata?.error === 'string'
-          ? message.metadata.error
-          : '';
+    const rawContent = interruption
+      ? getInterruptionMessage(interruption)
+      : i18nMessage
+        ? i18nMessage
+        : hasText(message.content)
+          ? message.content
+          : typeof message.metadata?.error === 'string'
+            ? message.metadata.error
+            : '';
     const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
     const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
     if (!content.trim()) return null;
