@@ -7,7 +7,11 @@ import type { RootState } from '../index';
 const DEFAULT_PANEL_WIDTH = 560;
 const MIN_PANEL_WIDTH = 180;
 
-export type ArtifactPanelView = 'files' | 'preview';
+export const ArtifactPanelView = {
+  Files: 'files',
+  Preview: 'preview',
+} as const;
+export type ArtifactPanelView = (typeof ArtifactPanelView)[keyof typeof ArtifactPanelView];
 export type ArtifactActiveTab = 'preview' | 'code';
 export const ArtifactLayoutMode = {
   Split: 'split',
@@ -44,7 +48,7 @@ const initialState: ArtifactState = {
   selectedArtifactId: null,
   isPanelOpen: false,
   activeTab: 'preview',
-  panelView: 'files',
+  panelView: ArtifactPanelView.Files,
   panelWidth: DEFAULT_PANEL_WIDTH,
   layoutMode: ArtifactLayoutMode.Split,
 };
@@ -53,7 +57,7 @@ const DEFAULT_SESSION_VIEW_STATE: ArtifactSessionViewState = {
   selectedArtifactId: null,
   isPanelOpen: false,
   activeTab: 'preview',
-  panelView: 'files',
+  panelView: ArtifactPanelView.Files,
   layoutMode: ArtifactLayoutMode.Split,
 };
 
@@ -204,7 +208,7 @@ const artifactSlice = createSlice({
     selectArtifact(state, action: PayloadAction<string | null>) {
       state.selectedArtifactId = action.payload;
       if (action.payload) {
-        state.panelView = 'preview';
+        state.panelView = ArtifactPanelView.Preview;
         state.isPanelOpen = true;
         state.activeTab = 'preview';
       }
