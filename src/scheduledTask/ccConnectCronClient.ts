@@ -1,8 +1,9 @@
+import type { Schedule } from './types';
+
 export type CcConnectCronTask = {
   taskId: string;
   scheduleVersion: string;
-  expression: string;
-  timezone?: string;
+  schedule: Schedule;
 };
 
 /** Minimal authenticated control-plane client; it never sends payloads or commands. */
