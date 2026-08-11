@@ -1,5 +1,27 @@
 !include "FileFunc.nsh"
 
+!define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
+!define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+
+!macro ExtractElevatedActionScript
+  SetOutPath "$PLUGINSDIR"
+  File /oname=${ELEVATED_ACTION_SCRIPT} "${PROJECT_DIR}\scripts\nsis-elevated-actions.ps1"
+!macroend
+
+!macro RunElevatedAction TOKEN ACTION TARGET
+  Delete "$PLUGINSDIR\${ELEVATED_ACTION_RESULT}"
+  StrCpy $0 "error"
+  StrCpy $1 ""
+  ClearErrors
+  ExecShellWait "runas" "$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File $\"$PLUGINSDIR\${ELEVATED_ACTION_SCRIPT}$\" -Action ${ACTION} -Target $\"${TARGET}$\" -ResultPath $\"$PLUGINSDIR\${ELEVATED_ACTION_RESULT}$\"' SW_HIDE $0
+  IfErrors ElevatedActionResult_${TOKEN}
+  IfFileExists "$PLUGINSDIR\${ELEVATED_ACTION_RESULT}" 0 ElevatedActionResult_${TOKEN}
+    FileOpen $2 "$PLUGINSDIR\${ELEVATED_ACTION_RESULT}" r
+    FileRead $2 $1
+    FileClose $2
+  ElevatedActionResult_${TOKEN}:
+!macroend
+
 !macro customHeader
   ManifestDPIAware true
   ; The application and immutable runtime cache are per-user. Elevated helper
@@ -235,6 +257,7 @@
   CreateDirectory "$APPDATA\ZhiYuanAgent"
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
   SetOutPath "$PLUGINSDIR"
+  !insertmacro ExtractElevatedActionScript
   FileOpen $2 "$PLUGINSDIR\component-targets.txt" w
   FileClose $2
   Delete "$PLUGINSDIR\component-switch-state.txt"
@@ -258,15 +281,13 @@
 
   EnableDefenderExclusion:
     DetailPrint "[Installer] Adding user-approved Defender exclusion"
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\"; $$command = \"Add-MpPreference -ExclusionPath ''$$runtimeRoot'' -ErrorAction Stop\"; $$process = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList @(''-NoProfile'', ''-NonInteractive'', ''-Command'', $$command) -Wait -PassThru; exit $$process.ExitCode"'
-    Pop $0
-    Pop $1
+    !insertmacro RunElevatedAction ADD_DEFENDER add-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
     StrCmp $0 "0" DefenderExclusionEnabled
       Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
       FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
       FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
       FileClose $2
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加，可能被组织策略阻止。知远仍会继续安装。"
+      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加。可能是你取消了管理员授权，或系统安全策略不允许修改。知远仍会继续安装。"
       Goto DefenderExclusionDone
 
   DefenderExclusionEnabled:
@@ -315,7 +336,7 @@
       if ($$parts.Count -ne 2 -or -not $$parts[0] -or -not $$parts[1]) { throw \"Invalid component target row: $$_\" };\
       $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}$$\") { throw \"Invalid component content ID for \" + $$parts[0] };\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$parts[0] };\
       [pscustomobject]@{ Key = $$parts[0]; Prefix = $$parts[1]; Id = $$id }\
     });\
     $$prepared = @();\
@@ -451,12 +472,13 @@
   InstallVcRuntime:
     IfFileExists "$INSTDIR\resources\vc_redist.x64.exe" 0 VcRuntimeReady
     DetailPrint "[Installer] Installing Microsoft Visual C++ Runtime"
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$process = Start-Process -FilePath \"$INSTDIR\resources\vc_redist.x64.exe\" -Verb RunAs -ArgumentList @(''/install'', ''/quiet'', ''/norestart'') -Wait -PassThru; exit $$process.ExitCode"'
-    Pop $0
-    Pop $1
+    !insertmacro RunElevatedAction INSTALL_VC install-vc-runtime "$INSTDIR\resources\vc_redist.x64.exe"
     StrCmp $0 "0" VcRuntimeReady
     StrCmp $0 "1638" VcRuntimeReady
     StrCmp $0 "3010" VcRuntimeReady
+      FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
+      FileWrite $2 "phase=vc-runtime-install-failed exit=$0 output=$1$\r$\n"
+      FileClose $2
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
   VcRuntimeReady:
 
@@ -504,7 +526,7 @@
       if ($$parts.Count -ne 2 -or -not $$parts[0]) { throw \"Invalid component target row: $$_\" };\
       $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$parts[0] + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}$$\") { throw \"Invalid component content ID for \" + $$parts[0] };\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$parts[0] };\
       [pscustomobject]@{ Key = $$parts[0]; Id = $$id }\
     });\
     foreach ($$row in $$rows) {\
@@ -578,9 +600,9 @@
   ; Remove only exclusions that this installer recorded as user-approved and
   ; installer-managed. Never remove an exclusion created independently.
   IfFileExists "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" 0 DefenderExclusionUninstallDone
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "$$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\"; $$command = \"Remove-MpPreference -ExclusionPath ''$$runtimeRoot'' -ErrorAction SilentlyContinue\"; $$process = Start-Process -FilePath powershell.exe -Verb RunAs -ArgumentList @(''-NoProfile'', ''-NonInteractive'', ''-Command'', $$command) -Wait -PassThru; exit $$process.ExitCode"'
-    Pop $0
-    Pop $1
-    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
+    !insertmacro ExtractElevatedActionScript
+    !insertmacro RunElevatedAction REMOVE_DEFENDER remove-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
+    StrCmp $0 "0" 0 DefenderExclusionUninstallDone
+      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
   DefenderExclusionUninstallDone:
 !macroend
