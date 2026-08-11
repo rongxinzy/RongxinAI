@@ -586,6 +586,9 @@
   ; data. User-created Skills and models remain under userData. Deleting the
   ; expanded runtime tree synchronously can take longer than the uninstaller
   ; itself, so rename it atomically and reclaim it in the background.
+  ; Keep both the uninstaller and spawned cleanup commands outside $INSTDIR so
+  ; electron-builder's final RMDir can remove the now-empty application root.
+  SetOutPath "$TEMP"
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
     if (Test-Path -LiteralPath $$runtimeRoot) {\

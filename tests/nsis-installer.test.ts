@@ -153,6 +153,10 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(uninstallBlock).toContain('Rename "$3" "$4"');
     expect(uninstallBlock).toContain('cmd /d /c rd /s /q "$4"');
     expect(uninstallBlock).not.toContain('Remove-Item -LiteralPath $$runtimeRoot -Recurse -Force');
+    expect(uninstallBlock).toContain('SetOutPath "$TEMP"');
+    expect(uninstallBlock.indexOf('SetOutPath "$TEMP"')).toBeLessThan(
+      uninstallBlock.indexOf("nsExec::ExecToLog 'powershell"),
+    );
   });
 
   test('waits for the spawned NSIS uninstaller to remove managed roots', () => {
