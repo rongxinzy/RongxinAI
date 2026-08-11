@@ -3,6 +3,7 @@ import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivit
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
+import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -49,7 +50,7 @@ export interface PiRuntimeEvents {
   permissionDismiss: (requestId: string) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
-  sessionStopped: (sessionId: string) => void;
+  sessionInterrupted: (event: CoworkSessionInterruption) => void;
   queueUpdated: (sessionId: string, items: CoworkPendingMessage[]) => void;
 }
 

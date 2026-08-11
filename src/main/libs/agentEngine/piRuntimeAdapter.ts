@@ -28,6 +28,10 @@ import {
   type CoworkPendingMessage,
 } from '../../../shared/cowork/pendingMessageQueue';
 import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import {
+  CoworkInterruptionCause,
+  type CoworkSessionInterruption,
+} from '../../../shared/cowork/interruption';
 import { CoworkToolActivityPhase } from '../../../shared/cowork/toolActivity';
 import {
   HarnessVersion,
@@ -38,6 +42,7 @@ import { MAX_STALE_PRODUCTION_ITERATIONS } from '../../../shared/productionLoop'
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
+  WorkbenchTaskStatus,
   type WorkbenchTaskContract,
 } from '../../../shared/workbenchTask';
 import {
@@ -126,7 +131,9 @@ import type {
 interface PiSession {
   prompt(text: string, options?: { streamingBehavior?: 'steer' | 'followUp' }): Promise<void>;
   sendUserMessage?(
-    content: string | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
+    content:
+      | string
+      | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>,
     options?: { deliverAs?: 'steer' | 'followUp' },
   ): Promise<void>;
   steer(text: string): Promise<void>;
@@ -328,7 +335,9 @@ function preparePiPrompt(
   attachments: PiStartOptions['imageAttachments'] | undefined,
   capabilities: ModelCapabilities,
 ): {
-  content: string | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
+  content:
+    | string
+    | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>;
   hasImages: boolean;
 } {
   if (!attachments?.length) return { content: text, hasImages: false };
@@ -343,7 +352,8 @@ function preparePiPrompt(
       };
     }
   }
-  const hint = '[image attachments were not sent because the selected model has no confirmed image support]';
+  const hint =
+    '[image attachments were not sent because the selected model has no confirmed image support]';
   return { content: text.trim() ? `${text}\n\n${hint}` : hint, hasImages: false };
 }
 
@@ -532,7 +542,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     if (this.activeSessions.has(sessionId)) {
-      this.stopSession(sessionId);
+      this.stopActiveSession(sessionId, 'The session was replaced by a new run.', false);
     }
 
     const pi = await getPiModules();
@@ -958,7 +968,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.activeSessions.delete(sessionId);
       }
       if (abortController.signal.aborted) {
-        this.emit('sessionStopped', sessionId);
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -1148,7 +1157,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         content: prompt,
         timestamp: Date.now(),
         metadata:
-            options.skillIds?.length || options._queueDelivery || options.imageAttachments?.length || options.fileAttachments?.length
+          options.skillIds?.length ||
+          options._queueDelivery ||
+          options.imageAttachments?.length ||
+          options.fileAttachments?.length
             ? {
                 ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
                 ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
@@ -1217,7 +1229,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     } catch (error) {
       active.isRunning = false;
       if (active.abortController.signal.aborted) {
-        this.emit('sessionStopped', sessionId);
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -1281,10 +1292,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   stopSession(sessionId: string): void {
-    this.stopActiveSession(sessionId, 'The user stopped this run.', true);
+    this.stopActiveSession(
+      sessionId,
+      'The user stopped this run.',
+      true,
+      CoworkInterruptionCause.UserStop,
+    );
   }
 
-  private stopActiveSession(sessionId: string, reason: string, drainQueuedFollowUp: boolean): void {
+  private stopActiveSession(
+    sessionId: string,
+    reason: string,
+    drainQueuedFollowUp: boolean,
+    cause?: CoworkInterruptionCause,
+  ): void {
     this.dismissAskUserQuestionsBySession(sessionId);
     const active = this.activeSessions.get(sessionId);
     if (!active) {
@@ -1293,6 +1314,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       return;
     }
     const wasRunning = active.isRunning;
+    if (!wasRunning && active.aborted) return;
 
     this.finalizeActiveThinking(sessionId, active);
 
@@ -1316,7 +1338,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     void active.piSession.abort();
     this.workbenchTaskService?.pauseRun?.(sessionId, reason);
     this.clearApprovalsBySession(sessionId);
-    this.emit('sessionStopped', sessionId);
+    if (cause) this.recordSessionInterruption(sessionId, cause);
 
     // A user stop ends the current turn without cancelling messages already
     // queued in Work. Start the next follow-up from a fresh Pi session; the
@@ -1336,9 +1358,35 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
   }
 
+  private recordSessionInterruption(
+    sessionId: string,
+    cause: CoworkInterruptionCause,
+  ): CoworkSessionInterruption {
+    const task = this.workbenchTaskService?.getCurrent(sessionId)?.task ?? null;
+    const interruption: CoworkSessionInterruption = {
+      sessionId,
+      interruptionId: randomUUID(),
+      cause,
+      taskId: task?.id ?? null,
+      recoverable: task?.status === WorkbenchTaskStatus.Paused,
+    };
+    const seed: CoworkMessage = {
+      id: randomUUID(),
+      type: 'system',
+      content: '',
+      timestamp: Date.now(),
+      metadata: { interruption },
+    };
+    const message = this.store ? this.store.addMessage(sessionId, seed) : seed;
+    this.store?.updateSession(sessionId, { status: 'idle' });
+    this.emit('message', sessionId, message);
+    this.emit('sessionInterrupted', interruption);
+    return interruption;
+  }
+
   stopAllSessions(): void {
     for (const [sessionId] of this.activeSessions) {
-      this.stopSession(sessionId);
+      this.stopActiveSession(sessionId, 'The application stopped the active session.', false);
     }
   }
 
@@ -1372,7 +1420,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         reason: denied ? result.message : undefined,
       });
       if (denied) {
-        this.stopActiveSession(sessionId, result.message || 'The user denied this action.', false);
+        this.stopActiveSession(
+          sessionId,
+          result.message || 'The user denied this action.',
+          false,
+          CoworkInterruptionCause.ApprovalDenied,
+        );
       }
       return;
     }
@@ -1581,7 +1634,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   onSessionDeleted(sessionId: string): void {
-    this.stopSession(sessionId);
+    this.stopActiveSession(sessionId, 'The session was deleted.', false);
     this.clearApprovalsBySession(sessionId);
     this.activeSessions.delete(sessionId);
     if (this.pendingMessageQueue.clear(sessionId)) this.emitQueueUpdated(sessionId);
@@ -2023,6 +2076,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               sessionId,
               `Production workflow made no progress for ${MAX_STALE_PRODUCTION_ITERATIONS} consecutive iterations.`,
               false,
+              CoworkInterruptionCause.RuntimePaused,
             );
             break;
           }

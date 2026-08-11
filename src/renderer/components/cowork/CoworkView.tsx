@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
@@ -225,9 +226,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     currentSessionWorkingDirectory || unmanagedWorkingDirectory || currentWorkspace?.path || '';
   const currentWorkspacePath =
     activeWorkspacePath ||
-    (workMode === WorkMode.Work
-      ? defaultConversationWorkspace?.path
-      : config.workingDirectory) ||
+    (workMode === WorkMode.Work ? defaultConversationWorkspace?.path : config.workingDirectory) ||
     '';
   const currentWorkspaceDisplayName =
     currentWorkspace && !currentWorkspace.isHidden && isScratchWorkspacePath(currentWorkspace.path)
@@ -416,7 +415,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               (fileAttachments && fileAttachments.length > 0)
                 ? {
                     ...(sessionSkillIds.length > 0 ? { skillIds: sessionSkillIds } : {}),
-                ...(imageAttachments && imageAttachments.length > 0
+                    ...(imageAttachments && imageAttachments.length > 0
                       ? { imageAttachments }
                       : {}),
                     ...(fileAttachments && fileAttachments.length > 0 ? { fileAttachments } : {}),
@@ -1299,7 +1298,28 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     // to the engine and leave the direct stream running).
     const directChatController = directChatAbortControllersRef.current.get(currentSession.id);
     if (directChatController) {
+      const interruptionId = crypto.randomUUID();
       directChatController.abort();
+      dispatch(
+        addMessage({
+          sessionId: currentSession.id,
+          message: {
+            id: `interruption-${interruptionId}`,
+            type: 'system',
+            content: '',
+            timestamp: Date.now(),
+            metadata: {
+              interruption: {
+                sessionId: currentSession.id,
+                interruptionId,
+                cause: CoworkInterruptionCause.UserStop,
+                taskId: null,
+                recoverable: false,
+              },
+            },
+          },
+        }),
+      );
       dispatch(
         updateSessionStatus({
           sessionId: currentSession.id,

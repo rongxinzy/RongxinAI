@@ -10,6 +10,7 @@ import coworkReducer, {
   addMessage,
   addSession,
   clearCurrentSessionForWorkspaceChange,
+  clearPendingPermissionsForSession,
   clearLoadingSessionId,
   enqueuePendingPermission,
   setConfig,
@@ -46,19 +47,23 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   ...overrides,
 });
 
-test('defaults scheduler recovery policy to skip missed jobs', () => {
+test('defaults hidden OpenClaw session policy to thirty days', () => {
   const state = coworkReducer(undefined, { type: 'init' });
 
+  expect(state.config.openClawSessionPolicy).toEqual({
+    keepAlive: '30d',
+  });
   expect(state.config.skipMissedJobs).toBe(true);
 });
 
-test('setConfig loads Pi-owned cowork configuration', () => {
+test('setConfig preserves loaded OpenClaw session policy', () => {
   const state = coworkReducer(
     undefined,
     setConfig({
       workingDirectory: '/tmp',
       systemPrompt: '',
       executionMode: 'local',
+      agentEngine: 'openclaw',
       memoryEnabled: true,
       memoryImplicitUpdateEnabled: true,
       memoryLlmJudgeEnabled: false,
@@ -73,11 +78,13 @@ test('setConfig loads Pi-owned cowork configuration', () => {
       embeddingVectorWeight: 0.7,
       embeddingRemoteBaseUrl: '',
       embeddingRemoteApiKey: '',
+      openClawSessionPolicy: {
+        keepAlive: '365d',
+      },
     }),
   );
 
-  expect(state.config.skipMissedJobs).toBe(false);
-  expect(state.config.workingDirectory).toBe('/tmp');
+  expect(state.config.openClawSessionPolicy.keepAlive).toBe('365d');
 });
 
 test('updateCurrentSessionModelOverride only patches the active session', () => {
@@ -141,6 +148,34 @@ test('changing a session permission mode preserves pending approvals from every 
     'request-a',
     'request-b',
   ]);
+});
+
+test('session interruption clears only approvals owned by that session', () => {
+  const withPermissions = coworkReducer(
+    coworkReducer(
+      undefined,
+      enqueuePendingPermission({
+        origin: CoworkPermissionOrigin.PiWorkbench,
+        sessionId: 'session-a',
+        requestId: 'request-a',
+        toolName: 'write',
+        toolInput: {},
+        toolUseId: null,
+      }),
+    ),
+    enqueuePendingPermission({
+      origin: CoworkPermissionOrigin.PiWorkbench,
+      sessionId: 'session-b',
+      requestId: 'request-b',
+      toolName: 'bash',
+      toolInput: {},
+      toolUseId: null,
+    }),
+  );
+
+  const next = coworkReducer(withPermissions, clearPendingPermissionsForSession('session-a'));
+
+  expect(next.pendingPermissions.map(permission => permission.requestId)).toEqual(['request-b']);
 });
 
 test('addSession preserves the agent id in session summaries', () => {

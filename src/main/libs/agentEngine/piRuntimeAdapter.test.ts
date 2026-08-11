@@ -20,6 +20,7 @@ import {
   ProviderModelPiMaxTokensField,
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
+import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import {
   WorkbenchContractKind,
   WorkbenchRunStatus,
@@ -934,9 +935,7 @@ describe('PiRuntimeAdapter', () => {
       });
 
       await adapter.startSession('vision', 'Describe this image', {
-        imageAttachments: [
-          { name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' },
-        ],
+        imageAttachments: [{ name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' }],
       });
 
       expect(mockSession.sendUserMessage).toHaveBeenCalledWith(
@@ -950,9 +949,7 @@ describe('PiRuntimeAdapter', () => {
 
     it('keeps an image attachment as a text hint for non-vision models', async () => {
       await adapter.startSession('text-only', 'Describe this image', {
-        imageAttachments: [
-          { name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' },
-        ],
+        imageAttachments: [{ name: 'example.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' }],
       });
 
       expect(mockSession.prompt).toHaveBeenCalledWith(
@@ -1252,11 +1249,43 @@ describe('PiRuntimeAdapter', () => {
   describe('stopSession', () => {
     it('should keep session entry active (preserves IM routing) but mark it aborted', async () => {
       await adapter.startSession('test', 'Hello');
+      const addMessage = vi.fn(
+        (_sessionId: string, message: Parameters<CoworkStore['addMessage']>[1]) => ({
+          ...message,
+          id: 'persisted-interruption',
+          timestamp: Date.now(),
+        }),
+      );
+      const updateSession = vi.fn();
+      adapter.setCoworkStore({ addMessage, updateSession } as unknown as CoworkStore);
+      const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
+      adapter.stopSession('test');
       adapter.stopSession('test');
       // Session entry stays active so isSessionActive still reports true for IM,
       // but the underlying Pi session is marked aborted.
       expect(adapter.isSessionActive('test')).toBe(true);
       expect(mockSession.abort).toHaveBeenCalled();
+      expect(addMessage).toHaveBeenCalledOnce();
+      expect(addMessage).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({
+          type: 'system',
+          metadata: {
+            interruption: expect.objectContaining({
+              cause: CoworkInterruptionCause.UserStop,
+              recoverable: false,
+            }),
+          },
+        }),
+      );
+      expect(updateSession).toHaveBeenCalledWith('test', { status: 'idle' });
+      expect(interruptions).toEqual([
+        expect.objectContaining({
+          cause: CoworkInterruptionCause.UserStop,
+          recoverable: false,
+        }),
+      ]);
     });
 
     it('should cause continueSession to reconstruct after stop', async () => {
@@ -1361,7 +1390,13 @@ describe('PiRuntimeAdapter', () => {
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
       const requests: string[] = [];
+      const interruptions: Array<{
+        cause: string;
+        taskId: string | null;
+        recoverable: boolean;
+      }> = [];
       adapter.on('permissionRequest', (_sessionId, request) => requests.push(request.requestId));
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
 
       try {
         await adapter.startSession('denied-workbench', 'Create and validate a release report', {
@@ -1394,6 +1429,13 @@ describe('PiRuntimeAdapter', () => {
         expect(service.getCurrent('denied-workbench')?.runs[0].status).toBe(
           WorkbenchRunStatus.Paused,
         );
+        expect(interruptions).toEqual([
+          expect.objectContaining({
+            cause: CoworkInterruptionCause.ApprovalDenied,
+            taskId: detail!.task.id,
+            recoverable: true,
+          }),
+        ]);
       } finally {
         db.close();
       }

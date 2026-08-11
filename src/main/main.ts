@@ -1831,6 +1831,18 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     });
   });
 
+  runtime.on('sessionInterrupted', interruption => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.send(CoworkStreamIpc.Interrupted, interruption);
+      } catch (error) {
+        console.error('[PiWorkbenchForwarder] failed to forward a session interruption:', error);
+      }
+    });
+  });
+
   runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {

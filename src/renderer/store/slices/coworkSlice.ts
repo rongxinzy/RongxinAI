@@ -70,6 +70,7 @@ const initialState: CoworkState = {
     workingDirectory: '',
     systemPrompt: '',
     executionMode: 'local',
+    agentEngine: 'openclaw',
     memoryEnabled: true,
     memoryImplicitUpdateEnabled: true,
     memoryLlmJudgeEnabled: false,
@@ -85,6 +86,9 @@ const initialState: CoworkState = {
     embeddingVectorWeight: 0.7,
     embeddingRemoteBaseUrl: '',
     embeddingRemoteApiKey: '',
+    openClawSessionPolicy: {
+      keepAlive: '30d',
+    },
   },
 };
 
@@ -593,6 +597,12 @@ const coworkSlice = createSlice({
       state.pendingPermissions = [];
     },
 
+    clearPendingPermissionsForSession(state, action: PayloadAction<string>) {
+      state.pendingPermissions = state.pendingPermissions.filter(
+        permission => permission.sessionId !== action.payload,
+      );
+    },
+
     setConfig(state, action: PayloadAction<CoworkConfig>) {
       state.config = action.payload;
     },
@@ -673,6 +683,7 @@ export const {
   enqueuePendingPermission,
   dequeuePendingPermission,
   clearPendingPermissions,
+  clearPendingPermissionsForSession,
   setConfig,
   updateConfig,
   clearCurrentSession,

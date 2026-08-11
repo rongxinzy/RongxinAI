@@ -6,6 +6,7 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
+import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
 export interface CoworkImageAttachment {
@@ -83,6 +84,7 @@ export interface CoworkMessageMetadata {
   model?: string;
   modelProviderKey?: string;
   agentName?: string;
+  interruption?: CoworkSessionInterruption;
   [key: string]: unknown;
 }
 

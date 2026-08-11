@@ -20,6 +20,7 @@ import {
   appendSessions,
   clearCurrentSession,
   clearPendingPermissions,
+  clearPendingPermissionsForSession,
   deleteSession as deleteSessionAction,
   deleteSessions as deleteSessionsAction,
   dequeuePendingPermission,
@@ -206,6 +207,12 @@ class CoworkService {
       store.dispatch(dequeuePendingPermission({ requestId }));
     });
     this.streamListenerCleanups.push(permissionDismissCleanup);
+
+    const interruptedCleanup = cowork.onStreamInterrupted(({ sessionId }) => {
+      store.dispatch(clearPendingPermissionsForSession(sessionId));
+      store.dispatch(updateSessionStatus({ sessionId, status: 'idle' }));
+    });
+    this.streamListenerCleanups.push(interruptedCleanup);
 
     // Complete listener
     const completeCleanup = cowork.onStreamComplete(({ sessionId }) => {
