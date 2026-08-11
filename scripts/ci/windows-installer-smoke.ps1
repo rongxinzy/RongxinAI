@@ -76,7 +76,13 @@ $componentKeys = @('openclaw', 'skills', 'mcps', 'portable-git', 'python', 'skil
 
 try {
   Invoke-Installer $installer 'cold installation' 2700 $timingLog
-  Assert-Path (Join-Path $installRoot '知远.exe') 'installed application executable'
+  Assert-Path $installRoot 'installation root'
+  $applicationExecutables = @(Get-ChildItem -LiteralPath $installRoot -Filter '*.exe' -File |
+    Where-Object { $_.Name -notlike 'Uninstall*' })
+  if ($applicationExecutables.Count -ne 1) {
+    throw "Expected exactly one installed application executable; found $($applicationExecutables.Count)"
+  }
+  Assert-Path $applicationExecutables[0].FullName 'installed application executable'
   Assert-Path $timingLog 'cold installation timing log'
 
   $coldLog = Get-Content -LiteralPath $timingLog -Raw -Encoding UTF8
