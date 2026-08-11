@@ -1301,6 +1301,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkTodoCompleted: '已完成',
     coworkTodoInProgress: '进行中',
     coworkTodoPending: '待处理',
+    coworkTodoBlocked: '受阻',
     coworkTodoUntitled: '未命名待办',
     coworkTodoUnknownStatus: '未知状态',
     coworkDangerousOperation: '警告：此操作可能会修改文件或执行系统命令，请仔细检查。',
@@ -4191,6 +4192,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkTodoCompleted: 'completed',
     coworkTodoInProgress: 'in progress',
     coworkTodoPending: 'pending',
+    coworkTodoBlocked: 'blocked',
     coworkTodoUntitled: 'Untitled todo',
     coworkTodoUnknownStatus: 'Unknown status',
     coworkDangerousOperation:

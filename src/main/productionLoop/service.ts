@@ -158,6 +158,7 @@ export class ProductionLoopService {
   constructor(
     repository: ProductionLoopStore,
     private readonly measurement: ProductionLoopMeasurement,
+    private readonly onPlanChanged?: (state: ProductionLoopState) => void,
   ) {
     this.repository = repository;
   }
@@ -194,7 +195,7 @@ export class ProductionLoopService {
     const previous = this.repository.getLatestForTask(input.taskId, input.runId);
     const now = Date.now();
     const progressBaseline = previous?.progressVersion ?? 0;
-    return this.repository.create({
+    const state = this.repository.create({
       version: 1,
       taskId: input.taskId,
       runId: input.runId,
@@ -234,6 +235,8 @@ export class ProductionLoopService {
       createdAt: now,
       updatedAt: now,
     });
+    this.onPlanChanged?.(state);
+    return state;
   }
 
   recordPrototype(runId: string, reference: string, summary: string): ProductionLoopState {
@@ -271,7 +274,7 @@ export class ProductionLoopService {
       selectedDirection?: string;
     },
   ): ProductionLoopState {
-    return this.mutate(runId, state => {
+    const state = this.mutate(runId, state => {
       if (state.phase === ProductionLoopPhase.Explore) {
         if (state.prototypeRequired && state.prototypes.length === 0) {
           throw new Error('At least one prototype is required before committing the plan.');
@@ -331,6 +334,8 @@ export class ProductionLoopService {
         },
       });
     });
+    this.onPlanChanged?.(state);
+    return state;
   }
 
   updatePlanItem(
@@ -338,7 +343,7 @@ export class ProductionLoopService {
     itemId: string,
     status: ProductionPlanItemStatus,
   ): ProductionLoopState {
-    return this.mutate(runId, state => {
+    const state = this.mutate(runId, state => {
       if (
         state.phase !== ProductionLoopPhase.Execute &&
         state.phase !== ProductionLoopPhase.Revise
@@ -355,6 +360,8 @@ export class ProductionLoopService {
         state.progressVersion += 1;
       }
     });
+    this.onPlanChanged?.(state);
+    return state;
   }
 
   startInspection(

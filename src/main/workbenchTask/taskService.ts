@@ -20,6 +20,7 @@ import {
   type WorkbenchTaskChangedEvent,
   type WorkbenchTaskContract,
   type WorkbenchTaskDetail,
+  type WorkbenchProductionPlan,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
 import { HarnessActivationType } from '../../shared/harness';
@@ -82,16 +83,35 @@ export class WorkbenchTaskService extends EventEmitter {
     this.productionLoop = new ProductionLoopService(
       new ProductionLoopRepository(db),
       this.measurement,
+      state => {
+        const task = this.repository.getTask(state.taskId);
+        if (task) this.emitChanged(task);
+      },
     );
   }
 
   getCurrent(sessionId: string): WorkbenchTaskDetail | null {
     const task = this.repository.getLatestTaskForSession(sessionId);
-    return task ? this.repository.getDetail(task.id) : null;
+    return task ? this.withProductionPlan(this.repository.getDetail(task.id)) : null;
   }
 
   getDetail(taskId: string): WorkbenchTaskDetail | null {
-    return this.repository.getDetail(taskId);
+    return this.withProductionPlan(this.repository.getDetail(taskId));
+  }
+
+  private withProductionPlan(detail: WorkbenchTaskDetail | null): WorkbenchTaskDetail | null {
+    if (!detail) return null;
+    const state = detail.task.activeRunId
+      ? this.productionLoop.repository.get(detail.task.activeRunId)
+      : this.productionLoop.repository.getLatestForTask(detail.task.id);
+    const productionPlan: WorkbenchProductionPlan | null = state
+      ? {
+          runId: state.runId,
+          progressVersion: state.progressVersion,
+          items: state.planItems,
+        }
+      : null;
+    return { ...detail, productionPlan };
   }
 
   beginRun(input: {
