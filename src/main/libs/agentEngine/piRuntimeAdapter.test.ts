@@ -615,6 +615,8 @@ describe('PiRuntimeAdapter', () => {
       initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
+      const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
 
       try {
         await adapter.startSession('paused-production', 'Create and validate a release report', {
@@ -631,6 +633,12 @@ describe('PiRuntimeAdapter', () => {
         expect(mockSession.prompt).toHaveBeenCalledTimes(1);
         expect(mockSession.abort).toHaveBeenCalledOnce();
         expect(adapter.isSessionRunning('paused-production')).toBe(false);
+        expect(interruptions).toEqual([
+          expect.objectContaining({
+            cause: CoworkInterruptionCause.RuntimePaused,
+            recoverable: true,
+          }),
+        ]);
       } finally {
         db.close();
       }
@@ -1417,6 +1425,27 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('stopSession', () => {
+    it('keeps agent-backed chat interruptions on the normal continuation path', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const interruptions: Array<{ taskId: string | null; recoverable: boolean }> = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
+
+      try {
+        await adapter.startSession('chat-session', 'Hello', { sessionMode: 'chat' });
+        adapter.stopSession('chat-session');
+
+        expect(interruptions).toEqual([
+          expect.objectContaining({ taskId: null, recoverable: false }),
+        ]);
+      } finally {
+        db.close();
+      }
+    });
+
     it('cancels a session while the runtime is still initializing', async () => {
       let resolveCreateSession: ((value: { session: typeof mockSession }) => void) | undefined;
       mockCreateAgentSession.mockImplementationOnce(
