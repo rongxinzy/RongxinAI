@@ -15,27 +15,32 @@
       {
         "id": "dingtalk-connector",
         "npm": "@dingtalk-real-ai/dingtalk-connector",
-        "version": "0.8.16"
+        "version": "0.8.16",
+        "integrity": "sha512-xqz8/Fr1+u2J1nsWohWtigVZdnUd17tQwzitpzYbuUH2l5sWxKYPA/F+VmVGqXB9IB+iU7ewoArf+55K3w91fw=="
       },
       {
         "id": "openclaw-lark",
         "npm": "@larksuite/openclaw-lark",
-        "version": "2026.4.8"
+        "version": "2026.4.8",
+        "integrity": "sha512-HHIwDBQPtEZSLHHCnV52ip5WL8mag/qBUucIyH+pbyMHAAXyKtPHTfXFGTm1/HVMC0ZH2km5f11QvNyy85SDGw=="
       },
       {
         "id": "wecom-openclaw-plugin",
         "npm": "@wecom/wecom-openclaw-plugin",
-        "version": "2026.4.22"
+        "version": "2026.4.22",
+        "integrity": "sha512-scrJJ6LEm+b68MO9E5TKvIF7jDB5CDpf0RWT5C5V0WcqX7ZNfGsc6om6D3DZknOs0iPylzCbHCGu8vwbeVXzjA=="
       },
       {
         "id": "openclaw-weixin",
         "npm": "@tencent-weixin/openclaw-weixin",
-        "version": "2.4.3"
+        "version": "2.4.3",
+        "integrity": "sha512-dPQbidUNWigC6V10vGW4i+GLH09x+6zUhafZRjuxkJ9GDu8o62WBsnUTojp4KqUH756hz+t2v9khiCRSi0dBDw=="
       },
       {
         "id": "clawemail-email",
         "npm": "@clawemail/email",
-        "version": "0.9.12"
+        "version": "0.9.12",
+        "integrity": "sha512-J4mah1UWyVXX9hbTPfZb+5u2awj1k0XZigpjvGuSH2nGokAaI54a+3G+GRxeX+BoODNSBWyU7Nay2Whi4cbajg=="
       }
     ]
   },
