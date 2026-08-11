@@ -75,6 +75,7 @@ export type PiStartOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
+  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
@@ -93,6 +94,7 @@ export type PiContinueOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
+  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
   agentId?: string;

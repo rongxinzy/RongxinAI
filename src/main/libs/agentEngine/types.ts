@@ -67,6 +67,7 @@ export type CoworkStartOptions = {
   /** Work-only: run the prompt as a long-horizon Goal loop. */
   goalMode?: boolean;
   imageAttachments?: CoworkImageAttachment[];
+  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
@@ -84,6 +85,7 @@ export type CoworkContinueOptions = {
   /** Work-only: enable or keep the long-horizon Goal loop. */
   goalMode?: boolean;
   imageAttachments?: CoworkImageAttachment[];
+  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
   agentId?: string;

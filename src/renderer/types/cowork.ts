@@ -14,6 +14,12 @@ export interface CoworkImageAttachment {
   base64Data: string;
 }
 
+export interface CoworkFileAttachment {
+  name: string;
+  path: string;
+  extension: string;
+}
+
 // Cowork session status
 export const CoworkSessionStatusValue = {
   Idle: 'idle',
@@ -62,6 +68,7 @@ export interface CoworkMessageMetadata {
   /** Runtime-measured duration for this thinking message. */
   thinkingDurationMs?: number;
   skillIds?: string[];
+  fileAttachments?: CoworkFileAttachment[];
   usage?: {
     inputTokens?: number;
     outputTokens?: number;
@@ -261,6 +268,7 @@ export interface CoworkStartOptions {
   modelOverride?: string;
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
+  fileAttachments?: CoworkFileAttachment[];
 }
 
 // Continue session options
@@ -273,6 +281,7 @@ export interface CoworkContinueOptions {
   expertIds?: string[];
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
+  fileAttachments?: CoworkFileAttachment[];
 }
 
 // IPC result types

@@ -772,6 +772,7 @@ interface IElectronAPI {
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -787,6 +788,7 @@ interface IElectronAPI {
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;

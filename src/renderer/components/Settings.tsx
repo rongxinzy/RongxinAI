@@ -209,6 +209,7 @@ const resolveModelSupportsImageForProvider = (
 
 const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
   toolCalling: ModelCapabilityStatus.Unknown,
+  imageInput: ModelCapabilityStatus.Unknown,
   videoInput: ModelCapabilityStatus.Unknown,
   audioInput: ModelCapabilityStatus.Unknown,
   documentInput: ModelCapabilityStatus.Unknown,
@@ -217,6 +218,7 @@ const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
 
 const CUSTOM_MODEL_CAPABILITY_KEYS: readonly ModelCapabilityKey[] = [
   'toolCalling',
+  'imageInput',
   'videoInput',
   'audioInput',
   'documentInput',
@@ -849,7 +851,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [newModelName, setNewModelName] = useState('');
   const [newModelId, setNewModelId] = useState('');
-  const [newModelSupportsImage, setNewModelSupportsImage] = useState(false);
   const [newModelContextWindow, setNewModelContextWindow] = useState('');
   const [newModelMaxTokens, setNewModelMaxTokens] = useState('');
   const [newModelCapabilities, setNewModelCapabilities] = useState<Partial<ModelCapabilities>>(
@@ -1411,7 +1412,7 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelSupportsImage(false);
+    setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelContextWindow('');
     setNewModelMaxTokens('');
     setModelFormError(null);
@@ -1451,7 +1452,7 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelSupportsImage(false);
+    setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setModelFormError(null);
     setActiveProvider(provider);
     // 切换 provider 时清除测试结果
@@ -2220,7 +2221,7 @@ const Settings: React.FC<SettingsProps> = ({
       setEditingModelId(null);
       setNewModelName('');
       setNewModelId('');
-      setNewModelSupportsImage(false);
+      setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
       setModelFormError(null);
     }
     setActiveTab(tab);
@@ -2270,7 +2271,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelSupportsImage(false);
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
     setModelFormError(null);
@@ -2290,10 +2290,15 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(modelId);
     setNewModelName(modelName);
     setNewModelId(modelId);
-    setNewModelSupportsImage(!!supportsImage);
     setNewModelContextWindow(formatTokenK(contextWindow));
     setNewModelMaxTokens(formatTokenK(maxTokens));
-    setNewModelCapabilities({ ...DEFAULT_CUSTOM_MODEL_CAPABILITIES, ...capabilities });
+    setNewModelCapabilities({
+      ...DEFAULT_CUSTOM_MODEL_CAPABILITIES,
+      ...capabilities,
+      imageInput:
+        capabilities?.imageInput ??
+        (supportsImage ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported),
+    });
     setNewModelPiRuntime(piRuntime);
     setModelFormError(null);
   };
@@ -2378,7 +2383,7 @@ const Settings: React.FC<SettingsProps> = ({
       supportsImage: ProviderRegistry.resolveModelSupportsImage(
         activeProvider,
         modelId,
-        newModelSupportsImage,
+        newModelCapabilities.imageInput === ModelCapabilityStatus.Supported,
       ),
       ...(contextWindow ? { contextWindow } : {}),
       ...(maxTokens ? { maxTokens } : {}),
@@ -2405,7 +2410,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelSupportsImage(false);
     setNewModelContextWindow('');
     setNewModelMaxTokens('');
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
@@ -2419,7 +2423,6 @@ const Settings: React.FC<SettingsProps> = ({
     setEditingModelId(null);
     setNewModelName('');
     setNewModelId('');
-    setNewModelSupportsImage(false);
     setNewModelContextWindow('');
     setNewModelMaxTokens('');
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
@@ -5790,19 +5793,29 @@ const Settings: React.FC<SettingsProps> = ({
                         </div>
                       </>
                     )}
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`${activeProvider}-supportsImage`}
-                        checked={newModelSupportsImage}
-                        onCheckedChange={checked => setNewModelSupportsImage(checked === true)}
-                      />
-                      <label
-                        htmlFor={`${activeProvider}-supportsImage`}
-                        className="text-xs text-muted-foreground"
-                      >
-                        {i18nService.t('supportsImageInput')}
-                      </label>
-                    </div>
+                    {!isCustomProvider(activeProvider) && (
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`${activeProvider}-supportsImage`}
+                          checked={newModelCapabilities.imageInput === ModelCapabilityStatus.Supported}
+                          onCheckedChange={checked =>
+                            setNewModelCapabilities(current => ({
+                              ...current,
+                              imageInput:
+                                checked === true
+                                  ? ModelCapabilityStatus.Supported
+                                  : ModelCapabilityStatus.Unsupported,
+                            }))
+                          }
+                        />
+                        <label
+                          htmlFor={`${activeProvider}-supportsImage`}
+                          className="text-xs text-muted-foreground"
+                        >
+                          {i18nService.t('supportsImageInput')}
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
                 {isCustomProvider(activeProvider) && (

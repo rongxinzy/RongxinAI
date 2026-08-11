@@ -35,7 +35,7 @@ import {
   addMessage,
   addSession,
   clearCurrentSession,
-  setCurrentSession,
+  deleteSession,
   updateMessageContent,
   updateMessageContents,
   updateSessionStatus,
@@ -46,6 +46,7 @@ import { WorkMode } from '../../store/workMode/constants';
 import {
   CoworkSessionStatusValue,
   type CoworkImageAttachment,
+  type CoworkFileAttachment,
   type CoworkPermissionRequest,
   type CoworkPermissionResult,
   type CoworkSession,
@@ -80,6 +81,10 @@ export interface CoworkViewProps {
 const DirectChatDataChunkType = {
   Context: 'data-context',
 } as const;
+
+type DirectChatPart =
+  | { type: 'text'; text: string }
+  | { type: 'file'; mediaType: string; url: string; filename: string };
 
 interface DirectChatContextData {
   cacheReadTokens?: number;
@@ -316,6 +321,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
   ): Promise<boolean | void> => {
@@ -405,12 +411,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             content: prompt,
             timestamp: now,
             metadata:
-              sessionSkillIds.length > 0 || (imageAttachments && imageAttachments.length > 0)
+              sessionSkillIds.length > 0 ||
+              (imageAttachments && imageAttachments.length > 0) ||
+              (fileAttachments && fileAttachments.length > 0)
                 ? {
                     ...(sessionSkillIds.length > 0 ? { skillIds: sessionSkillIds } : {}),
-                    ...(imageAttachments && imageAttachments.length > 0
+                ...(imageAttachments && imageAttachments.length > 0
                       ? { imageAttachments }
                       : {}),
+                    ...(fileAttachments && fileAttachments.length > 0 ? { fileAttachments } : {}),
                   }
                 : undefined,
           },
@@ -427,8 +436,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       if (workMode === WorkMode.Chat && !isChatAgentExecution) {
         dispatch(addSession(tempSession));
       } else {
-        // Work sessions are added after the backend creates their real session.
-        dispatch(setCurrentSession(tempSession));
+        // Keep a new Work session in the list while the backend creates its
+        // persistent record, so attachments and the initial prompt remain
+        // visible if startup takes time or fails.
+        dispatch(addSession(tempSession));
       }
       // Clear quick action selection after starting session
       dispatch(clearSelection());
@@ -502,11 +513,20 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             modelProviderKey: directChatModel.providerKey,
             localThinkingEnabled,
           });
+          const userParts: DirectChatPart[] = [
+            { type: 'text' as const, text: prompt },
+            ...(imageAttachments ?? []).map(image => ({
+              type: 'file' as const,
+              mediaType: image.mimeType,
+              url: `data:${image.mimeType};base64,${image.base64Data}`,
+              filename: image.name,
+            })),
+          ];
           const stream = await transport.sendMessages({
             trigger: 'submit-message',
             chatId: tempSessionId,
             messageId: undefined,
-            messages: [{ id: `msg-${now}`, role: 'user', parts: [{ type: 'text', text: prompt }] }],
+            messages: [{ id: `msg-${now}`, role: 'user', parts: userParts }],
             abortSignal: abortController.signal,
           });
           const reader = stream.getReader();
@@ -807,6 +827,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         modelOverride: sessionModelOverride,
         permissionMode: config.permissionMode,
         imageAttachments,
+        fileAttachments,
       });
 
       if (!startedSession && startError) {
@@ -828,7 +849,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         return;
       }
 
-      if (startedSession) clearUnmanagedWorkingDirectory();
+      if (startedSession) {
+        clearUnmanagedWorkingDirectory();
+        // coworkService.startSession already selected the real session.
+        // Remove only the temporary list entry after that replacement.
+        dispatch(deleteSession(tempSessionId));
+      }
 
       // Stop immediately if user cancelled while startup request was in flight.
       if (isPendingStartCancelled() && startedSession) {
@@ -849,6 +875,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
   ) => {
@@ -894,6 +921,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         type: 'user' as const,
         content: prompt,
         timestamp: Date.now(),
+        ...(imageAttachments?.length || fileAttachments?.length
+          ? {
+              metadata: {
+                ...(imageAttachments?.length ? { imageAttachments } : {}),
+                ...(fileAttachments?.length ? { fileAttachments } : {}),
+              },
+            }
+          : {}),
       };
       let assistantContent = '';
       let assistantMessageAdded = false;
@@ -986,12 +1021,20 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             .map(m => ({
               id: m.id,
               role: m.type as 'user' | 'assistant',
-              parts: [{ type: 'text' as const, text: m.content }],
+              parts: [{ type: 'text' as const, text: m.content }] as DirectChatPart[],
             }))
             .concat({
               id: userMsgId,
               role: 'user' as const,
-              parts: [{ type: 'text' as const, text: prompt }],
+              parts: [
+                { type: 'text' as const, text: prompt },
+                ...(imageAttachments ?? []).map(image => ({
+                  type: 'file' as const,
+                  mediaType: image.mimeType,
+                  url: `data:${image.mimeType};base64,${image.base64Data}`,
+                  filename: image.name,
+                })),
+              ],
             }),
           abortSignal: abortController.signal,
         });
@@ -1240,6 +1283,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         permissionMode: sessionPermissionMode,
         goalMode,
         imageAttachments,
+        fileAttachments,
       });
     } finally {
       continuingSessionIdsRef.current.delete(currentSession.id);
