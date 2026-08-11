@@ -1,5 +1,5 @@
 import type { QueueTodo } from '@shared/components/ai-elements/queue';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   ProductionPlanItemStatus,
@@ -44,17 +44,25 @@ export function useProductionPlanTodos(
   sessionId?: string,
 ): ProductionPlanTodoSource | null | undefined {
   const [plan, setPlan] = useState<WorkbenchProductionPlan | null | undefined>(undefined);
+  const latestRequestIdRef = useRef(0);
 
   useEffect(() => {
     let active = true;
     setPlan(undefined);
     const loadActive = async () => {
+      const requestId = ++latestRequestIdRef.current;
       if (!sessionId) {
-        if (active) setPlan(null);
+        if (active && requestId === latestRequestIdRef.current) setPlan(null);
         return;
       }
-      const result = await window.electron.workbenchTask.getCurrent(sessionId);
-      if (active && result.success) setPlan(result.detail?.productionPlan ?? null);
+      try {
+        const result = await window.electron.workbenchTask.getCurrent(sessionId);
+        if (active && requestId === latestRequestIdRef.current && result.success) {
+          setPlan(result.detail?.productionPlan ?? null);
+        }
+      } catch {
+        if (active && requestId === latestRequestIdRef.current) setPlan(null);
+      }
     };
     void loadActive();
     const unsubscribe = window.electron.workbenchTask.onChanged(event => {
@@ -62,6 +70,7 @@ export function useProductionPlanTodos(
     });
     return () => {
       active = false;
+      latestRequestIdRef.current += 1;
       unsubscribe();
     };
   }, [sessionId]);
