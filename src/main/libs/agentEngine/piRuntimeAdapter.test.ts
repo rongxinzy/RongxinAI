@@ -252,6 +252,24 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
     });
 
+    it('rolls up session memory after a successful agent run', async () => {
+      const rollup = vi.fn().mockResolvedValue(null);
+      adapter.setSessionSummaryService({ rollup } as never);
+
+      await adapter.startSession('summary-session', 'Remember this', {
+        workspaceRoot: '/workspace/project',
+      });
+      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+        type: string;
+      }) => void;
+      listener({ type: 'agent_end' });
+
+      expect(rollup).toHaveBeenCalledWith({
+        sessionId: 'summary-session',
+        workingDirectory: '/workspace/project',
+      });
+    });
+
     it('initializes a controlled persistent run for academic research', async () => {
       const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-academic-runtime-'));
       try {

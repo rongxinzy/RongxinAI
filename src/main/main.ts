@@ -84,6 +84,7 @@ import { AgentManager } from './agentManager';
 import { EngramManager } from './memory/engramManager';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
+import { SessionSummaryService } from './memory/sessionSummaryService';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { registerMemoryIpcHandlers } from './memory/ipc';
 import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
@@ -1048,6 +1049,9 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
     piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
+    piRuntimeAdapter.setSessionSummaryService(
+      new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
+    );
     // mcpServerManager is created async later (ensureOpenClawRunningForCowork),
     // so it is always null here. Late-injection happens on every subsequent call.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);

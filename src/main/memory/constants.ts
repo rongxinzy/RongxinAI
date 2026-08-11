@@ -83,3 +83,4 @@ export const ENGRAM_RUNTIME_DIRECTORY = 'engram-runtime';
 export const ENGRAM_PACKAGED_DIRECTORY = 'memory';
 export const ENGRAM_DATA_DIRECTORY_SEGMENTS = ['memory', 'engram'] as const;
 export const ENGRAM_LOOPBACK_HOST = '127.0.0.1';
+export const SESSION_SUMMARY_TTL_DAYS = 30;
