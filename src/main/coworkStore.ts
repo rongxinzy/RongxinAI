@@ -410,6 +410,7 @@ export interface CoworkMessageMetadata {
   model?: string;
   modelProviderKey?: string;
   agentName?: string;
+  interruption?: import('../shared/cowork/interruption').CoworkSessionInterruption;
   [key: string]: unknown;
 }
 

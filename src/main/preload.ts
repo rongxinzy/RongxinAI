@@ -590,6 +590,9 @@ contextBridge.exposeInMainWorld('electron', {
       onPush(CoworkStreamIpc.Permission, callback),
     onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) =>
       onPush(CoworkStreamIpc.PermissionDismiss, callback),
+    onStreamInterrupted: (
+      callback: (data: import('../shared/cowork/interruption').CoworkSessionInterruption) => void,
+    ) => onPush(CoworkStreamIpc.Interrupted, callback),
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => onPush(CoworkStreamIpc.Complete, callback),

@@ -934,6 +934,11 @@ interface IElectronAPI {
       }) => void,
     ) => () => void;
     onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) => () => void;
+    onStreamInterrupted: (
+      callback: (
+        data: import('../../shared/cowork/interruption').CoworkSessionInterruption,
+      ) => void,
+    ) => () => void;
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => () => void;

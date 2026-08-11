@@ -10,6 +10,7 @@ import coworkReducer, {
   addMessage,
   addSession,
   clearCurrentSessionForWorkspaceChange,
+  clearPendingPermissionsForSession,
   clearLoadingSessionId,
   enqueuePendingPermission,
   setConfig,
@@ -147,6 +148,34 @@ test('changing a session permission mode preserves pending approvals from every 
     'request-a',
     'request-b',
   ]);
+});
+
+test('session interruption clears only approvals owned by that session', () => {
+  const withPermissions = coworkReducer(
+    coworkReducer(
+      undefined,
+      enqueuePendingPermission({
+        origin: CoworkPermissionOrigin.PiWorkbench,
+        sessionId: 'session-a',
+        requestId: 'request-a',
+        toolName: 'write',
+        toolInput: {},
+        toolUseId: null,
+      }),
+    ),
+    enqueuePendingPermission({
+      origin: CoworkPermissionOrigin.PiWorkbench,
+      sessionId: 'session-b',
+      requestId: 'request-b',
+      toolName: 'bash',
+      toolInput: {},
+      toolUseId: null,
+    }),
+  );
+
+  const next = coworkReducer(withPermissions, clearPendingPermissionsForSession('session-a'));
+
+  expect(next.pendingPermissions.map(permission => permission.requestId)).toEqual(['request-b']);
 });
 
 test('addSession preserves the agent id in session summaries', () => {
