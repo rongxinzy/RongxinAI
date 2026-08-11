@@ -21,6 +21,7 @@ const run: WorkbenchRun = {
   trigger: WorkbenchRunTrigger.Retry,
   startedAt: 1,
   endedAt: null,
+  context: null,
   verificationResult: null,
   failure: null,
   createdAt: 1,

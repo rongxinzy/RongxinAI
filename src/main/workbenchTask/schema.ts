@@ -27,6 +27,7 @@ export function initializeWorkbenchTaskSchema(db: Database.Database): void {
       trigger TEXT NOT NULL,
       started_at INTEGER,
       ended_at INTEGER,
+      context_json TEXT,
       verification_result_json TEXT,
       failure_json TEXT,
       created_at INTEGER NOT NULL,
@@ -100,4 +101,11 @@ export function initializeWorkbenchTaskSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_workbench_approvals_decision_effect
       ON workbench_approvals(decision, effect_status);
   `);
+
+  const runColumns = db.prepare('PRAGMA table_info(workbench_runs)').all() as Array<{
+    name: string;
+  }>;
+  if (!runColumns.some(column => column.name === 'context_json')) {
+    db.exec('ALTER TABLE workbench_runs ADD COLUMN context_json TEXT');
+  }
 }

@@ -1,4 +1,6 @@
-import { BrowserWindow, ipcMain } from 'electron';
+import { writeFile } from 'fs/promises';
+
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 
 import {
   WorkbenchRunTrigger,
@@ -42,6 +44,43 @@ export function registerWorkbenchTaskIpcHandlers(options: {
     success: true,
     tasks: service.listForSession(sessionId),
   }));
+
+  ipcMain.handle(WorkbenchTaskIpc.ExportAudit, async (event, taskId: string) => {
+    try {
+      const detail = service.getDetail(taskId);
+      if (!detail) return { success: false, error: 'Workbench task not found.' };
+      const owner = BrowserWindow.fromWebContents(event.sender);
+      const saveOptions = {
+        defaultPath: `workbench-task-audit-${detail.task.id}.json`,
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+      };
+      const selection = owner
+        ? await dialog.showSaveDialog(owner, saveOptions)
+        : await dialog.showSaveDialog(saveOptions);
+      if (selection.canceled || !selection.filePath) {
+        return { success: true, canceled: true };
+      }
+      await writeFile(
+        selection.filePath,
+        `${JSON.stringify(
+          {
+            schemaVersion: 1,
+            exportedAt: new Date().toISOString(),
+            detail,
+          },
+          null,
+          2,
+        )}\n`,
+        'utf8',
+      );
+      return { success: true, path: selection.filePath };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
 
   const startRun = async (
     taskId: string,
