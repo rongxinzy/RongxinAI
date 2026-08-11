@@ -248,6 +248,7 @@ import {
 } from './openclawSessionPolicy/store';
 import { configureRendererStartup } from './rendererStartup';
 import { SkillManager } from './skillManager';
+import { listPresetExperts } from './presetExpertCatalog';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { StartupProfiler } from './startupProfiler';
@@ -5014,34 +5015,7 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.GetPresetExperts, async () => {
     try {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
-      const presetsDir = path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'presets');
-      if (!fs.existsSync(presetsDir)) return { experts: [] };
-
-      const entries = fs.readdirSync(presetsDir, { withFileTypes: true });
-      const experts = entries
-        .filter(e => e.isDirectory())
-        .map(e => {
-          const pluginPath = path.join(presetsDir, e.name, 'plugin.json');
-          if (!fs.existsSync(pluginPath)) return null;
-          try {
-            const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf-8'));
-            return {
-              name: plugin.name,
-              displayName: plugin.displayName,
-              profession: plugin.profession,
-              displayDescription: plugin.displayDescription,
-              categoryId: plugin.categoryId,
-              tags: plugin.tags,
-              quickPrompts: plugin.quickPrompts,
-              path: path.join(presetsDir, e.name),
-            };
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-
-      return { experts };
+      return { experts: listPresetExperts(bundledSkillsRoot) };
     } catch (error) {
       return {
         experts: [],
