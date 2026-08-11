@@ -566,6 +566,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const abortController = new AbortController();
     let workbenchRunId: string | null = null;
     let workbenchTaskId: string | null = null;
+    let workbenchTaskGoal = prompt;
     let activeSession: ActivePiSession | null = null;
 
     try {
@@ -610,6 +611,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         });
         workbenchRunId = workbench.run.id;
         workbenchTaskId = workbench.task?.id ?? null;
+        workbenchTaskGoal = workbench.task?.goal ?? prompt;
       }
 
       // Pi's createAgentSession does not accept a systemPrompt option. Its
@@ -835,7 +837,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 taskId: workbenchTaskId,
                 runId: workbenchRunId,
                 workflowKind: workbenchContract.kind,
-                goal: prompt,
+                goal: workbenchTaskGoal,
                 prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
               },
               completionWorkflow || undefined,
@@ -1121,7 +1123,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           taskId: workbench.task.id,
           runId: workbench.run.id,
           workflowKind: workbenchContract.kind,
-          goal: prompt,
+          goal: workbench.task.goal,
           prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
         });
       }
@@ -1204,6 +1206,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       if (!completionWorkflow) {
         nextPrompt = `${loopPrompt}\n\n${nextPrompt}`;
       }
+    }
+    if (active.productionLoop && productionWorkflowEnabled) {
+      nextPrompt = `${active.productionLoop.buildInitialPrompt()}\n\n${nextPrompt}`;
     }
 
     try {

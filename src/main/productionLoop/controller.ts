@@ -80,9 +80,18 @@ export class ProductionLoopController {
 
   buildInitialPrompt(): string {
     this.refresh();
-    const phaseInstruction = this.state.prototypeRequired
-      ? 'Begin by creating a concrete prototype or materially distinct direction, then record it with production_loop record_prototype.'
-      : 'Begin by committing an executable plan with production_loop commit_plan before making changes.';
+    const phaseInstruction = (() => {
+      if (this.state.phase === ProductionLoopPhase.Explore) {
+        return 'Begin by creating a concrete prototype or materially distinct direction, then record it with production_loop record_prototype.';
+      }
+      if (this.state.phase === ProductionLoopPhase.Plan) {
+        return 'Begin by committing an executable plan with production_loop commit_plan before making changes.';
+      }
+      if (this.state.phase === ProductionLoopPhase.Execute) {
+        return 'Resume the persisted execution plan. Completed items remain completed; continue pending or blocked items, and rerun deterministic verifiers before inspection so their evidence belongs to this run.';
+      }
+      return 'Resume from the persisted production phase and rebuild any execution or verification evidence required by this run.';
+    })();
     return [
       '## Production workflow',
       `Persistent phase: ${this.state.phase}`,

@@ -489,6 +489,44 @@ describe('PiRuntimeAdapter', () => {
         };
         expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
         expect(service.getCurrent('resume-production')?.task.id).toBe(originalTask.id);
+        expect(service.productionLoop.getState(prepared.run.id).goal).toBe(originalTask.goal);
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('Persistent phase: plan'),
+        );
+      } finally {
+        db.close();
+      }
+    });
+
+    it('reinjects the production protocol when a reused runtime starts a new task', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const workspaceRoot = createTemporaryWorkspace();
+
+      try {
+        await adapter.startSession('reused-production', 'Create and validate a release report', {
+          sessionMode: 'work',
+          workspaceRoot,
+        });
+        await adapter.continueSession(
+          'reused-production',
+          'Create and validate a second release report',
+          {
+            sessionMode: 'work',
+            workspaceRoot,
+          },
+        );
+
+        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('## Production workflow'),
+        );
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('Persistent phase: plan'),
+        );
       } finally {
         db.close();
       }
