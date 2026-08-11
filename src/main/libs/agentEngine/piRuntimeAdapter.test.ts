@@ -615,6 +615,8 @@ describe('PiRuntimeAdapter', () => {
       initializeProductionLoopSchema(db);
       const service = new RealWorkbenchTaskService(db);
       adapter.setWorkbenchTaskService(service);
+      const interruptions: Array<{ cause: string; recoverable: boolean }> = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
 
       try {
         await adapter.startSession('paused-production', 'Create and validate a release report', {
@@ -631,6 +633,12 @@ describe('PiRuntimeAdapter', () => {
         expect(mockSession.prompt).toHaveBeenCalledTimes(1);
         expect(mockSession.abort).toHaveBeenCalledOnce();
         expect(adapter.isSessionRunning('paused-production')).toBe(false);
+        expect(interruptions).toEqual([
+          expect.objectContaining({
+            cause: CoworkInterruptionCause.RuntimePaused,
+            recoverable: true,
+          }),
+        ]);
       } finally {
         db.close();
       }
@@ -1119,10 +1127,18 @@ describe('PiRuntimeAdapter', () => {
 
     it('should replace existing session with same id', async () => {
       await adapter.startSession('test', 'First');
+      const staleListener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+        type: string;
+      }) => void;
       await adapter.startSession('test', 'Second');
       // Old session aborted, new one created
       expect(mockSession.abort).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+
+      staleListener({ type: 'agent_end' });
+
+      expect(adapter.isSessionRunning('test')).toBe(true);
+      expect(mockSession.abort).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1409,6 +1425,52 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('stopSession', () => {
+    it('keeps agent-backed chat interruptions on the normal continuation path', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const interruptions: Array<{ taskId: string | null; recoverable: boolean }> = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
+
+      try {
+        await adapter.startSession('chat-session', 'Hello', { sessionMode: 'chat' });
+        adapter.stopSession('chat-session');
+
+        expect(interruptions).toEqual([
+          expect.objectContaining({ taskId: null, recoverable: false }),
+        ]);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('cancels a session while the runtime is still initializing', async () => {
+      let resolveCreateSession: ((value: { session: typeof mockSession }) => void) | undefined;
+      mockCreateAgentSession.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveCreateSession = resolve;
+          }),
+      );
+      const interruptions: Array<{ cause: string }> = [];
+      adapter.on('sessionInterrupted', event => interruptions.push(event));
+
+      const startPromise = adapter.startSession('initializing', 'Hello');
+      await vi.waitFor(() => expect(mockCreateAgentSession).toHaveBeenCalledOnce());
+      adapter.stopSession('initializing');
+      resolveCreateSession?.({ session: mockSession });
+      await startPromise;
+
+      expect(mockSession.prompt).not.toHaveBeenCalled();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(adapter.isSessionActive('initializing')).toBe(false);
+      expect(interruptions).toEqual([
+        expect.objectContaining({ cause: CoworkInterruptionCause.UserStop }),
+      ]);
+    });
+
     it('should keep session entry active (preserves IM routing) but mark it aborted', async () => {
       await adapter.startSession('test', 'Hello');
       const addMessage = vi.fn(
@@ -1467,6 +1529,25 @@ describe('PiRuntimeAdapter', () => {
   });
 
   describe('stopAllSessions', () => {
+    it('cancels sessions that are still initializing', async () => {
+      let resolveCreateSession: ((value: { session: typeof mockSession }) => void) | undefined;
+      mockCreateAgentSession.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveCreateSession = resolve;
+          }),
+      );
+
+      const startPromise = adapter.startSession('initializing', 'Hello');
+      await vi.waitFor(() => expect(mockCreateAgentSession).toHaveBeenCalledOnce());
+      adapter.stopAllSessions();
+      resolveCreateSession?.({ session: mockSession });
+      await startPromise;
+
+      expect(mockSession.prompt).not.toHaveBeenCalled();
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+    });
+
     it('should keep all sessions active (preserves history)', async () => {
       await adapter.startSession('s1', 'A');
       await adapter.startSession('s2', 'B');

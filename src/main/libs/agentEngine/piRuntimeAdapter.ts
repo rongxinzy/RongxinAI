@@ -312,6 +312,11 @@ interface PiResourceState {
   fileToolsEnabled: boolean;
 }
 
+interface InitializingPiSession {
+  abortController: AbortController;
+  generation: symbol;
+}
+
 interface PiModelRuntime {
   registerProvider(provider: string, config: Record<string, unknown>): void;
   setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
@@ -474,6 +479,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
+  private readonly initializingSessions = new Map<string, InitializingPiSession>();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
 
@@ -552,11 +558,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       throw new Error('Prompt is required.');
     }
 
-    if (this.activeSessions.has(sessionId)) {
+    if (this.activeSessions.has(sessionId) || this.initializingSessions.has(sessionId)) {
       this.stopActiveSession(sessionId, 'The session was replaced by a new run.', false);
     }
 
+    const abortController = new AbortController();
+    const initialization: InitializingPiSession = {
+      abortController,
+      generation: Symbol(sessionId),
+    };
+    this.initializingSessions.set(sessionId, initialization);
+    const isCurrentInitialization = (): boolean =>
+      this.initializingSessions.get(sessionId)?.generation === initialization.generation &&
+      !abortController.signal.aborted;
+
     const pi = await getPiModules();
+    if (!isCurrentInitialization()) return;
 
     // Emit user message to UI (unless the caller already did).
     // Must persist via store.addMessage() — the CoworkStore is the source of
@@ -574,7 +591,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.emit('message', sessionId, persisted);
     }
 
-    const abortController = new AbortController();
     let workbenchRunId: string | null = null;
     let workbenchTaskId: string | null = null;
     let workbenchTaskGoal = prompt;
@@ -630,6 +646,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // so override that loader per session to keep expert contexts isolated.
       // Resolve model early — needed by both MCP proxy and subagent tool
       const resolvedModel = await resolvePiModel(pi, options.modelOverride);
+      if (!isCurrentInitialization()) return;
       const modelId =
         typeof resolvedModel.model.id === 'string'
           ? resolvedModel.model.id
@@ -686,6 +703,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         getAutoApprove: () =>
           this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
       });
+      if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
       if (settingsManager) {
         sessionOptions.settingsManager = settingsManager;
@@ -893,6 +911,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
+      if (!isCurrentInitialization()) {
+        void session.abort();
+        return;
+      }
 
       const active: ActivePiSession = {
         sessionId,
@@ -948,11 +970,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       // Subscribe to Pi events before sending the prompt
       active.unsubscribe = session.subscribe(event => {
-        if (abortController.signal.aborted) return;
+        if (
+          abortController.signal.aborted ||
+          this.activeSessions.get(sessionId) !== active
+        ) {
+          return;
+        }
         this.handlePiEvent(sessionId, active, event);
       });
 
+      if (!isCurrentInitialization()) {
+        active.unsubscribe();
+        void session.abort();
+        return;
+      }
       this.activeSessions.set(sessionId, active);
+      this.initializingSessions.delete(sessionId);
 
       // Send the prompt (may include conversation history for restart restores)
       let initialPrompt = researchRun
@@ -973,6 +1006,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workspaceRoot,
         prompt,
       );
+      if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
       if (projectMemoryContext) initialPrompt = `${projectMemoryContext}\n\n${initialPrompt}`;
 
       // The user may stop the session while the execution-mode question is
@@ -999,6 +1033,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.workbenchTaskService?.failRun?.(sessionId, { message });
       this.emit('error', sessionId, classifyCoworkError(message));
       throw error;
+    } finally {
+      if (
+        this.initializingSessions.get(sessionId)?.generation === initialization.generation
+      ) {
+        this.initializingSessions.delete(sessionId);
+      }
     }
   }
 
@@ -1339,10 +1379,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     cause?: CoworkInterruptionCause,
   ): void {
     this.dismissAskUserQuestionsBySession(sessionId);
+    const initializing = this.initializingSessions.get(sessionId);
+    if (initializing) {
+      initializing.abortController.abort();
+      this.initializingSessions.delete(sessionId);
+    }
     const active = this.activeSessions.get(sessionId);
     if (!active) {
       this.workbenchTaskService?.pauseRun?.(sessionId, reason);
       this.clearApprovalsBySession(sessionId);
+      if (cause) this.recordSessionInterruption(sessionId, cause);
       return;
     }
     const wasRunning = active.isRunning;
@@ -1395,12 +1441,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     cause: CoworkInterruptionCause,
   ): CoworkSessionInterruption {
     const task = this.workbenchTaskService?.getCurrent(sessionId)?.task ?? null;
+    const resumableTask = task?.contract.kind === WorkbenchContractKind.Chat ? null : task;
     const interruption: CoworkSessionInterruption = {
       sessionId,
       interruptionId: randomUUID(),
       cause,
-      taskId: task?.id ?? null,
-      recoverable: task?.status === WorkbenchTaskStatus.Paused,
+      taskId: resumableTask?.id ?? null,
+      recoverable: resumableTask?.status === WorkbenchTaskStatus.Paused,
     };
     const seed: CoworkMessage = {
       id: randomUUID(),
@@ -1417,7 +1464,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   stopAllSessions(): void {
-    for (const [sessionId] of this.activeSessions) {
+    const sessionIds = new Set([
+      ...this.activeSessions.keys(),
+      ...this.initializingSessions.keys(),
+    ]);
+    for (const sessionId of sessionIds) {
       this.stopActiveSession(sessionId, 'The application stopped the active session.', false);
     }
   }
@@ -2093,7 +2144,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.workbenchTaskService &&
           !this.workbenchTaskService.isRunRunning(active.workbenchRunId)
         ) {
-          this.stopActiveSession(sessionId, 'The workbench run is no longer active.', false);
+          this.stopActiveSession(
+            sessionId,
+            'The workbench run is no longer active.',
+            false,
+            CoworkInterruptionCause.RuntimePaused,
+          );
           break;
         }
         // Agent loop: when the finished iteration signaled "next", continue
