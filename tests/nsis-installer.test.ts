@@ -54,6 +54,8 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop');
     expect(installerScript).toContain('New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop');
     expect(installerScript).toContain('component-switch-state.txt');
+    expect(installerScript).toContain('Keep the journal in the persistent cache');
+    expect(installerScript).toContain('Join-Path $$runtimeRoot \\"component-switch-state.txt\\"');
     expect(installerScript).toContain('phase=component-set-rollback');
     expect(installerScript).toContain('phase=component-cleanup-complete');
     expect(installerScript).not.toContain('离线组件原子切换失败');

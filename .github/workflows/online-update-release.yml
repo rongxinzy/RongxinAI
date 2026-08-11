@@ -67,7 +67,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: rongxinzy/pi-connect
-          ref: 76b0f9bda604f95470d87054c4a99bf617556303
+          ref: 51d84979cc347cefd82737fa1db59dbc926aba3b
           path: .sidecars/pi-connect
           persist-credentials: false
       - name: Set up Go for the fixed cc-connect sidecar

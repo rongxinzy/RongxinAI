@@ -268,7 +268,25 @@
   StrCpy $R7 $R7 64
   StrCpy $1 $1 64
   StrCmp $1 $R7 0 OfflineComponentInstallFailed
-  Delete "$PLUGINSDIR\component-switch-state.txt"
+  ; Keep the journal in the persistent cache: $PLUGINSDIR is deleted after a forced quit.
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = \"Stop\";\
+    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
+    $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
+    if (-not (Test-Path -LiteralPath $$statePath)) { exit 0 };\
+    $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ -match \"^[^=|]+\\|(?:True|False)$$\" });\
+    [array]::Reverse($$states);\
+    foreach ($$state in $$states) {\
+      $$parts = $$state.Split(\"|\"); $$root = Join-Path $$runtimeRoot $$parts[0];\
+      $$current = Join-Path $$root \"current\"; $$next = Join-Path $$root \"current.next\"; $$previous = Join-Path $$root \"current.previous\";\
+      if ($$parts[1] -eq \"True\" -and (Test-Path -LiteralPath $$previous)) {\
+        if (Test-Path -LiteralPath $$current) { [IO.Directory]::Delete($$current) }; Rename-Item -LiteralPath $$previous -NewName \"current\" -ErrorAction Stop\
+      } elseif ($$parts[1] -eq \"False\" -and (Test-Path -LiteralPath $$current)) { [IO.Directory]::Delete($$current) };\
+      if (Test-Path -LiteralPath $$next) { [IO.Directory]::Delete($$next) }\
+    }; Remove-Item -LiteralPath $$statePath -Force -ErrorAction Stop"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 OfflineComponentInstallFailed
 
   ; Defender exclusion is optional and requires explicit, informed consent.
   ; Keep the scope limited to the immutable component cache; never exclude
@@ -342,7 +360,7 @@
     $$ErrorActionPreference = \"Stop\";\
     Set-StrictMode -Version Latest;\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+    $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
     $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
     $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Prefix = [string]$$_.prefix; Id = [string]$$_.contentId } });\
     $$prepared = @();\
@@ -449,9 +467,9 @@
   OfflineComponentInstallFailed:
     nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
       $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-      $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+      $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
       if (Test-Path -LiteralPath $$statePath) {\
-        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ });\
+        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ -match \"^[^=|]+\\|(?:True|False)$$\" });\
         [array]::Reverse($$states);\
         foreach ($$state in $$states) {\
           $$parts = $$state.Split(\"|\");\
@@ -562,7 +580,7 @@
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-timing.log" a
   FileWrite $2 "phase=component-cleanup-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $2
-  Delete "$PLUGINSDIR\component-switch-state.txt"
+  Delete "$LOCALAPPDATA\ZhiYuanAgent\runtimes\component-switch-state.txt"
 
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
   IfErrors InstallTimingDone
