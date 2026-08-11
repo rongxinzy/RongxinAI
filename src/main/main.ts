@@ -183,6 +183,8 @@ import {
   syncEnterpriseConfig,
 } from './libs/enterpriseConfigSync';
 import { LlamaCppManager } from './libs/llamacppManager';
+import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
+import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
 import { LlamaCppOpenClawEligibilityReason } from './libs/llamacppOpenClawBinding';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
 import { generateCorrelationId, runWithCorrelationId } from './libs/logCorrelation';
@@ -243,6 +245,7 @@ import { getLogFilePath, getRecentMainLogEntries, initLogger } from './logger';
 import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { OpenClawSessionIpc } from './openclawSession/constants';
+import { CcConnectPiBridge } from './im/ccConnectPiBridge';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 import {
   loadOpenClawSessionPolicyConfig,
@@ -1078,6 +1081,9 @@ let mcpInitPromise: Promise<McpToolManifestEntry[]> | null = null;
 let mcpLifecycleGeneration = 0;
 const activeMcpAuthorizations = new Map<string, AbortController>();
 let imGatewayManager: IMGatewayManager | null = null;
+let ccConnectBridgeServer: CcConnectBridgeServer | null = null;
+let ccConnectSidecarManager: CcConnectSidecarManager | null = null;
+let ccConnectPiBridge: CcConnectPiBridge | null = null;
 let storeInitPromise: Promise<SqliteStore> | null = null;
 let sqliteBackupManager: SqliteBackupManager | null = null;
 let openClawEngineManager: OpenClawEngineManager | null = null;
