@@ -7,6 +7,7 @@ import {
   extractLatestTodoListFromMessages,
   extractTodoListFromLatestAssistantMessage,
 } from '../../../utils/todoParser';
+import { useProductionPlanTodos } from './useProductionPlanTodos';
 
 export const TODO_COMPLETION_VISIBLE_MS = 3000;
 export const TODO_DISMISS_ANIMATION_MS = 200;
@@ -56,11 +57,21 @@ export function useTodoQueueLifecycle({
   messages,
   sessionId,
 }: UseTodoQueueLifecycleOptions): TodoQueueLifecycleState {
-  const [initialTodoList] = useState(() => extractLatestTodoListFromMessages(messages));
-  const latestTodoList = useMemo(
-    () => extractTodoListFromLatestAssistantMessage(messages),
-    [messages],
-  );
+  const productionPlan = useProductionPlanTodos(sessionId);
+  const [initialTodoList] = useState<ExtractedTodoList | null>(null);
+  const latestTodoList = useMemo(() => {
+    if (productionPlan === undefined) return null;
+    if (productionPlan) {
+      return productionPlan.todos.length > 0
+        ? {
+            sourceMessageId: `production-plan:${productionPlan.runId}`,
+            sourceTimestamp: productionPlan.progressVersion,
+            todos: productionPlan.todos,
+          }
+        : null;
+    }
+    return extractTodoListFromLatestAssistantMessage(messages);
+  }, [messages, productionPlan]);
   const [displayedTodoList, setDisplayedTodoList] = useState<DisplayedTodoList | null>(() =>
     toDisplayedTodoList(sessionId, initialTodoList),
   );
@@ -68,7 +79,7 @@ export function useTodoQueueLifecycle({
   displayedTodoListRef.current = displayedTodoList;
   const [isDismissing, setIsDismissing] = useState(false);
   const activeSessionIdRef = useRef(sessionId);
-  const restoredSessionIdRef = useRef(messages.length > 0 ? sessionId : undefined);
+  const restoredSessionIdRef = useRef<string | undefined>(undefined);
   const acceptedSourceRef = useRef<AcceptedTodoSource | null>(
     sessionId && initialTodoList
       ? {
@@ -85,13 +96,14 @@ export function useTodoQueueLifecycle({
   );
 
   useEffect(() => {
-    const acceptedSource = acceptedSourceRef.current;
+    let acceptedSource = acceptedSourceRef.current;
     const sessionChanged = activeSessionIdRef.current !== sessionId;
 
     if (!sessionId) {
       activeSessionIdRef.current = sessionId;
       restoredSessionIdRef.current = undefined;
       acceptedSourceRef.current = null;
+      acceptedSource = null;
       dismissedSourceIdRef.current = null;
       setDisplayedTodoList(null);
       setIsDismissing(false);
@@ -102,15 +114,18 @@ export function useTodoQueueLifecycle({
       activeSessionIdRef.current = sessionId;
       restoredSessionIdRef.current = undefined;
       acceptedSourceRef.current = null;
+      acceptedSource = null;
       dismissedSourceIdRef.current = null;
       setDisplayedTodoList(null);
       setIsDismissing(false);
     }
 
     if (restoredSessionIdRef.current !== sessionId) {
-      if (messages.length === 0) return;
+      if (productionPlan === undefined) return;
 
-      const restoredTodoList = extractLatestTodoListFromMessages(messages);
+      const restoredTodoList = productionPlan
+        ? latestTodoList
+        : extractLatestTodoListFromMessages(messages);
       restoredSessionIdRef.current = sessionId;
       acceptedSourceRef.current = restoredTodoList
         ? {
@@ -128,7 +143,13 @@ export function useTodoQueueLifecycle({
       return;
     }
 
-    if (!latestTodoList) return;
+    if (!latestTodoList) {
+      if (productionPlan) {
+        setDisplayedTodoList(null);
+        setIsDismissing(false);
+      }
+      return;
+    }
     if (acceptedSource && latestTodoList.sourceTimestamp < acceptedSource.sourceTimestamp) {
       return;
     }
@@ -146,7 +167,7 @@ export function useTodoQueueLifecycle({
     if (!complete) dismissedSourceIdRef.current = null;
     setDisplayedTodoList({ sessionId, ...latestTodoList });
     setIsDismissing(false);
-  }, [latestTodoList, messages, sessionId]);
+  }, [latestTodoList, messages, productionPlan, sessionId]);
 
   const todoStatusKey = getTodoStatusKey(displayedTodoList);
   const displayedSourceMessageId = displayedTodoList?.sourceMessageId;
