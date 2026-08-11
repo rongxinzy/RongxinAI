@@ -13,6 +13,8 @@ export class CcConnectSidecarManager extends EventEmitter {
     }
     fs.mkdirSync(path.dirname(this.configPath), { recursive: true });
     fs.writeFileSync(this.configPath, config, { mode: 0o600 });
+    // writeFile preserves an existing file's mode, so enforce it after every rotation.
+    fs.chmodSync(this.configPath, 0o600);
     this.child = spawn(this.executable, [], { env: { ...process.env, CC_CONNECT_CONFIG: this.configPath }, stdio: ['ignore', 'pipe', 'pipe'] });
     this.child.on('exit', (code, signal) => { this.child = null; this.emit('exit', { code, signal }); });
     this.child.on('error', error => this.emit('error', error));
