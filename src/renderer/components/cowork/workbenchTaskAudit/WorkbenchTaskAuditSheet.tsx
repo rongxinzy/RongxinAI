@@ -1,6 +1,13 @@
 import { Badge } from '@shared/components/ui/badge';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@shared/components/ui/select';
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -8,36 +15,60 @@ import {
   SheetTitle,
 } from '@shared/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { useEffect, useMemo, useState } from 'react';
 
 import type {
   WorkbenchApprovalResponseInput,
+  WorkbenchTask,
   WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
 import { ApprovalAuditTab } from './ApprovalAuditTab';
 import { ArtifactAuditTab } from './ArtifactAuditTab';
 import { AuditJsonDisclosure } from './AuditJsonDisclosure';
-import { WorkbenchTaskAuditTab } from './constants';
+import { WorkbenchTaskAuditTab, WorkbenchTaskRunFilter } from './constants';
 import { EventAuditTab } from './EventAuditTab';
 import { RunAuditTab } from './RunAuditTab';
-import { contractLabel, formatTimestamp, statusBadgeVariant, statusLabel } from './utils';
+import {
+  contractLabel,
+  filterTaskDetailByRun,
+  formatTimestamp,
+  statusBadgeVariant,
+  statusLabel,
+} from './utils';
 
 interface WorkbenchTaskAuditSheetProps {
   detail: WorkbenchTaskDetail;
+  tasks: WorkbenchTask[];
   open: boolean;
   busy: boolean;
+  loading: boolean;
   onOpenChange: (open: boolean) => void;
+  onSelectTask: (taskId: string) => void;
   onRespondToApproval: (input: WorkbenchApprovalResponseInput) => void;
 }
 
 export function WorkbenchTaskAuditSheet({
   detail,
+  tasks,
   open,
   busy,
+  loading,
   onOpenChange,
+  onSelectTask,
   onRespondToApproval,
 }: WorkbenchTaskAuditSheetProps) {
   const task = detail.task;
+  const [runFilter, setRunFilter] = useState<string>(WorkbenchTaskRunFilter.All);
+
+  useEffect(() => {
+    setRunFilter(WorkbenchTaskRunFilter.All);
+  }, [task.id]);
+
+  const filteredDetail = useMemo(
+    () => filterTaskDetailByRun(detail, runFilter),
+    [detail, runFilter],
+  );
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -51,6 +82,33 @@ export function WorkbenchTaskAuditSheet({
             className="flex flex-col gap-3"
             aria-label={i18nService.t('workbenchTaskSummary')}
           >
+            {tasks.length > 1 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-muted-foreground">
+                  {i18nService.t('workbenchTaskHistory')}
+                </span>
+                <Select value={task.id} onValueChange={value => value && onSelectTask(value)}>
+                  <SelectTrigger className="w-full" disabled={loading}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    {tasks.map(historyTask => (
+                      <SelectItem key={historyTask.id} value={historyTask.id}>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Badge variant={statusBadgeVariant(historyTask.status)}>
+                            {statusLabel(historyTask.status)}
+                          </Badge>
+                          <span className="max-w-96 truncate">{historyTask.goal}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {formatTimestamp(historyTask.createdAt)}
+                          </span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex flex-wrap items-start gap-2">
               <Badge variant={statusBadgeVariant(task.status)}>{statusLabel(task.status)}</Badge>
               <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{task.goal}</p>
@@ -94,38 +152,63 @@ export function WorkbenchTaskAuditSheet({
           <Tabs defaultValue={WorkbenchTaskAuditTab.Runs} className="flex min-h-0 flex-1 flex-col">
             <TabsList variant="line" className="w-full justify-start overflow-x-auto">
               <TabsTrigger value={WorkbenchTaskAuditTab.Runs}>
-                {tabLabel('workbenchTaskRuns', detail.runs.length)}
+                {tabLabel('workbenchTaskRuns', filteredDetail.runs.length)}
               </TabsTrigger>
               <TabsTrigger value={WorkbenchTaskAuditTab.Events}>
-                {tabLabel('workbenchTaskEvents', detail.events.length)}
+                {tabLabel('workbenchTaskEvents', filteredDetail.events.length)}
               </TabsTrigger>
               <TabsTrigger value={WorkbenchTaskAuditTab.Artifacts}>
-                {tabLabel('workbenchTaskArtifacts', detail.artifacts.length)}
+                {tabLabel('workbenchTaskArtifacts', filteredDetail.artifacts.length)}
               </TabsTrigger>
               <TabsTrigger value={WorkbenchTaskAuditTab.Approvals}>
-                {tabLabel('workbenchTaskApprovals', detail.approvals.length)}
+                {tabLabel('workbenchTaskApprovals', filteredDetail.approvals.length)}
               </TabsTrigger>
             </TabsList>
 
+            {detail.runs.length > 1 && (
+              <div className="flex items-center gap-2 pt-2">
+                <span className="text-xs text-muted-foreground">
+                  {i18nService.t('workbenchTaskRunFilter')}
+                </span>
+                <Select value={runFilter} onValueChange={value => value && setRunFilter(value)}>
+                  <SelectTrigger size="sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value={WorkbenchTaskRunFilter.All}>
+                      {i18nService.t('workbenchTaskAllRuns')}
+                    </SelectItem>
+                    {detail.runs.map(run => (
+                      <SelectItem key={run.id} value={run.id}>
+                        {i18nService
+                          .t('workbenchTaskRunAttempt')
+                          .replace('{attempt}', String(run.attempt))}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <TabsContent value={WorkbenchTaskAuditTab.Runs} className="min-h-0 flex-1">
               <ScrollArea className="h-full pr-2">
-                <RunAuditTab runs={detail.runs} activeRunId={task.activeRunId} />
+                <RunAuditTab runs={filteredDetail.runs} activeRunId={task.activeRunId} />
               </ScrollArea>
             </TabsContent>
             <TabsContent value={WorkbenchTaskAuditTab.Events} className="min-h-0 flex-1">
               <ScrollArea className="h-full pr-2">
-                <EventAuditTab events={detail.events} runs={detail.runs} />
+                <EventAuditTab events={filteredDetail.events} runs={detail.runs} />
               </ScrollArea>
             </TabsContent>
             <TabsContent value={WorkbenchTaskAuditTab.Artifacts} className="min-h-0 flex-1">
               <ScrollArea className="h-full">
-                <ArtifactAuditTab artifacts={detail.artifacts} runs={detail.runs} />
+                <ArtifactAuditTab artifacts={filteredDetail.artifacts} runs={detail.runs} />
               </ScrollArea>
             </TabsContent>
             <TabsContent value={WorkbenchTaskAuditTab.Approvals} className="min-h-0 flex-1">
               <ScrollArea className="h-full pr-2">
                 <ApprovalAuditTab
-                  approvals={detail.approvals}
+                  approvals={filteredDetail.approvals}
                   runs={detail.runs}
                   busy={busy}
                   onRespond={onRespondToApproval}

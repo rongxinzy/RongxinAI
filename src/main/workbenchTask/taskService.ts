@@ -99,6 +99,10 @@ export class WorkbenchTaskService extends EventEmitter {
     return this.withProductionPlan(this.repository.getDetail(taskId));
   }
 
+  listForSession(sessionId: string): WorkbenchTask[] {
+    return this.repository.listTasksForSession(sessionId);
+  }
+
   private withProductionPlan(detail: WorkbenchTaskDetail | null): WorkbenchTaskDetail | null {
     if (!detail) return null;
     const state = detail.task.activeRunId

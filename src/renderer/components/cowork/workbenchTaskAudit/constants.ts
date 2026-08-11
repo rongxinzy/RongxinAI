@@ -7,3 +7,7 @@ export const WorkbenchTaskAuditTab = {
 
 export type WorkbenchTaskAuditTab =
   (typeof WorkbenchTaskAuditTab)[keyof typeof WorkbenchTaskAuditTab];
+
+export const WorkbenchTaskRunFilter = {
+  All: 'all',
+} as const;

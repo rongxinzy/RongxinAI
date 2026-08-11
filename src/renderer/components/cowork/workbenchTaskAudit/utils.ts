@@ -17,6 +17,7 @@ import {
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
+import { WorkbenchTaskRunFilter } from './constants';
 
 const statusTranslationKeys: Record<string, string> = {
   [WorkbenchTaskStatus.Draft]: 'workbenchTaskStatusDraft',
@@ -173,3 +174,17 @@ export const getRunAttempt = (runs: WorkbenchRun[], runId: string): number | nul
 
 export const getProjectedRun = (detail: WorkbenchTaskDetail | null): WorkbenchRun | null =>
   detail?.runs.find(run => run.id === detail.task.activeRunId) ?? detail?.runs[0] ?? null;
+
+export const filterTaskDetailByRun = (
+  detail: WorkbenchTaskDetail,
+  runId: string,
+): WorkbenchTaskDetail => {
+  if (runId === WorkbenchTaskRunFilter.All) return detail;
+  return {
+    ...detail,
+    runs: detail.runs.filter(run => run.id === runId),
+    events: detail.events.filter(event => event.runId === runId),
+    artifacts: detail.artifacts.filter(artifact => artifact.runId === runId),
+    approvals: detail.approvals.filter(approval => approval.runId === runId),
+  };
+};
