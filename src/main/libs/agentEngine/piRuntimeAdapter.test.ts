@@ -1156,6 +1156,23 @@ describe('PiRuntimeAdapter', () => {
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
     });
 
+    it('recreates the session after MCP discovery refreshes its tool topology', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [{ server: 'Supabase', name: 'list_projects', description: 'List projects' }],
+      } as never);
+      await adapter.startSession('test', 'First');
+
+      adapter.refreshMcpTools();
+      await adapter.continueSession('test', 'Use Supabase');
+
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      const replacementOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(replacementOptions.customTools?.map(tool => tool.name)).toContain('mcp');
+    });
+
     it('should reload an active session when its system prompt changes', async () => {
       await adapter.startSession('test', 'First', { systemPrompt: 'You are the original expert.' });
       await adapter.continueSession('test', 'Second', {

@@ -273,6 +273,8 @@ interface ActivePiSession {
   turnFailed: boolean;
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
   queueFlushInFlight: boolean;
+  /** MCP tool manifest generation captured when this Pi session was created. */
+  mcpToolManifestGeneration: number;
 }
 
 // ── Dynamic imports ──
@@ -475,6 +477,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   >();
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
+  /**
+   * Pi custom tools are fixed when a session is created. Bump this whenever
+   * MCP discovery changes so the next user turn recreates an outdated session
+   * with the current MCP proxy topology.
+   */
+  private mcpToolManifestGeneration = 0;
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
@@ -514,6 +522,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   setMcpServerManager(mgr: McpServerManager): void {
     this.mcpServerManager = mgr;
     this.mcpInjected = true;
+    this.mcpToolManifestGeneration += 1;
+  }
+  refreshMcpTools(): void {
+    this.mcpToolManifestGeneration += 1;
   }
   hasMcpServerManager(): boolean {
     return this.mcpInjected;
@@ -965,15 +977,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         isRunning: true,
         turnFailed: false,
         queueFlushInFlight: false,
+        mcpToolManifestGeneration: this.mcpToolManifestGeneration,
       };
       activeSession = active;
 
       // Subscribe to Pi events before sending the prompt
       active.unsubscribe = session.subscribe(event => {
-        if (
-          abortController.signal.aborted ||
-          this.activeSessions.get(sessionId) !== active
-        ) {
+        if (abortController.signal.aborted || this.activeSessions.get(sessionId) !== active) {
           return;
         }
         this.handlePiEvent(sessionId, active, event);
@@ -1034,9 +1044,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.emit('error', sessionId, classifyCoworkError(message));
       throw error;
     } finally {
-      if (
-        this.initializingSessions.get(sessionId)?.generation === initialization.generation
-      ) {
+      if (this.initializingSessions.get(sessionId)?.generation === initialization.generation) {
         this.initializingSessions.delete(sessionId);
       }
     }
@@ -1071,12 +1079,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
     }
 
-    if (options.autoApprove !== undefined) {
-      active.autoApprove = Boolean(options.autoApprove);
-    }
-    active.isRunning = true;
-    active.turnFailed = false;
-
     const requestedSystemPrompt = options.systemPrompt?.trim();
     const requestedSkillIds =
       options.skillIds === undefined
@@ -1100,11 +1102,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     });
     const productionWorkflowTopologyChanged =
       productionWorkflowEnabled !== active.productionWorkflowEnabled;
+    const mcpToolTopologyChanged =
+      active.mcpToolManifestGeneration !== this.mcpToolManifestGeneration;
     if (
       !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
-      productionWorkflowTopologyChanged
+      productionWorkflowTopologyChanged ||
+      mcpToolTopologyChanged
     ) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
+      if (mcpToolTopologyChanged) {
+        console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
+      }
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1116,6 +1124,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         _piPromptOverride: buildPiConversationPrompt(history, prompt),
       });
     }
+
+    if (options.autoApprove !== undefined) {
+      active.autoApprove = Boolean(options.autoApprove);
+    }
+    active.isRunning = true;
+    active.turnFailed = false;
 
     const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
     const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
@@ -2715,16 +2729,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
     if (!this.mcpServerManager) return null;
-    const manifest = this.mcpServerManager.toolManifest;
-    if (manifest.length === 0) return null;
+    if (this.mcpServerManager.toolManifest.length === 0) return null;
 
     const mgr = this.mcpServerManager;
-
-    const toolIndex = manifest.map(e => ({
-      server: e.server,
-      name: e.name,
-      description: e.description,
-    }));
+    const getManifest = () => mgr.toolManifest;
 
     const buildStatusLine = (): string => {
       const servers = this.mcpServerManager?.toolManifest ?? [];
@@ -2781,6 +2789,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // content = undefined, which breaks the next LLM turn with
         // "content is not iterable". See agent-loop.ts createToolResultMessage.
         try {
+          const manifest = getManifest();
+          const toolIndex = manifest.map(e => ({
+            server: e.server,
+            name: e.name,
+            description: e.description,
+          }));
           const tool = typeof params.tool === 'string' ? params.tool : undefined;
           const argsStr = typeof params.args === 'string' ? params.args : undefined;
           const server = typeof params.server === 'string' ? params.server : undefined;
