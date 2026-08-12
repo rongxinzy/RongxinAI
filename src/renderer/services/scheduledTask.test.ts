@@ -73,3 +73,84 @@ test('queues one trailing load when a gateway refresh arrives during an active l
   await activeLoad;
   await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2));
 });
+
+function makeTaskFixture(id: string): ScheduledTask {
+  return {
+    id,
+    name: 'Morning brief',
+    description: '',
+    enabled: true,
+    schedule: { kind: 'cron', expr: '0 9 * * *' },
+    sessionTarget: 'isolated',
+    wakeMode: 'now',
+    payload: { kind: 'agentTurn', message: 'Summarize updates' },
+    delivery: { mode: 'none' },
+    agentId: 'agent-1',
+    sessionKey: null,
+    state: {
+      nextRunAtMs: null,
+      lastRunAtMs: null,
+      lastStatus: null,
+      lastError: null,
+      lastDurationMs: null,
+      runningAtMs: null,
+      consecutiveErrors: 0,
+    },
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+test('runManually flips the task to running before the gateway responds', async () => {
+  store.dispatch(setTasks([makeTaskFixture('task-1')]));
+  let resolveRun: ((result: { success: boolean; error?: string }) => void) | null = null;
+  const runManually = vi.fn(
+    () =>
+      new Promise<{ success: boolean; error?: string }>(resolve => {
+        resolveRun = resolve;
+      }),
+  );
+  vi.stubGlobal('window', {
+    electron: { scheduledTasks: { runManually } },
+    dispatchEvent: vi.fn(),
+  });
+  const service = new ScheduledTaskService();
+
+  const pendingRun = service.runManually('task-1');
+
+  // No gateway response yet — the optimistic running state must already show.
+  const runningAtMs = store.getState().scheduledTask.tasks.find(t => t.id === 'task-1')
+    ?.state.runningAtMs;
+  expect(runningAtMs).not.toBeNull();
+
+  (resolveRun as ((result: { success: boolean; error?: string }) => void) | null)?.({
+    success: true,
+  });
+  await pendingRun;
+
+  // A successful start keeps the running state until the real poll reconciles.
+  expect(
+    store.getState().scheduledTask.tasks.find(t => t.id === 'task-1')?.state.runningAtMs,
+  ).not.toBeNull();
+});
+
+test('runManually rolls back the optimistic state and toasts when the run fails to start', async () => {
+  store.dispatch(setTasks([makeTaskFixture('task-2')]));
+  const runManually = vi.fn().mockResolvedValue({ success: false, error: 'gateway offline' });
+  const dispatchEvent = vi.fn();
+  vi.stubGlobal('window', {
+    electron: { scheduledTasks: { runManually } },
+    dispatchEvent,
+  });
+  const service = new ScheduledTaskService();
+
+  await service.runManually('task-2');
+
+  const state = store.getState().scheduledTask;
+  expect(state.tasks.find(t => t.id === 'task-2')?.state.runningAtMs).toBeNull();
+  expect(state.error).toBe('gateway offline');
+  expect(dispatchEvent).toHaveBeenCalledOnce();
+  const event = dispatchEvent.mock.calls[0]?.[0] as CustomEvent<string>;
+  expect(event.type).toBe('app:showToast');
+  expect(event.detail.length).toBeGreaterThan(0);
+});

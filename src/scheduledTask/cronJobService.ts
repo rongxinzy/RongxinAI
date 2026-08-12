@@ -485,12 +485,23 @@ export class CronJobService {
   private runningJobIds: Set<string> = new Set();
   /** Activity run IDs for jobs that started while this service was polling. */
   private activeChannelRunIds: Map<string, string> = new Map();
+  /** Fast-poll state: after a manual run, poll at a quicker cadence until the
+   *  tracked job is observed to finish, so the UI sees start/stop transitions
+   *  without waiting for the next regular poll. */
+  private fastPollTimer: ReturnType<typeof setInterval> | null = null;
+  private fastPollJobId: string | null = null;
+  private fastPollSawRunning = false;
+  private fastPollStartedAt = 0;
 
   /** Polling interval for cron job state and run log sync.
    *  15s is the production default.  During local development 5s gives
    *  a better chance of catching brief "running" windows for fast tasks. */
   private static readonly POLL_INTERVAL_MS =
     process.env.NODE_ENV === 'development' ? 5_000 : 15_000;
+
+  /** Cadence and time bound for the post-manual-run fast polling window. */
+  private static readonly FAST_POLL_INTERVAL_MS = 2_000;
+  private static readonly FAST_POLL_WINDOW_MS = 5 * 60_000;
 
   constructor(deps: CronJobServiceDeps) {
     this.getGatewayClient = deps.getGatewayClient;
@@ -657,6 +668,43 @@ export class CronJobService {
   async runJob(id: string): Promise<void> {
     const client = await this.client();
     await client.request('cron.run', { id });
+    // Poll immediately and at a faster cadence so the renderer sees the
+    // running/finished transitions without waiting for the next regular poll.
+    this.startFastPolling(id);
+  }
+
+  /**
+   * Kick an immediate poll and a bounded fast-polling window for one manually
+   * started job. Fast polling stops once the job is observed to finish (or to
+   * have already finished before the first poll saw it running), the job is
+   * removed, or the time window expires — whichever comes first.
+   */
+  private startFastPolling(jobId: string): void {
+    if (!this.polling) return;
+    this.stopFastPolling();
+    this.fastPollJobId = jobId;
+    this.fastPollSawRunning = false;
+    this.fastPollStartedAt = Date.now();
+    void this.pollOnce();
+    this.fastPollTimer = setInterval(() => {
+      if (
+        !this.polling ||
+        Date.now() - this.fastPollStartedAt > CronJobService.FAST_POLL_WINDOW_MS
+      ) {
+        this.stopFastPolling();
+        return;
+      }
+      void this.pollOnce();
+    }, CronJobService.FAST_POLL_INTERVAL_MS);
+  }
+
+  private stopFastPolling(): void {
+    if (this.fastPollTimer) {
+      clearInterval(this.fastPollTimer);
+      this.fastPollTimer = null;
+    }
+    this.fastPollJobId = null;
+    this.fastPollSawRunning = false;
   }
 
   async listRuns(
@@ -773,12 +821,14 @@ export class CronJobService {
       clearInterval(this.pollingTimer);
       this.pollingTimer = null;
     }
+    this.stopFastPolling();
     this.clearPollingSnapshot();
     this.firstPollDone = false;
   }
 
   handleGatewayDisconnected(): void {
     this.pollGeneration += 1;
+    this.stopFastPolling();
     this.clearPollingSnapshot(false);
     this.firstPollDone = false;
   }
@@ -881,6 +931,22 @@ export class CronJobService {
           this.lastKnownStates.delete(knownId);
           this.lastKnownRunAtMs.delete(knownId);
           this.activeChannelRunIds.delete(knownId);
+        }
+      }
+
+      // End the fast-polling window once the tracked job has finished (or ran
+      // so quickly it completed before any poll observed it running), or was
+      // removed entirely.
+      if (this.fastPollTimer && this.fastPollJobId) {
+        if (this.runningJobIds.has(this.fastPollJobId)) {
+          this.fastPollSawRunning = true;
+        } else {
+          const trackedLastRunAtMs = this.lastKnownRunAtMs.get(this.fastPollJobId) ?? 0;
+          const finishedBeforeObserved = trackedLastRunAtMs >= this.fastPollStartedAt;
+          const trackedJobRemoved = !currentIds.has(this.fastPollJobId);
+          if (this.fastPollSawRunning || finishedBeforeObserved || trackedJobRemoved) {
+            this.stopFastPolling();
+          }
         }
       }
 
