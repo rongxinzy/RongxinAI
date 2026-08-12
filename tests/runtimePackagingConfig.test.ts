@@ -126,6 +126,41 @@ test("publish verification uses portable jq flags and preserves updater filename
   );
 });
 
+test("release supply-chain gates track every checked-in npm lockfile", () => {
+  const trackedLockfiles = execFileSync(
+    "git",
+    ["ls-files", "*package-lock.json"],
+    { cwd: root, encoding: "utf8" },
+  )
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .sort();
+  const policy = readFileSync(
+    path.join(root, "scripts", "ci", "check-supply-chain-inputs.mjs"),
+    "utf8",
+  );
+  const workflow = readFileSync(
+    path.join(root, ".github", "workflows", "online-update-release.yml"),
+    "utf8",
+  );
+  const policyLockfiles = Array.from(
+    policy.matchAll(/^\s+'([^']+package-lock\.json)',?$/gm),
+    (match) => match[1],
+  ).sort();
+  const signatureStep = workflow.slice(
+    workflow.indexOf("- name: Verify npm package signatures"),
+    workflow.indexOf("- name: Enforce approved package sources"),
+  );
+  const workflowLockfiles = Array.from(
+    signatureStep.matchAll(/^\s+([^\s]+package-lock\.json)(?: \\|; do)?$/gm),
+    (match) => match[1],
+  ).sort();
+
+  assert.deepEqual(policyLockfiles, trackedLockfiles);
+  assert.deepEqual(workflowLockfiles, trackedLockfiles);
+});
+
 test("unsigned macOS release builds do not receive empty signing credentials", () => {
   const workflow = readFileSync(
     path.join(root, ".github", "workflows", "online-update-release.yml"),
