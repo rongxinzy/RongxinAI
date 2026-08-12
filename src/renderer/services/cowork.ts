@@ -510,6 +510,7 @@ class CoworkService {
       expertIds: options.expertIds,
       permissionMode: options.permissionMode,
       imageAttachments: options.imageAttachments,
+      fileAttachments: options.fileAttachments,
     });
     if (!result.success) {
       if (result.code !== ENGINE_NOT_READY_CODE) {

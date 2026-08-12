@@ -901,7 +901,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       isStreaming &&
       (currentSession.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work
     ) {
-      const result = await coworkQueueService.enqueue(currentSession.id, prompt);
+      const result = await coworkQueueService.enqueue(
+        currentSession.id,
+        prompt,
+        imageAttachments,
+        fileAttachments,
+        [...activeSkillIds],
+        skillPrompt,
+      );
       if (!result.success) {
         window.dispatchEvent(
           new CustomEvent('app:showToast', {

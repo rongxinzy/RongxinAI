@@ -455,7 +455,7 @@ contextBridge.exposeInMainWorld('electron', {
       modelOverride?: string;
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Start, options),
 
     continueSession: (options: {
@@ -467,11 +467,18 @@ contextBridge.exposeInMainWorld('electron', {
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 
     listPendingMessages: (sessionId: string) => ipcRenderer.invoke(CoworkQueueIpc.List, sessionId),
-    enqueuePendingMessage: (options: { sessionId: string; text: string }) =>
+    enqueuePendingMessage: (options: {
+      sessionId: string;
+      text: string;
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
+      skillIds?: string[];
+      skillPrompt?: string;
+    }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
     updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Update, options),

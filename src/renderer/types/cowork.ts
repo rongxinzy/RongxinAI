@@ -19,6 +19,8 @@ export interface CoworkFileAttachment {
   name: string;
   path: string;
   extension: string;
+  /** Keeps image rendering independent from whether the selected model accepts vision input. */
+  isImage?: boolean;
 }
 
 // Cowork session status

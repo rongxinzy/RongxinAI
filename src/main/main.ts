@@ -644,12 +644,28 @@ const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
   // and must not be truncated by the generic sanitizer).
   let sanitizedMetadata: unknown;
   if (messageRecord.metadata && typeof messageRecord.metadata === 'object') {
-    const { imageAttachments, ...rest } = messageRecord.metadata as Record<string, unknown>;
+    const { imageAttachments, fileAttachments, ...rest } = messageRecord.metadata as Record<string, unknown>;
     const sanitizedRest = sanitizeIpcPayload(rest) as Record<string, unknown> | undefined;
     sanitizedMetadata = {
       ...(sanitizedRest && typeof sanitizedRest === 'object' ? sanitizedRest : {}),
       ...(Array.isArray(imageAttachments) && imageAttachments.length > 0
         ? { imageAttachments }
+        : {}),
+      ...(Array.isArray(fileAttachments) && fileAttachments.length > 0
+        ? {
+            fileAttachments: fileAttachments
+              .filter(
+                (attachment): attachment is Record<string, unknown> =>
+                  Boolean(attachment) && typeof attachment === 'object',
+              )
+              .slice(0, IPC_MAX_ITEMS)
+              .map(attachment => ({
+                name: typeof attachment.name === 'string' ? attachment.name : '',
+                path: typeof attachment.path === 'string' ? attachment.path : '',
+                extension: typeof attachment.extension === 'string' ? attachment.extension : '',
+                ...(typeof attachment.isImage === 'boolean' ? { isImage: attachment.isImage } : {}),
+              })),
+          }
         : {}),
     };
   } else {
@@ -4348,7 +4364,7 @@ if (!gotTheLock) {
         expertIds?: string[];
         permissionMode?: CoworkPermissionMode;
         imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-        fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+        fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       },
     ) => {
       try {
@@ -4490,7 +4506,14 @@ if (!gotTheLock) {
   ipcMain.handle(CoworkQueueIpc.Enqueue, async (_event, rawInput: unknown) => {
     try {
       const input = CoworkQueueEnqueueSchema.parse(rawInput);
-      return getPiRuntimeAdapter().enqueuePendingMessage(input.sessionId, input.text);
+      return getPiRuntimeAdapter().enqueuePendingMessage(
+        input.sessionId,
+        input.text,
+        input.imageAttachments,
+        input.fileAttachments,
+        input.skillIds,
+        input.skillPrompt,
+      );
     } catch (error) {
       return {
         success: false,

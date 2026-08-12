@@ -76,7 +76,7 @@ export type PiStartOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
-  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+  fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
@@ -97,7 +97,7 @@ export type PiContinueOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
-  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+  fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
   agentId?: string;
@@ -137,6 +137,10 @@ export interface PiRuntime {
   enqueuePendingMessage(
     sessionId: string,
     text: string,
+    imageAttachments?: PiImageAttachment[],
+    fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>,
+    skillIds?: string[],
+    skillPrompt?: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string };
   updatePendingMessage(
     sessionId: string,

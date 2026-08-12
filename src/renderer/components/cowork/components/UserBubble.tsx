@@ -1,6 +1,6 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
 import { Button } from '@shared/components/ui/button';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -28,6 +28,64 @@ const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string |
 
 const hasFocusWithin = (element: HTMLElement): boolean =>
   document.activeElement instanceof Node && element.contains(document.activeElement);
+
+const FileAttachmentCard: React.FC<{ file: CoworkFileAttachment }> = ({ file }) => (
+  <div
+    className="flex h-20 w-64 shrink-0 items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4"
+    title={file.path}
+  >
+    <FileTypeIcon fileName={file.name} className="h-12 w-12 shrink-0" />
+    <div className="min-w-0">
+      <div className="truncate text-base text-foreground">{file.name}</div>
+      <div className="truncate text-sm text-muted-foreground">{file.extension}</div>
+    </div>
+  </div>
+);
+
+const LocalImageAttachmentPreview: React.FC<{
+  file: CoworkFileAttachment;
+  onExpand: (image: ImagePreviewSource) => void;
+}> = ({ file, onExpand }) => {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [readFailed, setReadFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDataUrl(null);
+    setReadFailed(false);
+    void window.electron.dialog.readFileAsDataUrl(file.path).then(result => {
+      if (cancelled) return;
+      if (result.success && result.dataUrl) {
+        setDataUrl(result.dataUrl);
+      } else {
+        setReadFailed(true);
+      }
+    }).catch(() => {
+      if (!cancelled) setReadFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [file.path]);
+
+  if (!dataUrl) {
+    return readFailed ? <FileAttachmentCard file={file} /> : null;
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      className="block h-auto w-auto min-h-0 shrink-0 cursor-zoom-in rounded-lg p-0 shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50"
+      onClick={() => onExpand({ src: dataUrl, alt: file.name, name: file.name })}
+    >
+      <img
+        src={dataUrl}
+        alt={file.name || 'image'}
+        className="block h-40 w-auto max-w-80 rounded-lg border border-border object-contain"
+      />
+    </Button>
+  );
+};
 
 export const UserBubble: React.FC<{
   message: CoworkMessage;
@@ -75,6 +133,14 @@ export const UserBubble: React.FC<{
       .join('\n')
       .replace(/^\n+|\n+$/g, '');
   }, [displayContent, fileAttachments]);
+  const localImageAttachments = useMemo(
+    () => fileAttachments.filter(file => file.isImage),
+    [fileAttachments],
+  );
+  const documentAttachments = useMemo(
+    () => fileAttachments.filter(file => !file.isImage),
+    [fileAttachments],
+  );
   const hasTextContent = Boolean(textContent.trim()) || messageSkills.length > 0;
 
   return (
@@ -111,21 +177,21 @@ export const UserBubble: React.FC<{
           </div>
         )}
 
-        {fileAttachments.length > 0 && (
+        {localImageAttachments.length > 0 && (
           <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
-            {fileAttachments.map(file => (
-              <div
+            {localImageAttachments.map(file => (
+              <LocalImageAttachmentPreview
                 key={file.path}
-                className="flex h-20 w-64 shrink-0 items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4"
-                title={file.path}
-              >
-                <FileTypeIcon fileName={file.name} className="h-12 w-12 shrink-0" />
-                <div className="min-w-0">
-                  <div className="truncate text-base text-foreground">{file.name}</div>
-                  <div className="truncate text-sm text-muted-foreground">{file.extension}</div>
-                </div>
-              </div>
+                file={file}
+                onExpand={setExpandedImage}
+              />
             ))}
+          </div>
+        )}
+
+        {documentAttachments.length > 0 && (
+          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
+            {documentAttachments.map(file => <FileAttachmentCard key={file.path} file={file} />)}
           </div>
         )}
 

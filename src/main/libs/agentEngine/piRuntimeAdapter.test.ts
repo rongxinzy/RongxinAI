@@ -2678,7 +2678,9 @@ describe('PiRuntimeAdapter', () => {
 
       const steered = await adapter.steerPendingMessage('queue-session', queued.item!.id);
       expect(steered.success).toBe(true);
-      expect(mockSession.steer).toHaveBeenCalledWith('Change direction');
+      expect(mockSession.prompt).toHaveBeenCalledWith('Change direction', {
+        streamingBehavior: 'steer',
+      });
       expect(adapter.listPendingMessages('queue-session')).toEqual([]);
     });
 

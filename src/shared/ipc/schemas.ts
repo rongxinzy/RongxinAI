@@ -190,6 +190,7 @@ const FileAttachmentSchema = z.object({
   name: z.string(),
   path: z.string(),
   extension: z.string(),
+  isImage: z.boolean().optional(),
 });
 
 export const CoworkSessionStartSchema = {

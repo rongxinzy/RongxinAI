@@ -40,6 +40,32 @@ describe('PiPendingMessageQueue', () => {
     expect(queue.takeNext('session-1', CoworkQueueDelivery.FollowUp)?.id).toBe(second.id);
   });
 
+  test('keeps queued attachment metadata through delivery and retry', () => {
+    const queue = new PiPendingMessageQueue();
+    const queued = queue.enqueue(
+      'session-1',
+      'review the attachments',
+      CoworkQueueDelivery.FollowUp,
+      [{ name: 'screen.png', mimeType: 'image/png', base64Data: 'image-data' }],
+      [{ name: 'brief.docx', path: '/tmp/brief.docx', extension: 'DOCX' }],
+      ['skill-docx'],
+      'Use the document skill.',
+    );
+
+    const taken = queue.takeNext('session-1', CoworkQueueDelivery.FollowUp);
+    expect(taken).toMatchObject({
+      id: queued.id,
+      imageAttachments: [{ name: 'screen.png' }],
+      fileAttachments: [{ name: 'brief.docx', extension: 'DOCX' }],
+    });
+
+    const restored = queue.restore('session-1', { ...taken!, error: 'retry' });
+    expect(restored.fileAttachments?.[0]?.path).toBe('/tmp/brief.docx');
+    expect(restored.imageAttachments?.[0]?.base64Data).toBe('image-data');
+    expect(restored.skillIds).toEqual(['skill-docx']);
+    expect(restored.skillPrompt).toBe('Use the document skill.');
+  });
+
   test('does not take an item through the wrong delivery path', () => {
     const queue = new PiPendingMessageQueue();
     const steer = queue.enqueue('session-1', 'steer', CoworkQueueDelivery.Steer);
