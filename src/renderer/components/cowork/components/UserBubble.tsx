@@ -29,6 +29,53 @@ const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string |
 const hasFocusWithin = (element: HTMLElement): boolean =>
   document.activeElement instanceof Node && element.contains(document.activeElement);
 
+const IMAGE_ATTACHMENT_EXTENSION = /\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?|ico|avif)$/i;
+const LEGACY_INPUT_FILE_LABELS = ['输入文件', 'Input Files'] as const;
+const LEGACY_INPUT_FILE_PREFIX = new RegExp(
+  `^(?:${LEGACY_INPUT_FILE_LABELS.join('|')})\\s*[:：]\\s*`,
+);
+
+const isAbsoluteLocalPath = (value: string): boolean =>
+  value.startsWith('/') || value.startsWith('\\\\') || /^[a-z]:[\\/]/i.test(value);
+
+const getFileAttachmentFromPath = (path: string): CoworkFileAttachment | null => {
+  const normalizedPath = path.trim();
+  if (!isAbsoluteLocalPath(normalizedPath)) return null;
+  const name = normalizedPath.split(/[\\/]/).pop() || normalizedPath;
+  const extensionIndex = name.lastIndexOf('.');
+  return {
+    name,
+    path: normalizedPath,
+    extension: extensionIndex >= 0 ? name.slice(extensionIndex + 1).toUpperCase() : 'FILE',
+    isImage: IMAGE_ATTACHMENT_EXTENSION.test(name),
+  };
+};
+
+const getPromptAttachmentFallbacks = (content: string): CoworkFileAttachment[] => {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .flatMap(line => {
+      const match = LEGACY_INPUT_FILE_PREFIX.exec(line);
+      if (!match) return [];
+      const attachment = getFileAttachmentFromPath(line.slice(match[0].length));
+      return attachment ? [attachment] : [];
+    });
+};
+
+const removePromptAttachmentFallbacks = (content: string): string => {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .filter(line => {
+      const match = LEGACY_INPUT_FILE_PREFIX.exec(line);
+      if (!match) return true;
+      return getFileAttachmentFromPath(line.slice(match[0].length)) === null;
+    })
+    .join('\n')
+    .replace(/^\n+|\n+$/g, '');
+};
+
 const FileAttachmentCard: React.FC<{ file: CoworkFileAttachment }> = ({ file }) => (
   <div
     className="flex h-20 w-64 shrink-0 items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4"
@@ -119,15 +166,23 @@ export const UserBubble: React.FC<{
     [message.metadata],
   );
   const fileAttachments = useMemo(
-    () =>
-      ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
-        []) as CoworkFileAttachment[],
-    [message.metadata],
+    () => {
+      const persisted =
+        ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
+          []) as CoworkFileAttachment[];
+      const knownPaths = new Set(persisted.map(file => file.path));
+      const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
+        file => !knownPaths.has(file.path),
+      );
+      return [...persisted, ...fallbacks];
+    },
+    [message.content, message.metadata],
   );
   const textContent = useMemo(() => {
-    if (fileAttachments.length === 0) return displayContent;
+    const contentWithoutFallbacks = removePromptAttachmentFallbacks(displayContent);
+    if (fileAttachments.length === 0) return contentWithoutFallbacks;
     const filePaths = new Set(fileAttachments.map(file => file.path));
-    return displayContent
+    return contentWithoutFallbacks
       .split(/\r?\n/)
       .filter(line => !Array.from(filePaths).some(path => line.includes(path)))
       .join('\n')
