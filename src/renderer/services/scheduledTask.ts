@@ -226,10 +226,21 @@ export class ScheduledTaskService {
     if (!api) return;
 
     try {
-      await api.runManually(id);
+      const execution = api.runManually(id);
+      await this.loadTasks({ revalidate: true });
+      const result = await execution;
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to run task');
+      }
     } catch (err: unknown) {
       store.dispatch(setError(err instanceof Error ? err.message : String(err)));
       throw err;
+    } finally {
+      await Promise.all([
+        this.loadTasks({ revalidate: true }),
+        this.loadRuns(id),
+        this.loadAllRuns(),
+      ]);
     }
   }
 

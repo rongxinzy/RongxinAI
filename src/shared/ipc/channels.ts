@@ -126,7 +126,6 @@ export const CoworkSessionIpc = {
   Rename: 'cowork:session:rename',
   UpdateModel: 'cowork:session:updateModel',
   Get: 'cowork:session:get',
-  GatewaySessionId: 'cowork:session:gatewaySessionId',
   RemoteManaged: 'cowork:session:remoteManaged',
   List: 'cowork:session:list',
   GetMessages: 'cowork:session:getMessages',
