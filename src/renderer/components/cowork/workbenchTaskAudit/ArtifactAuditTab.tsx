@@ -97,10 +97,10 @@ export function ArtifactAuditTab({ artifacts, runs }: ArtifactAuditTabProps) {
             return (
               <TableRow key={artifact.id}>
                 <TableCell>{getRunAttempt(runs, artifact.runId) ?? '-'}</TableCell>
-                <TableCell className="max-w-[240px] truncate">{artifact.reference}</TableCell>
+                <TableCell className="max-w-[320px] break-all">{artifact.reference}</TableCell>
                 <TableCell>{artifactKindLabel(artifact.kind)}</TableCell>
                 <TableCell>{artifactProvenanceLabel(artifact.provenance)}</TableCell>
-                <TableCell className="max-w-48 truncate font-mono text-xs">
+                <TableCell className="max-w-64 break-all font-mono text-xs">
                   {artifact.contentHash}
                 </TableCell>
                 <TableCell>{artifactVerificationLabel(artifact.verificationStatus)}</TableCell>
