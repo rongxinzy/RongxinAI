@@ -657,8 +657,7 @@ class CoworkService {
     const requestId = ++this.latestLoadSessionRequestId;
 
     const result = await cowork.getSession(sessionId);
-    if (result.success && result.session) {
-      // Keep only the latest session load result to avoid stale async overwrites.
+    if (result.success && result.session) {      // Keep only the latest session load result to avoid stale async overwrites.
       if (requestId !== this.latestLoadSessionRequestId) {
         return result.session;
       }
@@ -694,6 +693,10 @@ class CoworkService {
       return result.session;
     }
 
+    // The session no longer exists in the backend (e.g. a stale temp-* entry
+    // leaked into the sidebar). Remove it from Redux so the ghost disappears
+    // instead of surfacing a load error on every click.
+    store.dispatch(deleteSessionAction(sessionId));
     console.error('Failed to load session:', result.error);
     return null;
   }
