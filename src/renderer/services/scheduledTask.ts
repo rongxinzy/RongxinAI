@@ -225,11 +225,40 @@ export class ScheduledTaskService {
     const api = window.electron?.scheduledTasks;
     if (!api) return;
 
+    // Flip the task to "running" optimistically so the UI reacts instantly.
+    // The gateway-driven status poll reconciles the real state shortly after;
+    // on failure we roll the optimistic marker back (see rollback below).
+    const previousState = store.getState().scheduledTask.tasks.find(t => t.id === id)?.state;
+    const optimisticRunningAtMs = Date.now();
+    if (previousState && previousState.runningAtMs === null) {
+      store.dispatch(
+        updateTaskState({
+          taskId: id,
+          taskState: { ...previousState, runningAtMs: optimisticRunningAtMs },
+        }),
+      );
+    }
+
+    const rollbackOptimisticState = () => {
+      if (!previousState) return;
+      const current = store.getState().scheduledTask.tasks.find(t => t.id === id);
+      // Only undo our own marker — a real status update from the poll wins.
+      if (current && current.state.runningAtMs === optimisticRunningAtMs) {
+        store.dispatch(updateTaskState({ taskId: id, taskState: previousState }));
+      }
+    };
+
     try {
-      await api.runManually(id);
+      const result = await api.runManually(id);
+      if (!result?.success) {
+        rollbackOptimisticState();
+        store.dispatch(setError(result?.error || i18nService.t('scheduledTasksRunFailed')));
+        showToast(i18nService.t('scheduledTasksRunFailed'));
+      }
     } catch (err: unknown) {
+      rollbackOptimisticState();
       store.dispatch(setError(err instanceof Error ? err.message : String(err)));
-      throw err;
+      showToast(i18nService.t('scheduledTasksRunFailed'));
     }
   }
 

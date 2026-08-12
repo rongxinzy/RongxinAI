@@ -391,3 +391,138 @@ describe('mapGatewayTaskState', () => {
     expect(state.lastError).toBe('agent timeout');
   });
 });
+
+function makeGatewayJob(overrides: { id?: string; state?: Record<string, unknown> } = {}) {
+  return {
+    id: overrides.id ?? 'job-1',
+    name: 'Morning brief',
+    enabled: true,
+    schedule: { kind: 'cron', expr: '0 9 * * *' },
+    sessionTarget: 'isolated',
+    wakeMode: 'now',
+    payload: { kind: 'agentTurn', message: 'Summarize updates' },
+    delivery: { mode: 'none' },
+    sessionKey: null,
+    state: overrides.state ?? {},
+    createdAtMs: 1,
+    updatedAtMs: 1,
+  };
+}
+
+type CronJobInternals = {
+  polling: boolean;
+  fastPollTimer: ReturnType<typeof setInterval> | null;
+  fastPollSawRunning: boolean;
+  pollOnce: () => Promise<void>;
+  stopFastPolling: () => void;
+};
+
+test('manual run kicks an immediate fast poll that tracks the job until it finishes', async () => {
+  const send = vi.fn();
+  electronMocks.getAllWindows.mockReturnValue([
+    {
+      isDestroyed: () => false,
+      webContents: { send },
+    },
+  ]);
+
+  let listPolls = 0;
+  const gatewayClient = {
+    request: vi.fn(async <T = Record<string, unknown>>(method: string): Promise<T> => {
+      if (method === 'cron.run') return {} as T;
+      if (method === 'cron.list') {
+        listPolls += 1;
+        const state =
+          listPolls === 1
+            ? { runningAtMs: 1700000000000, lastRunAtMs: 1 }
+            : { lastRunAtMs: 2, lastRunStatus: GatewayStatus.Ok };
+        return { jobs: [makeGatewayJob({ state })] } as T;
+      }
+      return { entries: [] } as T;
+    }),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+  });
+  const internals = service as unknown as CronJobInternals;
+  internals.polling = true;
+
+  try {
+    await service.runJob('job-1');
+    expect(gatewayClient.request).toHaveBeenCalledWith('cron.run', { id: 'job-1' });
+
+    // runJob fires an immediate poll; wait for it to land.
+    await vi.waitFor(() => expect(listPolls).toBe(1));
+    expect(internals.fastPollTimer).not.toBeNull();
+    expect(internals.fastPollSawRunning).toBe(true);
+
+    // Next poll sees the finished job: emits the status update, stops fast polling.
+    await internals.pollOnce();
+    expect(listPolls).toBe(2);
+    expect(internals.fastPollTimer).toBeNull();
+    expect(send).toHaveBeenCalledWith(
+      IpcChannel.StatusUpdate,
+      expect.objectContaining({ taskId: 'job-1' }),
+    );
+  } finally {
+    internals.stopFastPolling();
+    electronMocks.getAllWindows.mockReturnValue([]);
+  }
+});
+
+test('fast polling stops when the manual run finishes before any poll observes it running', async () => {
+  const gatewayClient = {
+    request: vi.fn(async <T = Record<string, unknown>>(method: string): Promise<T> => {
+      if (method === 'cron.run') return {} as T;
+      if (method === 'cron.list') {
+        return {
+          jobs: [
+            makeGatewayJob({
+              state: { lastRunAtMs: Date.now(), lastRunStatus: GatewayStatus.Ok },
+            }),
+          ],
+        } as T;
+      }
+      return { entries: [] } as T;
+    }),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+  });
+  const internals = service as unknown as CronJobInternals;
+  internals.polling = true;
+
+  try {
+    await service.runJob('job-1');
+    await vi.waitFor(() =>
+      expect(gatewayClient.request).toHaveBeenCalledWith('cron.list', expect.anything()),
+    );
+    // The run completed too fast to be observed running — no lingering timer.
+    await vi.waitFor(() => expect(internals.fastPollTimer).toBeNull());
+    expect(internals.fastPollSawRunning).toBe(false);
+  } finally {
+    internals.stopFastPolling();
+  }
+});
+
+test('manual run skips fast polling while polling is inactive', async () => {
+  const gatewayClient = {
+    request: vi.fn(async <T = Record<string, unknown>>(method: string): Promise<T> => {
+      if (method === 'cron.run') return {} as T;
+      return { jobs: [] } as T;
+    }),
+  };
+  const service = new CronJobService({
+    getGatewayClient: () => gatewayClient,
+    ensureGatewayReady: async () => {},
+  });
+  const internals = service as unknown as CronJobInternals;
+
+  await service.runJob('job-1');
+
+  expect(gatewayClient.request).toHaveBeenCalledWith('cron.run', { id: 'job-1' });
+  expect(internals.fastPollTimer).toBeNull();
+  expect(gatewayClient.request).not.toHaveBeenCalledWith('cron.list', expect.anything());
+});
