@@ -452,8 +452,6 @@ contextBridge.exposeInMainWorld('electron', {
     updateSessionModel: (options: { sessionId: string; modelOverride: string }) =>
       ipcRenderer.invoke(CoworkSessionIpc.UpdateModel, options),
     getSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId),
-    getGatewaySessionId: (sessionId: string) =>
-      ipcRenderer.invoke(CoworkSessionIpc.GatewaySessionId, sessionId),
     remoteManaged: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.RemoteManaged, sessionId),
     listSessions: (options?: {

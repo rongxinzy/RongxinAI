@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
-import { DeliveryMode, PayloadKind, ScheduleKind, SessionTarget, WakeMode } from './constants';
+import { DeliveryMode, PayloadKind, ScheduleKind, SessionTarget, TaskStatus, WakeMode } from './constants';
 import { CcConnectSchedulerRuntime } from './ccConnectSchedulerRuntime';
 import { SchedulerClockAccount } from './ccConnectCronClient';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
@@ -80,4 +80,22 @@ test('persists delivery separately after Pi completes without changing Run succe
   await runtime.runNow(task.id);
   expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ id: task.id }), expect.objectContaining({ status: 'success' }), 'done');
   expect(store.listRuns(task.id)[0]).toMatchObject({ status: 'success' });
+});
+
+test('finishes a claimed Run as error when Pi terminates unexpectedly', async () => {
+  const { store, task, client } = setup();
+  const runtime = new CcConnectSchedulerRuntime(store, client, async () => {
+    throw new Error('Pi session stopped before completion');
+  });
+
+  await expect(runtime.runNow(task.id)).rejects.toThrow('Pi session stopped before completion');
+  expect(store.get(task.id)?.state).toMatchObject({
+    runningAtMs: null,
+    lastStatus: TaskStatus.Error,
+    lastError: 'Pi session stopped before completion',
+  });
+  expect(store.listRuns(task.id)[0]).toMatchObject({
+    status: TaskStatus.Error,
+    error: 'Pi session stopped before completion',
+  });
 });
