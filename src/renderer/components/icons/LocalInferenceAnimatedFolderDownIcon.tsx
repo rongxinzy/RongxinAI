@@ -4,34 +4,28 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 
 import { cn } from '@shared/lib/utils';
 
-export interface SidebarAnimatedCpuIconHandle {
+export interface LocalInferenceAnimatedFolderDownIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface SidebarAnimatedCpuIconProps extends HTMLAttributes<HTMLDivElement> {
+interface LocalInferenceAnimatedFolderDownIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
 }
 
-const TRANSITION: Transition = {
+const ARROW_VARIANTS: Variants = {
+  normal: { y: 0 },
+  animate: { y: [0, 2, 0] },
+};
+
+const ARROW_TRANSITION: Transition = {
+  times: [0, 0.4, 1],
   duration: 0.5,
-  ease: 'easeInOut',
-  repeat: 1,
 };
 
-const Y_VARIANTS: Variants = {
-  normal: { scale: 1, rotate: 0, opacity: 1 },
-  animate: { scaleY: [1, 1.5, 1], opacity: [1, 0.8, 1] },
-};
-
-const X_VARIANTS: Variants = {
-  normal: { scale: 1, rotate: 0, opacity: 1 },
-  animate: { scaleX: [1, 1.5, 1], opacity: [1, 0.8, 1] },
-};
-
-export const SidebarAnimatedCpuIcon = forwardRef<
-  SidebarAnimatedCpuIconHandle,
-  SidebarAnimatedCpuIconProps
+export const LocalInferenceAnimatedFolderDownIcon = forwardRef<
+  LocalInferenceAnimatedFolderDownIconHandle,
+  LocalInferenceAnimatedFolderDownIconProps
 >(({ onMouseEnter, onMouseLeave, className, size = 16, ...props }, ref) => {
   const controls = useAnimation();
   const prefersReducedMotion = useReducedMotion();
@@ -66,7 +60,7 @@ export const SidebarAnimatedCpuIcon = forwardRef<
   return (
     <div
       aria-hidden="true"
-      className={cn('sidebar-local-inference-icon animated-cpu-icon size-4 shrink-0', className)}
+      className={cn('local-inference-animated-folder-down-icon size-4 shrink-0', className)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       {...props}
@@ -82,29 +76,19 @@ export const SidebarAnimatedCpuIcon = forwardRef<
         width={size}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect height="16" rx="2" width="16" x="4" y="4" />
-        <rect height="6" rx="1" width="6" x="9" y="9" />
-        <motion.path animate={controls} d="M15 2v2" transition={TRANSITION} variants={Y_VARIANTS} />
-        <motion.path
+        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+        <motion.g
           animate={controls}
-          d="M15 20v2"
-          transition={TRANSITION}
-          variants={Y_VARIANTS}
-        />
-        <motion.path animate={controls} d="M2 15h2" transition={TRANSITION} variants={X_VARIANTS} />
-        <motion.path animate={controls} d="M2 9h2" transition={TRANSITION} variants={X_VARIANTS} />
-        <motion.path
-          animate={controls}
-          d="M20 15h2"
-          transition={TRANSITION}
-          variants={X_VARIANTS}
-        />
-        <motion.path animate={controls} d="M20 9h2" transition={TRANSITION} variants={X_VARIANTS} />
-        <motion.path animate={controls} d="M9 2v2" transition={TRANSITION} variants={Y_VARIANTS} />
-        <motion.path animate={controls} d="M9 20v2" transition={TRANSITION} variants={Y_VARIANTS} />
+          initial="normal"
+          transition={ARROW_TRANSITION}
+          variants={ARROW_VARIANTS}
+        >
+          <path d="M12 10v6" />
+          <path d="m15 13-3 3-3-3" />
+        </motion.g>
       </svg>
     </div>
   );
 });
 
-SidebarAnimatedCpuIcon.displayName = 'SidebarAnimatedCpuIcon';
+LocalInferenceAnimatedFolderDownIcon.displayName = 'LocalInferenceAnimatedFolderDownIcon';
