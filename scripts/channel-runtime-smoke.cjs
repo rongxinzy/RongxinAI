@@ -90,7 +90,7 @@ async function main() {
   } catch {}
   const executable = path.join(runtimeRoot, publishedBinary);
   if (!fs.existsSync(executable)) {
-    throw new Error('Channel runtime is missing. Run `npm run channel:runtime:host` first.');
+    throw new Error('Channel runtime is missing. Run `npm run channel:runtime:download` first.');
   }
 
   const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-channel-smoke-'));
