@@ -493,7 +493,7 @@
       $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
       $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
       if (Test-Path -LiteralPath $$statePath) {\
-        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ -match \"^[^=|]+\\|(?:True|False)$$\" });\
+        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ -match \"^[^=|]+\\|(?:True|False)\\z\" });\
         [array]::Reverse($$states);\
         foreach ($$state in $$states) {\
           $$parts = $$state.Split(\"|\");\
