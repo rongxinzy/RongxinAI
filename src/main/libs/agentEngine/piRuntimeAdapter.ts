@@ -2263,11 +2263,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         }
         if (active.workbenchRunId && this.workbenchTaskService) {
           const workflowSnapshot = active.productionWorkflowEnabled
-            ? active.researchRun
-              ? active.researchRun.getSnapshot()
-              : active.shortcutWorkflow
-                ? active.shortcutWorkflow.getSnapshot()
-                : active.workExecution?.getSnapshot() || null
+            ? active.productionLoop
+              ? active.productionLoop.getSnapshot()
+              : active.researchRun
+                ? active.researchRun.getSnapshot()
+                : active.shortcutWorkflow
+                  ? active.shortcutWorkflow.getSnapshot()
+                  : active.workExecution?.getSnapshot() || null
             : null;
           this.workbenchTaskService.completeRun({
             sessionId,
@@ -2974,16 +2976,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   ): WorkbenchTaskContract {
     const research = managedWorkflow && isAcademicResearchSkillSet(skillIds);
     const shortcut = research ? null : resolveShortcutWorkflowKind(skillIds);
+    const kind =
+      sessionMode === 'chat'
+        ? WorkbenchContractKind.Chat
+        : research
+          ? WorkbenchContractKind.Research
+          : managedWorkflow && shortcut
+            ? WorkbenchContractKind.Shortcut
+            : WorkbenchContractKind.GenericWork;
     return {
-      kind:
-        sessionMode === 'chat'
-          ? WorkbenchContractKind.Chat
-          : research
-            ? WorkbenchContractKind.Research
-            : managedWorkflow && shortcut
-              ? WorkbenchContractKind.Shortcut
-              : WorkbenchContractKind.GenericWork,
-      requiresUserAcceptance: sessionMode !== 'chat' && !research && !(managedWorkflow && shortcut),
+      kind,
+      // Generic work without the production workflow (simple questions, trivial
+      // requests) is gated by the baseline checks alone and never needs manual
+      // acceptance. The production workflow owns the acceptance gate instead.
+      requiresUserAcceptance:
+        sessionMode !== 'chat' &&
+        kind === WorkbenchContractKind.GenericWork &&
+        managedWorkflow,
       metadata: {
         productionWorkflowEnabled: managedWorkflow,
         ...(skillIds?.length ? { skillIds } : {}),
