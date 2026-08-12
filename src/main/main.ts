@@ -2899,8 +2899,13 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  // Register custom protocol for OAuth callback
-  app.setAsDefaultProtocolClient('zhiyuan');
+  // In development Electron needs the app entry point before the callback URL;
+  // otherwise Windows treats the URL itself as the application to launch.
+  if (process.defaultApp && process.argv[1]) {
+    app.setAsDefaultProtocolClient('zhiyuan', process.execPath, [path.resolve(process.argv[1])]);
+  } else {
+    app.setAsDefaultProtocolClient('zhiyuan');
+  }
 
   const COMMUNITY_AUTH_ORIGIN = 'https://account.rongxzyai.com';
   const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
