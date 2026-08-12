@@ -113,4 +113,37 @@ describe('UserBubble', () => {
     expect(preview).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8=');
     expect(screen.queryByText('PNG')).not.toBeInTheDocument();
   });
+
+  test('restores an attachment card from a legacy Windows input-file prompt line', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content: '输入文件：C:\\Users\\whz\\Downloads\\brief.docx\n\n请总结这份文件',
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getByText('brief.docx')).toBeInTheDocument();
+    expect(screen.getByText('DOCX')).toBeInTheDocument();
+    expect(screen.getByText('请总结这份文件')).toBeInTheDocument();
+    expect(screen.queryByText(/输入文件：C:/)).not.toBeInTheDocument();
+  });
+
+  test('restores an attachment from an English UNC prompt line after language changes', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content: String.raw`Input Files: \\nas\shared\contract.docx`,
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getByText('contract.docx')).toBeInTheDocument();
+    expect(screen.getByText('DOCX')).toBeInTheDocument();
+    expect(screen.queryByText(/Input Files:/)).not.toBeInTheDocument();
+  });
 });
