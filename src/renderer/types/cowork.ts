@@ -6,11 +6,20 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
+import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 
 export interface CoworkImageAttachment {
   name: string;
   mimeType: string;
   base64Data: string;
+}
+
+export interface CoworkFileAttachment {
+  name: string;
+  path: string;
+  extension: string;
+  /** Keeps image rendering independent from whether the selected model accepts vision input. */
+  isImage?: boolean;
 }
 
 // Cowork session status
@@ -46,6 +55,7 @@ export interface CoworkMessageMetadata {
   /** Runtime-measured duration for this thinking message. */
   thinkingDurationMs?: number;
   skillIds?: string[];
+  fileAttachments?: CoworkFileAttachment[];
   usage?: {
     inputTokens?: number;
     outputTokens?: number;
@@ -60,6 +70,7 @@ export interface CoworkMessageMetadata {
   model?: string;
   modelProviderKey?: string;
   agentName?: string;
+  interruption?: CoworkSessionInterruption;
   [key: string]: unknown;
 }
 
@@ -232,6 +243,7 @@ export interface CoworkStartOptions {
   modelOverride?: string;
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
+  fileAttachments?: CoworkFileAttachment[];
 }
 
 // Continue session options
@@ -244,6 +256,7 @@ export interface CoworkContinueOptions {
   expertIds?: string[];
   permissionMode?: CoworkPermissionMode;
   imageAttachments?: CoworkImageAttachment[];
+  fileAttachments?: CoworkFileAttachment[];
 }
 
 // IPC result types

@@ -18,6 +18,7 @@ import {
   type WorkbenchArtifactVerificationStatus,
   type WorkbenchJsonObject,
   type WorkbenchRun,
+  type WorkbenchRunContext,
   type WorkbenchRunEvent,
   type WorkbenchRunStatus as WorkbenchRunStatusType,
   type WorkbenchRunTrigger,
@@ -60,6 +61,7 @@ type RunRow = {
   trigger: WorkbenchRunTrigger;
   started_at: number | null;
   ended_at: number | null;
+  context_json: string | null;
   verification_result_json: string | null;
   failure_json: string | null;
   created_at: number;
@@ -164,6 +166,13 @@ export class WorkbenchTaskRepository {
     return row ? this.mapTask(row) : null;
   }
 
+  listTasksForSession(sessionId: string): WorkbenchTask[] {
+    const rows = this.db
+      .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
+      .all(sessionId) as TaskRow[];
+    return rows.map(row => this.mapTask(row));
+  }
+
   getActiveTaskForSession(sessionId: string): WorkbenchTask | null {
     const rows = this.db
       .prepare('SELECT * FROM workbench_tasks WHERE session_id = ? ORDER BY created_at DESC')
@@ -212,6 +221,7 @@ export class WorkbenchTaskRepository {
       trigger,
       startedAt: null,
       endedAt: null,
+      context: null,
       verificationResult: null,
       failure: null,
       createdAt: now,
@@ -221,8 +231,8 @@ export class WorkbenchTaskRepository {
       .prepare(
         `INSERT INTO workbench_runs
          (id, task_id, attempt, status, trigger, started_at, ended_at,
-          verification_result_json, failure_json, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          context_json, verification_result_json, failure_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         run.id,
@@ -230,6 +240,7 @@ export class WorkbenchTaskRepository {
         run.attempt,
         run.status,
         run.trigger,
+        null,
         null,
         null,
         null,
@@ -249,6 +260,14 @@ export class WorkbenchTaskRepository {
       | RunRow
       | undefined;
     return row ? this.mapRun(row) : null;
+  }
+
+  updateRunContext(runId: string, context: WorkbenchRunContext): WorkbenchRun {
+    this.requireRun(runId);
+    this.db
+      .prepare('UPDATE workbench_runs SET context_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(context), Date.now(), runId);
+    return this.requireRun(runId);
   }
 
   updateRunStatus(
@@ -601,6 +620,7 @@ export class WorkbenchTaskRepository {
       trigger: row.trigger,
       startedAt: row.started_at,
       endedAt: row.ended_at,
+      context: parseJson<WorkbenchRunContext | null>(row.context_json, null),
       verificationResult: parseJson<WorkbenchVerificationResult | null>(
         row.verification_result_json,
         null,

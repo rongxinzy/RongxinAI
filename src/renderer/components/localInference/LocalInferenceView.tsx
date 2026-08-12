@@ -1,7 +1,19 @@
 import { Button } from '@shared/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@shared/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { Globe, PanelLeft, Pencil, Settings2 } from 'lucide-react';
+import { PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -20,6 +32,10 @@ import type {
 import { createMarketplaceHardwareProfile, withMarketplaceScore, type MarketplaceHardwareProfile } from '../../../shared/marketplace/scoring';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
+import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
+import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
+import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
+import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
@@ -126,8 +142,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
   );
+  const [runtimeSettingsOpen, setRuntimeSettingsOpen] = useState(Boolean(installRequestId));
   useEffect(() => {
-    if (installRequestId) setActiveTab('models');
+    if (installRequestId) {
+      setActiveTab('models');
+      setRuntimeSettingsOpen(true);
+    }
   }, [installRequestId]);
   const [tabDirection, setTabDirection] = useState(1);
   const [status, setStatus] = useState<OllamaStatusSnapshot | null>(cachedStatus);
@@ -992,33 +1012,41 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
               }
             >
               {activeTab === 'models' ? (
-                <RuntimeInstallCard installRequestId={installRequestId} />
-              ) : null}
-              {activeTab === 'models' ? (
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={localInferenceCompactButtonClass}
-                    size="sm"
-                    onClick={openAccessSettings}
-                  >
-                    <Globe data-icon="inline-start" />
-                    {i18nService.t('localInferenceAccessSettings')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={localInferenceCompactButtonClass}
-                    size="sm"
-                    onClick={() => {
-                      setDraftModelsDir(modelsDir);
-                      setLibrarySettingsOpen(true);
-                    }}
-                  >
-                    <Settings2 data-icon="inline-start" />
-                    {i18nService.t('localInferenceLibrarySettings')}
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className={`${localInferenceCompactButtonClass} min-w-32 hover:bg-background dark:hover:bg-background`}
+                          size="default"
+                        >
+                          <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
+                          {i18nService.t('localInferenceSettings')}
+                        </Button>
+                      }
+                    />
+                    <DropdownMenuContent align="end" className="min-w-32">
+                      <DropdownMenuItem onClick={() => setRuntimeSettingsOpen(true)}>
+                        <SidebarAnimatedCpuIcon />
+                        {i18nService.t('localInferenceRuntimeSettings')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={openAccessSettings}>
+                        <LocalInferenceAnimatedWifiPenIcon />
+                        {i18nService.t('localInferenceAccessMenuItem')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setDraftModelsDir(modelsDir);
+                          setLibrarySettingsOpen(true);
+                        }}
+                      >
+                        <LocalInferenceAnimatedFolderDownIcon />
+                        {i18nService.t('localInferenceLibraryMenuItem')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               ) : null}
 
@@ -1088,6 +1116,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           />
         </div>
       </Tabs>
+
+      <Dialog open={runtimeSettingsOpen} onOpenChange={setRuntimeSettingsOpen}>
+        <DialogContent className="w-[min(48rem,calc(100%-2rem))] max-h-[85vh] gap-4 overflow-y-auto sm:max-w-2xl">
+          <DialogHeader className="gap-1 pr-8">
+            <DialogTitle>{i18nService.t('localInferenceRuntimeSettings')}</DialogTitle>
+          </DialogHeader>
+          <RuntimeInstallCard installRequestId={installRequestId} />
+        </DialogContent>
+      </Dialog>
 
       <ModelLibrarySettingsModal
         isOpen={librarySettingsOpen}

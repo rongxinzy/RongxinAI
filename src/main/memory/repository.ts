@@ -62,6 +62,11 @@ export interface MemoryOutboxItem {
   lastError: string | null;
 }
 
+export interface MemoryRecallMetadata {
+  importance: number;
+  updatedAt: string;
+}
+
 interface MemoryOutboxRow {
   id: string;
   link_id: string | null;
@@ -199,6 +204,22 @@ export class MemoryRepository {
     return row ? mapLink(row, this.getDelivery(id)) : null;
   }
 
+  findActiveTopic(
+    projectId: string,
+    scope: MemoryScope,
+    topicKey: string,
+  ): ManagedMemoryRecord | null {
+    this.expireDue();
+    const row = this.db
+      .prepare(
+        `SELECT * FROM memory_links
+         WHERE project_id = ? AND scope = ? AND topic_key = ? AND status = ?
+         ORDER BY updated_at DESC LIMIT 1`,
+      )
+      .get(projectId, scope, topicKey, MemoryLifecycleStatus.Active) as SqlRow | undefined;
+    return row ? mapLink(row, this.getDelivery(String(row.id))) : null;
+  }
+
   findLinkByMemoryId(memoryId: number): ManagedMemoryRecord | null {
     const row = this.db
       .prepare('SELECT * FROM memory_links WHERE memory_id = ? ORDER BY updated_at DESC LIMIT 1')
@@ -308,6 +329,25 @@ export class MemoryRepository {
       )
       .all(projectId, MemoryLifecycleStatus.Active, ...memoryIds) as Array<{ memory_id: number }>;
     return new Set(rows.map(row => row.memory_id));
+  }
+
+  getRecallMetadata(projectId: string, memoryIds: number[]): Map<number, MemoryRecallMetadata> {
+    if (memoryIds.length === 0) return new Map();
+    this.expireDue();
+    const placeholders = memoryIds.map(() => '?').join(', ');
+    const rows = this.db
+      .prepare(
+        `SELECT memory_id, importance, updated_at FROM memory_links
+         WHERE project_id = ? AND status = ? AND memory_id IN (${placeholders})`,
+      )
+      .all(projectId, MemoryLifecycleStatus.Active, ...memoryIds) as Array<{
+      memory_id: number;
+      importance: number;
+      updated_at: string;
+    }>;
+    return new Map(
+      rows.map(row => [row.memory_id, { importance: row.importance, updatedAt: row.updated_at }]),
+    );
   }
 
   setLinkStatus(id: string, status: MemoryLifecycleStatus, supersededBy?: string): void {

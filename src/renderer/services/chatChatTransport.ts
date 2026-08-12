@@ -8,6 +8,7 @@ import {
 
 import { apiService } from './api';
 import type { DirectChatRequestOptions } from './localThinkingRequest';
+import type { ChatUserMessageInput, ImageAttachment } from '../types/chat';
 import {
   createToolInputAvailableChunk,
   createToolInputStartChunk,
@@ -22,6 +23,23 @@ function extractText(message: UIMessage): string {
     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
     .map(p => p.text)
     .join('');
+}
+
+function extractImages(message: UIMessage): ImageAttachment[] {
+  return message.parts.flatMap((part, index) => {
+    if (part.type !== 'file' || !part.mediaType?.startsWith('image/')) return [];
+    const url = (part as { url?: string }).url || '';
+    if (!url.startsWith('data:')) return [];
+    return [
+      {
+        id: `${message.id}-image-${index}`,
+        name: (part as { filename?: string }).filename || 'image',
+        type: part.mediaType,
+        size: 0,
+        dataUrl: url,
+      },
+    ];
+  });
 }
 
 function logDirectChat(message: string): void {
@@ -59,6 +77,10 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     const prompt = lastUser ? extractText(lastUser) : '';
     if (!prompt.trim()) throw new Error('No prompt to send.');
+    const images = lastUser ? extractImages(lastUser) : [];
+    const requestMessage: string | ChatUserMessageInput = images.length
+      ? { content: prompt, images }
+      : prompt;
 
     // Build history from previous messages (filtering out the current user message)
     const history: Array<{ role: 'user' | 'assistant'; content: string }> = [];
@@ -178,7 +200,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         logDirectChat(`request ${requestId} started`);
         void apiService
           .chatWithWebSearch(
-            prompt,
+            requestMessage,
             emitProgress,
             history,
             directChatOptions,

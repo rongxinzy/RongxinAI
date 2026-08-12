@@ -57,6 +57,7 @@ SKILLs/**/.venv/
 SKILLs/imap-smtp-email/package-lock.json
 SKILLs/technology-news-search/scripts/vendor/
 .pi/
+.zhiyuan/
 
 # Agent skills (installed via npx skills add)
 .agents/

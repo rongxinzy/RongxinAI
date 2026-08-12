@@ -59,6 +59,8 @@ const createController = () => {
     ),
     service,
     downstream,
+    task,
+    workbench,
   };
 };
 
@@ -98,6 +100,33 @@ test('a normal agent_loop next continues without recording a recovery', () => {
   expect(decision.nextPrompt).toContain('drafted the outline');
   // No recovery is recorded for an explicit, orderly iteration end.
   expect(controller.getState().recoveries.length).toBe(before);
+});
+
+test('describes resumed execution without asking the agent to recommit the plan', () => {
+  const { controller, task, workbench } = createController();
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  controller.updatePlanItem(planned.planItems[0].id, 'completed');
+  const retry = workbench.createRun(task.id, WorkbenchRunTrigger.Resume);
+  controller.startRun({
+    taskId: task.id,
+    runId: retry.id,
+    workflowKind: WorkbenchContractKind.Shortcut,
+    goal: 'Use the persisted state',
+    prototypeRequired: false,
+  });
+
+  const prompt = controller.buildInitialPrompt();
+
+  expect(controller.getState().phase).toBe(ProductionLoopPhase.Execute);
+  expect(prompt).toContain('Resume the persisted execution plan');
+  expect(prompt).toContain('evidence belongs to this run');
+  expect(prompt).not.toContain('Begin by committing an executable plan');
 });
 
 test('an omitted agent_loop signal records a missing-signal recovery', () => {

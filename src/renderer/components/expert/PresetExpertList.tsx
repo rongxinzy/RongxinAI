@@ -1,45 +1,28 @@
-import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
-import { AlertCircle, Download, Sparkles } from 'lucide-react';
+import { Card } from '@shared/components/ui/card';
+import { Spinner } from '@shared/components/ui/spinner';
+import { AlertCircle, MessageCircle, Sparkles } from 'lucide-react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
-import { shouldShowPresetExpertProfession } from './presetExpertLabels';
+import { ExpertDetailDialog, type PresetExpertSummary } from './ExpertDetailDialog';
+import { ExpertAvatar } from './expertAvatars';
 
-interface PresetExpertSummary {
-  name: string;
-  displayName: { en: string; zh: string };
-  profession: { en: string; zh: string };
-  displayDescription: { en: string; zh: string };
-  categoryId: string;
-  tags: Array<{ en: string; zh: string }>;
-  quickPrompts: Array<{ en: string; zh: string }>;
-  path: string;
+interface PresetExpertListProps {
+  onChatWithExpert?: (agentId: string) => void;
 }
 
-const PresetExpertList: React.FC = () => {
+const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert }) => {
   const [experts, setExperts] = useState<PresetExpertSummary[]>([]);
+  const [selectedExpert, setSelectedExpert] = useState<PresetExpertSummary | null>(null);
   const [installing, setInstalling] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const agents = useSelector((state: RootState) => state.agent.agents);
 
   const isZh = i18nService.getLanguage() === 'zh';
-
-  // Derive installed state from Redux: an expert is installed if any agent
-  // has a matching presetId (which equals the expert's plugin name).
-  const installedPresetIds = new Set(
-    agents.filter(a => a.source === 'expert-package' && a.presetId).map(a => a.presetId),
-  );
 
   useEffect(() => {
     window.electron?.agents?.getPresetExperts().then(result => {
@@ -47,33 +30,45 @@ const PresetExpertList: React.FC = () => {
     });
   }, []);
 
-  const handleInstall = useCallback(async (expert: PresetExpertSummary) => {
-    setInstalling(expert.name);
-    setErrors(prev => {
-      const next = { ...prev };
-      delete next[expert.name];
-      return next;
-    });
-    try {
-      const result = await agentService.importExpertPackage(expert.path);
-      if (result?.success) {
-        // Refresh agents from DB to update installed state
-        await agentService.loadAgents();
-      } else {
+  const handleUseExpert = useCallback(
+    async (expert: PresetExpertSummary) => {
+      const installedAgent = agents.find(
+        agent => agent.source === 'expert-package' && agent.presetId === expert.name,
+      );
+      if (installedAgent) {
+        onChatWithExpert?.(installedAgent.id);
+        return;
+      }
+
+      setInstalling(expert.name);
+      setErrors(prev => {
+        const next = { ...prev };
+        delete next[expert.name];
+        return next;
+      });
+      try {
+        const result = await agentService.importExpertPackage(expert.path);
+        const agentId = result?.agentIds?.[0];
+        if (result?.success && agentId) {
+          await agentService.loadAgents();
+          onChatWithExpert?.(agentId);
+        } else {
+          setErrors(prev => ({
+            ...prev,
+            [expert.name]: result?.error || i18nService.t('expertInstallError'),
+          }));
+        }
+      } catch (err) {
         setErrors(prev => ({
           ...prev,
-          [expert.name]: result?.error || i18nService.t('expertInstallError'),
+          [expert.name]: err instanceof Error ? err.message : i18nService.t('expertInstallError'),
         }));
+      } finally {
+        setInstalling(null);
       }
-    } catch (err) {
-      setErrors(prev => ({
-        ...prev,
-        [expert.name]: err instanceof Error ? err.message : i18nService.t('expertInstallError'),
-      }));
-    } finally {
-      setInstalling(null);
-    }
-  }, []);
+    },
+    [agents, onChatWithExpert],
+  );
 
   if (experts.length === 0) {
     return (
@@ -85,74 +80,69 @@ const PresetExpertList: React.FC = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {experts.map(expert => {
-        const isInstalled = installedPresetIds.has(expert.name);
-        const isCurrent = installing === expert.name;
-        const errMsg = errors[expert.name];
-        const displayName = isZh ? expert.displayName.zh : expert.displayName.en;
-        const profession = isZh ? expert.profession.zh : expert.profession.en;
+    <>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {experts.map(expert => {
+          const isCurrent = installing === expert.name;
+          const errMsg = errors[expert.name];
+          const displayName = isZh ? expert.displayName.zh : expert.displayName.en;
 
-        return (
-          <Card key={expert.name} className="flex flex-col">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="text-base">{displayName}</CardTitle>
-                  {shouldShowPresetExpertProfession(displayName, profession) && (
-                    <CardDescription className="mt-1">{profession}</CardDescription>
-                  )}
-                </div>
+          return (
+            <Card
+              key={expert.name}
+              size="sm"
+              className="group relative min-h-20 flex-row items-center gap-3 border border-border bg-card p-4 ring-0 transition-colors hover:bg-muted"
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label={displayName}
+                className="absolute inset-0 z-0 h-auto w-auto rounded-[inherit] border-0 p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
+                onClick={() => setSelectedExpert(expert)}
+              />
+
+              <div className="pointer-events-none relative z-10">
+                <ExpertAvatar name={expert.name} label={displayName} />
               </div>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-3 pt-0">
-              <p className="text-sm text-muted-foreground line-clamp-3">
-                {isZh ? expert.displayDescription.zh : expert.displayDescription.en}
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {expert.tags.map(tag => (
-                  <Badge key={tag.zh} variant="secondary" className="text-xs">
-                    {isZh ? tag.zh : tag.en}
-                  </Badge>
-                ))}
-              </div>
-              <div className="mt-auto pt-2 flex flex-col gap-2">
-                {isInstalled ? (
-                  <Button variant="outline" size="sm" disabled className="w-full">
-                    {i18nService.t('expertInstalled')}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    className="w-full"
-                    onClick={() => handleInstall(expert)}
-                    disabled={isCurrent}
-                  >
-                    {isCurrent ? (
-                      <span className="flex items-center gap-2">
-                        <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                        {i18nService.t('expertInstalling')}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-2">
-                        <Download className="size-4" />
-                        {i18nService.t('expertInstall')}
-                      </span>
-                    )}
-                  </Button>
-                )}
-                {errMsg && (
-                  <p className="flex items-start gap-1 text-xs text-destructive">
-                    <AlertCircle className="size-3 mt-0.5 shrink-0" />
-                    <span className="line-clamp-3">{errMsg}</span>
+
+              <div className="pointer-events-none relative z-10 min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {isZh ? expert.displayDescription.zh : expert.displayDescription.en}
+                </p>
+                {errMsg ? (
+                  <p className="mt-1 flex items-center gap-1 truncate text-xs text-destructive">
+                    <AlertCircle className="shrink-0" />
+                    <span className="truncate">{errMsg}</span>
                   </p>
-                )}
+                ) : null}
               </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-    </div>
+
+              <div className="relative z-10 flex shrink-0 items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={isCurrent || !onChatWithExpert}
+                  aria-label={i18nService.t('expertGoToConversation')}
+                  title={i18nService.t('expertGoToConversation')}
+                  onClick={() => void handleUseExpert(expert)}
+                >
+                  {isCurrent ? <Spinner /> : <MessageCircle />}
+                </Button>
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <ExpertDetailDialog
+        expert={selectedExpert}
+        isInstalling={installing === selectedExpert?.name}
+        onClose={() => setSelectedExpert(null)}
+        onUseExpert={handleUseExpert}
+      />
+    </>
   );
 };
 

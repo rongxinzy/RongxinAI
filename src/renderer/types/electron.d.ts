@@ -51,6 +51,8 @@ import type {
   WorkbenchApprovalResponseInput,
   WorkbenchTaskActionResult,
   WorkbenchTaskChangedEvent,
+  WorkbenchTaskExportResult,
+  WorkbenchTaskListResult,
 } from '../../shared/workbenchTask';
 import type {
   OllamaCancelPullResult,
@@ -600,6 +602,7 @@ interface IElectronAPI {
         categoryId: string;
         tags: Array<{ en: string; zh: string }>;
         quickPrompts: Array<{ en: string; zh: string }>;
+        workflow: string[];
         path: string;
       }>;
       error?: string;
@@ -709,6 +712,7 @@ interface IElectronAPI {
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -724,6 +728,7 @@ interface IElectronAPI {
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -736,6 +741,10 @@ interface IElectronAPI {
     enqueuePendingMessage: (options: {
       sessionId: string;
       text: string;
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
+      skillIds?: string[];
+      skillPrompt?: string;
     }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     updatePendingMessage: (options: {
       sessionId: string;
@@ -870,6 +879,11 @@ interface IElectronAPI {
       }) => void,
     ) => () => void;
     onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) => () => void;
+    onStreamInterrupted: (
+      callback: (
+        data: import('../../shared/cowork/interruption').CoworkSessionInterruption,
+      ) => void,
+    ) => () => void;
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => () => void;
@@ -884,7 +898,11 @@ interface IElectronAPI {
   workbenchTask: {
     getCurrent: (sessionId: string) => Promise<WorkbenchTaskActionResult>;
     getDetail: (taskId: string) => Promise<WorkbenchTaskActionResult>;
-    resume: (taskId: string) => Promise<WorkbenchTaskActionResult>;
+    listForSession: (sessionId: string) => Promise<WorkbenchTaskListResult>;
+    exportAudit: (taskId: string) => Promise<WorkbenchTaskExportResult>;
+    resume: (
+      input: import('../../shared/workbenchTask').WorkbenchTaskResumeInput,
+    ) => Promise<WorkbenchTaskActionResult>;
     retry: (taskId: string) => Promise<WorkbenchTaskActionResult>;
     accept: (taskId: string) => Promise<WorkbenchTaskActionResult>;
     respondToApproval: (

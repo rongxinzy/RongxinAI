@@ -1,4 +1,5 @@
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
+import type { CoworkFileAttachment, CoworkImageAttachment } from '../types/cowork';
 
 type QueueListener = (items: CoworkPendingMessage[]) => void;
 
@@ -32,8 +33,22 @@ class CoworkQueueService {
     return this.itemsBySession.get(sessionId) ?? [];
   }
 
-  enqueue(sessionId: string, text: string) {
-    return window.electron.cowork.enqueuePendingMessage({ sessionId, text });
+  enqueue(
+    sessionId: string,
+    text: string,
+    imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
+    skillIds?: string[],
+    skillPrompt?: string,
+  ) {
+    return window.electron.cowork.enqueuePendingMessage({
+      sessionId,
+      text,
+      imageAttachments,
+      fileAttachments,
+      skillIds,
+      skillPrompt,
+    });
   }
 
   update(sessionId: string, itemId: string, text: string) {

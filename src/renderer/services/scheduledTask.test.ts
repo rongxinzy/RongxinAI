@@ -1,7 +1,13 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ScheduledTask } from '../../scheduledTask/types';
-import { ScheduleKind, TaskStatus } from '../../scheduledTask/constants';
+import {
+  DeliveryMode,
+  PayloadKind,
+  ScheduleKind,
+  SessionTarget,
+  WakeMode,
+} from '../../scheduledTask/constants';
 import { store } from '../store';
 import { setListError, setLoading, setTasks } from '../store/slices/scheduledTaskSlice';
 import { ScheduledTaskService } from './scheduledTask';
@@ -75,10 +81,19 @@ test('queues one trailing load when a gateway refresh arrives during an active l
   await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2));
 });
 
-test('refreshes running and final state around a manual task execution', async () => {
-  const idleTask = {
-    id: 'task-1',
+function makeTaskFixture(id: string): ScheduledTask {
+  return {
+    id,
+    name: 'Morning brief',
+    description: '',
+    enabled: true,
     schedule: { kind: ScheduleKind.Every, everyMs: 60_000 },
+    sessionTarget: SessionTarget.Isolated,
+    wakeMode: WakeMode.Now,
+    payload: { kind: PayloadKind.AgentTurn, message: 'Summarize updates' },
+    delivery: { mode: DeliveryMode.None },
+    workspaceId: 'workspace-1',
+    sessionKey: null,
     state: {
       nextRunAtMs: null,
       lastRunAtMs: null,
@@ -88,48 +103,66 @@ test('refreshes running and final state around a manual task execution', async (
       runningAtMs: null,
       consecutiveErrors: 0,
     },
-  } as ScheduledTask;
-  const runningTask = {
-    ...idleTask,
-    state: { ...idleTask.state, runningAtMs: 100 },
-  } as ScheduledTask;
-  const finishedTask = {
-    ...idleTask,
-    state: { ...idleTask.state, lastStatus: TaskStatus.Success, runningAtMs: null },
-  } as ScheduledTask;
-  let finishRun: ((result: { success: boolean; error?: string }) => void) | null = null;
-  const list = vi
-    .fn()
-    .mockResolvedValueOnce({ success: true, tasks: [runningTask] })
-    .mockResolvedValueOnce({ success: true, tasks: [finishedTask] });
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
+test('runManually flips the task to running before the gateway responds', async () => {
+  store.dispatch(setTasks([makeTaskFixture('task-1')]));
+  let resolveRun: ((result: { success: boolean; error?: string }) => void) | null = null;
   const runManually = vi.fn(
     () =>
       new Promise<{ success: boolean; error?: string }>(resolve => {
-        finishRun = resolve;
+        resolveRun = resolve;
       }),
   );
+  const list = vi.fn().mockResolvedValue({ success: true, tasks: [makeTaskFixture('task-1')] });
   const listRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
   const listAllRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
   vi.stubGlobal('window', {
-    electron: {
-      scheduledTasks: { list, runManually, listRuns, listAllRuns },
-    },
+    electron: { scheduledTasks: { runManually, list, listRuns, listAllRuns } },
+    dispatchEvent: vi.fn(),
   });
-  store.dispatch(setTasks([idleTask]));
   const service = new ScheduledTaskService();
 
-  const execution = service.runManually(idleTask.id);
-  await vi.waitFor(() =>
-    expect(store.getState().scheduledTask.tasks[0]?.state.runningAtMs).toBe(100),
-  );
-  (finishRun as ((result: { success: boolean }) => void) | null)?.({ success: true });
-  await execution;
+  const pendingRun = service.runManually('task-1');
+
+  // No gateway response yet — the optimistic running state must already show.
+  const runningAtMs = store.getState().scheduledTask.tasks.find(t => t.id === 'task-1')
+    ?.state.runningAtMs;
+  expect(runningAtMs).not.toBeNull();
+
+  (resolveRun as ((result: { success: boolean; error?: string }) => void) | null)?.({
+    success: true,
+  });
+  await pendingRun;
 
   expect(list).toHaveBeenCalledTimes(2);
-  expect(listRuns).toHaveBeenCalledWith(idleTask.id, 20, undefined, undefined);
+  expect(listRuns).toHaveBeenCalledWith('task-1', 20, undefined, undefined);
   expect(listAllRuns).toHaveBeenCalledWith(undefined, undefined, undefined);
-  expect(store.getState().scheduledTask.tasks[0]?.state).toMatchObject({
-    lastStatus: TaskStatus.Success,
-    runningAtMs: null,
+});
+
+test('runManually rolls back the optimistic state and toasts when the run fails to start', async () => {
+  store.dispatch(setTasks([makeTaskFixture('task-2')]));
+  const runManually = vi.fn().mockResolvedValue({ success: false, error: 'gateway offline' });
+  const list = vi.fn().mockResolvedValue({ success: true, tasks: [makeTaskFixture('task-2')] });
+  const listRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
+  const listAllRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
+  const dispatchEvent = vi.fn();
+  vi.stubGlobal('window', {
+    electron: { scheduledTasks: { runManually, list, listRuns, listAllRuns } },
+    dispatchEvent,
   });
+  const service = new ScheduledTaskService();
+
+  await service.runManually('task-2');
+
+  const state = store.getState().scheduledTask;
+  expect(state.tasks.find(t => t.id === 'task-2')?.state.runningAtMs).toBeNull();
+  expect(state.error).toBe('gateway offline');
+  expect(dispatchEvent).toHaveBeenCalledOnce();
+  const event = dispatchEvent.mock.calls[0]?.[0] as CustomEvent<string>;
+  expect(event.type).toBe('app:showToast');
+  expect(event.detail.length).toBeGreaterThan(0);
 });

@@ -19,6 +19,13 @@ export function normalizeMcpErrorMessage(message: string): string {
   if (lower.includes('oauth') && lower.includes('timed out')) {
     return i18nService.t('mcpConnectTimedOut');
   }
+  if (
+    lower.includes('invalid credentials') ||
+    lower.includes('invalid_token') ||
+    lower.includes('access token is missing')
+  ) {
+    return i18nService.t('mcpAuthorizationExpired');
+  }
   const hasHtmlResponse = lower.includes('<!doctype html') || lower.includes('<html');
 
   if (hasHtmlResponse && lower.includes('streamable http')) {

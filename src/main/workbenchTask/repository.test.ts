@@ -62,6 +62,76 @@ test('increments attempts and run event sequences while enforcing uniqueness', (
   }
 });
 
+test('persists the runtime context for an audit run', () => {
+  const { db, repository } = createRepository();
+  try {
+    const task = repository.createTask('session', 'goal', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    const context = {
+      model: 'gpt-5',
+      provider: 'openai',
+      reasoningProfile: 'high',
+      workspaceRoot: 'D:/workspace',
+      skillIds: ['documents', 'spreadsheets'],
+    };
+
+    expect(repository.updateRunContext(run.id, context).context).toEqual(context);
+    expect(repository.getDetail(task.id)?.runs[0].context).toEqual(context);
+  } finally {
+    db.close();
+  }
+});
+
+test('adds runtime context storage to an existing workbench schema', () => {
+  const db = new Database(':memory:');
+  try {
+    db.exec(`
+      CREATE TABLE workbench_runs (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        attempt INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        trigger TEXT NOT NULL,
+        started_at INTEGER,
+        ended_at INTEGER,
+        verification_result_json TEXT,
+        failure_json TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        UNIQUE(task_id, attempt)
+      );
+    `);
+
+    initializeWorkbenchTaskSchema(db);
+
+    const columns = db.prepare('PRAGMA table_info(workbench_runs)').all() as Array<{
+      name: string;
+    }>;
+    expect(columns.map(column => column.name)).toContain('context_json');
+  } finally {
+    db.close();
+  }
+});
+
+test('lists task history for one session in newest-first order', () => {
+  const { db, repository } = createRepository();
+  try {
+    const first = repository.createTask('session', 'first goal', contract);
+    const second = repository.createTask('session', 'second goal', contract);
+    repository.createTask('other-session', 'unrelated goal', contract);
+
+    db.prepare('UPDATE workbench_tasks SET created_at = ? WHERE id = ?').run(1, first.id);
+    db.prepare('UPDATE workbench_tasks SET created_at = ? WHERE id = ?').run(2, second.id);
+
+    expect(repository.listTasksForSession('session').map(task => task.id)).toEqual([
+      second.id,
+      first.id,
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
 test('deduplicates identical artifact evidence within a run', () => {
   const { db, repository } = createRepository();
   try {

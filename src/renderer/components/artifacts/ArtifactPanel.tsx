@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
-import { Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
+import { ArrowLeft, Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -9,14 +9,17 @@ import type { RootState } from '@/store';
 import {
   addArtifact,
   ArtifactLayoutMode,
+  ArtifactPanelView,
   closePanel,
   MIN_PANEL_WIDTH,
   selectActiveTab,
   selectArtifactLayoutMode,
   selectArtifact,
+  selectPanelView,
   selectSessionSelectedArtifact,
   setActiveTab,
   setArtifactLayoutMode,
+  setPanelView,
 } from '@/store/slices/artifactSlice';
 import type { ArtifactActiveTab } from '@/store/slices/artifactSlice';
 import {
@@ -39,7 +42,10 @@ const t = (key: string) => i18nService.t(key);
 
 const BROWSER_OPENABLE_TYPES = new Set<ArtifactType>(['html', 'svg', 'mermaid']);
 
-const SYSTEM_OPENABLE_TYPES = new Set<ArtifactType>(['document', 'unsupported']);
+function isDelimitedArtifact(artifact: Artifact): boolean {
+  const name = (artifact.fileName || artifact.filePath || artifact.title || '').toLowerCase();
+  return name.endsWith('.csv') || name.endsWith('.tsv');
+}
 
 function buildBrowserHtml(artifact: Artifact): string | null {
   switch (artifact.type) {
@@ -86,6 +92,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     selectSessionSelectedArtifact(state, sessionId),
   );
   const activeTab = useSelector(selectActiveTab);
+  const panelView = useSelector(selectPanelView);
   const layoutMode = useSelector(selectArtifactLayoutMode);
   const selectedArtifactId = useSelector((state: RootState) => state.artifact.selectedArtifactId);
   const [showFileList, setShowFileList] = useState(false);
@@ -102,7 +109,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   );
   const previewableArtifacts = visibleArtifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
   const artifactPreviewMode = selectedArtifact
-    ? getArtifactPreviewMode(selectedArtifact.type)
+    ? isDelimitedArtifact(selectedArtifact)
+      ? ArtifactPreviewMode.Preview
+      : getArtifactPreviewMode(selectedArtifact.type)
     : ArtifactPreviewMode.Preview;
   const availableTabs: ArtifactActiveTab[] =
     artifactPreviewMode === ArtifactPreviewMode.Preview
@@ -111,6 +120,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         ? ['code']
         : ['preview', 'code'];
   const displayedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
+  const isCodeView = displayedTab === 'code';
+  const hasLocalFilePreview = Boolean(selectedArtifact?.filePath) && !isCodeView;
 
   const intermediateToggle = (
     <Button
@@ -339,7 +350,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
           </div>
         )}
 
-        {selectedArtifact ? (
+        {selectedArtifact && panelView === ArtifactPanelView.Preview ? (
           <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
             {/* Header: file list toggle + filename + type + actions */}
             <div
@@ -347,6 +358,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 isMac && isTopLevelPanel ? 'pl-20 pr-3' : 'px-3'
               }`}
             >
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => dispatch(setPanelView(ArtifactPanelView.Files))}
+                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                title={t('back')}
+                aria-label={t('back')}
+              >
+                <ArrowLeft />
+              </Button>
               <span className="text-sm font-medium truncate">
                 {selectedArtifact.fileName || selectedArtifact.title}
               </span>
@@ -362,7 +383,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <RefreshIcon />
                 </Button>
               )}
-              {selectedArtifact.type !== 'document' && selectedArtifact.type !== 'unsupported' && (
+              {isCodeView && selectedArtifact.type !== 'unsupported' && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -373,7 +394,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               )}
-              {BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
+              {hasLocalFilePreview && BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -384,7 +405,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <BrowserIcon />
                 </Button>
               )}
-              {SYSTEM_OPENABLE_TYPES.has(selectedArtifact.type) && selectedArtifact.filePath && (
+              {hasLocalFilePreview &&
+                !BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -486,9 +508,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             </div>
 
             {/* Render area */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div key={`${selectedArtifact.id}-${displayedTab}`} className="flex-1 min-h-0 overflow-hidden animate-fade-in">
               {displayedTab === 'preview' ? (
-                <ArtifactRenderer artifact={selectedArtifact} sessionArtifacts={artifacts} />
+                <ArtifactRenderer
+                  artifact={
+                    isDelimitedArtifact(selectedArtifact)
+                      ? { ...selectedArtifact, type: 'document' }
+                      : selectedArtifact
+                  }
+                  sessionArtifacts={artifacts}
+                />
               ) : (
                 <CodeRenderer artifact={selectedArtifact} />
               )}

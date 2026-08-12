@@ -3,9 +3,9 @@ import {
   PromptInputBody,
   PromptInputButton,
   PromptInputFooter,
+  PromptInputHeader,
   PromptInputProvider,
   PromptInputSubmit,
-  PromptInputTextarea,
   PromptInputTools,
   usePromptInputController,
 } from '@shared/components/ai-elements/prompt-input';
@@ -33,17 +33,17 @@ import {
   setDraftPrompt,
   updateCurrentSessionModelOverride,
 } from '../../store/slices/coworkSlice';
+import { clearSelection } from '../../store/slices/quickActionSlice';
 import {
   type Model,
   setDefaultSelectedModel,
   setSelectedModel,
 } from '../../store/slices/modelSlice';
-import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
+import { clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
-import { CoworkImageAttachment } from '../../types/cowork';
+import { CoworkFileAttachment, CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
 import { toAgentModelRef } from '../../utils/agentModelRef';
-import ActiveSkillBadge from '../skills/ActiveSkillBadge';
 import ActiveMcpBadge from '../mcp/ActiveMcpBadge';
 import {
   resolveAgentModelSelection,
@@ -54,9 +54,11 @@ import AttachmentCard from './AttachmentCard';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
+import InlineSkillPromptEditor from './InlineSkillPromptEditor';
 import { LocalThinkingToggle } from './LocalThinkingToggle';
 import PermissionModeMenu from './PermissionModeMenu';
 import PromptPlusMenu from './PromptPlusMenu';
+import { ResumeTaskContextBadge } from './ResumeTaskContextBadge';
 import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 
 // CoworkAttachment is aliased from the Redux-persisted DraftAttachment type
@@ -157,6 +159,7 @@ interface CoworkPromptInputProps {
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,
   ) => boolean | void | Promise<boolean | void>;
@@ -188,6 +191,8 @@ interface CoworkPromptInputProps {
   onLocalThinkingEnabledChange?: (enabled: boolean | undefined) => void;
   isDirectChat?: boolean;
   topAccessory?: React.ReactNode;
+  resumeTaskActive?: boolean;
+  onCancelTaskResume?: () => void;
 }
 
 const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkPromptInputProps>(
@@ -219,6 +224,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       onLocalThinkingEnabledChange,
       isDirectChat = false,
       topAccessory,
+      resumeTaskActive = false,
+      onCancelTaskResume,
     } = props;
     const dispatch = useDispatch();
     const controller = usePromptInputController();
@@ -273,7 +280,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const controllerRef = useRef(controller);
     controllerRef.current = controller;
 
-    // Sync local value to PromptInputTextarea's controller on all changes
+    // Sync local value to PromptInput's controller on all changes
     // (clear on submit, external setValue, session switch, etc.)
     useEffect(() => {
       const ctrl = controllerRef.current;
@@ -289,7 +296,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const [isPatchingModel, setIsPatchingModel] = useState(false);
     const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const textareaRef = useRef<HTMLDivElement>(null);
     const dragDepthRef = useRef(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const modelPatchRequestIdRef = useRef(0);
@@ -297,13 +304,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     React.useImperativeHandle(ref, () => ({
       setValue: (newValue: string) => {
         setValue(newValue);
-        // 触发自动调整高度
         requestAnimationFrame(() => {
-          const textarea = textareaRef.current;
-          if (textarea) {
-            textarea.style.height = 'auto';
-            textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)}px`;
-          }
+          textareaRef.current?.focus();
         });
       },
       setImageAttachments: (images: CoworkImageAttachment[]) => {
@@ -398,10 +400,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       ],
     );
 
-    const isLarge = size === 'large';
-    const minHeight = isLarge ? 60 : 24;
-    const maxHeight = isLarge ? 200 : 200;
-
     const agentEffectiveModel = resolveEffectiveModel({
       sessionId,
       agentSelectedModel,
@@ -448,15 +446,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         unsubscribe();
       };
     }, [syncSkills]);
-
-    // Auto-resize textarea
-    useEffect(() => {
-      const textarea = textareaRef.current;
-      if (textarea) {
-        textarea.style.height = 'auto';
-        textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)}px`;
-      }
-    }, [value, minHeight, maxHeight]);
 
     useEffect(() => {
       const handleFocusInput = (event: Event) => {
@@ -525,7 +514,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
       const trimmedValue = value.trim();
       if (
-        (!trimmedValue && attachments.length === 0) ||
+        (!trimmedValue && attachments.length === 0 && !resumeTaskActive) ||
         (isStreaming && !canQueueWhileStreaming) ||
         disabled ||
         sessionContextPending ||
@@ -565,6 +554,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         })),
       });
       const imageAtts: CoworkImageAttachment[] = [];
+      const fileAtts: CoworkFileAttachment[] = [];
       for (const attachment of attachments) {
         if (attachment.isImage && attachment.dataUrl) {
           const extracted = extractBase64FromDataUrl(attachment.dataUrl);
@@ -590,6 +580,20 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             isImage: attachment.isImage,
             hasDataUrl: !!attachment.dataUrl,
           });
+          const dotIndex = attachment.name.lastIndexOf('.');
+          fileAtts.push({
+            name: attachment.name,
+            path: attachment.path,
+            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
+            isImage: true,
+          });
+        } else {
+          const dotIndex = attachment.name.lastIndexOf('.');
+          fileAtts.push({
+            name: attachment.name,
+            path: attachment.path,
+            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
+          });
         }
       }
 
@@ -607,7 +611,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         .join('\n');
       const finalPrompt = trimmedValue
         ? attachmentLines
-          ? `${trimmedValue}\n\n${attachmentLines}`
+          ? `${attachmentLines}\n\n${trimmedValue}`
           : trimmedValue
         : attachmentLines;
 
@@ -640,12 +644,18 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         finalPrompt,
         skillPrompt,
         imageAtts.length > 0 ? imageAtts : undefined,
+        fileAtts.length > 0 ? fileAtts : undefined,
         selectedExpertIds,
         goalMode,
       );
       if (result === false) {
         // Submission rejected — restore the prompt so the user can retry.
         setValue(finalPrompt);
+      } else if (activeSkills.length > 0) {
+        // Skills describe this one input only. Clear their selection after a
+        // successful send so the next message starts with a clean context.
+        dispatch(clearActiveSkills());
+        dispatch(clearSelection());
       }
     }, [
       value,
@@ -668,6 +678,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       selectedExpertIds,
       goalMode,
       canQueueWhileStreaming,
+      resumeTaskActive,
     ]);
 
     const handleManageSkills = useCallback(() => {
@@ -676,18 +687,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       }
     }, [onManageSkills]);
 
-    const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
       const isComposing = event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229;
-      if (
-        event.key === 'Backspace' &&
-        !isComposing &&
-        event.currentTarget.value.length === 0 &&
-        activeSkillIds.length > 0
-      ) {
-        event.preventDefault();
-        dispatch(toggleActiveSkill(activeSkillIds[activeSkillIds.length - 1]));
-        return;
-      }
       if (event.key !== 'Enter' || isComposing) return;
 
       // Use synced state (kept up-to-date via config-updated event) so that
@@ -726,12 +727,10 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         event.preventDefault();
         handleSubmit();
       } else {
-        // Any non-send Enter combo inserts a newline.
-        // Shift+Enter inserts newline natively; for other combos use execCommand.
-        if (!event.shiftKey) {
-          event.preventDefault();
-          document.execCommand('insertText', false, '\n');
-        }
+        // Keep newlines as text nodes. Letting contenteditable create block
+        // elements makes the serialized prompt browser-dependent.
+        event.preventDefault();
+        document.execCommand('insertText', false, '\n');
       }
     };
 
@@ -894,7 +893,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   '[CoworkPromptInput] handleIncomingFiles: native image fallback to path-only (no dataUrl)',
                   { nativePath },
                 );
-                addAttachment(nativePath);
+                addAttachment(nativePath, { isImage: true });
               } else {
                 // No native path (clipboard/drag from browser):
                 // 1. Read as dataUrl for preview + base64 vision
@@ -949,13 +948,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
           // Non-image file or model doesn't support images: use original flow
           if (nativePath) {
-            addAttachment(nativePath);
+            addAttachment(nativePath, fileIsImage ? { isImage: true } : undefined);
             continue;
           }
 
           const stagedPath = await saveInlineFile(file);
           if (stagedPath) {
-            addAttachment(stagedPath);
+            addAttachment(stagedPath, fileIsImage ? { isImage: true } : undefined);
           }
         }
         if (hasImageWithoutVision) {
@@ -1015,7 +1014,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               hasImageWithoutVision = true;
             }
           }
-          addAttachment(filePath);
+          addAttachment(filePath, isImagePath(filePath) ? { isImage: true } : undefined);
         }
         if (hasImageWithoutVision) {
           setImageVisionHint(true);
@@ -1090,7 +1089,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     };
 
     const handlePaste = useCallback(
-      (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      (event: React.ClipboardEvent<HTMLDivElement>) => {
         if (disabled || isStreaming) return;
         const files = Array.from(event.clipboardData?.files ?? []);
         if (files.length === 0) return;
@@ -1120,17 +1119,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     return (
       <div className="relative">
-        {attachments.length > 0 && (
-          <div className="mb-2 flex flex-wrap gap-2 max-h-[136px] overflow-y-auto">
-            {attachments.map(attachment => (
-              <AttachmentCard
-                key={attachment.path}
-                attachment={attachment}
-                onRemove={handleRemoveAttachment}
-              />
-            ))}
-          </div>
-        )}
         {imageVisionHint && (
           <div className="mb-2 flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
             <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -1163,15 +1151,30 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               {i18nService.t('coworkDropFileHint')}
             </div>
           )}
+          {(resumeTaskActive || attachments.length > 0) && (
+            <PromptInputHeader className="max-h-[136px] items-start gap-2 overflow-y-auto px-2.5 pt-2">
+              {resumeTaskActive && onCancelTaskResume && (
+                <ResumeTaskContextBadge onCancel={onCancelTaskResume} />
+              )}
+              {attachments.map(attachment => (
+                <AttachmentCard
+                  key={attachment.path}
+                  attachment={attachment}
+                  onRemove={handleRemoveAttachment}
+                />
+              ))}
+            </PromptInputHeader>
+          )}
           <PromptInputBody>
-            <PromptInputTextarea
+            <InlineSkillPromptEditor
               ref={textareaRef}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              onChange={e => setValue(e.currentTarget.value)}
+              value={value}
               placeholder={placeholder}
               disabled={disabled}
-              className="min-h-20"
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onChange={setValue}
+              className={size === 'large' ? 'max-h-48 overflow-y-auto' : undefined}
             />
           </PromptInputBody>
           <PromptInputFooter className="flex-wrap">
@@ -1240,7 +1243,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   {isWorkVariant && goalMode && (
                     <GoalModeChip onRemove={() => setGoalMode(false)} />
                   )}
-                  <ActiveSkillBadge />
                   <ActiveMcpBadge />
                 </>
               )}

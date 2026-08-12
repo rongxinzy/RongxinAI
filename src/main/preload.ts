@@ -415,6 +415,7 @@ contextBridge.exposeInMainWorld('electron', {
       modelOverride?: string;
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Start, options),
 
     continueSession: (options: {
@@ -426,10 +427,18 @@ contextBridge.exposeInMainWorld('electron', {
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => ipcRenderer.invoke(CoworkSessionIpc.Continue, options),
 
     listPendingMessages: (sessionId: string) => ipcRenderer.invoke(CoworkQueueIpc.List, sessionId),
-    enqueuePendingMessage: (options: { sessionId: string; text: string }) =>
+    enqueuePendingMessage: (options: {
+      sessionId: string;
+      text: string;
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
+      skillIds?: string[];
+      skillPrompt?: string;
+    }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
     updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Update, options),
@@ -547,6 +556,9 @@ contextBridge.exposeInMainWorld('electron', {
       onPush(CoworkStreamIpc.Permission, callback),
     onStreamPermissionDismiss: (callback: (data: { requestId: string }) => void) =>
       onPush(CoworkStreamIpc.PermissionDismiss, callback),
+    onStreamInterrupted: (
+      callback: (data: import('../shared/cowork/interruption').CoworkSessionInterruption) => void,
+    ) => onPush(CoworkStreamIpc.Interrupted, callback),
     onStreamComplete: (
       callback: (data: { sessionId: string; claudeSessionId: string | null }) => void,
     ) => onPush(CoworkStreamIpc.Complete, callback),
@@ -562,7 +574,11 @@ contextBridge.exposeInMainWorld('electron', {
   workbenchTask: {
     getCurrent: (sessionId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.GetCurrent, sessionId),
     getDetail: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.GetDetail, taskId),
-    resume: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Resume, taskId),
+    listForSession: (sessionId: string) =>
+      ipcRenderer.invoke(WorkbenchTaskIpc.ListForSession, sessionId),
+    exportAudit: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.ExportAudit, taskId),
+    resume: (input: import('../shared/workbenchTask').WorkbenchTaskResumeInput) =>
+      ipcRenderer.invoke(WorkbenchTaskIpc.Resume, input),
     retry: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Retry, taskId),
     accept: (taskId: string) => ipcRenderer.invoke(WorkbenchTaskIpc.Accept, taskId),
     respondToApproval: (input: WorkbenchApprovalResponseInput) =>

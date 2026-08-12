@@ -55,12 +55,21 @@ export type MemorySourceKind = MemorySourceKindValue;
 
 export const PiMemoryAction = {
   Recall: 'recall',
+  List: 'list',
   Save: 'save',
   ProposePersonal: 'propose_personal',
   SessionSummary: 'session_summary',
 } as const;
 
 export type PiMemoryAction = (typeof PiMemoryAction)[keyof typeof PiMemoryAction];
+
+export const EngramSearchMatchMode = {
+  All: 'all',
+  Any: 'any',
+} as const;
+
+export type EngramSearchMatchMode =
+  (typeof EngramSearchMatchMode)[keyof typeof EngramSearchMatchMode];
 
 export const EngramEnvironment = {
   BinaryPath: 'ZHIYUAN_ENGRAM_BIN',
@@ -74,3 +83,4 @@ export const ENGRAM_RUNTIME_DIRECTORY = 'engram-runtime';
 export const ENGRAM_PACKAGED_DIRECTORY = 'memory';
 export const ENGRAM_DATA_DIRECTORY_SEGMENTS = ['memory', 'engram'] as const;
 export const ENGRAM_LOOPBACK_HOST = '127.0.0.1';
+export const SESSION_SUMMARY_TTL_DAYS = 30;

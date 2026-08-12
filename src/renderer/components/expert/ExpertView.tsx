@@ -5,7 +5,7 @@ import {
   LayeredTabsSeparatorEdge,
 } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { PanelLeft, Pencil } from 'lucide-react';
+import { PanelLeft, Pencil, Users } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -22,6 +22,7 @@ interface ExpertViewProps {
   readOnly?: boolean;
   onCreateSkillByChat?: () => void;
   onTrySkill?: (skillId: string) => void;
+  onChatWithExpert?: (agentId: string) => void;
   onUseMcp?: (prompt?: string) => void;
   /** Tab to open on mount (view remounts on every navigation, so this takes effect each time) */
   initialTab?: ExpertTab;
@@ -45,6 +46,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   readOnly,
   onCreateSkillByChat,
   onTrySkill,
+  onChatWithExpert,
   onUseMcp,
   initialTab,
 }) => {
@@ -104,10 +106,25 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           value={EXPERT_TAB.Experts}
           activeValue={activeTab}
           direction={tabDirection}
-          className="min-h-0 flex-1 overflow-y-auto px-6 py-4"
+          className="min-h-0 flex-1 overflow-y-auto"
           contentClassName="h-full"
         >
-          <PresetExpertList />
+          <div className="mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 py-4 sm:px-6">
+            <header className="flex items-center gap-4">
+              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+                <Users className="size-6 text-primary" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-xxl font-semibold text-foreground">
+                  {i18nService.t('expert')}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {i18nService.t('expertsDescription')}
+                </p>
+              </div>
+            </header>
+            <PresetExpertList onChatWithExpert={onChatWithExpert} />
+          </div>
         </LayeredTabsContent>
 
         <LayeredTabsContent

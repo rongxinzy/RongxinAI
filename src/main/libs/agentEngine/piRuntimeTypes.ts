@@ -3,6 +3,7 @@ import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivit
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
+import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -47,6 +48,7 @@ export interface PiRuntimeEvents {
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
   sessionStopped: (sessionId: string) => void;
+  sessionInterrupted: (event: CoworkSessionInterruption) => void;
   queueUpdated: (sessionId: string, items: CoworkPendingMessage[]) => void;
 }
 
@@ -72,6 +74,7 @@ export type PiStartOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
+  fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
@@ -81,6 +84,8 @@ export type PiStartOptions = {
   _piPromptOverride?: string;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
+  /** Internal: production workflow policy inherited from the owning task. */
+  _productionWorkflowEnabled?: boolean;
 };
 
 export type PiContinueOptions = {
@@ -90,6 +95,7 @@ export type PiContinueOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
+  fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
   agentId?: string;
@@ -99,6 +105,8 @@ export type PiContinueOptions = {
   autoApprove?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
+  /** Internal: production workflow policy inherited from the owning task. */
+  _productionWorkflowEnabled?: boolean;
   /** Internal: do not persist a synthetic Resume/Retry prompt as a user message. */
   _skipUserMessage?: boolean;
   /** Internal: marks a queued follow-up in the persisted transcript. */
@@ -127,6 +135,10 @@ export interface PiRuntime {
   enqueuePendingMessage(
     sessionId: string,
     text: string,
+    imageAttachments?: PiImageAttachment[],
+    fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>,
+    skillIds?: string[],
+    skillPrompt?: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string };
   updatePendingMessage(
     sessionId: string,

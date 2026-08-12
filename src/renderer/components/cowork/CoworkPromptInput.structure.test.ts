@@ -1,5 +1,5 @@
 /**
- * Source-structure guard for CoworkPromptInput's skill badge placement.
+ * Source-structure guard for CoworkPromptInput's inline skill editor.
  *
  * Why not render the component? CoworkPromptInput's import chain pulls in
  * window.electron IPC services (cowork/agent/config), ai-elements, and
@@ -9,11 +9,10 @@
  * mocking most of the renderer service layer, so this guard pins the two
  * facts PR #184 broke instead:
  *
- *   1. ActiveSkillBadge stays mounted in the prompt toolbar
- *      (inside PromptInputTools, next to the "+" menu).
- *   2. The broken textarea-internal grey-token implementation
- *      (ResizeObserver width measurement, dynamic paddingLeft, placeholder
- *      suppression while skills are active) stays gone.
+ *   1. Skills and text share one editable surface, so tokens can be inserted
+ *      at the current caret instead of being fixed before the textarea.
+ *   2. The editor owns its DOM selection, avoiding resize/dynamic-padding
+ *      token implementations that break input focus.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -25,30 +24,33 @@ const source = readFileSync(
   'utf8',
 );
 
-test('mounts ActiveSkillBadge inside the prompt toolbar', () => {
-  expect(source).toContain('<ActiveSkillBadge />');
+test('mounts the inline skill editor inside the prompt body', () => {
+  expect(source).toContain('<InlineSkillPromptEditor');
 
-  const toolsOpen = source.indexOf('<PromptInputTools');
-  const badge = source.indexOf('<ActiveSkillBadge />');
-  const toolsClose = source.indexOf('</PromptInputTools>');
-  expect(toolsOpen).toBeGreaterThanOrEqual(0);
-  expect(toolsClose).toBeGreaterThan(toolsOpen);
-  expect(badge).toBeGreaterThan(toolsOpen);
-  expect(badge).toBeLessThan(toolsClose);
+  const bodyOpen = source.indexOf('<PromptInputBody>');
+  const editor = source.indexOf('<InlineSkillPromptEditor');
+  const bodyClose = source.indexOf('</PromptInputBody>');
+  expect(bodyOpen).toBeGreaterThanOrEqual(0);
+  expect(bodyClose).toBeGreaterThan(bodyOpen);
+  expect(editor).toBeGreaterThan(bodyOpen);
+  expect(editor).toBeLessThan(bodyClose);
+  expect(source).not.toContain('overflow-x-auto');
 });
 
-test('keeps active skills attached after submitting within a session', () => {
-  expect(source).not.toContain('dispatch(clearActiveSkills())');
-  expect(source).not.toContain('submittedSkillIds');
-  expect(source).not.toContain('dispatch(setActiveSkillIds(');
+test('clears active skills after a successful submit', () => {
+  expect(source).toContain('dispatch(clearActiveSkills());');
+  expect(source).toContain('dispatch(clearSelection());');
 });
 
-test('does not reintroduce the PR #184 textarea-token implementation', () => {
-  // ResizeObserver-driven width measurement for the inline tokens.
+test('delegates deletion-key handling to the inline editor', () => {
+  expect(source).toContain('onKeyDown={handleKeyDown}');
+  expect(source).not.toContain('event.currentTarget.value.length');
+});
+
+test('does not reintroduce the PR #184 measurement implementation', () => {
   expect(source).not.toContain('skillTokensRef');
   expect(source).not.toContain('skillTokenWidth');
-  // The broken version cleared the textarea placeholder while skills were active.
-  expect(source).not.toContain("? '' : placeholder");
+  expect(source).toContain('InlineSkillPromptEditor');
 });
 
 test('keeps the session permission selector available during an active run', () => {
@@ -75,4 +77,9 @@ test('keeps text editing mounted while a target session context is pending', () 
   expect(source).toContain('inert={sessionContextPending ? true : undefined}');
   expect(source).toContain('disabled={sessionContextPending}');
   expect(source).toContain('sessionContextPending ||');
+});
+
+test('allows an empty amendment only while an explicit task resume context is active', () => {
+  expect(source).toContain('!trimmedValue && attachments.length === 0 && !resumeTaskActive');
+  expect(source).toContain('<ResumeTaskContextBadge onCancel={onCancelTaskResume} />');
 });

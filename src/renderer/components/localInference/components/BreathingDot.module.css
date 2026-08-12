@@ -1,0 +1,50 @@
+.dot {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: 50%;
+  background: var(--dot-color);
+  box-shadow: 0 0 4px var(--dot-color);
+}
+
+.dot::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  border-radius: inherit;
+  background: var(--dot-color);
+  animation: breathe var(--dot-duration) ease-in-out infinite;
+  pointer-events: none;
+}
+
+.dot[data-active='false'] {
+  opacity: 0.45;
+  filter: saturate(0.4);
+}
+
+.dot[data-active='false']::before {
+  display: none;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot::before {
+    animation: none;
+    opacity: 0.25;
+    transform: scale(1.4);
+  }
+}

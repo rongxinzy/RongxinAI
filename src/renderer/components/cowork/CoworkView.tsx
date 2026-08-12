@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { ChatChatTransport } from '../../services/chatChatTransport';
@@ -35,7 +36,7 @@ import {
   addMessage,
   addSession,
   clearCurrentSession,
-  setCurrentSession,
+  deleteSession,
   updateMessageContent,
   updateMessageContents,
   updateSessionStatus,
@@ -46,6 +47,7 @@ import { WorkMode } from '../../store/workMode/constants';
 import {
   CoworkSessionStatusValue,
   type CoworkImageAttachment,
+  type CoworkFileAttachment,
   type CoworkPermissionRequest,
   type CoworkPermissionResult,
   type CoworkSession,
@@ -62,6 +64,7 @@ import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
 import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
 import { useUnmanagedWorkingDirectory } from './useUnmanagedWorkingDirectory';
+import { useTaskResumeContext } from './hooks/useTaskResumeContext';
 
 export interface CoworkViewProps {
   onRequestAppSettings?: (options?: SettingsOpenOptions) => void;
@@ -80,6 +83,10 @@ export interface CoworkViewProps {
 const DirectChatDataChunkType = {
   Context: 'data-context',
 } as const;
+
+type DirectChatPart =
+  | { type: 'text'; text: string }
+  | { type: 'file'; mediaType: string; url: string; filename: string };
 
 interface DirectChatContextData {
   cacheReadTokens?: number;
@@ -172,6 +179,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const [localThinkingEnabled, setLocalThinkingEnabled] = useState<boolean | undefined>();
 
   const currentSession = useSelector(selectCurrentSession);
+  const taskResume = useTaskResumeContext(currentSession?.id);
   const displayedSessionId = useSelector(selectDisplayedSessionId);
   const workMode = useSelector(selectWorkMode);
   const directChatModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
@@ -220,9 +228,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     currentSessionWorkingDirectory || unmanagedWorkingDirectory || currentWorkspace?.path || '';
   const currentWorkspacePath =
     activeWorkspacePath ||
-    (workMode === WorkMode.Work
-      ? defaultConversationWorkspace?.path
-      : config.workingDirectory) ||
+    (workMode === WorkMode.Work ? defaultConversationWorkspace?.path : config.workingDirectory) ||
     '';
   const currentWorkspaceDisplayName =
     currentWorkspace && !currentWorkspace.isHidden && isScratchWorkspacePath(currentWorkspace.path)
@@ -316,6 +322,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
   ): Promise<boolean | void> => {
@@ -405,12 +412,15 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             content: prompt,
             timestamp: now,
             metadata:
-              sessionSkillIds.length > 0 || (imageAttachments && imageAttachments.length > 0)
+              sessionSkillIds.length > 0 ||
+              (imageAttachments && imageAttachments.length > 0) ||
+              (fileAttachments && fileAttachments.length > 0)
                 ? {
                     ...(sessionSkillIds.length > 0 ? { skillIds: sessionSkillIds } : {}),
                     ...(imageAttachments && imageAttachments.length > 0
                       ? { imageAttachments }
                       : {}),
+                    ...(fileAttachments && fileAttachments.length > 0 ? { fileAttachments } : {}),
                   }
                 : undefined,
           },
@@ -427,8 +437,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       if (workMode === WorkMode.Chat && !isChatAgentExecution) {
         dispatch(addSession(tempSession));
       } else {
-        // Work sessions are added after the backend creates their real session.
-        dispatch(setCurrentSession(tempSession));
+        // Keep a new Work session in the list while the backend creates its
+        // persistent record, so attachments and the initial prompt remain
+        // visible if startup takes time or fails.
+        dispatch(addSession(tempSession));
       }
       // Clear quick action selection after starting session
       dispatch(clearSelection());
@@ -502,11 +514,20 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             modelProviderKey: directChatModel.providerKey,
             localThinkingEnabled,
           });
+          const userParts: DirectChatPart[] = [
+            { type: 'text' as const, text: prompt },
+            ...(imageAttachments ?? []).map(image => ({
+              type: 'file' as const,
+              mediaType: image.mimeType,
+              url: `data:${image.mimeType};base64,${image.base64Data}`,
+              filename: image.name,
+            })),
+          ];
           const stream = await transport.sendMessages({
             trigger: 'submit-message',
             chatId: tempSessionId,
             messageId: undefined,
-            messages: [{ id: `msg-${now}`, role: 'user', parts: [{ type: 'text', text: prompt }] }],
+            messages: [{ id: `msg-${now}`, role: 'user', parts: userParts }],
             abortSignal: abortController.signal,
           });
           const reader = stream.getReader();
@@ -807,6 +828,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         modelOverride: sessionModelOverride,
         permissionMode: config.permissionMode,
         imageAttachments,
+        fileAttachments,
       });
 
       if (!startedSession && startError) {
@@ -828,7 +850,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         return;
       }
 
-      if (startedSession) clearUnmanagedWorkingDirectory();
+      if (startedSession) {
+        clearUnmanagedWorkingDirectory();
+        // coworkService.startSession already selected the real session.
+        // Remove only the temporary list entry after that replacement.
+        dispatch(deleteSession(tempSessionId));
+      }
 
       // Stop immediately if user cancelled while startup request was in flight.
       if (isPendingStartCancelled() && startedSession) {
@@ -849,10 +876,21 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds: string[] = [],
     goalMode = false,
   ) => {
     if (!currentSession) return;
+    if (taskResume.interruption) {
+      return taskResume.resume({
+        amendment: prompt,
+        skillIds: [...activeSkillIds],
+        expertIds,
+        goalMode,
+        imageAttachments,
+        fileAttachments,
+      });
+    }
     if (continuingSessionIdsRef.current.has(currentSession.id)) return;
 
     // Work keeps the prompt editable while Pi is running. Normal input during
@@ -863,7 +901,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       isStreaming &&
       (currentSession.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work
     ) {
-      const result = await coworkQueueService.enqueue(currentSession.id, prompt);
+      const result = await coworkQueueService.enqueue(
+        currentSession.id,
+        prompt,
+        imageAttachments,
+        fileAttachments,
+        [...activeSkillIds],
+        skillPrompt,
+      );
       if (!result.success) {
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
@@ -894,6 +939,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         type: 'user' as const,
         content: prompt,
         timestamp: Date.now(),
+        ...(imageAttachments?.length || fileAttachments?.length
+          ? {
+              metadata: {
+                ...(imageAttachments?.length ? { imageAttachments } : {}),
+                ...(fileAttachments?.length ? { fileAttachments } : {}),
+              },
+            }
+          : {}),
       };
       let assistantContent = '';
       let assistantMessageAdded = false;
@@ -986,12 +1039,20 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             .map(m => ({
               id: m.id,
               role: m.type as 'user' | 'assistant',
-              parts: [{ type: 'text' as const, text: m.content }],
+              parts: [{ type: 'text' as const, text: m.content }] as DirectChatPart[],
             }))
             .concat({
               id: userMsgId,
               role: 'user' as const,
-              parts: [{ type: 'text' as const, text: prompt }],
+              parts: [
+                { type: 'text' as const, text: prompt },
+                ...(imageAttachments ?? []).map(image => ({
+                  type: 'file' as const,
+                  mediaType: image.mimeType,
+                  url: `data:${image.mimeType};base64,${image.base64Data}`,
+                  filename: image.name,
+                })),
+              ],
             }),
           abortSignal: abortController.signal,
         });
@@ -1240,6 +1301,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         permissionMode: sessionPermissionMode,
         goalMode,
         imageAttachments,
+        fileAttachments,
       });
     } finally {
       continuingSessionIdsRef.current.delete(currentSession.id);
@@ -1255,7 +1317,28 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     // to the engine and leave the direct stream running).
     const directChatController = directChatAbortControllersRef.current.get(currentSession.id);
     if (directChatController) {
+      const interruptionId = crypto.randomUUID();
       directChatController.abort();
+      dispatch(
+        addMessage({
+          sessionId: currentSession.id,
+          message: {
+            id: `interruption-${interruptionId}`,
+            type: 'system',
+            content: '',
+            timestamp: Date.now(),
+            metadata: {
+              interruption: {
+                sessionId: currentSession.id,
+                interruptionId,
+                cause: CoworkInterruptionCause.UserStop,
+                taskId: null,
+                recoverable: false,
+              },
+            },
+          },
+        }),
+      );
       dispatch(
         updateSessionStatus({
           sessionId: currentSession.id,
@@ -1433,6 +1516,9 @@ const CoworkView: React.FC<CoworkViewProps> = ({
           onRespondToInlineQuestion={onRespondToInlineQuestion}
           inlinePermission={inlinePermission}
           onRespondToInlinePermission={onRespondToInlinePermission}
+          resumeTaskId={taskResume.interruption?.taskId}
+          onResumeTask={taskResume.select}
+          onCancelTaskResume={taskResume.cancel}
         />
       </div>
     );

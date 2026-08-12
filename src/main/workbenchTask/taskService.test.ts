@@ -666,6 +666,7 @@ test('startup recovery preserves pending approval projection until resume', asyn
     ).toThrow('interrupted run');
 
     const resumed = service.prepareRun(task.id, WorkbenchRunTrigger.Resume);
+    expect(resumed.task.id).toBe(task.id);
     expect(resumed.run.attempt).toBe(2);
     const resumedDetail = service.getDetail(task.id);
     expect(resumedDetail?.approvals[0].decision).toBe(WorkbenchApprovalDecision.Expired);
