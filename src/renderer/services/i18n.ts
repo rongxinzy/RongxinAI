@@ -6,6 +6,15 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    localInferenceSettings: '本地模型设置',
+    localInferenceRuntimeSettings: '运行环境',
+    localInferenceAccessMenuItem: '访问',
+    localInferenceLibraryMenuItem: '模型库',
+    localInferenceRuntimeReadyWithBackend: '当前版本：{backend}',
+    localInferenceRuntimeNotInstalledMessage: '未安装本地推理引擎',
+    localInferenceRuntimeServiceRunning: '服务运行中',
+    localInferenceRuntimeServiceNotRunning: '服务程序已安装但未运行',
+    localInferenceRuntimeServiceUnavailable: '未安装本地推理服务程序',
     coworkQueueTitle: '\u5f85\u5904\u7406\u6d88\u606f',
     coworkQueueCount: '{count} \u6761\u5f85\u5904\u7406\u6d88\u606f',
     coworkQueueEmpty: '\u961f\u5217\u4e3a\u7a7a',
@@ -2853,6 +2862,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailDeleting: '删除中...',
   },
   en: {
+    localInferenceSettings: 'Local Settings',
+    localInferenceRuntimeSettings: 'Runtime',
+    localInferenceAccessMenuItem: 'Access',
+    localInferenceLibraryMenuItem: 'Model Library',
+    localInferenceRuntimeReadyWithBackend: 'Current version: {backend}',
+    localInferenceRuntimeNotInstalledMessage: 'The local inference engine is not installed.',
+    localInferenceRuntimeServiceRunning: 'Service is running',
+    localInferenceRuntimeServiceNotRunning: 'Service is installed but not running',
+    localInferenceRuntimeServiceUnavailable: 'The local inference service is not installed',
     coworkQueueTitle: 'Pending messages',
     coworkQueueCount: '{count} pending',
     coworkQueueEmpty: 'Queue is empty',
