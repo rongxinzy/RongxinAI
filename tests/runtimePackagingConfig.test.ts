@@ -217,8 +217,10 @@ test("Windows release workflow runs the clean-path bundled runtime gate", () => 
     path.join(root, "scripts", "ci", "windows-runtime-smoke.ps1"),
     "utf8",
   );
-  assert.match(smoke, /skill-python\\xlsx/);
-  assert.match(smoke, /skill-python\\pdf/);
+  assert.match(smoke, /skill-python\\layers\\shared\\Scripts\\python\.exe/);
+  assert.doesNotMatch(smoke, /skill-python\\(?:xlsx|pdf)\\Scripts\\python\.exe/);
+  assert.match(smoke, /bundled XLSX dependency probe/);
+  assert.match(smoke, /bundled PDF dependency probe/);
   assert.match(smoke, /markdown_to_docx\.mjs/);
   assert.match(smoke, /docx\\scripts\\markdown_to_docx\.mjs/);
   assert.match(smoke, /electron-builder\.json/);
