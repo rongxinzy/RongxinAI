@@ -232,11 +232,7 @@ function rebaseEnvironmentSymlinks(environmentRoot, basePythonPath) {
     ) {
       continue;
     }
-    const targetRelativeToBase = path.relative(baseRuntimeRoot, resolvedTarget);
-    const packageBaseRoot = path.dirname(path.dirname(environmentRoot));
-    const packagedBaseRoot = path.join(packageBaseRoot, path.basename(baseRuntimeRoot));
-    const packagedTarget = path.join(packagedBaseRoot, targetRelativeToBase);
-    const relativeTarget = path.relative(path.dirname(linkPath), packagedTarget);
+    const relativeTarget = path.relative(path.dirname(linkPath), resolvedTarget);
     fs.unlinkSync(linkPath);
     fs.symlinkSync(relativeTarget, linkPath);
   }
@@ -576,6 +572,7 @@ module.exports = {
   normalizePlatform,
   parseImportNames,
   pythonExecutableForEnvironment,
+  rebaseEnvironmentSymlinks,
   validateSkillDependencyDeclarations,
   ensureSkillPythonRuntimes,
 };
