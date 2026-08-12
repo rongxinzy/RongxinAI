@@ -101,6 +101,7 @@ import { useConversationRailScrollSync } from './hooks/useConversationRailScroll
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
+import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
 import { WorkbenchTaskStatusBar } from './WorkbenchTaskStatus';
 
@@ -1270,6 +1271,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                           permission={inlineQuestionPermission}
                           onRespond={onRespondToInlineQuestion}
                         />
+                      </div>
+                    )}
+                    {sessionId && (
+                      <div className="px-3 pt-3">
+                        <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
                       </div>
                     )}
                     <div className="h-20" />
