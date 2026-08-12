@@ -26,6 +26,7 @@ const task: WorkbenchTask = {
     metadata: {},
   },
   createdAt: 1,
+  completedAt: null,
   updatedAt: 1,
 };
 
