@@ -70,6 +70,30 @@ try {
   const invalidOverflowOrnament = run();
   assert.equal(invalidOverflowOrnament.status, 1, 'decorative overflow requires an explicit opt-in');
   assert.match(invalidOverflowOrnament.stdout, /element exceeds canvas bounds/);
+
+  // Overflow errors must state the concrete deficit (px and lines), not just the symptom.
+  page.elements = [
+    { id: 'tight', type: 'text', bounds: [96, 96, 500, 50], fontSize: 24, text: '这是一段用于验证溢出报错差额的信息内容', wrap: true },
+  ];
+  fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
+  const overflowDelta = run();
+  assert.equal(overflowDelta.status, 1, 'overflow must still block export');
+  assert.match(overflowDelta.stdout, /overflows its height by \d+px/, 'overflow error must carry a px deficit');
+  assert.match(overflowDelta.stdout, /about \d+ line\(s\)/, 'overflow error must carry a line deficit');
+
+  // A page whose rendered text area exceeds the usable canvas must be reported
+  // as a structural budget error, so the model reduces content instead of tweaking bounds.
+  page.elements = [
+    { id: 'wall-1', type: 'text', bounds: [96, 96, 500, 700], fontSize: 36, text: '资'.repeat(120), wrap: true, allowOverlap: true, allowUnderfill: true },
+    { id: 'wall-2', type: 'text', bounds: [96, 96, 500, 700], fontSize: 36, text: '资'.repeat(120), wrap: true, allowOverlap: true, allowUnderfill: true },
+    { id: 'wall-3', type: 'text', bounds: [96, 96, 500, 700], fontSize: 36, text: '资'.repeat(120), wrap: true, allowOverlap: true, allowUnderfill: true },
+  ];
+  fs.writeFileSync(pagePath, `${JSON.stringify(page, null, 2)}\n`);
+  const budgetOverflow = run();
+  assert.equal(budgetOverflow.status, 1, 'an over-budget page must block export');
+  assert.match(budgetOverflow.stdout, /canvas budget/, 'over-budget pages must be reported structurally');
+  assert.match(budgetOverflow.stdout, /bounds adjustments cannot fix this/, 'budget error must steer away from bounds tweaking');
+
   console.log('Presentation Studio validator tests passed');
 } finally {
   fs.rmSync(workspace, { recursive: true, force: true });
