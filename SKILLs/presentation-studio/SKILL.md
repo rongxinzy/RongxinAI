@@ -39,6 +39,9 @@ Create an isolated project directory:
 4. **Create three proof pages first:** cover, representative content page, and data/diagram page. Render/inspect them with the available visual capability and revise the design contract before expanding the deck.
 5. **Create `deck.json`, then pages in order.** Use only the documented DeckSpec fields. Use native `text`, `shape`, `image`, `table`, and `chart` elements; do not rasterize an entire page. Declare semantic colors and explicitly style non-text elements: a mask, rule, panel, table, or chart must not silently inherit one global primary color. Images are required where the design contract calls for visual storytelling. Use high-quality, relevant assets; never replace missing imagery with a placeholder or an unrelated gradient.
 6. **Validate, fix, validate.** Run the validator in strict mode. A warning is a real presentation defect unless explicitly listed as an intentional exception in `design.md`. Do not export until validation reports zero errors and zero warnings.
+   - Overflow errors state the exact deficit in px and lines; fix to that number in one pass instead of guessing.
+   - A **canvas budget error** means the page content physically cannot fit. Bounds adjustments can never resolve it. Reduce the text, split the page into two, or move to a denser layout family.
+   - **Convergence rule:** if the same element reports the same defect in two consecutive validation runs, stop adjusting its bounds. Bounds tweaking cannot fix a space deficit. Apply a structural fix instead (shorten the text, split the page, change the layout family) and re-validate.
 7. **Compile and inspect the final PPTX.** Confirm the file exists and is non-empty. Render the final PPTX when a renderer is available and inspect every page—not merely the source preview.
 
 ## Tooling
