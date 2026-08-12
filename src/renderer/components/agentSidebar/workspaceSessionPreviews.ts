@@ -19,6 +19,11 @@ export const mergeSessionsIntoWorkspacePreviews = (
 
   for (const session of incoming) {
     if (!session.workspaceId) continue;
+    // Temporary sessions (`temp-*`) are frontend-only UI identities that never
+    // exist in the backend. They must never enter the workspace tree — the
+    // tree only shows real sessions, and a temp entry would flash in as a
+    // ghost running session until the real session replaces it.
+    if (session.id.startsWith('temp-')) continue;
     const workspaceSessions = sessionsByWorkspace.get(session.workspaceId) ?? [];
     workspaceSessions.push(session);
     sessionsByWorkspace.set(session.workspaceId, workspaceSessions);
@@ -28,16 +33,14 @@ export const mergeSessionsIntoWorkspacePreviews = (
 
   const next = { ...current };
   sessionsByWorkspace.forEach((sessions, workspaceId) => {
-    const incomingIds = new Set(sessions.map(session => session.id));
     next[workspaceId] = mergeSessionSummaries(
-      // Temporary sessions (`temp-*`) are frontend-only UI identities. They
-      // never exist in the backend, so once they leave the Redux session list
-      // they must also leave the preview — otherwise a stale temp entry stays
-      // visible as a ghost running session that fails to load on click.
+      // Temporary sessions (`temp-*`) are frontend-only UI identities that
+      // never exist in the backend. Drop every temp entry from the preview —
+      // both stale ones leaked by an older build and any that briefly enter
+      // the Redux list while a new session is starting. Backend-loaded real
+      // sessions are preserved.
       (current[workspaceId] ?? []).filter(
-        session =>
-          session.workspaceId === workspaceId &&
-          (!session.id.startsWith('temp-') || incomingIds.has(session.id)),
+        session => session.workspaceId === workspaceId && !session.id.startsWith('temp-'),
       ),
       sessions,
     );

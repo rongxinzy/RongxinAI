@@ -64,15 +64,29 @@ test('drops stale temp-* sessions that left the session list', () => {
   expect(previews['workspace-a'].map(session => session.id)).toEqual(['session-a']);
 });
 
-test('keeps a temp-* session that is still present in the session list', () => {
+test('never lets a temp-* session enter the preview even while it is in the list', () => {
   const temp = makeSession('temp-1786533458865', 'workspace-a');
+  const real = makeSession('session-a', 'workspace-a');
 
   const previews = mergeSessionsIntoWorkspacePreviews(
     {
-      'workspace-a': [temp],
+      'workspace-a': [temp, real],
     },
-    [temp],
+    [temp, real],
   );
 
-  expect(previews['workspace-a'].map(session => session.id)).toEqual(['temp-1786533458865']);
+  expect(previews['workspace-a'].map(session => session.id)).toEqual(['session-a']);
+});
+
+test('keeps backend-loaded real sessions not present in the session list', () => {
+  const backendOnly = makeSession('session-b', 'workspace-a');
+
+  const previews = mergeSessionsIntoWorkspacePreviews(
+    {
+      'workspace-a': [backendOnly],
+    },
+    [],
+  );
+
+  expect(previews['workspace-a'].map(session => session.id)).toEqual(['session-b']);
 });
