@@ -1,5 +1,6 @@
-import crypto from "node:crypto";
 import http from "node:http";
+
+import { CcConnectRequestAuthenticator } from './ccConnectRequestAuthenticator';
 
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
@@ -38,12 +39,14 @@ export interface CcConnectBridgeHandlers {
 /** Loopback-only bridge between the trimmed channel sidecar and ZhiYuan. */
 export class CcConnectBridgeServer {
   private server: http.Server | null = null;
+  private readonly authenticator: CcConnectRequestAuthenticator;
 
   constructor(
     private readonly token: string,
     private readonly handlers: CcConnectBridgeHandlers,
   ) {
     if (!token.trim()) throw new Error("cc-connect bridge token is required");
+    this.authenticator = new CcConnectRequestAuthenticator(token);
   }
 
   async start(): Promise<string> {
@@ -75,7 +78,7 @@ export class CcConnectBridgeServer {
     response: http.ServerResponse,
   ): Promise<void> {
     try {
-      if (!this.authorized(request)) return void response.writeHead(401).end();
+      if (!this.authenticator.authorize(request)) return void response.writeHead(401).end();
       if (request.method !== "POST") return void response.writeHead(404).end();
       const body = await readJson(request);
       if (request.url === "/v1/cc-connect/turn") {
@@ -101,16 +104,6 @@ export class CcConnectBridgeServer {
       const message = error instanceof Error ? error.message : String(error);
       response.writeHead(500).end(message);
     }
-  }
-
-  private authorized(request: http.IncomingMessage): boolean {
-    const value = request.headers.authorization;
-    const expected = Buffer.from(`Bearer ${this.token}`);
-    const actual = Buffer.from(typeof value === "string" ? value : "");
-    return (
-      actual.length === expected.length &&
-      crypto.timingSafeEqual(actual, expected)
-    );
   }
 }
 

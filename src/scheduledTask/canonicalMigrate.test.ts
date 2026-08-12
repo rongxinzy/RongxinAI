@@ -27,3 +27,18 @@ test('imports legacy Run history into canonical SQLite instead of OpenClaw JSONL
   expect(store.listRuns('task-1')).toMatchObject([{ id: 'run-1', status: 'success', sessionId: 'session' }]);
   expect(values.get('scheduled_task_runs_migrated_to_canonical_v1')).toBe('true');
 });
+
+test('rolls back the canonical import and completion marker when any ZhiYuan task is invalid', async () => {
+  const db = new Database(':memory:');
+  db.exec(`CREATE TABLE scheduled_tasks (id TEXT, name TEXT, description TEXT, enabled INTEGER, schedule_json TEXT, prompt TEXT, notify_platforms_json TEXT)`);
+  const insert = db.prepare('INSERT INTO scheduled_tasks VALUES (?, ?, ?, ?, ?, ?, ?)');
+  insert.run('valid', 'Valid', '', 1, JSON.stringify({ type: 'interval', intervalMs: 60_000 }), 'run', '[]');
+  insert.run('invalid', 'Invalid', '', 1, '{broken', 'run', '[]');
+  const values = new Map<string, string>();
+  const store = new SqliteScheduledTaskStore(db);
+  await expect(migrateLegacyScheduledTasksToCanonical({
+    db, store, getKv: key => values.get(key), setKv: (key, value) => values.set(key, value),
+  })).rejects.toThrow('invalid');
+  expect(store.list()).toEqual([]);
+  expect(values.has('scheduled_tasks_migrated_to_canonical_v1')).toBe(false);
+});

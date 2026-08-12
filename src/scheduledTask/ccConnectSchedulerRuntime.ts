@@ -7,7 +7,7 @@ import type { ScheduledTask, ScheduledTaskRun } from './types';
 
 type TriggerClient = {
   upsert(task: CcConnectCronTask): Promise<void>;
-  remove(task: CcConnectCronTask): Promise<void>;
+  remove(task: Pick<CcConnectCronTask, 'taskId'>): Promise<void>;
 };
 
 /**
@@ -28,7 +28,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async register(task: ScheduledTask): Promise<void> {
     if (!task.enabled) {
-      await this.removeProjection(task);
+      await this.removeProjectionTask(task);
       return;
     }
     const scheduleVersion = task.scheduleVersion;
@@ -38,7 +38,15 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async remove(taskId: string): Promise<void> {
     const task = this.store.get(taskId);
-    if (task) await this.removeProjection(task);
+    if (task) await this.removeProjectionTask(task);
+  }
+
+  async removeProjection(taskId: string): Promise<void> {
+    try {
+      await this.client.remove({ taskId });
+    } catch (error) {
+      if (!String(error).includes('HTTP 404')) throw error;
+    }
   }
 
   async runNow(taskId: string): Promise<void> {
@@ -56,7 +64,9 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   async handleTrigger(input: { accountId: string; taskId: string; scheduleVersion: string; scheduledAt: string }): Promise<void> {
     const task = this.store.get(input.taskId);
     if (!task || input.accountId !== SchedulerClockAccount) return;
-    const run = this.store.claimTrigger(input);
+    const scheduledAtMs = Date.parse(input.scheduledAt);
+    if (!Number.isFinite(scheduledAtMs)) return;
+    const run = this.store.claimTrigger({ ...input, scheduledAt: new Date(scheduledAtMs).toISOString() });
     if (!run) return; // disabled/stale/duplicate triggers are intentionally harmless.
     await this.executeAndFinish(task, run);
   }
@@ -81,8 +91,8 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     }
   }
 
-  private async removeProjection(task: ScheduledTask): Promise<void> {
-    try { await this.client.remove({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: task.scheduleVersion ?? '', schedule: task.schedule }); }
+  private async removeProjectionTask(task: ScheduledTask): Promise<void> {
+    try { await this.client.remove({ taskId: task.id }); }
     catch (error) {
       // A restarted sidecar has no in-memory registration; its 404 is already
       // the desired state and must not prevent the canonical mutation.

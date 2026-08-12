@@ -9,19 +9,18 @@ export class CanonicalScheduledTaskService implements ScheduledTaskService {
 
   async addJob(input: ScheduledTaskInput): Promise<ScheduledTask> {
     const task = this.store.create(input);
-    try { await this.runtime.register(task); return task; }
-    catch (error) { this.store.remove(task.id); throw error; }
+    await this.projectBestEffort(task);
+    return task;
   }
   async updateJob(id: string, input: Partial<ScheduledTaskInput>): Promise<ScheduledTask> {
-    const previous = this.store.get(id);
-    if (!previous) throw new Error(`Scheduled task not found: ${id}`);
     const task = this.store.update(id, input);
-    try { await this.runtime.register(task); return task; }
-    catch (error) { this.store.update(id, previous); throw error; }
+    await this.projectBestEffort(task);
+    return task;
   }
   async removeJob(id: string): Promise<void> {
-    await this.runtime.remove(id);
     this.store.remove(id);
+    try { await this.runtime.removeProjection(id); }
+    catch (error) { console.warn(`[Scheduler] failed to remove disposable projection for task ${id}:`, error); }
   }
   async listJobs(): Promise<ScheduledTask[]> { return this.store.list(); }
   async getJob(id: string): Promise<ScheduledTask | null> { return this.store.get(id); }
@@ -39,6 +38,11 @@ export class CanonicalScheduledTaskService implements ScheduledTaskService {
   /** State is pushed by the sidecar; no runtime polling is needed. */
   startPolling(): void {}
   stopPolling(): void {}
+
+  private async projectBestEffort(task: ScheduledTask): Promise<void> {
+    try { await this.runtime.register(task); }
+    catch (error) { console.warn(`[Scheduler] canonical task ${task.id} is waiting for sidecar reconciliation:`, error); }
+  }
 }
 
 function filterRuns<T extends ScheduledTaskRun>(runs: readonly T[], filter?: RunFilter): T[] {

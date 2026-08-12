@@ -22,3 +22,24 @@ test('persists canonical task before projecting and exposes renderer operations'
   await service.removeJob(task.id);
   expect(await service.getJob(task.id)).toBeNull();
 });
+
+test('keeps canonical mutations when the disposable sidecar is offline', async () => {
+  const store = new SqliteScheduledTaskStore(new Database(':memory:'));
+  const client = {
+    upsert: vi.fn(async () => { throw new Error('sidecar offline'); }),
+    remove: vi.fn(async () => { throw new Error('sidecar offline'); }),
+  };
+  const service = new CanonicalScheduledTaskService(
+    store,
+    new CcConnectSchedulerRuntime(store, client, async () => ({ sessionId: 'pi' })),
+  );
+  const task = await service.addJob({ name: 'offline', description: '', enabled: true,
+    schedule: { kind: ScheduleKind.Every, everyMs: 60_000 }, sessionTarget: SessionTarget.Isolated,
+    wakeMode: WakeMode.NextHeartbeat, payload: { kind: PayloadKind.AgentTurn, message: 'go' },
+    delivery: { mode: DeliveryMode.None }, agentId: 'main' });
+  expect(await service.getJob(task.id)).not.toBeNull();
+  const updated = await service.updateJob(task.id, { enabled: false });
+  expect(updated.enabled).toBe(false);
+  await service.removeJob(task.id);
+  expect(await service.getJob(task.id)).toBeNull();
+});

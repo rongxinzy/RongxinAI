@@ -110,11 +110,15 @@ export async function migrateLegacyScheduledTasksToCanonical(deps: {
   const exists = deps.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'").get();
   if (!exists) { deps.setKv(key, 'true'); return; }
   const rows = deps.db.prepare('SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks').all() as LegacyTaskRow[];
-  for (const row of rows) {
+  const inputs = rows.map(row => {
     const input = rowToInput(row);
-    if (input) deps.store.importLegacy(row.id, input);
-  }
-  deps.setKv(key, 'true');
+    if (!input) throw new Error(`Cannot convert ZhiYuan scheduled task ${row.id}`);
+    return { id: row.id, input };
+  });
+  deps.db.transaction(() => {
+    for (const entry of inputs) deps.store.importLegacy(entry.id, entry.input);
+    deps.setKv(key, 'true');
+  })();
 }
 
 /** Imports legacy Run history without writing OpenClaw JSONL state. */
@@ -129,8 +133,8 @@ export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
   const exists = deps.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'").get();
   if (!exists) { deps.setKv(key, 'true'); return; }
   const rows = deps.db.prepare('SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs').all() as LegacyRunRow[];
-  for (const row of rows) {
-    deps.store.importLegacyRun({
+  deps.db.transaction(() => {
+    for (const row of rows) deps.store.importLegacyRun({
       id: row.id,
       taskId: row.task_id,
       sessionId: row.session_id,
@@ -141,6 +145,6 @@ export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
       durationMs: row.duration_ms,
       error: row.error,
     });
-  }
-  deps.setKv(key, 'true');
+    deps.setKv(key, 'true');
+  })();
 }

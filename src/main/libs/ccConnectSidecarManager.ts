@@ -6,6 +6,7 @@ import path from 'path';
 export class CcConnectSidecarManager extends EventEmitter {
   private child: ChildProcessWithoutNullStreams | null = null;
   constructor(private readonly executable: string, private readonly configPath: string) { super(); }
+  get pid(): number | null { return this.child?.pid ?? null; }
   async start(config: string): Promise<void> {
     if (this.child) return;
     if (!config.includes('bridge_url') || !config.includes('bridge_token')) {

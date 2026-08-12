@@ -258,6 +258,8 @@ import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
 import { OpenClawSessionIpc } from './openclawSession/constants';
 import { CcConnectPiBridge, parseCcConnectScopedConversationId } from './im/ccConnectPiBridge';
+import { ChannelInboxStore } from './im/channelInboxStore';
+import { ChannelTurnCoordinator } from './im/channelTurnCoordinator';
 import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandler';
 import { IMStore } from './im/imStore';
 import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
@@ -1116,11 +1118,11 @@ const getScheduledTaskDetectorConfig = async (): Promise<{ apiKey: string; baseU
   }
   return config?.api?.key ? { apiKey: config.api.key, baseUrl: config.api.baseUrl, model: config.model?.defaultModel } : null;
 };
-const attachCcConnectCronControl = async (accountId: string, baseUrl: string): Promise<void> => {
+const attachCcConnectCronControl = async (accountId: string, baseUrl: string, expectedPid: number): Promise<void> => {
   if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
   getCanonicalScheduledTaskService();
   const client = new CcConnectCronClient(baseUrl, ccConnectBridgeToken);
-  await client.healthCheck();
+  await client.healthCheck(expectedPid);
   await deferredCcConnectCronClient!.attach(accountId, client);
   // The sidecar intentionally has no durable task state. Rebuild its complete
   // trigger projection from SQLite after every successful control-plane attach.
@@ -1149,9 +1151,10 @@ const startCcConnectBridge = async (): Promise<void> => {
   ccConnectPiBridge = new CcConnectPiBridge({
     runtime: getPiRuntimeAdapter(), coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
+    turnCoordinator: new ChannelTurnCoordinator(new ChannelInboxStore(getStore().getDatabase())),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
     detectScheduledTaskRequest: createIMScheduledTaskRequestDetector({ getLLMConfig: getScheduledTaskDetectorConfig }),
-    createScheduledTask: async ({ sessionId, message, request }) => {
+    createScheduledTask: async ({ message, request }) => {
       const [accountId, destination] = parseCcConnectScopedConversationId(message.conversationId);
       const task = await getCanonicalScheduledTaskService().addJob({
         name: request.taskName, description: '', enabled: true,
@@ -1199,11 +1202,11 @@ const resolveCcConnectSidecarExecutable = (): string | null => {
   return candidates.find(candidate => fs.existsSync(candidate)) ?? null;
 };
 
-const waitForCcConnectCronControl = async (accountId: string, baseUrl: string): Promise<void> => {
+const waitForCcConnectCronControl = async (accountId: string, baseUrl: string, expectedPid: number): Promise<void> => {
   let lastError: unknown;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     try {
-      await attachCcConnectCronControl(accountId, baseUrl);
+      await attachCcConnectCronControl(accountId, baseUrl, expectedPid);
       return;
     } catch (error) {
       lastError = error;
@@ -1213,7 +1216,7 @@ const waitForCcConnectCronControl = async (accountId: string, baseUrl: string): 
   throw lastError instanceof Error ? lastError : new Error('cc-connect cron control did not become ready');
 };
 
-const waitForCcConnectDeliveryControl = async (accountId: string, baseUrl: string): Promise<void> => {
+const waitForCcConnectDeliveryControl = async (accountId: string, baseUrl: string, expectedPid: number): Promise<void> => {
   if (!ccConnectBridgeToken) throw new Error('cc-connect bridge token is not initialized');
   let lastError: unknown;
   for (let attempt = 0; attempt < 40; attempt += 1) {
@@ -1221,7 +1224,7 @@ const waitForCcConnectDeliveryControl = async (accountId: string, baseUrl: strin
       const client = new CcConnectDeliveryClient(baseUrl, ccConnectBridgeToken);
       // Health is shared with the trigger-only control plane. Channel processes
       // are delivery transports, never canonical scheduler clocks.
-      await new CcConnectCronClient(baseUrl, ccConnectBridgeToken).healthCheck();
+      await new CcConnectCronClient(baseUrl, ccConnectBridgeToken).healthCheck(expectedPid);
       ccConnectDeliveryTransport?.attach(accountId, client);
       return;
     } catch (error) {
@@ -1260,7 +1263,9 @@ const startCanonicalSchedulerClock = async (): Promise<void> => {
       cronControlListen: `127.0.0.1:${port}`,
       accountId: SchedulerClockAccount,
     }));
-  await waitForCcConnectCronControl(SchedulerClockAccount, `http://127.0.0.1:${port}`);
+    const pid = manager.pid;
+    if (!pid) throw new Error('cc-connect scheduler sidecar has no child PID');
+    await waitForCcConnectCronControl(SchedulerClockAccount, `http://127.0.0.1:${port}`, pid);
     schedulerClockRestartAttempts = 0;
   } catch (error) {
     ccConnectSidecarManager = null;
@@ -1300,7 +1305,9 @@ const startCcConnectChannelSidecar = async (account: ReturnType<typeof listCcCon
       cronControlListen: `127.0.0.1:${port}`,
       projects: [account],
     }));
-    await waitForCcConnectDeliveryControl(account.accountId, `http://127.0.0.1:${port}`);
+    const pid = manager.pid;
+    if (!pid) throw new Error(`cc-connect channel sidecar ${account.accountId} has no child PID`);
+    await waitForCcConnectDeliveryControl(account.accountId, `http://127.0.0.1:${port}`, pid);
   } catch (error) {
     ccConnectChannelSidecarManagers.delete(account.accountId);
     ccConnectDeliveryTransport?.detach(account.accountId);

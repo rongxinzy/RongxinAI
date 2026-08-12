@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "vitest";
 
 import { CcConnectBridgeServer } from "./ccConnectBridgeServer";
+import { createCcConnectProtocolHeaders } from '../../shared/ccConnect/protocol';
 
 const servers: CcConnectBridgeServer[] = [];
 
@@ -39,6 +40,7 @@ test("accepts only an authenticated normalized channel turn", async () => {
     headers: {
       authorization: "Bearer secret",
       "content-type": "application/json",
+      ...createCcConnectProtocolHeaders('request-1'),
     },
     body: JSON.stringify(body),
   });
@@ -56,13 +58,13 @@ test("requires a complete cron trigger identity", async () => {
   const url = await server.start();
   const invalid = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
     method: "POST",
-    headers: { authorization: "Bearer secret" },
+    headers: { authorization: "Bearer secret", ...createCcConnectProtocolHeaders('invalid') },
     body: JSON.stringify({ taskId: "task" }),
   });
   expect(invalid.status).toBe(400);
   const accepted = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
     method: "POST",
-    headers: { authorization: "Bearer secret" },
+    headers: { authorization: "Bearer secret", ...createCcConnectProtocolHeaders('accepted') },
     body: JSON.stringify({
       requestId: "r",
       project: "p",
@@ -73,4 +75,19 @@ test("requires a complete cron trigger identity", async () => {
   });
   expect(accepted.status).toBe(204);
   expect(seen).toEqual(["task"]);
+});
+
+test('rejects replayed protocol nonces', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async () => ({ content: 'ok' }),
+    onCronTrigger: async () => undefined,
+  });
+  servers.push(server);
+  const url = await server.start();
+  const headers = { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('replay') };
+  const body = JSON.stringify({
+    requestId: 'replay', project: 'p', taskId: 't', scheduleVersion: 'v1', scheduledAt: new Date().toISOString(),
+  });
+  expect((await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status).toBe(204);
+  expect((await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status).toBe(401);
 });

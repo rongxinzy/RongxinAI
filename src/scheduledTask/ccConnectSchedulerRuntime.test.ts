@@ -28,6 +28,14 @@ test('projects only schedules and executes a claimed trigger once', async () => 
   expect(store.listRuns(task.id)[0]).toMatchObject({ status: 'success', sessionId: 'pi-run' });
 });
 
+test('normalizes equivalent scheduledAt offsets before claiming a Run', async () => {
+  const { store, task, execute, runtime } = setup();
+  await runtime.handleTrigger({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T14:00:00+08:00' });
+  await runtime.handleTrigger({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: task.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
+  expect(execute).toHaveBeenCalledOnce();
+  expect(store.listRuns(task.id)).toHaveLength(1);
+});
+
 test('rebuilds the complete trigger projection from canonical SQLite tasks', async () => {
   const { store, task, client, runtime } = setup();
   const disabled = store.update(task.id, { enabled: false });
@@ -36,7 +44,7 @@ test('rebuilds the complete trigger projection from canonical SQLite tasks', asy
     wakeMode: WakeMode.NextHeartbeat, payload: { kind: PayloadKind.AgentTurn, message: 'run' },
     delivery: { mode: DeliveryMode.None }, agentId: 'main' });
   await runtime.reconcile([disabled, second]);
-  expect(client.remove).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: disabled.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
+  expect(client.remove).toHaveBeenCalledWith({ taskId: disabled.id });
   expect(client.upsert).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: second.id, scheduleVersion: second.scheduleVersion, schedule: second.schedule });
 });
 
@@ -44,7 +52,7 @@ test('disabled tasks delete their sidecar projection and never execute', async (
   const { store, task, client, execute, runtime } = setup();
   const disabled = store.update(task.id, { enabled: false });
   await runtime.register(disabled);
-  expect(client.remove).toHaveBeenCalledWith({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: disabled.scheduleVersion, schedule: disabled.schedule });
+  expect(client.remove).toHaveBeenCalledWith({ taskId: task.id });
   await runtime.handleTrigger({ accountId: SchedulerClockAccount, taskId: task.id, scheduleVersion: disabled.scheduleVersion!, scheduledAt: '2026-08-11T06:00:00.000Z' });
   expect(execute).not.toHaveBeenCalled();
 });

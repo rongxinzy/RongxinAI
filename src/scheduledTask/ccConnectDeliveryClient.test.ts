@@ -2,6 +2,7 @@ import http from 'node:http';
 import { afterEach, expect, test } from 'vitest';
 
 import { CcConnectDeliveryClient } from './ccConnectDeliveryClient';
+import { CcConnectProtocol } from '../shared/ccConnect/constants';
 
 const servers: http.Server[] = [];
 afterEach(async () => Promise.all(servers.splice(0).map(server => new Promise<void>(resolve => server.close(() => resolve())))));
@@ -12,6 +13,8 @@ test('sends only authenticated resolved delivery data to the sidecar', async () 
     expect(request.method).toBe('POST');
     expect(request.url).toBe('/v1/cc-connect/deliver');
     expect(request.headers.authorization).toBe('Bearer secret');
+    expect(request.headers[CcConnectProtocol.Header.Version]).toBe(CcConnectProtocol.Version);
+    expect(request.headers[CcConnectProtocol.Header.Nonce]).toBeTruthy();
     request.on('data', chunk => { body += chunk; });
     request.on('end', () => response.writeHead(204).end());
   });

@@ -6,6 +6,7 @@ import type {
   CcConnectTurnRequest,
 } from "../libs/ccConnectBridgeServer";
 import { IMCoworkHandler } from "./imCoworkHandler";
+import type { ChannelTurnCoordinator } from './channelTurnCoordinator';
 import type { IMStore } from "./imStore";
 import type { IMScheduledTaskRequestDetector, IMScheduledTaskCreationResult, ParsedIMScheduledTaskRequest } from "./imScheduledTaskHandler";
 import type { IMMessage, Platform } from "./types";
@@ -33,9 +34,11 @@ export class CcConnectPiBridge {
     onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
     detectScheduledTaskRequest?: IMScheduledTaskRequestDetector;
     createScheduledTask?: (input: { sessionId: string; message: IMMessage; request: ParsedIMScheduledTaskRequest }) => Promise<IMScheduledTaskCreationResult>;
+    turnCoordinator: ChannelTurnCoordinator;
   }) {
     this.onCronTrigger = options.onCronTrigger;
     this.imStore = options.imStore;
+    this.turnCoordinator = options.turnCoordinator;
     this.handler = new IMCoworkHandler({
       // Pi emits the complete Cowork event contract (including sessionStopped),
       // but its narrower EventEmitter generic is not structurally assignable.
@@ -51,6 +54,7 @@ export class CcConnectPiBridge {
   private readonly onCronTrigger: (
     trigger: CcConnectCronTrigger,
   ) => Promise<void>;
+  private readonly turnCoordinator: ChannelTurnCoordinator;
 
   async runTurn(request: CcConnectTurnRequest): Promise<{ content: string }> {
     if (!SUPPORTED_PLATFORMS.has(request.message.platform)) {
@@ -86,7 +90,14 @@ export class CcConnectPiBridge {
           : "group",
       timestamp: request.message.userMessageTimeMs ?? Date.now(),
     };
-    return { content: await this.handler.processMessage(message) };
+    const content = await this.turnCoordinator.run({
+      platform: request.message.platform,
+      accountId: request.project,
+      conversationId: request.message.channelId,
+      messageId: request.message.messageId,
+      payload: JSON.stringify(request),
+    }, () => this.handler.processMessage(message));
+    return { content };
   }
 
   async runCronTrigger(trigger: CcConnectCronTrigger): Promise<void> {
