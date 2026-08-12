@@ -100,7 +100,7 @@ export function WorkbenchTaskAuditSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-3xl">
+      <SheetContent className="w-full sm:max-w-5xl">
         <SheetHeader>
           <div className="flex items-center gap-2">
             <SheetTitle className="min-w-0 flex-1">
