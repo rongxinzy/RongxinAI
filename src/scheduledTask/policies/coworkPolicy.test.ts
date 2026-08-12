@@ -87,7 +87,7 @@ test('CoworkPolicy.toWireBinding: ui_session binding -> managed sessionKey', () 
   const policy = new CoworkTaskPolicy();
   const result = policy.toWireBinding({ kind: BindingKind.UISession, sessionId: 'sess-x' });
   expect(result.sessionTarget).toBe(SessionTarget.Main);
-  expect(result.sessionKey).toBe('agent:main:zhiyuan:sess-x');
+  expect(result.sessionKey).toBe('zhiyuan:sess-x');
 });
 
 test('CoworkPolicy.toWireBinding: session_key binding -> isolated + original sessionKey', () => {

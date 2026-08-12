@@ -146,6 +146,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imAuthProbeTimeout: '鉴权探测超时',
     imAuthFailed: '鉴权失败: {error}',
     imAuthFailedSuggestion: '请检查 ID/Secret/Token 是否正确，且机器人权限已开通。',
+    imWeixinReconnectRequired: '微信频道需要重新授权后才能连接。',
     imChannelEnabledNotConnected: 'IM 渠道已启用但当前未连接。',
     imChannelEnabledNotConnectedSuggestion: '请检查网络、机器人配置和平台侧事件开关。',
     imChannelRunning: 'IM 渠道已启用且运行正常。',
@@ -248,8 +249,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTransportMode: '传输模式',
     emailTransportImap: 'IMAP/SMTP（传统模式）',
     emailTransportWs: 'WebSocket（安全模式，无需密码）',
-    emailAgentBinding: '绑定 Agent',
-    emailAgentBindingHint: '该邮箱的所有邮件对话将路由到选定的 Agent',
     emailAllowFrom: '允许的发件人（白名单）',
     emailAllowFromPlaceholder: 'user@example.com\n*.trusted-domain.com\n*@company.com',
     emailAllowFromHint: '支持通配符，每行一个。留空表示接受所有发件人。',
@@ -457,6 +456,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imAuthFailed: 'Authentication failed: {error}',
     imAuthFailedSuggestion:
       'Please check that your ID/Secret/Token are correct and that bot permissions are enabled.',
+    imWeixinReconnectRequired: 'Reconnect the Weixin channel before it can receive messages.',
     imChannelEnabledNotConnected: 'IM channel is enabled but not currently connected.',
     imChannelEnabledNotConnectedSuggestion:
       'Please check the network, bot configuration, and platform-side event settings.',
@@ -581,8 +581,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTransportMode: 'Transport Mode',
     emailTransportImap: 'IMAP/SMTP (Traditional)',
     emailTransportWs: 'WebSocket (Secure, no password required)',
-    emailAgentBinding: 'Agent Binding',
-    emailAgentBindingHint: 'All email conversations will be routed to the selected Agent',
     emailAllowFrom: 'Allowed Senders (Whitelist)',
     emailAllowFromPlaceholder: 'user@example.com\n*.trusted-domain.com\n*@company.com',
     emailAllowFromHint: 'Supports wildcards, one per line. Empty = accept all senders.',

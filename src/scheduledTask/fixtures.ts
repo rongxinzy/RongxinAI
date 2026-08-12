@@ -1,7 +1,6 @@
 import type { SessionTarget, WakeMode } from './constants';
 import {
   BindingKind,
-  DefaultAgentId,
   DeliveryMode,
   OriginKind,
   PayloadKind,
@@ -22,7 +21,7 @@ interface TaskOverrides {
   wakeMode?: WakeMode;
   payload?: unknown;
   delivery?: PolicyDelivery;
-  agentId?: string | null;
+  workspaceId?: string | null;
   sessionKey?: string | null;
   state?: unknown;
   createdAt?: string;
@@ -43,7 +42,7 @@ export function makeTask(overrides: TaskOverrides = {}) {
     wakeMode: overrides.wakeMode ?? WM.Now,
     payload: overrides.payload ?? { kind: PayloadKind.SystemEvent, text: 'test' },
     delivery: overrides.delivery ?? { mode: DeliveryMode.None as const },
-    agentId: overrides.agentId ?? DefaultAgentId,
+    workspaceId: overrides.workspaceId ?? 'workspace-test',
     sessionKey: overrides.sessionKey ?? null,
     state: overrides.state ?? {
       nextRunAtMs: 0,

@@ -6,7 +6,6 @@
 import type Database from 'better-sqlite3';
 
 import {
-  DefaultAgentId,
   DeliveryMode,
   PayloadKind,
   ScheduleKind,
@@ -49,7 +48,9 @@ function formatLocalTimezoneOffset(): string {
   const offsetMinutes = -new Date().getTimezoneOffset();
   const sign = offsetMinutes >= 0 ? '+' : '-';
   const absMinutes = Math.abs(offsetMinutes);
-  return `${sign}${Math.floor(absMinutes / 60).toString().padStart(2, '0')}:${(absMinutes % 60).toString().padStart(2, '0')}`;
+  return `${sign}${Math.floor(absMinutes / 60)
+    .toString()
+    .padStart(2, '0')}:${(absMinutes % 60).toString().padStart(2, '0')}`;
 }
 
 function ensureTimezoneOffset(datetime: string): string {
@@ -74,7 +75,11 @@ function convertSchedule(legacy: LegacySchedule, preservePastAt = false): Schedu
 
 function convertDelivery(platformsJson: string): ScheduledTaskDelivery {
   let platforms: unknown;
-  try { platforms = JSON.parse(platformsJson); } catch { return { mode: DeliveryMode.None }; }
+  try {
+    platforms = JSON.parse(platformsJson);
+  } catch {
+    return { mode: DeliveryMode.None };
+  }
   return Array.isArray(platforms) && typeof platforms[0] === 'string'
     ? { mode: DeliveryMode.Announce, channel: platforms[0] }
     : { mode: DeliveryMode.None };
@@ -82,7 +87,11 @@ function convertDelivery(platformsJson: string): ScheduledTaskDelivery {
 
 function rowToInput(row: LegacyTaskRow): ScheduledTaskInput | null {
   let legacy: LegacySchedule;
-  try { legacy = JSON.parse(row.schedule_json) as LegacySchedule; } catch { return null; }
+  try {
+    legacy = JSON.parse(row.schedule_json) as LegacySchedule;
+  } catch {
+    return null;
+  }
   const schedule = convertSchedule(legacy, true);
   if (!schedule) return null;
   return {
@@ -94,7 +103,7 @@ function rowToInput(row: LegacyTaskRow): ScheduledTaskInput | null {
     wakeMode: WakeMode.NextHeartbeat,
     payload: { kind: PayloadKind.AgentTurn, message: row.prompt },
     delivery: convertDelivery(row.notify_platforms_json ?? '[]'),
-    agentId: DefaultAgentId,
+    workspaceId: null,
   };
 }
 
@@ -107,9 +116,18 @@ export async function migrateLegacyScheduledTasksToCanonical(deps: {
 }): Promise<void> {
   const key = 'scheduled_tasks_migrated_to_canonical_v1';
   if (deps.getKv(key) === 'true') return;
-  const exists = deps.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'").get();
-  if (!exists) { deps.setKv(key, 'true'); return; }
-  const rows = deps.db.prepare('SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks').all() as LegacyTaskRow[];
+  const exists = deps.db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_tasks'")
+    .get();
+  if (!exists) {
+    deps.setKv(key, 'true');
+    return;
+  }
+  const rows = deps.db
+    .prepare(
+      'SELECT id, name, description, enabled, schedule_json, prompt, notify_platforms_json FROM scheduled_tasks',
+    )
+    .all() as LegacyTaskRow[];
   const inputs = rows.map(row => {
     const input = rowToInput(row);
     if (!input) throw new Error(`Cannot convert ZhiYuan scheduled task ${row.id}`);
@@ -130,21 +148,36 @@ export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
 }): Promise<void> {
   const key = 'scheduled_task_runs_migrated_to_canonical_v1';
   if (deps.getKv(key) === 'true') return;
-  const exists = deps.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'").get();
-  if (!exists) { deps.setKv(key, 'true'); return; }
-  const rows = deps.db.prepare('SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs').all() as LegacyRunRow[];
+  const exists = deps.db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='scheduled_task_runs'")
+    .get();
+  if (!exists) {
+    deps.setKv(key, 'true');
+    return;
+  }
+  const rows = deps.db
+    .prepare(
+      'SELECT id, task_id, session_id, status, started_at, finished_at, duration_ms, error FROM scheduled_task_runs',
+    )
+    .all() as LegacyRunRow[];
   deps.db.transaction(() => {
-    for (const row of rows) deps.store.importLegacyRun({
-      id: row.id,
-      taskId: row.task_id,
-      sessionId: row.session_id,
-      sessionKey: null,
-      status: row.status === 'success' ? TaskStatus.Success : row.status === 'error' ? TaskStatus.Error : TaskStatus.Skipped,
-      startedAt: row.started_at,
-      finishedAt: row.finished_at,
-      durationMs: row.duration_ms,
-      error: row.error,
-    });
+    for (const row of rows)
+      deps.store.importLegacyRun({
+        id: row.id,
+        taskId: row.task_id,
+        sessionId: row.session_id,
+        sessionKey: null,
+        status:
+          row.status === 'success'
+            ? TaskStatus.Success
+            : row.status === 'error'
+              ? TaskStatus.Error
+              : TaskStatus.Skipped,
+        startedAt: row.started_at,
+        finishedAt: row.finished_at,
+        durationMs: row.duration_ms,
+        error: row.error,
+      });
     deps.setKv(key, 'true');
   })();
 }

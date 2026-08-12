@@ -22,6 +22,6 @@ test('sends only authenticated resolved delivery data to the sidecar', async () 
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as { port: number }).port;
   await new CcConnectDeliveryClient(`http://127.0.0.1:${port}`, 'secret')
-    .send({ platform: 'telegram', sessionKey: 'telegram:42', content: 'done' });
-  expect(JSON.parse(body)).toEqual({ platform: 'telegram', sessionKey: 'telegram:42', content: 'done' });
+    .send({ accountId: 'account', platform: 'telegram', sessionKey: 'telegram:42', content: 'done' });
+  expect(JSON.parse(body)).toEqual({ accountId: 'account', platform: 'telegram', sessionKey: 'telegram:42', content: 'done' });
 });

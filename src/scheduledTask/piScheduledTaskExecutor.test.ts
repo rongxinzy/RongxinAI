@@ -22,7 +22,7 @@ const task: ScheduledTask = {
   wakeMode: WakeMode.NextHeartbeat,
   payload: { kind: PayloadKind.AgentTurn, message: 'run' },
   delivery: { mode: DeliveryMode.None },
-  agentId: 'finance-agent',
+  workspaceId: 'finance-workspace',
   sessionKey: null,
   state: {
     nextRunAtMs: null,
@@ -55,7 +55,8 @@ function createCoworkStore() {
     activeSkillIds: ['daily-trending'],
     cwd: 'D:/finance',
     mode: 'work' as const,
-    agentId: task.agentId,
+    agentId: 'main',
+    workspaceId: task.workspaceId,
     modelOverride: 'provider/model',
     experts: [],
   };
@@ -67,12 +68,7 @@ function createCoworkStore() {
         systemPrompt: 'Default prompt',
         executionMode: 'local',
       }),
-      getAgent: () => ({
-        workingDirectory: session.cwd,
-        systemPrompt: session.systemPrompt,
-        skillIds: session.activeSkillIds,
-        model: session.modelOverride,
-      }),
+      getWorkspace: () => ({ id: task.workspaceId, path: session.cwd }),
       createSession: vi.fn(() => session),
       getSession: (id: string) =>
         id === session.id
@@ -93,7 +89,7 @@ function createCoworkStore() {
   };
 }
 
-test('runs a canonical task with its agent configuration and waits for complete', async () => {
+test('runs a canonical task in its workspace and waits for complete', async () => {
   const startSession = vi.fn(async (id: string) => {
     queueMicrotask(() => runtime.emit('complete', id, null));
   });
@@ -111,12 +107,14 @@ test('runs a canonical task with its agent configuration and waits for complete'
   expect(store.createSession).toHaveBeenCalledWith(
     'Scheduled: task',
     session.cwd,
-    session.systemPrompt,
+    'Default prompt',
     'local',
-    session.activeSkillIds,
-    task.agentId,
-    session.modelOverride,
+    [],
+    'main',
+    '',
     'work',
+    undefined,
+    task.workspaceId,
   );
   expect(startSession).toHaveBeenCalledWith(
     session.id,
@@ -128,6 +126,34 @@ test('runs a canonical task with its agent configuration and waits for complete'
     }),
   );
   expect(startSession.mock.calls[0]?.[2]).not.toHaveProperty('confirmationMode');
+});
+
+test('reuses the workspace session referenced by a managed session key', async () => {
+  const startSession = vi.fn(async (id: string) => {
+    queueMicrotask(() => runtime.emit('complete', id, null));
+  });
+  const runtime = Object.assign(new EventEmitter(), {
+    isSessionActive: () => false,
+    startSession,
+    continueSession: async () => undefined,
+    stopSession: () => undefined,
+  });
+  const { session, store } = createCoworkStore();
+  const mainSessionTask = {
+    ...task,
+    sessionTarget: SessionTarget.Main,
+    sessionKey: `zhiyuan:${session.id}`,
+  };
+
+  await expect(
+    new PiScheduledTaskExecutor(runtime as never, store as never).execute(mainSessionTask, run),
+  ).resolves.toEqual({ sessionId: session.id, output: 'done' });
+  expect(store.createSession).not.toHaveBeenCalled();
+  expect(startSession).toHaveBeenCalledWith(
+    session.id,
+    'run',
+    expect.objectContaining({ workspaceRoot: session.cwd }),
+  );
 });
 
 test('rejects immediately and removes listeners when Pi stops before completion', async () => {

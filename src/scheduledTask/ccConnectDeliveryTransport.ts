@@ -54,7 +54,7 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
         `cc-connect delivery route is unknown for ${platform}:${conversationId}`,
       );
     }
-    await client.send({ platform, sessionKey, content: input.content });
+    await client.send({ accountId, platform, sessionKey, content: input.content });
     return {};
   }
 }

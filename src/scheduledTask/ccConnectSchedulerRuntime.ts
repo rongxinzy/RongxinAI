@@ -7,7 +7,7 @@ import type { ScheduledTask, ScheduledTaskRun } from './types';
 
 type TriggerClient = {
   upsert(task: CcConnectCronTask): Promise<void>;
-  remove(task: Pick<CcConnectCronTask, 'taskId'>): Promise<void>;
+  remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void>;
 };
 
 /**
@@ -43,7 +43,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
 
   async removeProjection(taskId: string): Promise<void> {
     try {
-      await this.client.remove({ taskId });
+      await this.client.remove({ accountId: SchedulerClockAccount, taskId });
     } catch (error) {
       if (!String(error).includes('HTTP 404')) throw error;
     }
@@ -92,7 +92,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   }
 
   private async removeProjectionTask(task: ScheduledTask): Promise<void> {
-    try { await this.client.remove({ taskId: task.id }); }
+    try { await this.client.remove({ accountId: SchedulerClockAccount, taskId: task.id }); }
     catch (error) {
       // A restarted sidecar has no in-memory registration; its 404 is already
       // the desired state and must not prevent the canonical mutation.

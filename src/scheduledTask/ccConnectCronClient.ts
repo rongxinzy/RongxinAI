@@ -2,7 +2,7 @@ import type { Schedule } from './types';
 import { CcConnectProtocol, type CcConnectHealth } from '../shared/ccConnect/constants';
 import { createCcConnectProtocolHeaders, isCcConnectHealth } from '../shared/ccConnect/protocol';
 
-/** Internal project identity for the credential-free canonical scheduler clock. */
+/** Internal account identity for the credential-free canonical scheduler clock. */
 export const SchedulerClockAccount = '__zhiyuan_scheduler__';
 
 export type CcConnectCronTask = {
@@ -17,14 +17,17 @@ export class CcConnectCronClient {
   constructor(private readonly baseUrl: string, private readonly token: string) {}
 
   async upsert(task: CcConnectCronTask): Promise<void> {
-    // accountId selects the local sidecar process and is never part of the
-    // sidecar protocol. The process is already bound to that one account.
-    const { accountId: _accountId, ...payload } = task;
-    await this.request('/v1/cc-connect/cron/tasks', { method: 'POST', body: JSON.stringify(payload) });
+    await this.request('/v1/cc-connect/cron/tasks', {
+      method: 'POST',
+      body: JSON.stringify(task),
+    });
   }
 
-  async remove(task: Pick<CcConnectCronTask, 'taskId'>): Promise<void> {
-    await this.request(`/v1/cc-connect/cron/tasks/${encodeURIComponent(task.taskId)}`, { method: 'DELETE' });
+  async remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void> {
+    const query = new URLSearchParams({ accountId: task.accountId });
+    await this.request(`/v1/cc-connect/cron/tasks/${encodeURIComponent(task.taskId)}?${query}`, {
+      method: 'DELETE',
+    });
   }
 
   async reconcile(tasks: readonly CcConnectCronTask[]): Promise<void> {

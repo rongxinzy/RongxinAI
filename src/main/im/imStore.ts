@@ -5,6 +5,8 @@
 
 import Database from 'better-sqlite3';
 
+import type { IMGatewayConfigPatch } from './configPatch';
+
 import {
   DEFAULT_DINGTALK_MULTI_INSTANCE_CONFIG,
   DEFAULT_DINGTALK_CHANNEL_CONFIG,
@@ -54,7 +56,6 @@ interface SessionMappingRow {
   im_conversation_id: string;
   platform: string;
   cowork_session_id: string;
-  agent_id: string;
   transport_session_key?: string | null;
   created_at: number;
   last_active_at: number;
@@ -89,7 +90,6 @@ export class IMStore {
         im_conversation_id TEXT NOT NULL,
         platform TEXT NOT NULL,
         cowork_session_id TEXT NOT NULL,
-        agent_id TEXT NOT NULL DEFAULT 'main',
         transport_session_key TEXT,
         created_at INTEGER NOT NULL,
         last_active_at INTEGER NOT NULL,
@@ -139,7 +139,7 @@ export class IMStore {
     const feishuMulti = this.getFeishuMultiInstanceConfig();
     const wecomMulti = this.getWecomMultiInstanceConfig();
     const weixin = this.getConfigValue<WeixinChannelConfig>('weixin') ?? DEFAULT_WEIXIN_CONFIG;
-    const settings = this.getConfigValue<IMSettings>('settings') ?? DEFAULT_IM_SETTINGS;
+    const settings = this.normalizeIMSettings(this.getConfigValue<IMSettings>('settings'));
 
     // Resolve enabled field: default to false for safety
     // User must explicitly enable the service by setting enabled: true
@@ -160,11 +160,11 @@ export class IMStore {
       qq: qqMulti,
       wecom: wecomMulti,
       weixin: resolveEnabled(weixin, DEFAULT_WEIXIN_CONFIG),
-      settings: { ...DEFAULT_IM_SETTINGS, ...settings },
+      settings,
     };
   }
 
-  setConfig(config: Partial<IMGatewayConfig>): void {
+  setConfig(config: IMGatewayConfigPatch): void {
     if (config.dingtalk) {
       this.setDingTalkMultiInstanceConfig(config.dingtalk);
     }
@@ -573,6 +573,25 @@ export class IMStore {
     return { ...DEFAULT_WEIXIN_CONFIG, ...stored };
   }
 
+  /** Resolve the desktop-owned Workspace binding for a stable ChannelAccount id. */
+  getChannelAccountWorkspaceId(accountId: string): string | null {
+    const normalizedAccountId = accountId.trim();
+    if (!normalizedAccountId) return null;
+
+    const instance = [
+      ...this.getDingTalkInstances(),
+      ...this.getFeishuInstances(),
+      ...this.getTelegramInstances(),
+      ...this.getDiscordInstances(),
+      ...this.getQQInstances(),
+      ...this.getWecomInstances(),
+    ].find(item => item.instanceId === normalizedAccountId);
+    if (instance) return instance.workspaceId.trim() || null;
+
+    const weixin = this.getWeixinConfig();
+    return weixin.accountId === normalizedAccountId ? weixin.workspaceId.trim() || null : null;
+  }
+
   setWeixinConfig(config: Partial<WeixinChannelConfig>): void {
     const current = this.getWeixinConfig();
     this.setConfigValue('weixin', { ...current, ...config });
@@ -581,13 +600,19 @@ export class IMStore {
   // ==================== IM Settings ====================
 
   getIMSettings(): IMSettings {
-    const stored = this.getConfigValue<IMSettings>('settings');
-    return { ...DEFAULT_IM_SETTINGS, ...stored };
+    return this.normalizeIMSettings(this.getConfigValue<IMSettings>('settings'));
   }
 
   setIMSettings(settings: Partial<IMSettings>): void {
     const current = this.getIMSettings();
-    this.setConfigValue('settings', { ...current, ...settings });
+    this.setConfigValue('settings', this.normalizeIMSettings({ ...current, ...settings }));
+  }
+
+  private normalizeIMSettings(settings?: Partial<IMSettings>): IMSettings {
+    return {
+      systemPrompt: settings?.systemPrompt ?? DEFAULT_IM_SETTINGS.systemPrompt,
+      skillsEnabled: settings?.skillsEnabled ?? DEFAULT_IM_SETTINGS.skillsEnabled,
+    };
   }
 
   // ==================== Utility ====================
@@ -658,14 +683,23 @@ export class IMStore {
   }
 
   /** Keeps the sidecar-native reply key separate from legacy gateway mappings. */
-  getCcConnectSessionKey(accountId: string, platform: string, conversationId: string): string | null {
+  getCcConnectSessionKey(
+    accountId: string,
+    platform: string,
+    conversationId: string,
+  ): string | null {
     const route = this.getConfigValue<StoredCcConnectSessionRoute>(
       ccConnectSessionRouteKey(accountId, platform, conversationId),
     );
     return route?.sessionKey?.trim() || null;
   }
 
-  setCcConnectSessionKey(accountId: string, platform: string, conversationId: string, sessionKey: string): void {
+  setCcConnectSessionKey(
+    accountId: string,
+    platform: string,
+    conversationId: string,
+    sessionKey: string,
+  ): void {
     const normalizedSessionKey = sessionKey.trim();
     if (!normalizedSessionKey) return;
     this.setConfigValue(ccConnectSessionRouteKey(accountId, platform, conversationId), {
@@ -681,7 +715,7 @@ export class IMStore {
   getSessionMapping(imConversationId: string, platform: Platform): IMSessionMapping | null {
     const row = this.db
       .prepare(
-        'SELECT im_conversation_id, platform, cowork_session_id, agent_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE im_conversation_id = ? AND platform = ?',
+        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE im_conversation_id = ? AND platform = ?',
       )
       .get(imConversationId, platform) as SessionMappingRow | undefined;
     if (!row) return null;
@@ -689,7 +723,6 @@ export class IMStore {
       imConversationId: row.im_conversation_id,
       platform: row.platform as Platform,
       coworkSessionId: row.cowork_session_id,
-      agentId: row.agent_id || 'main',
       ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
       createdAt: row.created_at,
       lastActiveAt: row.last_active_at,
@@ -702,7 +735,7 @@ export class IMStore {
   getSessionMappingByCoworkSessionId(coworkSessionId: string): IMSessionMapping | null {
     const row = this.db
       .prepare(
-        'SELECT im_conversation_id, platform, cowork_session_id, agent_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE cowork_session_id = ? LIMIT 1',
+        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE cowork_session_id = ? LIMIT 1',
       )
       .get(coworkSessionId) as SessionMappingRow | undefined;
     if (!row) return null;
@@ -710,7 +743,6 @@ export class IMStore {
       imConversationId: row.im_conversation_id,
       platform: row.platform as Platform,
       coworkSessionId: row.cowork_session_id,
-      agentId: row.agent_id || 'main',
       ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
       createdAt: row.created_at,
       lastActiveAt: row.last_active_at,
@@ -724,20 +756,18 @@ export class IMStore {
     imConversationId: string,
     platform: Platform,
     coworkSessionId: string,
-    agentId: string = 'main',
     transportSessionKey: string = '',
   ): IMSessionMapping {
     const now = Date.now();
     const normalizedTransportSessionKey = transportSessionKey.trim();
     this.db
       .prepare(
-        'INSERT INTO channel_session_mappings (im_conversation_id, platform, cowork_session_id, agent_id, transport_session_key, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        'INSERT INTO channel_session_mappings (im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?)',
       )
       .run(
         imConversationId,
         platform,
         coworkSessionId,
-        agentId,
         normalizedTransportSessionKey || null,
         now,
         now,
@@ -746,8 +776,9 @@ export class IMStore {
       imConversationId,
       platform,
       coworkSessionId,
-      agentId,
-      ...(normalizedTransportSessionKey ? { transportSessionKey: normalizedTransportSessionKey } : {}),
+      ...(normalizedTransportSessionKey
+        ? { transportSessionKey: normalizedTransportSessionKey }
+        : {}),
       createdAt: now,
       lastActiveAt: now,
     };
@@ -763,33 +794,6 @@ export class IMStore {
         'UPDATE channel_session_mappings SET last_active_at = ? WHERE im_conversation_id = ? AND platform = ?',
       )
       .run(now, imConversationId, platform);
-  }
-
-  /**
-   * Update the target session and agent for an existing mapping.
-   * Used when the platform's agent binding changes.
-   */
-  updateSessionMappingTarget(
-    imConversationId: string,
-    platform: Platform,
-    newCoworkSessionId: string,
-    newAgentId: string,
-    newTransportSessionKey?: string,
-  ): void {
-    const now = Date.now();
-    const normalizedTransportSessionKey = newTransportSessionKey?.trim() || null;
-    this.db
-      .prepare(
-        'UPDATE channel_session_mappings SET cowork_session_id = ?, agent_id = ?, transport_session_key = COALESCE(?, transport_session_key), last_active_at = ? WHERE im_conversation_id = ? AND platform = ?',
-      )
-      .run(
-        newCoworkSessionId,
-        newAgentId,
-        normalizedTransportSessionKey,
-        now,
-        imConversationId,
-        platform,
-      );
   }
 
   updateSessionTransportSessionKey(
@@ -848,7 +852,7 @@ export class IMStore {
       // is not yet stored — group: prefix is a temporary heuristic until im_account_id
       // column is introduced.
       const directClauses = Array.from(directPrefixes).map(() => 'im_conversation_id LIKE ?');
-      query = `SELECT im_conversation_id, platform, cowork_session_id, agent_id, transport_session_key, created_at, last_active_at
+      query = `SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at
         FROM channel_session_mappings
         WHERE platform = ?
           AND (${directClauses.join(' OR ')} OR im_conversation_id LIKE 'group:%')
@@ -856,11 +860,11 @@ export class IMStore {
       params = [platform, ...Array.from(directPrefixes).map(prefix => `${prefix}:%`)];
     } else if (platform) {
       query =
-        'SELECT im_conversation_id, platform, cowork_session_id, agent_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE platform = ? ORDER BY last_active_at DESC';
+        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE platform = ? ORDER BY last_active_at DESC';
       params = [platform];
     } else {
       query =
-        'SELECT im_conversation_id, platform, cowork_session_id, agent_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings ORDER BY last_active_at DESC';
+        'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings ORDER BY last_active_at DESC';
       params = [];
     }
 
@@ -869,7 +873,6 @@ export class IMStore {
       imConversationId: row.im_conversation_id,
       platform: row.platform as Platform,
       coworkSessionId: row.cowork_session_id,
-      agentId: row.agent_id || 'main',
       ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
       createdAt: row.created_at,
       lastActiveAt: row.last_active_at,
@@ -877,8 +880,13 @@ export class IMStore {
   }
 }
 
-function ccConnectSessionRouteKey(accountId: string, platform: string, conversationId: string): string {
+function ccConnectSessionRouteKey(
+  accountId: string,
+  platform: string,
+  conversationId: string,
+): string {
   const values = [accountId, platform, conversationId].map(value => value.trim());
-  if (values.some(value => !value)) throw new Error('cc-connect session route identity is required');
+  if (values.some(value => !value))
+    throw new Error('cc-connect session route identity is required');
   return `cc_connect_session_route:${Buffer.from(JSON.stringify(values)).toString('base64url')}`;
 }

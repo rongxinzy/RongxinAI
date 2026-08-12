@@ -390,6 +390,7 @@ if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
+  private readonly initializingSessions = new Map<string, AbortController>();
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
   private readonly approvalSessionMap = new Map<string, string>();
   private readonly pendingAskUserQuestions = new Map<
@@ -481,7 +482,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.stopSession(sessionId);
     }
 
+    this.initializingSessions.get(sessionId)?.abort();
+    const abortController = new AbortController();
+    this.initializingSessions.set(sessionId, abortController);
     const pi = await getPiModules();
+    if (abortController.signal.aborted) return;
 
     // Emit user message to UI (unless the caller already did).
     // Must persist via store.addMessage() — the CoworkStore is the source of
@@ -499,7 +504,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.emit('message', sessionId, persisted);
     }
 
-    const abortController = new AbortController();
     let workbenchRunId: string | null = null;
     let workbenchTaskId: string | null = null;
     let activeSession: ActivePiSession | null = null;
@@ -804,6 +808,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
+      if (abortController.signal.aborted) {
+        void session.abort();
+        return;
+      }
 
       const active: ActivePiSession = {
         sessionId,
@@ -855,6 +863,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
 
       this.activeSessions.set(sessionId, active);
+      if (this.initializingSessions.get(sessionId) === abortController) {
+        this.initializingSessions.delete(sessionId);
+      }
 
       // Send the prompt (may include conversation history for restart restores)
       let initialPrompt = researchRun
@@ -883,6 +894,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       await session.prompt(initialPrompt);
     } catch (error) {
+      if (this.initializingSessions.get(sessionId) === abortController) {
+        this.initializingSessions.delete(sessionId);
+      }
       // A stopped turn can immediately restart from the first queued follow-up.
       // Its eventual abort rejection must not delete that replacement session.
       if (activeSession && this.activeSessions.get(sessionId) === activeSession) {
@@ -1203,6 +1217,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   stopSession(sessionId: string): void {
+    const initializing = this.initializingSessions.get(sessionId);
+    if (initializing) {
+      initializing.abort();
+      this.initializingSessions.delete(sessionId);
+    }
     this.stopActiveSession(sessionId, 'The user stopped this run.', true);
   }
 
@@ -1259,6 +1278,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   stopAllSessions(): void {
+    for (const [sessionId, controller] of this.initializingSessions) {
+      controller.abort();
+      this.initializingSessions.delete(sessionId);
+    }
     for (const [sessionId] of this.activeSessions) {
       this.stopSession(sessionId);
     }

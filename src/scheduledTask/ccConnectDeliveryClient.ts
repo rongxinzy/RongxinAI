@@ -4,7 +4,7 @@ import { createCcConnectProtocolHeaders } from '../shared/ccConnect/protocol';
 export class CcConnectDeliveryClient {
   constructor(private readonly baseUrl: string, private readonly token: string) {}
 
-  async send(input: { platform: string; sessionKey: string; content: string }): Promise<void> {
+  async send(input: { accountId: string; platform: string; sessionKey: string; content: string }): Promise<void> {
     const response = await fetch(new URL('/v1/cc-connect/deliver', this.baseUrl), {
       method: 'POST',
       headers: {

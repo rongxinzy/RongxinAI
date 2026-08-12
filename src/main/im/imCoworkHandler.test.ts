@@ -29,6 +29,7 @@ class FakeRuntime extends EventEmitter {
   startCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> = [];
   continueCalls: Array<{ sessionId: string; prompt: string; options: Record<string, unknown> }> =
     [];
+  stopCalls: string[] = [];
 
   async startSession(sessionId: string, prompt: string, options = {}) {
     this.startCalls.push({ sessionId, prompt, options });
@@ -38,7 +39,7 @@ class FakeRuntime extends EventEmitter {
     this.continueCalls.push({ sessionId, prompt, options });
   }
 
-  stopSession() {}
+  stopSession(sessionId: string) { this.stopCalls.push(sessionId); }
   stopAllSessions() {}
   respondToPermission() {}
   isSessionActive() {
@@ -59,6 +60,10 @@ class FakeCoworkStore {
   sessions = new Map<string, Record<string, unknown>>();
   sessionCounter = 0;
   messageCounter = 0;
+  workspaces = new Map([
+    ['workspace-1', { id: 'workspace-1', name: 'Workspace 1', path: 'C:\\workspace-1' }],
+    ['workspace-2', { id: 'workspace-2', name: 'Workspace 2', path: 'C:\\workspace-2' }],
+  ]);
 
   getConfig() {
     return this.config;
@@ -68,7 +73,22 @@ class FakeCoworkStore {
     return null;
   }
 
-  createSession(title: string, cwd: string, systemPrompt: string, executionMode: string) {
+  getWorkspace(id: string) {
+    return this.workspaces.get(id) || null;
+  }
+
+  createSession(
+    title: string,
+    cwd: string,
+    systemPrompt: string,
+    executionMode: string,
+    activeSkillIds: string[] = [],
+    agentId = 'main',
+    modelOverride = '',
+    mode: 'work' | 'chat' = 'work',
+    _id?: string,
+    workspaceId = 'workspace-1',
+  ) {
     const id = `session-${++this.sessionCounter}`;
     const session = {
       id,
@@ -76,6 +96,11 @@ class FakeCoworkStore {
       cwd,
       systemPrompt,
       executionMode,
+      activeSkillIds,
+      agentId,
+      modelOverride,
+      mode,
+      workspaceId,
       claudeSessionId: null,
       status: 'idle',
       messages: [] as Array<Record<string, unknown>>,
@@ -200,15 +225,14 @@ test('IM scheduled-task requests bypass agent execution and create a real cron.a
       return {
         id: 'job-1',
         name: (params.request as Record<string, unknown>).taskName,
-        agentId: 'main',
-        sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
+        sessionKey: `zhiyuan:${params.sessionId}`,
         payloadText: (params.request as Record<string, unknown>).payloadText,
         scheduleAt: (params.request as Record<string, unknown>).scheduleAt,
       };
     },
   });
 
-  const reply = await handler.processMessage(createMessage());
+  const reply = await handler.processMessage(createMessage(), undefined, 'workspace-1');
 
   expect(reply).toMatch(/2分钟后（16:30）会提醒你喝水/u);
   expect(runtime.startCalls.length).toBe(0);
@@ -263,8 +287,7 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
     createScheduledTask: async (params: Record<string, unknown>) => ({
       id: 'job-1',
       name: (params.request as Record<string, unknown>).taskName,
-      agentId: 'main',
-      sessionKey: `agent:main:zhiyuan:${params.sessionId}`,
+      sessionKey: `zhiyuan:${params.sessionId}`,
       payloadText: (params.request as Record<string, unknown>).payloadText,
       scheduleAt: (params.request as Record<string, unknown>).scheduleAt,
     }),
@@ -274,7 +297,7 @@ test.skip('async reminder turns on IM-created sessions relay back to the origina
     },
   });
 
-  await handler.processMessage(createMessage());
+  await handler.processMessage(createMessage(), undefined, 'workspace-1');
   const [session] = [...coworkStore.sessions.values()];
 
   runtime.emit('message', session.id, {
@@ -325,6 +348,12 @@ test('async reminder turns on channel-synced sessions are tracked lazily and rel
     },
   });
 
+  coworkStore.addMessage(session.id as string, {
+    id: 'assistant-history',
+    type: 'assistant',
+    content: 'Previous conversation reply.',
+    metadata: {},
+  });
   runtime.emit('message', session.id, {
     id: 'system-1',
     type: 'system',
@@ -366,7 +395,11 @@ test('falls back to normal agent execution when detector does not recognize a sc
     detectScheduledTaskRequest: async () => null,
   });
 
-  const pending = handler.processMessage(createMessage({ content: '帮我总结一下今天的会议纪要' }));
+  const pending = handler.processMessage(
+    createMessage({ content: '帮我总结一下今天的会议纪要' }),
+    undefined,
+    'workspace-1',
+  );
   await new Promise(resolve => setImmediate(resolve));
 
   expect(runtime.startCalls.length).toBe(1);
@@ -387,13 +420,163 @@ test('falls back to normal agent execution when detector does not recognize a sc
   handler.destroy();
 });
 
+test('cancels the Pi turn when the channel bridge request disconnects', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+  const controller = new AbortController();
+
+  const response = handler.processMessage(
+    createMessage({ content: 'Generate a report.' }),
+    controller.signal,
+    'workspace-1',
+  );
+  await vi.waitFor(() => expect(runtime.startCalls).toHaveLength(1));
+  controller.abort();
+
+  await expect(response).rejects.toThrow('Channel request was cancelled');
+  expect(runtime.stopCalls).toEqual(['session-1']);
+
+  runtime.emit('message', 'session-1', {
+    id: 'late-assistant',
+    type: 'assistant',
+    content: 'This late result must not resolve the cancelled bridge request.',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-1', null);
+  handler.destroy();
+});
+
+test('IM turns use workspace session configuration without disabling Pi tools', async () => {
+  const runtime = new FakeRuntime();
+  const coworkStore = new FakeCoworkStore();
+  const imStore = new FakeIMStore();
+  coworkStore.config.systemPrompt = 'Use the workspace conversation context.';
+
+  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+  const firstResponse = handler.processMessage(
+    createMessage({ content: 'Draft a report.' }),
+    undefined,
+    'workspace-1',
+  );
+  await new Promise(resolve => setImmediate(resolve));
+
+  const session = coworkStore.getSession('session-1')!;
+  expect(session).toMatchObject({
+    agentId: 'main',
+    activeSkillIds: [],
+    modelOverride: '',
+    mode: 'work',
+  });
+  expect(runtime.startCalls[0].options).toMatchObject({
+    skillIds: [],
+    workspaceRoot: session.cwd,
+    sessionMode: 'work',
+  });
+  expect(runtime.startCalls[0].options.systemPrompt).toContain(
+    'Use the workspace conversation context.',
+  );
+  expect(runtime.startCalls[0].options).not.toHaveProperty('confirmationMode');
+  expect(runtime.startCalls[0].options).not.toHaveProperty('autoApprove');
+
+  runtime.emit('message', 'session-1', {
+    id: 'assistant-1',
+    type: 'assistant',
+    content: 'First response.',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  coworkStore.addMessage('session-1', {
+    type: 'assistant',
+    content: 'First response.',
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-1', null);
+  await expect(firstResponse).resolves.toBe('First response.');
+
+  vi.spyOn(runtime, 'isSessionActive').mockReturnValue(true);
+  const secondResponse = handler.processMessage(
+    createMessage({ messageId: 'im-msg-2', content: 'Continue.' }),
+    undefined,
+    'workspace-2',
+  );
+  await new Promise(resolve => setImmediate(resolve));
+  expect(runtime.continueCalls[0].options).toMatchObject({
+    skillIds: [],
+    workspaceRoot: session.cwd,
+    sessionMode: 'work',
+  });
+
+  runtime.emit('message', 'session-1', {
+    id: 'assistant-2',
+    type: 'assistant',
+    content: 'Second response.',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  coworkStore.addMessage('session-1', {
+    type: 'assistant',
+    content: 'Second response.',
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-1', null);
+  await expect(secondResponse).resolves.toBe('Second response.');
+
+  vi.spyOn(runtime, 'isSessionActive').mockReturnValue(false);
+  const thirdResponse = handler.processMessage(
+    createMessage({
+      messageId: 'im-msg-3',
+      conversationId: 'conv-2',
+      content: 'Start another conversation.',
+    }),
+    undefined,
+    'workspace-2',
+  );
+  await new Promise(resolve => setImmediate(resolve));
+  expect(coworkStore.getSession('session-2')).toMatchObject({
+    workspaceId: 'workspace-2',
+    cwd: 'C:\\workspace-2',
+  });
+
+  runtime.emit('message', 'session-2', {
+    id: 'assistant-3',
+    type: 'assistant',
+    content: 'Third response.',
+    timestamp: Date.now(),
+    metadata: {},
+  });
+  runtime.emit('complete', 'session-2', null);
+  await expect(thirdResponse).resolves.toBe('Third response.');
+
+  handler.destroy();
+});
+
+test('requires an explicit workspace when creating a channel conversation', async () => {
+  const handler = new IMCoworkHandler({
+    coworkRuntime: new FakeRuntime(),
+    coworkStore: new FakeCoworkStore(),
+    imStore: new FakeIMStore(),
+  });
+
+  await expect(handler.processMessage(createMessage())).rejects.toThrow(
+    'Channel account workspace is not configured',
+  );
+  handler.destroy();
+});
+
 test('emits a matching terminal run event when a session fails while waiting for permission', async () => {
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
   const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
 
-  const response = handler.processMessage(createMessage({ content: '删除临时文件' }));
+  const response = handler.processMessage(
+    createMessage({ content: '删除临时文件' }),
+    undefined,
+    'workspace-1',
+  );
   await new Promise(resolve => setImmediate(resolve));
 
   runtime.emit('permissionRequest', 'session-1', {
@@ -438,7 +621,11 @@ test('closes a started run when existing-session setup fails before runtime exec
     },
   });
 
-  const firstResponse = handler.processMessage(createMessage({ content: '第一条消息' }));
+  const firstResponse = handler.processMessage(
+    createMessage({ content: '第一条消息' }),
+    undefined,
+    'workspace-1',
+  );
   await new Promise(resolve => setImmediate(resolve));
   runtime.emit('message', 'session-1', {
     id: 'assistant-1',
@@ -453,7 +640,11 @@ test('closes a started run when existing-session setup fails before runtime exec
   imStore.settings.skillsEnabled = true;
   failSkillsPrompt = true;
   await expect(
-    handler.processMessage(createMessage({ messageId: 'im-msg-2', content: '第二条消息' })),
+    handler.processMessage(
+      createMessage({ messageId: 'im-msg-2', content: '第二条消息' }),
+      undefined,
+      'workspace-1',
+    ),
   ).rejects.toThrow('skill prompt unavailable');
 
   const runEvents = electronMocks.send.mock.calls

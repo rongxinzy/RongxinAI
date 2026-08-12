@@ -68,7 +68,7 @@ const imSlice = createSlice({
     },
     setDingTalkInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<DingTalkChannelConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<DingTalkInstanceConfig> }>,
     ) => {
       const inst = state.config.dingtalk.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -99,7 +99,7 @@ const imSlice = createSlice({
     },
     setFeishuInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<FeishuChannelConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<FeishuInstanceConfig> }>,
     ) => {
       const inst = state.config.feishu.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -129,7 +129,7 @@ const imSlice = createSlice({
     },
     setTelegramInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<TelegramChannelConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<TelegramInstanceConfig> }>,
     ) => {
       const inst = state.config.telegram.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -160,7 +160,7 @@ const imSlice = createSlice({
     },
     setQQInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<QQChannelConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<QQInstanceConfig> }>,
     ) => {
       const inst = state.config.qq.instances.find(i => i.instanceId === action.payload.instanceId);
       if (inst) Object.assign(inst, action.payload.config);
@@ -188,7 +188,7 @@ const imSlice = createSlice({
     },
     setDiscordInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<DiscordChannelConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<DiscordInstanceConfig> }>,
     ) => {
       const inst = state.config.discord.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -219,7 +219,7 @@ const imSlice = createSlice({
     },
     setWecomInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<WecomChannelConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<WecomInstanceConfig> }>,
     ) => {
       const inst = state.config.wecom.instances.find(
         i => i.instanceId === action.payload.instanceId,

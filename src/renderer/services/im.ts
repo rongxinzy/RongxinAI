@@ -33,24 +33,19 @@ import {
 } from '../store/slices/imSlice';
 import type {
   DingTalkInstanceConfig,
-  DingTalkChannelConfig,
   DiscordInstanceConfig,
-  DiscordChannelConfig,
   FeishuInstanceConfig,
-  FeishuChannelConfig,
   IMConfigResult,
   IMConnectivityTestResponse,
   IMConnectivityTestResult,
   IMGatewayConfig,
+  IMGatewayConfigPatch,
   IMGatewayResult,
   IMGatewayStatus,
   IMStatusResult,
   QQInstanceConfig,
-  QQChannelConfig,
   TelegramInstanceConfig,
-  TelegramChannelConfig,
   WecomInstanceConfig,
-  WecomChannelConfig,
 } from '../types/im';
 
 class IMService {
@@ -142,7 +137,7 @@ class IMService {
    * Update configuration and trigger gateway sync/restart.
    * Used by toggleGateway and other operations that need immediate effect.
    */
-  async updateConfig(config: Partial<IMGatewayConfig>): Promise<boolean> {
+  async updateConfig(config: IMGatewayConfigPatch): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
       const result: IMGatewayResult = await window.electron.im.setConfig(config, {
@@ -169,7 +164,7 @@ class IMService {
    * Persist configuration to DB without triggering gateway sync/restart.
    * Used by onBlur handlers to save field values silently.
    */
-  async persistConfig(config: Partial<IMGatewayConfig>): Promise<boolean> {
+  async persistConfig(config: IMGatewayConfigPatch): Promise<boolean> {
     try {
       const result: IMGatewayResult = await window.electron.im.setConfig(config, {
         syncGateway: false,
@@ -308,7 +303,8 @@ class IMService {
 
   async addDingTalkInstance(name: string): Promise<DingTalkInstanceConfig | null> {
     try {
-      const result = await window.electron.im.addDingTalkInstance(name);
+      const workspaceId = store.getState().workspace.currentWorkspaceId ?? '';
+      const result = await window.electron.im.addDingTalkInstance(name, workspaceId);
       if (result.success && result.instance) {
         store.dispatch(addDingTalkInstance(result.instance));
         return result.instance;
@@ -338,7 +334,7 @@ class IMService {
 
   async persistDingTalkInstanceConfig(
     instanceId: string,
-    config: Partial<DingTalkChannelConfig>,
+    config: Partial<DingTalkInstanceConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setDingTalkInstanceConfig(instanceId, config, {
@@ -358,7 +354,7 @@ class IMService {
 
   async updateDingTalkInstanceConfig(
     instanceId: string,
-    config: Partial<DingTalkChannelConfig>,
+    config: Partial<DingTalkInstanceConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -386,7 +382,8 @@ class IMService {
 
   async addQQInstance(name: string): Promise<QQInstanceConfig | null> {
     try {
-      const result = await window.electron.im.addQQInstance(name);
+      const workspaceId = store.getState().workspace.currentWorkspaceId ?? '';
+      const result = await window.electron.im.addQQInstance(name, workspaceId);
       if (result.success && result.instance) {
         store.dispatch(addQQInstance(result.instance));
         return result.instance;
@@ -416,7 +413,7 @@ class IMService {
 
   async persistQQInstanceConfig(
     instanceId: string,
-    config: Partial<QQChannelConfig>,
+    config: Partial<QQInstanceConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setQQInstanceConfig(instanceId, config, {
@@ -436,7 +433,7 @@ class IMService {
 
   async updateQQInstanceConfig(
     instanceId: string,
-    config: Partial<QQChannelConfig>,
+    config: Partial<QQInstanceConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -464,7 +461,8 @@ class IMService {
 
   async addFeishuInstance(name: string): Promise<FeishuInstanceConfig | null> {
     try {
-      const result = await window.electron.im.addFeishuInstance(name);
+      const workspaceId = store.getState().workspace.currentWorkspaceId ?? '';
+      const result = await window.electron.im.addFeishuInstance(name, workspaceId);
       if (result.success && result.instance) {
         store.dispatch(addFeishuInstance(result.instance));
         return result.instance;
@@ -494,7 +492,7 @@ class IMService {
 
   async persistFeishuInstanceConfig(
     instanceId: string,
-    config: Partial<FeishuChannelConfig>,
+    config: Partial<FeishuInstanceConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setFeishuInstanceConfig(instanceId, config, {
@@ -514,7 +512,7 @@ class IMService {
 
   async updateFeishuInstanceConfig(
     instanceId: string,
-    config: Partial<FeishuChannelConfig>,
+    config: Partial<FeishuInstanceConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -542,7 +540,8 @@ class IMService {
 
   async addWecomInstance(name: string): Promise<WecomInstanceConfig | null> {
     try {
-      const result = await window.electron.im.addWecomInstance(name);
+      const workspaceId = store.getState().workspace.currentWorkspaceId ?? '';
+      const result = await window.electron.im.addWecomInstance(name, workspaceId);
       if (result.success && result.instance) {
         store.dispatch(addWecomInstance(result.instance));
         return result.instance;
@@ -572,7 +571,7 @@ class IMService {
 
   async persistWecomInstanceConfig(
     instanceId: string,
-    config: Partial<WecomChannelConfig>,
+    config: Partial<WecomInstanceConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setWecomInstanceConfig(instanceId, config, {
@@ -592,7 +591,7 @@ class IMService {
 
   async updateWecomInstanceConfig(
     instanceId: string,
-    config: Partial<WecomChannelConfig>,
+    config: Partial<WecomInstanceConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -620,7 +619,8 @@ class IMService {
 
   async addTelegramInstance(name: string): Promise<TelegramInstanceConfig | null> {
     try {
-      const result = await window.electron.im.addTelegramInstance(name);
+      const workspaceId = store.getState().workspace.currentWorkspaceId ?? '';
+      const result = await window.electron.im.addTelegramInstance(name, workspaceId);
       if (result.success && result.instance) {
         store.dispatch(addTelegramInstance(result.instance));
         return result.instance;
@@ -650,7 +650,7 @@ class IMService {
 
   async persistTelegramInstanceConfig(
     instanceId: string,
-    config: Partial<TelegramChannelConfig>,
+    config: Partial<TelegramInstanceConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setTelegramInstanceConfig(instanceId, config, {
@@ -670,7 +670,7 @@ class IMService {
 
   async updateTelegramInstanceConfig(
     instanceId: string,
-    config: Partial<TelegramChannelConfig>,
+    config: Partial<TelegramInstanceConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -698,7 +698,8 @@ class IMService {
 
   async addDiscordInstance(name: string): Promise<DiscordInstanceConfig | null> {
     try {
-      const result = await window.electron.im.addDiscordInstance(name);
+      const workspaceId = store.getState().workspace.currentWorkspaceId ?? '';
+      const result = await window.electron.im.addDiscordInstance(name, workspaceId);
       if (result.success && result.instance) {
         store.dispatch(addDiscordInstance(result.instance));
         return result.instance;
@@ -728,7 +729,7 @@ class IMService {
 
   async persistDiscordInstanceConfig(
     instanceId: string,
-    config: Partial<DiscordChannelConfig>,
+    config: Partial<DiscordInstanceConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setDiscordInstanceConfig(instanceId, config, {
@@ -748,7 +749,7 @@ class IMService {
 
   async updateDiscordInstanceConfig(
     instanceId: string,
-    config: Partial<DiscordChannelConfig>,
+    config: Partial<DiscordInstanceConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));

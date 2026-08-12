@@ -1,6 +1,9 @@
 import type { CcConnectCronTask } from './ccConnectCronClient';
 
-type TriggerClient = { upsert(task: CcConnectCronTask): Promise<void>; remove(task: Pick<CcConnectCronTask, 'taskId'>): Promise<void> };
+type TriggerClient = {
+  upsert(task: CcConnectCronTask): Promise<void>;
+  remove(task: Pick<CcConnectCronTask, 'accountId' | 'taskId'>): Promise<void>;
+};
 
 /** Keeps the canonical desired projection while the disposable sidecar is offline. */
 export class DeferredCcConnectCronClient implements TriggerClient {

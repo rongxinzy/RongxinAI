@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { t } from '../i18n';
 import { fetchJsonWithTimeout } from './http';
 import { IMStore } from './imStore';
+import type { IMGatewayConfigPatch } from './configPatch';
 import type {
   IMConnectivityCheck,
   IMConnectivityTestResult,
@@ -28,11 +29,16 @@ export class ChannelAccountManager {
     return this.imStore;
   }
 
-  setConfig(config: Partial<IMGatewayConfig>, _options?: { syncGateway?: boolean }): void {
+  setConfig(config: IMGatewayConfigPatch, _options?: { syncGateway?: boolean }): void {
     this.imStore.setConfig(config);
   }
 
-  getStatus(): IMGatewayStatus {
+  getStatus(
+    runtimeStatus: (instanceId: string) => {
+      connected: boolean;
+      lastError: string | null;
+    } = () => ({ connected: false, lastError: null }),
+  ): IMGatewayStatus {
     const config = this.getConfig();
     const common = <T extends { instanceId: string; instanceName: string; enabled: boolean }>(
       instances: T[],
@@ -42,16 +48,17 @@ export class ChannelAccountManager {
       instanceName: string;
       connected: boolean;
       startedAt: null;
-      lastError: null;
+      lastError: string | null;
       lastInboundAt: null;
       lastOutboundAt: null;
     }> =>
       instances.map(instance => ({
         instanceId: instance.instanceId,
         instanceName: instance.instanceName,
-        connected: instance.enabled && configured(instance),
+        ...(instance.enabled && configured(instance)
+          ? runtimeStatus(instance.instanceId)
+          : { connected: false, lastError: null }),
         startedAt: null as null,
-        lastError: null as null,
         lastInboundAt: null as null,
         lastOutboundAt: null as null,
       }));
@@ -86,9 +93,10 @@ export class ChannelAccountManager {
         })),
       },
       weixin: {
-        connected: Boolean(config.weixin.enabled && config.weixin.accountId),
+        ...(config.weixin.enabled && config.weixin.accountId
+          ? runtimeStatus(config.weixin.accountId)
+          : { connected: false, lastError: null }),
         startedAt: null,
-        lastError: null,
         lastInboundAt: null,
         lastOutboundAt: null,
       },

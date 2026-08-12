@@ -35,6 +35,7 @@ test("uses the sidecar-native session key instead of the display destination", a
     "conversation",
   );
   expect(send).toHaveBeenCalledWith({
+    accountId: "account",
     platform: "qqbot",
     sessionKey: "qqbot:group:opaque",
     content: "completed",

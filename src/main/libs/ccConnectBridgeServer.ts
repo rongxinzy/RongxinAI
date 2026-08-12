@@ -6,12 +6,12 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024;
 
 export type CcConnectTurnRequest = {
   requestId: string;
-  project: string;
+  accountId: string;
   message: {
     sessionKey: string;
     platform: string;
     messageId: string;
-    channelId: string;
+    channelId?: string;
     userId: string;
     userName?: string;
     chatName?: string;
@@ -25,14 +25,14 @@ export type CcConnectTurnRequest = {
 
 export type CcConnectCronTrigger = {
   requestId: string;
-  project: string;
+  accountId: string;
   taskId: string;
   scheduleVersion: string;
   scheduledAt: string;
 };
 
 export interface CcConnectBridgeHandlers {
-  onTurn(request: CcConnectTurnRequest): Promise<{ content: string }>;
+  onTurn(request: CcConnectTurnRequest, signal: AbortSignal): Promise<{ content: string }>;
   onCronTrigger(trigger: CcConnectCronTrigger): Promise<void>;
 }
 
@@ -84,7 +84,17 @@ export class CcConnectBridgeServer {
       if (request.url === "/v1/cc-connect/turn") {
         if (!isTurnRequest(body))
           return void response.writeHead(400).end("invalid turn request");
-        const result = await this.handlers.onTurn(body);
+        const abortController = new AbortController();
+        const abortTurn = () => abortController.abort();
+        request.once("aborted", abortTurn);
+        response.once("close", abortTurn);
+        let result: { content: string };
+        try {
+          result = await this.handlers.onTurn(body, abortController.signal);
+        } finally {
+          request.off("aborted", abortTurn);
+          response.off("close", abortTurn);
+        }
         if (!result.content.trim())
           throw new Error("Pi bridge returned an empty response");
         response
@@ -131,7 +141,7 @@ function isTurnRequest(value: unknown): value is CcConnectTurnRequest {
   if (
     !isRecord(value) ||
     !nonEmptyString(value.requestId) ||
-    !nonEmptyString(value.project)
+    !nonEmptyString(value.accountId)
   )
     return false;
   const message = value.message;
@@ -141,7 +151,6 @@ function isTurnRequest(value: unknown): value is CcConnectTurnRequest {
       "sessionKey",
       "platform",
       "messageId",
-      "channelId",
       "userId",
       "content",
     ].every((key) => nonEmptyString(message[key]))
@@ -151,7 +160,7 @@ function isTurnRequest(value: unknown): value is CcConnectTurnRequest {
 function isCronTrigger(value: unknown): value is CcConnectCronTrigger {
   return (
     isRecord(value) &&
-    ["requestId", "project", "taskId", "scheduleVersion", "scheduledAt"].every(
+    ["requestId", "accountId", "taskId", "scheduleVersion", "scheduledAt"].every(
       (key) => nonEmptyString(value[key]),
     ) &&
     !Number.isNaN(Date.parse(value.scheduledAt as string))

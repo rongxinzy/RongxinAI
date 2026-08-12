@@ -23,7 +23,23 @@ test('sends only authenticated trigger registration without a task payload', asy
   await new CcConnectCronClient(`http://127.0.0.1:${port}`, 'secret').upsert({
     accountId: 'account-a', taskId: 't', scheduleVersion: 'v1', schedule: { kind: ScheduleKind.Every, everyMs: 60_000 },
   });
-  expect(JSON.parse(body)).toEqual({ taskId: 't', scheduleVersion: 'v1', schedule: { kind: 'every', everyMs: 60_000 } });
+  expect(JSON.parse(body)).toEqual({ accountId: 'account-a', taskId: 't', scheduleVersion: 'v1', schedule: { kind: 'every', everyMs: 60_000 } });
+});
+
+test('routes task removal by account id', async () => {
+  let requestUrl = '';
+  const server = http.createServer((req, res) => {
+    requestUrl = req.url ?? '';
+    res.writeHead(204).end();
+  });
+  servers.push(server);
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as { port: number }).port;
+  await new CcConnectCronClient(`http://127.0.0.1:${port}`, 'secret').remove({
+    accountId: 'scheduler account',
+    taskId: 'task/a',
+  });
+  expect(requestUrl).toBe('/v1/cc-connect/cron/tasks/task%2Fa?accountId=scheduler+account');
 });
 
 test('checks the authenticated sidecar control-plane health route', async () => {
@@ -35,6 +51,7 @@ test('checks the authenticated sidecar control-plane health route', async () => 
       pid: 42,
       parentPid: process.pid,
       capabilities: [CcConnectProtocol.Capability.TriggerOnlyCron],
+      platforms: [],
     }));
   });
   servers.push(server);
