@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react"],
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "ignorePatterns": [
+    "dist/",
+    "dist-electron/",
+    "node_modules/",
+    "release/",
+    "build/",
+    "SKILLs/",
+    "sandbox/",
+    "scripts/"
+  ],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "no-unused-vars": [
+      "warn",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "no-undef": "off",
+    "no-redeclare": "off",
+    "no-control-regex": "off",
+    "no-useless-escape": "off",
+    "no-constant-condition": "off",
+    "typescript/no-explicit-any": "off",
+    "typescript/no-require-imports": "off",
+    "typescript/ban-ts-comment": "off",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "warn",
+    "react/only-export-components": "off"
+  }
+}

@@ -1,0 +1,5 @@
+name: 代码安全扫描
+description: 扫描依赖漏洞、密钥泄露和常见 OWASP 风险，输出按严重程度排序的安全问题与修复建议。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

@@ -1,0 +1,5 @@
+name: 智能提交信息
+description: 分析代码差异并生成符合 Conventional Commits 规范的提交信息，自动推断类型与影响范围。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

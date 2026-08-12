@@ -1,0 +1,5 @@
+name: 英文学术论文润色
+description: 按学术写作标准审阅英文论文的语法、用词、语态与逻辑衔接，提供逐段修改建议和优化文本。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

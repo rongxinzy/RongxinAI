@@ -1,0 +1,5 @@
+name: 数据库巡检
+description: 安全读取 SQLite 与 PostgreSQL 的表结构和数据概览，辅助理解数据关系并生成 ER 图。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

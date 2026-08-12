@@ -1,0 +1,5 @@
+name: PDF 文档处理
+description: 创建、设计和重排 PDF 文档，并支持 PDF 表单字段填写。
+author: MiniMax
+license: MIT
+skillmd: ./SKILL.md

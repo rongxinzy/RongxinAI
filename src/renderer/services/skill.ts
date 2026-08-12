@@ -1,0 +1,344 @@
+import {
+  LocalizedText,
+  LocalSkillInfo,
+  MarketplaceSkill,
+  MarketplaceSkillPage,
+  Skill,
+} from '../types/skill';
+import { i18nService } from './i18n';
+
+export function resolveLocalizedText(text: string | LocalizedText): string {
+  if (!text) return '';
+  if (typeof text === 'string') return text;
+  const lang = i18nService.getLanguage();
+  return text[lang] || text.en || '';
+}
+
+export function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(s => parseInt(s, 10) || 0);
+  const pb = b.split('.').map(s => parseInt(s, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+type EmailConnectivityCheck = {
+  code: 'imap_connection' | 'smtp_connection';
+  level: 'pass' | 'fail';
+  message: string;
+  durationMs: number;
+};
+
+type EmailConnectivityTestResult = {
+  testedAt: number;
+  verdict: 'pass' | 'fail';
+  checks: EmailConnectivityCheck[];
+};
+
+class SkillService {
+  private skills: Skill[] = [];
+  private initialized = false;
+  private localSkillDescriptions: Map<string, string | LocalizedText> = new Map();
+  private marketplaceSkillDescriptions: Map<string, string | LocalizedText> = new Map();
+  private marketplaceCache = new Map<string, MarketplaceSkillPage>();
+  private marketplaceFetchPromises = new Map<string, Promise<MarketplaceSkillPage>>();
+
+  async init(): Promise<void> {
+    if (this.initialized) return;
+    await this.loadSkills();
+    this.initialized = true;
+  }
+
+  async loadSkills(): Promise<Skill[]> {
+    try {
+      const result = await window.electron.skills.list();
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+      } else {
+        this.skills = [];
+      }
+      return this.skills;
+    } catch (error) {
+      console.error('Failed to load skills:', error);
+      this.skills = [];
+      return this.skills;
+    }
+  }
+
+  async setSkillEnabled(id: string, enabled: boolean): Promise<Skill[]> {
+    try {
+      const result = await window.electron.skills.setEnabled({ id, enabled });
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+        return this.skills;
+      }
+      throw new Error(result.error || 'Failed to update skill');
+    } catch (error) {
+      console.error('Failed to update skill:', error);
+      throw error;
+    }
+  }
+
+  async setSkillsEnabled(ids: string[], enabled: boolean): Promise<Skill[]> {
+    const setEnabledBatch = window.electron.skills.setEnabledBatch;
+    const loadLegacyHandlers = async (): Promise<Skill[]> => {
+      // Older main/preload versions do not have the batch IPC. Keep writes
+      // serialized so each state update observes the previous one.
+      for (const id of ids) {
+        const result = await window.electron.skills.setEnabled({ id, enabled });
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to update skills');
+        }
+      }
+      const latest = await window.electron.skills.list();
+      if (latest.success && latest.skills) {
+        this.skills = latest.skills;
+        return this.skills;
+      }
+      throw new Error(latest.error || 'Failed to update skills');
+    };
+
+    if (!setEnabledBatch) return loadLegacyHandlers();
+
+    try {
+      const result = await setEnabledBatch({ ids, enabled });
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+        return this.skills;
+      }
+      throw new Error(result.error || 'Failed to update skills');
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('No handler registered')) {
+        return loadLegacyHandlers();
+      }
+      throw error;
+    }
+  }
+
+  async setSkillPinned(id: string, pinned: boolean): Promise<Skill[]> {
+    const result = await window.electron.skills.setPinned({ id, pinned });
+    if (result.success && result.skills) {
+      this.skills = result.skills;
+      return this.skills;
+    }
+    throw new Error(result.error || 'Failed to update skill');
+  }
+
+  async deleteSkill(id: string): Promise<{ success: boolean; skills?: Skill[]; error?: string }> {
+    try {
+      const result = await window.electron.skills.delete(id);
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to delete skill';
+      console.error('Failed to delete skill:', error);
+      return { success: false, error: message };
+    }
+  }
+
+  async downloadSkill(source: string, options: { iconUrl?: string; displayName?: string } = {}): Promise<{
+    success: boolean;
+    skills?: Skill[];
+    error?: string;
+    errorCode?: string;
+    auditReport?: any;
+    pendingInstallId?: string;
+  }> {
+    try {
+      const result = await window.electron.skills.download(
+        source,
+        options.iconUrl || options.displayName ? options : undefined,
+      );
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to download skill';
+      console.error('Failed to download skill:', error);
+      return { success: false, error: message };
+    }
+  }
+
+  async confirmInstall(
+    pendingId: string,
+    action: string,
+  ): Promise<{ success: boolean; skills?: Skill[]; error?: string }> {
+    try {
+      const result = await window.electron.skills.confirmInstall(pendingId, action);
+      if (result.success && result.skills) {
+        this.skills = result.skills;
+      }
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to confirm install';
+      console.error('Failed to confirm install:', error);
+      return { success: false, error: message };
+    }
+  }
+
+  async getSkillsRoot(): Promise<string | null> {
+    try {
+      const result = await window.electron.skills.getRoot();
+      if (result.success && result.path) {
+        return result.path;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to get skills root:', error);
+      return null;
+    }
+  }
+
+  onSkillsChanged(callback: () => void): () => void {
+    return window.electron.skills.onChanged(callback);
+  }
+
+  getSkills(): Skill[] {
+    return this.skills;
+  }
+
+  getEnabledSkills(): Skill[] {
+    return this.skills.filter(s => s.enabled);
+  }
+
+  getSkillById(id: string): Skill | undefined {
+    return this.skills.find(s => s.id === id);
+  }
+
+  async getSkillConfig(skillId: string): Promise<Record<string, string>> {
+    try {
+      const result = await window.electron.skills.getConfig(skillId);
+      if (result.success && result.config) {
+        return result.config;
+      }
+      return {};
+    } catch (error) {
+      console.error('Failed to get skill config:', error);
+      return {};
+    }
+  }
+
+  async setSkillConfig(skillId: string, config: Record<string, string>): Promise<boolean> {
+    try {
+      const result = await window.electron.skills.setConfig(skillId, config);
+      return result.success;
+    } catch (error) {
+      console.error('Failed to set skill config:', error);
+      return false;
+    }
+  }
+
+  async testEmailConnectivity(
+    skillId: string,
+    config: Record<string, string>,
+  ): Promise<EmailConnectivityTestResult | null> {
+    try {
+      const result = await window.electron.skills.testEmailConnectivity(skillId, config);
+      if (result.success && result.result) {
+        return result.result;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to test email connectivity:', error);
+      return null;
+    }
+  }
+
+  async getAutoRoutingPrompt(): Promise<string | null> {
+    try {
+      const result = await window.electron.skills.autoRoutingPrompt();
+      return result.success ? result.prompt || null : null;
+    } catch (error) {
+      console.error('Failed to get auto-routing prompt:', error);
+      return null;
+    }
+  }
+  hasLocalizedSkillDescriptions(): boolean {
+    return this.localSkillDescriptions.size > 0 || this.marketplaceSkillDescriptions.size > 0;
+  }
+
+  async fetchMarketplaceSkills(
+    options: { forceRefresh?: boolean; pageNumber?: number; pageSize?: number } = {},
+  ): Promise<MarketplaceSkillPage> {
+    const { forceRefresh = false, pageNumber = 1, pageSize = 8 } = options;
+    const cacheKey = `${pageNumber}:${pageSize}`;
+
+    if (!forceRefresh && this.marketplaceCache.has(cacheKey)) {
+      return this.marketplaceCache.get(cacheKey)!;
+    }
+    const pendingFetch = this.marketplaceFetchPromises.get(cacheKey);
+    if (pendingFetch) {
+      return pendingFetch;
+    }
+
+    const fetchPromise = this.loadMarketplaceSkills(pageNumber, pageSize);
+    this.marketplaceFetchPromises.set(cacheKey, fetchPromise);
+    try {
+      return await fetchPromise;
+    } finally {
+      this.marketplaceFetchPromises.delete(cacheKey);
+    }
+  }
+
+  private async loadMarketplaceSkills(
+    pageNumber: number,
+    pageSize: number,
+  ): Promise<MarketplaceSkillPage> {
+    try {
+      const result = await window.electron.skills.fetchMarketplace({ pageNumber, pageSize });
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'Failed to fetch');
+      }
+      const json = JSON.parse(result.data);
+      const value = json?.data?.value;
+      // Store local skill descriptions for i18n lookup
+      const localSkills: LocalSkillInfo[] = Array.isArray(value?.localSkill)
+        ? value.localSkill
+        : [];
+      if (pageNumber === 1) this.localSkillDescriptions.clear();
+      for (const ls of localSkills) {
+        this.localSkillDescriptions.set(ls.name, ls.description);
+        this.localSkillDescriptions.set(ls.id, ls.description);
+      }
+      const skills: MarketplaceSkill[] = Array.isArray(value?.marketplace) ? value.marketplace : [];
+      // Also store marketplace skill descriptions for i18n lookup (keyed by id)
+      if (pageNumber === 1) this.marketplaceSkillDescriptions.clear();
+      for (const ms of skills) {
+        if (typeof ms.description === 'object') {
+          this.marketplaceSkillDescriptions.set(ms.id, ms.description);
+        }
+      }
+      const page = {
+        skills,
+        hasMore: value?.hasMore === true,
+      };
+      this.marketplaceCache.set(`${pageNumber}:${pageSize}`, page);
+      return page;
+    } catch (error) {
+      console.error('Failed to fetch marketplace skills:', error);
+      const cachedPage = this.marketplaceCache.get(`${pageNumber}:${pageSize}`);
+      if (cachedPage) {
+        return cachedPage;
+      }
+      throw error;
+    }
+  }
+
+  getLocalizedSkillDescription(skillId: string, skillName: string, fallback: string): string {
+    const localDesc =
+      this.localSkillDescriptions.get(skillName) ?? this.localSkillDescriptions.get(skillId);
+    if (localDesc != null) return resolveLocalizedText(localDesc);
+    const marketDesc = this.marketplaceSkillDescriptions.get(skillId);
+    if (marketDesc != null) return resolveLocalizedText(marketDesc);
+    return fallback;
+  }
+}
+
+export const skillService = new SkillService();

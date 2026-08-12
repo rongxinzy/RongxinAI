@@ -1,0 +1,5 @@
+name: Excel 电子表格
+description: 创建、读取、编辑和校验 Excel 电子表格，支持公式和格式保留。
+author: MiniMax
+license: MIT
+skillmd: ./SKILL.md

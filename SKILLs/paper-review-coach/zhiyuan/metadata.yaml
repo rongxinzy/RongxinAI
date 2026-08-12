@@ -1,0 +1,5 @@
+name: 论文评审辅导
+description: 从原创性、方法、结果和写作质量等维度审阅学术论文，给出清晰的修改优先级与可执行建议。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

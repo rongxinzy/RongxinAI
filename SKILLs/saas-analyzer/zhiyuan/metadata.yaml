@@ -1,0 +1,5 @@
+name: SaaS 经营分析
+description: 基于营收、客户和获客成本等数据计算核心 SaaS 指标，形成涵盖增长、留存与效率的经营报告。
+author: Abbas Mir
+license: MIT
+skillmd: ./SKILL.md

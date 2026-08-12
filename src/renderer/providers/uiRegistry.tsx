@@ -1,0 +1,54 @@
+import { ProviderName } from '@shared/providers';
+import React from 'react';
+
+import {
+  AnthropicIcon,
+  CustomProviderIcon,
+  DeepSeekIcon,
+  GeminiIcon,
+  GrokIcon,
+  GitHubCopilotIcon,
+  LlamaCppIcon,
+  MiniMaxIcon,
+  MoonshotIcon,
+  OllamaIcon,
+  OpenAIIcon,
+  OpenRouterIcon,
+  QianfanIcon,
+  QwenIcon,
+  StepfunIcon,
+  VolcengineIcon,
+  XiaomiIcon,
+  ZhipuIcon,
+} from '../components/icons/providers';
+
+type ProviderIconComponent = React.ComponentType<{ className?: string }>;
+
+const PROVIDER_ICON_MAP: Record<string, ProviderIconComponent> = {
+  [ProviderName.OpenAI]: OpenAIIcon,
+  [ProviderName.DeepSeek]: DeepSeekIcon,
+  [ProviderName.Gemini]: GeminiIcon,
+  [ProviderName.Grok]: GrokIcon,
+  [ProviderName.Anthropic]: AnthropicIcon,
+  [ProviderName.Moonshot]: MoonshotIcon,
+  [ProviderName.Zhipu]: ZhipuIcon,
+  [ProviderName.Minimax]: MiniMaxIcon,
+  [ProviderName.Qwen]: QwenIcon,
+  [ProviderName.Xiaomi]: XiaomiIcon,
+  [ProviderName.StepFun]: StepfunIcon,
+  [ProviderName.Volcengine]: VolcengineIcon,
+  [ProviderName.OpenRouter]: OpenRouterIcon,
+  [ProviderName.Copilot]: GitHubCopilotIcon,
+  [ProviderName.Ollama]: OllamaIcon,
+  [ProviderName.LlamaCpp]: LlamaCppIcon,
+  [ProviderName.Qianfan]: QianfanIcon,
+};
+
+export function ProviderIcon({ id, className }: { id: string; className?: string }) {
+  const Icon = PROVIDER_ICON_MAP[id] ?? CustomProviderIcon;
+  return <Icon className={className} />;
+}
+
+export function getProviderIcon(id: string): React.ReactNode {
+  return <ProviderIcon id={id} />;
+}

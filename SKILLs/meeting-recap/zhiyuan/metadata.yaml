@@ -1,0 +1,5 @@
+name: 会议纪要整理
+description: 将会议转写、笔记或聊天记录整理为结构清晰的纪要，提取结论、待办事项、负责人和截止日期。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

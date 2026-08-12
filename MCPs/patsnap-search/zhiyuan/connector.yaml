@@ -1,0 +1,25 @@
+id: patsnap-search
+icon: icon.png
+presentation:
+  name: "\u667a\u6167\u82bd"
+  authorization: token
+  zh:
+    description: "\u4e13\u5229\u3001\u6587\u732e\u548c\u79d1\u6280\u60c5\u62a5\u68c0\u7d22"
+    examples:
+      - "\u8bf7\u68c0\u7d22\u8fd1\u4e09\u5e74\u4e0e\u300c\u56fa\u6001\u7535\u6c60\u300d\u76f8\u5173\u7684\u4e13\u5229\uff0c\u603b\u7ed3\u4e3b\u8981\u6280\u672f\u8def\u7ebf\u548c\u91cd\u70b9\u7533\u8bf7\u4eba\u3002"
+      - "\u8bf7\u67e5\u627e\u4e0e\u6211\u4eec\u7684\u76ee\u6807\u6280\u672f\u6700\u63a5\u8fd1\u7684\u4e13\u5229\uff0c\u5217\u51fa\u53ef\u80fd\u7684\u4fb5\u6743\u98ce\u9669\u3002"
+    connect:
+      usage: { title: "\u5982\u4f55\u4f7f\u7528", description: "\u914d\u7f6e API Token \u540e\uff0c\u667a\u80fd\u4f53\u53ef\u6309\u8bf7\u6c42\u68c0\u7d22\u4e13\u5229\u548c\u6587\u732e\u3002" }
+      data: { title: "\u6570\u636e\u4e0e\u6743\u9650", description: "\u8bf7\u4f7f\u7528\u4f60\u7684\u667a\u6167\u82bd\u5b98\u65b9 API Token\u3002" }
+      control: { title: "\u4f60\u59cb\u7ec8\u53ef\u63a7", description: "\u53ef\u968f\u65f6\u66f4\u6362 Token \u6216\u5378\u8f7d\u8fde\u63a5\u3002" }
+      authorization: { title: "Token \u914d\u7f6e", description: "\u5728\u5e94\u7528\u4e2d\u5f55\u5165\u5b98\u65b9 API Token\uff0c\u4e0d\u4f1a\u6253\u5f00\u6d4f\u89c8\u5668 OAuth\u3002" }
+  en:
+    description: Patsnap patent, literature, and technology intelligence search.
+    examples:
+      - Search patents on solid-state batteries from the past three years and summarize technology routes and leading applicants.
+      - Find patents closest to our target technology and list potential infringement risks.
+    connect:
+      usage: { title: How it works, description: Configure an API token before the agent searches patents and literature. }
+      data: { title: Data and permissions, description: Use an API token issued by Patsnap. }
+      control: { title: You stay in control, description: Replace the token or uninstall the connection at any time. }
+      authorization: { title: Token configuration, description: Enter the official API token in the app; browser OAuth is not used. }

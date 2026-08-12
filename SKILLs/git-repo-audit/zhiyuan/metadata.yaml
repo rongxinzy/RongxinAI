@@ -1,0 +1,5 @@
+name: Git 仓库审计
+description: 分析提交历史、热点文件和贡献情况，识别代码演进风险及历史记录中的潜在密钥泄露问题。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

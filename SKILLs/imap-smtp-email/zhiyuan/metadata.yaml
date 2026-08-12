@@ -1,0 +1,5 @@
+name: 邮件收发助手
+description: 通过已配置的邮箱账户读取、搜索和管理邮件，并支持安全发送含附件的邮件，覆盖主流 IMAP 与 SMTP 服务。
+author: NetEase
+license: MIT
+skillmd: ./SKILL.md

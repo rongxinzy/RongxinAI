@@ -1,0 +1,5 @@
+name: 客户流失挽回
+description: 分析客户流失原因，设计取消流程、挽回方案、退出调研与续费提醒策略，提升留存表现。
+author: Alireza Rezvani
+license: MIT
+skillmd: ./SKILL.md

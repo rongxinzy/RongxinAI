@@ -1,0 +1,25 @@
+id: feishu
+icon: icon.png
+presentation:
+  name: Feishu
+  authorization: cli
+  zh:
+    description: "\u98de\u4e66\u6587\u6863\u3001\u65e5\u5386\u3001\u6d88\u606f\u3001\u4e91\u76d8\u548c\u5ba1\u6279\u534f\u4f5c"
+    examples:
+      - "\u8bf7\u67e5\u8be2\u98de\u4e66\u65e5\u5386\u4e2d\u672c\u5468\u7684\u4f1a\u8bae\uff0c\u5e76\u6574\u7406\u6210\u65f6\u95f4\u8868\u548c\u51c6\u5907\u6e05\u5355\u3002"
+      - "\u8bf7\u5728\u98de\u4e66\u4e91\u6587\u6863\u4e2d\u67e5\u627e\u6700\u65b0\u7684\u9879\u76ee\u5468\u62a5\uff0c\u603b\u7ed3\u672c\u5468\u8fdb\u5c55\u548c\u98ce\u9669\u3002"
+    connect:
+      usage: { title: "\u5982\u4f55\u4f7f\u7528", description: "\u4ec5\u5728\u4f60\u660e\u786e\u8bf7\u6c42\u65f6\uff0c\u667a\u80fd\u4f53\u624d\u4f1a\u8c03\u7528\u98de\u4e66\u5de5\u5177\u3002" }
+      data: { title: "\u6570\u636e\u4e0e\u6743\u9650", description: "\u4ec5\u8bbf\u95ee\u4f60\u5728\u98de\u4e66\u6388\u6743\u4e2d\u660e\u786e\u5141\u8bb8\u7684\u5185\u5bb9\u548c\u64cd\u4f5c\u8303\u56f4\u3002" }
+      control: { title: "\u4f60\u59cb\u7ec8\u53ef\u63a7", description: "\u4f60\u53ef\u4ee5\u968f\u65f6\u5728\u5df2\u5b89\u88c5\u670d\u52a1\u4e2d\u65ad\u98de\u4e66\u8fde\u63a5\u3002" }
+      authorization: { title: "\u5b98\u65b9\u767b\u5f55", description: "\u901a\u8fc7\u98de\u4e66\u5b98\u65b9 CLI \u5b8c\u6210\u914d\u7f6e\u5e76\u6253\u5f00\u6d4f\u89c8\u5668\u767b\u5f55\u3002" }
+  en:
+    description: Feishu documents, calendars, messages, drive, and approvals.
+    examples:
+      - Review this week's Feishu calendar and prepare a schedule with meeting preparation items.
+      - Find the latest project weekly report in Feishu Docs and summarize progress and risks.
+    connect:
+      usage: { title: How it works, description: The agent uses Feishu tools only when you explicitly request them. }
+      data: { title: Data and permissions, description: Only content and actions approved during Feishu authorization are accessed. }
+      control: { title: You stay in control, description: You can disconnect Feishu at any time. }
+      authorization: { title: Official sign-in, description: The official Feishu CLI completes setup and browser sign-in. }

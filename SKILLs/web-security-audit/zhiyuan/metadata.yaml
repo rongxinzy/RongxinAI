@@ -1,0 +1,5 @@
+name: Web 安全审计
+description: 依据 OWASP Top 10 审查常见 Web 漏洞，定位风险代码并给出具备上下文的修复方案。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

@@ -1,0 +1,5 @@
+name: 流程文档设计
+description: 将零散业务做法沉淀为流程图、职责矩阵和标准作业程序，形成便于执行与维护的规范文档。
+author: Anthropic
+license: Apache-2.0
+skillmd: ./SKILL.md

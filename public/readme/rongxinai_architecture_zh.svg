@@ -1,0 +1,87 @@
+<svg width="1120" height="880" viewBox="0 0 1120 880" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="hatch" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#000" stroke-width="0.7"/>
+    </pattern>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#000"/>
+    </marker>
+    <style>
+      text { fill: #000; font-family: 'Latin Modern Roman', 'CMU Serif', 'STIX Two Text', 'Noto Serif CJK SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', 'Times New Roman', serif; }
+      .t0 { font-size: 26px; font-weight: 700; }
+      .t1 { font-size: 15px; font-style: italic; }
+      .t2 { font-size: 18px; font-weight: 700; }
+      .t3 { font-size: 17px; font-weight: 700; }
+      .t4 { font-size: 13px; }
+      .t5 { font-size: 16px; font-weight: 700; }
+      .t6 { font-size: 12px; font-style: italic; }
+      .t7 { font-size: 15px; font-weight: 700; }
+      .box { fill: #fff; stroke: #000; stroke-width: 1.6; }
+      .grp { fill: none; stroke: #000; stroke-width: 1.4; stroke-dasharray: 7 5; }
+      .ln  { stroke: #000; stroke-width: 1.6; }
+    </style>
+  </defs>
+
+  <rect width="1120" height="880" fill="#fff"/>
+
+  <text x="560" y="50" text-anchor="middle" class="t0">知远智能体 — 本地 AI Agent 工作台</text>
+  <text x="560" y="80" text-anchor="middle" class="t1">全栈自研 &#183; 自研 Agent 运行时与本地推理引擎 &#183; Electron 掌管桌面安全边界</text>
+
+  <!-- Electron 主进程 -->
+  <rect x="60" y="110" width="1000" height="300" class="grp"/>
+  <text x="82" y="142" class="t2">Electron 主进程</text>
+
+  <rect x="95" y="165" width="350" height="95" fill="url(#hatch)" stroke="#000" stroke-width="1.6"/>
+  <text x="115" y="201" class="t3">Agent 运行时</text>
+  <text x="115" y="227" class="t4">Cowork 会话、工具调用、权限请求</text>
+  <rect x="352" y="178" width="78" height="24" fill="#fff" stroke="#000" stroke-width="1.2"/>
+  <text x="391" y="195" text-anchor="middle" class="t4" font-weight="700">主引擎</text>
+
+  <rect x="470" y="165" width="270" height="95" class="box"/>
+  <text x="490" y="201" class="t3">本地推理服务</text>
+  <text x="490" y="227" class="t4">GGUF 模型、启动参数、</text>
+  <text x="490" y="247" class="t4">模型市场</text>
+
+  <rect x="765" y="165" width="270" height="95" class="box"/>
+  <text x="785" y="201" class="t3">技能 / MCP 管理</text>
+  <text x="785" y="227" class="t4">内置技能、技能市场、</text>
+  <text x="785" y="247" class="t4">外部工具</text>
+
+  <rect x="95" y="290" width="350" height="95" class="box"/>
+  <text x="115" y="326" class="t3">SQLite 本地存储</text>
+  <text x="115" y="352" class="t4">会话、配置、记忆、任务</text>
+
+  <rect x="470" y="290" width="270" height="95" class="box"/>
+  <text x="490" y="326" class="t3">定时任务调度</text>
+  <text x="490" y="352" class="t4">Cron、后台触发、结果投递</text>
+
+  <rect x="765" y="290" width="270" height="95" class="box"/>
+  <text x="785" y="326" class="t3">IM / 邮件网关</text>
+  <text x="785" y="352" class="t4">微信、企微、钉钉、</text>
+  <text x="785" y="372" class="t4">飞书、QQ、邮箱</text>
+
+  <!-- IPC 桥接 -->
+  <line x1="560" y1="410" x2="560" y2="462" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="578" y="442" class="t6">IPC 调用</text>
+  <rect x="420" y="465" width="280" height="70" class="box"/>
+  <text x="560" y="497" text-anchor="middle" class="t5">Preload 脚本</text>
+  <text x="560" y="521" text-anchor="middle" class="t6">contextBridge &#183; IPC 安全桥接</text>
+  <line x1="560" y1="535" x2="560" y2="587" class="ln" marker-start="url(#arr)" marker-end="url(#arr)"/>
+  <text x="578" y="568" class="t6">流式事件</text>
+
+  <!-- 渲染进程 -->
+  <rect x="60" y="590" width="1000" height="200" class="grp"/>
+  <text x="82" y="622" class="t2">渲染进程（React）</text>
+
+  <rect x="95" y="655" width="215" height="85" class="box"/>
+  <text x="202" y="705" text-anchor="middle" class="t7">Redux 状态</text>
+
+  <rect x="335" y="655" width="250" height="85" class="box"/>
+  <text x="460" y="705" text-anchor="middle" class="t7">Cowork / 推理界面</text>
+
+  <rect x="610" y="655" width="220" height="85" class="box"/>
+  <text x="720" y="705" text-anchor="middle" class="t7">Artifacts 预览</text>
+
+  <rect x="855" y="655" width="180" height="85" class="box"/>
+  <text x="945" y="705" text-anchor="middle" class="t7">设置 / 市场</text>
+</svg>

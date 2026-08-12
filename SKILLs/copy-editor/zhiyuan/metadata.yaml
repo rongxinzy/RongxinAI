@@ -1,0 +1,5 @@
+name: 文案深度润色
+description: 通过多轮编辑检查优化文案逻辑、证据、情感与风险表述，在保留原意的基础上提升完成度。
+author: Corey Haines
+license: MIT
+skillmd: ./SKILL.md

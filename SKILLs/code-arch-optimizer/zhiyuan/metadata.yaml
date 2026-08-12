@@ -1,0 +1,5 @@
+name: 代码架构优化
+description: 深入分析代码库的耦合与测试瓶颈，提出可落地的模块重构方案，并输出结构化 RFC 建议。
+author: Matt Pocock
+license: MIT
+skillmd: ./SKILL.md

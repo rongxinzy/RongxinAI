@@ -1,0 +1,1 @@
+Prepare an executive proposal for a regional energy-transition program. Audience: public-sector and infrastructure leaders. Include the decision, investment trade-offs, a 2027–2035 pathway, and an emissions chart. Seek credible material restraint, not generic green or blue sustainability styling.

@@ -1,0 +1,8 @@
+{
+  "name": "ziwei-doushu-runtime",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "iztro": "^2.5.8"
+  }
+}

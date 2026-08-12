@@ -1,0 +1,188 @@
+name: Clean online update storage
+
+on:
+  schedule:
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: zhiyuan-online-update-production
+  cancel-in-progress: false
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      R2_BUCKET: zhiyuan-releases
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_ENDPOINT_URL_S3: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+      UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: '24.x' }
+      - name: Install release tools
+        run: |
+          pipx install 'awscli>=1.45.10,<2'
+          npm ci --prefix scripts/release --ignore-scripts --no-audit --no-fund
+      - name: Read manifests and release inventory
+        id: inventory
+        run: |
+          mkdir -p manifest/cleanup
+          set +e
+          aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json \
+            > manifest/stable-pointer-head.json 2> manifest/stable-pointer-head.err
+          pointer_status=$?
+          set -e
+          if [[ $pointer_status -eq 0 ]]; then
+            aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable-pointer.json \
+              manifest/stable-pointer.json > /dev/null
+            generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/stable-pointer.json)"
+            echo "generation=$generation" >> "$GITHUB_OUTPUT"
+            aws s3api get-object --bucket "$R2_BUCKET" \
+              --key "generations/${generation}/legacy/stable.json" manifest/stable.json > /dev/null
+            pointer=true
+            echo 'pointer=true' >> "$GITHUB_OUTPUT"
+          elif grep -Eq '404|Not Found|NoSuchKey' manifest/stable-pointer-head.err; then
+            aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable.json \
+              manifest/stable.json > /dev/null
+            pointer=false
+            echo 'pointer=false' >> "$GITHUB_OUTPUT"
+            echo 'generation=-' >> "$GITHUB_OUTPUT"
+          else
+            cat manifest/stable-pointer-head.err >&2
+            exit "$pointer_status"
+          fi
+
+          previous_key=channels/stable.previous.json
+          if [[ "$pointer" == 'true' ]]; then
+            set +e
+            aws s3api head-object --bucket "$R2_BUCKET" --key channels/stable.previous-pointer.json \
+              > manifest/previous-head.json 2> manifest/previous-head.err
+            previous_status=$?
+            set -e
+            if [[ $previous_status -eq 0 ]]; then
+              aws s3api get-object --bucket "$R2_BUCKET" --key channels/stable.previous-pointer.json \
+                manifest/previous-pointer.json > /dev/null
+              previous_generation="$(jq -er 'select(.schemaVersion == 1) | .generation | select(type == "string" and test("^[A-Za-z0-9._-]+$"))' manifest/previous-pointer.json)"
+              echo "previous_generation=$previous_generation" >> "$GITHUB_OUTPUT"
+              aws s3api get-object --bucket "$R2_BUCKET" \
+                --key "generations/${previous_generation}/legacy/stable.json" manifest/previous.json > /dev/null
+              echo 'previous=true' >> "$GITHUB_OUTPUT"
+            elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
+              echo 'previous=false' >> "$GITHUB_OUTPUT"
+              echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
+            else
+              cat manifest/previous-head.err >&2
+              exit "$previous_status"
+            fi
+          else
+            set +e
+            aws s3api head-object --bucket "$R2_BUCKET" --key "$previous_key" \
+              > manifest/previous-head.json 2> manifest/previous-head.err
+            previous_status=$?
+            set -e
+            if [[ $previous_status -eq 0 ]]; then
+              aws s3api get-object --bucket "$R2_BUCKET" --key "$previous_key" manifest/previous.json > /dev/null
+              echo 'previous=true' >> "$GITHUB_OUTPUT"
+              echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
+            elif grep -Eq '404|Not Found|NoSuchKey' manifest/previous-head.err; then
+              echo 'previous=false' >> "$GITHUB_OUTPUT"
+              echo 'previous_generation=-' >> "$GITHUB_OUTPUT"
+            else
+              cat manifest/previous-head.err >&2
+              exit "$previous_status"
+            fi
+          fi
+
+          inventory_files=()
+          for prefix in releases/ generations/; do
+            label="${prefix%/}"
+            page=1
+            continuation_token=''
+            while :; do
+              page_path="manifest/cleanup/${label}-objects-${page}.json"
+              inventory_files+=("$page_path")
+              list_args=(--bucket "$R2_BUCKET" --prefix "$prefix" --max-keys 1000)
+              if [[ -n "$continuation_token" ]]; then
+                list_args+=(--continuation-token "$continuation_token")
+              fi
+              aws s3api list-objects-v2 "${list_args[@]}" > "$page_path"
+
+              if [[ "$(jq -r '.IsTruncated // false' "$page_path")" != 'true' ]]; then
+                break
+              fi
+              continuation_token="$(jq -r '.NextContinuationToken // empty' "$page_path")"
+              if [[ -z "$continuation_token" ]]; then
+                echo "R2 returned a truncated listing without a continuation token for $prefix" >&2
+                exit 1
+              fi
+              page=$((page + 1))
+            done
+          done
+          jq -s '{Contents: [.[].Contents[]?]}' "${inventory_files[@]}" \
+            > manifest/r2-objects.json
+      - name: Plan expired object cleanup
+        run: |
+          previous_path='-'
+          previous_head_path='-'
+          if [[ '${{ steps.inventory.outputs.previous }}' == 'true' ]]; then
+            previous_path='manifest/previous.json'
+            previous_head_path='manifest/previous-head.json'
+          fi
+          node scripts/release/plan-r2-cleanup.mjs \
+            manifest/stable.json \
+            "$previous_path" \
+            "$previous_head_path" \
+            '${{ steps.inventory.outputs.generation }}' \
+            '${{ steps.inventory.outputs.previous_generation }}' \
+            manifest/r2-objects.json \
+            manifest/cleanup
+      - name: Delete expired unreferenced objects
+        run: |
+          for batch in manifest/cleanup/delete-*.json; do
+            [[ -e "$batch" ]] || continue
+            aws s3api delete-objects --bucket "$R2_BUCKET" --delete "file://$batch"
+          done
+
+  github-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete workflow artifacts older than seven days
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_RETENTION_DAYS: '7'
+        run: |
+          set -euo pipefail
+          cutoff_epoch="$(date -u -d "${ARTIFACT_RETENTION_DAYS} days ago" +%s)"
+          artifact_ids="$(mktemp)"
+          trap 'rm -f "$artifact_ids"' EXIT
+
+          page=1
+          while :; do
+            response="$(gh api \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100&page=${page}")"
+            jq -r --argjson cutoff "$cutoff_epoch" \
+              '.artifacts[] | select(.created_at | fromdateiso8601 < $cutoff) | .id' \
+              <<< "$response" >> "$artifact_ids"
+            count="$(jq '.artifacts | length' <<< "$response")"
+            [[ "$count" -lt 100 ]] && break
+            page=$((page + 1))
+          done
+
+          deleted=0
+          while IFS= read -r artifact_id; do
+            [[ -z "$artifact_id" ]] && continue
+            gh api --method DELETE \
+              "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}"
+            deleted=$((deleted + 1))
+          done < "$artifact_ids"
+          echo "Deleted ${deleted} workflow artifacts older than ${ARTIFACT_RETENTION_DAYS} days."

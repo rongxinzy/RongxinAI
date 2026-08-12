@@ -1,0 +1,320 @@
+{
+  "appId": "com.zhiyuanagent.app",
+  "productName": "知远",
+  "executableName": "知远",
+  "directories": {
+    "output": "release"
+  },
+  "afterSign": "scripts/notarize.js",
+  "beforePack": "./scripts/electron-builder-hooks.cjs",
+  "afterPack": "./scripts/electron-builder-hooks.cjs",
+  "files": [
+    "package.json",
+    "resources/SYSTEM_PROMPT.md",
+    {
+      "from": "dist",
+      "to": "dist",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "dist-electron",
+      "to": "dist-electron",
+      "filter": ["**/*"]
+    },
+    "!**/*.map",
+    "!**/*.d.ts",
+    "!**/*.d.cts",
+    "!**/*.d.mts",
+    "!**/README.md",
+    "!**/README",
+    "!**/readme.md",
+    "!**/CHANGELOG.md",
+    "!**/CHANGELOG",
+    "!**/HISTORY.md",
+    "!**/LICENSE",
+    "!**/LICENSE.md",
+    "!**/LICENSE.txt",
+    "!**/.eslintrc*",
+    "!**/.prettierrc*",
+    "!**/tsconfig.json",
+    "!**/tsconfig.*.json",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/tests/**",
+    "!**/test/**",
+    "!**/__tests__/**"
+  ],
+  "extraResources": [
+    {
+      "from": "build/icons/win/icon.ico",
+      "to": "app-icons/icon.ico"
+    },
+    {
+      "from": "build/icons/png/256x256.png",
+      "to": "app-icons/icon.png"
+    },
+    {
+      "from": "resources/tray",
+      "to": "tray",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "resources/modelscope.tokens.local.json",
+      "to": "modelscope.tokens.local.json"
+    },
+    {
+      "from": "vendor/engram-runtime/current",
+      "to": "memory",
+      "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
+    }
+  ],
+  "protocols": [
+    {
+      "name": "知远",
+      "schemes": ["zhiyuan"]
+    }
+  ],
+  "mac": {
+    "target": ["dmg", "zip"],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.rongxzyai.com/v2/electron/stable/darwin/arm64/default"
+      }
+    ],
+    "icon": "build/icons/mac/icon.icns",
+    "category": "public.app-category.productivity",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "extendInfo": {
+      "CFBundleIconName": "icon",
+      "NSCalendarsUsageDescription": "知远需要访问您的日历来帮助您查看和管理日程安排，例如查找事件、创建会议等。",
+      "NSRemindersUsageDescription": "知远需要访问您的提醒事项来帮助您管理待办事项。",
+      "NSAppleEventsUsageDescription": "知远需要使用 Apple Events 来控制 Calendar 应用执行自动化操作。"
+    },
+    "extraResources": [
+      {
+        "from": "MCPs",
+        "to": "MCPs",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "SKILLs",
+        "to": "SKILLs",
+        "filter": [
+          "**/*",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/.venv",
+          "!**/.venv/**",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/*.d.cts",
+          "!**/*.d.mts",
+          "!**/README.md",
+          "!**/README",
+          "!**/readme.md",
+          "!**/CHANGELOG.md",
+          "!**/CHANGELOG",
+          "!**/HISTORY.md",
+          "!**/LICENSE",
+          "!**/LICENSE.md",
+          "!**/LICENSE.txt",
+          "!**/.eslintrc*",
+          "!**/.prettierrc*",
+          "!**/tsconfig.json",
+          "!**/tsconfig.*.json",
+          "!**/*.test.*",
+          "!**/*.spec.*",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      },
+      {
+        "from": "resources/uv-mac",
+        "to": "uv-mac",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/python-mac",
+        "to": "python-mac",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/skill-python",
+        "to": "skill-python",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "vendor/channel-runtime/current",
+        "to": "channel-runtime",
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/*.d.cts",
+          "!**/*.d.mts",
+          "!**/README.md",
+          "!**/README",
+          "!**/readme.md",
+          "!**/CHANGELOG.md",
+          "!**/CHANGELOG",
+          "!**/HISTORY.md",
+          "!**/LICENSE",
+          "!**/LICENSE.md",
+          "!**/LICENSE.txt",
+          "!**/.eslintrc*",
+          "!**/.prettierrc*",
+          "!**/tsconfig.json",
+          "!**/tsconfig.*.json",
+          "!**/*.test.*",
+          "!**/*.spec.*",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      }
+    ]
+  },
+  "dmg": {
+    "sign": false
+  },
+  "win": {
+    "target": ["nsis"],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.rongxzyai.com/v2/electron/stable/win32/x64/lite"
+      }
+    ],
+    "icon": "build/icons/win/icon.ico",
+    "requestedExecutionLevel": "asInvoker",
+    "extraResources": [
+      {
+        "from": "resources/vc_redist.x64.exe",
+        "to": "vc_redist.x64.exe"
+      }
+    ]
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.rongxzyai.com/v2/electron/stable/linux/x64/appimage"
+      }
+    ],
+    "icon": "build/icons/png",
+    "category": "Utility",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "extraResources": [
+      {
+        "from": "MCPs",
+        "to": "MCPs",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/uv-linux",
+        "to": "uv-linux",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/python-linux",
+        "to": "python-linux",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "resources/skill-python",
+        "to": "skill-python",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "SKILLs",
+        "to": "SKILLs",
+        "filter": [
+          "**/*",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/.venv",
+          "!**/.venv/**",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/*.d.cts",
+          "!**/*.d.mts",
+          "!**/README.md",
+          "!**/README",
+          "!**/readme.md",
+          "!**/CHANGELOG.md",
+          "!**/CHANGELOG",
+          "!**/HISTORY.md",
+          "!**/LICENSE",
+          "!**/LICENSE.md",
+          "!**/LICENSE.txt",
+          "!**/.eslintrc*",
+          "!**/.prettierrc*",
+          "!**/tsconfig.json",
+          "!**/tsconfig.*.json",
+          "!**/*.test.*",
+          "!**/*.spec.*",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      },
+      {
+        "from": "vendor/channel-runtime/current",
+        "to": "channel-runtime",
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/*.d.cts",
+          "!**/*.d.mts",
+          "!**/README.md",
+          "!**/README",
+          "!**/readme.md",
+          "!**/CHANGELOG.md",
+          "!**/CHANGELOG",
+          "!**/HISTORY.md",
+          "!**/LICENSE",
+          "!**/LICENSE.md",
+          "!**/LICENSE.txt",
+          "!**/.eslintrc*",
+          "!**/.prettierrc*",
+          "!**/tsconfig.json",
+          "!**/tsconfig.*.json",
+          "!**/*.test.*",
+          "!**/*.spec.*",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "runAfterFinish": true,
+    "deleteAppDataOnUninstall": true,
+    "installerHeader": "build/installer-assets/installerHeader.bmp",
+    "installerSidebar": "build/installer-assets/installerSidebar.bmp",
+    "uninstallerSidebar": "build/installer-assets/uninstallerSidebar.bmp",
+    "include": "scripts/nsis-installer.nsh",
+    "artifactName": "${productName}-Setup-${version}.${ext}"
+  },
+  "electronVersion": "40.2.1",
+  "electronUpdaterCompatibility": ">=6.0.0",
+  "detectUpdateChannel": false,
+  "generateUpdatesFilesForAllChannels": false,
+  "asarUnpack": [
+    "node_modules/@img/**",
+    "node_modules/@firecrawl/**",
+    "node_modules/better-sqlite3/**",
+    "node_modules/npm/**"
+  ],
+  "asar": true
+}

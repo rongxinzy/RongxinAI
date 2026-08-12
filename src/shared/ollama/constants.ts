@@ -1,0 +1,28 @@
+export const OllamaIpcChannel = {
+  Status: 'ollama:status',
+  Install: 'ollama:install',
+  Start: 'ollama:start',
+  Stop: 'ollama:stop',
+  Restart: 'ollama:restart',
+  GetServiceConfig: 'ollama:service-config:get',
+  SetServiceConfig: 'ollama:service-config:set',
+  ModelsDir: 'ollama:models-dir',
+  ListLocalModels: 'ollama:list-local-models',
+  ListRunningModels: 'ollama:list-running-models',
+  DeleteModel: 'ollama:delete-model',
+  ShowModel: 'ollama:show-model',
+  CreateModel: 'ollama:create-model',
+  PreloadModel: 'ollama:preload-model',
+  UnloadModel: 'ollama:unload-model',
+  PullModel: 'ollama:pull-model',
+  CancelPull: 'ollama:cancel-pull',
+  Chat: 'ollama:chat',
+  ChatStream: 'ollama:chat-stream',
+  CancelChatStream: 'ollama:cancel-chat-stream',
+  StatusChanged: 'ollama:status-changed',
+  InstallProgress: 'ollama:install-progress',
+  PullProgress: 'ollama:pull-progress',
+  ChatStreamChunk: 'ollama:chat-stream-chunk',
+} as const;
+
+export type OllamaIpcChannel = (typeof OllamaIpcChannel)[keyof typeof OllamaIpcChannel];

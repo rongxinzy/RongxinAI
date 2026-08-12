@@ -1,0 +1,28 @@
+<svg width="34" height="34" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 知远智能体 chip-shrimp icon (monochrome for CSS mask) -->
+  <!-- Chip pins — top -->
+  <path d="M338 112v88M452 112v88M566 112v88M680 112v88" stroke="black" stroke-width="54" stroke-linecap="round"/>
+  <!-- Chip pins — bottom -->
+  <path d="M338 824v88M452 824v88M566 824v88M680 824v88" stroke="black" stroke-width="54" stroke-linecap="round"/>
+  <!-- Chip pins — left -->
+  <path d="M112 338h88M112 452h88M112 566h88M112 680h88" stroke="black" stroke-width="54" stroke-linecap="round"/>
+  <!-- Chip pins — right -->
+  <path d="M824 338h88M824 452h88M824 566h88M824 680h88" stroke="black" stroke-width="54" stroke-linecap="round"/>
+  <!-- Rounded chip body -->
+  <rect x="200" y="200" width="624" height="624" rx="118" stroke="black" stroke-width="54"/>
+  <!-- Shrimp body -->
+  <path d="M603 675c-95 92-256 78-342-23-66-78-79-187-33-280 26-53 70-95 124-119 35-15 76 6 84 43 5 23-6 47-26 59-78 46-102 145-56 222 49 83 159 105 235 47 24-18 58-12 74 14 8 13 4 27-60 37z" fill="black"/>
+  <!-- White highlight on shrimp -->
+  <path d="M302 430c75 23 150 20 218-9" stroke="black" stroke-width="25"/>
+  <!-- Shrimp body lines -->
+  <path d="M270 505c88 45 190 51 286 8" stroke="black" stroke-width="25" stroke-linecap="round"/>
+  <path d="M318 628c67 33 148 35 223 3" stroke="black" stroke-width="25" stroke-linecap="round"/>
+  <!-- Shrimp head line -->
+  <path d="M400 310c128-71 319-39 407 57 32 35 18 91-28 106L481 566" stroke="black" stroke-width="54" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M485 568c61-20 153-49 269-87" stroke="black" stroke-width="54" stroke-linecap="round"/>
+  <circle cx="646" cy="374" r="24" fill="black"/>
+  <!-- Circuit claw / legs -->
+  <path d="M535 682l87-88M582 746l101-102" stroke="black" stroke-width="38" stroke-linecap="round"/>
+  <circle cx="646" cy="570" r="26" fill="black"/>
+  <circle cx="710" cy="634" r="26" fill="black"/>
+</svg>

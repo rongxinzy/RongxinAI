@@ -1,0 +1,5 @@
+name: 营销活动方案
+description: 从目标、受众和核心信息出发，制定包含渠道策略、内容日历与衡量指标的完整营销活动方案。
+author: Anthropic
+license: Apache-2.0
+skillmd: ./SKILL.md

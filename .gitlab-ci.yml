@@ -1,0 +1,346 @@
+# .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
+#
+# Stage: lint → build → test
+# 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
+# 缓存：使用 GitLab CI 原生 cache，存储在 runner 本地目录，不依赖宿主机卷
+
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_TAG
+    - when: never
+
+default:
+  image: rongxinai-ci:latest
+  cache:
+    - key: '$CI_COMMIT_REF_SLUG'
+      paths:
+        - node_modules/
+  before_script:
+    - |
+      export NPM_CONFIG_USERCONFIG="$CI_PROJECT_DIR/.npmrc"
+      export NPM_CONFIG_CACHE="$CI_PROJECT_DIR/.npm-cache"
+      mkdir -p "$NPM_CONFIG_CACHE"
+      printf "registry=%s\ncache=%s\n" "$NPM_CONFIG_REGISTRY" "$NPM_CONFIG_CACHE" > "$NPM_CONFIG_USERCONFIG"
+    - npm install -g bun --prefer-offline --no-audit
+    - bun install --ignore-scripts
+
+stages:
+  - lint
+  - build
+  - test
+  - build-platforms
+
+variables:
+  NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+  NODEJS_ORG_MIRROR: 'https://npmmirror.com/mirrors/node'
+  ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+  ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+  ELECTRON_BUILDER_BINARIES_MIRROR: 'https://npmmirror.com/mirrors/electron-builder-binaries/'
+
+# ═══════════════════════════════════════════════════════
+# Stage 1: Lint（仅变更的 TS/TSX 文件）
+# ═══════════════════════════════════════════════════════
+lint:
+  stage: lint
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - |
+      if [ -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA" ]; then
+        FILES=$(git diff --name-only --diff-filter=ACMR $CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD -- '*.ts' '*.tsx')
+      elif [ -n "$CI_COMMIT_BEFORE_SHA" ] && [ "$CI_COMMIT_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+        FILES=$(git diff --name-only --diff-filter=ACMR $CI_COMMIT_BEFORE_SHA...HEAD -- '*.ts' '*.tsx')
+      else
+        FILES=$(git diff --name-only --diff-filter=ACMR HEAD~1 -- '*.ts' '*.tsx')
+      fi
+    - |
+      if [ -n "$FILES" ]; then
+        echo "Linting changed files:"
+        echo "$FILES"
+        echo "$FILES" | xargs npx oxlint --report-unused-disable-directives --deny-warnings
+      else
+        echo "No TypeScript files changed, skipping lint"
+      fi
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ═══════════════════════════════════════════════════════
+# Stage 2: 构建
+# ═══════════════════════════════════════════════════════
+
+build-renderer:
+  stage: build
+  needs:
+    - job: lint
+      optional: true
+  variables:
+    VITE_SKIP_ELECTRON: '1'
+  script:
+    - npx tsc --noEmit
+    - node --max-old-space-size=4096 node_modules/.bin/vite build --sourcemap false
+    - test -f dist/index.html
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - src/renderer/**/*
+        - vite.config.ts
+        - tsconfig.json
+        - tailwind.config.js
+        - postcss.config.js
+
+build-main:
+  stage: build
+  needs:
+    - job: lint
+      optional: true
+  script:
+    - npx --no-install tsc --project electron-tsconfig.json
+    - echo "tsc output:" && find dist-electron -name "main.js" -o -name "preload.js" 2>&1
+    - test -n "$(find dist-electron -name "main.js" -o -name "preload.js")"
+  artifacts:
+    paths:
+      - dist-electron/
+    expire_in: 1 hour
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - src/main/**/*
+        - src/common/**/*
+        - electron-tsconfig.json
+        - src/main/preload.ts
+
+build-skills:
+  stage: build
+  script:
+    - npm run build:skills
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - changes:
+        - SKILLs/**/*
+
+# ═══════════════════════════════════════════════════════
+# Stage 3: 测试
+# ═══════════════════════════════════════════════════════
+test:
+  stage: test
+  needs:
+    - job: build-main
+      optional: true
+  script:
+    - npm test
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ═══════════════════════════════════════════════════════
+# Stage 4: 平台打包（自托管 Runner）
+# ═══════════════════════════════════════════════════════
+
+# ═══════════════════════════════════════════════════════
+# Windows 安装包构建（自托管 Runner，tags: windows）
+#
+# 触发条件：
+#   - 推送 v* 格式的 tag（自动）
+#   - 通过 Web UI 手动触发（Pipeline → Run pipeline → 手动点 ▶）
+#
+# 缓存策略：
+#   - node_modules：按分支 + lockfile hash 缓存，减少重复安装
+#   - OpenClaw 运行时：按 OpenClaw 版本号缓存，避免每次完整构建
+#   - Python 运行时：按 Python 版本号缓存
+# ═══════════════════════════════════════════════════════
+
+build-windows-lite:
+  timeout: 2h
+  stage: build-platforms
+  tags:
+    - windows
+  image: null
+  before_script: []
+  variables:
+    NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+    ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+    GIT_CLEAN_FLAGS: none
+    ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: lite
+  cache:
+    - key: 'win-npm-dev'
+      paths:
+        - node_modules/
+    - key: 'win-python-3.11.9'
+      paths:
+        - resources/python-win/
+    - key: 'win-openclaw-v2026.4.14'
+      paths:
+        - vendor/openclaw-runtime/win-x64/
+        - build-tar/win-resources.tar
+    - key: 'win-llamacpp-backends-b9244'
+      paths:
+        - build/win-lite/
+        - build/win-full/
+  script:
+    - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/package-windows.ps1
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+
+build-windows-full:
+  timeout: 2h
+  stage: build-platforms
+  tags:
+    - windows
+  image: null
+  before_script: []
+  variables:
+    NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+    ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+    GIT_CLEAN_FLAGS: none
+    ZHIYUAN_WIN_LLAMACPP_BACKEND_BUNDLE: full
+  cache:
+    - key: 'win-npm-dev'
+      paths:
+        - node_modules/
+    - key: 'win-python-3.11.9'
+      paths:
+        - resources/python-win/
+    - key: 'win-openclaw-v2026.4.14'
+      paths:
+        - vendor/openclaw-runtime/win-x64/
+        - build-tar/win-resources.tar
+    - key: 'win-llamacpp-backends-b9244'
+      paths:
+        - build/win-lite/
+        - build/win-full/
+  script:
+    - powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/package-windows.ps1
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual
+
+# ═══════════════════════════════════════════════════════
+# Linux 安装包构建（Docker executor，复用 rongxinai-ci 镜像）
+#
+# 触发条件：
+#   - 推送 v* 格式的 tag（自动）
+#   - 通过 Web UI 手动触发（Pipeline → Run pipeline → 手动点 ▶ build-linux）
+#
+# 产物：AppImage + deb
+# ═══════════════════════════════════════════════════════
+
+build-linux:
+  timeout: 2h
+  stage: build-platforms
+  image: rongxinai-ci:latest
+  # 覆盖默认 before_script：build-windows 同样跳过，避免 npm install 与
+  # npm ci 重复执行。此处改为 npm install --prefer-offline，与 node_modules
+  # 缓存协同：首次全量安装，后续命中缓存仅校验增量，大幅提速。
+  before_script: []
+  variables:
+    NPM_CONFIG_REGISTRY: 'https://registry.npmmirror.com'
+    ELECTRON_MIRROR: 'https://npmmirror.com/mirrors/electron/'
+    GIT_CLEAN_FLAGS: none
+    # 跳过 Electron postinstall 下载
+    ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    # 从内网 GitLab 镜像拉取 OpenClaw 源码（避免 GitHub 不可达）
+    OPENCLAW_REPO: 'http://172.18.5.179:8180/rxzy-opensource/openclaw-mirror.git'
+    OPENCLAW_SRC: '${CI_PROJECT_DIR}/vendor/openclaw-src'
+  cache:
+    - key: 'linux-npm-release-1-0'
+      paths:
+        - node_modules/
+    - key: 'linux-openclaw-v2026.4.14'
+      paths:
+        - vendor/openclaw-runtime/linux-x64/
+        - vendor/openclaw-src/
+  script:
+    # 清理构建输出（不删 node_modules，保留缓存命中的依赖）
+    - rm -rf dist dist-electron release
+    # 确保 Electron 打包所需的系统库存在（镜像可能已预装，缺少则安装）
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 2>/dev/null || true
+    # 安装依赖：使用 bun（lockfile 为 bun.lock）以利用 node_modules 缓存
+    # --ignore-scripts 跳过 postinstall（Electron 二进制由下方步骤手动下载）
+    - npm install -g bun --prefer-offline --no-audit
+    - bun install --ignore-scripts
+    - npm install -g pnpm --registry https://registry.npmmirror.com
+    - pnpm config set registry https://registry.npmmirror.com
+    # 手动下载 Electron 二进制（避免 GitHub 不可达）
+    # node_modules 缓存命中时此步骤为 no-op
+    - |
+      ELECTRON_VER="40.2.1"
+      ELECTRON_DIST="node_modules/electron/dist"
+      if [ ! -f "$ELECTRON_DIST/electron" ]; then
+        echo "Downloading Electron $ELECTRON_VER from npmmirror..."
+        curl -fsSL "https://npmmirror.com/mirrors/electron/v$ELECTRON_VER/electron-v$ELECTRON_VER-linux-x64.zip" -o /tmp/electron.zip
+        mkdir -p "$ELECTRON_DIST"
+        unzip -qo /tmp/electron.zip -d "$ELECTRON_DIST"
+        rm -f /tmp/electron.zip
+        echo "Electron extracted to $ELECTRON_DIST"
+      else
+        echo "Electron already present at $ELECTRON_DIST"
+      fi
+    # 版本号处理
+    - |
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      if echo "$CI_COMMIT_TAG" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+        export APP_BUILD_VERSION=""
+        echo "Release build: version=$PKG_VERSION"
+      else
+        export APP_BUILD_VERSION="$PKG_VERSION-$CI_COMMIT_SHORT_SHA"
+        echo "Dev build: version=$APP_BUILD_VERSION"
+      fi
+    # 完整打包：OpenClaw 运行时 → 编译 → skills → electron-builder
+    - npm run openclaw:runtime:linux-x64
+    - DEBUG=electron-builder npm run dist:linux
+    # 验证产物
+    - |
+      echo "=== Release directory contents ==="
+      ls -lh release/
+    - |
+      if ls release/*.AppImage 1>/dev/null 2>&1 || ls release/*.deb 1>/dev/null 2>&1; then
+        echo "Linux packages built successfully"
+      else
+        echo "FATAL: No .AppImage or .deb found in release/"
+        exit 1
+      fi
+    # 上传到 Artifactory
+    - |
+      for pkg in release/*.AppImage release/*.deb; do
+        if [ -f "$pkg" ]; then
+          SIZE=$(du -h "$pkg" | cut -f1)
+          echo "Package: $pkg ($SIZE)"
+          ENCODED_NAME=$(python3 -c "import urllib.parse; print(urllib.parse.quote_plus('$(basename "$pkg")'))")
+          UPLOAD_URL="http://172.18.5.249:8081/artifactory/ZhiYuanAgent/linux/$ENCODED_NAME"
+          if [ -n "$ARTIFACTORY_USER" ] && [ -n "$ARTIFACTORY_PASSWORD" ]; then
+            echo "Uploading to $UPLOAD_URL ..."
+            curl -sS --fail --connect-timeout 10 --max-time 900 \
+              -u "$ARTIFACTORY_USER:$ARTIFACTORY_PASSWORD" \
+              -T "$pkg" "$UPLOAD_URL" \
+              && echo "Uploaded to Artifactory" \
+              || echo "Artifactory upload failed (non-fatal)"
+          else
+            echo "Skipping upload: ARTIFACTORY_USER or ARTIFACTORY_PASSWORD not set"
+          fi
+        fi
+      done
+  artifacts:
+    paths:
+      - release/*.AppImage
+      - release/*.deb
+    expire_in: 7 days
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: manual

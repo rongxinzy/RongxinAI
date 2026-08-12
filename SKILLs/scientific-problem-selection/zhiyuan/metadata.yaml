@@ -1,0 +1,5 @@
+name: 科研问题选择
+description: 通过系统化提问和决策树，帮助科研人员评估新想法、梳理项目卡点并选择值得投入的研究问题。
+author: 开源社区
+license: Apache-2.0
+skillmd: ./SKILL.md

@@ -1,0 +1,53 @@
+{
+  "name": "presales-technical-consultant",
+  "version": "1.0.0",
+  "description": "Presales technical consulting expert for discovery, demos, solution architecture, POCs, competitive positioning, and technical evaluations.",
+  "author": {
+    "name": "ZhiYuan Agent"
+  },
+
+  "expertType": "agent",
+  "agentName": "presales-technical-consultant",
+
+  "agents": ["./agents/presales-technical-consultant.md"],
+  "skills": ["./skills/presales-technical-consulting"],
+  "skillIds": ["web-search", "docx", "xlsx", "pptx", "pdf"],
+
+  "displayName": {
+    "en": "Presales Technical Consultant",
+    "zh": "售前技术顾问"
+  },
+  "profession": {
+    "en": "Enterprise Solution and Technical Evaluation Consultant",
+    "zh": "企业解决方案与技术评估顾问"
+  },
+  "displayDescription": {
+    "en": "Turns customer requirements into outcome-led demos, scoped POCs, solution architectures, competitive responses, and decision-ready technical evaluations.",
+    "zh": "梳理客户需求与决策标准，设计演示、验证方案和技术架构，并形成可执行的竞争应对与评估结论。"
+  },
+  "categoryId": "07-SalesCommerce",
+  "defaultInitPrompt": {
+    "zh": "请为这次企业客户技术交流设计需求发现提纲，并给出后续演示与POC建议。",
+    "en": "Design a discovery guide for this enterprise technical meeting, then recommend the follow-up demo and POC."
+  },
+  "plugin": "presales-technical-consultant",
+  "tags": [
+    { "en": "Technical Discovery", "zh": "技术需求发现" },
+    { "en": "Demo and POC", "zh": "演示与验证" },
+    { "en": "Solution Architecture", "zh": "解决方案架构" }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "请为这次企业客户技术交流设计需求发现提纲，并给出后续演示与POC建议。",
+      "en": "Design a discovery guide for this enterprise technical meeting, then recommend the follow-up demo and POC."
+    },
+    {
+      "zh": "根据这份客户需求，设计一套以业务结果为主线的产品演示脚本。",
+      "en": "Create an outcome-led product demo script from these customer requirements."
+    },
+    {
+      "zh": "为这个项目定义POC范围、成功标准、时间线、责任人和决策门。",
+      "en": "Define the POC scope, success criteria, timeline, owners, and decision gates for this opportunity."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+name: 回归分析解读
+description: 对 CSV 或 Excel 数据完成线性与逻辑回归分析，并用通俗语言解释系数、显著性和业务含义。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md

@@ -1,0 +1,5 @@
+name: 研究写作助手
+description: 支持资料调研、引用补充、文章结构设计与逐节反馈，帮助将研究想法组织成高质量内容。
+author: ComposioHQ
+license: Apache-2.0
+skillmd: ./SKILL.md

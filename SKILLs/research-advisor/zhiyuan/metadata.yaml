@@ -1,0 +1,5 @@
+name: 科研决策顾问
+description: 协助科研人员完成选题构思、研究规划、问题排查与方案决策，输出清晰的研究路径与风险判断。
+author: Anthropic
+license: Apache-2.0
+skillmd: ./SKILL.md

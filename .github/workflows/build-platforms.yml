@@ -1,0 +1,183 @@
+name: Build platform artifacts (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_macos:
+        description: 'Build macOS'
+        required: true
+        default: true
+        type: boolean
+      build_windows:
+        description: 'Build Windows'
+        required: true
+        default: true
+        type: boolean
+      build_linux:
+        description: 'Build Linux'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  plan-platforms:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - id: plan
+        env:
+          BUILD_MACOS: ${{ inputs.build_macos }}
+          BUILD_WINDOWS: ${{ inputs.build_windows }}
+          BUILD_LINUX: ${{ inputs.build_linux }}
+        shell: bash
+        run: |
+          matrix='{"include":['
+          separator=''
+
+          if [[ "$BUILD_MACOS" == "true" ]]; then
+            matrix+='{"platform":"macos","runner":"macos-latest","artifact":"macos-build","runtime_target":"mac-arm64"}'
+            separator=','
+          fi
+          if [[ "$BUILD_WINDOWS" == "true" ]]; then
+            matrix+="${separator}{\"platform\":\"windows\",\"runner\":\"windows-latest\",\"artifact\":\"windows-build\",\"runtime_target\":\"win-x64\"}"
+            separator=','
+          fi
+          if [[ "$BUILD_LINUX" == "true" ]]; then
+            matrix+="${separator}{\"platform\":\"linux\",\"runner\":\"ubuntu-latest\",\"artifact\":\"linux-build\",\"runtime_target\":\"linux-x64\"}"
+          fi
+
+          matrix+=']}'
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  build-platforms:
+    needs: plan-platforms
+    strategy:
+      # A manual platform build is a single release unit; cancel sibling builds
+      # as soon as one selected platform fails.
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan-platforms.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    # A release build may download upstream runtimes, but it must never consume
+    # a runner indefinitely when an upstream command stalls.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+      - name: Enforce retired runtime decoupling
+        run: node scripts/ci/check-openclaw-decoupling.mjs
+      - name: Check out the fixed cc-connect sidecar source
+        uses: actions/checkout@v6
+        with:
+          repository: rongxinzy/pi-connect
+          ref: 2ccda878a77402d7445daa22d06f3cf54028aa34
+          path: .sidecars/pi-connect
+          persist-credentials: false
+      - name: Set up Go for the fixed cc-connect sidecar
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: .sidecars/pi-connect/go.mod
+          cache-dependency-path: .sidecars/pi-connect/go.sum
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            vendor/engram-runtime
+          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
+      - name: Install Electron system dependencies
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
+            libxss1 libxtst6 libuuid1 xdg-utils xvfb
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up Windows runtimes
+        if: ${{ matrix.platform == 'windows' }}
+        run: |
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+          bun run engram:runtime:${{ matrix.runtime_target }}
+      - name: Set up POSIX runtimes
+        if: ${{ matrix.platform != 'windows' }}
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+          bun run engram:runtime:${{ matrix.runtime_target }}
+      - name: Build macOS
+        if: ${{ matrix.platform == 'macos' }}
+        run: bun run dist:mac
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Windows
+        if: ${{ matrix.platform == 'windows' }}
+        run: bun run dist:win
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}\\.sidecars\\pi-connect
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build Linux
+        if: ${{ matrix.platform == 'linux' }}
+        run: bun run dist:linux
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify Windows package runtimes with a clean PATH
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-runtime-smoke.ps1
+          -ProjectRoot ${{ github.workspace }}
+      - name: Verify the packaged renderer in a virtual Ubuntu desktop
+        if: ${{ matrix.platform == 'linux' }}
+        run: >-
+          node scripts/verify-linux-renderer.mjs
+          release/linux-unpacked
+          release/linux-render-smoke.png
+      - uses: actions/upload-artifact@v6
+        if: ${{ matrix.platform == 'macos' }}
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/*.dmg
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        if: ${{ matrix.platform == 'windows' }}
+        with:
+          name: ${{ matrix.artifact }}
+          path: release/*.exe
+          retention-days: 7
+      - uses: actions/upload-artifact@v6
+        if: ${{ always() && matrix.platform == 'linux' }}
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/linux-render-smoke.png
+          retention-days: 7

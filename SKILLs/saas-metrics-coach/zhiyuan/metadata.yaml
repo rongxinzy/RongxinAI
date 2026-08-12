@@ -1,0 +1,5 @@
+name: SaaS 指标顾问
+description: 解读 ARR、MRR、流失率、LTV 与 CAC 等关键指标，帮助团队诊断 SaaS 业务健康度和改进重点。
+author: Abbas Mir
+license: MIT
+skillmd: ./SKILL.md

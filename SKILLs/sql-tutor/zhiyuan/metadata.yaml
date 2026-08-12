@@ -1,0 +1,5 @@
+name: SQL 学习助手
+description: 帮助编写、解释和优化 SQL 查询，辅助阅读执行计划并用循序渐进的方式讲清查询思路。
+author: 开源社区
+license: MIT
+skillmd: ./SKILL.md
