@@ -3,7 +3,7 @@ import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { cn } from '@shared/lib/utils';
 import { MotionConfig, useReducedMotion } from 'motion/react';
-import { MessageCircle, PanelLeft, Trash2, TriangleAlert, X } from 'lucide-react';
+import { MessageCircle, Trash2, TriangleAlert, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -37,6 +37,7 @@ import {
   SidebarAnimatedSearchIcon,
   type SidebarAnimatedSearchIconHandle,
 } from './icons/SidebarAnimatedSearchIcon';
+import { SidebarAnimatedPanelLeftCloseIcon } from './icons/SidebarAnimatedPanelLeftCloseIcon';
 import { toggleBatchSelection, toggleVisibleBatchSelection } from './agentSidebar/batchSelection';
 import MyAgentSidebarTree from './agentSidebar/MyAgentSidebarTree';
 import { sortAgentSidebarTasks, toAgentSidebarTaskNode } from './agentSidebar/useAgentSidebarState';
@@ -520,7 +521,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className="non-draggable h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
                 aria-label={isCollapsed ? i18nService.t('expand') : i18nService.t('collapse')}
               >
-                <PanelLeft className="h-4 w-4" />
+                <SidebarAnimatedPanelLeftCloseIcon />
               </Button>
             </div>
             <SidebarNavigationControls
