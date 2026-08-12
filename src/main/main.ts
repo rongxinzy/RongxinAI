@@ -83,6 +83,7 @@ import {
   ApiFetchSchema,
   ApiStreamSchema,
   CoworkSessionStartSchema,
+  CoworkSessionUpdateModelSchema,
   ProjectCreateDirectorySchema,
 } from '../shared/ipc/schemas';
 import { PlatformRegistry } from '../shared/platform';
@@ -2533,7 +2534,7 @@ const startMcpBridge = (): Promise<McpBridgeConfig | null> => {
           if (win.isDestroyed()) return;
           try {
             win.webContents.send(OpenClawBridgeIpc.AskUser, {
-              sessionId: CoworkPermissionSessionId.OpenClawBridge,
+              sessionId: CoworkPermissionSessionId.LegacyBridge,
               request: {
                 requestId: request.requestId,
                 toolName: CoworkPermissionToolName.AskUserQuestion,
@@ -4914,6 +4915,28 @@ if (!gotTheLock) {
       }
     },
   );
+
+  ipcMain.handle(CoworkSessionIpc.UpdateModel, async (_event, rawInput: unknown) => {
+    try {
+      const input = CoworkSessionUpdateModelSchema.input.parse(rawInput);
+      const store = getCoworkStore();
+      const existing = store.getSession(input.sessionId, 0);
+      if (!existing) {
+        return { success: false, error: 'Session not found' };
+      }
+      store.updateSession(
+        input.sessionId,
+        { modelOverride: input.modelOverride },
+        { touchUpdatedAt: false },
+      );
+      return { success: true, session: store.getSession(input.sessionId, 0) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update session model',
+      };
+    }
+  });
 
   ipcMain.handle(CoworkSessionIpc.Get, async (_event, sessionId: string) => {
     try {

@@ -36,7 +36,6 @@ export type CoworkPermissionBehavior =
 
 export const CoworkPermissionOrigin = {
   PiWorkbench: 'pi-workbench',
-  OpenClawBridge: 'openclaw-bridge',
 } as const;
 
 export type CoworkPermissionOrigin =
@@ -50,5 +49,5 @@ export type CoworkPermissionToolName =
   (typeof CoworkPermissionToolName)[keyof typeof CoworkPermissionToolName];
 
 export const CoworkPermissionSessionId = {
-  OpenClawBridge: 'openclaw-bridge',
+  LegacyBridge: 'legacy-bridge',
 } as const;

@@ -256,6 +256,11 @@ export const CoworkSessionRenameSchema = {
   output: IpcResult({}),
 };
 
+export const CoworkSessionUpdateModelSchema = {
+  input: z.object({ sessionId: z.string().min(1), modelOverride: z.string() }),
+  output: IpcResult({ session: z.object({}).passthrough().nullable().optional() }),
+};
+
 export const CoworkSessionGetSchema = {
   input: z.string().min(1),
   output: IpcResult({ session: z.object({}).passthrough() }),
@@ -351,7 +356,6 @@ export const CoworkConfigSetSchema = {
   input: z.object({
     workingDirectory: z.string().optional(),
     executionMode: z.enum(['auto', 'local', 'sandbox']).optional(),
-    agentEngine: z.enum(['openclaw', 'pi']).optional(),
     memoryEnabled: z.boolean().optional(),
     memoryImplicitUpdateEnabled: z.boolean().optional(),
     memoryLlmJudgeEnabled: z.boolean().optional(),

@@ -46,23 +46,19 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   ...overrides,
 });
 
-test('defaults hidden OpenClaw session policy to thirty days', () => {
+test('defaults scheduler recovery policy to skip missed jobs', () => {
   const state = coworkReducer(undefined, { type: 'init' });
 
-  expect(state.config.openClawSessionPolicy).toEqual({
-    keepAlive: '30d',
-  });
   expect(state.config.skipMissedJobs).toBe(true);
 });
 
-test('setConfig preserves loaded OpenClaw session policy', () => {
+test('setConfig loads Pi-owned cowork configuration', () => {
   const state = coworkReducer(
     undefined,
     setConfig({
       workingDirectory: '/tmp',
       systemPrompt: '',
       executionMode: 'local',
-      agentEngine: 'openclaw',
       memoryEnabled: true,
       memoryImplicitUpdateEnabled: true,
       memoryLlmJudgeEnabled: false,
@@ -77,13 +73,11 @@ test('setConfig preserves loaded OpenClaw session policy', () => {
       embeddingVectorWeight: 0.7,
       embeddingRemoteBaseUrl: '',
       embeddingRemoteApiKey: '',
-      openClawSessionPolicy: {
-        keepAlive: '365d',
-      },
     }),
   );
 
-  expect(state.config.openClawSessionPolicy.keepAlive).toBe('365d');
+  expect(state.config.skipMissedJobs).toBe(false);
+  expect(state.config.workingDirectory).toBe('/tmp');
 });
 
 test('updateCurrentSessionModelOverride only patches the active session', () => {

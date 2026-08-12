@@ -30,8 +30,6 @@ import {
   McpIpc,
   NetworkIpc,
   OpenAICodexOAuthIpc,
-  OpenClawBridgeIpc,
-  OpenClawEngineIpc,
   PermissionsIpc,
   ProjectIpc,
   ShellIpc,
@@ -58,8 +56,6 @@ import {
   type WorkbenchApprovalResponseInput,
   type WorkbenchTaskChangedEvent,
 } from '../shared/workbenchTask';
-import { OpenClawSessionIpc } from './openclawSession/constants';
-import { OpenClawSessionPolicyIpc } from './openclawSessionPolicy/constants';
 
 // Helper: typed main→renderer push listener with automatic cleanup
 const onPush = <T>(channel: string, callback: (data: T) => void): (() => void) => {
@@ -342,43 +338,6 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke(AppConfigIpc.GenerateSessionTitle, userInput),
   getRecentCwds: (limit?: number) => ipcRenderer.invoke(AppConfigIpc.GetRecentCwds, limit),
 
-  openclaw: {
-    bridge: {
-      respondToAskUser: (options: { requestId: string; result: unknown }) =>
-        ipcRenderer.invoke(OpenClawBridgeIpc.RespondAskUser, options),
-      onAskUser: (callback: (data: { sessionId: string; request: unknown }) => void) =>
-        onPush(OpenClawBridgeIpc.AskUser, callback),
-      onAskUserDismiss: (callback: (data: { requestId: string }) => void) =>
-        onPush(OpenClawBridgeIpc.AskUserDismiss, callback),
-    },
-    engine: {
-      getStatus: () => ipcRenderer.invoke(OpenClawEngineIpc.GetStatus),
-      install: () => ipcRenderer.invoke(OpenClawEngineIpc.Install),
-      retryInstall: () => ipcRenderer.invoke(OpenClawEngineIpc.RetryInstall),
-      restartGateway: () => ipcRenderer.invoke(OpenClawEngineIpc.RestartGateway),
-      onProgress: (callback: (status: unknown) => void) =>
-        onPush(OpenClawEngineIpc.OnProgress, callback),
-    },
-    sessionPolicy: {
-      get: () => ipcRenderer.invoke(OpenClawSessionPolicyIpc.Get),
-      set: (config: { keepAlive: '1d' | '7d' | '30d' | '365d' }) =>
-        ipcRenderer.invoke(OpenClawSessionPolicyIpc.Set, config),
-    },
-    session: {
-      patch: (options: {
-        sessionId: string;
-        patch: {
-          model?: string | null;
-          thinkingLevel?: string | null;
-          reasoningLevel?: string | null;
-          elevatedLevel?: string | null;
-          responseUsage?: 'off' | 'tokens' | 'full' | null;
-          sendPolicy?: 'allow' | 'deny' | null;
-        };
-      }) => ipcRenderer.invoke(OpenClawSessionIpc.Patch, options),
-    },
-  },
-
   agents: {
     list: async () => {
       const result = await ipcRenderer.invoke(AgentIpcChannel.List);
@@ -490,6 +449,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CoworkSessionIpc.Pin, options),
     renameSession: (options: { sessionId: string; title: string }) =>
       ipcRenderer.invoke(CoworkSessionIpc.Rename, options),
+    updateSessionModel: (options: { sessionId: string; modelOverride: string }) =>
+      ipcRenderer.invoke(CoworkSessionIpc.UpdateModel, options),
     getSession: (sessionId: string) => ipcRenderer.invoke(CoworkSessionIpc.Get, sessionId),
     getGatewaySessionId: (sessionId: string) =>
       ipcRenderer.invoke(CoworkSessionIpc.GatewaySessionId, sessionId),
@@ -526,7 +487,6 @@ contextBridge.exposeInMainWorld('electron', {
     setConfig: (config: {
       workingDirectory?: string;
       executionMode?: 'auto' | 'local' | 'sandbox';
-      agentEngine?: 'openclaw';
       memoryEnabled?: boolean;
       memoryImplicitUpdateEnabled?: boolean;
       memoryLlmJudgeEnabled?: boolean;

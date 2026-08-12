@@ -1,5 +1,4 @@
 import type { CoworkError } from '../../common/coworkError';
-import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
 import type { ChannelRunSummary } from '../../shared/channelRun/constants';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
@@ -10,7 +9,6 @@ import type {
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
-import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import type {
   ProviderModelDiscoveryRequest,
   ProviderModelDiscoveryResult,
@@ -129,7 +127,6 @@ interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: 'auto' | 'local' | 'sandbox';
-  agentEngine: 'openclaw' | 'pi';
   memoryEnabled: boolean;
   memoryImplicitUpdateEnabled: boolean;
   memoryLlmJudgeEnabled: boolean;
@@ -144,7 +141,6 @@ interface CoworkConfig {
   embeddingVectorWeight: number;
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
-  openClawSessionPolicy: OpenClawSessionPolicyConfig;
 }
 
 type CoworkConfigUpdate = Partial<
@@ -152,7 +148,6 @@ type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
-    | 'agentEngine'
     | 'memoryEnabled'
     | 'memoryImplicitUpdateEnabled'
     | 'memoryLlmJudgeEnabled'
@@ -205,18 +200,6 @@ interface CoworkApiConfig {
   baseURL: string;
   model: string;
   apiType?: 'anthropic' | 'openai';
-}
-
-interface OpenClawEngineStatus {
-  phase: OpenClawEnginePhase;
-  version: string | null;
-  progressPercent?: number;
-  message?: string;
-  canRetry: boolean;
-}
-
-interface OpenClawSessionPolicyConfig {
-  keepAlive: '1d' | '7d' | '30d' | '365d';
 }
 
 interface WindowState {
@@ -658,52 +641,6 @@ interface IElectronAPI {
   saveApiConfig: (config: CoworkApiConfig) => Promise<{ success: boolean; error?: string }>;
   generateSessionTitle: (userInput: string | null) => Promise<string>;
   getRecentCwds: (limit?: number) => Promise<string[]>;
-  openclaw: {
-    bridge: {
-      respondToAskUser: (options: {
-        requestId: string;
-        result: CoworkPermissionResult;
-      }) => Promise<{ success: boolean; error?: string }>;
-      onAskUser: (
-        callback: (data: {
-          sessionId: string;
-          request: Omit<CoworkPermissionRequest, 'origin'>;
-        }) => void,
-      ) => () => void;
-      onAskUserDismiss: (callback: (data: { requestId: string }) => void) => () => void;
-    };
-    engine: {
-      getStatus: () => Promise<{ success: boolean; status?: OpenClawEngineStatus; error?: string }>;
-      install: () => Promise<{ success: boolean; status?: OpenClawEngineStatus; error?: string }>;
-      retryInstall: () => Promise<{
-        success: boolean;
-        status?: OpenClawEngineStatus;
-        error?: string;
-      }>;
-      restartGateway: () => Promise<{
-        success: boolean;
-        status?: OpenClawEngineStatus;
-        error?: string;
-      }>;
-      onProgress: (callback: (status: OpenClawEngineStatus) => void) => () => void;
-    };
-    sessionPolicy: {
-      get: () => Promise<{
-        success: boolean;
-        config?: OpenClawSessionPolicyConfig;
-        error?: string;
-      }>;
-      set: (
-        config: OpenClawSessionPolicyConfig,
-      ) => Promise<{ success: boolean; config?: OpenClawSessionPolicyConfig; error?: string }>;
-    };
-    session: {
-      patch: (options: {
-        sessionId: string;
-        patch: OpenClawSessionPatch;
-      }) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;
-    };
-  };
   appEvents: {
     onOpenSettings: (callback: () => void) => () => void;
     onNewTask: (callback: () => void) => () => void;
@@ -829,6 +766,10 @@ interface IElectronAPI {
       sessionId: string;
       title: string;
     }) => Promise<{ success: boolean; error?: string }>;
+    updateSessionModel: (options: {
+      sessionId: string;
+      modelOverride: string;
+    }) => Promise<{ success: boolean; session?: CoworkSession | null; error?: string }>;
     getSession: (
       sessionId: string,
     ) => Promise<{ success: boolean; session?: CoworkSession; error?: string }>;

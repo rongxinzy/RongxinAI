@@ -141,6 +141,7 @@ export const CoworkSessionIpc = {
   DeleteBatch: 'cowork:session:deleteBatch',
   Pin: 'cowork:session:pin',
   Rename: 'cowork:session:rename',
+  UpdateModel: 'cowork:session:updateModel',
   Get: 'cowork:session:get',
   GatewaySessionId: 'cowork:session:gatewaySessionId',
   RemoteManaged: 'cowork:session:remoteManaged',

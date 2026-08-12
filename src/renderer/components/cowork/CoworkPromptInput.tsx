@@ -362,7 +362,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           setIsPatchingModel(true);
           dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
           try {
-            const ok = await coworkService.patchSession(sessionId, { model: modelRef });
+            const ok = await coworkService.updateSessionModel(sessionId, modelRef);
             if (reqId !== modelPatchRequestIdRef.current) return;
             if (!ok) {
               dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));

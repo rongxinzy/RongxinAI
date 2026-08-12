@@ -58,7 +58,6 @@ import {
 } from '../../types/im';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
-import { useGatewayReady } from '../cowork/useGatewayReady';
 import DingTalkInstanceSettings from './DingTalkInstanceSettings';
 import DiscordInstanceSettings from './DiscordInstanceSettings';
 import FeishuInstanceSettings from './FeishuInstanceSettings';
@@ -102,7 +101,6 @@ const PlatformGuide: React.FC<{
 const IMSettings: React.FC = () => {
   const dispatch = useDispatch();
   const { config, status, isLoading } = useSelector((state: RootState) => state.im);
-  const gatewayReady = useGatewayReady();
   const [activePlatform, setActivePlatform] = useState<Platform>('weixin');
   const [activeQQInstanceId, setActiveQQInstanceId] = useState<string | null>(null);
   const [qqExpanded, setQqExpanded] = useState(false);
@@ -851,7 +849,7 @@ const IMSettings: React.FC = () => {
     const isEnabled = isPlatformEnabled(platform);
     // Can toggle ON if credentials are present, can always toggle OFF
     const canToggle = isEnabled || canStart(platform);
-    if (canToggle && !isLoading && gatewayReady) {
+    if (canToggle && !isLoading) {
       setActivePlatform(platform);
       toggleGateway(platform);
     }
@@ -864,7 +862,7 @@ const IMSettings: React.FC = () => {
       variant="outline"
       size="sm"
       onClick={() => handleConnectivityTest(platform)}
-      disabled={!gatewayReady || isLoading || testingPlatform === platform}
+      disabled={isLoading || testingPlatform === platform}
     >
       {testingPlatform === platform ? (
         <Spinner data-icon="inline-start" />
@@ -1455,7 +1453,7 @@ const IMSettings: React.FC = () => {
               <Switch
                 className="mr-2"
                 checked={isEnabled}
-                disabled={!gatewayReady || !canToggle || togglingPlatform === platform}
+                disabled={!canToggle || togglingPlatform === platform}
                 aria-label={`${i18nService.t(platform)} ${i18nService.t('enabled')}`}
                 onCheckedChange={() => handlePlatformToggle(platform)}
               />
