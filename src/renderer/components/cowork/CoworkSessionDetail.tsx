@@ -20,6 +20,7 @@ import {
 } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
+import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { RootState } from '../../store';
 import {
@@ -55,7 +56,6 @@ import type {
 } from '../../types/cowork';
 import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
 import WindowTitleBar from '../window/WindowTitleBar';
-import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import {
@@ -1179,7 +1179,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             aria-label={i18nService.t('artifactPanelToggle')}
             disabled={isSessionSwitching}
           >
-            <ArtifactPanelIcon className="h-4 w-4" open={!isSessionSwitching && isPanelOpen} />
+            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isPanelOpen} />
           </Button>
 
           <WindowTitleBar inline className="ml-1" />

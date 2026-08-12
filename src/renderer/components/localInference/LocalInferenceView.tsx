@@ -13,7 +13,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { Cpu, FolderOpen, Globe, PanelLeft, Pencil, Settings2 } from 'lucide-react';
+import { PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -32,6 +32,10 @@ import type {
 import { createMarketplaceHardwareProfile, withMarketplaceScore, type MarketplaceHardwareProfile } from '../../../shared/marketplace/scoring';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
+import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
+import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
+import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
+import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
@@ -1018,18 +1022,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                           className={`${localInferenceCompactButtonClass} min-w-32 hover:bg-background dark:hover:bg-background`}
                           size="default"
                         >
-                          <Settings2 data-icon="inline-start" />
+                          <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
                           {i18nService.t('localInferenceSettings')}
                         </Button>
                       }
                     />
                     <DropdownMenuContent align="end" className="min-w-32">
                       <DropdownMenuItem onClick={() => setRuntimeSettingsOpen(true)}>
-                        <Cpu data-icon="inline-start" />
+                        <SidebarAnimatedCpuIcon />
                         {i18nService.t('localInferenceRuntimeSettings')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={openAccessSettings}>
-                        <Globe data-icon="inline-start" />
+                        <LocalInferenceAnimatedWifiPenIcon />
                         {i18nService.t('localInferenceAccessMenuItem')}
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -1038,7 +1042,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                           setLibrarySettingsOpen(true);
                         }}
                       >
-                        <FolderOpen data-icon="inline-start" />
+                        <LocalInferenceAnimatedFolderDownIcon />
                         {i18nService.t('localInferenceLibraryMenuItem')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>

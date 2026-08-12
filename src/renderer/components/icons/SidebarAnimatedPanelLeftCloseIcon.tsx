@@ -4,38 +4,32 @@ import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 
 import { cn } from '@shared/lib/utils';
 
-export interface SidebarAnimatedCpuIconHandle {
+export interface SidebarAnimatedPanelLeftCloseIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface SidebarAnimatedCpuIconProps extends HTMLAttributes<HTMLDivElement> {
+interface SidebarAnimatedPanelLeftCloseIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
 }
 
-const TRANSITION: Transition = {
+const DEFAULT_TRANSITION: Transition = {
+  times: [0, 0.4, 1],
   duration: 0.5,
-  ease: 'easeInOut',
-  repeat: 1,
 };
 
-const Y_VARIANTS: Variants = {
-  normal: { scale: 1, rotate: 0, opacity: 1 },
-  animate: { scaleY: [1, 1.5, 1], opacity: [1, 0.8, 1] },
+const PATH_VARIANTS: Variants = {
+  normal: { x: 0 },
+  animate: { x: [0, -1.5, 0] },
 };
 
-const X_VARIANTS: Variants = {
-  normal: { scale: 1, rotate: 0, opacity: 1 },
-  animate: { scaleX: [1, 1.5, 1], opacity: [1, 0.8, 1] },
-};
-
-export const SidebarAnimatedCpuIcon = forwardRef<
-  SidebarAnimatedCpuIconHandle,
-  SidebarAnimatedCpuIconProps
+export const SidebarAnimatedPanelLeftCloseIcon = forwardRef<
+  SidebarAnimatedPanelLeftCloseIconHandle,
+  SidebarAnimatedPanelLeftCloseIconProps
 >(({ onMouseEnter, onMouseLeave, className, size = 16, ...props }, ref) => {
   const controls = useAnimation();
-  const prefersReducedMotion = useReducedMotion();
   const isControlledRef = useRef(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useImperativeHandle(ref, () => {
     isControlledRef.current = true;
@@ -66,7 +60,7 @@ export const SidebarAnimatedCpuIcon = forwardRef<
   return (
     <div
       aria-hidden="true"
-      className={cn('sidebar-local-inference-icon animated-cpu-icon size-4 shrink-0', className)}
+      className={cn('sidebar-animated-panel-left-close-icon size-4 shrink-0', className)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       {...props}
@@ -82,29 +76,17 @@ export const SidebarAnimatedCpuIcon = forwardRef<
         width={size}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect height="16" rx="2" width="16" x="4" y="4" />
-        <rect height="6" rx="1" width="6" x="9" y="9" />
-        <motion.path animate={controls} d="M15 2v2" transition={TRANSITION} variants={Y_VARIANTS} />
+        <rect height="18" rx="2" width="18" x="3" y="3" />
+        <path d="M9 3v18" />
         <motion.path
           animate={controls}
-          d="M15 20v2"
-          transition={TRANSITION}
-          variants={Y_VARIANTS}
+          d="m16 15-3-3 3-3"
+          transition={DEFAULT_TRANSITION}
+          variants={PATH_VARIANTS}
         />
-        <motion.path animate={controls} d="M2 15h2" transition={TRANSITION} variants={X_VARIANTS} />
-        <motion.path animate={controls} d="M2 9h2" transition={TRANSITION} variants={X_VARIANTS} />
-        <motion.path
-          animate={controls}
-          d="M20 15h2"
-          transition={TRANSITION}
-          variants={X_VARIANTS}
-        />
-        <motion.path animate={controls} d="M20 9h2" transition={TRANSITION} variants={X_VARIANTS} />
-        <motion.path animate={controls} d="M9 2v2" transition={TRANSITION} variants={Y_VARIANTS} />
-        <motion.path animate={controls} d="M9 20v2" transition={TRANSITION} variants={Y_VARIANTS} />
       </svg>
     </div>
   );
 });
 
-SidebarAnimatedCpuIcon.displayName = 'SidebarAnimatedCpuIcon';
+SidebarAnimatedPanelLeftCloseIcon.displayName = 'SidebarAnimatedPanelLeftCloseIcon';
