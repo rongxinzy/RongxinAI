@@ -204,7 +204,7 @@ class McpService {
 
   /**
    * Refresh the MCP Bridge: restarts MCP servers, re-discovers tools,
-   * syncs openclaw.json, and restarts the gateway.
+   * refreshes the in-process MCP server connections.
    * Returns the number of tools discovered.
    */
   async refreshBridge(): Promise<{ success: boolean; tools: number; error?: string }> {

@@ -35,7 +35,7 @@ const DEFINITIONS = [
     id: 'weixin',
     label: 'WeChat',
     region: 'china',
-    channel: 'openclaw-weixin',
+    channel: 'weixin',
     channelAliases: [],
     logo: 'weixin.png',
     guideUrl: '',
@@ -63,7 +63,7 @@ const DEFINITIONS = [
     label: 'WeCom',
     region: 'china',
     channel: 'wecom',
-    channelAliases: ['wecom-openclaw-plugin'],
+    channelAliases: [],
     logo: 'wecom.png',
     guideUrl: '',
   },
@@ -117,9 +117,9 @@ export interface PlatformDef {
   readonly label: string;
   /** Region grouping */
   readonly region: 'china' | 'global';
-  /** Primary OpenClaw channel */
+  /** Primary transport channel */
   readonly channel: ChannelName;
-  /** Additional channel aliases (e.g. wecom has both 'wecom' and 'wecom-openclaw-plugin') */
+  /** Additional transport channel aliases */
   readonly channelAliases: readonly ChannelName[];
   /** Logo filename relative to /im-logos/ in public assets */
   readonly logo: string;
@@ -194,7 +194,7 @@ class PlatformRegistryImpl {
     return this.platformIndex.get(platform)!.guideUrl;
   }
 
-  /** Primary OpenClaw channel for a platform. */
+  /** Primary transport channel for a platform. */
   channelOf(platform: Platform): ChannelName {
     return this.platformIndex.get(platform)!.channel;
   }

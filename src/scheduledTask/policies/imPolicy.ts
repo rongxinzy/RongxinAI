@@ -1,4 +1,4 @@
-import { buildManagedSessionKey } from '../../main/libs/openclawChannelSessionSync';
+import { buildManagedSessionKey } from '../../main/libs/channelSessionKey';
 import {
   BindingKind,
   DeliveryMode,

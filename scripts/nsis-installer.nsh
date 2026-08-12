@@ -278,7 +278,7 @@
 
   ; Defender exclusion is optional and requires explicit, informed consent.
   ; Keep the scope limited to the immutable component cache; never exclude
-  ; user-created Skills, OpenClaw state, model data, or the full install tree.
+  ; user-created Skills, agent state, model data, or the full install tree.
   DetailPrint "[Installer] Checking Microsoft Defender exclusion"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\

@@ -23,7 +23,7 @@ import {
   updateOllamaRuntimeModels,
   updateLlamaCppRunningModels,
 } from './claudeSettings';
-import { buildLlamaCppRunningModelBinding } from './llamacppOpenClawBinding';
+import { buildLlamaCppRunningModelBinding } from './llamacppAgentBinding';
 
 const createAppConfig = (defaultModel: string) => ({
   model: {
@@ -339,7 +339,7 @@ test('resolveRawApiConfig ignores stale general models while coding plan is enab
   });
 });
 
-test('resolveAllEnabledProviderConfigs only exposes OpenClaw-eligible llama.cpp running models', () => {
+test('resolveAllEnabledProviderConfigs only exposes Agent-eligible llama.cpp running models', () => {
   const eligible = buildLlamaCppRunningModelBinding({
     name: 'qwen-eligible',
     trained_context_length: 32768,

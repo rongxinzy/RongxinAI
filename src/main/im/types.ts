@@ -1,4 +1,4 @@
-﻿/**
+/**
  * IM Gateway Type Definitions
  * Types for DingTalk, Feishu and Telegram IM bot integration
  */
@@ -6,7 +6,7 @@
 import type { Platform } from '../../shared/platform';
 export type { Platform } from '../../shared/platform';
 
-export interface DingTalkOpenClawConfig {
+export interface DingTalkChannelConfig {
   enabled: boolean;
   clientId: string;
   clientSecret: string;
@@ -34,7 +34,7 @@ export interface DingTalkGatewayStatus {
 
 export const MAX_DINGTALK_INSTANCES = 5;
 
-export interface DingTalkInstanceConfig extends DingTalkOpenClawConfig {
+export interface DingTalkInstanceConfig extends DingTalkChannelConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -58,24 +58,24 @@ export const DEFAULT_DINGTALK_MULTI_INSTANCE_CONFIG: DingTalkMultiInstanceConfig
 
 // ==================== Feishu Types ====================
 
-export interface FeishuOpenClawGroupConfig {
+export interface FeishuChannelGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-export interface FeishuOpenClawFooterConfig {
+export interface FeishuChannelFooterConfig {
   status?: boolean;
   elapsed?: boolean;
 }
 
-export interface FeishuOpenClawBlockStreamingCoalesceConfig {
+export interface FeishuChannelBlockStreamingCoalesceConfig {
   minChars?: number;
   maxChars?: number;
   idleMs?: number;
 }
 
-export interface FeishuOpenClawConfig {
+export interface FeishuChannelConfig {
   enabled: boolean;
   appId: string;
   appSecret: string;
@@ -84,13 +84,13 @@ export interface FeishuOpenClawConfig {
   allowFrom: string[];
   groupPolicy: 'allowlist' | 'open' | 'disabled';
   groupAllowFrom: string[];
-  groups: Record<string, FeishuOpenClawGroupConfig>;
+  groups: Record<string, FeishuChannelGroupConfig>;
   historyLimit: number;
   streaming: boolean;
   replyMode: 'auto' | 'static' | 'streaming';
   blockStreaming: boolean;
-  footer: FeishuOpenClawFooterConfig;
-  blockStreamingCoalesce?: FeishuOpenClawBlockStreamingCoalesceConfig;
+  footer: FeishuChannelFooterConfig;
+  blockStreamingCoalesce?: FeishuChannelBlockStreamingCoalesceConfig;
   mediaMaxMb: number;
   debug: boolean;
 }
@@ -108,7 +108,7 @@ export interface FeishuGatewayStatus {
 
 export const MAX_FEISHU_INSTANCES = 5;
 
-export interface FeishuInstanceConfig extends FeishuOpenClawConfig {
+export interface FeishuInstanceConfig extends FeishuChannelConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -128,20 +128,20 @@ export interface FeishuMultiInstanceStatus {
 
 // ==================== Telegram Types ====================
 
-export interface TelegramOpenClawGroupConfig {
+export interface TelegramChannelGroupConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-export interface TelegramOpenClawConfig {
+export interface TelegramChannelConfig {
   enabled: boolean;
   botToken: string;
   dmPolicy: 'pairing' | 'allowlist' | 'open' | 'disabled';
   allowFrom: string[];
   groupPolicy: 'allowlist' | 'open' | 'disabled';
   groupAllowFrom: string[];
-  groups: Record<string, TelegramOpenClawGroupConfig>;
+  groups: Record<string, TelegramChannelGroupConfig>;
   historyLimit: number;
   replyToMode: 'off' | 'first' | 'all';
   linkPreview: boolean;
@@ -166,7 +166,7 @@ export interface TelegramGatewayStatus {
 
 export const MAX_TELEGRAM_INSTANCES = 5;
 
-export interface TelegramInstanceConfig extends TelegramOpenClawConfig {
+export interface TelegramInstanceConfig extends TelegramChannelConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -186,20 +186,20 @@ export interface TelegramMultiInstanceStatus {
 
 // ==================== Discord Types ====================
 
-export interface DiscordOpenClawGuildConfig {
+export interface DiscordChannelGuildConfig {
   requireMention?: boolean;
   allowFrom?: string[];
   systemPrompt?: string;
 }
 
-export interface DiscordOpenClawConfig {
+export interface DiscordChannelConfig {
   enabled: boolean;
   botToken: string;
   dmPolicy: 'pairing' | 'allowlist' | 'open' | 'disabled';
   allowFrom: string[];
   groupPolicy: 'allowlist' | 'open' | 'disabled';
   groupAllowFrom: string[];
-  guilds: Record<string, DiscordOpenClawGuildConfig>;
+  guilds: Record<string, DiscordChannelGuildConfig>;
   historyLimit: number;
   streaming: 'off' | 'partial' | 'block' | 'progress';
   mediaMaxMb: number;
@@ -219,7 +219,7 @@ export interface DiscordGatewayStatus {
 
 export const MAX_DISCORD_INSTANCES = 5;
 
-export interface DiscordInstanceConfig extends DiscordOpenClawConfig {
+export interface DiscordInstanceConfig extends DiscordChannelConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -239,7 +239,7 @@ export interface DiscordMultiInstanceStatus {
 
 // ==================== QQ Types ====================
 
-export interface QQOpenClawConfig {
+export interface QQChannelConfig {
   enabled: boolean;
   appId: string;
   appSecret: string;
@@ -253,8 +253,8 @@ export interface QQOpenClawConfig {
   debug: boolean;
 }
 
-/** @deprecated Use QQOpenClawConfig instead */
-export type QQConfig = QQOpenClawConfig;
+/** @deprecated Use QQChannelConfig instead */
+export type QQConfig = QQChannelConfig;
 
 export interface QQGatewayStatus {
   connected: boolean;
@@ -268,7 +268,7 @@ export interface QQGatewayStatus {
 
 export const MAX_QQ_INSTANCES = 5;
 
-export interface QQInstanceConfig extends QQOpenClawConfig {
+export interface QQInstanceConfig extends QQChannelConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -288,7 +288,7 @@ export interface QQMultiInstanceStatus {
 
 // ==================== WeCom (浼佷笟寰俊) Types ====================
 
-export interface WecomOpenClawConfig {
+export interface WecomChannelConfig {
   enabled: boolean;
   botId: string;
   secret: string;
@@ -300,8 +300,8 @@ export interface WecomOpenClawConfig {
   debug: boolean;
 }
 
-/** @deprecated Use WecomOpenClawConfig instead */
-export type WecomConfig = WecomOpenClawConfig;
+/** @deprecated Use WecomChannelConfig instead */
+export type WecomConfig = WecomChannelConfig;
 
 export interface WecomGatewayStatus {
   connected: boolean;
@@ -316,7 +316,7 @@ export interface WecomGatewayStatus {
 
 export const MAX_WECOM_INSTANCES = 5;
 
-export interface WecomInstanceConfig extends WecomOpenClawConfig {
+export interface WecomInstanceConfig extends WecomChannelConfig {
   instanceId: string;
   instanceName: string;
 }
@@ -336,7 +336,7 @@ export interface WecomMultiInstanceStatus {
 
 // ==================== Weixin (寰俊) Types ====================
 
-export interface WeixinOpenClawConfig {
+export interface WeixinChannelConfig {
   enabled: boolean;
   accountId: string;
   dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled';
@@ -363,7 +363,7 @@ export interface IMGatewayConfig {
   qq: QQMultiInstanceConfig;
   discord: DiscordMultiInstanceConfig;
   wecom: WecomMultiInstanceConfig;
-  weixin: WeixinOpenClawConfig;
+  weixin: WeixinChannelConfig;
   settings: IMSettings;
 }
 
@@ -432,7 +432,7 @@ export interface IMSessionMapping {
   platform: Platform;
   coworkSessionId: string;
   agentId: string;
-  openClawSessionKey?: string;
+  transportSessionKey?: string;
   createdAt: number;
   lastActiveAt: number;
 }
@@ -474,7 +474,7 @@ export type IMConnectivityCheckCode =
   | 'discord_group_requires_mention'
   | 'telegram_privacy_mode_hint'
   | 'dingtalk_bot_membership_hint'
-  | 'openclaw_gateway_not_running'
+  | 'channel_runtime_not_running'
   | 'qq_guild_mention_hint'
   | 'qq_mention_hint'
   | 'weixin_not_logged_in'
@@ -503,7 +503,7 @@ export interface IMConnectivityTestResponse {
 
 // ==================== Default Configurations ====================
 
-export const DEFAULT_DINGTALK_OPENCLAW_CONFIG: DingTalkOpenClawConfig = {
+export const DEFAULT_DINGTALK_CHANNEL_CONFIG: DingTalkChannelConfig = {
   enabled: false,
   clientId: '',
   clientSecret: '',
@@ -518,7 +518,7 @@ export const DEFAULT_DINGTALK_OPENCLAW_CONFIG: DingTalkOpenClawConfig = {
   debug: false,
 };
 
-export const DEFAULT_FEISHU_OPENCLAW_CONFIG: FeishuOpenClawConfig = {
+export const DEFAULT_FEISHU_CHANNEL_CONFIG: FeishuChannelConfig = {
   enabled: false,
   appId: '',
   appSecret: '',
@@ -537,7 +537,7 @@ export const DEFAULT_FEISHU_OPENCLAW_CONFIG: FeishuOpenClawConfig = {
   debug: false,
 };
 
-export const DEFAULT_DISCORD_OPENCLAW_CONFIG: DiscordOpenClawConfig = {
+export const DEFAULT_DISCORD_CHANNEL_CONFIG: DiscordChannelConfig = {
   enabled: false,
   botToken: '',
   dmPolicy: 'open',
@@ -556,7 +556,7 @@ export const DEFAULT_DISCORD_MULTI_INSTANCE_CONFIG: DiscordMultiInstanceConfig =
   instances: [],
 };
 
-export const DEFAULT_TELEGRAM_OPENCLAW_CONFIG: TelegramOpenClawConfig = {
+export const DEFAULT_TELEGRAM_CHANNEL_CONFIG: TelegramChannelConfig = {
   enabled: false,
   botToken: '',
   dmPolicy: 'open',
@@ -579,7 +579,7 @@ export const DEFAULT_TELEGRAM_MULTI_INSTANCE_CONFIG: TelegramMultiInstanceConfig
   instances: [],
 };
 
-export const DEFAULT_QQ_CONFIG: QQOpenClawConfig = {
+export const DEFAULT_QQ_CONFIG: QQChannelConfig = {
   enabled: false,
   appId: '',
   appSecret: '',
@@ -601,7 +601,7 @@ export const DEFAULT_FEISHU_MULTI_INSTANCE_CONFIG: FeishuMultiInstanceConfig = {
   instances: [],
 };
 
-export const DEFAULT_WECOM_CONFIG: WecomOpenClawConfig = {
+export const DEFAULT_WECOM_CONFIG: WecomChannelConfig = {
   enabled: false,
   botId: '',
   secret: '',
@@ -615,7 +615,7 @@ export const DEFAULT_WECOM_CONFIG: WecomOpenClawConfig = {
 
 export const DEFAULT_WECOM_MULTI_INSTANCE_CONFIG: WecomMultiInstanceConfig = { instances: [] };
 
-export const DEFAULT_WEIXIN_CONFIG: WeixinOpenClawConfig = {
+export const DEFAULT_WEIXIN_CONFIG: WeixinChannelConfig = {
   enabled: false,
   accountId: '',
   dmPolicy: 'open',

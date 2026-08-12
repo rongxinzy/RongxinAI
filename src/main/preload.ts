@@ -668,18 +668,6 @@ contextBridge.exposeInMainWorld('electron', {
 
     getStatus: () => ipcRenderer.invoke(ImIpc.StatusGet),
     getLocalIp: () => ipcRenderer.invoke(ImIpc.GetLocalIp) as Promise<string>,
-    getOpenClawConfigSchema: () => ipcRenderer.invoke(ImIpc.OpenClawConfigSchema),
-
-    weixinQrLoginStart: () => ipcRenderer.invoke(ImIpc.WeixinQrLoginStart),
-    weixinQrLoginWait: (accountId?: string) =>
-      ipcRenderer.invoke(ImIpc.WeixinQrLoginWait, accountId),
-
-    listPairingRequests: (platform: string) => ipcRenderer.invoke(ImIpc.PairingList, platform),
-    approvePairingCode: (platform: string, code: string) =>
-      ipcRenderer.invoke(ImIpc.PairingApprove, platform, code),
-    rejectPairingRequest: (platform: string, code: string) =>
-      ipcRenderer.invoke(ImIpc.PairingReject, platform, code),
-
     // Multi-Instance
     addDingTalkInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.dingtalkAdd, name),
     deleteDingTalkInstance: (instanceId: string) =>
@@ -806,8 +794,6 @@ contextBridge.exposeInMainWorld('electron', {
 
   feishu: {
     install: {
-      qrcode: (isLark: boolean) => ipcRenderer.invoke(FeishuInstallIpc.Qrcode, { isLark }),
-      poll: (deviceCode: string) => ipcRenderer.invoke(FeishuInstallIpc.Poll, { deviceCode }),
       verify: (appId: string, appSecret: string) =>
         ipcRenderer.invoke(FeishuInstallIpc.Verify, { appId, appSecret }),
     },

@@ -2,7 +2,7 @@ export function buildScheduledTaskEnginePrompt(): string {
   return [
     '## Scheduled Tasks',
     '- Use the ZhiYuan scheduled-task API for any scheduled task creation or management request.',
-    '- Never call an OpenClaw `cron` RPC or CLI; ZhiYuan SQLite is the task and Run source of truth.',
+    '- Never call a legacy runtime cron RPC or CLI; ZhiYuan SQLite is the Task and Run source of truth.',
     '- Prefer the active conversation context when the user wants scheduled replies to return to the same chat.',
     '- Follow the ZhiYuan scheduled-task schema when choosing `sessionTarget`, `payload`, and delivery settings.',
     '- Channel delivery requires `sessionTarget: "isolated"`.',
@@ -11,7 +11,7 @@ export function buildScheduledTaskEnginePrompt(): string {
     '- In native IM/channel sessions, ignore channel-specific reminder helpers or reminder skills and use the ZhiYuan scheduler.',
     '- Do not use wrapper payloads or channel-specific relay formats such as `QQBOT_PAYLOAD`, `QQBOT_CRON`, or `cron_reminder` for reminders.',
     '- Do not use `sessions_spawn`, `subagents`, or ad-hoc background workflows as a substitute for the scheduler.',
-    '- Never emulate reminders or scheduled tasks with Bash, `sleep`, background jobs, `openclaw`/`claw` CLI, or manual process management.',
+    '- Never emulate reminders or scheduled tasks with Bash, `sleep`, background jobs, legacy runtime CLIs, or manual process management.',
     '- If the ZhiYuan scheduler is unavailable, say so explicitly instead of using a workaround.',
     '',
     '### Message delivery in scheduled-task sessions',

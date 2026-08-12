@@ -26,12 +26,12 @@ import type {
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 import {
-  buildOpenClawModelValidationTargets,
-  resolveFirstUnsupportedOpenClawModel,
-  resolveOpenClawModelSupportMessageKey,
-} from '../../utils/openclawModelSupport';
+  buildAgentModelValidationTargets,
+  resolveFirstUnsupportedAgentModel,
+  resolveAgentModelSupportMessageKey,
+} from '../../utils/agentModelSupport';
 import type { TaskTemplateValues } from './TaskTemplateGallery';
 import TaskFormBody from './TaskFormBody';
 import TaskTimePicker from './TaskTimePicker';
@@ -454,9 +454,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
         agentRecord = null;
       }
     }
-    const defaultModelRef = defaultSelectedModel ? toOpenClawModelRef(defaultSelectedModel) : '';
-    const unsupportedModel = resolveFirstUnsupportedOpenClawModel(
-      buildOpenClawModelValidationTargets({
+    const defaultModelRef = defaultSelectedModel ? toAgentModelRef(defaultSelectedModel) : '';
+    const unsupportedModel = resolveFirstUnsupportedAgentModel(
+      buildAgentModelValidationTargets({
         primaryModelRef: form.modelId || agentRecord?.model || selectedAgent?.model || '',
         fallbackModelRef: defaultModelRef,
         triageOverride: form.modelId ? null : (agentRecord?.triageOverride ?? null),
@@ -464,7 +464,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
       availableModels,
     );
     if (unsupportedModel) {
-      setSubmitError(i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)));
+      setSubmitError(i18nService.t(resolveAgentModelSupportMessageKey(unsupportedModel.reason)));
       return;
     }
 
@@ -1066,16 +1066,12 @@ const TaskForm: React.FC<TaskFormProps> = ({
             </SelectItem>
             {channelOptions.map(channel => {
               const displayName = getNotifyChannelLabel(channel);
-              const unsupported = channel.value === 'openclaw-weixin';
               return (
                 <SelectItem
                   key={`${channel.value}:${channel.accountId ?? ''}`}
                   value={channel.value}
-                  disabled={unsupported}
                 >
-                  {unsupported
-                    ? `${displayName} (${i18nService.t('scheduledTasksChannelUnsupported')})`
-                    : displayName}
+                  {displayName}
                 </SelectItem>
               );
             })}
@@ -1124,7 +1120,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
           payloadText={form.payloadText}
           errors={errors}
           modelOptions={availableModels.map(model => ({
-            value: toOpenClawModelRef(model),
+            value: toAgentModelRef(model),
             label: model.name,
           }))}
           scheduleControl={renderScheduleRow()}

@@ -50,7 +50,7 @@ import {
   type CoworkPermissionResult,
   type CoworkSession,
 } from '../../types/cowork';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 import { isScratchWorkspacePath } from '../../utils/path';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
@@ -392,7 +392,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         cwd: currentWorkspacePath,
         systemPrompt: '',
         modelOverride: currentAgentSelectedModel
-          ? toOpenClawModelRef(currentAgentSelectedModel)
+          ? toAgentModelRef(currentAgentSelectedModel)
           : '',
         executionMode: config.executionMode || 'local',
         activeSkillIds: sessionSkillIds,
@@ -778,7 +778,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
       // Start the actual session immediately with fallback title
       const sessionModelOverride = currentAgentSelectedModel
-        ? toOpenClawModelRef(currentAgentSelectedModel)
+        ? toAgentModelRef(currentAgentSelectedModel)
         : '';
       console.log('[CoworkView] creating session:', {
         modelId: currentAgentSelectedModel?.id,

@@ -1,6 +1,6 @@
 /**
  * IM Cowork Handler
- * Adapter that enables IM (DingTalk/Feishu/Telegram) to use CoworkRuntime for tool-enabled AI execution
+ * Adapter that routes channel turns through the Pi runtime.
  */
 
 import { EventEmitter } from 'events';
@@ -12,7 +12,7 @@ import { buildChannelRunSummary } from '../../shared/channelRun/summary';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
 import { getDefaultConversationWorkspacePath } from '../defaultConversationWorkspace';
 import { t } from '../i18n';
-import type { CoworkRuntime, PermissionRequest, PermissionResult } from '../libs/agentEngine/types';
+import type { PermissionRequest, PermissionResult, PiRuntime } from '../libs/agentEngine/types';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
 import { serializeForLog } from '../libs/sanitizeForLog';
 import { emitChannelRunEvent } from './channelRunEvents';
@@ -58,7 +58,7 @@ const IM_DENY_RESPONSE_RE = /^(拒绝|不同意|no|n)$/i;
 const IM_ALLOW_OPTION_LABEL = '允许本次操作';
 
 export interface IMCoworkHandlerOptions {
-  coworkRuntime: CoworkRuntime;
+  coworkRuntime: PiRuntime;
   coworkStore: CoworkStore;
   imStore: IMStore;
   getSkillsPrompt?: () => Promise<string | null>;
@@ -72,7 +72,7 @@ export interface IMCoworkHandlerOptions {
 }
 
 export class IMCoworkHandler extends EventEmitter {
-  private coworkRuntime: CoworkRuntime;
+  private coworkRuntime: PiRuntime;
   private coworkStore: CoworkStore;
   private imStore: IMStore;
   private getSkillsPrompt?: () => Promise<string | null>;
@@ -150,7 +150,7 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Set up event listeners for CoworkRuntime
+   * Set up event listeners for Pi runtime events.
    */
   private setupEventListeners(): void {
     this.coworkRuntime.on('message', this.onMessage);
@@ -162,7 +162,7 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Process an incoming IM message using CoworkRuntime
+   * Process an incoming IM message using the Pi runtime.
    */
   async processMessage(message: IMMessage): Promise<string> {
     const pendingPermissionReply = await this.handlePendingPermissionReply(message);
@@ -352,7 +352,7 @@ export class IMCoworkHandler extends EventEmitter {
     const systemPrompt = await this.buildSystemPromptWithSkills();
 
     // Resolve the agent bound to this platform (single-instance platforms only;
-    // multi-instance platforms route through OpenClaw channel session sync)
+    // multi-instance platforms route through the channel transport session map)
     const imSettings = this.imStore.getIMSettings();
     const agentId = imSettings.platformAgentBindings?.[platform] || 'main';
     // IM channel conversations belong to the app's default conversation
@@ -408,7 +408,7 @@ export class IMCoworkHandler extends EventEmitter {
         'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
         'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
         'Do not use any other product name, model name, runtime name, or preset role as your identity.',
-        'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
+        'The execution runtime and local inference stack are fully self-developed implementation details; mention them only when the user asks about runtime, local-model, or integration details.',
       ].join('\n'),
     ];
     if (systemPrompt) {
@@ -578,7 +578,7 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Handle message event from CoworkRuntime
+   * Handle a message event from the Pi runtime.
    */
   private handleMessage(sessionId: string, message: CoworkMessage): void {
     // Only process messages from IM sessions

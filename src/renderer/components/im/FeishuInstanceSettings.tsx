@@ -5,19 +5,16 @@
 
 import { Button } from '@shared/components/ui/button';
 import { Input } from '@shared/components/ui/input';
-import { Separator } from '@shared/components/ui/separator';
 import { Switch } from '@shared/components/ui/switch';
 import { PlatformRegistry } from '@shared/platform';
-import { cn } from '@shared/lib/utils';
-import { RefreshCw, Signal, Trash2, X } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import React, { useEffect, useRef, useState } from 'react';
+import { Signal, Trash2, X } from 'lucide-react';
+import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import type {
   FeishuInstanceConfig,
   FeishuInstanceStatus,
-  FeishuOpenClawConfig,
+  FeishuChannelConfig,
   IMConnectivityTestResult,
 } from '../../types/im';
 import {
@@ -32,8 +29,8 @@ import {
 interface FeishuInstanceSettingsProps {
   instance: FeishuInstanceConfig;
   instanceStatus: FeishuInstanceStatus | undefined;
-  onConfigChange: (update: Partial<FeishuOpenClawConfig>) => void;
-  onSave: (override?: Partial<FeishuOpenClawConfig>) => Promise<void>;
+  onConfigChange: (update: Partial<FeishuChannelConfig>) => void;
+  onSave: (override?: Partial<FeishuChannelConfig>) => Promise<void>;
   onRename: (newName: string) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
@@ -71,87 +68,6 @@ const PlatformGuide: React.FC<{
   </div>
 );
 
-// Pairing section component
-const PairingSection: React.FC<{
-  platform: string;
-}> = ({ platform }) => {
-  const [pairingCodeInput, setPairingCodeInput] = useState('');
-  const [pairingStatus, setPairingStatus] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-
-  const handleApprovePairing = async (code: string) => {
-    setPairingStatus(null);
-    try {
-      const result = await window.electron.im.approvePairingCode(platform, code);
-      if (result.success) {
-        setPairingStatus({
-          type: 'success',
-          message: i18nService.t('imPairingCodeApproved').replace('{code}', code),
-        });
-      } else {
-        setPairingStatus({
-          type: 'error',
-          message: result.error || i18nService.t('imPairingCodeInvalid'),
-        });
-      }
-    } catch {
-      setPairingStatus({ type: 'error', message: i18nService.t('imPairingCodeInvalid') });
-    }
-  };
-
-  return (
-    <IMField id={`${platform}-pairing-code`} label={i18nService.t('imPairingApproval')}>
-      <div className="flex gap-2">
-        <Input
-          id={`${platform}-pairing-code`}
-          type="text"
-          value={pairingCodeInput}
-          onChange={e => {
-            setPairingCodeInput(e.target.value.toUpperCase());
-            if (pairingStatus) setPairingStatus(null);
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              const code = pairingCodeInput.trim();
-              if (code) {
-                void handleApprovePairing(code).then(() => {
-                  setPairingCodeInput('');
-                });
-              }
-            }
-          }}
-          className="flex-1 font-mono uppercase tracking-widest"
-          placeholder={i18nService.t('imPairingCodePlaceholder')}
-          maxLength={8}
-        />
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={() => {
-            const code = pairingCodeInput.trim();
-            if (code) {
-              void handleApprovePairing(code).then(() => {
-                setPairingCodeInput('');
-              });
-            }
-          }}
-        >
-          {i18nService.t('imPairingApprove')}
-        </Button>
-      </div>
-      {pairingStatus && (
-        <IMStatusAlert error={pairingStatus.type === 'error'}>
-          {pairingStatus.message}
-        </IMStatusAlert>
-      )}
-    </IMField>
-  );
-};
-
 const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
   instance,
   instanceStatus,
@@ -169,101 +85,6 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
   const [groupAllowIdInput, setGroupAllowIdInput] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [nameValue, setNameValue] = useState(instance.instanceName);
-
-  // QR code scanning state
-  const [qrStatus, setQrStatus] = useState<
-    'idle' | 'loading' | 'showing' | 'success' | 'expired' | 'error'
-  >('idle');
-  const [qrUrl, setQrUrl] = useState('');
-  const [qrTimeLeft, setQrTimeLeft] = useState(0);
-  const [qrError, setQrError] = useState('');
-  const qrDeviceCodeRef = useRef('');
-  const qrPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const qrCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isMountedRef = useRef(true);
-
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      if (qrPollTimerRef.current) clearInterval(qrPollTimerRef.current);
-      if (qrCountdownTimerRef.current) clearInterval(qrCountdownTimerRef.current);
-    };
-  }, []);
-
-  const handleStartQr = async () => {
-    if (qrPollTimerRef.current) clearInterval(qrPollTimerRef.current);
-    if (qrCountdownTimerRef.current) clearInterval(qrCountdownTimerRef.current);
-    setQrStatus('loading');
-    setQrError('');
-    try {
-      const result = await window.electron.feishu.install.qrcode(false);
-      if (!isMountedRef.current) return;
-      setQrUrl(result.url);
-      qrDeviceCodeRef.current = result.deviceCode;
-      const expireIn = (result as any).expireIn ?? 300;
-      setQrTimeLeft(expireIn);
-      setQrStatus('showing');
-
-      qrCountdownTimerRef.current = setInterval(() => {
-        setQrTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(qrCountdownTimerRef.current!);
-            qrCountdownTimerRef.current = null;
-            if (qrPollTimerRef.current) {
-              clearInterval(qrPollTimerRef.current);
-              qrPollTimerRef.current = null;
-            }
-            // QR expired: keep it visible with a reconnect overlay.
-            setQrStatus('expired');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      const intervalMs = Math.max((result as any).interval ?? 5, 3) * 1000;
-      qrPollTimerRef.current = setInterval(async () => {
-        try {
-          const pollResult = await window.electron.feishu.install.poll(qrDeviceCodeRef.current);
-          if (!isMountedRef.current) return;
-          if (pollResult.done && pollResult.appId && pollResult.appSecret) {
-            clearInterval(qrPollTimerRef.current!);
-            qrPollTimerRef.current = null;
-            clearInterval(qrCountdownTimerRef.current!);
-            qrCountdownTimerRef.current = null;
-            onConfigChange({
-              appId: pollResult.appId,
-              appSecret: pollResult.appSecret,
-              enabled: true,
-            });
-            await onSave({
-              appId: pollResult.appId,
-              appSecret: pollResult.appSecret,
-              enabled: true,
-            });
-            setQrStatus('success');
-          } else if (
-            pollResult.error &&
-            pollResult.error !== 'authorization_pending' &&
-            pollResult.error !== 'slow_down'
-          ) {
-            clearInterval(qrPollTimerRef.current!);
-            qrPollTimerRef.current = null;
-            clearInterval(qrCountdownTimerRef.current!);
-            qrCountdownTimerRef.current = null;
-            setQrStatus('expired');
-          }
-        } catch {
-          /* keep retrying */
-        }
-      }, intervalMs);
-    } catch (err: any) {
-      if (!isMountedRef.current) return;
-      setQrStatus('error');
-      setQrError(err?.message || i18nService.t('imQrGenerationFailed'));
-    }
-  };
 
   // Sync nameValue when instance changes
   React.useEffect(() => {
@@ -357,75 +178,6 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
         </Button>
       </div>
 
-      {/* Scan QR code section */}
-      <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center flex flex-col gap-3">
-        {qrStatus === 'idle' && (
-          <>
-            <Button type="button" onClick={() => void handleStartQr()} disabled={false}>
-              {i18nService.t('feishuBotCreateWizardScanBtn')}
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              {i18nService.t('feishuBotCreateWizardScanHint')}
-            </p>
-          </>
-        )}
-        {qrStatus === 'error' && (
-          <>
-            <Button type="button" onClick={() => void handleStartQr()} disabled={false}>
-              {i18nService.t('feishuBotCreateWizardScanBtn')}
-            </Button>
-            {qrError && <IMStatusAlert error>{qrError}</IMStatusAlert>}
-          </>
-        )}
-        {qrStatus === 'loading' && (
-          <div className="flex flex-col items-center gap-2 py-2">
-            <RefreshCw className="size-7 text-primary animate-spin" />
-            <span className="text-xs text-muted-foreground">
-              {i18nService.t('feishuBotCreateWizardGenerating')}
-            </span>
-          </div>
-        )}
-        {(qrStatus === 'showing' || qrStatus === 'expired') && qrUrl && (
-          <div className="flex flex-col items-center gap-2">
-            <div className="relative inline-block">
-              <div
-                className={cn('rounded-lg bg-white p-2', qrStatus === 'expired' && 'opacity-30')}
-              >
-                <QRCodeSVG value={qrUrl} size={160} />
-              </div>
-              {qrStatus === 'expired' && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Button type="button" onClick={() => void handleStartQr()}>
-                    <RefreshCw data-icon="inline-start" />
-                    {i18nService.t('feishuBotCreateWizardQrcodeRefresh')}
-                  </Button>
-                </div>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground max-w-[240px]">
-              {qrStatus === 'expired'
-                ? i18nService.t('feishuBotCreateWizardQrcodeExpired')
-                : i18nService.t('feishuBotCreateWizardQrcodeDesc')}
-            </p>
-            {qrStatus === 'showing' && (
-              <p className="text-xs text-muted-foreground">{qrTimeLeft}s</p>
-            )}
-          </div>
-        )}
-        {qrStatus === 'success' && (
-          <IMStatusAlert>{i18nService.t('feishuBotCreateWizardSuccessTitle')}</IMStatusAlert>
-        )}
-      </div>
-
-      {/* Divider */}
-      <div className="flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="whitespace-nowrap text-xs text-muted-foreground">
-          {i18nService.t('feishuBotCreateWizardOrManual')}
-        </span>
-        <Separator className="flex-1" />
-      </div>
-
       {/* Guide */}
       <PlatformGuide
         steps={[i18nService.t('imFeishuGuideStep1'), i18nService.t('imFeishuGuideStep2')]}
@@ -504,14 +256,13 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { dmPolicy: value as FeishuOpenClawConfig['dmPolicy'] };
+              const update = { dmPolicy: value as FeishuChannelConfig['dmPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
           />
 
           {/* Pairing Requests (shown when dmPolicy is 'pairing') */}
-          {instance.dmPolicy === 'pairing' && <PairingSection platform="feishu" />}
 
           {/* Allow From (User IDs) */}
           <IMField
@@ -594,7 +345,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { groupPolicy: value as FeishuOpenClawConfig['groupPolicy'] };
+              const update = { groupPolicy: value as FeishuChannelConfig['groupPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -724,7 +475,7 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
               { value: 'streaming', label: i18nService.t('imReplyModeStreaming') },
             ]}
             onValueChange={value => {
-              const update = { replyMode: value as FeishuOpenClawConfig['replyMode'] };
+              const update = { replyMode: value as FeishuChannelConfig['replyMode'] };
               onConfigChange(update);
               void onSave(update);
             }}

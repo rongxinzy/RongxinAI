@@ -121,7 +121,7 @@ export async function migrateLegacyScheduledTasksToCanonical(deps: {
   })();
 }
 
-/** Imports legacy Run history without writing OpenClaw JSONL state. */
+/** Imports legacy ZhiYuan Run rows into the canonical scheduler tables. */
 export async function migrateLegacyScheduledTaskRunsToCanonical(deps: {
   db: Database.Database;
   getKv: (key: string) => unknown;

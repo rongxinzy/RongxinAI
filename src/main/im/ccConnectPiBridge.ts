@@ -1,6 +1,5 @@
 import type { CoworkStore } from "../coworkStore";
 import type { PiRuntimeAdapter } from "../libs/agentEngine";
-import type { CoworkRuntime } from "../libs/agentEngine/types";
 import type {
   CcConnectCronTrigger,
   CcConnectTurnRequest,
@@ -40,9 +39,7 @@ export class CcConnectPiBridge {
     this.imStore = options.imStore;
     this.turnCoordinator = options.turnCoordinator;
     this.handler = new IMCoworkHandler({
-      // Pi emits the complete Cowork event contract (including sessionStopped),
-      // but its narrower EventEmitter generic is not structurally assignable.
-      coworkRuntime: options.runtime as unknown as CoworkRuntime,
+      coworkRuntime: options.runtime,
       coworkStore: options.coworkStore,
       imStore: options.imStore,
       getSkillsPrompt: options.getSkillsPrompt,

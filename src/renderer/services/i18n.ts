@@ -475,12 +475,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceUnloading: '卸载中...',
     localInferenceUnloadingHint: '正在卸载这个模型，按钮已暂时锁定。',
     localInferenceInfer: '推理',
-    localInferenceUseOpenClaw: '用于Agent 引擎',
-    localInferenceUseOpenClawDisabledHint: '请先配置启动并加载模型，再用于Agent 引擎。',
-    localInferenceSetOpenClawDone: '当前运行中的模型 {name} 已可供Agent 引擎使用',
-    localInferenceSetOpenClawFailed: '刷新Agent 引擎可见模型失败',
-    localInferenceSetOpenClawCtxTooSmall:
-      '当前上下文长度 {ctx} 低于Agent 引擎最低要求 ({min})，请先调大上下文长度再配置。',
     localInferencePresetSaved: '推理参数已保存',
     localInferenceGenerationCancelled: '生成已取消',
     localInferenceModel: '模型',
@@ -1099,41 +1093,14 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkApiConfigHint:
       '支持 Anthropic 兼容与 OpenAI 兼容协议（OpenAI 兼容通过本地转换服务接入）。',
     coworkAgentEngine: 'Agent 引擎',
-    coworkAgentEngineOpenClaw: 'Agent 引擎（默认）',
-    coworkAgentEngineOpenClawHint: '个人 AI 助理',
     coworkAgentEnginePi: 'Pi（内测）',
     coworkAgentEnginePiHint:
       '极简 Agent Loop，进程内运行，Work/Chat 模式专用。Pi 引擎无需额外启动。',
     coworkEngineArchInfo: '知远智能体 采用双内核并行架构，两个引擎同时常驻运行，按职责固定分工：',
     coworkEnginePiRole:
       '负责 Cowork Work（Agent 模式）和 Chat（直连 LLM）。进程内运行，无需额外启动。',
-    coworkEngineOpenClawRole:
-      '负责 IM 频道（钉钉/飞书/企微/微信等）和定时任务。需启动 Gateway 子进程。',
-    settingsSavedButOpenClawSyncFailed:
-      '设置已保存，但应用到Agent 引擎运行环境失败。请重试保存，或重启Agent 引擎后再试。',
-    openClawSessionKeepAlive: '会话保持时长',
-    openClawSessionKeepAliveHint:
-      '决定一段对话在连续空闲多久后会被视为新的会话。只要间隔没有超过这个时间，就会继续沿用原来的上下文。设置得更长可以保留更多上下文，但也可能增加 token 消耗。',
-    openClawSessionKeepAliveOneDay: '24小时',
-    openClawSessionKeepAliveSevenDays: '7天',
-    openClawSessionKeepAliveThirtyDays: '30天（推荐）',
-    openClawSessionKeepAliveOneYear: '1年',
     coworkAgentEngineClaudeLegacy: 'Cowork',
     coworkAgentEngineClaudeLegacyHint: '内置引擎，开箱即用，推荐作为日常任务主引擎。',
-    coworkOpenClawInstall: '启动Agent 引擎',
-    coworkOpenClawRetryInstall: '重试启动Agent 引擎',
-    coworkOpenClawStart: '启动Agent 引擎',
-    coworkOpenClawInstalling: '正在启动Agent 引擎...',
-    coworkOpenClawInstallHint: 'Agent 引擎运行时已内置。切换到该引擎或启动任务时会自动拉起网关。',
-    coworkOpenClawGoToSettingsInstall: '查看引擎设置',
-    coworkOpenClawRestartGateway: '重新启动网关',
-    coworkOpenClawNotInstalledNotice:
-      '未检测到内置Agent 引擎 runtime（内置运行时），请先执行打包前构建脚本。',
-    coworkOpenClawReadyNotice: 'Agent 引擎 runtime 已就绪。开始任务时会自动启动网关。',
-    coworkOpenClawStarting: 'AI 引擎正在启动网关...',
-    coworkOpenClawRunning: 'AI 引擎已就绪。',
-    coworkOpenClawError: 'Agent 引擎网关未能在规定时间内启动成功。',
-    coworkOpenClawErrorHint: '请检查网络连接或Agent 引擎配置后重试。',
     coworkMemoryTitle: '记忆',
     coworkAgentTab: '个性化',
     coworkBootstrapIdentityTitle: '助手身份',
@@ -3275,13 +3242,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceUnloading: 'Unloading...',
     localInferenceUnloadingHint: 'This model is unloading and its actions are temporarily locked.',
     localInferenceInfer: 'Infer',
-    localInferenceUseOpenClaw: 'Use for Agent engine',
-    localInferenceUseOpenClawDisabledHint:
-      'Configure and load the model before using it for Agent engine.',
-    localInferenceSetOpenClawDone: 'Running model {name} is now visible to Agent engine',
-    localInferenceSetOpenClawFailed: 'Failed to refresh Agent engine-visible local models',
-    localInferenceSetOpenClawCtxTooSmall:
-      'Current context length {ctx} is below the minimum required for Agent engine ({min}). Please increase the context length first.',
     localInferencePresetSaved: 'Inference parameters saved',
     localInferenceGenerationCancelled: 'Generation cancelled',
     localInferenceModel: 'Model',
@@ -3958,8 +3918,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkApiConfigHint:
       'Supports Anthropic-compatible and OpenAI-compatible APIs (OpenAI compatibility is bridged by a local adapter).',
     coworkAgentEngine: 'Agent Engine',
-    coworkAgentEngineOpenClaw: 'Agent engine (Default)',
-    coworkAgentEngineOpenClawHint: 'Personal AI assistant',
     coworkAgentEnginePi: 'Pi (Beta)',
     coworkAgentEnginePiHint:
       'Minimal agent loop, runs in-process. Dedicated for Work/Chat mode. No extra startup required.',
@@ -3967,37 +3925,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'ZhiYuan Agent runs a dual-kernel architecture with both engines running simultaneously, each with fixed responsibilities:',
     coworkEnginePiRole:
       'Handles Cowork Work (Agent mode) and Chat (direct LLM). Runs in-process, no extra startup required.',
-    coworkEngineOpenClawRole:
-      'Handles IM channels (DingTalk/Feishu/WeCom/WeChat etc.) and scheduled tasks. Requires Gateway subprocess.',
-    settingsSavedButOpenClawSyncFailed:
-      'Settings were saved locally, but applying them to the running Agent engine environment failed. Please save again or restart Agent engine.',
-    openClawSessionKeepAlive: 'Session continuity',
-    openClawSessionKeepAliveHint:
-      'Determines how long a conversation can stay continuously idle before it is treated as a new session. As long as the gap does not exceed this duration, the existing context will continue to be used. Longer durations preserve more context, but may also increase token usage.',
-    openClawSessionKeepAliveOneDay: '24 hours',
-    openClawSessionKeepAliveSevenDays: '7 days',
-    openClawSessionKeepAliveThirtyDays: '30 days (Recommended)',
-    openClawSessionKeepAliveOneYear: '1 year',
     coworkAgentEngineClaudeLegacy: 'Cowork',
     coworkAgentEngineClaudeLegacyHint:
       'Built-in engine, ready out of the box, recommended for daily tasks.',
-    coworkOpenClawInstall: 'Start Agent engine',
-    coworkOpenClawRetryInstall: 'Retry Agent engine Startup',
-    coworkOpenClawStart: 'Start Agent engine',
-    coworkOpenClawInstalling: 'Starting Agent engine...',
-    coworkOpenClawInstallHint:
-      'Agent engine runtime is bundled. Switching to this engine or starting a task will auto-start the gateway.',
-    coworkOpenClawGoToSettingsInstall: 'View Engine Settings',
-    coworkOpenClawRestartGateway: 'Restart Gateway',
-    coworkOpenClawNotInstalledNotice:
-      'Bundled Agent engine runtime (built-in runtime) was not found. Build the runtime before packaging.',
-    coworkOpenClawReadyNotice:
-      'Agent engine runtime is ready. The gateway will auto-start when you run a task.',
-    coworkOpenClawStarting: 'AI engine is starting the gateway...',
-    coworkOpenClawRunning: 'AI engine is ready.',
-    coworkOpenClawError: 'Agent engine gateway failed to become healthy in time.',
-    coworkOpenClawErrorHint:
-      'Check your network connection or Agent engine configuration and try again.',
     coworkMemoryTitle: 'Memory',
     coworkAgentTab: 'Personalization',
     coworkBootstrapIdentityTitle: 'Assistant Identity',

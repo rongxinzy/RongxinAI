@@ -184,7 +184,7 @@ test('ManualPolicy.describeRunBehavior: im_session -> mentions platform', () => 
   expect(desc).toContain('discord');
 });
 
-test('ManualPolicy.describeRunBehavior: session_key -> mentions OpenClaw', () => {
+test('ManualPolicy.describeRunBehavior: session_key returns a description', () => {
   const policy = new ManualTaskPolicy();
   const draft = makeModel({
     origin: { kind: OriginKind.Manual },

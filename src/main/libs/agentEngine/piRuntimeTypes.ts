@@ -7,12 +7,9 @@ import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQ
 /**
  * Pi-native workbench runtime types (issue #225).
  *
- * Pi is the sole execution kernel for Work / Chat and owns its session,
- * event and approval types. It must not implement or reference the
- * OpenClaw `CoworkRuntime` glue interface — that interface stays inside
- * the OpenClaw Channel/Cron domain (see `./types.ts`). Shared payload
- * primitives (messages, tool activity, errors) come from the store/shared
- * layers, not from the OpenClaw runtime abstraction.
+ * Pi is the sole execution kernel for Work, Chat, Channel and Cron runs and
+ * owns its session, event and approval types. Shared payload primitives
+ * come from the store and shared layers instead of a second runtime abstraction.
  */
 
 export type PiPermissionResult =

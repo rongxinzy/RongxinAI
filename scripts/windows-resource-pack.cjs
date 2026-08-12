@@ -4,7 +4,38 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const { shouldExclude } = require('./pack-openclaw-tar.cjs');
+const EXCLUDED_FILE_PATTERNS = [
+  /\.map$/i,
+  /\.d\.(ts|cts|mts)$/i,
+  /^(readme|changelog|history)(\.(md|txt|rst))?$/i,
+  /^(license|licence|authors|contributors)(\.(md|txt))?$/i,
+  /^\.(eslintrc|prettierrc|editorconfig|npmignore|gitignore|gitattributes)/i,
+  /^tsconfig(\..+)?\.json$/i,
+  /^(jest|vitest)\.config/i,
+  /^\.babelrc/i,
+  /^babel\.config/i,
+  /\.(test|spec)\.\w+$/i,
+];
+const EXCLUDED_DIRECTORIES = new Set([
+  'test',
+  'tests',
+  '__tests__',
+  '__mocks__',
+  '.github',
+  'example',
+  'examples',
+  'coverage',
+  '.venv',
+  '.bin',
+]);
+
+function shouldExclude(entryPath) {
+  const segments = entryPath.split(/[/\\]/);
+  if (segments.some(segment => EXCLUDED_DIRECTORIES.has(segment.toLowerCase()))) return true;
+  const basename = path.basename(entryPath);
+  if (/^\.env(\..+)?$/i.test(basename)) return true;
+  return EXCLUDED_FILE_PATTERNS.some(pattern => pattern.test(basename));
+}
 
 const WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION = 4;
 const WINDOWS_RESOURCE_ARCHIVE_EXTENSION = '.7z';

@@ -107,7 +107,7 @@ test('collectAvailableModels merges running llama.cpp model metadata', async () 
     model => model.providerKey === ProviderName.LlamaCpp && model.id === 'qwen-local',
   );
   expect(llamaCppModel).toBeDefined();
-  expect(llamaCppModel?.llamaCppOpenClawEligibility).toMatchObject({
+  expect(llamaCppModel?.llamaCppAgentEligibility).toMatchObject({
     eligible: false,
     runtimeContextWindow: 8192,
     trainedContextWindow: 32768,

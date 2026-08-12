@@ -1,21 +1,21 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { LlamaCppOpenClawEligibility } from '../../../shared/llamacpp';
+import type { LlamaCppAgentEligibility } from '../../../shared/llamacpp';
 import { type ModelCapabilities, ProviderRegistry } from '../../../shared/providers';
 import { defaultConfig, getProviderDisplayName } from '../../config';
-import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
+import { resolveAgentModelRef } from '../../utils/agentModelRef';
 
 export interface Model {
   id: string;
   name: string;
   provider?: string;
   providerKey?: string;
-  openClawProviderId?: string;
+  agentProviderId?: string;
   supportsImage?: boolean;
   capabilities?: Partial<ModelCapabilities>;
   supportsThinkingToggle?: boolean;
   contextWindow?: number;
-  llamaCppOpenClawEligibility?: LlamaCppOpenClawEligibility;
+  llamaCppAgentEligibility?: LlamaCppAgentEligibility;
   llamaCppRuntimeContextWindow?: number;
   llamaCppTrainedContextWindow?: number;
 }
@@ -87,7 +87,7 @@ export function selectAgentSelectedModel(
   if (override) return override;
   const trimmed = agentModelRef.trim();
   if (trimmed) {
-    const resolved = resolveOpenClawModelRef(trimmed, modelState.availableModels);
+    const resolved = resolveAgentModelRef(trimmed, modelState.availableModels);
     if (resolved) return resolved;
   }
   return modelState.defaultSelectedModel;

@@ -16,7 +16,7 @@ import type {
   IMConnectivityTestResult,
   WecomInstanceConfig,
   WecomInstanceStatus,
-  WecomOpenClawConfig,
+  WecomChannelConfig,
 } from '../../types/im';
 import {
   IMConnectionBadge,
@@ -30,8 +30,8 @@ import {
 interface WecomInstanceSettingsProps {
   instance: WecomInstanceConfig;
   instanceStatus: WecomInstanceStatus | undefined;
-  onConfigChange: (update: Partial<WecomOpenClawConfig>) => void;
-  onSave: (override?: Partial<WecomOpenClawConfig>) => Promise<void>;
+  onConfigChange: (update: Partial<WecomChannelConfig>) => void;
+  onSave: (override?: Partial<WecomChannelConfig>) => Promise<void>;
   onRename: (newName: string) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
@@ -41,7 +41,6 @@ interface WecomInstanceSettingsProps {
   quickSetupError: string;
   testingPlatform: string | null;
   connectivityResults: Record<string, IMConnectivityTestResult>;
-  renderPairingSection: (platform: string) => React.ReactNode;
 }
 
 const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
@@ -58,7 +57,6 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
   quickSetupError,
   testingPlatform,
   connectivityResults,
-  renderPairingSection,
 }) => {
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [allowedUserIdInput, setAllowedUserIdInput] = useState('');
@@ -268,14 +266,13 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { dmPolicy: value as WecomOpenClawConfig['dmPolicy'] };
+              const update = { dmPolicy: value as WecomChannelConfig['dmPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
           />
 
           {/* Pairing Requests (shown when dmPolicy is 'pairing') */}
-          {instance.dmPolicy === 'pairing' && renderPairingSection('wecom')}
 
           {/* Allow From */}
           <IMField
@@ -358,7 +355,7 @@ const WecomInstanceSettings: React.FC<WecomInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { groupPolicy: value as WecomOpenClawConfig['groupPolicy'] };
+              const update = { groupPolicy: value as WecomChannelConfig['groupPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * IM Settings Component
  * Configuration UI for DingTalk, Feishu and Telegram IM bots
  */
@@ -19,13 +19,11 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
-  RefreshCw,
   Signal,
   TriangleAlert,
   X,
   XCircle,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -46,7 +44,7 @@ import type {
   IMConnectivityCheck,
   IMConnectivityTestResult,
   IMGatewayConfig,
-  WeixinOpenClawConfig,
+  WeixinChannelConfig,
 } from '../../types/im';
 import {
   MAX_DINGTALK_INSTANCES,
@@ -131,14 +129,7 @@ const IMSettings: React.FC = () => {
     'idle' | 'pending' | 'success' | 'error'
   >('idle');
   const [wecomQuickSetupError, setWecomQuickSetupError] = useState<string>('');
-  // Weixin QR login state
-  const [weixinQrStatus, setWeixinQrStatus] = useState<
-    'idle' | 'loading' | 'showing' | 'waiting' | 'success' | 'expired' | 'error'
-  >('idle');
-  const [weixinQrUrl, setWeixinQrUrl] = useState<string>('');
-  const [weixinQrError, setWeixinQrError] = useState<string>('');
   const [weixinAllowFromInput, setWeixinAllowFromInput] = useState<string>('');
-  const weixinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
 
   // Subscribe to language changes
@@ -194,131 +185,11 @@ const IMSettings: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded]);
 
-  // Cleanup feishu QR timers on unmount
-  useEffect(() => {
-    return () => {
-      if (feishuQrPollTimerRef.current) clearInterval(feishuQrPollTimerRef.current);
-      if (feishuQrCountdownTimerRef.current) clearInterval(feishuQrCountdownTimerRef.current);
-    };
-  }, []);
-
-  // Reset feishu QR state when switching away from feishu
-  useEffect(() => {
-    if (activePlatform !== 'feishu') {
-      if (feishuQrPollTimerRef.current) {
-        clearInterval(feishuQrPollTimerRef.current);
-        feishuQrPollTimerRef.current = null;
-      }
-      if (feishuQrCountdownTimerRef.current) {
-        clearInterval(feishuQrCountdownTimerRef.current);
-        feishuQrCountdownTimerRef.current = null;
-      }
-      setFeishuQrStatus('idle');
-      setFeishuQrUrl('');
-      setFeishuQrError('');
-    }
-  }, [activePlatform]);
-
-  // @ts-ignore: will be used when QR flow is wired to FeishuInstanceSettings
-  const _handleFeishuStartQr = async () => {
-    if (feishuQrPollTimerRef.current) clearInterval(feishuQrPollTimerRef.current);
-    if (feishuQrCountdownTimerRef.current) clearInterval(feishuQrCountdownTimerRef.current);
-    setFeishuQrStatus('loading');
-    setFeishuQrError('');
-    try {
-      const result = await window.electron.feishu.install.qrcode(false);
-      if (!isMountedRef.current) return;
-      setFeishuQrUrl(result.url);
-      feishuQrDeviceCodeRef.current = result.deviceCode;
-      const expireIn = result.expireIn ?? 300;
-      setFeishuQrTimeLeft(expireIn);
-      setFeishuQrStatus('showing');
-
-      // Countdown
-      feishuQrCountdownTimerRef.current = setInterval(() => {
-        setFeishuQrTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(feishuQrCountdownTimerRef.current!);
-            feishuQrCountdownTimerRef.current = null;
-            if (feishuQrPollTimerRef.current) {
-              clearInterval(feishuQrPollTimerRef.current);
-              feishuQrPollTimerRef.current = null;
-            }
-            setFeishuQrStatus('error');
-            setFeishuQrError(i18nService.t('feishuBotCreateWizardQrcodeExpired'));
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      // Poll
-      const intervalMs = Math.max(result.interval ?? 5, 3) * 1000;
-      feishuQrPollTimerRef.current = setInterval(async () => {
-        try {
-          const pollResult = await window.electron.feishu.install.poll(
-            feishuQrDeviceCodeRef.current,
-          );
-          if (!isMountedRef.current) return;
-          if (pollResult.done && pollResult.appId && pollResult.appSecret) {
-            clearInterval(feishuQrPollTimerRef.current!);
-            feishuQrPollTimerRef.current = null;
-            clearInterval(feishuQrCountdownTimerRef.current!);
-            feishuQrCountdownTimerRef.current = null;
-            // QR flow creates a new instance with the scanned credentials
-            const inst = await imService.addFeishuInstance('Feishu Bot');
-            if (inst) {
-              await imService.updateFeishuInstanceConfig(inst.instanceId, {
-                appId: pollResult.appId,
-                appSecret: pollResult.appSecret,
-                enabled: true,
-              });
-              setActiveFeishuInstanceId(inst.instanceId);
-              setFeishuExpanded(true);
-            }
-            if (!isMountedRef.current) return; // re-check after async updateConfig
-            setFeishuQrStatus('success');
-          } else if (
-            pollResult.error &&
-            pollResult.error !== 'authorization_pending' &&
-            pollResult.error !== 'slow_down'
-          ) {
-            clearInterval(feishuQrPollTimerRef.current!);
-            feishuQrPollTimerRef.current = null;
-            clearInterval(feishuQrCountdownTimerRef.current!);
-            feishuQrCountdownTimerRef.current = null;
-            setFeishuQrStatus('error');
-            setFeishuQrError(pollResult.error);
-          }
-        } catch {
-          /* keep retrying */
-        }
-      }, intervalMs);
-    } catch (err: any) {
-      if (!isMountedRef.current) return;
-      setFeishuQrStatus('error');
-      setFeishuQrError(err?.message || i18nService.t('imQrGenerationFailed'));
-    }
-  };
-
   // Reset wecom quick setup state when switching away from wecom
   useEffect(() => {
     if (activePlatform !== 'wecom') {
       setWecomQuickSetupStatus('idle');
       setWecomQuickSetupError('');
-    }
-  }, [activePlatform]);
-
-  // Reset weixin QR login state when switching away from weixin
-  useEffect(() => {
-    if (activePlatform !== 'weixin') {
-      if (weixinTimerRef.current) {
-        clearTimeout(weixinTimerRef.current);
-        weixinTimerRef.current = null;
-      }
-      setWeixinQrStatus('idle');
-      setWeixinQrUrl('');
-      setWeixinQrError('');
     }
   }, [activePlatform]);
 
@@ -342,50 +213,6 @@ const IMSettings: React.FC = () => {
   // Handle Feishu multi-instance config
   const feishuMultiConfig = config.feishu;
 
-  // Inline QR code state for feishu bot creation (mirroring WeCom quick-setup pattern)
-  // These are used by handleFeishuStartQr which creates instances via QR flow
-  // @ts-ignore: will be used when QR flow is wired to FeishuInstanceSettings
-  const [_feishuQrStatus, setFeishuQrStatus] = useState<
-    'idle' | 'loading' | 'showing' | 'success' | 'error'
-  >('idle');
-  // @ts-ignore
-  const [_feishuQrUrl, setFeishuQrUrl] = useState<string>('');
-  // @ts-ignore
-  const [_feishuQrTimeLeft, setFeishuQrTimeLeft] = useState<number>(0);
-  // @ts-ignore
-  const [_feishuQrError, setFeishuQrError] = useState<string>('');
-  // These don't need to be state — they don't affect rendering directly
-  const feishuQrDeviceCodeRef = useRef<string>('');
-  const feishuQrPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const feishuQrCountdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Pairing state for OpenClaw platforms
-  const [pairingCodeInput, setPairingCodeInput] = useState<Record<string, string>>({});
-  const [pairingStatus, setPairingStatus] = useState<
-    Record<string, { type: 'success' | 'error'; message: string } | null>
-  >({});
-
-  const handleApprovePairing = async (platform: string, code: string) => {
-    setPairingStatus(prev => ({ ...prev, [platform]: null }));
-    const result = await imService.approvePairingCode(platform, code);
-    if (result.success) {
-      setPairingStatus(prev => ({
-        ...prev,
-        [platform]: {
-          type: 'success',
-          message: i18nService.t('imPairingCodeApproved').replace('{code}', code),
-        },
-      }));
-    } else {
-      setPairingStatus(prev => ({
-        ...prev,
-        [platform]: {
-          type: 'error',
-          message: result.error || i18nService.t('imPairingCodeInvalid'),
-        },
-      }));
-    }
-  };
   // Telegram multi-instance config alias
   const tgMultiConfig = config.telegram;
 
@@ -393,64 +220,8 @@ const IMSettings: React.FC = () => {
 
   const discordMultiConfig = config.discord;
 
-  // Handle Weixin OpenClaw config
-  const weixinOpenClawConfig = config.weixin;
-
-  const handleWeixinQrLogin = async () => {
-    setWeixinQrStatus('loading');
-    setWeixinQrError('');
-    try {
-      const startResult = await window.electron.im.weixinQrLoginStart();
-      if (!isMountedRef.current) return;
-
-      if (!startResult.success || !startResult.qrDataUrl) {
-        setWeixinQrStatus('error');
-        setWeixinQrError(startResult.message || i18nService.t('imWeixinQrFailed'));
-        return;
-      }
-
-      setWeixinQrUrl(startResult.qrDataUrl);
-      setWeixinQrStatus('showing');
-
-      // QR expires in 1 minute.  Keep the QR visible but show a reconnect
-      // overlay — don't tear down the display or show a red error.
-      if (weixinTimerRef.current) clearTimeout(weixinTimerRef.current);
-      weixinTimerRef.current = setTimeout(() => {
-        if (!isMountedRef.current) return;
-        setWeixinQrStatus('expired');
-      }, 60_000);
-
-      // Start polling for scan result
-      setWeixinQrStatus('waiting');
-      const waitResult = await window.electron.im.weixinQrLoginWait(startResult.sessionKey);
-      if (weixinTimerRef.current) {
-        clearTimeout(weixinTimerRef.current);
-        weixinTimerRef.current = null;
-      }
-      if (!isMountedRef.current) return;
-
-      if (waitResult.success && waitResult.connected) {
-        setWeixinQrStatus('success');
-        // Enable weixin and save config with accountId
-        const accountId = waitResult.accountId || '';
-        const fullConfig = { ...weixinOpenClawConfig, enabled: true, accountId };
-        dispatch(setWeixinConfig({ enabled: true, accountId }));
-        dispatch(clearError());
-        await imService.updateConfig({ weixin: fullConfig });
-        await imService.loadStatus();
-      } else {
-        // Not connected — keep QR visible with reconnect overlay.
-        setWeixinQrStatus('expired');
-      }
-    } catch {
-      if (weixinTimerRef.current) {
-        clearTimeout(weixinTimerRef.current);
-        weixinTimerRef.current = null;
-      }
-      if (!isMountedRef.current) return;
-      setWeixinQrStatus('expired');
-    }
-  };
+  // Handle Weixin channel config.
+  const weixinConfig = config.weixin;
 
   const getCheckTitle = (code: IMConnectivityCheck['code']): string => {
     return i18nService.t(`imConnectivityCheckTitle_${code}`);
@@ -499,12 +270,11 @@ const IMSettings: React.FC = () => {
     setTogglingPlatform(platform);
 
     try {
-      // All OpenClaw platforms: im:config:set handler already calls
-      // syncOpenClawConfig({ restartGatewayIfRunning: true }), so no startGateway/stopGateway needed.
+      // Persisting config reconciles the corresponding channel sidecar.
       // Only updateConfig + loadStatus is required.
       // Pessimistic UI update: wait for IPC to complete before updating Redux state.
       // This prevents UI/backend state divergence when rapidly toggling, since the
-      // backend debounces syncOpenClawConfig calls with a 600ms window.
+      // The backend debounces account reconciliation.
       if (platform === 'telegram') {
         // Telegram multi-instance: toggle is handled per-instance in TelegramInstanceSettings
         return;
@@ -531,9 +301,9 @@ const IMSettings: React.FC = () => {
       }
 
       if (platform === 'weixin') {
-        const newEnabled = !weixinOpenClawConfig.enabled;
+        const newEnabled = !weixinConfig.enabled;
         const success = await imService.updateConfig({
-          weixin: { ...weixinOpenClawConfig, enabled: newEnabled },
+          weixin: { ...weixinConfig, enabled: newEnabled },
         });
         if (success) {
           dispatch(setWeixinConfig({ enabled: newEnabled }));
@@ -665,7 +435,7 @@ const IMSettings: React.FC = () => {
       return;
     }
 
-    // For DingTalk, persist dingtalk config and test (OpenClaw mode)
+    // Persist DingTalk config and test connectivity.
     if (platform === 'dingtalk') {
       await imService.persistConfig({ dingtalk: dingtalkMultiConfig });
       const result = await runConnectivityTest(platform, {
@@ -694,7 +464,7 @@ const IMSettings: React.FC = () => {
       return;
     }
 
-    // For QQ, persist qq config and test (OpenClaw mode)
+    // Persist QQ config and test connectivity.
     if (platform === 'qq') {
       await imService.persistConfig({ qq: qqMultiConfig });
       const result = await runConnectivityTest(platform, {
@@ -716,7 +486,7 @@ const IMSettings: React.FC = () => {
       return;
     }
 
-    // For WeCom, persist wecom config and test (OpenClaw mode)
+    // Persist WeCom config and test connectivity.
     if (platform === 'wecom') {
       const wecomMultiConfig = config.wecom;
       await imService.persistConfig({ wecom: wecomMultiConfig });
@@ -742,13 +512,13 @@ const IMSettings: React.FC = () => {
       return;
     }
 
-    // For Weixin, persist weixin config and test (OpenClaw mode)
+    // Persist Weixin config and test connectivity.
     if (platform === 'weixin') {
-      await imService.persistConfig({ weixin: weixinOpenClawConfig });
+      await imService.persistConfig({ weixin: weixinConfig });
       const result = await runConnectivityTest(platform, {
-        weixin: weixinOpenClawConfig,
+        weixin: weixinConfig,
       } as Partial<IMGatewayConfig>);
-      if (!weixinOpenClawConfig.enabled && result) {
+      if (!weixinConfig.enabled && result) {
         const authCheck = result.checks.find(c => c.code === 'auth_check');
         if (authCheck && authCheck.level === 'pass') {
           toggleGateway(platform);
@@ -757,7 +527,7 @@ const IMSettings: React.FC = () => {
       return;
     }
 
-    // For Feishu, persist feishu config and test (OpenClaw mode)
+    // Persist Feishu config and test connectivity.
     if (platform === 'feishu') {
       await imService.persistConfig({ feishu: feishuMultiConfig });
       const result = await runConnectivityTest(platform, {
@@ -783,7 +553,7 @@ const IMSettings: React.FC = () => {
       }
       return;
     }
-    // For Discord, persist discord config and test (OpenClaw mode)
+    // Persist Discord config and test connectivity.
     if (platform === 'discord') {
       await imService.persistConfig({ discord: discordMultiConfig });
       const result = await runConnectivityTest(platform, {
@@ -889,56 +659,6 @@ const IMSettings: React.FC = () => {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [connectivityModalPlatform]);
-
-  const renderPairingSection = (platform: string) => (
-    <IMField id={`${platform}-pairing-code`} label={i18nService.t('imPairingApproval')}>
-      <div className="flex gap-2">
-        <Input
-          id={`${platform}-pairing-code`}
-          type="text"
-          value={pairingCodeInput[platform] || ''}
-          onChange={e => {
-            setPairingCodeInput(prev => ({ ...prev, [platform]: e.target.value.toUpperCase() }));
-            if (pairingStatus[platform]) setPairingStatus(prev => ({ ...prev, [platform]: null }));
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              const code = (pairingCodeInput[platform] || '').trim();
-              if (code) {
-                void handleApprovePairing(platform, code).then(() => {
-                  setPairingCodeInput(prev => ({ ...prev, [platform]: '' }));
-                });
-              }
-            }
-          }}
-          className="flex-1 font-mono uppercase tracking-widest"
-          placeholder={i18nService.t('imPairingCodePlaceholder')}
-          maxLength={8}
-        />
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={() => {
-            const code = (pairingCodeInput[platform] || '').trim();
-            if (code) {
-              void handleApprovePairing(platform, code).then(() => {
-                setPairingCodeInput(prev => ({ ...prev, [platform]: '' }));
-              });
-            }
-          }}
-        >
-          {i18nService.t('imPairingApprove')}
-        </Button>
-      </div>
-      {pairingStatus[platform] && (
-        <IMStatusAlert error={pairingStatus[platform]!.type === 'error'}>
-          {pairingStatus[platform]!.message}
-        </IMStatusAlert>
-      )}
-    </IMField>
-  );
 
   if (!configLoaded) {
     return (
@@ -2069,79 +1789,6 @@ const IMSettings: React.FC = () => {
         {/* Weixin (微信) Settings */}
         {activePlatform === 'weixin' && (
           <div className="flex flex-col gap-3">
-            {/* Scan QR code section */}
-            <div className="rounded-lg border border-dashed border-border-subtle p-4 text-center flex flex-col gap-3">
-              {weixinQrStatus === 'idle' && (
-                <div className="flex w-fit max-w-full flex-col gap-3 self-center">
-                  <Button
-                    type="button"
-                    className="w-full"
-                    onClick={() => void handleWeixinQrLogin()}
-                  >
-                    {i18nService.t('imWeixinScanBtn')}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    {i18nService.t('imWeixinScanHint')}
-                  </p>
-                </div>
-              )}
-              {weixinQrStatus === 'error' && (
-                <>
-                  <Button type="button" onClick={() => void handleWeixinQrLogin()}>
-                    {i18nService.t('imWeixinScanBtn')}
-                  </Button>
-                  {weixinQrError && <IMStatusAlert error>{weixinQrError}</IMStatusAlert>}
-                </>
-              )}
-              {weixinQrStatus === 'loading' && (
-                <div className="flex items-center justify-center gap-2 py-4">
-                  <RefreshCw className="size-5 animate-spin text-primary" />
-                  <span className="text-sm text-muted-foreground">
-                    {i18nService.t('imWeixinQrLoading')}
-                  </span>
-                </div>
-              )}
-              {(weixinQrStatus === 'showing' ||
-                weixinQrStatus === 'waiting' ||
-                weixinQrStatus === 'expired') &&
-                weixinQrUrl && (
-                  <div className="flex flex-col items-center gap-3">
-                    <p className="text-sm font-medium text-foreground">
-                      {weixinQrStatus === 'expired'
-                        ? i18nService.t('imWeixinQrExpired')
-                        : i18nService.t('imWeixinQrScanPrompt')}
-                    </p>
-                    <div className="relative w-fit">
-                      <div
-                        className={cn(
-                          'rounded-lg border border-border-subtle bg-white p-3',
-                          weixinQrStatus === 'expired' && 'opacity-30',
-                        )}
-                      >
-                        <QRCodeSVG value={weixinQrUrl} size={192} />
-                      </div>
-                      {weixinQrStatus === 'expired' && (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Button type="button" onClick={() => void handleWeixinQrLogin()}>
-                            <RefreshCw data-icon="inline-start" />
-                            {i18nService.t('imWeixinQrRefresh')}
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {weixinQrStatus === 'waiting' && (
-                      <div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-                        <RefreshCw className="size-3.5 animate-spin" />
-                        {i18nService.t('imWeixinQrWaiting')}
-                      </div>
-                    )}
-                  </div>
-                )}
-              {weixinQrStatus === 'success' && (
-                <IMStatusAlert>{i18nService.t('imWeixinQrSuccess')}</IMStatusAlert>
-              )}
-            </div>
-
             {/* Platform Guide */}
             <PlatformGuide
               steps={[
@@ -2156,9 +1803,9 @@ const IMSettings: React.FC = () => {
             <div className="pt-1">{renderConnectivityTestButton('weixin')}</div>
 
             {/* Account ID display */}
-            {weixinOpenClawConfig.accountId && (
+            {weixinConfig.accountId && (
               <IMStatusAlert>
-                {i18nService.t('imAccountId')}: {weixinOpenClawConfig.accountId}
+                {i18nService.t('imAccountId')}: {weixinConfig.accountId}
               </IMStatusAlert>
             )}
 
@@ -2177,7 +1824,7 @@ const IMSettings: React.FC = () => {
                 <IMSelectField
                   id="weixin-dm-policy"
                   label={i18nService.t('imDmPolicy')}
-                  value={weixinOpenClawConfig.dmPolicy}
+                  value={weixinConfig.dmPolicy}
                   options={[
                     { value: 'open', label: i18nService.t('imDmPolicyOpen') },
                     { value: 'pairing', label: i18nService.t('imDmPolicyPairing') },
@@ -2185,9 +1832,9 @@ const IMSettings: React.FC = () => {
                     { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
                   ]}
                   onValueChange={value => {
-                    const update = { dmPolicy: value as WeixinOpenClawConfig['dmPolicy'] };
+                    const update = { dmPolicy: value as WeixinChannelConfig['dmPolicy'] };
                     void imService.updateConfig({
-                      weixin: { ...weixinOpenClawConfig, ...update },
+                      weixin: { ...weixinConfig, ...update },
                     });
                   }}
                 />
@@ -2204,11 +1851,11 @@ const IMSettings: React.FC = () => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           const id = weixinAllowFromInput.trim();
-                          if (id && !weixinOpenClawConfig.allowFrom.includes(id)) {
-                            const newIds = [...weixinOpenClawConfig.allowFrom, id];
+                          if (id && !weixinConfig.allowFrom.includes(id)) {
+                            const newIds = [...weixinConfig.allowFrom, id];
                             setWeixinAllowFromInput('');
                             void imService.updateConfig({
-                              weixin: { ...weixinOpenClawConfig, allowFrom: newIds },
+                              weixin: { ...weixinConfig, allowFrom: newIds },
                             });
                           }
                         }
@@ -2222,11 +1869,11 @@ const IMSettings: React.FC = () => {
                       size="sm"
                       onClick={() => {
                         const id = weixinAllowFromInput.trim();
-                        if (id && !weixinOpenClawConfig.allowFrom.includes(id)) {
-                          const newIds = [...weixinOpenClawConfig.allowFrom, id];
+                        if (id && !weixinConfig.allowFrom.includes(id)) {
+                          const newIds = [...weixinConfig.allowFrom, id];
                           setWeixinAllowFromInput('');
                           void imService.updateConfig({
-                            weixin: { ...weixinOpenClawConfig, allowFrom: newIds },
+                            weixin: { ...weixinConfig, allowFrom: newIds },
                           });
                         }
                       }}
@@ -2234,9 +1881,9 @@ const IMSettings: React.FC = () => {
                       {i18nService.t('add')}
                     </Button>
                   </div>
-                  {weixinOpenClawConfig.allowFrom.length > 0 && (
+                  {weixinConfig.allowFrom.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {weixinOpenClawConfig.allowFrom.map(id => (
+                      {weixinConfig.allowFrom.map(id => (
                         <span
                           key={id}
                           className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-surface border-border-subtle border text-foreground"
@@ -2248,11 +1895,11 @@ const IMSettings: React.FC = () => {
                             size="icon-xs"
                             aria-label={i18nService.t('delete')}
                             onClick={() => {
-                              const newIds = weixinOpenClawConfig.allowFrom.filter(
+                              const newIds = weixinConfig.allowFrom.filter(
                                 uid => uid !== id,
                               );
                               void imService.updateConfig({
-                                weixin: { ...weixinOpenClawConfig, allowFrom: newIds },
+                                weixin: { ...weixinConfig, allowFrom: newIds },
                               });
                             }}
                           >
@@ -2369,7 +2016,6 @@ const IMSettings: React.FC = () => {
                   connectivityResults={
                     connectivityResults as Record<string, IMConnectivityTestResult>
                   }
-                  renderPairingSection={renderPairingSection}
                 />
               );
             }

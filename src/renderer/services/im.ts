@@ -33,11 +33,11 @@ import {
 } from '../store/slices/imSlice';
 import type {
   DingTalkInstanceConfig,
-  DingTalkOpenClawConfig,
+  DingTalkChannelConfig,
   DiscordInstanceConfig,
-  DiscordOpenClawConfig,
+  DiscordChannelConfig,
   FeishuInstanceConfig,
-  FeishuOpenClawConfig,
+  FeishuChannelConfig,
   IMConfigResult,
   IMConnectivityTestResponse,
   IMConnectivityTestResult,
@@ -46,11 +46,11 @@ import type {
   IMGatewayStatus,
   IMStatusResult,
   QQInstanceConfig,
-  QQOpenClawConfig,
+  QQChannelConfig,
   TelegramInstanceConfig,
-  TelegramOpenClawConfig,
+  TelegramChannelConfig,
   WecomInstanceConfig,
-  WecomOpenClawConfig,
+  WecomChannelConfig,
 } from '../types/im';
 
 class IMService {
@@ -187,7 +187,7 @@ class IMService {
   }
 
   /**
-   * Sync IM gateway config (regenerate openclaw.json and restart gateway).
+   * Reconcile persisted IM account configuration with channel sidecars.
    * Called from the global Settings Save button.
    */
   async saveAndSyncConfig(): Promise<boolean> {
@@ -304,45 +304,6 @@ class IMService {
     });
   }
 
-  /**
-   * List pending pairing requests and approved allowFrom for a platform
-   */
-  async listPairingRequests(platform: string) {
-    return window.electron.im.listPairingRequests(platform);
-  }
-
-  /**
-   * Approve a pairing code
-   */
-  async approvePairingCode(platform: string, code: string) {
-    return window.electron.im.approvePairingCode(platform, code);
-  }
-
-  /**
-   * Reject a pairing request
-   */
-  async rejectPairingRequest(platform: string, code: string) {
-    return window.electron.im.rejectPairingRequest(platform, code);
-  }
-
-  /**
-   * Fetch the OpenClaw config schema (JSON Schema + uiHints) from the gateway.
-   */
-  async getOpenClawConfigSchema(): Promise<{
-    schema: Record<string, unknown>;
-    uiHints: Record<string, Record<string, unknown>>;
-  } | null> {
-    try {
-      const result = await window.electron.im.getOpenClawConfigSchema();
-      if (result.success && result.result) {
-        return result.result;
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-
   // ==================== DingTalk Multi-Instance Operations ====================
 
   async addDingTalkInstance(name: string): Promise<DingTalkInstanceConfig | null> {
@@ -377,7 +338,7 @@ class IMService {
 
   async persistDingTalkInstanceConfig(
     instanceId: string,
-    config: Partial<DingTalkOpenClawConfig>,
+    config: Partial<DingTalkChannelConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setDingTalkInstanceConfig(instanceId, config, {
@@ -397,7 +358,7 @@ class IMService {
 
   async updateDingTalkInstanceConfig(
     instanceId: string,
-    config: Partial<DingTalkOpenClawConfig>,
+    config: Partial<DingTalkChannelConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -455,7 +416,7 @@ class IMService {
 
   async persistQQInstanceConfig(
     instanceId: string,
-    config: Partial<QQOpenClawConfig>,
+    config: Partial<QQChannelConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setQQInstanceConfig(instanceId, config, {
@@ -475,7 +436,7 @@ class IMService {
 
   async updateQQInstanceConfig(
     instanceId: string,
-    config: Partial<QQOpenClawConfig>,
+    config: Partial<QQChannelConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -533,7 +494,7 @@ class IMService {
 
   async persistFeishuInstanceConfig(
     instanceId: string,
-    config: Partial<FeishuOpenClawConfig>,
+    config: Partial<FeishuChannelConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setFeishuInstanceConfig(instanceId, config, {
@@ -553,7 +514,7 @@ class IMService {
 
   async updateFeishuInstanceConfig(
     instanceId: string,
-    config: Partial<FeishuOpenClawConfig>,
+    config: Partial<FeishuChannelConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -611,7 +572,7 @@ class IMService {
 
   async persistWecomInstanceConfig(
     instanceId: string,
-    config: Partial<WecomOpenClawConfig>,
+    config: Partial<WecomChannelConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setWecomInstanceConfig(instanceId, config, {
@@ -631,7 +592,7 @@ class IMService {
 
   async updateWecomInstanceConfig(
     instanceId: string,
-    config: Partial<WecomOpenClawConfig>,
+    config: Partial<WecomChannelConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -689,7 +650,7 @@ class IMService {
 
   async persistTelegramInstanceConfig(
     instanceId: string,
-    config: Partial<TelegramOpenClawConfig>,
+    config: Partial<TelegramChannelConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setTelegramInstanceConfig(instanceId, config, {
@@ -709,7 +670,7 @@ class IMService {
 
   async updateTelegramInstanceConfig(
     instanceId: string,
-    config: Partial<TelegramOpenClawConfig>,
+    config: Partial<TelegramChannelConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));
@@ -767,7 +728,7 @@ class IMService {
 
   async persistDiscordInstanceConfig(
     instanceId: string,
-    config: Partial<DiscordOpenClawConfig>,
+    config: Partial<DiscordChannelConfig>,
   ): Promise<boolean> {
     try {
       const result = await window.electron.im.setDiscordInstanceConfig(instanceId, config, {
@@ -787,7 +748,7 @@ class IMService {
 
   async updateDiscordInstanceConfig(
     instanceId: string,
-    config: Partial<DiscordOpenClawConfig>,
+    config: Partial<DiscordChannelConfig>,
   ): Promise<boolean> {
     try {
       store.dispatch(setLoading(true));

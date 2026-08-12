@@ -295,7 +295,7 @@ const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfi
   }
 
   // OpenAI in OAuth mode stores tokens in <CODEX_HOME>/auth.json (read by the
-  // OpenClaw runtime), not in the provider config — `authType === 'oauth'`
+  // OAuth token store), not in the provider config — `authType === 'oauth'`
   // alone is the signal that ChatGPT login completed.
   if (provider === 'openai' && config.authType === 'oauth') {
     return true;

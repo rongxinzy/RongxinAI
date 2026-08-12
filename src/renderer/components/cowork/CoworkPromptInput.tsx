@@ -42,7 +42,7 @@ import { setSkills, toggleActiveSkill } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 import ActiveSkillBadge from '../skills/ActiveSkillBadge';
 import ActiveMcpBadge from '../mcp/ActiveMcpBadge';
 import {
@@ -350,7 +350,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           dispatch(setDefaultSelectedModel(nextModel));
           return;
         }
-        const modelRef = toOpenClawModelRef(nextModel);
+        const modelRef = toAgentModelRef(nextModel);
         // Always update the agent-level model selection so that CoworkView's
         // currentAgentSelectedModel (used to build ChatChatTransport) reflects
         // the user's latest choice — even when switching model inside a session.
@@ -599,7 +599,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       // Note: inline/clipboard images have pseudo-paths starting with 'inline:' and are excluded.
       // Note: image attachments that already carry base64 data are excluded — their content
       // is delivered via the attachments parameter of chat.send. Including the file path
-      // would trigger OpenClaw's Native-image detection, which rejects paths outside allowed
+      // would trigger native image-path detection, which rejects paths outside allowed
       // directories and can drop the base64 image during sanitization (macOS-only bug).
       const attachmentLines = attachments
         .filter(a => !a.path.startsWith('inline:') && !(a.isImage && a.dataUrl))

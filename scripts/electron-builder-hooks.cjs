@@ -8,15 +8,12 @@ const {
   statSync,
   mkdirSync,
   mkdtempSync,
-  readFileSync,
   rmSync,
-  cpSync,
   lstatSync,
   writeFileSync,
   symlinkSync,
 } = require('fs');
 const { spawnSync } = require('child_process');
-const asar = require('@electron/asar');
 const { ensurePortablePythonRuntime, checkRuntimeHealth } = require('./setup-python-runtime.js');
 const {
   ensurePortableUvRuntime,
@@ -35,7 +32,7 @@ const {
   ensureSkillPythonRuntimes,
   checkSkillPythonRuntimeHealth,
 } = require('./setup-skill-python-runtime.js');
-const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
+
 const {
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
@@ -44,11 +41,6 @@ const {
   isWindowsResourceComponentReusable,
   sha256File,
 } = require('./windows-resource-pack.cjs');
-const {
-  DIST_DIFFS_EXTENSION_DIR,
-  DIST_EXTENSIONS_DIR,
-  summarizeGatewayAsarEntries,
-} = require('./openclaw-runtime-packaging.cjs');
 
 function isWindowsTarget(context) {
   return context?.electronPlatformName === 'win32';
@@ -133,266 +125,6 @@ function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
   }
 }
 
-function resolveOpenClawRuntimeTargetId(context) {
-  const platform = context?.electronPlatformName;
-  const arch = resolveTargetArch(context);
-
-  if (platform === 'darwin') {
-    return arch === 'x64' ? 'mac-x64' : 'mac-arm64';
-  }
-  if (platform === 'win32') {
-    return arch === 'arm64' ? 'win-arm64' : 'win-x64';
-  }
-  if (platform === 'linux') {
-    return arch === 'arm64' ? 'linux-arm64' : 'linux-x64';
-  }
-
-  return null;
-}
-
-function readRuntimeBuildInfo(runtimeRoot) {
-  const buildInfoPath = path.join(runtimeRoot, 'runtime-build-info.json');
-  if (!existsSync(buildInfoPath)) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(readFileSync(buildInfoPath, 'utf8'));
-    return parsed && typeof parsed === 'object' ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function getOpenClawRuntimeBuildHint(targetId) {
-  if (!targetId) {
-    return 'npm run openclaw:runtime:host';
-  }
-  return `npm run openclaw:runtime:${targetId}`;
-}
-
-function syncCurrentOpenClawRuntimeForTarget(context) {
-  const runtimeBase = path.join(__dirname, '..', 'vendor', 'openclaw-runtime');
-  const currentRoot = path.join(runtimeBase, 'current');
-  const targetId = resolveOpenClawRuntimeTargetId(context);
-
-  if (!targetId) {
-    return { runtimeRoot: currentRoot, targetId: null };
-  }
-
-  const targetRoot = path.join(runtimeBase, targetId);
-  if (!existsSync(targetRoot)) {
-    return { runtimeRoot: currentRoot, targetId };
-  }
-
-  const currentBuildInfo = readRuntimeBuildInfo(currentRoot);
-  if (currentBuildInfo?.target !== targetId) {
-    rmSync(currentRoot, { recursive: true, force: true });
-    cpSync(targetRoot, currentRoot, { recursive: true, force: true });
-    console.log(`[electron-builder-hooks] Synced OpenClaw runtime ${targetId} -> current`);
-  }
-
-  return { runtimeRoot: currentRoot, targetId };
-}
-
-function verifyPreinstalledPlugins(runtimeRoot, buildHint) {
-  const pkgPath = path.join(__dirname, '..', 'package.json');
-  let plugins = [];
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
-    plugins = (pkg.openclaw && pkg.openclaw.plugins) || [];
-  } catch {
-    return; // Cannot read package.json — skip verification
-  }
-
-  if (!Array.isArray(plugins) || plugins.length === 0) {
-    return;
-  }
-
-  const extensionsDir = path.join(runtimeRoot, 'third-party-extensions');
-  const missing = [];
-
-  for (const plugin of plugins) {
-    if (!plugin.id) continue;
-    const pluginDir = path.join(extensionsDir, plugin.id);
-    if (!existsSync(pluginDir)) {
-      missing.push(plugin.id);
-    }
-  }
-
-  if (missing.length > 0) {
-    throw new Error(
-      '[electron-builder-hooks] Preinstalled OpenClaw plugins missing from runtime: ' +
-        missing.join(', ') +
-        `. Run \`${buildHint}\` (which includes openclaw:plugins) before packaging.`,
-    );
-  }
-
-  console.log(
-    `[electron-builder-hooks] Verified ${plugins.length} preinstalled OpenClaw plugin(s).`,
-  );
-}
-
-function hasCompiledLocalExtension(runtimeRoot, extensionId) {
-  const pluginDir = path.join(runtimeRoot, 'third-party-extensions', extensionId);
-  return (
-    existsSync(path.join(pluginDir, 'openclaw.plugin.json')) &&
-    existsSync(path.join(pluginDir, 'index.js'))
-  );
-}
-
-function precompileLocalExtensions(runtimeRoot, buildHint) {
-  const scriptPath = path.join(__dirname, 'precompile-openclaw-extensions.cjs');
-  const result = spawnSync(process.execPath, [scriptPath, runtimeRoot], {
-    cwd: path.join(__dirname, '..'),
-    stdio: 'inherit',
-  });
-
-  if (result.status !== 0) {
-    throw new Error(
-      '[electron-builder-hooks] Failed to precompile local OpenClaw extensions. ' +
-        `Run \`${buildHint}\` before packaging.`,
-    );
-  }
-}
-
-function ensureBundledLocalExtensions(runtimeRoot, buildHint) {
-  const requiredLocalExtensions = ['mcp-bridge', 'ask-user-question'];
-  const missingCompiledExtensions = requiredLocalExtensions.filter(
-    extensionId => !hasCompiledLocalExtension(runtimeRoot, extensionId),
-  );
-
-  if (missingCompiledExtensions.length === 0) {
-    return;
-  }
-
-  console.log(
-    '[electron-builder-hooks] Restoring local OpenClaw extensions before packaging: ' +
-      missingCompiledExtensions.join(', '),
-  );
-  syncLocalOpenClawExtensions(runtimeRoot);
-  precompileLocalExtensions(runtimeRoot, buildHint);
-
-  const stillMissing = requiredLocalExtensions.filter(
-    extensionId => !hasCompiledLocalExtension(runtimeRoot, extensionId),
-  );
-  if (stillMissing.length > 0) {
-    throw new Error(
-      '[electron-builder-hooks] Bundled OpenClaw runtime is missing compiled local extensions: ' +
-        stillMissing.join(', ') +
-        `. Run \`${buildHint}\` before packaging.`,
-    );
-  }
-}
-
-function ensureBundledOpenClawRuntime(context) {
-  const { runtimeRoot, targetId } = syncCurrentOpenClawRuntimeForTarget(context);
-  const buildHint = getOpenClawRuntimeBuildHint(targetId);
-
-  ensureBundledLocalExtensions(runtimeRoot, buildHint);
-
-  const requiredExternalPaths = [path.join(runtimeRoot, 'node_modules')];
-  const missingExternal = requiredExternalPaths.filter(candidate => !existsSync(candidate));
-  if (missingExternal.length > 0) {
-    throw new Error(
-      '[electron-builder-hooks] Bundled OpenClaw runtime is incomplete. Missing: ' +
-        missingExternal.join(', ') +
-        `. Run \`${buildHint}\` before packaging.`,
-    );
-  }
-
-  // Verify preinstalled plugins are present in the runtime extensions directory
-  verifyPreinstalledPlugins(runtimeRoot, buildHint);
-
-  // Verify gateway-bundle.mjs exists and is reasonably sized.
-  // Without it, Windows first-launch falls back to loading ~1100 ESM modules
-  // individually, causing 80-100s startup delay.
-  const gatewayBundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs');
-  if (!existsSync(gatewayBundlePath)) {
-    throw new Error(
-      '[electron-builder-hooks] gateway-bundle.mjs is missing from ' +
-        runtimeRoot +
-        '. Run `npm run openclaw:bundle` before packaging.',
-    );
-  }
-  const gatewayBundleStat = statSync(gatewayBundlePath);
-  if (gatewayBundleStat.size < 1_000_000) {
-    throw new Error(
-      '[electron-builder-hooks] gateway-bundle.mjs is suspiciously small (' +
-        gatewayBundleStat.size +
-        ' bytes, expected ~27MB). Rebuild with: `npm run openclaw:bundle`.',
-    );
-  }
-
-  const gatewayAsarPath = path.join(runtimeRoot, 'gateway.asar');
-  if (existsSync(gatewayAsarPath)) {
-    let summary;
-    try {
-      summary = summarizeGatewayAsarEntries(asar.listPackage(gatewayAsarPath));
-    } catch (error) {
-      throw new Error(
-        '[electron-builder-hooks] Failed to read OpenClaw gateway.asar: ' +
-          `${gatewayAsarPath}. ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    if (
-      !summary.hasOpenClawEntry ||
-      !summary.hasControlUiIndex ||
-      !summary.hasGatewayEntry ||
-      summary.hasBundledExtensions
-    ) {
-      throw new Error(
-        '[electron-builder-hooks] OpenClaw gateway.asar is incomplete. ' +
-          `openclaw.mjs=${summary.hasOpenClawEntry}, control-ui=${summary.hasControlUiIndex}, entry=${summary.hasGatewayEntry}, extensions=${summary.hasBundledExtensions}.`,
-      );
-    }
-
-    const bundledExtensionsDir = path.join(runtimeRoot, DIST_EXTENSIONS_DIR);
-    if (!existsSync(bundledExtensionsDir)) {
-      throw new Error(
-        '[electron-builder-hooks] Bundled OpenClaw runtime is missing bare dist/extensions. ' +
-          `Expected ${bundledExtensionsDir} after gateway.asar packing.`,
-      );
-    }
-
-    const diffsExtensionDir = path.join(runtimeRoot, DIST_DIFFS_EXTENSION_DIR);
-    if (existsSync(diffsExtensionDir)) {
-      throw new Error(
-        '[electron-builder-hooks] Bundled OpenClaw runtime still contains the diffs extension. ' +
-          `Expected ${diffsExtensionDir} to be removed before packaging.`,
-      );
-    }
-
-    return;
-  }
-
-  const legacyRequiredPaths = [
-    path.join(runtimeRoot, 'openclaw.mjs'),
-    path.join(runtimeRoot, 'dist', 'control-ui', 'index.html'),
-  ];
-
-  const hasLegacyEntry =
-    existsSync(path.join(runtimeRoot, 'dist', 'entry.js')) ||
-    existsSync(path.join(runtimeRoot, 'dist', 'entry.mjs'));
-  if (!hasLegacyEntry) {
-    throw new Error(
-      '[electron-builder-hooks] Missing OpenClaw runtime entry. ' +
-        `Expected ${path.join(runtimeRoot, 'dist', 'entry.js')} or ${path.join(runtimeRoot, 'dist', 'entry.mjs')}, ` +
-        `or ${path.join(runtimeRoot, 'gateway.asar')}.`,
-    );
-  }
-
-  const missingLegacy = legacyRequiredPaths.filter(candidate => !existsSync(candidate));
-  if (missingLegacy.length > 0) {
-    throw new Error(
-      '[electron-builder-hooks] Bundled OpenClaw legacy runtime is incomplete. Missing: ' +
-        missingLegacy.join(', ') +
-        `. Run \`${buildHint}\` before packaging.`,
-    );
-  }
-}
-
 /**
  * Build the deliberately trimmed cc-connect sidecar from a checked-out,
  * immutable pi-connect revision.  The release workflow supplies
@@ -423,16 +155,20 @@ function ensureBundledChannelRuntime(context) {
 
   rmSync(runtimeRoot, { recursive: true, force: true });
   mkdirSync(runtimeRoot, { recursive: true });
-  const result = spawnSync('go', ['build', '-trimpath', '-ldflags=-s -w', '-o', binaryPath, './cmd/zhiyuan-sidecar'], {
-    cwd: sourceRoot,
-    env: {
-      ...process.env,
-      GOOS: platform === 'win32' ? 'windows' : platform,
-      GOARCH: goArch,
-      CGO_ENABLED: '0',
+  const result = spawnSync(
+    'go',
+    ['build', '-trimpath', '-ldflags=-s -w', '-o', binaryPath, './cmd/zhiyuan-sidecar'],
+    {
+      cwd: sourceRoot,
+      env: {
+        ...process.env,
+        GOOS: platform === 'win32' ? 'windows' : platform,
+        GOARCH: goArch,
+        CGO_ENABLED: '0',
+      },
+      encoding: 'utf8',
     },
-    encoding: 'utf8',
-  });
+  );
   if (result.status !== 0 || !existsSync(binaryPath)) {
     throw new Error(
       '[electron-builder-hooks] Failed to build cc-connect channel sidecar: ' +
@@ -573,46 +309,12 @@ function applyMacIconFix(appPath) {
 }
 
 /**
- * Remove all node_modules/.bin directories from the cfmind tree.
+ * Remove node_modules/.bin directories from bundled dependency trees.
  *
  * macOS codesign rejects symlinks inside app bundles (even valid relative ones).
  * .bin/ directories contain only CLI wrapper symlinks that are never used at
  * runtime, so removing them entirely is safe and fixes signing.
  */
-function removeAllBinDirsInCfmind(appOutDir) {
-  const cfmindDir = path.join(appOutDir, 'Contents', 'Resources', 'cfmind');
-
-  if (!existsSync(cfmindDir)) {
-    return;
-  }
-
-  console.log('[electron-builder-hooks] Removing node_modules/.bin directories from cfmind...');
-
-  let removedCount = 0;
-  const walk = dir => {
-    let entries;
-    try {
-      entries = readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      const full = path.join(dir, entry.name);
-      if (!entry.isDirectory()) continue;
-      if (entry.name === '.bin' && path.basename(path.dirname(full)) === 'node_modules') {
-        rmSync(full, { recursive: true, force: true });
-        removedCount++;
-        continue;
-      }
-      walk(full);
-    }
-  };
-  walk(cfmindDir);
-
-  console.log(
-    `[electron-builder-hooks] ✓ Removed ${removedCount} .bin director${removedCount === 1 ? 'y' : 'ies'} from cfmind`,
-  );
-}
 
 /**
  * Check if a command exists in the system PATH.

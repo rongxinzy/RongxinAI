@@ -3,11 +3,11 @@
 /**
  * If APP_BUILD_VERSION is set, patches the top-level "version" field in
  * package.json to that value right before electron-builder runs. This
- * handles cases where intermediate build steps (OpenClaw runtime etc.)
+ * handles cases where intermediate build steps
  * restore the original version.
  *
  * Only the first "version" field is replaced; nested fields inside
- * "openclaw", "llamacpp", etc. are left unchanged.
+ * runtime-specific fields such as "llamacpp" are left unchanged.
  */
 const fs = require('fs');
 const path = require('path');

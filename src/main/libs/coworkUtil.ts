@@ -5,7 +5,6 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
-  realpathSync,
   statSync,
   writeFileSync,
 } from 'fs';
@@ -1274,31 +1273,6 @@ function applyPackagedEnvOverrides(
       );
     }
 
-    // In dev mode, add openclaw runtime's node_modules to NODE_PATH so exec tool
-    // can access shared packages like sharp.
-    const devRuntimeNodeModules = (() => {
-      const candidates = [
-        join(app.getAppPath(), 'vendor', 'openclaw-runtime', 'current', 'node_modules'),
-        join(process.cwd(), 'vendor', 'openclaw-runtime', 'current', 'node_modules'),
-      ];
-      for (const c of candidates) {
-        try {
-          const resolved = realpathSync(c);
-          if (existsSync(resolved)) return resolved;
-        } catch {
-          /* symlink target missing — skip */
-        }
-      }
-      return null;
-    })();
-    if (devRuntimeNodeModules) {
-      env.NODE_PATH = appendEnvPath(env.NODE_PATH, [devRuntimeNodeModules]);
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        `Dev mode: added openclaw runtime node_modules to NODE_PATH: ${devRuntimeNodeModules}`,
-      );
-    }
     return;
   }
 
@@ -1402,7 +1376,6 @@ function applyPackagedEnvOverrides(
   const nodePaths = [
     join(resourcesPath, 'app.asar', 'node_modules'),
     join(resourcesPath, 'app.asar.unpacked', 'node_modules'),
-    join(resourcesPath, 'cfmind', 'node_modules'),
   ].filter(nodePath => existsSync(nodePath));
 
   if (nodePaths.length > 0) {

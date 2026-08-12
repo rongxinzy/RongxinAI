@@ -31,11 +31,13 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+      - name: Enforce retired runtime decoupling
+        run: node scripts/ci/check-openclaw-decoupling.mjs
       - name: Check out the fixed cc-connect sidecar source
         uses: actions/checkout@v6
         with:
           repository: rongxinzy/pi-connect
-          ref: 51d84979cc347cefd82737fa1db59dbc926aba3b
+          ref: 2ccda878a77402d7445daa22d06f3cf54028aa34
           path: .sidecars/pi-connect
           persist-credentials: false
       - name: Set up Go for the fixed cc-connect sidecar
@@ -49,9 +51,6 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.14"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
@@ -60,9 +59,6 @@ jobs:
             ~/.npm
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-            ~/AppData/Local/pnpm/store
-            vendor/openclaw-runtime/win-x64
-            vendor/openclaw-plugins
             vendor/engram-runtime
           key: windows-installer-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |

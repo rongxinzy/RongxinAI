@@ -35,23 +35,16 @@ export interface ScheduledTaskHandlerDeps {
           }>;
         }
       | undefined;
-    primeConversationReplyRoute: (
-      platform: string,
-      conversationId: string,
-      coworkSessionId: string,
-    ) => Promise<void>;
   } | null;
 }
 
 /**
  * Normalizes an announce-mode delivery payload for local channel delivery.
  * Mutates `normalizedInput` in place: sets sessionTarget, converts SystemEvent
- * payloads to AgentTurn, strips IM subtype prefixes from delivery.to, and primes
- * the DingTalk reply route when needed.
+ * payloads to AgentTurn, and strips IM subtype prefixes from delivery.to.
  */
 async function applyAnnounceDeliveryNormalization(
   normalizedInput: Record<string, any>,
-  getIMGatewayManager: ScheduledTaskHandlerDeps['getIMGatewayManager'],
 ): Promise<void> {
   const delivery = normalizedInput.delivery;
   if (!(delivery && delivery.mode === STDeliveryMode.Announce && delivery.channel && delivery.to)) {
@@ -80,18 +73,6 @@ async function applyAnnounceDeliveryNormalization(
       '->',
       delivery.to,
     );
-  }
-
-  if (platform === 'dingtalk') {
-    const imStore = getIMGatewayManager()?.getIMStore();
-    const mapping = imStore?.getSessionMapping(rawTo, platform);
-    if (mapping) {
-      await getIMGatewayManager()!.primeConversationReplyRoute(
-        platform,
-        rawTo,
-        mapping.coworkSessionId,
-      );
-    }
   }
 }
 
@@ -126,7 +107,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
     try {
       const normalizedInput = input && typeof input === 'object' ? { ...input } : {};
       console.debug('[ScheduledTask] create input:', JSON.stringify(normalizedInput, null, 2));
-      await applyAnnounceDeliveryNormalization(normalizedInput, getIMGatewayManager);
+      await applyAnnounceDeliveryNormalization(normalizedInput);
 
       const task = await getCronJobService().addJob(normalizedInput);
       console.log('[IPC][scheduledTask:create] result task id:', task?.id, 'name:', task?.name);
@@ -147,7 +128,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         id,
         JSON.stringify(normalizedInput, null, 2),
       );
-      await applyAnnounceDeliveryNormalization(normalizedInput, getIMGatewayManager);
+      await applyAnnounceDeliveryNormalization(normalizedInput);
 
       const task = await getCronJobService().updateJob(id, normalizedInput);
       console.log('[IPC][scheduledTask:update] result task id:', task?.id, 'name:', task?.name);

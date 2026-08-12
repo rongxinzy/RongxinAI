@@ -303,7 +303,7 @@ export function formatPayloadLabel(payload: ScheduledTaskPayload): string {
 
 /**
  * Resolve a channel name to a user-friendly display name via i18n + PlatformRegistry.
- * e.g. 'feishu' → '飞书', 'openclaw-weixin' → '微信'
+ * e.g. 'feishu' -> '飞书', 'weixin' -> '微信'
  */
 function resolveChannelDisplayName(channel: string): string {
   const platform = PlatformRegistry.platformOfChannel(channel);

@@ -22,7 +22,7 @@ import {
   getCoworkOpenAICompatProxyStatus,
   type OpenAICompatProxyTarget,
 } from './coworkOpenAICompatProxy';
-import type { LlamaCppOpenClawEligibility } from './llamacppOpenClawBinding';
+import type { LlamaCppAgentEligibility } from './llamacppAgentBinding';
 import { readOpenAICodexAuthFile } from './openaiCodexAuth';
 
 type LocalProviderConfig = Omit<ProviderConfig, 'apiFormat'> & { apiFormat?: ApiFormat | 'native' };
@@ -53,7 +53,7 @@ type ProviderModelConfig = {
   maxTokens?: number;
   capabilities?: Partial<ModelCapabilities>;
   piRuntime?: ProviderModelPiRuntimeConfig;
-  openClawEligibility?: LlamaCppOpenClawEligibility;
+  agentEligibility?: LlamaCppAgentEligibility;
 };
 
 type ProviderModelInputConfig = {
@@ -65,7 +65,7 @@ type ProviderModelInputConfig = {
   maxTokens?: number;
   capabilities?: Partial<ModelCapabilities>;
   piRuntime?: ProviderModelPiRuntimeConfig;
-  openClawEligibility?: LlamaCppOpenClawEligibility;
+  agentEligibility?: LlamaCppAgentEligibility;
 };
 
 export type ApiConfigResolution = {
@@ -113,7 +113,7 @@ function serializeLlamaCppRunningModels(models: ProviderModelConfig[]): string {
         contextTokens: model.contextTokens,
         maxTokens: model.maxTokens,
         capabilities: model.capabilities,
-        openClawEligibility: model.openClawEligibility,
+        agentEligibility: model.agentEligibility,
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
   );
@@ -131,7 +131,7 @@ export function getLlamaCppRunningModels(): ProviderModelConfig[] {
   return llamaCppRunningModelCache.map(model => ({
     ...model,
     capabilities: model.capabilities ? { ...model.capabilities } : undefined,
-    openClawEligibility: model.openClawEligibility ? { ...model.openClawEligibility } : undefined,
+    agentEligibility: model.agentEligibility ? { ...model.agentEligibility } : undefined,
   }));
 }
 
@@ -198,10 +198,10 @@ export function getLlamaCppModelContextWindow(modelId: string): number | undefin
   return findLlamaCppRunningModel(modelId)?.contextWindow;
 }
 
-export function getLlamaCppModelOpenClawEligibility(
+export function getLlamaCppModelAgentEligibility(
   modelId: string,
-): LlamaCppOpenClawEligibility | undefined {
-  const eligibility = findLlamaCppRunningModel(modelId)?.openClawEligibility;
+): LlamaCppAgentEligibility | undefined {
+  const eligibility = findLlamaCppRunningModel(modelId)?.agentEligibility;
   return eligibility ? { ...eligibility } : undefined;
 }
 
@@ -242,8 +242,8 @@ function normalizeProviderModels(
             ? model.maxTokens
             : registeredModel?.maxTokens,
         piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime),
-        openClawEligibility: model.openClawEligibility
-          ? { ...model.openClawEligibility }
+        agentEligibility: model.agentEligibility
+          ? { ...model.agentEligibility }
           : undefined,
       };
     });
@@ -270,7 +270,7 @@ type MatchedProvider = {
   capabilities?: Partial<ModelCapabilities>;
   piRuntime?: ProviderModelPiRuntimeConfig;
   userModelConfig?: ProviderModelConfig;
-  openClawEligibility?: LlamaCppOpenClawEligibility;
+  agentEligibility?: LlamaCppAgentEligibility;
 };
 
 function getMatchedRuntimeSnapshot(matched: MatchedProvider): RuntimeModelSnapshot | undefined {
@@ -291,8 +291,8 @@ function getMatchedRuntimeSnapshot(matched: MatchedProvider): RuntimeModelSnapsh
   }
   if (matched.providerName !== ProviderName.LlamaCpp) return undefined;
   const trainedContextWindow =
-    matched.userModelConfig?.openClawEligibility?.trainedContextWindow ??
-    matched.openClawEligibility?.trainedContextWindow;
+    matched.userModelConfig?.agentEligibility?.trainedContextWindow ??
+    matched.agentEligibility?.trainedContextWindow;
   const detectedCapabilities = matched.capabilities;
   return {
     kind: 'llamacpp',
@@ -350,7 +350,7 @@ function getEffectiveProviderModels(
   return normalizeProviderModels(providerName, configuredModels, effectiveApiFormat);
 }
 
-function getOpenClawEligibleProviderModels(
+function getAgentEligibleProviderModels(
   providerName: string,
   providerConfig: LocalProviderConfig,
 ): ProviderModelConfig[] {
@@ -358,7 +358,7 @@ function getOpenClawEligibleProviderModels(
   if (providerName !== ProviderName.LlamaCpp) {
     return models;
   }
-  return models.filter(model => model.openClawEligibility?.eligible === true);
+  return models.filter(model => model.agentEligibility?.eligible === true);
 }
 
 function shouldUseOpenAICodexOAuth(
@@ -487,7 +487,7 @@ function resolveMatchedProviderFromSelection(
       userModelConfig: storedProviderConfig.models?.find(
         model => model.id.toLowerCase() === modelId.toLowerCase(),
       ),
-      openClawEligibility: matchedModel.openClawEligibility,
+      agentEligibility: matchedModel.agentEligibility,
     },
   };
 }
@@ -597,7 +597,7 @@ function resolveMatchedProvider(appConfig: AppConfig): {
     modelId: string;
   } | null => {
     for (const [providerName, providerConfig] of Object.entries(providers)) {
-      const models = getOpenClawEligibleProviderModels(providerName, providerConfig);
+      const models = getAgentEligibleProviderModels(providerName, providerConfig);
       if (!isProviderEnabled(providerName, providerConfig) || models.length === 0) {
         continue;
       }
@@ -702,7 +702,7 @@ export function resolveCurrentApiConfig(
   let resolvedApiKey = matched.providerConfig.apiKey?.trim() || '';
 
   // Providers that don't require auth (e.g. Ollama) still need a non-empty
-  // placeholder so downstream components (OpenClaw gateway, compat proxy)
+  // placeholder so downstream components such as the compatibility proxy
   // don't reject the request with "No API key found for provider".
   const effectiveApiKey =
     resolvedApiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
@@ -799,7 +799,7 @@ export function getCurrentApiConfig(
 /**
  * Resolve the raw API config directly from the app config,
  * without requiring the OpenAI compatibility proxy.
- * Used by OpenClaw config sync which has its own model routing.
+ * Used by Pi model routing without requiring the compatibility proxy.
  */
 export function resolveRawApiConfig(): ApiConfigResolution {
   const sqliteStore = getStore();
@@ -847,9 +847,9 @@ export function resolveRawApiConfig(): ApiConfigResolution {
       providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
     }),
   );
-  // OpenClaw's gateway requires a non-empty apiKey for every provider — even
-  // local servers (Ollama, vLLM, etc.) that don't enforce auth.  When the user
-  // leaves the key blank we supply a placeholder so the gateway doesn't reject
+  // The compatibility layer requires a non-empty apiKey for every provider, even
+  // local servers that do not enforce auth. When the user leaves the key blank,
+  // supply a placeholder so request validation does not reject
   // the request with "No API key found for provider".
   const effectiveApiKey =
     apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
@@ -902,8 +902,7 @@ export function resolveRawApiConfigForModelRef(modelRef: string): ApiConfigResol
 
 /**
  * Collect apiKeys for ALL configured providers (not just the currently selected one).
- * Used by OpenClaw config sync to pre-register all apiKeys as env vars at gateway
- * startup, so switching between providers doesn't require a process restart.
+ * Used to pre-register provider credentials for local compatibility routes.
  *
  * Returns a map of env-var-safe provider name → apiKey.
  */
@@ -1034,7 +1033,7 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 
     if (!effectiveBaseURL) continue;
 
-    const models = getOpenClawEligibleProviderModels(providerName, providerConfig);
+    const models = getAgentEligibleProviderModels(providerName, providerConfig);
     if (models.length === 0) continue;
 
     result.push({
@@ -1052,9 +1051,8 @@ export function resolveAllEnabledProviderConfigs(): ProviderRawConfig[] {
 }
 
 /**
- * Returns the long-lived GitHub OAuth token used by OpenClaw's built-in
- * github-copilot provider to exchange for short-lived Copilot API tokens.
- * OpenClaw reads this from the COPILOT_GITHUB_TOKEN env var.
+ * Returns the long-lived GitHub OAuth token used to exchange for short-lived
+ * Copilot API tokens.
  */
 export function getCopilotGithubToken(): string | null {
   const sqliteStore = getStore();

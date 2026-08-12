@@ -54,7 +54,7 @@ class FakeCoworkStore {
     workingDirectory: process.cwd(),
     systemPrompt: '',
     executionMode: 'auto',
-    agentEngine: 'openclaw',
+    agentEngine: 'pi',
   };
   sessions = new Map<string, Record<string, unknown>>();
   sessionCounter = 0;

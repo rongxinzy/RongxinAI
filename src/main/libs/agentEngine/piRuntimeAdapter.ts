@@ -359,7 +359,7 @@ const MESSAGE_UPDATE_THROTTLE_MS = 200;
 /**
  * How often streaming content is written to SQLite. better-sqlite3 is synchronous
  * and blocks the main-process event loop, so writing on every Pi frame causes
- * visible streaming jank. We throttle store writes (like the OpenClaw adapter)
+ * visible streaming jank. Store writes are throttled
  * and flush the latest content on finalize.
  */
 const STORE_UPDATE_THROTTLE_MS = 250;
@@ -1812,7 +1812,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'tool_execution_start': {
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
-        // Mirrors OpenClaw adapter's tool_use construction.
+        // Preserve the shared tool_use message shape.
         if (!event.toolCallId || !event.toolName) break;
         const runningActivity = active.toolActivityTracker.upsert(
           {

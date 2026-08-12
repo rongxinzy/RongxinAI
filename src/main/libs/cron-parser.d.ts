@@ -1,6 +1,6 @@
 /**
  * Minimal type declarations for cron-parser (MIT)
- * Used by openclawEngineManager.ts to enumerate missed cron job run boundaries.
+ * Used by the canonical scheduler to enumerate cron boundaries.
  */
 declare module 'cron-parser' {
   export const CronExpressionParser: {

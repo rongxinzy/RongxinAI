@@ -15,7 +15,7 @@ import type {
   IMConnectivityTestResult,
   QQInstanceConfig,
   QQInstanceStatus,
-  QQOpenClawConfig,
+  QQChannelConfig,
 } from '../../types/im';
 import {
   IMConnectionBadge,
@@ -29,8 +29,8 @@ import {
 interface QQInstanceSettingsProps {
   instance: QQInstanceConfig;
   instanceStatus: QQInstanceStatus | undefined;
-  onConfigChange: (update: Partial<QQOpenClawConfig>) => void;
-  onSave: (override?: Partial<QQOpenClawConfig>) => Promise<void>;
+  onConfigChange: (update: Partial<QQChannelConfig>) => void;
+  onSave: (override?: Partial<QQChannelConfig>) => Promise<void>;
   onRename: (newName: string) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
@@ -231,7 +231,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
               { value: 'allowlist', label: i18nService.t('imDmPolicyAllowlist') },
             ]}
             onValueChange={value => {
-              const update = { dmPolicy: value as QQOpenClawConfig['dmPolicy'] };
+              const update = { dmPolicy: value as QQChannelConfig['dmPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -318,7 +318,7 @@ const QQInstanceSettings: React.FC<QQInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { groupPolicy: value as QQOpenClawConfig['groupPolicy'] };
+              const update = { groupPolicy: value as QQChannelConfig['groupPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}

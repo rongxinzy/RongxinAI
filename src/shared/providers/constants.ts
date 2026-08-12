@@ -7,7 +7,7 @@
  *
  * When adding a new provider:
  * 1. Add the provider key to ProviderName
- * 2. Add the OpenClaw provider ID to OpenClawProviderId (if different)
+ * 2. Add the runtime provider ID to AgentProviderId (if different)
  * 3. Add one record to the PROVIDER_DEFINITIONS array
  *    — that's it, types and lookups are derived automatically.
  *
@@ -50,9 +50,9 @@ export const ProviderName = {
 } as const;
 export type ProviderName = (typeof ProviderName)[keyof typeof ProviderName];
 
-// ─── OpenClaw Provider ID ───────────────────────────────────────────────
-// OpenClaw gateway provider identifiers. May differ from ProviderName.
-export const OpenClawProviderId = {
+// ─── Agent Runtime Provider ID ─────────────────────────────────────────
+// Runtime provider identifiers may differ from ProviderName.
+export const AgentProviderId = {
   Moonshot: 'moonshot',
   Google: 'google',
   Anthropic: 'anthropic',
@@ -60,8 +60,8 @@ export const OpenClawProviderId = {
   OpenAICodex: 'openai-codex',
   DeepSeek: 'deepseek',
   Qianfan: 'qianfan',
-  Qwen: 'qwen-portal', // OpenClaw normalizes 'qwen' → 'qwen-portal'; use canonical ID to avoid config diff loop
-  Zai: 'zai', // OpenClaw official provider ID for Zhipu/GLM
+  Qwen: 'qwen-portal',
+  Zai: 'zai',
   Volcengine: 'volcengine',
   Minimax: 'minimax',
   StepFun: 'stepfun',
@@ -74,10 +74,10 @@ export const OpenClawProviderId = {
   Ollama: 'ollama',
   Zhiyuan: 'zhiyuan',
 } as const;
-export type OpenClawProviderId = (typeof OpenClawProviderId)[keyof typeof OpenClawProviderId];
+export type AgentProviderId = (typeof AgentProviderId)[keyof typeof AgentProviderId];
 
-// ─── OpenClaw API Protocol ──────────────────────────────────────────────
-export const OpenClawApi = {
+// ─── Agent Runtime API Protocol ────────────────────────────────────────
+export const AgentApi = {
   AnthropicMessages: 'anthropic-messages',
   OpenAICompletions: 'openai-completions',
   OpenAIResponses: 'openai-responses',
@@ -85,7 +85,7 @@ export const OpenClawApi = {
   GoogleGenerativeAI: 'google-generative-ai',
   Ollama: 'ollama',
 } as const;
-export type OpenClawApi = (typeof OpenClawApi)[keyof typeof OpenClawApi];
+export type AgentApi = (typeof AgentApi)[keyof typeof AgentApi];
 
 // ─── API Format (provider default protocol format) ──────────────────────
 export const ApiFormat = {
@@ -221,13 +221,13 @@ interface ProviderDefInput {
    */
   readonly codingPlanModels?: readonly ProviderModelDefinition[];
   /**
-   * The OpenClaw gateway provider ID used when building model refs (e.g. "provider/modelId").
+   * The runtime provider ID used when building model refs (e.g. "provider/modelId").
    * Most providers share the same value as `id`, but some differ
    * (e.g. zhipu → zai, gemini → google).
    * Used by renderer to construct scheduled-task model references without
-   * importing main-process-only openclawConfigSync.
+   * importing main-process-only runtime configuration.
    */
-  readonly openClawProviderId: OpenClawProviderId;
+  readonly agentProviderId: AgentProviderId;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -243,7 +243,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'DeepSeek',
     website: 'https://platform.deepseek.com',
     apiKeyUrl: 'https://platform.deepseek.com/api_keys',
-    openClawProviderId: OpenClawProviderId.DeepSeek,
+    agentProviderId: AgentProviderId.DeepSeek,
     defaultBaseUrl: 'https://api.deepseek.com/anthropic',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: false,
@@ -284,7 +284,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Moonshot',
     website: 'https://platform.moonshot.cn',
     apiKeyUrl: 'https://platform.moonshot.cn/console/api-keys',
-    openClawProviderId: OpenClawProviderId.Moonshot,
+    agentProviderId: AgentProviderId.Moonshot,
     // Moonshot's /anthropic endpoint does not fully implement the Anthropic Messages spec
     // (no tool use, incomplete streaming, etc.). API connectivity tests pass, but actual
     // cowork sessions fail to send/receive messages. Force OpenAI-compatible format instead.
@@ -348,7 +348,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Qwen',
     website: 'https://dashscope.console.aliyun.com',
     apiKeyUrl: 'https://dashscope.console.aliyun.com/apiKey',
-    openClawProviderId: OpenClawProviderId.Qwen,
+    agentProviderId: AgentProviderId.Qwen,
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/apps/anthropic',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: true,
@@ -450,7 +450,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Zhipu',
     website: 'https://open.bigmodel.cn',
     apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
-    openClawProviderId: OpenClawProviderId.Zai,
+    agentProviderId: AgentProviderId.Zai,
     defaultBaseUrl: 'https://open.bigmodel.cn/api/anthropic',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: true,
@@ -529,7 +529,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'MiniMax',
     website: 'https://platform.minimaxi.com',
     apiKeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
-    openClawProviderId: OpenClawProviderId.Minimax,
+    agentProviderId: AgentProviderId.Minimax,
     defaultBaseUrl: 'https://api.minimaxi.com/anthropic',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: false,
@@ -571,7 +571,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Volcengine',
     website: 'https://console.volcengine.com/ark',
     apiKeyUrl: 'https://console.volcengine.com/ark',
-    openClawProviderId: OpenClawProviderId.Volcengine,
+    agentProviderId: AgentProviderId.Volcengine,
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/compatible',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: true,
@@ -621,7 +621,7 @@ const PROVIDER_DEFINITIONS = [
     id: ProviderName.Qianfan,
     label: 'Qianfan',
     apiKeyUrl: 'https://console.bce.baidu.com/qianfan/ais/console/apiKey',
-    openClawProviderId: OpenClawProviderId.Qianfan,
+    agentProviderId: AgentProviderId.Qianfan,
     defaultBaseUrl: 'https://qianfan.baidubce.com/v2',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: true,
@@ -656,7 +656,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'StepFun',
     website: 'https://platform.stepfun.com',
     apiKeyUrl: 'https://platform.stepfun.com/interface-key',
-    openClawProviderId: OpenClawProviderId.StepFun,
+    agentProviderId: AgentProviderId.StepFun,
     defaultBaseUrl: 'https://api.stepfun.com/v1',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -686,7 +686,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Xiaomi',
     website: 'https://dev.mi.com/platform',
     apiKeyUrl: 'https://dev.mi.com/platform',
-    openClawProviderId: OpenClawProviderId.Xiaomi,
+    agentProviderId: AgentProviderId.Xiaomi,
     defaultBaseUrl: 'https://api.xiaomimimo.com/anthropic',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: true,
@@ -760,7 +760,7 @@ const PROVIDER_DEFINITIONS = [
     id: ProviderName.Ollama,
     label: 'Ollama',
     website: 'https://ollama.com',
-    openClawProviderId: OpenClawProviderId.Ollama,
+    agentProviderId: AgentProviderId.Ollama,
     defaultBaseUrl: 'http://localhost:11434/v1',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -776,7 +776,7 @@ const PROVIDER_DEFINITIONS = [
     id: ProviderName.LlamaCpp,
     label: 'Llama.cpp',
     website: 'https://github.com/ggerganov/llama.cpp',
-    openClawProviderId: OpenClawProviderId.LlamaCpp,
+    agentProviderId: AgentProviderId.LlamaCpp,
     defaultBaseUrl: 'http://127.0.0.1:8080/v1',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -792,7 +792,7 @@ const PROVIDER_DEFINITIONS = [
   {
     id: ProviderName.Copilot,
     label: 'GitHub Copilot',
-    openClawProviderId: OpenClawProviderId.ZhiyuanCopilot,
+    agentProviderId: AgentProviderId.ZhiyuanCopilot,
     defaultBaseUrl: 'https://api.individual.githubcopilot.com',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -834,7 +834,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Grok',
     website: 'https://x.ai',
     apiKeyUrl: 'https://console.x.ai',
-    openClawProviderId: OpenClawProviderId.Grok,
+    agentProviderId: AgentProviderId.Grok,
     defaultBaseUrl: 'https://api.x.ai/v1',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -860,7 +860,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'OpenAI',
     website: 'https://platform.openai.com',
     apiKeyUrl: 'https://platform.openai.com/api-keys',
-    openClawProviderId: OpenClawProviderId.OpenAI,
+    agentProviderId: AgentProviderId.OpenAI,
     defaultBaseUrl: 'https://api.openai.com/v1',
     defaultApiFormat: ApiFormat.OpenAI,
     codingPlanSupported: false,
@@ -942,7 +942,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Gemini',
     website: 'https://aistudio.google.com',
     apiKeyUrl: 'https://aistudio.google.com/apikey',
-    openClawProviderId: OpenClawProviderId.Google,
+    agentProviderId: AgentProviderId.Google,
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     defaultApiFormat: ApiFormat.Gemini,
     codingPlanSupported: false,
@@ -977,7 +977,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'Anthropic',
     website: 'https://console.anthropic.com',
     apiKeyUrl: 'https://console.anthropic.com/settings/keys',
-    openClawProviderId: OpenClawProviderId.Anthropic,
+    agentProviderId: AgentProviderId.Anthropic,
     defaultBaseUrl: 'https://api.anthropic.com',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: false,
@@ -1012,7 +1012,7 @@ const PROVIDER_DEFINITIONS = [
     label: 'OpenRouter',
     website: 'https://openrouter.ai',
     apiKeyUrl: 'https://openrouter.ai/keys',
-    openClawProviderId: OpenClawProviderId.OpenRouter,
+    agentProviderId: AgentProviderId.OpenRouter,
     defaultBaseUrl: 'https://openrouter.ai/api',
     defaultApiFormat: ApiFormat.Anthropic,
     codingPlanSupported: false,
@@ -1093,7 +1093,7 @@ export interface ProviderDef {
   /** Default model list */
   readonly defaultModels: readonly ProviderModelDefinition[];
   readonly codingPlanModels?: readonly ProviderModelDefinition[];
-  readonly openClawProviderId: OpenClawProviderId;
+  readonly agentProviderId: AgentProviderId;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1407,11 +1407,11 @@ class ProviderRegistryImpl {
     return this.idIndex.get(id)?.switchableBaseUrls?.[format];
   }
 
-  getOpenClawProviderId(providerName: string): string {
+  getAgentProviderId(providerName: string): string {
     return (
-      this.idIndex.get(providerName)?.openClawProviderId ??
+      this.idIndex.get(providerName)?.agentProviderId ??
       providerName ??
-      OpenClawProviderId.Zhiyuan
+      AgentProviderId.Zhiyuan
     );
   }
 

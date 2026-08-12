@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { migrateLegacyScheduledTaskRunsToCanonical, migrateLegacyScheduledTasksToCanonical } from './migrate';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 
-test('imports legacy tasks into SQLite canonical storage without OpenClaw and preserves past at tasks', async () => {
+test('imports legacy tasks into canonical SQLite and preserves past at tasks', async () => {
   const db = new Database(':memory:');
   db.exec(`CREATE TABLE scheduled_tasks (id TEXT, name TEXT, description TEXT, enabled INTEGER, schedule_json TEXT, prompt TEXT, notify_platforms_json TEXT)`);
   db.prepare('INSERT INTO scheduled_tasks VALUES (?, ?, ?, ?, ?, ?, ?)').run(
@@ -17,7 +17,7 @@ test('imports legacy tasks into SQLite canonical storage without OpenClaw and pr
   expect(values.get('scheduled_tasks_migrated_to_canonical_v1')).toBe('true');
 });
 
-test('imports legacy Run history into canonical SQLite instead of OpenClaw JSONL', async () => {
+test('imports legacy Run history into canonical SQLite', async () => {
   const db = new Database(':memory:');
   db.exec(`CREATE TABLE scheduled_task_runs (id TEXT, task_id TEXT, session_id TEXT, status TEXT, started_at TEXT, finished_at TEXT, duration_ms INTEGER, error TEXT)`);
   db.prepare('INSERT INTO scheduled_task_runs VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('run-1', 'task-1', 'session', 'success', '2026-08-11T01:00:00.000Z', '2026-08-11T01:00:01.000Z', 1000, null);

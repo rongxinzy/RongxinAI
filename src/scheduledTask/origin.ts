@@ -2,7 +2,7 @@ import {
   isManagedSessionKey,
   parseChannelSessionKey,
   parseManagedSessionKey,
-} from '../main/libs/openclawChannelSessionSync';
+} from '../main/libs/channelSessionKey';
 import { BindingKind, DeliveryChannel, DeliveryMode, OriginKind } from './constants';
 
 // Re-declare origin/binding types here so common/ doesn't depend on renderer/

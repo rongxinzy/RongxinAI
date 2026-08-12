@@ -8,26 +8,26 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type {
   DingTalkInstanceConfig,
   DingTalkMultiInstanceConfig,
-  DingTalkOpenClawConfig,
+  DingTalkChannelConfig,
   DiscordInstanceConfig,
   DiscordMultiInstanceConfig,
-  DiscordOpenClawConfig,
+  DiscordChannelConfig,
   FeishuInstanceConfig,
   FeishuMultiInstanceConfig,
-  FeishuOpenClawConfig,
+  FeishuChannelConfig,
   IMGatewayConfig,
   IMGatewayStatus,
   IMSettings,
   QQInstanceConfig,
   QQMultiInstanceConfig,
-  QQOpenClawConfig,
+  QQChannelConfig,
   TelegramInstanceConfig,
   TelegramMultiInstanceConfig,
-  TelegramOpenClawConfig,
+  TelegramChannelConfig,
   WecomInstanceConfig,
   WecomMultiInstanceConfig,
-  WecomOpenClawConfig,
-  WeixinOpenClawConfig,
+  WecomChannelConfig,
+  WeixinChannelConfig,
 } from '../../types/im';
 import { DEFAULT_IM_CONFIG, DEFAULT_IM_STATUS } from '../../types/im';
 
@@ -53,7 +53,7 @@ const imSlice = createSlice({
       state.config = action.payload;
     },
     /** @deprecated Use setDingTalkInstanceConfig instead */
-    setDingTalkConfig: (state, action: PayloadAction<Partial<DingTalkOpenClawConfig>>) => {
+    setDingTalkConfig: (state, action: PayloadAction<Partial<DingTalkChannelConfig>>) => {
       // Backward compat: update first instance if exists
       const first = state.config.dingtalk.instances[0];
       if (first) {
@@ -68,7 +68,7 @@ const imSlice = createSlice({
     },
     setDingTalkInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<DingTalkOpenClawConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<DingTalkChannelConfig> }>,
     ) => {
       const inst = state.config.dingtalk.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -84,7 +84,7 @@ const imSlice = createSlice({
       );
     },
     /** @deprecated Use setFeishuInstanceConfig instead */
-    setFeishuConfig: (state, action: PayloadAction<Partial<FeishuOpenClawConfig>>) => {
+    setFeishuConfig: (state, action: PayloadAction<Partial<FeishuChannelConfig>>) => {
       // Backward compat: update first instance if exists
       const first = state.config.feishu.instances[0];
       if (first) {
@@ -99,7 +99,7 @@ const imSlice = createSlice({
     },
     setFeishuInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<FeishuOpenClawConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<FeishuChannelConfig> }>,
     ) => {
       const inst = state.config.feishu.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -115,7 +115,7 @@ const imSlice = createSlice({
       );
     },
     /** @deprecated Use setTelegramInstanceConfig instead */
-    setTelegramOpenClawConfig: (state, action: PayloadAction<Partial<TelegramOpenClawConfig>>) => {
+    setTelegramChannelConfig: (state, action: PayloadAction<Partial<TelegramChannelConfig>>) => {
       const first = state.config.telegram.instances[0];
       if (first) {
         Object.assign(first, action.payload);
@@ -129,7 +129,7 @@ const imSlice = createSlice({
     },
     setTelegramInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<TelegramOpenClawConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<TelegramChannelConfig> }>,
     ) => {
       const inst = state.config.telegram.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -145,7 +145,7 @@ const imSlice = createSlice({
       );
     },
     /** @deprecated Use setQQInstanceConfig instead */
-    setQQConfig: (state, action: PayloadAction<Partial<QQOpenClawConfig>>) => {
+    setQQConfig: (state, action: PayloadAction<Partial<QQChannelConfig>>) => {
       // Backward compat: update first instance if exists
       const first = state.config.qq.instances[0];
       if (first) {
@@ -160,7 +160,7 @@ const imSlice = createSlice({
     },
     setQQInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<QQOpenClawConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<QQChannelConfig> }>,
     ) => {
       const inst = state.config.qq.instances.find(i => i.instanceId === action.payload.instanceId);
       if (inst) Object.assign(inst, action.payload.config);
@@ -174,7 +174,7 @@ const imSlice = createSlice({
       );
     },
     /** @deprecated Use setDiscordInstanceConfig instead */
-    setDiscordConfig: (state, action: PayloadAction<Partial<DiscordOpenClawConfig>>) => {
+    setDiscordConfig: (state, action: PayloadAction<Partial<DiscordChannelConfig>>) => {
       const first = state.config.discord.instances[0];
       if (first) {
         Object.assign(first, action.payload);
@@ -188,7 +188,7 @@ const imSlice = createSlice({
     },
     setDiscordInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<DiscordOpenClawConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<DiscordChannelConfig> }>,
     ) => {
       const inst = state.config.discord.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -204,7 +204,7 @@ const imSlice = createSlice({
       );
     },
     /** @deprecated Use setWecomInstanceConfig instead */
-    setWecomConfig: (state, action: PayloadAction<Partial<WecomOpenClawConfig>>) => {
+    setWecomConfig: (state, action: PayloadAction<Partial<WecomChannelConfig>>) => {
       // Backward compat: update first instance if exists
       const first = state.config.wecom.instances[0];
       if (first) {
@@ -219,7 +219,7 @@ const imSlice = createSlice({
     },
     setWecomInstanceConfig: (
       state,
-      action: PayloadAction<{ instanceId: string; config: Partial<WecomOpenClawConfig> }>,
+      action: PayloadAction<{ instanceId: string; config: Partial<WecomChannelConfig> }>,
     ) => {
       const inst = state.config.wecom.instances.find(
         i => i.instanceId === action.payload.instanceId,
@@ -234,7 +234,7 @@ const imSlice = createSlice({
         i => i.instanceId !== action.payload,
       );
     },
-    setWeixinConfig: (state, action: PayloadAction<Partial<WeixinOpenClawConfig>>) => {
+    setWeixinConfig: (state, action: PayloadAction<Partial<WeixinChannelConfig>>) => {
       state.config.weixin = { ...state.config.weixin, ...action.payload };
     },
     setIMSettings: (state, action: PayloadAction<Partial<IMSettings>>) => {
@@ -269,7 +269,7 @@ export const {
   setFeishuInstanceConfig,
   addFeishuInstance,
   removeFeishuInstance,
-  setTelegramOpenClawConfig,
+  setTelegramChannelConfig,
   setTelegramInstances,
   setTelegramMultiInstanceConfig,
   setTelegramInstanceConfig,
