@@ -50,3 +50,17 @@ describe('CoworkSessionContinueSchema permissionMode', () => {
     ).toThrow();
   });
 });
+
+describe.each([
+  ['start', CoworkSessionStartSchema.input, { prompt: 'hello' }],
+  ['continue', CoworkSessionContinueSchema.input, { sessionId: 'session-1', prompt: 'go on' }],
+])('%s session expertIds', (_name, schema, baseInput) => {
+  test('accepts zero or one expert', () => {
+    expect(schema.parse(baseInput).expertIds).toBeUndefined();
+    expect(schema.parse({ ...baseInput, expertIds: ['expert-a'] }).expertIds).toEqual(['expert-a']);
+  });
+
+  test('rejects multiple experts', () => {
+    expect(() => schema.parse({ ...baseInput, expertIds: ['expert-a', 'expert-b'] })).toThrow();
+  });
+});

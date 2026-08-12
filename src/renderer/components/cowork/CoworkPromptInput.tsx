@@ -260,7 +260,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       !isDirectChat &&
       (currentSession?.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work;
     const persistedExpertIds = useMemo(
-      () => currentSession?.experts?.map(expert => expert.expertId) ?? [],
+      () => currentSession?.experts?.slice(0, 1).map(expert => expert.expertId) ?? [],
       [currentSession?.experts],
     );
     const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(() =>

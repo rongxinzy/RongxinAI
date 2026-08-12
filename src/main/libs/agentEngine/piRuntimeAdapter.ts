@@ -22,7 +22,11 @@ import * as os from 'os';
 import path from 'path';
 
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
-import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import {
+  CoworkSessionExpertSource,
+  normalizeSingleExpertIds,
+  type CoworkMessageExpertIdentity,
+} from '../../../shared/cowork/sessionExperts';
 import {
   CoworkQueueDelivery,
   type CoworkPendingMessage,
@@ -222,6 +226,8 @@ interface ActivePiSession {
   requestedSystemPrompt: string;
   requestedSkillIds: string[] | undefined;
   requestedExpertIds: string[];
+  /** Experts selected for the current turn, retained when messages are persisted. */
+  turnExperts: CoworkMessageExpertIdentity[];
   resourceState: PiResourceState;
   /** Message id for the visible answer (text) bubble of the current turn. */
   assistantMessageId: string | null;
@@ -447,11 +453,6 @@ const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined
     ? undefined
     : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
 
-const normalizeExpertIds = (expertIds: string[] | undefined): string[] =>
-  expertIds === undefined
-    ? []
-    : [...new Set(expertIds.map(expertId => expertId.trim()).filter(Boolean))];
-
 const haveSameStringList = (left: string[] | undefined, right: string[] | undefined): boolean =>
   left === right ||
   (left !== undefined &&
@@ -578,6 +579,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!hasContent) {
       throw new Error('Prompt is required.');
     }
+    const expertIds = normalizeSingleExpertIds(options.expertIds);
 
     if (this.activeSessions.has(sessionId) || this.initializingSessions.has(sessionId)) {
       this.stopActiveSession(sessionId, 'The session was replaced by a new run.', false);
@@ -606,7 +608,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         type: 'user',
         content: prompt,
         timestamp: Date.now(),
-        metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
+        metadata:
+          options.skillIds?.length || expertIds.length
+            ? {
+                ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
+                ...(expertIds.length
+                  ? {
+                      experts: (this.store?.getSession(sessionId)?.experts ?? [])
+                        .filter(expert => expertIds.includes(expert.expertId))
+                        .map(expert => ({
+                          expertId: expert.expertId,
+                          expertName: expert.expertName,
+                          presetId: expert.packageId,
+                        })),
+                    }
+                  : {}),
+              }
+            : undefined,
       };
       const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
       this.emit('message', sessionId, persisted);
@@ -843,8 +861,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // the team member agents alongside the built-in profiles.
       let subagentPresetId: string | undefined;
       if (this.store) {
-        const candidateAgentIds = options.expertIds?.length
-          ? options.expertIds
+        const candidateAgentIds = expertIds.length
+          ? expertIds
           : options.agentId
             ? [options.agentId]
             : [];
@@ -961,7 +979,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         harnessModelProfile,
         requestedSystemPrompt: basePrompt,
         requestedSkillIds: resourceState.skillIds,
-        requestedExpertIds: normalizeExpertIds(options.expertIds),
+        requestedExpertIds: expertIds,
+        turnExperts: (this.store?.getSession(sessionId)?.experts ?? [])
+          .filter(expert => expertIds.includes(expert.expertId))
+          .map(expert => ({
+            expertId: expert.expertId,
+            expertName: expert.expertName,
+            presetId: expert.packageId,
+          })),
         resourceState,
         assistantMessageId: null,
         thinkingMessageId: null,
@@ -1071,6 +1096,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     prompt: string,
     options: PiContinueOptions = {},
   ): Promise<void> {
+    const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
     const active = this.activeSessions.get(sessionId);
     if (!active || active.aborted) {
       if (active?.aborted) {
@@ -1086,7 +1112,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ...options,
         skipInitialUserMessage: options._skipUserMessage,
         systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
-        expertIds: options.expertIds ?? storedSession?.experts.map(expert => expert.expertId),
+        expertIds:
+          options.expertIds === undefined
+            ? storedSession?.experts.slice(0, 1).map(expert => expert.expertId)
+            : explicitExpertIds,
         workspaceRoot: options.workspaceRoot ?? storedSession?.cwd,
         agentId: options.agentId ?? storedSession?.agentId,
         modelOverride: options.modelOverride ?? storedSession?.modelOverride,
@@ -1103,7 +1132,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const requestedExpertIds =
       options.expertIds === undefined
         ? active.requestedExpertIds
-        : normalizeExpertIds(options.expertIds);
+        : explicitExpertIds;
     const requestedSessionMode =
       options.sessionMode ??
       (active.workbenchContract.kind === WorkbenchContractKind.Chat
@@ -1247,6 +1276,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.writeTokenLimitRecovery.reset();
     active.pendingError = null;
     active.turnFailed = false;
+    active.turnExperts = (this.store?.getSession(sessionId)?.experts ?? [])
+      .filter(expert => active.requestedExpertIds.includes(expert.expertId))
+      .map(expert => ({
+        expertId: expert.expertId,
+        expertName: expert.expertName,
+        presetId: expert.packageId,
+      }));
 
     // Emit user message (persisted to SQLite, same as startSession).
     if (!options._skipUserMessage) {
@@ -1259,7 +1295,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           options.skillIds?.length ||
           options._queueDelivery ||
           options.imageAttachments?.length ||
-          options.fileAttachments?.length
+          options.fileAttachments?.length ||
+          active.turnExperts.length
             ? {
                 ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
                 ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
@@ -1269,6 +1306,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 ...(options.fileAttachments?.length
                   ? { fileAttachments: options.fileAttachments }
                   : {}),
+                ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
               }
             : undefined,
       };
@@ -2392,7 +2430,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       metadata:
         kind === 'thinking'
           ? { isStreaming: true, isFinal: false, isThinking: true }
-          : { isStreaming: true, isFinal: false },
+          : {
+              isStreaming: true,
+              isFinal: false,
+              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            },
     };
     if (kind === 'thinking') {
       active.thinkingLifecycle.start(seed.timestamp);
@@ -2415,7 +2457,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const metadata =
       kind === 'thinking'
         ? { isStreaming: true, isFinal: false, isThinking: true }
-        : { isStreaming: true, isFinal: false };
+        : {
+            isStreaming: true,
+            isFinal: false,
+            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+          };
     if (kind === 'thinking') {
       active.thinkingLifecycle.markContentStreaming();
     }
@@ -2444,7 +2490,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             isThinking: true,
             ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
           }
-        : { isStreaming: false, isFinal: true };
+        : {
+            isStreaming: false,
+            isFinal: true,
+            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+          };
     if (this.store) {
       this.store.updateMessage(sessionId, messageId, { content, metadata });
     }
@@ -2468,6 +2518,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       isStreaming: false,
       isFinal: true,
       isFinalAnswer: true,
+      ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
     };
     if (this.store) {
       const message = this.store

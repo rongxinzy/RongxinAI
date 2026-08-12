@@ -1180,6 +1180,44 @@ describe('PiRuntimeAdapter', () => {
       expect(replacementOptions.customTools?.map(tool => tool.name)).toContain('mcp');
     });
 
+    it('persists the selected expert on a continuation user message', async () => {
+      const addMessage = vi.fn((_sessionId: string, message: Record<string, unknown>) => message);
+
+      await adapter.startSession('test', 'First', { expertIds: ['expert-a'] });
+      adapter.setCoworkStore({
+        addMessage,
+        getSession: vi.fn(() => ({
+          experts: [
+            {
+              expertId: 'expert-a',
+              expertName: 'Expert A',
+              packageId: 'package-a',
+            },
+          ],
+        })),
+        updateSession: vi.fn(),
+      } as unknown as CoworkStore);
+
+      await adapter.continueSession('test', 'Second', { expertIds: ['expert-a'] });
+
+      expect(addMessage).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({
+          type: 'user',
+          content: 'Second',
+          metadata: {
+            experts: [
+              {
+                expertId: 'expert-a',
+                expertName: 'Expert A',
+                presetId: 'package-a',
+              },
+            ],
+          },
+        }),
+      );
+    });
+
     it('should reload an active session when its system prompt changes', async () => {
       await adapter.startSession('test', 'First', { systemPrompt: 'You are the original expert.' });
       await adapter.continueSession('test', 'Second', {
