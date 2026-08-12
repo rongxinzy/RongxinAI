@@ -340,3 +340,14 @@ test('skip_workflow is rejected after a plan is committed', () => {
   reachCritique(controller);
   expect(() => controller.skipWorkflow('too late')).toThrow('before a plan is committed');
 });
+
+test('getSnapshot exposes the skip flag for the verification chain', () => {
+  const { controller } = createController();
+  expect(controller.getSnapshot().skipped).toBe(false);
+  controller.skipWorkflow('Pure information request with no work to plan');
+  expect(controller.getSnapshot()).toMatchObject({
+    skipped: true,
+    phase: ProductionLoopPhase.Plan,
+    status: ProductionLoopStatus.Completed,
+  });
+});
