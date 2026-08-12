@@ -1,5 +1,7 @@
 import React from 'react';
 
+import { Skeleton } from '@shared/components/ui/skeleton';
+
 import type { Artifact } from '@/types/artifact';
 
 // Renderers pull heavy runtimes (Prism/refractor, mermaid, KaTeX/CodeMirror
@@ -21,8 +23,8 @@ const UnsupportedRenderer = React.lazy(() => import('./renderers/UnsupportedRend
  * shift once the real renderer mounts.
  */
 const rendererFallback = (
-  <div className="h-full p-4">
-    <div className="h-full w-full animate-pulse rounded-xl bg-muted/30" />
+  <div className="h-full min-h-0 p-4" aria-busy="true">
+    <Skeleton className="h-full w-full rounded-lg" />
   </div>
 );
 

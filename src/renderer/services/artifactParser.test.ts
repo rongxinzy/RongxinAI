@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   normalizeFilePathForDedup,
   detectArtifactsFromMessages,
+  parseCodeBlockArtifacts,
   parseDeclareArtifactFromMessages,
   parseToolArtifact,
 } from './artifactParser';
@@ -176,6 +177,16 @@ describe('parseDeclareArtifactFromMessages', () => {
     const artifacts = parseDeclareArtifactFromMessages(messages, sessId, defaultRole);
     expect(artifacts).toHaveLength(0);
   });
+});
+
+describe('parseCodeBlockArtifacts', () => {
+  test('treats csv and tsv code blocks as document previews', () => {
+    const csv = parseCodeBlockArtifacts('```csv\na,b\n1,2\n```', 'message-csv', 'session');
+    const tsv = parseCodeBlockArtifacts('```tsv\na\tb\n1\t2\n```', 'message-tsv', 'session');
+    expect(csv[0].type).toBe('document');
+    expect(tsv[0].type).toBe('document');
+  });
+
 });
 
 describe('parseToolArtifact', () => {

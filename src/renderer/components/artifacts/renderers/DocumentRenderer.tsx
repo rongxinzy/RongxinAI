@@ -5,6 +5,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 
+import type { CsvPreviewWorkerResponse } from './csvPreview.worker';
+
 import PptxSlideNavigator from './PptxSlideNavigator';
 import { normalizePptxData } from './pptxDataNormalizer';
 import { buildPptxSlideDocument, type PptxPreviewSlide } from './pptxSlideNavigation';
@@ -279,18 +281,29 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
 
     const parse = async () => {
       try {
-        const XLSX = await import('xlsx');
-
-        let workbook: ReturnType<typeof XLSX.read>;
         const fileName = artifact.fileName || artifact.filePath || '';
-
-        if (isCsvOrTsv(fileName)) {
+        if (isCsvOrTsv(fileName) || artifact.language === 'csv' || artifact.language === 'tsv') {
           const text = new TextDecoder('utf-8').decode(new Uint8Array(data));
-          workbook = XLSX.read(text, { type: 'string' });
-        } else {
-          workbook = XLSX.read(new Uint8Array(data), { type: 'array', cellStyles: true });
+          const delimiter = fileName.toLowerCase().endsWith('.tsv') || artifact.language === 'tsv' ? '\t' : ',';
+          const worker = new Worker(new URL('./csvPreview.worker.ts', import.meta.url), {
+            type: 'module',
+          });
+          worker.onmessage = (event: MessageEvent<CsvPreviewWorkerResponse>) => {
+            if (!cancelled) {
+              setSheets([{ name: 'Sheet1', ...event.data }]);
+            }
+            worker.terminate();
+          };
+          worker.onerror = () => {
+            if (!cancelled) setError(t('artifactDocumentError'));
+            worker.terminate();
+          };
+          worker.postMessage({ text, delimiter });
+          return;
         }
 
+        const XLSX = await import('xlsx');
+        const workbook = XLSX.read(new Uint8Array(data), { type: 'array', cellStyles: true });
         const parsed: SheetData[] = workbook.SheetNames.map(name => {
           const sheet = workbook.Sheets[name];
           const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
@@ -340,7 +353,7 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
     return () => {
       cancelled = true;
     };
-  }, [data, loadError, artifact.fileName, artifact.filePath]);
+  }, [data, loadError, artifact.fileName, artifact.filePath, artifact.language]);
 
   if (error) {
     return (
@@ -443,6 +456,7 @@ const VirtualRows: React.FC<{
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 20,
+    initialRect: { width: 0, height: 600 },
   });
 
   return (
@@ -1015,6 +1029,7 @@ interface DocumentRendererProps {
 
 const DocumentRenderer: React.FC<DocumentRendererProps> = ({ artifact }) => {
   const ext = getExtension(artifact.fileName || artifact.filePath || '');
+  const language = artifact.language?.toLowerCase();
 
   switch (ext) {
     case '.docm':
@@ -1042,7 +1057,11 @@ const DocumentRenderer: React.FC<DocumentRendererProps> = ({ artifact }) => {
     case '.ppsx':
       return <PptxSubRenderer artifact={artifact} />;
     default:
-      return <FileInfoFallback artifact={artifact} />;
+      return language === 'csv' || language === 'tsv' ? (
+        <XlsxSubRenderer artifact={artifact} />
+      ) : (
+        <FileInfoFallback artifact={artifact} />
+      );
   }
 };
 

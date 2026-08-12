@@ -42,7 +42,10 @@ const t = (key: string) => i18nService.t(key);
 
 const BROWSER_OPENABLE_TYPES = new Set<ArtifactType>(['html', 'svg', 'mermaid']);
 
-const SYSTEM_OPENABLE_TYPES = new Set<ArtifactType>(['document', 'unsupported']);
+function isDelimitedArtifact(artifact: Artifact): boolean {
+  const name = (artifact.fileName || artifact.filePath || artifact.title || '').toLowerCase();
+  return name.endsWith('.csv') || name.endsWith('.tsv');
+}
 
 function buildBrowserHtml(artifact: Artifact): string | null {
   switch (artifact.type) {
@@ -106,7 +109,9 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   );
   const previewableArtifacts = visibleArtifacts.filter(a => PREVIEWABLE_ARTIFACT_TYPES.has(a.type));
   const artifactPreviewMode = selectedArtifact
-    ? getArtifactPreviewMode(selectedArtifact.type)
+    ? isDelimitedArtifact(selectedArtifact)
+      ? ArtifactPreviewMode.Preview
+      : getArtifactPreviewMode(selectedArtifact.type)
     : ArtifactPreviewMode.Preview;
   const availableTabs: ArtifactActiveTab[] =
     artifactPreviewMode === ArtifactPreviewMode.Preview
@@ -115,6 +120,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
         ? ['code']
         : ['preview', 'code'];
   const displayedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
+  const isCodeView = displayedTab === 'code';
+  const hasLocalFilePreview = Boolean(selectedArtifact?.filePath) && !isCodeView;
 
   const intermediateToggle = (
     <Button
@@ -376,7 +383,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <RefreshIcon />
                 </Button>
               )}
-              {selectedArtifact.type !== 'document' && selectedArtifact.type !== 'unsupported' && (
+              {isCodeView && selectedArtifact.type !== 'unsupported' && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -387,7 +394,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <Copy className="h-3.5 w-3.5" />
                 </Button>
               )}
-              {BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
+              {hasLocalFilePreview && BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -398,7 +405,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <BrowserIcon />
                 </Button>
               )}
-              {SYSTEM_OPENABLE_TYPES.has(selectedArtifact.type) && selectedArtifact.filePath && (
+              {hasLocalFilePreview &&
+                !BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -500,9 +508,16 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             </div>
 
             {/* Render area */}
-            <div className="flex-1 min-h-0 overflow-hidden">
+            <div key={`${selectedArtifact.id}-${displayedTab}`} className="flex-1 min-h-0 overflow-hidden animate-fade-in">
               {displayedTab === 'preview' ? (
-                <ArtifactRenderer artifact={selectedArtifact} sessionArtifacts={artifacts} />
+                <ArtifactRenderer
+                  artifact={
+                    isDelimitedArtifact(selectedArtifact)
+                      ? { ...selectedArtifact, type: 'document' }
+                      : selectedArtifact
+                  }
+                  sessionArtifacts={artifacts}
+                />
               ) : (
                 <CodeRenderer artifact={selectedArtifact} />
               )}
