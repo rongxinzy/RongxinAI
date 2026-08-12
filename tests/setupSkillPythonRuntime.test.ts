@@ -8,6 +8,7 @@ import {
   listRequirementFiles,
   normalizePlatform,
   parseImportNames,
+  rebaseEnvironmentSymlinks,
   validateSkillDependencyDeclarations,
 } from '../scripts/setup-skill-python-runtime.js';
 
@@ -64,6 +65,27 @@ describe('setup-skill-python-runtime', () => {
       expect(validateSkillDependencyDeclarations(root)).toEqual({ ok: true, missing: [] });
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rebases POSIX environment links to the sibling packaged Python runtime', () => {
+    const resourcesRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-python-links-'));
+    try {
+      const basePython = path.join(resourcesRoot, 'python-mac', 'bin', 'python3');
+      const environmentRoot = path.join(resourcesRoot, 'skill-python', 'layers', 'shared');
+      const environmentPython = path.join(environmentRoot, 'bin', 'python3');
+      fs.mkdirSync(path.dirname(basePython), { recursive: true });
+      fs.mkdirSync(path.dirname(environmentPython), { recursive: true });
+      fs.writeFileSync(basePython, '');
+      fs.symlinkSync(basePython, environmentPython);
+
+      rebaseEnvironmentSymlinks(environmentRoot, basePython);
+
+      const rebasedTarget = fs.readlinkSync(environmentPython);
+      expect(path.isAbsolute(rebasedTarget)).toBe(false);
+      expect(path.resolve(path.dirname(environmentPython), rebasedTarget)).toBe(basePython);
+    } finally {
+      fs.rmSync(resourcesRoot, { recursive: true, force: true });
     }
   });
 });
