@@ -82,7 +82,6 @@ jobs:
         run: |
           set -euo pipefail
           for lockfile in \
-            package-lock.json \
             SKILLs/presentation-studio/package-lock.json \
             SKILLs/web-search/package-lock.json \
             scripts/release/package-lock.json; do
