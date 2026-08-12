@@ -103,6 +103,41 @@ export function verifyWorkbenchRun(
     };
   }
 
+  // The production workflow was declared unnecessary (skip_workflow): the
+  // baseline checks already passed, so there is nothing left to accept.
+  if (context.workflowSnapshot?.skipped === true) {
+    return {
+      outcome: WorkbenchVerificationOutcome.Passed,
+      checks: [
+        {
+          name: 'workflow_skipped',
+          status: WorkbenchVerificationCheckStatus.Passed,
+        },
+      ],
+      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      summary: 'The production workflow was skipped; the baseline checks passed.',
+    };
+  }
+
+  // Generic work without the production workflow (simple questions, trivial
+  // requests) has no verifiable artifacts: the baseline checks are the only
+  // gate and need no explicit user acceptance.
+  if (!context.contract.requiresUserAcceptance) {
+    return {
+      outcome: WorkbenchVerificationOutcome.Passed,
+      checks: [
+        {
+          name: 'deterministic_contract',
+          status: WorkbenchVerificationCheckStatus.Passed,
+          detail: 'The work result passed the baseline completeness checks.',
+        },
+        ...baselineChecks,
+      ],
+      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
+      summary: 'The work result passed the baseline completeness checks.',
+    };
+  }
+
   return {
     outcome: WorkbenchVerificationOutcome.AcceptanceRequired,
     checks: [
