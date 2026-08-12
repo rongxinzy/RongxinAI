@@ -16,6 +16,52 @@ afterEach(() => {
 });
 
 describe('resumable runtime download', () => {
+  test('cancels an in-flight resume preflight before it starts a download', async () => {
+    let notifyHeadRequest: (() => void) | undefined;
+    let closeHeadRequest: (() => void) | undefined;
+    let getRequests = 0;
+    const server = http.createServer((request, response) => {
+      if (request.method === 'HEAD') {
+        notifyHeadRequest?.();
+        response.once('close', () => closeHeadRequest?.());
+        return;
+      }
+      getRequests += 1;
+      response.statusCode = 500;
+      response.end();
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (!address || typeof address === 'string') throw new Error('Test server failed to start.');
+
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-resume-preflight-test-'));
+    temporaryDirectories.push(directory);
+    const outputPath = path.join(directory, 'runtime.zip');
+    fs.writeFileSync(outputPath, Buffer.alloc(1));
+    const controller = new AbortController();
+    const headRequestReceived = new Promise<void>(resolve => {
+      notifyHeadRequest = resolve;
+    });
+    const headRequestClosed = new Promise<void>(resolve => {
+      closeHeadRequest = resolve;
+    });
+    const download = downloadFileWithResume({
+      url: `http://127.0.0.1:${address.port}/runtime.zip`,
+      outputPath,
+      signal: controller.signal,
+    });
+
+    try {
+      await headRequestReceived;
+      controller.abort();
+      await expect(download).rejects.toBeInstanceOf(DownloadCancelledError);
+      await headRequestClosed;
+      expect(getRequests).toBe(0);
+    } finally {
+      await new Promise<void>(resolve => server.close(() => resolve()));
+    }
+  });
+
   test('keeps a cancelled partial file and resumes it with Range', async () => {
     const bytes = Buffer.alloc(512 * 1024, 7);
     const ranges: Array<string | undefined> = [];
