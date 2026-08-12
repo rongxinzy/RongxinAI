@@ -135,12 +135,30 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
   }
 };
 
+const resumePlanItemStatus = (status: ProductionPlanItemStatus): ProductionPlanItemStatus =>
+  status === ProductionPlanItemStatus.InProgress ? ProductionPlanItemStatus.Pending : status;
+
+const resolveInitialPhase = (
+  previous: ProductionLoopState | null,
+  prototypeRequired: boolean,
+): ProductionLoopPhase => {
+  if (!previous) {
+    return prototypeRequired ? ProductionLoopPhase.Explore : ProductionLoopPhase.Plan;
+  }
+  if (previous.planItems.length > 0) return ProductionLoopPhase.Execute;
+  if (prototypeRequired && previous.prototypes.length === 0) {
+    return ProductionLoopPhase.Explore;
+  }
+  return ProductionLoopPhase.Plan;
+};
+
 export class ProductionLoopService {
   readonly repository: ProductionLoopStore;
 
   constructor(
     repository: ProductionLoopStore,
     private readonly measurement: ProductionLoopMeasurement,
+    private readonly onPlanChanged?: (state: ProductionLoopState) => void,
   ) {
     this.repository = repository;
   }
@@ -176,13 +194,14 @@ export class ProductionLoopService {
     if (existing) return existing;
     const previous = this.repository.getLatestForTask(input.taskId, input.runId);
     const now = Date.now();
-    return this.repository.create({
+    const progressBaseline = previous?.progressVersion ?? 0;
+    const state = this.repository.create({
       version: 1,
       taskId: input.taskId,
       runId: input.runId,
       workflowKind: input.workflowKind,
-      goal: input.goal,
-      phase: input.prototypeRequired ? ProductionLoopPhase.Explore : ProductionLoopPhase.Plan,
+      goal: previous?.goal ?? input.goal,
+      phase: resolveInitialPhase(previous, input.prototypeRequired),
       status: ProductionLoopStatus.Active,
       prototypeRequired: input.prototypeRequired,
       prototypes: previous?.prototypes ?? [],
@@ -194,8 +213,10 @@ export class ProductionLoopService {
       observedToolResults: [],
       inspections: [],
       planItems:
-        previous?.planItems.map(item => ({ ...item, status: ProductionPlanItemStatus.Pending })) ??
-        [],
+        previous?.planItems.map(item => ({
+          ...item,
+          status: resumePlanItemStatus(item.status),
+        })) ?? [],
       critic: {
         requested: false,
         toolCallId: null,
@@ -208,12 +229,14 @@ export class ProductionLoopService {
       recoveries: [],
       skip: null,
       deliveryReason: null,
-      progressVersion: 0,
-      lastObservedProgressVersion: 0,
+      progressVersion: progressBaseline,
+      lastObservedProgressVersion: progressBaseline,
       staleCount: 0,
       createdAt: now,
       updatedAt: now,
     });
+    this.onPlanChanged?.(state);
+    return state;
   }
 
   recordPrototype(runId: string, reference: string, summary: string): ProductionLoopState {
@@ -251,7 +274,7 @@ export class ProductionLoopService {
       selectedDirection?: string;
     },
   ): ProductionLoopState {
-    return this.mutate(runId, state => {
+    const state = this.mutate(runId, state => {
       if (state.phase === ProductionLoopPhase.Explore) {
         if (state.prototypeRequired && state.prototypes.length === 0) {
           throw new Error('At least one prototype is required before committing the plan.');
@@ -311,6 +334,8 @@ export class ProductionLoopService {
         },
       });
     });
+    this.onPlanChanged?.(state);
+    return state;
   }
 
   updatePlanItem(
@@ -318,7 +343,7 @@ export class ProductionLoopService {
     itemId: string,
     status: ProductionPlanItemStatus,
   ): ProductionLoopState {
-    return this.mutate(runId, state => {
+    const state = this.mutate(runId, state => {
       if (
         state.phase !== ProductionLoopPhase.Execute &&
         state.phase !== ProductionLoopPhase.Revise
@@ -335,6 +360,8 @@ export class ProductionLoopService {
         state.progressVersion += 1;
       }
     });
+    this.onPlanChanged?.(state);
+    return state;
   }
 
   startInspection(

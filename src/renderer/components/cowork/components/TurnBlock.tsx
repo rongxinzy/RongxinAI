@@ -4,13 +4,18 @@ import {
   ChainOfThoughtHeader,
 } from '@shared/components/ai-elements/chain-of-thought';
 import { ReasoningContent, ReasoningTrigger } from '@shared/components/ai-elements/reasoning';
+import { MessageAction, MessageActions } from '@shared/components/ai-elements/message';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
-import { Info, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
+import { Info, RotateCcw, SparklesIcon, TriangleAlert, Wrench } from 'lucide-react';
 import React from 'react';
 
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
+import {
+  CoworkInterruptionCause,
+  type CoworkSessionInterruption,
+} from '../../../../shared/cowork/interruption';
 import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 import { i18nService } from '../../../services/i18n';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
@@ -35,6 +40,18 @@ import { PersistentChainOfThought, PersistentReasoning } from './PersistentColla
 import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
 
+const getInterruptionMessage = (interruption: CoworkSessionInterruption): string => {
+  switch (interruption.cause) {
+    case CoworkInterruptionCause.ApprovalDenied:
+      return i18nService.t('coworkInterruptionApprovalDenied');
+    case CoworkInterruptionCause.RuntimePaused:
+      return i18nService.t('coworkInterruptionRuntimePaused');
+    case CoworkInterruptionCause.UserStop:
+    default:
+      return i18nService.t('coworkInterruptionUserStop');
+  }
+};
+
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
   artifacts?: Artifact[];
@@ -44,6 +61,9 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons?: boolean;
   isTurnComplete?: boolean;
   toolActivities?: CoworkToolActivity[];
+  recoverableTaskId?: string | null;
+  resumeTaskId?: string | null;
+  onResumeTask?: (interruption: CoworkSessionInterruption) => void;
   /** Expand long tool results fully (image export capture). */
   expandToolResults?: boolean;
 }> = ({
@@ -55,27 +75,39 @@ const TurnBlockComponent: React.FC<{
   showCopyButtons = true,
   isTurnComplete = true,
   toolActivities = [],
+  recoverableTaskId,
+  resumeTaskId,
+  onResumeTask,
   expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
 
   const renderSystemMessage = (message: CoworkMessage) => {
+    const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
     const isError = !hasText(message.content) && typeof message.metadata?.error === 'string';
     const errorKind = message.metadata?.errorKind as CoworkErrorKind | undefined;
     const i18nKey = isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
     const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
-    const rawContent = i18nMessage
-      ? i18nMessage
-      : hasText(message.content)
-        ? message.content
-        : typeof message.metadata?.error === 'string'
-          ? message.metadata.error
-          : '';
+    const rawContent = interruption
+      ? getInterruptionMessage(interruption)
+      : i18nMessage
+        ? i18nMessage
+        : hasText(message.content)
+          ? message.content
+          : typeof message.metadata?.error === 'string'
+            ? message.metadata.error
+            : '';
     const normalizedContent = getScheduledReminderDisplayText(rawContent) ?? rawContent;
     const content = mapDisplayText ? mapDisplayText(normalizedContent) : normalizedContent;
     if (!content.trim()) return null;
+    const canResume = Boolean(
+      interruption?.recoverable &&
+      interruption.taskId &&
+      interruption.taskId === recoverableTaskId &&
+      onResumeTask,
+    );
     return (
-      <div className="rounded-lg border border-border bg-background px-3 py-2">
+      <div className="flex flex-col gap-2 rounded-lg border border-border bg-background px-3 py-2">
         <div className="flex items-center gap-2">
           {isError ? (
             <TriangleAlert className="size-4 text-muted-foreground shrink-0" />
@@ -84,6 +116,18 @@ const TurnBlockComponent: React.FC<{
           )}
           <div className="text-xs whitespace-pre-wrap text-muted-foreground">{content}</div>
         </div>
+        {canResume && interruption && onResumeTask && (
+          <MessageActions>
+            <MessageAction
+              tooltip={i18nService.t('coworkResumeTaskAction')}
+              label={i18nService.t('coworkResumeTaskAction')}
+              disabled={resumeTaskId === interruption.taskId}
+              onClick={() => onResumeTask(interruption)}
+            >
+              <RotateCcw />
+            </MessageAction>
+          </MessageActions>
+        )}
       </div>
     );
   };
@@ -247,6 +291,7 @@ const TurnBlockComponent: React.FC<{
     };
 
     for (const item of visibleAssistantItems) {
+      const isInterruption = item.type === 'system' && Boolean(item.message.metadata?.interruption);
       const isAnswer =
         item.type === 'assistant' &&
         !item.message.metadata?.isThinking &&
@@ -257,8 +302,8 @@ const TurnBlockComponent: React.FC<{
         item.type === 'tool_result' ||
         item.type === 'system';
 
-      if (isAnswer) {
-        flush(true);
+      if (isAnswer || isInterruption) {
+        flush(isAnswer);
         result.push({
           items: [item],
           followedByAnswer: false,
@@ -287,9 +332,16 @@ const TurnBlockComponent: React.FC<{
   const visibleGroups = groups.filter(group => !isEmptyAnswerGroup(group));
   const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems, isTurnComplete);
   const finalAnswerItem = finalAnswerIndex >= 0 ? visibleAssistantItems[finalAnswerIndex] : null;
+  const interruptionItems = visibleAssistantItems.filter(
+    item => item.type === 'system' && Boolean(item.message.metadata?.interruption),
+  );
   const executionItems =
     finalAnswerIndex >= 0
-      ? visibleAssistantItems.filter((_, index) => index !== finalAnswerIndex)
+      ? visibleAssistantItems.filter(
+          (item, index) =>
+            index !== finalAnswerIndex &&
+            !(item.type === 'system' && Boolean(item.message.metadata?.interruption)),
+        )
       : [];
   const executionSummary = getExecutionSummary(executionItems);
   const latestToolActivity = toolActivities[toolActivities.length - 1];
@@ -319,7 +371,9 @@ const TurnBlockComponent: React.FC<{
   ) => {
     const firstItem = group.items[0];
     const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
-    if (isAnswerItem) {
+    const isInterruptionItem =
+      firstItem?.type === 'system' && Boolean(firstItem.message.metadata?.interruption);
+    if (isAnswerItem || isInterruptionItem) {
       return renderItem(firstItem, 0, isFinalAnswer);
     }
 
@@ -367,15 +421,16 @@ const TurnBlockComponent: React.FC<{
                 })}
               </ExecutionSummary>
             )}
-            {finalAnswerItem
-              ? renderItem(finalAnswerItem, finalAnswerIndex, true)
-              : visibleGroups.map((group, index) =>
-                  renderExecutionGroup(
-                    group,
-                    `turn-group-${index}`,
-                    index === lastAnswerGroupIndex,
-                  ),
-                )}
+            {finalAnswerItem ? (
+              <>
+                {renderItem(finalAnswerItem, finalAnswerIndex, true)}
+                {interruptionItems.map((item, index) => renderItem(item, index, false))}
+              </>
+            ) : (
+              visibleGroups.map((group, index) =>
+                renderExecutionGroup(group, `turn-group-${index}`, index === lastAnswerGroupIndex),
+              )
+            )}
             {toolActivityStatus && !finalAnswerItem && !hasTrailingExecutionGroup && (
               <ChainOfThought key="transient-working-summary" defaultOpen={false}>
                 <ChainOfThoughtHeader icon={Wrench}>

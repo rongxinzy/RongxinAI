@@ -32,8 +32,8 @@ export const SkillsIpc = {
   GetConfig: 'skills:getConfig',
   SetConfig: 'skills:setConfig',
   TestEmailConnectivity: 'skills:testEmailConnectivity',
-    FetchMarketplace: 'skills:fetchMarketplace',
-    FetchMarketplaceContent: 'skills:fetchMarketplaceContent',
+  FetchMarketplace: 'skills:fetchMarketplace',
+  FetchMarketplaceContent: 'skills:fetchMarketplaceContent',
   Changed: 'skills:changed',
 } as const;
 export type SkillsIpc = (typeof SkillsIpc)[keyof typeof SkillsIpc];
@@ -184,6 +184,7 @@ export const CoworkStreamIpc = {
   ToolActivity: 'cowork:stream:toolActivity',
   Permission: 'cowork:stream:permission',
   PermissionDismiss: 'cowork:stream:permissionDismiss',
+  Interrupted: 'cowork:stream:interrupted',
   Complete: 'cowork:stream:complete',
   Error: 'cowork:stream:error',
   QueueUpdated: 'cowork:stream:queueUpdated',

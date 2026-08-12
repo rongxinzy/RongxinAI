@@ -186,6 +186,12 @@ const ImageAttachmentSchema = z.object({
   mimeType: z.string(),
   base64Data: z.string(),
 });
+const FileAttachmentSchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  extension: z.string(),
+  isImage: z.boolean().optional(),
+});
 
 export const CoworkSessionStartSchema = {
   input: z.object({
@@ -202,6 +208,7 @@ export const CoworkSessionStartSchema = {
     modelOverride: z.string().optional(),
     permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
+    fileAttachments: z.array(FileAttachmentSchema).optional(),
   }),
   output: IpcResult({
     session: z
@@ -227,6 +234,7 @@ export const CoworkSessionContinueSchema = {
     expertIds: z.array(z.string().min(1)).max(16).optional(),
     permissionMode: z.enum([CoworkPermissionMode.Ask, CoworkPermissionMode.AllowAll]).optional(),
     imageAttachments: z.array(ImageAttachmentSchema).optional(),
+    fileAttachments: z.array(FileAttachmentSchema).optional(),
   }),
   output: IpcResult({ engineStatus: z.object({}).passthrough().optional() }),
 };

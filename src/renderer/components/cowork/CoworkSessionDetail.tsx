@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
+import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
+import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { RootState } from '../../store';
 import {
@@ -46,15 +48,14 @@ import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
+  CoworkFileAttachment,
   CoworkMessage,
   CoworkMessageMetadata,
   CoworkPermissionRequest,
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
-import { ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH } from '../artifacts/artifactPanelResize';
 import WindowTitleBar from '../window/WindowTitleBar';
-import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import {
@@ -95,6 +96,7 @@ import {
   toAbsolutePathFromCwd,
 } from './helpers/pathUtils';
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
+import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
 import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
@@ -119,6 +121,7 @@ interface CoworkSessionDetailProps {
     prompt: string,
     skillPrompt?: string,
     imageAttachments?: CoworkImageAttachment[],
+    fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
   ) => boolean | void | Promise<boolean | void>;
   onStop: () => void;
@@ -134,6 +137,9 @@ interface CoworkSessionDetailProps {
   onRespondToInlineQuestion?: (result: CoworkPermissionResult) => void | Promise<void>;
   inlinePermission?: CoworkPermissionRequest | null;
   onRespondToInlinePermission?: (result: CoworkPermissionResult) => void | Promise<void>;
+  resumeTaskId?: string | null;
+  onResumeTask?: (interruption: CoworkSessionInterruption) => void;
+  onCancelTaskResume?: () => void;
 }
 
 const NAV_SCROLL_LOCK_DURATION = 800;
@@ -198,6 +204,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onRespondToInlineQuestion,
   inlinePermission,
   onRespondToInlinePermission,
+  resumeTaskId,
+  onResumeTask,
+  onCancelTaskResume,
 }) => {
   const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
@@ -212,6 +221,16 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
 
   const sessionId = currentSession?.id;
+  const recoverableTaskId = useRecoverableWorkbenchTaskId(sessionId);
+
+  const handleResumeTask = useCallback(
+    (interruption: CoworkSessionInterruption) => {
+      onResumeTask?.(interruption);
+      requestAnimationFrame(() => promptInputRef.current?.focus());
+    },
+    [onResumeTask],
+  );
+
 
   // Rail navigation states
   const [currentRailIndex, setCurrentRailIndex] = useState(-1);
@@ -348,10 +367,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const updateArtifactPanelMaxWidth = useCallback(() => {
     const contentWidth = contentRowRef.current?.clientWidth ?? 0;
     if (contentWidth <= 0) return;
-    const nextMaxWidth = Math.max(
-      MIN_PANEL_WIDTH,
-      contentWidth - ARTIFACT_PANEL_RESIZE_HANDLE_WIDTH,
-    );
+    const nextMaxWidth = Math.max(MIN_PANEL_WIDTH, contentWidth);
     setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
   }, []);
 
@@ -1072,6 +1088,9 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 toolActivities={isLastTurn ? toolActivities : undefined}
                 showCopyButtons={!isStreaming || !isLastTurn}
                 isTurnComplete={!isStreaming || !isLastTurn}
+                recoverableTaskId={recoverableTaskId}
+                resumeTaskId={resumeTaskId}
+                onResumeTask={onResumeTask ? handleResumeTask : undefined}
                 expandToolResults={isExportingImage}
               />
             </div>
@@ -1142,7 +1161,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             aria-label={i18nService.t('artifactPanelToggle')}
             disabled={isSessionSwitching}
           >
-            <ArtifactPanelIcon className="h-4 w-4" open={!isSessionSwitching && isPanelOpen} />
+            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isPanelOpen} />
           </Button>
 
           <WindowTitleBar inline className="ml-1" />
@@ -1565,6 +1584,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 showLocalThinkingToggle={isDirectChat}
                 localThinkingEnabled={localThinkingEnabled}
                 onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
+                resumeTaskActive={Boolean(resumeTaskId)}
+                onCancelTaskResume={onCancelTaskResume}
                 sessionId={displayedSessionId ?? currentSession?.id}
               />
               <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">

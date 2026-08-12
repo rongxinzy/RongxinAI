@@ -44,6 +44,7 @@ function source(overrides: Partial<VerifiedWorkbenchRunMemorySource> = {}) {
     trigger: WorkbenchRunTrigger.Message,
     startedAt: 1,
     endedAt: 2,
+    context: null,
     verificationResult: null,
     failure: null,
     createdAt: 1,

@@ -15,7 +15,7 @@ export function buildPiProjectMemoryTool(input: {
     label: 'Memory',
     description:
       'Recall project and confirmed personal memory, explicitly save durable project memory, ' +
-      'propose personal memory for user review, or save a short-lived session summary.',
+      'list controlled active memory, propose personal memory for user review, or save a short-lived session summary.',
     promptSnippet:
       'Use memory to recall prior project decisions or save durable facts only when they are useful later.',
     parameters: {
@@ -24,9 +24,10 @@ export function buildPiProjectMemoryTool(input: {
         action: {
           type: 'string',
           enum: Object.values(PiMemoryAction),
-          description: 'recall, save, propose_personal, or session_summary',
+          description: 'recall, list, save, propose_personal, or session_summary',
         },
         query: { type: 'string', description: 'Search query for recall.' },
+        limit: { type: 'number', description: 'Maximum number of memories to list.' },
         title: { type: 'string', description: 'Short title for a saved project memory.' },
         content: { type: 'string', description: 'Atomic memory content or session summary.' },
         topicKey: { type: 'string', description: 'Stable topic key for project memory upsert.' },
@@ -59,6 +60,22 @@ export function buildPiProjectMemoryTool(input: {
                 .join('\n')
             : 'No relevant project memory found.';
           return toolResult(text, { count: observations.length });
+        }
+        if (action === PiMemoryAction.List) {
+          const memories = input.service.listRecallableMemories({
+            workingDirectory: input.workingDirectory,
+            query: typeof params.query === 'string' ? params.query.trim() || undefined : undefined,
+            limit: typeof params.limit === 'number' ? params.limit : undefined,
+          });
+          const text = memories.length
+            ? memories
+                .map(
+                  memory =>
+                    `[memory:${memory.memoryId ?? memory.id}] [${memory.scope}] ${memory.title}: ${memory.content}`,
+                )
+                .join('\n')
+            : 'No active project or confirmed personal memory found.';
+          return toolResult(text, { count: memories.length });
         }
         if (action === PiMemoryAction.ProposePersonal) {
           const candidateId = input.service.proposePersonalMemory({

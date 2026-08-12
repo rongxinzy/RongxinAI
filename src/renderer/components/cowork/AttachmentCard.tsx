@@ -80,7 +80,7 @@ const ImageCard: React.FC<AttachmentCardProps> = ({ attachment, onRemove }) => {
         <img
           src={thumbUrl!}
           alt={attachment.name}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
           onError={() => setImgError(true)}
           draggable={false}
         />

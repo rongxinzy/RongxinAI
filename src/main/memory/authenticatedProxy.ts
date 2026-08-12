@@ -24,6 +24,7 @@ function tokensMatch(expected: string, actual: string): boolean {
 export function isAllowedEngramRequest(method = '', pathname = ''): boolean {
   if (method === 'GET' && pathname === '/health') return true;
   if (method === 'GET' && pathname === '/search') return true;
+  if (method === 'GET' && pathname === '/observations/recent') return true;
   if (method === 'POST' && pathname === '/sessions') return true;
   if (method === 'POST' && /^\/sessions\/[^/]+\/end$/.test(pathname)) return true;
   if (method === 'POST' && pathname === '/observations') return true;

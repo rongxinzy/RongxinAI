@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 import {
   EngramMemoryScope,
   EngramObservationType,
+  EngramSearchMatchMode,
   MemoryOutboxOperation,
   MemoryOutboxStatus,
 } from './constants';
@@ -35,6 +36,20 @@ class FakeRepository {
   filterRecallableMemoryIds(_projectId: string, memoryIds: number[]) {
     return new Set(memoryIds);
   }
+
+  listManaged() {
+    return [];
+  }
+
+  getRecallMetadata() {
+    return new Map();
+  }
+
+  findActiveTopic() {
+    return null;
+  }
+
+  supersedeActiveTopic() {}
 
   createLink(input: Record<string, unknown>) {
     this.links.push(input);
@@ -138,7 +153,7 @@ test('keeps an unavailable write pending for a later outbox drain', async () => 
 test('enforces the project context token budget', async () => {
   const adapter = {
     recall: vi.fn(async (input: { scope: string }) =>
-      input.scope === EngramMemoryScope.Personal
+      input.scope !== EngramMemoryScope.Project
         ? []
         : [
             { id: 1, title: 'First', content: 'A'.repeat(40) },
@@ -160,4 +175,155 @@ test('enforces the project context token budget', async () => {
 
   expect(context).toContain('[memory:1]');
   expect(context).not.toContain('[memory:2]');
+});
+
+test('broadens an empty CJK search with any-match terms', async () => {
+  const recall = vi.fn(async (input: { matchMode: string }) =>
+    input.matchMode === EngramSearchMatchMode.Any
+      ? [
+          {
+            id: 9,
+            title: 'Project database',
+            content: 'Use SQLite.',
+            updated_at: '2026-01-01T00:00:00.000Z',
+          },
+        ]
+      : [],
+  );
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    { recall, recent: vi.fn(async () => []) } as never,
+    identityFor,
+  );
+
+  await expect(
+    service.recallProject({ workingDirectory: 'alpha', query: '我们项目使用什么数据库' }),
+  ).resolves.toMatchObject([{ id: 9 }]);
+  expect(recall).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ matchMode: EngramSearchMatchMode.Any }),
+  );
+});
+
+test('falls back to bounded recent active memory only for explicit memory intent', async () => {
+  const recent = vi.fn(async () => [
+    {
+      id: 10,
+      title: 'Current project',
+      content: 'The project is ZhiYuan.',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    },
+  ]);
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    { recall: vi.fn(async () => []), recent } as never,
+    identityFor,
+  );
+
+  await expect(
+    service.recallProject({ workingDirectory: 'alpha', query: '当前项目是什么' }),
+  ).resolves.toMatchObject([{ id: 10 }]);
+  expect(recent).toHaveBeenCalledWith({
+    project: 'project-alpha',
+    scope: EngramMemoryScope.Project,
+    limit: 8,
+  });
+});
+
+test('lists only the current project and confirmed personal memories', () => {
+  const memories = [
+    { id: 'project-current', projectId: 'project-alpha', scope: EngramMemoryScope.Project },
+    { id: 'project-other', projectId: 'project-beta', scope: EngramMemoryScope.Project },
+    {
+      id: 'personal',
+      projectId: 'personal://zhiyuan-agent/user',
+      scope: EngramMemoryScope.Personal,
+    },
+    { id: 'session', projectId: 'project-alpha', scope: EngramMemoryScope.Session },
+  ];
+  const service = new ProjectMemoryService(
+    { listManaged: vi.fn(() => memories) } as never,
+    {} as never,
+    identityFor,
+  );
+
+  expect(
+    service.listRecallableMemories({ workingDirectory: 'alpha' }).map(memory => memory.id),
+  ).toEqual(['project-current', 'personal']);
+});
+
+test('stores rolling session summaries with a 30 day expiration', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-08-11T00:00:00.000Z'));
+  const repository = new FakeRepository();
+  const adapter = {
+    saveCandidate: vi.fn(input => ({ id: 'candidate-summary', ...input })),
+    confirmMemory: vi.fn(async () => 21),
+    discardCandidate: vi.fn(),
+  };
+  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+
+  await expect(
+    service.saveSessionSummary({
+      sessionId: 'session-1',
+      workingDirectory: 'alpha',
+      summary: 'Session objective: fix recall',
+    }),
+  ).resolves.toBe(21);
+
+  expect(repository.items[0].payload).toMatchObject({
+    scope: EngramMemoryScope.Session,
+    topicKey: 'session/session-1',
+    expiresAt: '2026-09-10T00:00:00.000Z',
+  });
+  vi.useRealTimers();
+});
+
+test('injects session recall under its own context budget', async () => {
+  const adapter = {
+    recall: vi.fn(async (input: { scope: string }) =>
+      input.scope === EngramMemoryScope.Session
+        ? [
+            {
+              id: 31,
+              title: 'Session summary',
+              content: 'The previous session fixed CJK recall.',
+              updated_at: '2026-08-11T00:00:00.000Z',
+            },
+          ]
+        : [],
+    ),
+  };
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    adapter as never,
+    identityFor,
+  );
+
+  await expect(
+    service.buildProjectContext({ workingDirectory: 'alpha', query: 'CJK recall' }),
+  ).resolves.toContain('Session:\n- [memory:31]');
+});
+
+test('counts CJK characters conservatively against context budgets', async () => {
+  const adapter = {
+    recall: vi.fn(async (input: { scope: string }) =>
+      input.scope === EngramMemoryScope.Project
+        ? [{ id: 41, title: '中文', content: '记'.repeat(80) }]
+        : [],
+    ),
+  };
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    adapter as never,
+    identityFor,
+  );
+
+  await expect(
+    service.buildProjectContext({
+      workingDirectory: 'alpha',
+      query: 'budget',
+      tokenBudget: 30,
+    }),
+  ).resolves.toBe('');
 });

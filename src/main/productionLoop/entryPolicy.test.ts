@@ -29,54 +29,52 @@ test('bypasses production workflow for explicit lightweight one-step tasks', () 
   );
   expect(shouldEnableProductionWorkflow(workRequest('你好，帮我翻译这句话'))).toBe(false);
   expect(shouldEnableProductionWorkflow(workRequest('当前时间'))).toBe(false);
+  expect(shouldEnableProductionWorkflow(workRequest('Create an empty file.'))).toBe(false);
+  expect(shouldEnableProductionWorkflow(workRequest('把标题改成蓝色'))).toBe(false);
 });
 
-test('retains production workflow for changes and scoped reviews', () => {
+test('enables production workflow only for changes with production evidence', () => {
   expect(shouldEnableProductionWorkflow(workRequest('修复登录流程中的刷新问题'))).toBe(true);
   expect(
     shouldEnableProductionWorkflow(workRequest('Review this repository for regressions.')),
   ).toBe(true);
   expect(shouldEnableProductionWorkflow(workRequest('先修改配置，然后运行测试'))).toBe(true);
   expect(shouldEnableProductionWorkflow(workRequest('Can you fix the stale closure?'))).toBe(true);
+  expect(
+    shouldEnableProductionWorkflow(workRequest('Research reliable agent architectures.')),
+  ).toBe(true);
 });
 
-test('retains production workflow for explicit signals and ambiguous Work requests', () => {
+test('uses explicit goal mode and inherited task policy as authoritative signals', () => {
   expect(shouldEnableProductionWorkflow({ ...workRequest('你好'), goalMode: true })).toBe(true);
   expect(
     shouldEnableProductionWorkflow({
-      ...workRequest('Review this repository'),
-      skillIds: ['code-review'],
+      ...workRequest('Continue'),
+      inheritedProductionWorkflow: true,
     }),
   ).toBe(true);
-  expect(shouldEnableProductionWorkflow({ ...workRequest('Continue'), resumeRun: true })).toBe(
-    true,
-  );
-  expect(shouldEnableProductionWorkflow(workRequest('Handle the request'))).toBe(true);
-});
-
-test('does not let a selected skill override an explicitly lightweight turn', () => {
-  expect(
-    shouldEnableProductionWorkflow({ ...workRequest('你好'), skillIds: ['presentation-studio'] }),
-  ).toBe(false);
   expect(
     shouldEnableProductionWorkflow({
-      ...workRequest('Read package.json'),
-      skillIds: ['code-review'],
+      ...workRequest('Build an application'),
+      inheritedProductionWorkflow: false,
     }),
   ).toBe(false);
+  expect(shouldEnableProductionWorkflow(workRequest('Handle the request'))).toBe(false);
 });
 
-test('keeps continuations and revisions inside an existing skilled workflow', () => {
+test('does not let skills, experts, attachments, or old-task hints raise the gate', () => {
+  const incidentalContext = {
+    ...workRequest('继续'),
+    skillIds: ['presentation-studio'],
+    expertIds: ['reviewer'],
+    imageAttachmentCount: 1,
+    resumeRun: true,
+  };
+  expect(shouldEnableProductionWorkflow(incidentalContext)).toBe(false);
   expect(
     shouldEnableProductionWorkflow({
-      ...workRequest('继续'),
-      skillIds: ['presentation-studio'],
+      ...incidentalContext,
+      prompt: 'Read package.json',
     }),
-  ).toBe(true);
-  expect(
-    shouldEnableProductionWorkflow({
-      ...workRequest('把标题改成蓝色'),
-      skillIds: ['presentation-studio'],
-    }),
-  ).toBe(true);
+  ).toBe(false);
 });

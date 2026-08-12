@@ -1,19 +1,24 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
 import { Button } from '@shared/components/ui/button';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
   CoworkImageAttachment,
+  CoworkFileAttachment,
   CoworkMessage,
   CoworkMessageMetadata,
 } from '../../../types/cowork';
+import { i18nService } from '../../../services/i18n';
+import { resolveSkillIconUrl } from '../../../services/skillIcon';
 import { PlusMenuSkillsIcon } from '../plusMenuIcons';
 import type { Skill } from '../../../types/skill';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
+import { findChatSkillShortcut } from '../../chat/constants';
 import { CopyButton, ReEditButton } from './CopyButton';
+import FileTypeIcon from '../../icons/fileTypes/FileTypeIcon';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -23,6 +28,111 @@ const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string |
 
 const hasFocusWithin = (element: HTMLElement): boolean =>
   document.activeElement instanceof Node && element.contains(document.activeElement);
+
+const IMAGE_ATTACHMENT_EXTENSION = /\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?|ico|avif)$/i;
+const LEGACY_INPUT_FILE_LABELS = ['输入文件', 'Input Files'] as const;
+const LEGACY_INPUT_FILE_PREFIX = new RegExp(
+  `^(?:${LEGACY_INPUT_FILE_LABELS.join('|')})\\s*[:：]\\s*`,
+);
+
+const isAbsoluteLocalPath = (value: string): boolean =>
+  value.startsWith('/') || value.startsWith('\\\\') || /^[a-z]:[\\/]/i.test(value);
+
+const getFileAttachmentFromPath = (path: string): CoworkFileAttachment | null => {
+  const normalizedPath = path.trim();
+  if (!isAbsoluteLocalPath(normalizedPath)) return null;
+  const name = normalizedPath.split(/[\\/]/).pop() || normalizedPath;
+  const extensionIndex = name.lastIndexOf('.');
+  return {
+    name,
+    path: normalizedPath,
+    extension: extensionIndex >= 0 ? name.slice(extensionIndex + 1).toUpperCase() : 'FILE',
+    isImage: IMAGE_ATTACHMENT_EXTENSION.test(name),
+  };
+};
+
+const getPromptAttachmentFallbacks = (content: string): CoworkFileAttachment[] => {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .flatMap(line => {
+      const match = LEGACY_INPUT_FILE_PREFIX.exec(line);
+      if (!match) return [];
+      const attachment = getFileAttachmentFromPath(line.slice(match[0].length));
+      return attachment ? [attachment] : [];
+    });
+};
+
+const removePromptAttachmentFallbacks = (content: string): string => {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .filter(line => {
+      const match = LEGACY_INPUT_FILE_PREFIX.exec(line);
+      if (!match) return true;
+      return getFileAttachmentFromPath(line.slice(match[0].length)) === null;
+    })
+    .join('\n')
+    .replace(/^\n+|\n+$/g, '');
+};
+
+const FileAttachmentCard: React.FC<{ file: CoworkFileAttachment }> = ({ file }) => (
+  <div
+    className="flex h-20 w-64 shrink-0 items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4"
+    title={file.path}
+  >
+    <FileTypeIcon fileName={file.name} className="h-12 w-12 shrink-0" />
+    <div className="min-w-0">
+      <div className="truncate text-base text-foreground">{file.name}</div>
+      <div className="truncate text-sm text-muted-foreground">{file.extension}</div>
+    </div>
+  </div>
+);
+
+const LocalImageAttachmentPreview: React.FC<{
+  file: CoworkFileAttachment;
+  onExpand: (image: ImagePreviewSource) => void;
+}> = ({ file, onExpand }) => {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [readFailed, setReadFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDataUrl(null);
+    setReadFailed(false);
+    void window.electron.dialog.readFileAsDataUrl(file.path).then(result => {
+      if (cancelled) return;
+      if (result.success && result.dataUrl) {
+        setDataUrl(result.dataUrl);
+      } else {
+        setReadFailed(true);
+      }
+    }).catch(() => {
+      if (!cancelled) setReadFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [file.path]);
+
+  if (!dataUrl) {
+    return readFailed ? <FileAttachmentCard file={file} /> : null;
+  }
+
+  return (
+    <Button
+      variant="ghost"
+      className="block h-auto w-auto min-h-0 shrink-0 cursor-zoom-in rounded-lg p-0 shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50"
+      onClick={() => onExpand({ src: dataUrl, alt: file.name, name: file.name })}
+    >
+      <img
+        src={dataUrl}
+        alt={file.name || 'image'}
+        className="block h-40 w-auto max-w-80 rounded-lg border border-border object-contain"
+      />
+    </Button>
+  );
+};
 
 export const UserBubble: React.FC<{
   message: CoworkMessage;
@@ -49,42 +159,61 @@ export const UserBubble: React.FC<{
   const messageSkills = messageSkillIds
     .map(id => skills.find(s => s.id === id))
     .filter((s): s is NonNullable<typeof s> => s !== undefined);
-  const imageAttachments = ((message.metadata as CoworkMessageMetadata)?.imageAttachments ??
-    []) as CoworkImageAttachment[];
+  const imageAttachments = useMemo(
+    () =>
+      ((message.metadata as CoworkMessageMetadata)?.imageAttachments ??
+        []) as CoworkImageAttachment[],
+    [message.metadata],
+  );
+  const fileAttachments = useMemo(
+    () => {
+      const persisted =
+        ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
+          []) as CoworkFileAttachment[];
+      const knownPaths = new Set(persisted.map(file => file.path));
+      const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
+        file => !knownPaths.has(file.path),
+      );
+      return [...persisted, ...fallbacks];
+    },
+    [message.content, message.metadata],
+  );
+  const textContent = useMemo(() => {
+    const contentWithoutFallbacks = removePromptAttachmentFallbacks(displayContent);
+    if (fileAttachments.length === 0) return contentWithoutFallbacks;
+    const filePaths = new Set(fileAttachments.map(file => file.path));
+    return contentWithoutFallbacks
+      .split(/\r?\n/)
+      .filter(line => !Array.from(filePaths).some(path => line.includes(path)))
+      .join('\n')
+      .replace(/^\n+|\n+$/g, '');
+  }, [displayContent, fileAttachments]);
+  const localImageAttachments = useMemo(
+    () => fileAttachments.filter(file => file.isImage),
+    [fileAttachments],
+  );
+  const documentAttachments = useMemo(
+    () => fileAttachments.filter(file => !file.isImage),
+    [fileAttachments],
+  );
+  const hasTextContent = Boolean(textContent.trim()) || messageSkills.length > 0;
 
   return (
     <div
-      className="py-2 px-4 focus:outline-none"
+      className="w-full py-2 px-4 focus:outline-none"
       tabIndex={0}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
       onBlur={handleBlur}
     >
-      <div className="max-w-5xl min-w-[320px] mx-auto">
-        <Message from="user" className="ml-auto items-end">
-          <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
-            <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
-              {messageSkills.map(skill => (
-                <span
-                  key={skill.id}
-                  className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground"
-                >
-                  <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate">{skill.name}</span>
-                </span>
-              ))}
-              <span className="whitespace-pre-wrap wrap-break-word">{displayContent}</span>
-            </div>
-          </MessageContent>
-        </Message>
-
+      <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end">
         {imageAttachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-end mt-2">
+          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
             {imageAttachments.map((img, idx) => (
               <Button
                 key={idx}
                 variant="ghost"
-                className="block max-w-[200px] rounded-lg overflow-hidden border border-border hover:border-primary/50 p-0"
+                className="block h-auto w-auto min-h-0 shrink-0 cursor-zoom-in rounded-lg p-0 shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50"
                 onClick={() =>
                   setExpandedImage({
                     src: `data:${img.mimeType};base64,${img.base64Data}`,
@@ -96,11 +225,42 @@ export const UserBubble: React.FC<{
                 <img
                   src={`data:${img.mimeType};base64,${img.base64Data}`}
                   alt={img.name || 'image'}
-                  className="max-h-32 object-cover"
+                  className="block h-40 w-auto max-w-80 rounded-lg border border-border object-contain"
                 />
               </Button>
             ))}
           </div>
+        )}
+
+        {localImageAttachments.length > 0 && (
+          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
+            {localImageAttachments.map(file => (
+              <LocalImageAttachmentPreview
+                key={file.path}
+                file={file}
+                onExpand={setExpandedImage}
+              />
+            ))}
+          </div>
+        )}
+
+        {documentAttachments.length > 0 && (
+          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
+            {documentAttachments.map(file => <FileAttachmentCard key={file.path} file={file} />)}
+          </div>
+        )}
+
+        {hasTextContent && (
+          <Message from="user" className="ml-auto items-end">
+            <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
+              <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
+                {messageSkills.map(skill => (
+                  <MessageSkillSummary key={skill.id} skill={skill} />
+                ))}
+                <span className="whitespace-pre-wrap wrap-break-word">{textContent}</span>
+              </div>
+            </MessageContent>
+          </Message>
         )}
 
         <div
@@ -123,3 +283,28 @@ export const UserBubble: React.FC<{
     </div>
   );
 });
+
+const MessageSkillSummary: React.FC<{ skill: Skill }> = ({ skill }) => {
+  const shortcut = findChatSkillShortcut(skill.id);
+  const label = shortcut
+    ? i18nService.t(shortcut.labelKey)
+    : skill.displayName || skill.name;
+  const ShortcutIcon = shortcut?.icon;
+
+  return (
+    <span className="inline-flex max-w-40 items-center gap-1 rounded-md bg-background px-1.5 py-1 text-sm text-foreground">
+      {skill.iconUrl ? (
+        <img
+          src={resolveSkillIconUrl(skill.iconUrl)}
+          alt=""
+          className="size-3.5 shrink-0 object-contain"
+        />
+      ) : ShortcutIcon ? (
+        <ShortcutIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      ) : (
+        <PlusMenuSkillsIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      )}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+};

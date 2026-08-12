@@ -1,6 +1,10 @@
 import { expect, test, vi } from 'vitest';
 
-import { LlamaCppRuntimeBackend, LlamaCppRuntimeCudaMajor } from '../../shared/llamacpp';
+import {
+  LlamaCppIpcChannel,
+  LlamaCppRuntimeBackend,
+  LlamaCppRuntimeCudaMajor,
+} from '../../shared/llamacpp';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import {
   enforceLlamaCppParallelTwo,
@@ -359,6 +363,57 @@ test('does not refresh model capabilities for manager status events', async () =
 
   expect(listRunningModels).not.toHaveBeenCalled();
   expect(client).not.toHaveBeenCalled();
+});
+
+test('waits for runtime install cleanup before confirming cancellation', async () => {
+  electronMocks.handlers.clear();
+  let resolveInstall: ((value: { success: false; cancelled: true }) => void) | undefined;
+  let aborted = false;
+  const manager = {} as LlamaCppManager;
+  Object.assign(manager, {
+    on: vi.fn(() => manager),
+    installRuntime: vi.fn(({ signal }: { signal: AbortSignal }) =>
+      new Promise<{ success: false; cancelled: true }>(resolve => {
+        resolveInstall = resolve;
+        signal.addEventListener(
+          'abort',
+          () => {
+            aborted = true;
+          },
+          { once: true },
+        );
+      }),
+    ),
+  });
+  const store = {
+    get: vi.fn(() => undefined),
+    set: vi.fn(),
+  };
+
+  registerLlamaCppIpcHandlers(manager, {
+    getStore: () => store as never,
+  });
+
+  const installHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Install);
+  const cancelHandler = electronMocks.handlers.get(LlamaCppIpcChannel.CancelRuntimeInstall);
+  if (!installHandler || !cancelHandler) throw new Error('Runtime install IPC handlers were not registered.');
+
+  const install = Promise.resolve(installHandler());
+  await Promise.resolve();
+  let cancelSettled = false;
+  const cancel = Promise.resolve(cancelHandler()).then(result => {
+    cancelSettled = true;
+    return result;
+  });
+  await Promise.resolve();
+
+  expect(aborted).toBe(true);
+  expect(cancelSettled).toBe(false);
+
+  resolveInstall?.({ success: false, cancelled: true });
+
+  await expect(cancel).resolves.toEqual({ success: true, cancelled: true });
+  await expect(install).resolves.toEqual({ success: false, cancelled: true });
 });
 
 test('computes total free VRAM from nvidia-smi snapshots', () => {

@@ -86,9 +86,11 @@ import {
 import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
+import { ConversationHistoryService } from './conversationHistory/service';
 import { EngramManager } from './memory/engramManager';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
+import { SessionSummaryService } from './memory/sessionSummaryService';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { registerMemoryIpcHandlers } from './memory/ipc';
 import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
@@ -228,6 +230,7 @@ import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandle
 import { IMStore } from './im/imStore';
 import { configureRendererStartup } from './rendererStartup';
 import { SkillManager } from './skillManager';
+import { listPresetExperts } from './presetExpertCatalog';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { StartupProfiler } from './startupProfiler';
@@ -434,12 +437,31 @@ const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
   // and must not be truncated by the generic sanitizer).
   let sanitizedMetadata: unknown;
   if (messageRecord.metadata && typeof messageRecord.metadata === 'object') {
-    const { imageAttachments, ...rest } = messageRecord.metadata as Record<string, unknown>;
+    const { imageAttachments, fileAttachments, ...rest } = messageRecord.metadata as Record<
+      string,
+      unknown
+    >;
     const sanitizedRest = sanitizeIpcPayload(rest) as Record<string, unknown> | undefined;
     sanitizedMetadata = {
       ...(sanitizedRest && typeof sanitizedRest === 'object' ? sanitizedRest : {}),
       ...(Array.isArray(imageAttachments) && imageAttachments.length > 0
         ? { imageAttachments }
+        : {}),
+      ...(Array.isArray(fileAttachments) && fileAttachments.length > 0
+        ? {
+            fileAttachments: fileAttachments
+              .filter(
+                (attachment): attachment is Record<string, unknown> =>
+                  Boolean(attachment) && typeof attachment === 'object',
+              )
+              .slice(0, IPC_MAX_ITEMS)
+              .map(attachment => ({
+                name: typeof attachment.name === 'string' ? attachment.name : '',
+                path: typeof attachment.path === 'string' ? attachment.path : '',
+                extension: typeof attachment.extension === 'string' ? attachment.extension : '',
+                ...(typeof attachment.isImage === 'boolean' ? { isImage: attachment.isImage } : {}),
+              })),
+          }
         : {}),
     };
   } else {
@@ -840,6 +862,12 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setCoworkStore(getCoworkStore());
     piRuntimeAdapter.setWorkbenchTaskService(getWorkbenchTaskService());
     piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
+    piRuntimeAdapter.setSessionSummaryService(
+      new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
+    );
+    piRuntimeAdapter.setConversationHistoryService(
+      new ConversationHistoryService(getStore().getDatabase()),
+    );
     // MCP initialization runs asynchronously, so late injection may still be needed.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
   }
@@ -1420,6 +1448,18 @@ const forwardPiWorkbenchRuntimeToRenderer = (runtime: PiRuntimeAdapter): void =>
     });
   });
 
+  runtime.on('sessionInterrupted', interruption => {
+    const windows = BrowserWindow.getAllWindows();
+    windows.forEach(win => {
+      if (win.isDestroyed()) return;
+      try {
+        win.webContents.send(CoworkStreamIpc.Interrupted, interruption);
+      } catch (error) {
+        console.error('[PiWorkbenchForwarder] failed to forward a session interruption:', error);
+      }
+    });
+  });
+
   runtime.on('complete', (sessionId: string, claudeSessionId: string | null) => {
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(win => {
@@ -1743,6 +1783,7 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
         return [];
       }
       console.log(`[McpInit] MCP servers started: ${tools.length} tools discovered`);
+      syncPiMcpToolManifest();
       return tools;
     } catch (err) {
       console.error('[McpInit] Failed to start MCP servers:', err);
@@ -1756,10 +1797,25 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
 };
 
 /**
+ * Pi sessions capture their custom-tool topology at creation time. Keep an
+ * already-created Pi runtime synchronized after both startup discovery and
+ * later connector refreshes without instantiating Pi just for MCP bootstrap.
+ */
+const syncPiMcpToolManifest = (): void => {
+  if (!piRuntimeAdapter || !mcpServerManager) return;
+  if (!piRuntimeAdapter.hasMcpServerManager()) {
+    piRuntimeAdapter.setMcpServerManager(mcpServerManager);
+    return;
+  }
+  piRuntimeAdapter.refreshMcpTools();
+};
+
+/**
  * Refresh in-process MCP servers after configuration changes.
  * Returns a summary for the renderer to display.
  */
 let mcpBridgeRefreshPromise: Promise<{ tools: number; error?: string }> | null = null;
+let mcpBridgeRefreshPending = false;
 
 const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>): void => {
   const windows = BrowserWindow.getAllWindows();
@@ -1775,6 +1831,10 @@ const broadcastMcpBridgeSync = (channel: string, data?: Record<string, unknown>)
 
 const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
   if (mcpBridgeRefreshPromise) {
+    // A server setting changed while the current pass was reading the enabled
+    // list. Schedule one more pass after it completes so the bridge converges
+    // on the latest persisted configuration.
+    mcpBridgeRefreshPending = true;
     return mcpBridgeRefreshPromise;
   }
   mcpBridgeRefreshPromise = (async () => {
@@ -1798,7 +1858,11 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
       const toolCount = tools.length;
       console.log(`[McpBridge] refresh: ${toolCount} tools discovered`);
 
-      getPiRuntimeAdapter().setMcpServerManager(mcpServerManager);
+      // Pi's custom tool topology is captured when a session is created.
+      // Mark live sessions stale after discovery so their next user turn is
+      // rebuilt with the freshly discovered MCP proxy instead of relying on
+      // whichever servers happened to be ready during app startup.
+      syncPiMcpToolManifest();
       console.log(`[McpBridge] refresh complete: ${toolCount} tools discovered`);
       return { tools: toolCount };
     } catch (error) {
@@ -1818,6 +1882,10 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
     })
     .finally(() => {
       mcpBridgeRefreshPromise = null;
+      if (mcpBridgeRefreshPending) {
+        mcpBridgeRefreshPending = false;
+        void refreshMcpBridge();
+      }
     });
   return mcpBridgeRefreshPromise;
 };
@@ -2093,8 +2161,13 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  // Register custom protocol for OAuth callback
-  app.setAsDefaultProtocolClient('zhiyuan');
+  // In development Electron needs the app entry point before the callback URL;
+  // otherwise Windows treats the URL itself as the application to launch.
+  if (process.defaultApp && process.argv[1]) {
+    app.setAsDefaultProtocolClient('zhiyuan', process.execPath, [path.resolve(process.argv[1])]);
+  } else {
+    app.setAsDefaultProtocolClient('zhiyuan');
+  }
 
   const COMMUNITY_AUTH_ORIGIN = 'https://account.rongxzyai.com';
   const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
@@ -2851,10 +2924,10 @@ if (!gotTheLock) {
           if (validationError) {
             return { success: false, error: validationError };
           }
-          const probeResult = await probeMcpConnection(existing);
-          if (!probeResult.success) {
-            return { success: false, error: probeResult.error || 'Failed to test MCP connection' };
-          }
+          // Enabling must remain responsive. refreshMcpBridge() immediately
+          // follows this write and performs the single authoritative OAuth
+          // refresh plus MCP initialization. Doing it here as a synchronous
+          // probe duplicated that network work and blocked the switch.
         }
       }
 
@@ -3347,6 +3420,9 @@ if (!gotTheLock) {
           });
           messageMetadata.imageAttachments = options.imageAttachments;
         }
+        if (options.fileAttachments?.length) {
+          messageMetadata.fileAttachments = options.fileAttachments;
+        }
         coworkStoreInstance.addMessage(session.id, {
           type: 'user',
           content: options.prompt,
@@ -3377,6 +3453,7 @@ if (!gotTheLock) {
             goalMode: options.goalMode,
             autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
+            fileAttachments: options.fileAttachments,
             agentId: options.agentId,
             expertIds: expertSnapshots.map(expert => expert.expertId),
             modelOverride: options.modelOverride,
@@ -3433,6 +3510,12 @@ if (!gotTheLock) {
         expertIds?: string[];
         permissionMode?: CoworkPermissionMode;
         imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+        fileAttachments?: Array<{
+          name: string;
+          path: string;
+          extension: string;
+          isImage?: boolean;
+        }>;
       },
     ) => {
       try {
@@ -3516,6 +3599,7 @@ if (!gotTheLock) {
                 : CoworkSessionMode.Work,
             goalMode: options.goalMode,
             imageAttachments: options.imageAttachments,
+            fileAttachments: options.fileAttachments,
             workspaceRoot: existingSession?.cwd,
             agentId: existingSession?.agentId,
             expertIds: existingSession?.experts.map(expert => expert.expertId),
@@ -3573,7 +3657,14 @@ if (!gotTheLock) {
   ipcMain.handle(CoworkQueueIpc.Enqueue, async (_event, rawInput: unknown) => {
     try {
       const input = CoworkQueueEnqueueSchema.parse(rawInput);
-      return getPiRuntimeAdapter().enqueuePendingMessage(input.sessionId, input.text);
+      return getPiRuntimeAdapter().enqueuePendingMessage(
+        input.sessionId,
+        input.text,
+        input.imageAttachments,
+        input.fileAttachments,
+        input.skillIds,
+        input.skillPrompt,
+      );
     } catch (error) {
       return {
         success: false,
@@ -4073,34 +4164,7 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.GetPresetExperts, async () => {
     try {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
-      const presetsDir = path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'presets');
-      if (!fs.existsSync(presetsDir)) return { experts: [] };
-
-      const entries = fs.readdirSync(presetsDir, { withFileTypes: true });
-      const experts = entries
-        .filter(e => e.isDirectory())
-        .map(e => {
-          const pluginPath = path.join(presetsDir, e.name, 'plugin.json');
-          if (!fs.existsSync(pluginPath)) return null;
-          try {
-            const plugin = JSON.parse(fs.readFileSync(pluginPath, 'utf-8'));
-            return {
-              name: plugin.name,
-              displayName: plugin.displayName,
-              profession: plugin.profession,
-              displayDescription: plugin.displayDescription,
-              categoryId: plugin.categoryId,
-              tags: plugin.tags,
-              quickPrompts: plugin.quickPrompts,
-              path: path.join(presetsDir, e.name),
-            };
-          } catch {
-            return null;
-          }
-        })
-        .filter(Boolean);
-
-      return { experts };
+      return { experts: listPresetExperts(bundledSkillsRoot) };
     } catch (error) {
       return {
         experts: [],
@@ -6545,26 +6609,29 @@ if (!gotTheLock) {
       .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
-      startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun) => {
+      startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun, resumeInput) => {
         const session = getCoworkStore().getSession(task.sessionId);
         if (!session) throw new Error('Cowork session not found.');
         const config = getCoworkStore().getConfig();
-        await getPiRuntimeAdapter().continueSession(
-          session.id,
-          'Continue the current task from its persisted state and verify the result.',
-          {
-            systemPrompt: session.systemPrompt,
-            skillIds: session.activeSkillIds,
-            sessionMode: session.mode,
-            workspaceRoot: session.cwd,
-            agentId: session.agentId,
-            expertIds: session.experts.map(expert => expert.expertId),
-            modelOverride: session.modelOverride,
-            autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
-            _workbenchRunId: run.id,
-            _skipUserMessage: true,
-          },
-        );
+        const amendment = resumeInput?.amendment?.trim() ?? '';
+        const prompt =
+          amendment || 'Continue the current task from its persisted state and verify the result.';
+        await getPiRuntimeAdapter().continueSession(session.id, prompt, {
+          systemPrompt: session.systemPrompt,
+          skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
+          sessionMode: session.mode,
+          workspaceRoot: session.cwd,
+          agentId: session.agentId,
+          expertIds: resumeInput?.expertIds ?? session.experts.map(expert => expert.expertId),
+          modelOverride: session.modelOverride,
+          autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
+          goalMode: resumeInput?.goalMode,
+          imageAttachments: resumeInput?.imageAttachments,
+          fileAttachments: resumeInput?.fileAttachments,
+          _workbenchRunId: run.id,
+          _productionWorkflowEnabled: task.contract.metadata?.productionWorkflowEnabled === true,
+          _skipUserMessage: !amendment,
+        });
       },
     });
     registerMemoryIpcHandlers({ getService: getProjectMemoryService });

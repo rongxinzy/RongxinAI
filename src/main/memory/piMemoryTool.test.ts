@@ -10,6 +10,15 @@ test('exposes only controlled project memory actions', async () => {
     saveProjectMemory: vi.fn(),
     proposePersonalMemory: vi.fn(),
     saveSessionSummary: vi.fn(),
+    listRecallableMemories: vi.fn(() => [
+      {
+        id: 'link-1',
+        memoryId: 7,
+        scope: 'project',
+        title: 'Database',
+        content: 'Use SQLite.',
+      },
+    ]),
   };
   const tool = buildPiProjectMemoryTool({
     service: service as never,
@@ -29,5 +38,13 @@ test('exposes only controlled project memory actions', async () => {
   expect(service.recallProject).toHaveBeenCalledWith({
     workingDirectory: '/workspace/project',
     query: 'database',
+  });
+
+  const listResult = await tool.execute('call-2', { action: PiMemoryAction.List, limit: 5 });
+  expect(listResult).toMatchObject({ details: { count: 1 } });
+  expect(service.listRecallableMemories).toHaveBeenCalledWith({
+    workingDirectory: '/workspace/project',
+    query: undefined,
+    limit: 5,
   });
 });

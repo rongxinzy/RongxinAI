@@ -1,15 +1,14 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { Spinner } from '@shared/components/ui/spinner';
-import { Pencil, Play, Trash2 } from 'lucide-react';
+import { Play, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import type { ScheduledTask } from '../../../scheduledTask/types';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import { setViewMode } from '../../store/slices/scheduledTaskSlice';
 import AllRunsHistory from './AllRunsHistory';
 import {
   formatDateTime,
@@ -26,7 +25,6 @@ interface TaskDetailProps {
 }
 
 const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
-  const dispatch = useDispatch();
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const [preflight, setPreflight] = useState<{
     hasChannel: boolean;
@@ -71,15 +69,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => dispatch(setViewMode('edit'))}
-            title={i18nService.t('scheduledTasksEdit')}
-          >
-            <Pencil />
-          </Button>
           {task.state.runningAtMs ? (
             <Badge variant="secondary" className="gap-1">
               <Spinner className="size-3" />

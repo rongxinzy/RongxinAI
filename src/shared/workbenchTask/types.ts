@@ -14,6 +14,7 @@ import type {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
 } from './constants';
+import type { ProductionPlanItem } from '../productionLoop';
 
 export type WorkbenchJsonObject = Record<string, unknown>;
 
@@ -48,6 +49,14 @@ export interface WorkbenchTask {
   completedAt: number | null;
 }
 
+export interface WorkbenchRunContext {
+  model: string;
+  provider: string;
+  reasoningProfile: string;
+  workspaceRoot: string;
+  skillIds: string[];
+}
+
 export interface WorkbenchRun {
   id: string;
   taskId: string;
@@ -56,6 +65,7 @@ export interface WorkbenchRun {
   trigger: WorkbenchRunTrigger;
   startedAt: number | null;
   endedAt: number | null;
+  context: WorkbenchRunContext | null;
   verificationResult: WorkbenchVerificationResult | null;
   failure: WorkbenchJsonObject | null;
   createdAt: number;
@@ -110,6 +120,13 @@ export interface WorkbenchTaskDetail {
   events: WorkbenchRunEvent[];
   artifacts: WorkbenchArtifact[];
   approvals: WorkbenchApproval[];
+  productionPlan?: WorkbenchProductionPlan | null;
+}
+
+export interface WorkbenchProductionPlan {
+  runId: string;
+  progressVersion: number;
+  items: ProductionPlanItem[];
 }
 
 export interface WorkbenchTaskChangedEvent {
@@ -121,6 +138,37 @@ export interface WorkbenchTaskActionResult {
   success: boolean;
   detail?: WorkbenchTaskDetail;
   error?: string;
+}
+
+export interface WorkbenchTaskListResult {
+  success: boolean;
+  tasks?: WorkbenchTask[];
+  error?: string;
+}
+
+export interface WorkbenchTaskExportResult {
+  success: boolean;
+  path?: string;
+  canceled?: boolean;
+  error?: string;
+}
+
+export interface WorkbenchTaskResumeInput {
+  taskId: string;
+  amendment?: string;
+  skillIds?: string[];
+  expertIds?: string[];
+  goalMode?: boolean;
+  imageAttachments?: Array<{
+    name: string;
+    mimeType: string;
+    base64Data: string;
+  }>;
+  fileAttachments?: Array<{
+    name: string;
+    path: string;
+    extension: string;
+  }>;
 }
 
 export interface WorkbenchApprovalResponseInput {

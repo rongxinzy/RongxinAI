@@ -593,6 +593,12 @@ const coworkSlice = createSlice({
       state.pendingPermissions = [];
     },
 
+    clearPendingPermissionsForSession(state, action: PayloadAction<string>) {
+      state.pendingPermissions = state.pendingPermissions.filter(
+        permission => permission.sessionId !== action.payload,
+      );
+    },
+
     setConfig(state, action: PayloadAction<CoworkConfig>) {
       state.config = action.payload;
     },
@@ -673,6 +679,7 @@ export const {
   enqueuePendingPermission,
   dequeuePendingPermission,
   clearPendingPermissions,
+  clearPendingPermissionsForSession,
   setConfig,
   updateConfig,
   clearCurrentSession,

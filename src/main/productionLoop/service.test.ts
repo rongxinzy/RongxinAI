@@ -390,11 +390,103 @@ test('keeps acceptance-required work ready until the user accepts it', () => {
   });
 });
 
-test('inherits the durable plan into a new run without replaying prior progress', () => {
+test('inherits durable task progress while rebuilding run evidence', () => {
   const { task, run } = begin();
   const first = commitPlan(run.id);
   service.updatePlanItem(run.id, first.planItems[0].id, ProductionPlanItemStatus.Completed);
+  service.updatePlanItem(run.id, first.planItems[1].id, ProductionPlanItemStatus.InProgress);
+  const priorEvidence = recordVerifier(run.id);
   const retry = workbench.createRun(task.id, WorkbenchRunTrigger.Retry);
+  const resumed = service.beginRun({
+    taskId: task.id,
+    runId: retry.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: 'Also use a shorter title',
+    prototypeRequired: false,
+  });
+
+  expect(resumed.phase).toBe(ProductionLoopPhase.Execute);
+  expect(resumed.goal).toBe(task.goal);
+  expect(resumed.acceptanceCriteria).toEqual(first.acceptanceCriteria);
+  expect(resumed.planItems.map(item => item.id)).toEqual(first.planItems.map(item => item.id));
+  expect(resumed.planItems.map(item => item.status)).toEqual([
+    ProductionPlanItemStatus.Completed,
+    ProductionPlanItemStatus.Pending,
+  ]);
+  expect(resumed.observedToolResults).toEqual([]);
+  expect(resumed.inspections).toEqual([]);
+  expect(resumed.critic.requested).toBe(false);
+  expect(resumed.critic.toolCallId).toBeNull();
+  expect(resumed.deliveryReason).toBeNull();
+  expect(resumed.revisions).toEqual([]);
+  expect(resumed.recoveries).toEqual([]);
+  expect(resumed.progressVersion).toBe(first.progressVersion + 2);
+  expect(resumed.lastObservedProgressVersion).toBe(resumed.progressVersion);
+
+  service.updatePlanItem(retry.id, resumed.planItems[1].id, ProductionPlanItemStatus.Completed);
+  expect(() =>
+    service.startInspection(retry.id, {
+      artifacts: [{ kind: 'file', reference: 'report.md' }],
+      verifiers: [
+        {
+          name: 'artifact_verifier',
+          evidenceRef: priorEvidence.evidenceRef ?? 'missing',
+        },
+      ],
+    }),
+  ).toThrow('Passing deterministic verifier evidence');
+
+  expect(startInspection(retry.id).phase).toBe(ProductionLoopPhase.Inspect);
+});
+
+test('keeps blocked plan items when resuming prototype-based work', () => {
+  const { task, run } = begin(true);
+  service.recordPrototype(run.id, 'prototype-a.html', 'First concrete direction');
+  const planned = commitPlan(run.id);
+  service.updatePlanItem(run.id, planned.planItems[0].id, ProductionPlanItemStatus.Blocked);
+  const retry = workbench.createRun(task.id, WorkbenchRunTrigger.Resume);
+
+  const resumed = service.beginRun({
+    taskId: task.id,
+    runId: retry.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: 'Continue',
+    prototypeRequired: true,
+  });
+
+  expect(resumed.phase).toBe(ProductionLoopPhase.Execute);
+  expect(resumed.prototypes).toEqual(service.getState(run.id).prototypes);
+  expect(resumed.planItems[0].status).toBe(ProductionPlanItemStatus.Blocked);
+});
+
+test('resumes prototype-only work at planning without requiring another prototype', () => {
+  const { task, run } = begin(true);
+  service.recordPrototype(run.id, 'prototype-a.html', 'First concrete direction');
+  const retry = workbench.createRun(task.id, WorkbenchRunTrigger.Resume);
+
+  const resumed = service.beginRun({
+    taskId: task.id,
+    runId: retry.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: task.goal,
+    prototypeRequired: true,
+  });
+
+  expect(resumed.phase).toBe(ProductionLoopPhase.Plan);
+  expect(resumed.prototypes).toHaveLength(1);
+});
+
+test('clears prior inspection and critic bindings before resumed verification', () => {
+  const { task, run } = begin();
+  const planned = commitPlan(run.id);
+  for (const item of planned.planItems) {
+    service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
+  }
+  startInspection(run.id);
+  service.requestCritique(run.id);
+  service.recordCriticStart(run.id, 'prior-review');
+  const retry = workbench.createRun(task.id, WorkbenchRunTrigger.Resume);
+
   const resumed = service.beginRun({
     taskId: task.id,
     runId: retry.id,
@@ -403,16 +495,18 @@ test('inherits the durable plan into a new run without replaying prior progress'
     prototypeRequired: false,
   });
 
-  expect(resumed.phase).toBe(ProductionLoopPhase.Plan);
-  expect(resumed.acceptanceCriteria).toEqual(first.acceptanceCriteria);
-  expect(resumed.planItems.every(item => item.status === ProductionPlanItemStatus.Pending)).toBe(
+  expect(resumed.phase).toBe(ProductionLoopPhase.Execute);
+  expect(resumed.planItems.every(item => item.status === ProductionPlanItemStatus.Completed)).toBe(
     true,
   );
-  expect(resumed.critic.requested).toBe(false);
-  expect(resumed.deliveryReason).toBeNull();
-  expect(resumed.revisions).toEqual([]);
-  expect(resumed.recoveries).toEqual([]);
-  expect(resumed.progressVersion).toBe(0);
+  expect(resumed.observedToolResults).toEqual([]);
+  expect(resumed.inspections).toEqual([]);
+  expect(resumed.critic).toMatchObject({
+    requested: false,
+    toolCallId: null,
+    passed: false,
+    execution: null,
+  });
 });
 
 test('records explicit stale recovery without marking the loop complete', () => {
