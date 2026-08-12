@@ -3,7 +3,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 const root = process.cwd();
-const expectedSidecarRef = '2ccda878a77402d7445daa22d06f3cf54028aa34';
+const expectedSidecarRef = '18cccf0898de8fcc2ac20f3a63dd2cc8a0c8bb5f';
 const forbiddenRuntimePattern = /openclaw|cfmind/i;
 const forbiddenStoragePattern =
   /(?:\.openclaw|openclaw\.json|im_session_mappings|openclaw_session_key|telegramOpenClaw|feishuOpenClaw|dingtalkOpenClaw)/i;
