@@ -65,18 +65,6 @@ jobs:
           ref: ${{ needs.prepare-release.outputs.commit }}
       - name: Enforce retired runtime decoupling
         run: node scripts/ci/check-openclaw-decoupling.mjs
-      - name: Check out the fixed cc-connect sidecar source
-        uses: actions/checkout@v6
-        with:
-          repository: rongxinzy/pi-connect
-          ref: 18cccf0898de8fcc2ac20f3a63dd2cc8a0c8bb5f
-          path: .sidecars/pi-connect
-          persist-credentials: false
-      - name: Set up Go for the fixed cc-connect sidecar
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: .sidecars/pi-connect/go.mod
-          cache-dependency-path: .sidecars/pi-connect/go.sum
       - uses: actions/setup-node@v6
         with: { node-version: '24.x' }
       - uses: oven-sh/setup-bun@v2
@@ -166,6 +154,7 @@ jobs:
             ~/.cache/electron-builder
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
+            vendor/channel-runtime
           key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
@@ -193,7 +182,6 @@ jobs:
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}\\.sidecars\\pi-connect
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Validate optional macOS signing and notarization credentials
@@ -247,7 +235,6 @@ jobs:
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Build signed macOS package
@@ -256,7 +243,6 @@ jobs:
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
@@ -283,7 +269,6 @@ jobs:
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
-          ZHIYUAN_CC_CONNECT_SOURCE: ${{ github.workspace }}/.sidecars/pi-connect
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
       - name: Verify Windows package runtimes with a clean PATH

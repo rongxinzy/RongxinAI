@@ -44,6 +44,23 @@
       "linux-arm64": "e84230533527e97547d34dfe7b9117a2e36810e1e364c437256c0d86017a7116"
     }
   },
+  "channelRuntime": {
+    "version": "zhiyuan-sidecar-v1",
+    "repo": "rongxinzy/pi-connect",
+    "sourceRevision": "dcbff6603d39c0dc88877b91bb3e5442a2ec17da",
+    "runtimeAssets": {
+      "mac-x64": "cc-connect-sidecar-darwin-amd64",
+      "mac-arm64": "cc-connect-sidecar-darwin-arm64",
+      "win-x64": "cc-connect-sidecar-windows-amd64.exe",
+      "linux-x64": "cc-connect-sidecar-linux-amd64"
+    },
+    "runtimeChecksums": {
+      "mac-x64": "67d068e20b46499f99c2cf51f7ff38b115d26b5708ae0c3cfaf80f439986225b",
+      "mac-arm64": "2753cc1a345c48a76c25be0c6f581077039d41b26edef31cd78c917d9c93fa22",
+      "win-x64": "de7d99b503cdea36abe89127fe31b893f83e5a114f8389d6dd1738129280ee98",
+      "linux-x64": "13996aa4e62ef817baf8898c44dd480705a59774b48213d90863dcd1bd7184d1"
+    }
+  },
   "main": "dist-electron/main.js",
   "engines": {
     "node": ">=24 <25"
@@ -77,17 +94,17 @@
     "start:electron": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron .",
     "electron:dev": "bun run channel:runtime:host && bun run engram:runtime:host && rimraf dist-electron && bun run compile:electron && concurrently \"vite --port 5175\" \"wait-on -l -t 120000 -d 20000 -i 1000 -s 1 http://localhost:5175 && wait-on -l -t 120000 -i 1000 dist-electron/.electron-ready && bun run start:electron\"",
     "postinstall": "patch-package && electron-builder install-app-deps",
-    "pack": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder --dir",
-    "dist": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder",
-    "dist:mac": "npm run prepare:modelscope-tokens && npm run engram:runtime:mac-arm64 && electron-builder --mac --config electron-builder.json --publish never",
-    "predist:mac": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:mac-arm64",
-    "dist:mac:x64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:mac-x64 && npm run prepare:modelscope-tokens && electron-builder --mac --x64",
-    "dist:mac:arm64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --arm64",
-    "dist:mac:universal": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --universal",
+    "pack": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:download && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder --dir",
+    "dist": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:download && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder",
+    "dist:mac": "npm run prepare:modelscope-tokens && npm run channel:runtime:mac-arm64 && npm run engram:runtime:mac-arm64 && electron-builder --mac --config electron-builder.json --publish never",
+    "predist:mac": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-arm64 && npm run engram:runtime:mac-arm64",
+    "dist:mac:x64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-x64 && npm run engram:runtime:mac-x64 && npm run prepare:modelscope-tokens && electron-builder --mac --x64",
+    "dist:mac:arm64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-arm64 && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --arm64",
+    "dist:mac:universal": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-universal && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --universal",
     "dist:win": "npm run dist:win:offline",
-    "dist:win:offline": "npm run engram:runtime:win-x64 && npm run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && npm run build && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
+    "dist:win:offline": "npm run channel:runtime:win-x64 && npm run engram:runtime:win-x64 && npm run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && npm run build && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
     "dist:win:lite": "npm run dist:win:offline",
-    "predist:linux": "npm run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && npm run prepare:update-release",
+    "predist:linux": "npm run channel:runtime:linux-x64 && npm run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && npm run prepare:update-release",
     "dist:linux": "npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:linux-x64 && npm run prepare:modelscope-tokens && electron-builder --linux --publish never",
     "clean:release": "rimraf release",
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
@@ -101,6 +118,12 @@
     "setup:skill-python-runtime": "node scripts/setup-skill-python-runtime.js",
     "validate:skills": "node scripts/validate-skill-frontmatter.cjs",
     "channel:runtime:host": "node scripts/channel-runtime-host.cjs",
+    "channel:runtime:download": "node scripts/download-channel-runtime.cjs",
+    "channel:runtime:mac-x64": "node scripts/download-channel-runtime.cjs mac-x64",
+    "channel:runtime:mac-arm64": "node scripts/download-channel-runtime.cjs mac-arm64",
+    "channel:runtime:mac-universal": "node scripts/download-channel-runtime.cjs mac-x64 && node scripts/download-channel-runtime.cjs mac-arm64",
+    "channel:runtime:win-x64": "node scripts/download-channel-runtime.cjs win-x64",
+    "channel:runtime:linux-x64": "node scripts/download-channel-runtime.cjs linux-x64",
     "channel:runtime:smoke": "node scripts/channel-runtime-smoke.cjs",
     "engram:runtime:host": "node scripts/download-engram-runtime.cjs",
     "engram:runtime:mac-x64": "node scripts/download-engram-runtime.cjs mac-x64",

@@ -3,7 +3,8 @@ import path from 'node:path';
 import process from 'node:process';
 
 const root = process.cwd();
-const expectedSidecarRef = '18cccf0898de8fcc2ac20f3a63dd2cc8a0c8bb5f';
+const expectedSidecarVersion = 'zhiyuan-sidecar-v1';
+const expectedSidecarRevision = 'dcbff6603d39c0dc88877b91bb3e5442a2ec17da';
 const forbiddenRuntimePattern = /openclaw|cfmind/i;
 const forbiddenStoragePattern =
   /(?:\.openclaw|openclaw\.json|im_session_mappings|openclaw_session_key|telegramOpenClaw|feishuOpenClaw|dingtalkOpenClaw)/i;
@@ -87,6 +88,22 @@ for (const buildRoot of buildRoots) {
 
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 if ('openclaw' in packageJson) failures.push('package.json contains retired runtime metadata');
+const channelRuntime = packageJson.channelRuntime;
+if (
+  channelRuntime?.version !== expectedSidecarVersion ||
+  channelRuntime?.sourceRevision !== expectedSidecarRevision ||
+  channelRuntime?.repo !== 'rongxinzy/pi-connect'
+) {
+  failures.push('package.json must pin the immutable pi-connect sidecar release');
+}
+for (const targetId of ['mac-x64', 'mac-arm64', 'win-x64', 'linux-x64']) {
+  if (!channelRuntime?.runtimeAssets?.[targetId]) {
+    failures.push(`package.json is missing the channel runtime asset for ${targetId}`);
+  }
+  if (!/^[a-f0-9]{64}$/.test(channelRuntime?.runtimeChecksums?.[targetId] ?? '')) {
+    failures.push(`package.json is missing the finalized channel runtime checksum for ${targetId}`);
+  }
+}
 for (const [name, command] of Object.entries(packageJson.scripts ?? {})) {
   if (name === 'check:openclaw-decoupling') continue;
   if (forbiddenRuntimePattern.test(`${name} ${command}`)) {
@@ -106,11 +123,12 @@ checkFile('vite.config.ts', [forbiddenRuntimePattern, forbiddenStoragePattern]);
 
 for (const workflowFile of workflowFiles) {
   const content = fs.readFileSync(path.join(root, workflowFile), 'utf8');
-  const refs = [
-    ...content.matchAll(/repository:\s*rongxinzy\/pi-connect[\s\S]{0,180}?ref:\s*([^\s]+)/g),
-  ];
-  if (refs.length !== 1 || refs[0][1] !== expectedSidecarRef) {
-    failures.push(`${workflowFile} must pin pi-connect to ${expectedSidecarRef}`);
+  if (
+    /repository:\s*rongxinzy\/pi-connect|actions\/setup-go|ZHIYUAN_CC_CONNECT_SOURCE/.test(content)
+  ) {
+    failures.push(
+      `${workflowFile} must consume the published channel runtime, not pi-connect source`,
+    );
   }
   const contentWithoutGateCommand = content
     .split(/\r?\n/)

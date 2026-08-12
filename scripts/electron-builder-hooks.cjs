@@ -4,11 +4,14 @@ const path = require('path');
 const os = require('os');
 const {
   existsSync,
+  cpSync,
+  readFileSync,
   readdirSync,
   statSync,
   mkdirSync,
   mkdtempSync,
   rmSync,
+  renameSync,
   lstatSync,
   writeFileSync,
   symlinkSync,
@@ -125,72 +128,52 @@ function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
   }
 }
 
-/**
- * Build the deliberately trimmed cc-connect sidecar from a checked-out,
- * immutable pi-connect revision.  The release workflow supplies
- * ZHIYUAN_CC_CONNECT_SOURCE from that exact tag; no package build downloads a
- * moving branch or invokes an Agent adapter.
- */
+/** Verify that the prepared channel runtime matches the immutable release pin. */
 function ensureBundledChannelRuntime(context) {
   const projectRoot = path.join(__dirname, '..');
-  const sourceRoot = process.env.ZHIYUAN_CC_CONNECT_SOURCE;
-  if (!sourceRoot || !existsSync(path.join(sourceRoot, 'cmd', 'zhiyuan-sidecar', 'main.go'))) {
-    throw new Error(
-      '[electron-builder-hooks] ZHIYUAN_CC_CONNECT_SOURCE must point to the fixed pi-connect release checkout containing cmd/zhiyuan-sidecar.',
-    );
-  }
   const platform = context?.electronPlatformName;
   const arch = resolveTargetArch(context);
-  const goArch = arch === 'x64' ? 'amd64' : arch;
-  const runtimeRoot = path.join(projectRoot, 'vendor', 'channel-runtime', 'current');
+  const runtimeBase = path.join(projectRoot, 'vendor', 'channel-runtime');
   const binaryName = platform === 'win32' ? 'cc-connect-sidecar.exe' : 'cc-connect-sidecar';
-  const binaryPath = path.join(runtimeRoot, binaryName);
-  const sourceRevision = spawnSync('git', ['rev-parse', 'HEAD'], {
-    cwd: sourceRoot,
-    encoding: 'utf8',
-  });
-  if (sourceRevision.status !== 0) {
-    throw new Error('[electron-builder-hooks] Cannot resolve fixed pi-connect source revision.');
-  }
-
-  rmSync(runtimeRoot, { recursive: true, force: true });
-  mkdirSync(runtimeRoot, { recursive: true });
-  const result = spawnSync(
-    'go',
-    ['build', '-trimpath', '-ldflags=-s -w', '-o', binaryPath, './cmd/zhiyuan-sidecar'],
-    {
-      cwd: sourceRoot,
-      env: {
-        ...process.env,
-        GOOS: platform === 'win32' ? 'windows' : platform,
-        GOARCH: goArch,
-        CGO_ENABLED: '0',
-      },
-      encoding: 'utf8',
-    },
-  );
-  if (result.status !== 0 || !existsSync(binaryPath)) {
+  const targetId = `${platform === 'win32' ? 'win' : platform === 'darwin' ? 'mac' : platform}-${arch}`;
+  const targetDirectory = path.join(runtimeBase, targetId);
+  const binaryPath = path.join(targetDirectory, binaryName);
+  const buildInfoPath = path.join(targetDirectory, 'runtime-build-info.json');
+  if (!existsSync(binaryPath) || !existsSync(buildInfoPath)) {
     throw new Error(
-      '[electron-builder-hooks] Failed to build cc-connect channel sidecar: ' +
-        (result.error?.message || result.stderr || result.stdout || `exit ${result.status}`),
+      '[electron-builder-hooks] Missing verified channel runtime. Run the matching channel:runtime:<target> script before packaging.',
     );
   }
-  writeFileSync(
-    path.join(runtimeRoot, 'runtime-build-info.json'),
-    `${JSON.stringify(
-      {
-        schemaVersion: 1,
-        sourceRepository: 'https://github.com/rongxinzy/pi-connect',
-        sourceRevision: sourceRevision.stdout.trim(),
-        target: `${platform}-${arch}`,
-        binary: binaryName,
-        sha256: sha256File(binaryPath),
-      },
-      null,
-      2,
-    )}\n`,
-    'utf8',
-  );
+  const packageJson = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+  const config = packageJson.channelRuntime;
+  const buildInfo = JSON.parse(readFileSync(buildInfoPath, 'utf8'));
+  const checksum = config?.runtimeChecksums?.[targetId];
+  const assetName = config?.runtimeAssets?.[targetId];
+  if (
+    buildInfo?.schemaVersion !== 1 ||
+    buildInfo?.repo !== config?.repo ||
+    buildInfo?.version !== config?.version ||
+    buildInfo?.sourceRevision !== config?.sourceRevision ||
+    buildInfo?.target !== targetId ||
+    buildInfo?.assetName !== assetName ||
+    buildInfo?.checksum !== checksum ||
+    sha256File(binaryPath) !== checksum
+  ) {
+    throw new Error(
+      '[electron-builder-hooks] Channel runtime does not match the pinned release metadata.',
+    );
+  }
+
+  const currentDirectory = path.join(runtimeBase, 'current');
+  const stagedCurrentDirectory = mkdtempSync(path.join(runtimeBase, '.current.packaging-'));
+  try {
+    rmSync(stagedCurrentDirectory, { recursive: true, force: true });
+    cpSync(targetDirectory, stagedCurrentDirectory, { recursive: true });
+    rmSync(currentDirectory, { recursive: true, force: true });
+    renameSync(stagedCurrentDirectory, currentDirectory);
+  } finally {
+    rmSync(stagedCurrentDirectory, { recursive: true, force: true });
+  }
 }
 
 function findPackagedBash(appOutDir) {
