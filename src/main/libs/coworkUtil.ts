@@ -1091,7 +1091,14 @@ function applyDomesticPackageMirrorDefaults(env: Record<string, string | undefin
   }
 }
 
-function applyPackagedEnvOverrides(
+/**
+ * Add application-managed command runtimes to a subprocess environment.
+ *
+ * This deliberately does not add provider credentials. Callers that need the
+ * app's Node/npm shim, managed Python, uv, and Windows Git Bash PATH handling
+ * can use it without exposing a session's API configuration globally.
+ */
+export function applyApplicationRuntimeEnv(
   env: Record<string, string | undefined>,
   options: EnhancedEnvOptions = {},
 ): void {
@@ -1554,7 +1561,7 @@ export async function getEnhancedEnv(
   const config = getCurrentApiConfig(target);
   const env = config ? buildEnvForConfig(config) : { ...process.env };
 
-  applyPackagedEnvOverrides(env, options);
+  applyApplicationRuntimeEnv(env, options);
 
   // Inject SKILLs directory path for skill scripts.
   // On Windows, normalise backslashes to forward slashes so the value is usable
