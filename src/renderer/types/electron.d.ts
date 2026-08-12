@@ -775,7 +775,7 @@ interface IElectronAPI {
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -791,7 +791,7 @@ interface IElectronAPI {
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-      fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
     }) => Promise<{
       success: boolean;
       session?: CoworkSession;
@@ -804,6 +804,10 @@ interface IElectronAPI {
     enqueuePendingMessage: (options: {
       sessionId: string;
       text: string;
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
+      fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
+      skillIds?: string[];
+      skillPrompt?: string;
     }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     updatePendingMessage: (options: {
       sessionId: string;
