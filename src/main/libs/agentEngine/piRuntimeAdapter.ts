@@ -76,7 +76,11 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
-import { getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
+import {
+  applyApplicationRuntimeEnv,
+  getSkillsRoot,
+  resolveGitBashPathForPi,
+} from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import {
@@ -460,6 +464,11 @@ const haveSameStringList = (left: string[] | undefined, right: string[] | undefi
 // tools won't emit escape sequences without this env var.
 if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
 
+// Pi's bash tool inherits the main-process environment. Initialize the
+// application-managed runtime once so later session creation cannot duplicate
+// PATH entries in process.env.
+let hasAppliedApplicationRuntimeEnv = false;
+
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
   private readonly pendingMessageQueue = new PiPendingMessageQueue();
@@ -598,6 +607,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
     try {
       const workspaceRoot = options.workspaceRoot || process.cwd();
+      // Pi's built-in bash tool snapshots process.env when it executes. Give
+      // that snapshot the same app-managed Node/npm, Python, uv, and Git Bash
+      // PATH configuration used by direct Skill execution.
+      if (!hasAppliedApplicationRuntimeEnv) {
+        applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
+        hasAppliedApplicationRuntimeEnv = true;
+      }
       const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
 
       // System prompt — user config only. Skills are discovered and appended
