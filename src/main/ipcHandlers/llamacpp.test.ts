@@ -5,7 +5,6 @@ import {
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
 } from '../../shared/llamacpp';
-import { ProviderName } from '../../shared/providers/constants';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import {
   enforceLlamaCppParallelTwo,
@@ -15,8 +14,6 @@ import {
   getTotalFreeVramMiB,
   hasRecoveredVram,
   sanitizeLlamaCppServiceConfig,
-  shouldSyncOpenClawAfterRunningModelRefresh,
-  shouldSyncOpenClawForRunningModelRefresh,
   waitForLlamaCppModelUnloadConfirmation,
   registerLlamaCppIpcHandlers,
 } from './llamacpp';
@@ -339,56 +336,6 @@ test('getLlamaCppLoadedModelLimitViolation allows reloading an already running m
   ).toBeNull();
 });
 
-test('shouldSyncOpenClawAfterRunningModelRefresh syncs when running llama.cpp model bindings change', () => {
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-loaded')).toBe(true);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-unloaded')).toBe(true);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-running')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-status-not-running')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-deleted')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-visibility-refresh')).toBe(
-    true,
-  );
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-launched')).toBe(true);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-set-openclaw-model')).toBe(false);
-  expect(shouldSyncOpenClawAfterRunningModelRefresh('llamacpp-model-stopped')).toBe(true);
-});
-
-test('shouldSyncOpenClawForRunningModelRefresh requires the llama.cpp provider to be enabled', () => {
-  expect(
-    shouldSyncOpenClawForRunningModelRefresh({
-      reason: 'llamacpp-model-loaded',
-      runningModelsChanged: true,
-      appConfigChanged: false,
-      appConfig: {
-        providers: {
-          [ProviderName.LlamaCpp]: {
-            enabled: false,
-            userEnabled: false,
-            models: [],
-          },
-        },
-      },
-    }),
-  ).toBe(false);
-
-  expect(
-    shouldSyncOpenClawForRunningModelRefresh({
-      reason: 'llamacpp-model-loaded',
-      runningModelsChanged: true,
-      appConfigChanged: false,
-      appConfig: {
-        providers: {
-          [ProviderName.LlamaCpp]: {
-            enabled: true,
-            userEnabled: true,
-            models: [],
-          },
-        },
-      },
-    }),
-  ).toBe(true);
-});
-
 test('does not refresh model capabilities for manager status events', async () => {
   let statusListener: ((status: unknown) => void) | undefined;
   const listRunningModels = vi.fn(async () => []);
@@ -408,7 +355,6 @@ test('does not refresh model capabilities for manager status events', async () =
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
-    syncOpenClawConfig: vi.fn(async () => ({ success: true })),
   });
 
   expect(statusListener).toBeDefined();
@@ -446,7 +392,6 @@ test('waits for runtime install cleanup before confirming cancellation', async (
 
   registerLlamaCppIpcHandlers(manager, {
     getStore: () => store as never,
-    syncOpenClawConfig: vi.fn(async () => ({ success: true })),
   });
 
   const installHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Install);

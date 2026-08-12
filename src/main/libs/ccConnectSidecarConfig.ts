@@ -9,8 +9,9 @@ type TomlValue = string | number | boolean | readonly string[];
 export type CcConnectSidecarProject = {
   /** Stable ZhiYuan ChannelAccount id. It is never a user-visible cc-connect project. */
   accountId: string;
-  platform: string;
-  options: Readonly<Record<string, TomlValue>>;
+  /** Scheduler projects intentionally have no platform transport. */
+  platform?: string;
+  options?: Readonly<Record<string, TomlValue>>;
 };
 
 export type CcConnectSidecarConfig = {
@@ -20,11 +21,6 @@ export type CcConnectSidecarConfig = {
   /** The control plane stays local and is authenticated with bridgeToken. */
   cronControlListen: string;
   projects: readonly CcConnectSidecarProject[];
-};
-
-export type CcConnectCronSidecarConfig = Omit<CcConnectSidecarConfig, 'projects'> & {
-  /** Stable internal account id used to authorize scheduler triggers. */
-  accountId: string;
 };
 
 /**
@@ -37,12 +33,7 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
   assertLoopbackUrl(config.bridgeUrl);
   assertNonEmpty('bridgeToken', config.bridgeToken);
   assertLoopbackListen(config.cronControlListen);
-  // Each process owns exactly one authenticated channel account and one cron
-  // control port. A multi-project config would make those projects compete for
-  // the same listener inside the sidecar.
-  if (config.projects.length !== 1) {
-    throw new Error('cc-connect sidecar config must contain exactly one project');
-  }
+  if (config.projects.length === 0) throw new Error('cc-connect sidecar config requires a project');
 
   const seenAccounts = new Set<string>();
   const lines = [
@@ -55,7 +46,7 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
 
   for (const project of config.projects) {
     assertNonEmpty('accountId', project.accountId);
-    if (!SUPPORTED_PLATFORMS.has(project.platform)) {
+    if (project.platform && !SUPPORTED_PLATFORMS.has(project.platform)) {
       throw new Error(`Unsupported cc-connect platform: ${project.platform}`);
     }
     if (seenAccounts.has(project.accountId)) {
@@ -73,49 +64,22 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
       `bridge_url = ${tomlString(config.bridgeUrl)}`,
       `bridge_token = ${tomlString(config.bridgeToken)}`,
       `cron_control_listen = ${tomlString(config.cronControlListen)}`,
-      '[[projects.platforms]]',
-      `type = ${tomlString(project.platform)}`,
     );
-    const entries = Object.entries(project.options).sort(([left], [right]) => left.localeCompare(right));
-    if (entries.length > 0) lines.push('[projects.platforms.options]');
-    for (const [key, value] of entries) {
-      if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
-        throw new Error(`Unsafe cc-connect option key: ${key}`);
+    if (project.platform) {
+      lines.push('[[projects.platforms]]', `type = ${tomlString(project.platform)}`);
+      const entries = Object.entries(project.options ?? {}).sort(([left], [right]) => left.localeCompare(right));
+      if (entries.length > 0) lines.push('[projects.platforms.options]');
+      for (const [key, value] of entries) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+          throw new Error(`Unsafe cc-connect option key: ${key}`);
+        }
+        lines.push(`${key} = ${tomlValue(value)}`);
       }
-      lines.push(`${key} = ${tomlValue(value)}`);
     }
     lines.push('');
   }
 
   return `${lines.join('\n')}\n`;
-}
-
-/**
- * A credential-free sidecar used only as the canonical scheduler clock.  It
- * has no channel platform blocks, hence cannot receive or send user messages.
- */
-export function serializeCcConnectCronSidecarConfig(config: CcConnectCronSidecarConfig): string {
-  assertNonEmpty('accountId', config.accountId);
-  assertNonEmpty('dataDir', config.dataDir);
-  assertLoopbackUrl(config.bridgeUrl);
-  assertNonEmpty('bridgeToken', config.bridgeToken);
-  assertLoopbackListen(config.cronControlListen);
-  return [
-    `data_dir = ${tomlString(config.dataDir)}`,
-    '',
-    '[webhook]', 'enabled = false', '',
-    '[bridge]', 'enabled = false', '',
-    '[management]', 'enabled = false', '',
-    '[[projects]]',
-    `name = ${tomlString(config.accountId)}`,
-    '[projects.agent]',
-    'type = "zhiyuan-bridge"',
-    '[projects.agent.options]',
-    `bridge_url = ${tomlString(config.bridgeUrl)}`,
-    `bridge_token = ${tomlString(config.bridgeToken)}`,
-    `cron_control_listen = ${tomlString(config.cronControlListen)}`,
-    '',
-  ].join('\n');
 }
 
 function assertNonEmpty(name: string, value: string): void {

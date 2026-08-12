@@ -264,6 +264,11 @@ export const CoworkSessionRenameSchema = {
   output: IpcResult({}),
 };
 
+export const CoworkSessionUpdateModelSchema = {
+  input: z.object({ sessionId: z.string().min(1), modelOverride: z.string() }),
+  output: IpcResult({ session: z.object({}).passthrough().nullable().optional() }),
+};
+
 export const CoworkSessionGetSchema = {
   input: z.string().min(1),
   output: IpcResult({ session: z.object({}).passthrough() }),
@@ -359,7 +364,6 @@ export const CoworkConfigSetSchema = {
   input: z.object({
     workingDirectory: z.string().optional(),
     executionMode: z.enum(['auto', 'local', 'sandbox']).optional(),
-    agentEngine: z.enum(['openclaw', 'pi']).optional(),
     memoryEnabled: z.boolean().optional(),
     memoryImplicitUpdateEnabled: z.boolean().optional(),
     memoryLlmJudgeEnabled: z.boolean().optional(),
@@ -801,41 +805,7 @@ export const CoworkSessionsChangedSchema = {
   output: z.object({ sessionId: z.string().optional() }),
 };
 
-// ─── OpenClaw Engine ────────────────────────────────────────────────────────
-
-export const OpenClawEngineStatusSchema = {
-  output: z.object({}).passthrough(),
-};
-
-// ─── OpenClaw Session Policy ────────────────────────────────────────────────
-
-export const OpenClawSessionPolicyGetSchema = {
-  output: IpcResult({
-    config: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }).passthrough(),
-  }),
-};
-
-export const OpenClawSessionPolicySetSchema = {
-  input: z.object({ keepAlive: z.enum(['1d', '7d', '30d', '365d']) }),
-  output: IpcResult({ config: z.object({}).passthrough().optional() }),
-};
-
-// ─── OpenClaw Session Patch ─────────────────────────────────────────────────
-
-export const OpenClawSessionPatchSchema = {
-  input: z.object({
-    sessionId: z.string().min(1),
-    patch: z.object({
-      model: z.string().nullable().optional(),
-      thinkingLevel: z.string().nullable().optional(),
-      reasoningLevel: z.string().nullable().optional(),
-      elevatedLevel: z.string().nullable().optional(),
-      responseUsage: z.enum(['off', 'tokens', 'full']).nullable().optional(),
-      sendPolicy: z.enum(['allow', 'deny']).nullable().optional(),
-    }),
-  }),
-  output: IpcResult({ session: z.object({}).passthrough() }),
-};
+// ─── Agent Engine ──────────────────────────────────────────────────────────
 
 // ─── App Config ─────────────────────────────────────────────────────────────
 

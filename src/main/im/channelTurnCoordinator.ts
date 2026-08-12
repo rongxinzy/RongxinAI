@@ -19,7 +19,11 @@ export class ChannelTurnCoordinator {
     this.store.recoverInterrupted();
   }
 
-  run(event: ChannelInboxEvent, execute: () => Promise<string>): Promise<string> {
+  run(
+    event: ChannelInboxEvent,
+    execute: () => Promise<string>,
+    signal?: AbortSignal,
+  ): Promise<string> {
     const eventKey = JSON.stringify([event.platform, event.accountId, event.messageId]);
     const existing = this.activeEvents.get(eventKey);
     if (existing) return existing;
@@ -29,7 +33,12 @@ export class ChannelTurnCoordinator {
     const conversationKey = JSON.stringify([event.platform, event.accountId, event.conversationId]);
     const previous = this.conversationTails.get(conversationKey) ?? Promise.resolve();
     const operation = previous.catch((): undefined => undefined).then(async (): Promise<string> => {
+      if (signal?.aborted) throw new Error('Channel turn was cancelled before execution');
       await this.acquire();
+      if (signal?.aborted) {
+        this.release();
+        throw new Error('Channel turn was cancelled before execution');
+      }
       this.store.markProcessing(event);
       try {
         const result = await execute();

@@ -70,7 +70,6 @@ const initialState: CoworkState = {
     workingDirectory: '',
     systemPrompt: '',
     executionMode: 'local',
-    agentEngine: 'openclaw',
     memoryEnabled: true,
     memoryImplicitUpdateEnabled: true,
     memoryLlmJudgeEnabled: false,
@@ -86,9 +85,6 @@ const initialState: CoworkState = {
     embeddingVectorWeight: 0.7,
     embeddingRemoteBaseUrl: '',
     embeddingRemoteApiKey: '',
-    openClawSessionPolicy: {
-      keepAlive: '30d',
-    },
   },
 };
 

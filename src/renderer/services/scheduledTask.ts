@@ -249,7 +249,9 @@ export class ScheduledTaskService {
     };
 
     try {
-      const result = await api.runManually(id);
+      const execution = api.runManually(id);
+      await this.loadTasks({ revalidate: true });
+      const result = await execution;
       if (!result?.success) {
         rollbackOptimisticState();
         store.dispatch(setError(result?.error || i18nService.t('scheduledTasksRunFailed')));
@@ -259,6 +261,12 @@ export class ScheduledTaskService {
       rollbackOptimisticState();
       store.dispatch(setError(err instanceof Error ? err.message : String(err)));
       showToast(i18nService.t('scheduledTasksRunFailed'));
+    } finally {
+      await Promise.all([
+        this.loadTasks({ revalidate: true }),
+        this.loadRuns(id),
+        this.loadAllRuns(),
+      ]);
     }
   }
 

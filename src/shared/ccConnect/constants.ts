@@ -22,4 +22,12 @@ export type CcConnectHealth = {
   pid: number;
   parentPid: number;
   capabilities: string[];
+  platforms: CcConnectPlatformStatus[];
+};
+
+export type CcConnectPlatformStatus = {
+  accountId: string;
+  platform: string;
+  state: 'starting' | 'ready' | 'unavailable';
+  lastError?: string;
 };

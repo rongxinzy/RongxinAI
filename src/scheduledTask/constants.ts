@@ -81,7 +81,6 @@ export const TaskStatus = {
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
 // ─── Default Agent ID ───────────────────────────────────────────────────────
-export const DefaultAgentId = 'main' as const;
 
 // ─── Policy Run-Behavior Descriptions ───────────────────────────────────────
 export const RunBehavior = {
