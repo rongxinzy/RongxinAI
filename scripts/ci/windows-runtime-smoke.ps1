@@ -102,8 +102,7 @@ try {
     $bash = Join-Path $resourcesRoot 'mingit\bin\bash.exe'
   }
   $python = Join-Path $resourcesRoot 'python-win\python.exe'
-  $skillPython = Join-Path $resourcesRoot 'skill-python\xlsx\Scripts\python.exe'
-  $pdfPython = Join-Path $resourcesRoot 'skill-python\pdf\Scripts\python.exe'
+  $skillPython = Join-Path $resourcesRoot 'skill-python\layers\shared\Scripts\python.exe'
   $builderConfigPath = Join-Path $ProjectRoot 'electron-builder.json'
   Assert-Path $builderConfigPath 'electron-builder configuration'
   $builderConfig = Get-Content -LiteralPath $builderConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -122,8 +121,7 @@ try {
 
   Assert-Path $bash 'bundled PortableGit Bash'
   Assert-Path $python 'bundled application Python'
-  Assert-Path $skillPython 'bundled XLSX Skill Python'
-  Assert-Path $pdfPython 'bundled PDF Skill Python'
+  Assert-Path $skillPython 'bundled shared Skill Python'
   Assert-Path $electron 'packaged Electron Node runtime'
   Assert-Path $docxValidator 'DOCX smoke validator'
   Assert-Path (Join-Path $resourcesRoot 'uv-win\uv.exe') 'bundled uv'
@@ -145,7 +143,7 @@ try {
   # Windows PowerShell 5.1 strips nested quotes from native process arguments.
   # Keep these probes quote-free so the Python code is identical on clean CI hosts.
   Invoke-Checked $skillPython @('-c', 'import pandas, openpyxl; print(1)') 'bundled XLSX dependency probe'
-  Invoke-Checked $pdfPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
+  Invoke-Checked $skillPython @('-c', 'import reportlab, pypdfium2, PIL; print(1)') 'bundled PDF dependency probe'
   Invoke-Checked $bash @('-lc', 'printf "portable-git-bash-ok\n"') 'bundled Bash probe'
   $markdown = Join-Path $smokeRoot 'smoke.md'
   $docx = Join-Path $smokeRoot 'smoke.docx'
