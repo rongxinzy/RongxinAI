@@ -31,8 +31,10 @@ import {
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
 import {
+  isProviderEnabled,
   ModelCapabilityStatus,
   parseLlamaCppRuntimeCapabilities,
+  ProviderName,
   type ModelCapabilities,
 } from '../../shared/providers';
 import { t } from '../i18n';
@@ -58,10 +60,10 @@ import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
 import {
   buildLlamaCppRunningModelBinding,
-  type LlamaCppAgentAppConfig,
+  type LlamaCppOpenClawAppConfig,
   removeLlamaCppModelFromAppConfig,
   upsertLlamaCppProviderInAppConfig,
-} from '../libs/llamacppAgentBinding';
+} from '../libs/llamacppOpenClawBinding';
 import {
   ensureLlamaCppServiceRunning,
   getLlamaCppServiceStartupFailureI18nKey,
@@ -97,6 +99,34 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   threadsBatch: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsBatch ?? '-1',
   mainGpu: DEFAULT_LLAMACPP_SERVICE_CONFIG.mainGpu ?? '0',
 } as const;
+
+export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
+  return (
+    reason === 'llamacpp-model-loaded' ||
+    reason === 'llamacpp-model-unloaded' ||
+    reason === 'llamacpp-model-launched' ||
+    reason === 'llamacpp-model-stopped' ||
+    reason === 'llamacpp-model-visibility-refresh'
+  );
+}
+
+export function shouldSyncOpenClawForRunningModelRefresh(input: {
+  reason: string;
+  runningModelsChanged: boolean;
+  appConfigChanged: boolean;
+  appConfig: LlamaCppOpenClawAppConfig;
+}): boolean {
+  const llamaCppEnabled = isProviderEnabled(
+    ProviderName.LlamaCpp,
+    input.appConfig.providers?.[ProviderName.LlamaCpp],
+  );
+
+  return (
+    llamaCppEnabled &&
+    (input.runningModelsChanged || input.appConfigChanged) &&
+    shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
+  );
+}
 
 export function getLlamaCppLoadedModelLimitViolation(input: {
   modelsMax: string | undefined;
@@ -219,10 +249,16 @@ export function registerLlamaCppIpcHandlers(
   manager: LlamaCppManager,
   options: {
     getStore: () => SqliteStore;
+    syncOpenClawConfig: (options: {
+      reason: string;
+      restartGatewayIfRunning?: boolean;
+      forceGatewayRestartIfRunning?: boolean;
+    }) => Promise<{ success: boolean; error?: string }>;
   },
 ): void {
   const updateRunningModelBindings = async (
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
+    reason: string,
   ): Promise<void> => {
     const store = options.getStore();
     const modelPreferences = getLlamaCppModelPreferences(store);
@@ -252,24 +288,40 @@ export function registerLlamaCppIpcHandlers(
         }),
       )
     ).filter((model): model is NonNullable<typeof model> => Boolean(model));
-    updateLlamaCppRunningModels(bindingModels);
-    const current = store.get<LlamaCppAgentAppConfig>('app_config') ?? {};
+    const runningModelsChanged = updateLlamaCppRunningModels(bindingModels);
+    const current = store.get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
     const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
     if (appConfigUpdate.changed) {
       store.set('app_config', appConfigUpdate.config);
     }
+    if (
+      shouldSyncOpenClawForRunningModelRefresh({
+        reason,
+        runningModelsChanged,
+        appConfigChanged: appConfigUpdate.changed,
+        appConfig: appConfigUpdate.config,
+      })
+    ) {
+      await options.syncOpenClawConfig({
+        reason,
+        restartGatewayIfRunning: true,
+        forceGatewayRestartIfRunning: true,
+      });
+    }
   };
 
-  const refreshRunningModelBindings = async (): Promise<void> => {
+  const refreshRunningModelBindings = async (
+    reason = 'llamacpp-model-visibility-refresh',
+  ): Promise<void> => {
     if (bindingRefreshSuppressed) return;
     const refreshGeneration = bindingRefreshGeneration;
     try {
       const runningModels = await manager.listRunningModels();
       if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
-      await updateRunningModelBindings(runningModels);
+      await updateRunningModelBindings(runningModels, reason);
     } catch {
       if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
-      await updateRunningModelBindings([]);
+      await updateRunningModelBindings([], reason);
     }
   };
 
@@ -330,9 +382,15 @@ export function registerLlamaCppIpcHandlers(
     runRuntimeInstall(signal => manager.installRuntime({ signal })),
   );
   ipcMain.handle(LlamaCppIpcChannel.CancelRuntimeInstall, async () => {
-    const cancelled = Boolean(runtimeInstallController && !runtimeInstallController.signal.aborted);
-    runtimeInstallController?.abort();
-    return { success: true as const, cancelled };
+    const controller = runtimeInstallController;
+    const install = activeRuntimeInstall;
+    if (!controller || controller.signal.aborted || !install) {
+      return { success: true as const, cancelled: false };
+    }
+
+    controller.abort();
+    const result = await install.catch((): RuntimeInstallResult | undefined => undefined);
+    return { success: true as const, cancelled: Boolean(result?.cancelled) };
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
@@ -405,7 +463,7 @@ export function registerLlamaCppIpcHandlers(
           start: () => manager.start(),
           applyConfig: () => undefined,
           clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: () => refreshRunningModelBindings(),
+          refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
           setBindingRefreshSuppressed: suppressed => {
             bindingRefreshSuppressed = suppressed;
             if (suppressed) bindingRefreshGeneration += 1;
@@ -453,7 +511,7 @@ export function registerLlamaCppIpcHandlers(
             store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
           },
           clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: () => refreshRunningModelBindings(),
+          refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
           setBindingRefreshSuppressed: suppressed => {
             bindingRefreshSuppressed = suppressed;
             if (suppressed) bindingRefreshGeneration += 1;
@@ -492,7 +550,7 @@ export function registerLlamaCppIpcHandlers(
         modelPreferences;
       store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
     }
-    const current = store.get<LlamaCppAgentAppConfig>('app_config');
+    const current = store.get<LlamaCppOpenClawAppConfig>('app_config');
     if (!current) return result;
 
     const next = removeLlamaCppModelFromAppConfig(current, result.removedModelName);
@@ -655,7 +713,7 @@ export function registerLlamaCppIpcHandlers(
                 await (await manager.client()).unloadModel(unloadModelName);
               },
             });
-            await refreshRunningModelBindings();
+            await refreshRunningModelBindings('llamacpp-model-loaded');
             launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
               runningModelCount: result.runningModels.length,
             });
@@ -692,7 +750,10 @@ export function registerLlamaCppIpcHandlers(
       modelName,
       listRunningModels: () => manager.listRunningModels(),
     });
-    await updateRunningModelBindings(confirmation.runningModels);
+    await updateRunningModelBindings(
+      confirmation.runningModels,
+      confirmation.confirmed ? 'llamacpp-model-unloaded' : 'llamacpp-model-visibility-refresh',
+    );
     for (const clearedModelName of getLlamaCppModelLogClearNames(modelName, unloadingModel)) {
       clearModelLaunchLog(clearedModelName);
     }
