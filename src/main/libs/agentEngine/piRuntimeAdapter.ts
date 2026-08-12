@@ -1539,6 +1539,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   enqueuePendingMessage(
     sessionId: string,
     text: string,
+    imageAttachments?: PiContinueOptions['imageAttachments'],
+    fileAttachments?: PiContinueOptions['fileAttachments'],
+    skillIds?: string[],
+    skillPrompt?: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
     const active = this.activeSessions.get(sessionId);
     if (!this.isWorkSession(sessionId, active)) {
@@ -1553,6 +1557,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionId,
       normalizedText,
       CoworkQueueDelivery.FollowUp,
+      imageAttachments,
+      fileAttachments,
+      skillIds,
+      skillPrompt,
     );
     this.emitQueueUpdated(sessionId);
     return { success: true, item };
@@ -1602,8 +1610,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
     try {
-      await active.piSession.steer(item.text);
-      this.persistQueuedUserMessage(sessionId, item.text, CoworkQueueDelivery.Steer);
+      await sendPiPrompt(
+        active.piSession,
+        item.skillPrompt ? `${item.skillPrompt}\n\n${item.text}` : item.text,
+        item.imageAttachments,
+        active.capabilities,
+        'steer',
+      );
+      this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
       this.pendingMessageQueue.finishDelivery(item.id);
       return { success: true, item };
@@ -1635,6 +1649,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionMode: CoworkSessionMode.Work,
         _queueDelivery: CoworkQueueDelivery.FollowUp,
         _streamingBehavior: 'followUp',
+        imageAttachments: item.imageAttachments,
+        fileAttachments: item.fileAttachments,
+        skillIds: item.skillIds,
       });
       this.pendingMessageQueue.finishDelivery(item.id);
       return { success: true, item };
@@ -1653,15 +1670,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   private persistQueuedUserMessage(
     sessionId: string,
-    text: string,
+    item: CoworkPendingMessage,
     delivery: CoworkQueueDelivery,
   ): CoworkMessage {
     const message: CoworkMessage = {
       id: randomUUID(),
       type: 'user',
-      content: text,
+      content: item.text,
       timestamp: Date.now(),
-      metadata: { queueDelivery: delivery },
+      metadata: {
+        queueDelivery: delivery,
+        ...(item.skillIds?.length ? { skillIds: item.skillIds } : {}),
+        ...(item.imageAttachments?.length ? { imageAttachments: item.imageAttachments } : {}),
+        ...(item.fileAttachments?.length ? { fileAttachments: item.fileAttachments } : {}),
+      },
     };
     const persisted = this.store ? this.store.addMessage(sessionId, message) : message;
     this.emit('message', sessionId, persisted);
@@ -1689,6 +1711,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           sessionMode: CoworkSessionMode.Work,
           _queueDelivery: CoworkQueueDelivery.FollowUp,
           _streamingBehavior: 'followUp',
+          imageAttachments: next.imageAttachments,
+          fileAttachments: next.fileAttachments,
+          skillIds: next.skillIds,
         });
         this.pendingMessageQueue.finishDelivery(next.id);
       } catch (error) {

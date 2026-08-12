@@ -580,6 +580,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             isImage: attachment.isImage,
             hasDataUrl: !!attachment.dataUrl,
           });
+          const dotIndex = attachment.name.lastIndexOf('.');
+          fileAtts.push({
+            name: attachment.name,
+            path: attachment.path,
+            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
+            isImage: true,
+          });
         } else {
           const dotIndex = attachment.name.lastIndexOf('.');
           fileAtts.push({
@@ -886,7 +893,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   '[CoworkPromptInput] handleIncomingFiles: native image fallback to path-only (no dataUrl)',
                   { nativePath },
                 );
-                addAttachment(nativePath);
+                addAttachment(nativePath, { isImage: true });
               } else {
                 // No native path (clipboard/drag from browser):
                 // 1. Read as dataUrl for preview + base64 vision
@@ -941,13 +948,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
           // Non-image file or model doesn't support images: use original flow
           if (nativePath) {
-            addAttachment(nativePath);
+            addAttachment(nativePath, fileIsImage ? { isImage: true } : undefined);
             continue;
           }
 
           const stagedPath = await saveInlineFile(file);
           if (stagedPath) {
-            addAttachment(stagedPath);
+            addAttachment(stagedPath, fileIsImage ? { isImage: true } : undefined);
           }
         }
         if (hasImageWithoutVision) {
@@ -1007,7 +1014,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               hasImageWithoutVision = true;
             }
           }
-          addAttachment(filePath);
+          addAttachment(filePath, isImagePath(filePath) ? { isImage: true } : undefined);
         }
         if (hasImageWithoutVision) {
           setImageVisionHint(true);
