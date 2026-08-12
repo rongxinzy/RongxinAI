@@ -51,6 +51,44 @@ test('generic work falls back to explicit acceptance', () => {
   expect(result.outcome).toBe(WorkbenchVerificationOutcome.AcceptanceRequired);
 });
 
+test('generic work without user acceptance passes on baseline checks alone', () => {
+  const result = verifyWorkbenchRun({
+    contract: {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: false,
+    },
+    finalAnswer: '2',
+    streamClosedCleanly: true,
+  });
+  expect(result.outcome).toBe(WorkbenchVerificationOutcome.Passed);
+  expect(result.checks.some(check => check.name === 'deterministic_contract')).toBe(true);
+
+  // Baseline failures still block the run.
+  const failed = verifyWorkbenchRun({
+    contract: {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: false,
+    },
+    finalAnswer: '',
+    streamClosedCleanly: true,
+  });
+  expect(failed.outcome).toBe(WorkbenchVerificationOutcome.Failed);
+});
+
+test('a skipped production workflow passes without manual acceptance', () => {
+  const result = verifyWorkbenchRun({
+    contract: {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    },
+    finalAnswer: '2',
+    streamClosedCleanly: true,
+    workflowSnapshot: { skipped: true, phase: 'plan' },
+  });
+  expect(result.outcome).toBe(WorkbenchVerificationOutcome.Passed);
+  expect(result.checks.some(check => check.name === 'workflow_skipped')).toBe(true);
+});
+
 test('generic work cannot use acceptance to override baseline failures', () => {
   const contract = {
     kind: WorkbenchContractKind.GenericWork,
