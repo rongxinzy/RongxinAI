@@ -644,7 +644,10 @@ const sanitizeCoworkMessageForIpc = (message: unknown): unknown => {
   // and must not be truncated by the generic sanitizer).
   let sanitizedMetadata: unknown;
   if (messageRecord.metadata && typeof messageRecord.metadata === 'object') {
-    const { imageAttachments, fileAttachments, ...rest } = messageRecord.metadata as Record<string, unknown>;
+    const { imageAttachments, fileAttachments, ...rest } = messageRecord.metadata as Record<
+      string,
+      unknown
+    >;
     const sanitizedRest = sanitizeIpcPayload(rest) as Record<string, unknown> | undefined;
     sanitizedMetadata = {
       ...(sanitizedRest && typeof sanitizedRest === 'object' ? sanitizedRest : {}),
@@ -2251,6 +2254,7 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
         return [];
       }
       console.log(`[McpInit] MCP servers started: ${tools.length} tools discovered`);
+      syncPiMcpToolManifest();
       return tools;
     } catch (err) {
       console.error('[McpInit] Failed to start MCP servers:', err);
@@ -2261,6 +2265,20 @@ const initMcpServers = async (): Promise<McpToolManifestEntry[]> => {
   });
 
   return mcpInitPromise;
+};
+
+/**
+ * Pi sessions capture their custom-tool topology at creation time. Keep an
+ * already-created Pi runtime synchronized after both startup discovery and
+ * later connector refreshes without instantiating Pi just for MCP bootstrap.
+ */
+const syncPiMcpToolManifest = (): void => {
+  if (!piRuntimeAdapter || !mcpServerManager) return;
+  if (!piRuntimeAdapter.hasMcpServerManager()) {
+    piRuntimeAdapter.setMcpServerManager(mcpServerManager);
+    return;
+  }
+  piRuntimeAdapter.refreshMcpTools();
 };
 
 /**
@@ -2424,6 +2442,12 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
       }
       const toolCount = bridgeConfig?.tools.length ?? 0;
       console.log(`[McpBridge] refresh: ${toolCount} tools discovered`);
+
+      // Pi's custom tool topology is captured when a session is created.
+      // Mark live sessions stale after discovery so their next user turn is
+      // rebuilt with the freshly discovered MCP proxy instead of relying on
+      // whichever servers happened to be ready during app startup.
+      syncPiMcpToolManifest();
 
       // 3. Sync openclaw.json before reporting completion. The gateway pins
       // its MCP tool snapshot at startup, so returning before this write lets
@@ -4364,7 +4388,12 @@ if (!gotTheLock) {
         expertIds?: string[];
         permissionMode?: CoworkPermissionMode;
         imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-        fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
+        fileAttachments?: Array<{
+          name: string;
+          path: string;
+          extension: string;
+          isImage?: boolean;
+        }>;
       },
     ) => {
       try {
