@@ -14,8 +14,8 @@ import { i18nService } from '../../services/i18n';
 import type {
   DiscordInstanceConfig,
   DiscordInstanceStatus,
-  DiscordOpenClawConfig,
-  DiscordOpenClawGuildConfig,
+  DiscordChannelConfig,
+  DiscordChannelGuildConfig,
   IMConnectivityTestResult,
 } from '../../types/im';
 import {
@@ -31,8 +31,8 @@ import {
 interface DiscordInstanceSettingsProps {
   instance: DiscordInstanceConfig;
   instanceStatus: DiscordInstanceStatus | undefined;
-  onConfigChange: (update: Partial<DiscordOpenClawConfig>) => void;
-  onSave: (override?: Partial<DiscordOpenClawConfig>) => Promise<void>;
+  onConfigChange: (update: Partial<DiscordChannelConfig>) => void;
+  onSave: (override?: Partial<DiscordChannelConfig>) => Promise<void>;
   onRename: (newName: string) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
@@ -80,7 +80,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
 
   const handleGuildConfigChange = (
     guildId: string,
-    update: Partial<DiscordOpenClawGuildConfig>,
+    update: Partial<DiscordChannelGuildConfig>,
   ) => {
     const currentGuild = instance.guilds[guildId] ?? {};
     const newGuilds = { ...instance.guilds, [guildId]: { ...currentGuild, ...update } };
@@ -239,7 +239,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { dmPolicy: value as DiscordOpenClawConfig['dmPolicy'] };
+              const update = { dmPolicy: value as DiscordChannelConfig['dmPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -326,7 +326,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { groupPolicy: value as DiscordOpenClawConfig['groupPolicy'] };
+              const update = { groupPolicy: value as DiscordChannelConfig['groupPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -510,7 +510,7 @@ const DiscordInstanceSettings: React.FC<DiscordInstanceSettingsProps> = ({
               { value: 'progress', label: i18nService.t('imStreamingProgress') },
             ]}
             onValueChange={value => {
-              const update = { streaming: value as DiscordOpenClawConfig['streaming'] };
+              const update = { streaming: value as DiscordChannelConfig['streaming'] };
               onConfigChange(update);
               void onSave(update);
             }}

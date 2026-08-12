@@ -328,7 +328,6 @@ function shouldAutoDeleteMemoryText(text: string): boolean {
 export type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error';
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system';
 export type CoworkExecutionMode = 'auto' | 'local' | 'sandbox';
-export type CoworkAgentEngine = 'openclaw' | 'pi';
 
 export type AgentSource = 'custom' | 'preset' | 'expert-package' | 'expert-package-member';
 
@@ -520,7 +519,6 @@ export interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: CoworkExecutionMode;
-  agentEngine: CoworkAgentEngine;
   memoryEnabled: boolean;
   memoryImplicitUpdateEnabled: boolean;
   memoryLlmJudgeEnabled: boolean;
@@ -543,7 +541,6 @@ export type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
-    | 'agentEngine'
     | 'memoryEnabled'
     | 'memoryImplicitUpdateEnabled'
     | 'memoryLlmJudgeEnabled'
@@ -1644,7 +1641,6 @@ export class CoworkStore {
     const configKeys = [
       'workingDirectory',
       'executionMode',
-      'agentEngine',
       'memoryEnabled',
       'memoryImplicitUpdateEnabled',
       'memoryLlmJudgeEnabled',
@@ -1671,7 +1667,6 @@ export class CoworkStore {
       workingDirectory: cfg.get('workingDirectory') || getDefaultWorkingDirectory(),
       systemPrompt: getDefaultSystemPrompt(),
       executionMode: 'local' as CoworkExecutionMode,
-      agentEngine: (cfg.get('agentEngine') as CoworkAgentEngine | undefined) || 'openclaw',
       memoryEnabled: parseBooleanConfig(cfg.get('memoryEnabled'), DEFAULT_MEMORY_ENABLED),
       memoryImplicitUpdateEnabled: parseBooleanConfig(
         cfg.get('memoryImplicitUpdateEnabled'),
@@ -1721,9 +1716,6 @@ export class CoworkStore {
     }
     if (config.executionMode !== undefined) {
       this.upsertConfig('executionMode', config.executionMode, now);
-    }
-    if (config.agentEngine !== undefined) {
-      this.upsertConfig('agentEngine', config.agentEngine, now);
     }
     if (config.memoryEnabled !== undefined) {
       this.upsertConfig('memoryEnabled', config.memoryEnabled ? '1' : '0', now);

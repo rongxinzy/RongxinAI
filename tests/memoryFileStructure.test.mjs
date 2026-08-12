@@ -28,7 +28,7 @@ Module._load = function patchedModuleLoad(request, parent, isMain) {
 const {
   parseMemoryMd,
   serializeMemoryMd,
-} = require('../dist-electron/main/libs/openclawMemoryFile.js');
+} = require('../dist-electron/main/libs/agentMemoryFile.js');
 
 // ---------------------------------------------------------------------------
 // #753: Single-character entries should be parsed

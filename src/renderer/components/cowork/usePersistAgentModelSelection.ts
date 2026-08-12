@@ -5,7 +5,7 @@ import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { Model } from '../../store/slices/modelSlice';
 import { setDefaultSelectedModel, setSelectedModel } from '../../store/slices/modelSlice';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 
 export function usePersistAgentModelSelection({
   agentId,
@@ -26,7 +26,7 @@ export function usePersistAgentModelSelection({
 
       try {
         const updatedAgent = await agentService.updateAgent(agentId, {
-          model: toOpenClawModelRef(model),
+          model: toAgentModelRef(model),
         });
         if (requestId !== requestIdRef.current) {
           return false;

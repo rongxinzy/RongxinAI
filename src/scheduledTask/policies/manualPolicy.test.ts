@@ -120,7 +120,7 @@ test('ManualPolicy.toWireBinding: ui_session with sessionId -> main + managed ke
   const policy = new ManualTaskPolicy();
   const result = policy.toWireBinding({ kind: BindingKind.UISession, sessionId: 'sess-x' });
   expect(result.sessionTarget).toBe(SessionTarget.Main);
-  expect(result.sessionKey).toBe('agent:main:zhiyuan:sess-x');
+  expect(result.sessionKey).toBe('zhiyuan:sess-x');
 });
 
 test('ManualPolicy.toWireBinding: im_session with sessionId -> main + managed key', () => {
@@ -132,7 +132,7 @@ test('ManualPolicy.toWireBinding: im_session with sessionId -> main + managed ke
     sessionId: 'sess-y',
   });
   expect(result.sessionTarget).toBe(SessionTarget.Main);
-  expect(result.sessionKey).toBe('agent:main:zhiyuan:sess-y');
+  expect(result.sessionKey).toBe('zhiyuan:sess-y');
 });
 
 test('ManualPolicy.toWireBinding: im_session without sessionId -> main + null', () => {
@@ -184,7 +184,7 @@ test('ManualPolicy.describeRunBehavior: im_session -> mentions platform', () => 
   expect(desc).toContain('discord');
 });
 
-test('ManualPolicy.describeRunBehavior: session_key -> mentions OpenClaw', () => {
+test('ManualPolicy.describeRunBehavior: session_key returns a description', () => {
   const policy = new ManualTaskPolicy();
   const draft = makeModel({
     origin: { kind: OriginKind.Manual },

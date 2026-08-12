@@ -6,7 +6,7 @@ import { inferOriginAndBinding } from './origin';
 
 test('infer: managed key without IM channel -> cowork origin + ui_session binding', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:zhiyuan:sess-001', delivery: { mode: DeliveryMode.None } }),
+    makeTask({ sessionKey: 'zhiyuan:sess-001', delivery: { mode: DeliveryMode.None } }),
   );
   expect(result.origin).toEqual({ kind: OriginKind.Cowork, sessionId: 'sess-001' });
   expect(result.binding).toEqual({ kind: BindingKind.UISession, sessionId: 'sess-001' });
@@ -15,7 +15,7 @@ test('infer: managed key without IM channel -> cowork origin + ui_session bindin
 test('infer: managed key with IM announce channel -> im origin + im_session binding', () => {
   const result = inferOriginAndBinding(
     makeTask({
-      sessionKey: 'agent:main:zhiyuan:sess-002',
+      sessionKey: 'zhiyuan:sess-002',
       delivery: { mode: DeliveryMode.Announce, channel: 'telegram' },
     }),
   );
@@ -26,21 +26,10 @@ test('infer: managed key with IM announce channel -> im origin + im_session bind
   expect((result.binding as any).sessionId).toBe('sess-002');
 });
 
-test('infer: non-main agentId managed key -> cowork origin', () => {
-  const result = inferOriginAndBinding(
-    makeTask({
-      sessionKey: 'agent:secondary:zhiyuan:sess-003',
-      delivery: { mode: DeliveryMode.None },
-    }),
-  );
-  expect(result.origin).toEqual({ kind: OriginKind.Cowork, sessionId: 'sess-003' });
-  expect(result.binding).toEqual({ kind: BindingKind.UISession, sessionId: 'sess-003' });
-});
-
 test('infer: managed key with channel=last -> cowork origin (last is not an IM platform)', () => {
   const result = inferOriginAndBinding(
     makeTask({
-      sessionKey: 'agent:main:zhiyuan:sess-004',
+      sessionKey: 'zhiyuan:sess-004',
       delivery: { mode: DeliveryMode.Announce, channel: DeliveryChannel.Last },
     }),
   );
@@ -49,7 +38,7 @@ test('infer: managed key with channel=last -> cowork origin (last is not an IM p
 });
 
 test('infer: telegram channel key -> im origin + im_session binding', () => {
-  const result = inferOriginAndBinding(makeTask({ sessionKey: 'agent:main:telegram:user:12345' }));
+  const result = inferOriginAndBinding(makeTask({ sessionKey: 'telegram:user:12345' }));
   expect(result.origin.kind).toBe(OriginKind.IM);
   expect((result.origin as any).platform).toBe('telegram');
   expect(result.binding.kind).toBe(BindingKind.IMSession);
@@ -57,19 +46,8 @@ test('infer: telegram channel key -> im origin + im_session binding', () => {
   expect((result.binding as any).conversationId).toBe('user:12345');
 });
 
-test('infer: dingtalk connector channel key -> im origin', () => {
-  const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:openai-user:dingtalk-connector:acct1:user:peer1' }),
-  );
-  expect(result.origin.kind).toBe(OriginKind.IM);
-  expect((result.origin as any).platform).toBe('dingtalk');
-  expect(result.binding.kind).toBe(BindingKind.IMSession);
-});
-
-test('infer: legacy dingtalk channel key remains readable', () => {
-  const result = inferOriginAndBinding(
-    makeTask({ sessionKey: 'agent:main:openai-user:dingtalk:acct1:user:peer1' }),
-  );
+test('infer: native dingtalk channel key -> im origin', () => {
+  const result = inferOriginAndBinding(makeTask({ sessionKey: 'dingtalk:acct1:user:peer1' }));
   expect(result.origin.kind).toBe(OriginKind.IM);
   expect((result.origin as any).platform).toBe('dingtalk');
   expect(result.binding.kind).toBe(BindingKind.IMSession);
@@ -103,14 +81,14 @@ test('infer: empty string sessionKey -> manual origin', () => {
 
 test('infer: sessionKey with whitespace is trimmed before parsing', () => {
   const result = inferOriginAndBinding(
-    makeTask({ sessionKey: '  agent:main:zhiyuan:sess-trimmed  ' }),
+    makeTask({ sessionKey: '  zhiyuan:sess-trimmed  ' }),
   );
   expect(result.origin.kind).toBe(OriginKind.Cowork);
   expect((result.origin as any).sessionId).toBe('sess-trimmed');
 });
 
 test('infer: pure function - same input, same output', () => {
-  const task = makeTask({ sessionKey: 'agent:main:zhiyuan:sess-stable' });
+  const task = makeTask({ sessionKey: 'zhiyuan:sess-stable' });
   const r1 = inferOriginAndBinding(task);
   const r2 = inferOriginAndBinding(task);
   expect(r1).toEqual(r2);

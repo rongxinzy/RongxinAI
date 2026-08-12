@@ -15,7 +15,7 @@ import type {
   IMConnectivityTestResult,
   TelegramInstanceConfig,
   TelegramInstanceStatus,
-  TelegramOpenClawConfig,
+  TelegramChannelConfig,
 } from '../../types/im';
 import {
   IMConnectionBadge,
@@ -29,8 +29,8 @@ import {
 interface TelegramInstanceSettingsProps {
   instance: TelegramInstanceConfig;
   instanceStatus: TelegramInstanceStatus | undefined;
-  onConfigChange: (update: Partial<TelegramOpenClawConfig>) => void;
-  onSave: (override?: Partial<TelegramOpenClawConfig>) => Promise<void>;
+  onConfigChange: (update: Partial<TelegramChannelConfig>) => void;
+  onSave: (override?: Partial<TelegramChannelConfig>) => Promise<void>;
   onRename: (newName: string) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
@@ -216,7 +216,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imDmPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { dmPolicy: value as TelegramOpenClawConfig['dmPolicy'] };
+              const update = { dmPolicy: value as TelegramChannelConfig['dmPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -303,7 +303,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
               { value: 'disabled', label: i18nService.t('imGroupPolicyDisabled') },
             ]}
             onValueChange={value => {
-              const update = { groupPolicy: value as TelegramOpenClawConfig['groupPolicy'] };
+              const update = { groupPolicy: value as TelegramChannelConfig['groupPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -393,7 +393,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
               { value: 'progress', label: i18nService.t('imStreamingProgress') },
             ]}
             onValueChange={value => {
-              const update = { streaming: value as TelegramOpenClawConfig['streaming'] };
+              const update = { streaming: value as TelegramChannelConfig['streaming'] };
               onConfigChange(update);
               void onSave(update);
             }}
@@ -421,7 +421,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
               { value: 'all', label: i18nService.t('imReplyToModeAll') },
             ]}
             onValueChange={value => {
-              const update = { replyToMode: value as TelegramOpenClawConfig['replyToMode'] };
+              const update = { replyToMode: value as TelegramChannelConfig['replyToMode'] };
               onConfigChange(update);
               void onSave(update);
             }}

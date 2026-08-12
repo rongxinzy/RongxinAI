@@ -35,14 +35,6 @@ Start the Electron application for normal UI development:
 bun run electron:dev
 ```
 
-Start the application after preparing the complete bundled runtimes:
-
-```bash
-bun run electron:dev:openclaw
-```
-
-The complete setup may take longer on its first run because runtime sources and dependencies need to be prepared.
-
 Use Bun for dependency installation and commit changes to `bun.lock` when dependencies change. Do not create or commit an npm lockfile.
 
 ## Project Layout

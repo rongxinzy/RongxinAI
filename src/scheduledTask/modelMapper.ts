@@ -27,7 +27,7 @@ export interface WireTask {
   wakeMode: WakeMode;
   payload: unknown;
   delivery: PolicyDelivery;
-  agentId: string | null;
+  workspaceId: string | null;
   sessionKey: string | null;
   state: unknown;
   createdAt: string;
@@ -64,7 +64,7 @@ export class TaskModelMapper {
       wakeMode: model.wakeMode,
       payload: model.payload,
       delivery: model.delivery,
-      agentId: model.agentId,
+      workspaceId: model.workspaceId,
       sessionKey: wireBinding.sessionKey,
     };
   }
@@ -83,7 +83,7 @@ export class TaskModelMapper {
       wakeMode: defaults.wakeMode ?? WM.Now,
       payload: defaults.payload ?? { kind: PayloadKind.SystemEvent, text: '' },
       delivery: defaults.delivery ?? { mode: DeliveryMode.None },
-      agentId: defaults.agentId ?? null,
+      workspaceId: defaults.workspaceId ?? null,
       sessionKey: defaults.sessionKey ?? null,
       state: {
         nextRunAtMs: null,

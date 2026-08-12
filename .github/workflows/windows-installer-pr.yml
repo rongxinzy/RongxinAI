@@ -31,15 +31,14 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
+      - name: Enforce retired runtime decoupling
+        run: node scripts/ci/check-openclaw-decoupling.mjs
       - uses: actions/setup-node@v6
         with:
           node-version: "24.x"
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.14"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
@@ -48,10 +47,8 @@ jobs:
             ~/.npm
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-            ~/AppData/Local/pnpm/store
-            vendor/openclaw-runtime/win-x64
-            vendor/openclaw-plugins
             vendor/engram-runtime
+            vendor/channel-runtime
           key: windows-installer-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             windows-installer-node24-bun1.3.14-
@@ -62,7 +59,16 @@ jobs:
           bun run setup:python-runtime
           bun run engram:runtime:win-x64
       - name: Build complete offline installer
-        run: bun run dist:win:offline
+        # Keep a stuck packager observable and fail it before the job-level
+        # timeout so the diagnostics upload below still gets a chance to run.
+        timeout-minutes: 65
+        shell: pwsh
+        run: |
+          & .\scripts\ci\run-with-heartbeat.ps1 `
+            -FilePath 'bun' `
+            -ArgumentList @('run', 'dist:win:offline') `
+            -TimeoutMinutes 55 `
+            -HeartbeatSeconds 60
         env:
           NODE_OPTIONS: "--max-old-space-size=4096"
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
@@ -101,5 +107,6 @@ jobs:
           path: |
             release/*.exe
             installer-diagnostics/install-timing.log
+            ${{ runner.temp }}/zhiyuan-build-logs
           if-no-files-found: ignore
           retention-days: 7

@@ -8,9 +8,6 @@ This file provides guidance to coding agents when working with code in this repo
 # Development - starts Vite dev server (port 5175) + Electron app with hot reload
 npm run electron:dev
 
-# Development with OpenClaw engine (clones/builds OpenClaw on first run)
-npm run electron:dev:openclaw
-
 # Build production bundle (TypeScript + Vite)
 npm run build
 
@@ -31,26 +28,22 @@ npm run dist:mac        # macOS (.dmg)
 npm run dist:win        # Windows (.exe)
 npm run dist:linux      # Linux (.AppImage)
 
-# Build OpenClaw runtime manually
-npm run openclaw:runtime:host   # current platform
 ```
 
 **Requirements**: Node.js >=24 <25, Bun >=1.3 (package manager; `bun install` instead of `npm install`, lockfile is `bun.lock`). Windows builds require PortableGit (see README.md for setup).
-
-**OpenClaw env vars**: `OPENCLAW_SRC` (default `../openclaw`), `OPENCLAW_FORCE_BUILD=1` (force rebuild), `OPENCLAW_SKIP_ENSURE=1` (skip version checkout).
 
 ## Architecture Overview
 
 知远智能体 is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
 
-1. **Cowork Mode** - AI-assisted task sessions powered by OpenClaw as the primary agent runtime
-2. **llama.cpp Local Inference** - local model service management, model launch options, and local model integration with OpenClaw
+1. **Cowork Mode** - AI-assisted task sessions powered exclusively by the in-process Pi runtime
+2. **llama.cpp Local Inference** - local model service management, model launch options, and Pi model integration
 3. **Skills and MCP** - built-in skills, remote skill marketplace, and MCP server configuration
 4. **Artifacts System** - rich preview of code outputs (HTML, SVG, React, Mermaid)
 
 Uses strict process isolation with IPC communication.
 
-Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. All pre-rebrand product names (including 知远智能体, LEO, and 李知远) are retired — do not reintroduce them in branding. OpenClaw, pi, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Legacy identifiers (the old storage name, the retired SQLite filename, the old app data directory, the retired protocol scheme, and legacy session keys) have been fully replaced with the new 知远智能体 (ZhiYuan Agent) identifiers under a scorched-earth policy: no data migration, no compatibility shims, no fallbacks; pre-rename user data is abandoned in place. New code must use the new identifiers only.
+Public-facing product documentation and user-visible UI copy must use the 知远智能体 (ZhiYuan Agent) name. All pre-rebrand product names are retired and must not be reintroduced. Pi, cc-connect, and llama.cpp are internal implementation details: never expose them in branding or user-facing copy; describe the agent runtime and local inference as self-developed (全栈自研). Legacy identifiers and the retired runtime are handled under a scorched-earth policy: no data migration, compatibility shims, reads, startup, packaging, or fallback. Old data and directories are abandoned in place and are not actively deleted.
 
 ### Authentication Flow
 
@@ -75,7 +68,8 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 
 - Window lifecycle management
 - SQLite storage via `better-sqlite3` (`src/main/sqliteStore.ts`)
-- Agent engines (`src/main/libs/agentEngine/`) - `piRuntimeAdapter.ts` is the sole Work/Chat execution runtime; `openclawChannelGateway.ts` (OpenClawChannelGateway) is the OpenClaw Channel/Cron domain glue, the only place that still implements the internal `CoworkRuntime` interface
+- Agent runtime (`src/main/libs/agentEngine/`) - `piRuntimeAdapter.ts` is the sole execution kernel for Work, Chat, Channel, and Cron runs
+- Channel/Cron transport (`src/main/libs/ccConnect*`, `src/main/im/`) - cc-connect sidecars carry inbound/outbound events and cron triggers only; they never execute the agent or own task state
 - llama.cpp lifecycle and local inference management (`src/main/libs/llamacppManager.ts`, `src/shared/llamacpp/`)
 - Skill management (`src/main/skillManager.ts`)
 - MCP server configuration and marketplace integration
@@ -104,12 +98,11 @@ src/main/
 ├── im/                  # IM/email gateway integrations
 └── libs/
     ├── agentEngine/
-    │   ├── piRuntimeAdapter.ts      # Pi runtime — sole Work/Chat execution kernel
+    │   ├── piRuntimeAdapter.ts      # Pi runtime — sole execution kernel
     │   ├── piRuntimeTypes.ts        # Pi-native runtime/event/approval types
-    │   ├── openclawChannelGateway.ts # OpenClaw Channel/Cron domain gateway
-    │   └── types.ts                 # CoworkRuntime glue (OpenClaw-internal only)
-    ├── openclawEngineManager.ts # OpenClaw runtime lifecycle (install/start/status)
-    ├── openclawConfigSync.ts    # Syncs cowork config → OpenClaw config files
+    │   └── types.ts                 # Re-exported Pi runtime types
+    ├── ccConnectBridgeServer.ts # Authenticated Channel/Cron transport bridge
+    ├── ccConnectSidecarManager.ts # Channel sidecar lifecycle
     ├── llamacppManager.ts       # llama.cpp service lifecycle and configuration
 
 src/renderer/
@@ -157,14 +150,9 @@ The Cowork feature provides AI-assisted coding sessions:
 - `auto` - Automatically choose based on context
 - `local` - Run tools directly on the local machine
 
-**Agent Engine** (configured via `agentEngine` in cowork config):
+**Agent Engine**: Pi is the only execution kernel. `cowork:stream:*` carries Work/Chat events, while Channel/Cron runs are exposed as their own read-only activity projection. cc-connect only transports Channel/Cron inputs and deliveries.
 
-- `pi` - Pi in-process runtime (`piRuntimeAdapter.ts`); the only engine used for Work/Chat sessions.
-- `openclaw` - OpenClaw Channel/Cron gateway (`openclawChannelGateway.ts`); requires the bundled OpenClaw runtime to be running. Engine lifecycle managed by `OpenClawEngineManager` with states: `not_installed → ready → starting → running | error`
-
-The Pi runtime forwards stream events to the renderer (`cowork:stream:*` carries Pi workbench sessions only). Engine-specific IPC: `openclaw:engine:*` channels manage the OpenClaw Channel/Cron runtime lifecycle separately from `cowork:*` session channels.
-
-**Memory System**: File-based persistent memory stored in the OpenClaw working directory:
+**Memory System**: File-based persistent memory stored in the application-owned agent workspace:
 
 - `MEMORY.md` - Durable facts, preferences, and decisions; loaded automatically at every session start.
 - `memory/YYYY-MM-DD.md` - Daily notes for recent context.
@@ -233,9 +221,8 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 - App config stored in SQLite `kv` table
 - Cowork config stored in `cowork_config` table (workingDirectory, systemPrompt, executionMode, **agentEngine**)
 - Cowork sessions and messages stored in `cowork_sessions` and `cowork_messages` tables
-- Scheduled task metadata stored in `scheduled_task_meta` table (origin and binding info); task definitions are managed by OpenClaw
+- Task, Run, Delivery, ChannelAccount, and ChannelSession records are canonical in ZhiYuan SQLite
 - Database file: `zhiyuan.sqlite` in the user data directory. Pre-rename database files are not migrated or read — old data is abandoned in place (scorched earth).
-- OpenClaw pinned version declared in `package.json` under `"openclaw": { "version": "...", "repo": "..." }`; update the version field and re-run to upgrade
 
 ### TypeScript Configuration
 
@@ -244,7 +231,8 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 
 ### Key Dependencies
 
-- OpenClaw (bundled runtime under `Resources/cfmind`) - Primary agent engine for cowork sessions
+- Pi SDK packages - sole in-process agent execution kernel
+- cc-connect sidecar - Channel/Cron transport only
 - `better-sqlite3` - SQLite database for persistence
 - `react-markdown`, `remark-gfm`, `rehype-katex` - Markdown rendering with math support
 - `mermaid` - Diagram rendering
@@ -497,7 +485,7 @@ chore: bump version to 2026.3.18
 
 ### Built-in skills
 
-The `SKILLs/` directory contains OpenClaw skill definitions used by the Cowork runtime. Do not confuse these with IDE/agent plugin skills.
+The `SKILLs/` directory contains bundled skill definitions used by the Pi runtime. Do not confuse these with IDE/agent plugin skills.
 
 ### Claude Code
 

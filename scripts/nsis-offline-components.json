@@ -1,5 +1,5 @@
 [
-  { "key": "openclaw", "prefix": "cfmind" },
+  { "key": "channel-runtime", "prefix": "channel-runtime" },
   { "key": "skills", "prefix": "SKILLs" },
   { "key": "mcps", "prefix": "MCPs" },
   { "key": "portable-git", "prefix": "mingit" },

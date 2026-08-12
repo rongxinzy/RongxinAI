@@ -3,7 +3,7 @@ import {
   parseScheduledReminderPrompt,
   parseSimpleScheduledReminderText,
 } from '../../scheduledTask/reminderText';
-import { buildOpenClawLocalTimeContextPrompt } from '../libs/openclawLocalTimeContextPrompt';
+import { buildAgentLocalTimeContextPrompt } from '../libs/agentLocalTimeContextPrompt';
 import { IMChatHandler } from './imChatHandler';
 import type { IMMediaAttachment, IMMessage } from './types';
 
@@ -99,7 +99,6 @@ export interface ParsedIMScheduledTaskRequest {
 export interface IMScheduledTaskCreationResult {
   id: string;
   name: string;
-  agentId: string | null;
   sessionKey: string | null;
   payloadText: string;
   scheduleAt: string;
@@ -224,7 +223,7 @@ export function normalizeDetectedScheduledTaskRequest(
 function buildScheduledTaskDetectionPrompt(now: Date): string {
   return [
     'You are a structured extractor for one-shot reminder requests in an IM conversation.',
-    buildOpenClawLocalTimeContextPrompt(now),
+    buildAgentLocalTimeContextPrompt(now),
     'Return JSON only. No markdown. No prose.',
     'Decide whether the user is explicitly asking to create a one-time scheduled reminder/task.',
     'If yes, return: {"shouldCreateTask":true,"scheduleAt":"ISO8601 with explicit timezone offset","reminderBody":"short reminder content","taskName":"short task name"}',

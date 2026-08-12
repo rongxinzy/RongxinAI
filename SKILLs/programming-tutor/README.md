@@ -63,6 +63,7 @@ pip install -r requirements.txt
 ### 教学模式
 
 #### 模式一：概念学习
+
 ```
 "教我递归"
 "解释 JavaScript 中闭包是怎么工作的"
@@ -70,6 +71,7 @@ pip install -r requirements.txt
 ```
 
 #### 模式二：代码审查
+
 ```
 "审查我的代码" [粘贴或附上文件]
 "怎么改进这个函数？"
@@ -77,6 +79,7 @@ pip install -r requirements.txt
 ```
 
 #### 模式三：调试（苏格拉底式教学法）
+
 ```
 "帮我调试这个错误"
 "我的函数返回 None 而不是求和结果"
@@ -86,6 +89,7 @@ pip install -r requirements.txt
 导师会通过提问引导你自己发现 bug！
 
 #### 模式四：算法练习
+
 ```
 "给我一道简单的算法题"
 "用链表做练习"
@@ -93,6 +97,7 @@ pip install -r requirements.txt
 ```
 
 #### 模式五：项目指导
+
 ```
 "帮我设计一个任务管理 API"
 "我要做一个博客，从哪里开始？"
@@ -100,6 +105,7 @@ pip install -r requirements.txt
 ```
 
 #### 模式六：设计模式
+
 ```
 "教我单例模式"
 "什么时候该用工厂模式？"
@@ -107,6 +113,7 @@ pip install -r requirements.txt
 ```
 
 #### 模式七：面试准备
+
 ```
 "模拟技术面试"
 "系统设计：设计一个推特"
@@ -114,6 +121,7 @@ pip install -r requirements.txt
 ```
 
 #### 模式八：语言学习
+
 ```
 "我会 Python，教我 JavaScript"
 "在 Rust 中怎么做 X？"
@@ -138,6 +146,7 @@ python scripts/analyze_code.py app.js
 ```
 
 **输出内容**：
+
 - 代码指标（行数、注释、复杂度）
 - 按严重程度分类的问题（严重、警告、提示）
 - 具体的改进建议
@@ -158,6 +167,7 @@ python scripts/run_tests.py tests/ --format json
 ```
 
 **支持的框架**：
+
 - pytest（Python）
 - unittest（Python）
 - Jest（JavaScript）
@@ -178,6 +188,7 @@ python scripts/complexity_analyzer.py algorithm.py --format json
 ```
 
 **输出内容**：
+
 - 时间复杂度（大 O 表示法）
 - 空间复杂度
 - 递归检测
@@ -215,6 +226,7 @@ code-mentor-1.0.0/
 ## 进度追踪
 
 你的学习进度在每次会话后自动保存到 `references/user-progress/learning_log.md`。包括：
+
 - 涵盖的主题和掌握的概念
 - 已解决的算法题
 - 练习的技能和使用的模式
@@ -327,11 +339,13 @@ squares = [x ** 2 for x in range(10)]
 ### 脚本不工作？
 
 安装依赖：
+
 ```bash
 pip install -r requirements.txt
 ```
 
 用于 JavaScript 测试（Jest）：
+
 ```bash
 npm install --save-dev jest
 ```
@@ -339,6 +353,7 @@ npm install --save-dev jest
 ### 找不到参考材料？
 
 参考材料按类别组织：
+
 - 算法：`references/algorithms/`
 - 数据结构：`references/data-structures/`
 - 设计模式：`references/design-patterns/`
@@ -348,6 +363,7 @@ npm install --save-dev jest
 ### Skill 无法理解你的请求？
 
 试着说得更具体：
+
 - "教我 [概念]"
 - "给我一道 [难度] 的 [主题] 题目"
 - "审查我的 [语言] 代码"
@@ -368,7 +384,7 @@ MIT 许可证 - 可自由使用和修改！
 
 ## 致谢
 
-基于 OpenClaw 框架构建的教育类 AI skill。
+为知远智能体构建的教育类 AI skill。
 
 ---
 

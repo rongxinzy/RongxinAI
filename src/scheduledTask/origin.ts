@@ -2,7 +2,7 @@ import {
   isManagedSessionKey,
   parseChannelSessionKey,
   parseManagedSessionKey,
-} from '../main/libs/openclawChannelSessionSync';
+} from '../main/libs/channelSessionKey';
 import { BindingKind, DeliveryChannel, DeliveryMode, OriginKind } from './constants';
 
 // Re-declare origin/binding types here so common/ doesn't depend on renderer/
@@ -31,12 +31,11 @@ export type ExecutionBinding =
 interface InferableTask {
   sessionKey?: string | null;
   delivery?: { mode?: string; channel?: string };
-  agentId?: string | null;
 }
 
 /**
  * Infer origin and binding from a ScheduledTask's wire fields.
- * Used for backward compatibility with tasks that have no stored metadata.
+ * Used when tasks have no separately stored origin metadata.
  * Pure function — no side effects.
  */
 export function inferOriginAndBinding(task: InferableTask): {
@@ -45,7 +44,7 @@ export function inferOriginAndBinding(task: InferableTask): {
 } {
   const sk = (task.sessionKey ?? '').trim();
 
-  // 1. Managed session key: "agent:main:zhiyuan:{sessionId}"
+  // 1. Workspace-managed session key: "zhiyuan:{sessionId}"
   if (sk && isManagedSessionKey(sk)) {
     const parsed = parseManagedSessionKey(sk);
     if (parsed) {
@@ -75,7 +74,7 @@ export function inferOriginAndBinding(task: InferableTask): {
     }
   }
 
-  // 2. Channel session key: "agent:{agentId}:{platform}:{conversationId}"
+  // 2. Native channel session key: "{platform}:{conversationId}"
   if (sk) {
     const channelInfo = parseChannelSessionKey(sk);
     if (channelInfo) {

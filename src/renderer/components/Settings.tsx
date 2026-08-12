@@ -41,7 +41,6 @@ import {
   resolveCodingPlanBaseUrl,
 } from '../../shared/providers';
 import type { LlamaCppModelPreference } from '../../shared/llamacpp';
-import { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../shared/appUpdate/constants';
 import {
   type AppConfig,
@@ -79,13 +78,9 @@ import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
 import { selectCoworkConfig } from '../store/selectors/coworkSelectors';
 import type {
-  CoworkAgentEngine,
   CoworkMemoryStats,
   CoworkUserMemoryEntry,
-  OpenClawEngineStatus,
-  OpenClawSessionKeepAlive,
 } from '../types/cowork';
-import { OpenClawSessionKeepAlive as OpenClawSessionKeepAliveValues } from '../types/cowork';
 import Modal from './common/Modal';
 import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
 import ErrorMessage from './ErrorMessage';
@@ -133,7 +128,6 @@ import type { EmailSettingsHandle } from './settings/email/types';
 type TabType =
   | 'general'
   | 'appearance'
-  | 'coworkAgentEngine'
   | 'model'
   | 'triage'
   | 'coworkMemory'
@@ -303,7 +297,7 @@ const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfi
   }
 
   // OpenAI in OAuth mode stores tokens in <CODEX_HOME>/auth.json (read by the
-  // OpenClaw runtime), not in the provider config — `authType === 'oauth'`
+  // OAuth token store), not in the provider config — `authType === 'oauth'`
   // alone is the signal that ChatGPT login completed.
   if (provider === 'openai' && config.authType === 'oauth') {
     return true;
@@ -915,9 +909,6 @@ const Settings: React.FC<SettingsProps> = ({
 
   const coworkConfig = useSelector(selectCoworkConfig);
 
-  const [coworkAgentEngine, setCoworkAgentEngine] = useState<CoworkAgentEngine>(
-    coworkConfig.agentEngine || 'openclaw',
-  );
   const [coworkMemoryEnabled, setCoworkMemoryEnabled] = useState<boolean>(
     coworkConfig.memoryEnabled ?? true,
   );
@@ -946,10 +937,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [embeddingRemoteApiKey, setEmbeddingRemoteApiKey] = useState<string>(
     coworkConfig.embeddingRemoteApiKey ?? '',
   );
-  const [openClawSessionKeepAlive, setOpenClawSessionKeepAlive] =
-    useState<OpenClawSessionKeepAlive>(
-      coworkConfig.openClawSessionPolicy?.keepAlive || OpenClawSessionKeepAliveValues.ThirtyDays,
-    );
   const [coworkMemoryEntries, setCoworkMemoryEntries] = useState<CoworkUserMemoryEntry[]>([]);
   const [coworkMemoryStats, setCoworkMemoryStats] = useState<CoworkMemoryStats | null>(null);
   const [coworkMemoryListLoading, setCoworkMemoryListLoading] = useState<boolean>(false);
@@ -963,9 +950,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [bootstrapLoaded, setBootstrapLoaded] = useState<boolean>(false);
   const [bootstrapTab, setBootstrapTab] = useState<'IDENTITY.md' | 'SOUL.md' | 'USER.md'>(
     'IDENTITY.md',
-  );
-  const [openClawEngineStatus, setOpenClawEngineStatus] = useState<OpenClawEngineStatus | null>(
-    null,
   );
 
   const syncLlamaCppProviderFromConfig = useCallback(async () => {
@@ -989,7 +973,6 @@ const Settings: React.FC<SettingsProps> = ({
   }, []);
 
   useEffect(() => {
-    setCoworkAgentEngine(coworkConfig.agentEngine || 'openclaw');
     setCoworkMemoryEnabled(coworkConfig.memoryEnabled ?? true);
     setCoworkMemoryLlmJudgeEnabled(coworkConfig.memoryLlmJudgeEnabled ?? false);
     setSkipMissedJobs(coworkConfig.skipMissedJobs ?? true);
@@ -1000,14 +983,9 @@ const Settings: React.FC<SettingsProps> = ({
     setEmbeddingVectorWeight(coworkConfig.embeddingVectorWeight ?? 0.7);
     setEmbeddingRemoteBaseUrl(coworkConfig.embeddingRemoteBaseUrl ?? '');
     setEmbeddingRemoteApiKey(coworkConfig.embeddingRemoteApiKey ?? '');
-    setOpenClawSessionKeepAlive(
-      coworkConfig.openClawSessionPolicy?.keepAlive || OpenClawSessionKeepAliveValues.ThirtyDays,
-    );
   }, [
-    coworkConfig.agentEngine,
     coworkConfig.memoryEnabled,
     coworkConfig.memoryLlmJudgeEnabled,
-    coworkConfig.openClawSessionPolicy?.keepAlive,
     coworkConfig.skipMissedJobs,
     coworkConfig.embeddingEnabled,
     coworkConfig.embeddingProvider,
@@ -1017,22 +995,6 @@ const Settings: React.FC<SettingsProps> = ({
     coworkConfig.embeddingRemoteBaseUrl,
     coworkConfig.embeddingRemoteApiKey,
   ]);
-
-  useEffect(() => {
-    let active = true;
-    void coworkService.getOpenClawEngineStatus().then(status => {
-      if (!active || !status) return;
-      setOpenClawEngineStatus(status);
-    });
-    const unsubscribe = coworkService.onOpenClawEngineStatus(status => {
-      if (!active) return;
-      setOpenClawEngineStatus(status);
-    });
-    return () => {
-      active = false;
-      unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     let active = true;
@@ -1786,13 +1748,9 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   const hasCoworkConfigChanges =
-    coworkAgentEngine !== coworkConfig.agentEngine ||
     coworkMemoryEnabled !== coworkConfig.memoryEnabled ||
     coworkMemoryLlmJudgeEnabled !== coworkConfig.memoryLlmJudgeEnabled ||
     skipMissedJobs !== (coworkConfig.skipMissedJobs ?? true) ||
-    openClawSessionKeepAlive !==
-      (coworkConfig.openClawSessionPolicy?.keepAlive ||
-        OpenClawSessionKeepAliveValues.ThirtyDays) ||
     embeddingEnabled !== (coworkConfig.embeddingEnabled ?? false) ||
     embeddingProvider !== (coworkConfig.embeddingProvider ?? 'openai') ||
     embeddingModel !== (coworkConfig.embeddingModel ?? '') ||
@@ -1800,44 +1758,6 @@ const Settings: React.FC<SettingsProps> = ({
     embeddingVectorWeight !== (coworkConfig.embeddingVectorWeight ?? 0.7) ||
     embeddingRemoteBaseUrl !== (coworkConfig.embeddingRemoteBaseUrl ?? '') ||
     embeddingRemoteApiKey !== (coworkConfig.embeddingRemoteApiKey ?? '');
-  const isOpenClawAgentEngine = coworkAgentEngine === 'openclaw';
-
-  const openClawProgressPercent = useMemo(() => {
-    if (
-      typeof openClawEngineStatus?.progressPercent !== 'number' ||
-      !Number.isFinite(openClawEngineStatus.progressPercent)
-    ) {
-      return null;
-    }
-    return Math.max(0, Math.min(100, Math.round(openClawEngineStatus.progressPercent)));
-  }, [openClawEngineStatus]);
-
-  const resolveOpenClawStatusText = (status: OpenClawEngineStatus | null): string => {
-    if (!status) {
-      return i18nService.t('coworkOpenClawNotInstalledNotice');
-    }
-    if (status.message?.trim()) {
-      return status.message.trim();
-    }
-    switch (status.phase) {
-      case OpenClawEnginePhase.NotInstalled:
-        return i18nService.t('coworkOpenClawNotInstalledNotice');
-      case OpenClawEnginePhase.Installing:
-        return i18nService.t('coworkOpenClawInstalling');
-      case OpenClawEnginePhase.Ready:
-        return i18nService.t('coworkOpenClawReadyNotice');
-      case OpenClawEnginePhase.Starting:
-      case OpenClawEnginePhase.Compiling:
-      case OpenClawEnginePhase.Restarting:
-        return i18nService.t('coworkOpenClawStarting');
-      case OpenClawEnginePhase.Error:
-        return i18nService.t('coworkOpenClawError');
-      case OpenClawEnginePhase.Running:
-      default:
-        return i18nService.t('coworkOpenClawRunning');
-    }
-  };
-
   const loadCoworkMemoryData = useCallback(async () => {
     setCoworkMemoryListLoading(true);
     try {
@@ -2159,7 +2079,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       if (hasCoworkConfigChanges) {
         const updated = await coworkService.updateConfig({
-          agentEngine: coworkAgentEngine,
           memoryEnabled: coworkMemoryEnabled,
           memoryLlmJudgeEnabled: coworkMemoryLlmJudgeEnabled,
           skipMissedJobs,
@@ -2172,12 +2091,6 @@ const Settings: React.FC<SettingsProps> = ({
           embeddingRemoteApiKey,
         });
         if (!updated) {
-          throw new Error(i18nService.t('coworkConfigSaveFailed'));
-        }
-        const savedSessionPolicy = await coworkService.updateSessionPolicy({
-          keepAlive: openClawSessionKeepAlive,
-        });
-        if (!savedSessionPolicy) {
           throw new Error(i18nService.t('coworkConfigSaveFailed'));
         }
       }
@@ -2194,12 +2107,10 @@ const Settings: React.FC<SettingsProps> = ({
         }
       }
 
-      // Sync IM gateway config (regenerate openclaw.json and restart gateway if running).
-      // This is done on every save regardless of activeTab, because the user may have
-      // edited IM config then switched tabs before clicking Save.
+      // Persist channel account configuration even if the user changed tabs before saving.
       const syncSucceeded = await imService.saveAndSyncConfig();
       if (!syncSucceeded) {
-        throw new Error(i18nService.t('settingsSavedButOpenClawSyncFailed'));
+        throw new Error(i18nService.t('coworkConfigSaveFailed'));
       }
 
       didSaveRef.current = true;
@@ -3333,64 +3244,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'email':
         return null;
-
-      case 'coworkAgentEngine':
-        return (
-          <div className="space-y-6">
-            <p className="text-sm text-muted-foreground">{i18nService.t('coworkEngineArchInfo')}</p>
-            <div className="space-y-3">
-              <div className="flex items-start gap-3 rounded-xl border px-3 py-2 text-sm border-border">
-                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-green-500 shrink-0" />
-                <span>
-                  <span className="block font-medium text-foreground">Pi</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {i18nService.t('coworkEnginePiRole')}
-                  </span>
-                </span>
-              </div>
-              <div className="flex items-start gap-3 rounded-xl border px-3 py-2 text-sm border-border">
-                <span className="mt-1 inline-block h-3 w-3 rounded-full bg-blue-500 shrink-0" />
-                <span>
-                  <span className="block font-medium text-foreground">OpenClaw</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {i18nService.t('coworkEngineOpenClawRole')}
-                  </span>
-                </span>
-              </div>
-            </div>
-            {isOpenClawAgentEngine && (
-              <div className="space-y-3 rounded-xl border px-4 py-4 border-border">
-                <div className="text-xs text-muted-foreground">
-                  {i18nService.t('coworkOpenClawInstallHint')}
-                </div>
-                <div
-                  className={`rounded-xl border px-4 py-3 text-sm ${
-                    openClawEngineStatus?.phase === 'error'
-                      ? 'border-red-300 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300'
-                      : 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      {resolveOpenClawStatusText(openClawEngineStatus)}
-                      {openClawProgressPercent !== null && (
-                        <span className="ml-2 text-xs opacity-80">{openClawProgressPercent}%</span>
-                      )}
-                    </div>
-                  </div>
-                  {openClawProgressPercent !== null && (
-                    <div className="mt-2 h-2 rounded-full bg-black/10 overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${openClawProgressPercent}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        );
 
       case 'coworkMemory':
         return (

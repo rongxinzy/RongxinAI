@@ -215,7 +215,7 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(workflow, /paths:/);
   assert.match(workflow, /"scripts\/\*\*"/);
   assert.match(workflow, /runs-on: windows-latest/);
-  assert.match(workflow, /bun run dist:win:offline/);
+  assert.match(workflow, /@\('run', 'dist:win:offline'\)/);
   assert.match(workflow, /windows-runtime-smoke\.ps1/);
   assert.match(workflow, /windows-installer-size-smoke\.ps1/);
   assert.match(workflow, /windows-installer-smoke\.ps1/);

@@ -89,7 +89,7 @@ export function makeAuthCheckFail(reason = 'invalid token'): IMConnectivityCheck
 }
 
 export function makeGatewayRunningCheck(): IMConnectivityCheck {
-  return makeCheck('gateway_running', 'info', 'OpenClaw Gateway is running.');
+  return makeCheck('gateway_running', 'info', 'Channel runtime is running.');
 }
 
 export function makeInboundActivityCheck(level: 'pass' | 'warn' = 'pass'): IMConnectivityCheck {

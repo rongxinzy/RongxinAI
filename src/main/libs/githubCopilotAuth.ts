@@ -8,7 +8,7 @@
  * 4. Exchange the GitHub token for a Copilot API token
  *
  * References:
- * - OpenClaw's implementation: extensions/github-copilot/token.ts
+ * - GitHub Copilot's public token exchange behavior
  * - The Copilot token contains a `proxy-ep=...` parameter that indicates the
  *   correct API base URL. We derive it by replacing `proxy.*` with `api.*`.
  */
@@ -75,7 +75,7 @@ export function deriveCopilotApiBaseUrlFromToken(token: string): string | null {
     return null;
   }
 
-  // Convert proxy.* → api.* (following openclaw's convention)
+  // Convert proxy.* endpoints to api.* endpoints.
   const host = proxyEp.replace(/^https?:\/\//, '').replace(/^proxy\./i, 'api.');
   if (!host) {
     return null;

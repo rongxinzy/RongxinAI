@@ -1,7 +1,5 @@
 /**
- * Local metadata store for scheduled task origin/binding.
- * OpenClaw gateway cron.* API doesn't support custom fields,
- * so we persist origin/binding locally in SQLite.
+ * Canonical SQLite metadata store for scheduled task origin and binding.
  */
 import type Database from 'better-sqlite3';
 

@@ -1,6 +1,6 @@
 /**
  * IM Cowork Handler
- * Adapter that enables IM (DingTalk/Feishu/Telegram) to use CoworkRuntime for tool-enabled AI execution
+ * Adapter that routes channel turns through the Pi runtime.
  */
 
 import { EventEmitter } from 'events';
@@ -10,9 +10,8 @@ import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt
 import { ChannelRunStatus, ChannelRunTrigger } from '../../shared/channelRun/constants';
 import { buildChannelRunSummary } from '../../shared/channelRun/summary';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
-import { getDefaultConversationWorkspacePath } from '../defaultConversationWorkspace';
 import { t } from '../i18n';
-import type { CoworkRuntime, PermissionRequest, PermissionResult } from '../libs/agentEngine/types';
+import type { PermissionRequest, PermissionResult, PiRuntime } from '../libs/agentEngine/types';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
 import { serializeForLog } from '../libs/sanitizeForLog';
 import { emitChannelRunEvent } from './channelRunEvents';
@@ -30,6 +29,7 @@ import type { IMMediaAttachment, IMMessage, IMSessionMapping, Platform } from '.
 interface MessageAccumulator {
   runId: string;
   messages: CoworkMessage[];
+  storeMessageCountAtStart?: number;
   resolve?: (text: string) => void;
   reject?: (error: Error) => void;
   timeoutId?: NodeJS.Timeout;
@@ -52,13 +52,13 @@ interface PendingIMPermission {
 }
 
 const PERMISSION_CONFIRM_TIMEOUT_MS = 60_000;
-const ACCUMULATOR_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const ACCUMULATOR_TIMEOUT_MS = 4 * 60 * 1000 + 30 * 1000;
 const IM_ALLOW_RESPONSE_RE = /^(允许|同意|yes|y)$/i;
 const IM_DENY_RESPONSE_RE = /^(拒绝|不同意|no|n)$/i;
 const IM_ALLOW_OPTION_LABEL = '允许本次操作';
 
 export interface IMCoworkHandlerOptions {
-  coworkRuntime: CoworkRuntime;
+  coworkRuntime: PiRuntime;
   coworkStore: CoworkStore;
   imStore: IMStore;
   getSkillsPrompt?: () => Promise<string | null>;
@@ -72,7 +72,7 @@ export interface IMCoworkHandlerOptions {
 }
 
 export class IMCoworkHandler extends EventEmitter {
-  private coworkRuntime: CoworkRuntime;
+  private coworkRuntime: PiRuntime;
   private coworkStore: CoworkStore;
   private imStore: IMStore;
   private getSkillsPrompt?: () => Promise<string | null>;
@@ -150,7 +150,7 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Set up event listeners for CoworkRuntime
+   * Set up event listeners for Pi runtime events.
    */
   private setupEventListeners(): void {
     this.coworkRuntime.on('message', this.onMessage);
@@ -162,23 +162,27 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Process an incoming IM message using CoworkRuntime
+   * Process an incoming IM message using the Pi runtime.
    */
-  async processMessage(message: IMMessage): Promise<string> {
+  async processMessage(
+    message: IMMessage,
+    signal?: AbortSignal,
+    workspaceId?: string,
+  ): Promise<string> {
     const pendingPermissionReply = await this.handlePendingPermissionReply(message);
     if (pendingPermissionReply !== null) {
       return pendingPermissionReply;
     }
 
     try {
-      return await this.processMessageInternal(message, false);
+      return await this.processMessageInternal(message, false, signal, workspaceId);
     } catch (error) {
       if (!this.isSessionNotFoundError(error)) {
         if (this.shouldRetryWithFreshSession(error, message)) {
           console.warn(
             `[IMCoworkHandler] Detected recoverable API 400 for ${message.platform}:${message.conversationId}, recreating session and retrying once`,
           );
-          return this.processMessageInternal(message, true);
+          return this.processMessageInternal(message, true, signal, workspaceId);
         }
         throw error;
       }
@@ -186,13 +190,15 @@ export class IMCoworkHandler extends EventEmitter {
       console.warn(
         `[IMCoworkHandler] Cowork session mapping is stale for ${message.platform}:${message.conversationId}, recreating session`,
       );
-      return this.processMessageInternal(message, true);
+      return this.processMessageInternal(message, true, signal, workspaceId);
     }
   }
 
   private async processMessageInternal(
     message: IMMessage,
     forceNewSession: boolean,
+    signal?: AbortSignal,
+    workspaceId?: string,
   ): Promise<string> {
     const cid = generateCorrelationId();
     return runWithCorrelationId(cid, async () => {
@@ -202,6 +208,7 @@ export class IMCoworkHandler extends EventEmitter {
         forceNewSession,
         message.senderId,
         message,
+        workspaceId,
       );
       this.sessionConversationMap.set(coworkSessionId, {
         conversationId: message.conversationId,
@@ -224,6 +231,26 @@ export class IMCoworkHandler extends EventEmitter {
       }
 
       const responsePromise = this.createAccumulatorPromise(coworkSessionId, cid);
+      const cancelTurn = () => {
+        const accumulator = this.messageAccumulators.get(coworkSessionId);
+        if (!accumulator || accumulator.runId !== cid) return;
+        this.cleanupAccumulator(coworkSessionId);
+        this.coworkRuntime.stopSession(coworkSessionId);
+        this.emitAccumulatorRunEvent(
+          coworkSessionId,
+          accumulator,
+          ChannelRunStatus.Failed,
+          undefined,
+          'Channel request was cancelled',
+        );
+        accumulator.reject?.(new Error('Channel request was cancelled'));
+      };
+      if (signal?.aborted) cancelTurn();
+      else signal?.addEventListener('abort', cancelTurn, { once: true });
+
+      if (signal?.aborted) {
+        return await responsePromise;
+      }
 
       // Project the run lifecycle to the renderer (read-only; issue #225).
       emitChannelRunEvent(
@@ -248,10 +275,14 @@ export class IMCoworkHandler extends EventEmitter {
       try {
         // Start or continue session. Setup errors after the Started projection
         // must close the same run instead of leaving the activity feed stuck.
+        const session = this.coworkStore.getSession(coworkSessionId);
+        if (!session) {
+          throw new Error(`Cowork session not found: ${coworkSessionId}`);
+        }
         const isActive = this.coworkRuntime.isSessionActive(coworkSessionId);
         const systemPrompt = await this.buildSystemPromptWithSkills();
+        if (signal?.aborted) throw new Error('Channel request was cancelled');
         const hasAvailableSkills = systemPrompt.includes('<available_skills>');
-        const session = this.coworkStore.getSession(coworkSessionId);
         if (session && session.systemPrompt !== systemPrompt) {
           // Claude resume sessions may ignore updated system prompt.
           // Reset claudeSessionId so this turn starts a fresh SDK session with new prompt.
@@ -274,14 +305,22 @@ export class IMCoworkHandler extends EventEmitter {
 
         if (isActive) {
           this.coworkRuntime
-            .continueSession(coworkSessionId, formattedContent, { systemPrompt })
+            .continueSession(coworkSessionId, formattedContent, {
+              systemPrompt,
+              skillIds: session.activeSkillIds,
+              workspaceRoot: session.cwd,
+              sessionMode: session.mode,
+              modelOverride: session.modelOverride || undefined,
+            })
             .catch(onSessionStartError);
         } else {
           this.coworkRuntime
             .startSession(coworkSessionId, formattedContent, {
-              workspaceRoot: session?.cwd,
-              confirmationMode: 'text',
               systemPrompt,
+              skillIds: session.activeSkillIds,
+              workspaceRoot: session.cwd,
+              sessionMode: session.mode,
+              modelOverride: session.modelOverride || undefined,
             })
             .catch(onSessionStartError);
         }
@@ -289,7 +328,11 @@ export class IMCoworkHandler extends EventEmitter {
         onSessionStartError(error);
       }
 
-      return responsePromise;
+      try {
+        return await responsePromise;
+      } finally {
+        signal?.removeEventListener('abort', cancelTurn);
+      }
     });
   }
 
@@ -302,6 +345,7 @@ export class IMCoworkHandler extends EventEmitter {
     forceNewSession: boolean = false,
     senderId?: string,
     message?: IMMessage,
+    workspaceId?: string,
   ): Promise<string> {
     if (forceNewSession) {
       const stale = this.imStore.getSessionMapping(imConversationId, platform);
@@ -337,7 +381,13 @@ export class IMCoworkHandler extends EventEmitter {
     }
 
     // Create new Cowork session
-    return this.createCoworkSessionForConversation(imConversationId, platform, senderId, message);
+    return this.createCoworkSessionForConversation(
+      imConversationId,
+      platform,
+      senderId,
+      message,
+      workspaceId,
+    );
   }
 
   private async createCoworkSessionForConversation(
@@ -345,27 +395,26 @@ export class IMCoworkHandler extends EventEmitter {
     platform: Platform,
     senderId?: string,
     message?: IMMessage,
+    workspaceId?: string,
   ): Promise<string> {
     // Create new Cowork session
     const config = this.coworkStore.getConfig();
     const title = this.buildSessionTitle(platform, imConversationId, senderId, message);
     const systemPrompt = await this.buildSystemPromptWithSkills();
-
-    // Resolve the agent bound to this platform (single-instance platforms only;
-    // multi-instance platforms route through OpenClaw channel session sync)
-    const imSettings = this.imStore.getIMSettings();
-    const agentId = imSettings.platformAgentBindings?.[platform] || 'main';
-    // IM channel conversations belong to the app's default conversation
-    // workspace, independently of the currently selected project.
-    const resolvedWorkspaceRoot = getDefaultConversationWorkspacePath();
+    const workspace = workspaceId ? this.coworkStore.getWorkspace(workspaceId) : null;
+    if (!workspace) throw new Error('Channel account workspace is not configured');
 
     const session = this.coworkStore.createSession(
       title,
-      resolvedWorkspaceRoot,
+      workspace.path,
       systemPrompt,
       config.executionMode || 'local',
       [],
-      agentId,
+      'main',
+      '',
+      'work',
+      undefined,
+      workspace.id,
     );
 
     // Save mapping
@@ -408,7 +457,7 @@ export class IMCoworkHandler extends EventEmitter {
         'Treat 知远智能体 and ZhiYuan Agent as the only official product names. Do not translate, localize, transliterate, shorten, or replace them with any other variant or product identity.',
         'When the user asks who you are, answer with the official product identity only. In Chinese, say "我是知远智能体。" You may add "英文名是 ZhiYuan Agent。". In English, say "I am ZhiYuan Agent." You may add "My Chinese product name is 知远智能体."',
         'Do not use any other product name, model name, runtime name, or preset role as your identity.',
-        'OpenClaw, Ollama, and Cowork are implementation details; mention them only when the user asks about the runtime, local models, or integration details.',
+        'The execution runtime and local inference stack are fully self-developed implementation details; mention them only when the user asks about runtime, local-model, or integration details.',
       ].join('\n'),
     ];
     if (systemPrompt) {
@@ -578,7 +627,7 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Handle message event from CoworkRuntime
+   * Handle a message event from the Pi runtime.
    */
   private handleMessage(sessionId: string, message: CoworkMessage): void {
     // Only process messages from IM sessions
@@ -595,7 +644,7 @@ export class IMCoworkHandler extends EventEmitter {
 
     let accumulator = this.messageAccumulators.get(sessionId);
     if (!accumulator) {
-      accumulator = this.ensureBackgroundAccumulator(sessionId);
+      accumulator = this.ensureBackgroundAccumulator(sessionId, message);
     }
     if (accumulator) {
       accumulator.messages.push(message);
@@ -644,6 +693,7 @@ export class IMCoworkHandler extends EventEmitter {
         if (accumulator && accumulator.timeoutId === timeoutId) {
           const partialReply = this.formatReply(sessionId, accumulator.messages);
           this.cleanupAccumulator(sessionId);
+          this.coworkRuntime.stopSession(sessionId);
           if (partialReply && partialReply !== '处理完成，但没有生成回复。') {
             this.emitAccumulatorRunEvent(
               sessionId,
@@ -670,6 +720,7 @@ export class IMCoworkHandler extends EventEmitter {
       this.messageAccumulators.set(sessionId, {
         runId,
         messages: [],
+        storeMessageCountAtStart: this.coworkStore.getSession(sessionId)?.messages.length ?? 0,
         resolve,
         reject,
         timeoutId,
@@ -678,7 +729,10 @@ export class IMCoworkHandler extends EventEmitter {
     });
   }
 
-  private ensureBackgroundAccumulator(sessionId: string): MessageAccumulator | null {
+  private ensureBackgroundAccumulator(
+    sessionId: string,
+    firstMessage: CoworkMessage,
+  ): MessageAccumulator | null {
     const conversation = this.sessionConversationMap.get(sessionId);
     if (!conversation) {
       return null;
@@ -704,9 +758,13 @@ export class IMCoworkHandler extends EventEmitter {
       );
     }, ACCUMULATOR_TIMEOUT_MS);
 
+    const storeMessages = this.coworkStore.getSession(sessionId)?.messages ?? [];
+    const firstMessageIndex = storeMessages.findIndex(message => message.id === firstMessage.id);
     const nextAccumulator: MessageAccumulator = {
       runId: generateCorrelationId(),
       messages: [],
+      storeMessageCountAtStart:
+        firstMessageIndex >= 0 ? firstMessageIndex : storeMessages.length,
       timeoutId,
       backgroundDelivery: {
         conversationId: conversation.conversationId,
@@ -738,7 +796,7 @@ export class IMCoworkHandler extends EventEmitter {
     reply?: string,
     error?: string,
   ): void {
-    // Background delivery is an outbound Cron result. CronJobService owns the
+    // Background delivery is an outbound scheduled-task result. The canonical scheduler owns the
     // Cron activity lifecycle; do not project this accumulator as a second run.
     if (accumulator.backgroundDelivery) return;
     const conversation =
@@ -1016,7 +1074,11 @@ export class IMCoworkHandler extends EventEmitter {
     // Fall back to accumulator messages if the store has none (e.g. timeout path).
     const session = this.coworkStore.getSession(sessionId);
     const storeMessages = session?.messages ?? [];
-    const messages = storeMessages.length > 0 ? storeMessages : accumulator.messages;
+    const currentTurnStoreMessages = storeMessages.slice(
+      accumulator.storeMessageCountAtStart ?? storeMessages.length,
+    );
+    const messages =
+      currentTurnStoreMessages.length > 0 ? currentTurnStoreMessages : accumulator.messages;
 
     // For cron-triggered background deliveries (scheduled task executions),
     // skip the reminder guard — the assistant text IS the scheduled reminder
@@ -1034,7 +1096,7 @@ export class IMCoworkHandler extends EventEmitter {
           replyLength: replyText.length,
           reply: replyText,
           backgroundDelivery: accumulator.backgroundDelivery ?? null,
-          usedStoreMessages: storeMessages.length > 0,
+          usedStoreMessages: currentTurnStoreMessages.length > 0,
         },
         null,
         2,

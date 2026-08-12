@@ -2,13 +2,13 @@ import { expect, test } from 'vitest';
 
 import { buildScheduledTaskEnginePrompt } from './enginePrompt';
 
-test('openclaw prompt points scheduled task requests to the native cron tool', () => {
+test('prompt keeps scheduled task ownership in ZhiYuan SQLite', () => {
   const prompt = buildScheduledTaskEnginePrompt();
 
-  expect(prompt).toMatch(/native `cron` tool/i);
-  expect(prompt).toMatch(/action: "add".*cron\.add/i);
+  expect(prompt).toMatch(/ZhiYuan scheduled-task API/i);
+  expect(prompt).toMatch(/Never call a legacy runtime cron RPC or CLI/i);
   expect(prompt).toMatch(/active conversation context/i);
-  expect(prompt).toMatch(/follow the native `cron` tool schema/i);
+  expect(prompt).toMatch(/follow the ZhiYuan scheduled-task schema/i);
   expect(prompt).toMatch(
     /one-time reminders .*future iso timestamp with an explicit timezone offset/i,
   );
@@ -20,19 +20,19 @@ test('openclaw prompt points scheduled task requests to the native cron tool', (
   );
   expect(prompt).toMatch(/do not use wrapper payloads .*qqbot_payload.*qqbot_cron.*cron_reminder/i);
   expect(prompt).toMatch(
-    /do not use `sessions_spawn`, `subagents`, or ad-hoc background workflows as a substitute for `cron\.add`/i,
+    /do not use `sessions_spawn`, `subagents`, or ad-hoc background workflows as a substitute for the scheduler/i,
   );
-  expect(prompt).toMatch(/never emulate reminders .*bash.*sleep.*openclaw.*claw/i);
-  expect(prompt).toMatch(/if the native `cron` tool is unavailable/i);
+  expect(prompt).toMatch(/never emulate reminders .*bash.*sleep.*legacy runtime CLIs/i);
+  expect(prompt).toMatch(/if the ZhiYuan scheduler is unavailable/i);
 
   // Message delivery guard for cron sessions
   expect(prompt).toMatch(/do NOT.*call the `message` tool directly/i);
-  expect(prompt).toMatch(/cron system handles result delivery automatically/i);
+  expect(prompt).toMatch(/scheduler handles result delivery/i);
   expect(prompt).toMatch(/Channel is required/i);
   expect(prompt).toMatch(/output your results as plain text/i);
 });
 
-test('scheduled task prompt always uses the openclaw instructions', () => {
+test('scheduled task prompt does not instruct an engine switch', () => {
   const prompt = buildScheduledTaskEnginePrompt();
 
   expect(prompt).not.toMatch(/switch the agent engine/i);

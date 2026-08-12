@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 
-import { OpenClawProviderId } from '../../../shared/providers';
+import { AgentProviderId } from '../../../shared/providers';
 import type { RootState } from '../../store';
 import { type Model, selectAgentSelectedModel } from '../../store/slices/modelSlice';
-import { resolveOpenClawModelRef } from '../../utils/openclawModelRef';
+import { resolveAgentModelRef } from '../../utils/agentModelRef';
 
 type ResolveAgentModelSelectionInput = {
   sessionModel?: string;
@@ -23,7 +23,7 @@ type ResolveAgentModelSelectionResult = {
 };
 
 export function isLlamaCppModelRef(modelRef: string): boolean {
-  return modelRef.trim().startsWith(`${OpenClawProviderId.LlamaCpp}/`);
+  return modelRef.trim().startsWith(`${AgentProviderId.LlamaCpp}/`);
 }
 
 /**
@@ -58,7 +58,7 @@ export function resolveAgentModelSelection({
   const normalizedSessionModel = sessionModel?.trim() ?? '';
   if (normalizedSessionModel) {
     const explicitSessionModel =
-      resolveOpenClawModelRef(normalizedSessionModel, availableModels) ?? null;
+      resolveAgentModelRef(normalizedSessionModel, availableModels) ?? null;
     if (explicitSessionModel) {
       return {
         selectedModel: explicitSessionModel,
@@ -82,7 +82,7 @@ export function resolveAgentModelSelection({
 
   const normalizedAgentModel = agentModel.trim();
   if (normalizedAgentModel) {
-    const explicitModel = resolveOpenClawModelRef(normalizedAgentModel, availableModels) ?? null;
+    const explicitModel = resolveAgentModelRef(normalizedAgentModel, availableModels) ?? null;
     if (explicitModel) {
       return {
         selectedModel: explicitModel,

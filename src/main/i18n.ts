@@ -146,6 +146,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imAuthProbeTimeout: '鉴权探测超时',
     imAuthFailed: '鉴权失败: {error}',
     imAuthFailedSuggestion: '请检查 ID/Secret/Token 是否正确，且机器人权限已开通。',
+    imWeixinReconnectRequired: '微信频道需要重新授权后才能连接。',
     imChannelEnabledNotConnected: 'IM 渠道已启用但当前未连接。',
     imChannelEnabledNotConnectedSuggestion: '请检查网络、机器人配置和平台侧事件开关。',
     imChannelRunning: 'IM 渠道已启用且运行正常。',
@@ -166,7 +167,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imUnknownPlatform: '未知平台。',
 
     // QQ
-    imQqOpenClawHint: 'QQ 通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imQqMentionHint: '频道中需 @机器人 触发对话，也支持私信和群聊。',
     imQqAuthPassed: 'QQ 鉴权通过（AccessToken 已获取）。',
     imQqAccessTokenFailed: '获取 AccessToken 失败',
@@ -182,8 +182,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imTelegramAuthFailedUnknown: '未知错误',
     imTelegramCheckToken: '请检查 Bot Token 是否正确。',
     imTelegramCheckTokenNetwork: '请检查 Bot Token 是否正确，且网络通畅。',
-    imTelegramOpenClawHint:
-      'Telegram 通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
 
     // Discord
     imDiscordMissingBotToken: '缺少必要配置项: botToken',
@@ -191,8 +189,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDiscordAuthPassed: 'Discord Bot 鉴权通过（Bot: {username}）。',
     imDiscordAuthFailed: 'Discord Bot 鉴权失败: {error}',
     imDiscordCheckTokenNetwork: '请检查 Bot Token 是否正确，且网络通畅。',
-    imDiscordOpenClawHint:
-      'Discord 通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imDiscordGroupMention: 'Discord 群聊中仅响应 @机器人的消息。',
 
     // Feishu
@@ -200,8 +196,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imFeishuAuthPassed: '飞书鉴权通过（Bot: {botName}）',
     imFeishuAuthFailed: '飞书鉴权失败: {error}',
     imFeishuCheckAppIdSecret: '请检查 App ID 和 App Secret 是否正确。',
-    imFeishuOpenClawHint:
-      '飞书通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imFeishuGroupMention: '飞书群聊中仅响应 @机器人的消息。',
     imFeishuGroupMentionSuggestion: '请在群聊中使用 @机器人 + 内容触发对话。',
     imFeishuEventSubscription: '飞书需要开启消息事件订阅（im.message.receive_v1）才能收消息。',
@@ -214,25 +208,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDingtalkAuthFailed: '钉钉鉴权失败: {error}',
     imDingtalkCheckClientIdSecret:
       '请检查 Client ID 和 Client Secret 是否正确，且机器人权限已开通。',
-    imDingtalkOpenClawHint:
-      '钉钉通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
     imDingtalkBotMembership: '钉钉机器人需被加入目标会话并具备发言权限。',
     imDingtalkBotMembershipSuggestion: '请确认机器人在目标会话中，且企业权限配置允许收发消息。',
 
     // WeCom
     imWecomFillBotIdSecret: '请补全 Bot ID 和 Secret 后重新测试连通性。',
     imWecomConfigReady: '企业微信配置已就绪（Bot ID: {botId}）。',
-    imWecomOpenClawHint:
-      '企业微信通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
-    imWecomConfigReadyOpenClaw: '企业微信配置已就绪（Bot ID: {botId}），通过Agent 引擎运行。',
 
     // Weixin
     imWeixinNotEnabled: '微信渠道当前未启用。',
     imWeixinEnableSuggestion: '请启用微信渠道后重新测试连通性。',
     imWeixinConfigReady: '微信配置已就绪。',
-    imWeixinOpenClawHint:
-      '微信通过Agent 引擎运行时运行，Bot 将在Agent 引擎 Gateway 启动后自动连接。',
-    imWeixinConfigReadyOpenClaw: '微信配置已就绪，通过Agent 引擎运行。',
     imWeixinAccountMissing: '尚未绑定微信账号，需要扫码登录。',
     imWeixinAccountMissingSuggestion: '请在微信设置中点击"扫码连接微信"完成账号绑定。',
     imWeixinGatewayNotRunning: 'Agent 引擎 Gateway 未启动，微信频道无法连接。',
@@ -263,8 +249,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTransportMode: '传输模式',
     emailTransportImap: 'IMAP/SMTP（传统模式）',
     emailTransportWs: 'WebSocket（安全模式，无需密码）',
-    emailAgentBinding: '绑定 Agent',
-    emailAgentBindingHint: '该邮箱的所有邮件对话将路由到选定的 Agent',
     emailAllowFrom: '允许的发件人（白名单）',
     emailAllowFromPlaceholder: 'user@example.com\n*.trusted-domain.com\n*@company.com',
     emailAllowFromHint: '支持通配符，每行一个。留空表示接受所有发件人。',
@@ -472,6 +456,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imAuthFailed: 'Authentication failed: {error}',
     imAuthFailedSuggestion:
       'Please check that your ID/Secret/Token are correct and that bot permissions are enabled.',
+    imWeixinReconnectRequired: 'Reconnect the Weixin channel before it can receive messages.',
     imChannelEnabledNotConnected: 'IM channel is enabled but not currently connected.',
     imChannelEnabledNotConnectedSuggestion:
       'Please check the network, bot configuration, and platform-side event settings.',
@@ -499,8 +484,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imUnknownPlatform: 'Unknown platform.',
 
     // QQ
-    imQqOpenClawHint:
-      'QQ runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imQqMentionHint:
       '@mention the bot in channels to start a conversation. Direct messages and group chats are also supported.',
     imQqAuthPassed: 'QQ authentication passed (AccessToken obtained).',
@@ -519,8 +502,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imTelegramCheckToken: 'Please check that the Bot Token is correct.',
     imTelegramCheckTokenNetwork:
       'Please check that the Bot Token is correct and the network is reachable.',
-    imTelegramOpenClawHint:
-      'Telegram runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
 
     // Discord
     imDiscordMissingBotToken: 'Missing required configuration: botToken',
@@ -529,8 +510,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDiscordAuthFailed: 'Discord Bot authentication failed: {error}',
     imDiscordCheckTokenNetwork:
       'Please check that the Bot Token is correct and the network is reachable.',
-    imDiscordOpenClawHint:
-      'Discord runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imDiscordGroupMention: 'Discord only responds to @mentioned messages in group chats.',
 
     // Feishu
@@ -539,8 +518,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imFeishuAuthPassed: 'Feishu authentication passed (Bot: {botName})',
     imFeishuAuthFailed: 'Feishu authentication failed: {error}',
     imFeishuCheckAppIdSecret: 'Please check that the App ID and App Secret are correct.',
-    imFeishuOpenClawHint:
-      'Feishu runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imFeishuGroupMention: 'Feishu only responds to @mentioned messages in group chats.',
     imFeishuGroupMentionSuggestion:
       'Please @mention the bot in group chats to start a conversation.',
@@ -557,8 +534,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imDingtalkAuthFailed: 'DingTalk authentication failed: {error}',
     imDingtalkCheckClientIdSecret:
       'Please check that the Client ID and Client Secret are correct and that bot permissions are enabled.',
-    imDingtalkOpenClawHint:
-      'DingTalk runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
     imDingtalkBotMembership:
       'The DingTalk bot must be added to the target conversation with messaging permissions.',
     imDingtalkBotMembershipSuggestion:
@@ -567,18 +542,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // WeCom
     imWecomFillBotIdSecret: 'Please provide the Bot ID and Secret and test connectivity again.',
     imWecomConfigReady: 'WeCom configuration is ready (Bot ID: {botId}).',
-    imWecomOpenClawHint:
-      'WeCom runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
-    imWecomConfigReadyOpenClaw:
-      'WeCom configuration is ready (Bot ID: {botId}), running via Agent engine.',
 
     // Weixin
     imWeixinNotEnabled: 'WeChat channel is not currently enabled.',
     imWeixinEnableSuggestion: 'Please enable the WeChat channel and test connectivity again.',
     imWeixinConfigReady: 'WeChat configuration is ready.',
-    imWeixinOpenClawHint:
-      'WeChat runs via Agent engine runtime. The bot will connect automatically when Agent engine Gateway starts.',
-    imWeixinConfigReadyOpenClaw: 'WeChat configuration is ready, running via Agent engine.',
     imWeixinAccountMissing: 'WeChat account is not bound. QR code scan is required.',
     imWeixinAccountMissingSuggestion:
       'Please use "Scan to Connect WeChat" in WeChat settings to bind your account.',
@@ -613,8 +581,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTransportMode: 'Transport Mode',
     emailTransportImap: 'IMAP/SMTP (Traditional)',
     emailTransportWs: 'WebSocket (Secure, no password required)',
-    emailAgentBinding: 'Agent Binding',
-    emailAgentBindingHint: 'All email conversations will be routed to the selected Agent',
     emailAllowFrom: 'Allowed Senders (Whitelist)',
     emailAllowFromPlaceholder: 'user@example.com\n*.trusted-domain.com\n*@company.com',
     emailAllowFromHint: 'Supports wildcards, one per line. Empty = accept all senders.',

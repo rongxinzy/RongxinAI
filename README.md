@@ -116,21 +116,16 @@ bun install
 bun run electron:dev
 ```
 
-To prepare the runtimes separately:
+To prepare local inference separately:
 
 ```bash
 # Download the llama.cpp runtime for the current host
 bun run llamacpp:runtime:download
-
-# Fetch and build the pinned agent runtime for the current host
-bun run openclaw:runtime:host
 ```
 
-Or prepare the bundled agent runtime and local inference runtime, then start Electron:
-
-```bash
-bun run electron:dev:openclaw
-```
+The Pi execution kernel runs in-process. Channel and Cron transport is provided by
+the pinned `cc-connect` sidecar during release builds; it does not own agent execution
+or persistent task state.
 
 ### Build, test, and package
 

@@ -76,11 +76,7 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
-import {
-  applyApplicationRuntimeEnv,
-  getSkillsRoot,
-  resolveGitBashPathForPi,
-} from '../coworkUtil';
+import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import {
@@ -437,7 +433,7 @@ const MESSAGE_UPDATE_THROTTLE_MS = 200;
 /**
  * How often streaming content is written to SQLite. better-sqlite3 is synchronous
  * and blocks the main-process event loop, so writing on every Pi frame causes
- * visible streaming jank. We throttle store writes (like the OpenClaw adapter)
+ * visible streaming jank. Store writes are throttled
  * and flush the latest content on finalize.
  */
 const STORE_UPDATE_THROTTLE_MS = 250;
@@ -1053,6 +1049,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.activeSessions.delete(sessionId);
       }
       if (abortController.signal.aborted) {
+        this.emit('sessionStopped', sessionId);
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -1331,6 +1328,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     } catch (error) {
       active.isRunning = false;
       if (active.abortController.signal.aborted) {
+        this.emit('sessionStopped', sessionId);
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -1446,6 +1444,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     void active.piSession.abort();
     this.workbenchTaskService?.pauseRun?.(sessionId, reason);
     this.clearApprovalsBySession(sessionId);
+    this.emit('sessionStopped', sessionId);
     if (cause) this.recordSessionInterruption(sessionId, cause);
 
     // A user stop ends the current turn without cancelling messages already
@@ -2081,7 +2080,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'tool_execution_start': {
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
-        // Mirrors OpenClaw adapter's tool_use construction.
+        // Preserve the shared tool_use message shape.
         if (!event.toolCallId || !event.toolName) break;
         const runningActivity = active.toolActivityTracker.upsert(
           {

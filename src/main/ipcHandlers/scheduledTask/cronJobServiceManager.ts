@@ -1,51 +1,25 @@
-import { CronJobService } from '../../../scheduledTask/cronJobService';
-import { emitChannelRunEvent } from '../../im/channelRunEvents';
-
-type GatewayClientLike = {
-  request: <T = Record<string, unknown>>(
-    method: string,
-    params?: unknown,
-    opts?: { expectFinal?: boolean },
-  ) => Promise<T>;
-};
+import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 
 export interface CronJobServiceDeps {
-  getOpenClawChannelGateway: () => {
-    getGatewayClient: () => GatewayClientLike | null;
-    ensureReady: () => Promise<void>;
-    onGatewayDisconnect: (callback: (reason: string) => void) => () => void;
-    onGatewayReconnect: (callback: () => void) => () => void;
-  } | null;
+  /** SQLite-backed canonical scheduler; never fall back to an Agent runtime. */
+  getScheduledTaskService: () => ScheduledTaskService;
 }
 
-let cronJobService: CronJobService | null = null;
+let cronJobService: ScheduledTaskService | null = null;
 let deps: CronJobServiceDeps | null = null;
 
 export function initCronJobServiceManager(d: CronJobServiceDeps): void {
   deps = d;
 }
 
-export function getCronJobService(): CronJobService {
+export function getCronJobService(): ScheduledTaskService {
   if (!cronJobService) {
     if (!deps) {
       throw new Error(
         'CronJobServiceManager not initialized. Call initCronJobServiceManager() first.',
       );
     }
-    const adapter = deps.getOpenClawChannelGateway();
-    if (!adapter) {
-      throw new Error(
-        'OpenClaw runtime adapter not initialized. CronJobService requires OpenClaw.',
-      );
-    }
-    const service = new CronJobService({
-      getGatewayClient: () => adapter.getGatewayClient(),
-      ensureGatewayReady: () => adapter.ensureReady(),
-      onChannelRunEvent: emitChannelRunEvent,
-    });
-    adapter.onGatewayDisconnect(() => service.handleGatewayDisconnected());
-    adapter.onGatewayReconnect(() => service.handleGatewayConnected());
-    cronJobService = service;
+    cronJobService = deps.getScheduledTaskService();
   }
   return cronJobService;
 }

@@ -1,6 +1,13 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import type { ScheduledTask } from '../../scheduledTask/types';
+import {
+  DeliveryMode,
+  PayloadKind,
+  ScheduleKind,
+  SessionTarget,
+  WakeMode,
+} from '../../scheduledTask/constants';
 import { store } from '../store';
 import { setListError, setLoading, setTasks } from '../store/slices/scheduledTaskSlice';
 import { ScheduledTaskService } from './scheduledTask';
@@ -80,12 +87,12 @@ function makeTaskFixture(id: string): ScheduledTask {
     name: 'Morning brief',
     description: '',
     enabled: true,
-    schedule: { kind: 'cron', expr: '0 9 * * *' },
-    sessionTarget: 'isolated',
-    wakeMode: 'now',
-    payload: { kind: 'agentTurn', message: 'Summarize updates' },
-    delivery: { mode: 'none' },
-    agentId: 'agent-1',
+    schedule: { kind: ScheduleKind.Every, everyMs: 60_000 },
+    sessionTarget: SessionTarget.Isolated,
+    wakeMode: WakeMode.Now,
+    payload: { kind: PayloadKind.AgentTurn, message: 'Summarize updates' },
+    delivery: { mode: DeliveryMode.None },
+    workspaceId: 'workspace-1',
     sessionKey: null,
     state: {
       nextRunAtMs: null,
@@ -110,8 +117,11 @@ test('runManually flips the task to running before the gateway responds', async 
         resolveRun = resolve;
       }),
   );
+  const list = vi.fn().mockResolvedValue({ success: true, tasks: [makeTaskFixture('task-1')] });
+  const listRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
+  const listAllRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
   vi.stubGlobal('window', {
-    electron: { scheduledTasks: { runManually } },
+    electron: { scheduledTasks: { runManually, list, listRuns, listAllRuns } },
     dispatchEvent: vi.fn(),
   });
   const service = new ScheduledTaskService();
@@ -128,18 +138,20 @@ test('runManually flips the task to running before the gateway responds', async 
   });
   await pendingRun;
 
-  // A successful start keeps the running state until the real poll reconciles.
-  expect(
-    store.getState().scheduledTask.tasks.find(t => t.id === 'task-1')?.state.runningAtMs,
-  ).not.toBeNull();
+  expect(list).toHaveBeenCalledTimes(2);
+  expect(listRuns).toHaveBeenCalledWith('task-1', 20, undefined, undefined);
+  expect(listAllRuns).toHaveBeenCalledWith(undefined, undefined, undefined);
 });
 
 test('runManually rolls back the optimistic state and toasts when the run fails to start', async () => {
   store.dispatch(setTasks([makeTaskFixture('task-2')]));
   const runManually = vi.fn().mockResolvedValue({ success: false, error: 'gateway offline' });
+  const list = vi.fn().mockResolvedValue({ success: true, tasks: [makeTaskFixture('task-2')] });
+  const listRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
+  const listAllRuns = vi.fn().mockResolvedValue({ success: true, runs: [] });
   const dispatchEvent = vi.fn();
   vi.stubGlobal('window', {
-    electron: { scheduledTasks: { runManually } },
+    electron: { scheduledTasks: { runManually, list, listRuns, listAllRuns } },
     dispatchEvent,
   });
   const service = new ScheduledTaskService();

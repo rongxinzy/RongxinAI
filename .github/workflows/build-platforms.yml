@@ -70,16 +70,14 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v6
+      - name: Enforce retired runtime decoupling
+        run: node scripts/ci/check-openclaw-decoupling.mjs
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.14'
-      # The bundled runtime uses pnpm upstream; Bun installs this repository.
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
@@ -88,13 +86,10 @@ jobs:
             ~/.npm
             ~/.cache/electron
             ~/.cache/electron-builder
-            ~/.local/share/pnpm/store
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
-            ~/AppData/Local/pnpm/store
-            vendor/openclaw-runtime/${{ matrix.runtime_target }}
-            vendor/openclaw-plugins
             vendor/engram-runtime
+            vendor/channel-runtime
           key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
             packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-

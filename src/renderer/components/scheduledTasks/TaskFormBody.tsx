@@ -24,13 +24,16 @@ interface TaskFormBodyProps {
   mode: 'create' | 'edit';
   name: string;
   modelId: string;
+  workspaceId: string;
   payloadText: string;
   errors: Record<string, string>;
   modelOptions: Array<{ value: string; label: string }>;
+  workspaceOptions: Array<{ value: string; label: string }>;
   scheduleControl: React.ReactNode;
   notificationControl: React.ReactNode;
   onNameChange: (value: string) => void;
   onModelChange: (value: string) => void;
+  onWorkspaceChange: (value: string) => void;
   onPayloadTextChange: (value: string) => void;
 }
 
@@ -38,13 +41,16 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = ({
   mode,
   name,
   modelId,
+  workspaceId,
   payloadText,
   errors,
   modelOptions,
+  workspaceOptions,
   scheduleControl,
   notificationControl,
   onNameChange,
   onModelChange,
+  onWorkspaceChange,
   onPayloadTextChange,
 }) => (
   <div className="max-w-2xl mx-auto flex flex-col gap-4 w-full px-1">
@@ -99,6 +105,35 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = ({
           </SelectContent>
         </Select>
         <FieldError>{errors.modelId}</FieldError>
+      </Field>
+
+      <Field data-invalid={Boolean(errors.workspaceId) || undefined}>
+        <FieldLabel htmlFor="scheduled-task-workspace">
+          {i18nService.t('scheduledTasksFormWorkspace')}
+          <span className="text-destructive">*</span>
+        </FieldLabel>
+        <Select value={workspaceId} onValueChange={value => onWorkspaceChange(value ?? '')}>
+          <SelectTrigger
+            id="scheduled-task-workspace"
+            className="w-full"
+            aria-invalid={Boolean(errors.workspaceId)}
+          >
+            <SelectValue placeholder={i18nService.t('scheduledTasksFormWorkspacePlaceholder')} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              {workspaceOptions.map(workspace => (
+                <SelectItem key={workspace.value} value={workspace.value}>
+                  {workspace.label}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <FieldDescription className="text-xs">
+          {i18nService.t('scheduledTasksFormWorkspaceHint')}
+        </FieldDescription>
+        <FieldError>{errors.workspaceId}</FieldError>
       </Field>
 
       <Field data-invalid={Boolean(errors.schedule) || undefined}>

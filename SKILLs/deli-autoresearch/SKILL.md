@@ -1,8 +1,8 @@
 ---
 name: deli-autoresearch
-description: "A protocol framework for long-horizon autonomous research tasks. Targets three empirically-observed failure modes — cognitive loops, stalling, runtime fragility — by prescribing state management, stall detection, and watchdog mechanisms. Use when the user asks for academic research, literature surveys, paper writing, or any unattended multi-day research task. Triggers: academic research, 学术研究, literature review, 文献综述, paper writing, 论文写作, ICLR survey, autonomous research."
+description: 'A protocol framework for long-horizon autonomous research tasks. Targets three empirically-observed failure modes — cognitive loops, stalling, runtime fragility — by prescribing state management, stall detection, and watchdog mechanisms. Use when the user asks for academic research, literature surveys, paper writing, or any unattended multi-day research task. Triggers: academic research, 学术研究, literature review, 文献综述, paper writing, 论文写作, ICLR survey, autonomous research.'
 metadata:
-  version: "1.1"
+  version: '1.1'
   category: research
 ---
 
@@ -16,13 +16,13 @@ This skill is a protocol framework for long-horizon autonomous tasks (days to we
 
 The protocol's abstract mechanisms map onto concrete tools here:
 
-| Protocol mechanism | Concrete tool |
-|--------------------|---------------|
-| Orchestrator loop (`/loop`) | `agent_loop` tool — start a goal-mode loop, one iteration per research cycle |
-| Work agent (`Agent tool`) | `subagent` tool — single / parallel / chain delegation to researcher-scout-planner-reviewer profiles |
-| Fresh session per iteration | each `subagent` call is an isolated session with no shared conversation memory |
-| Durable heartbeat watchdog | cron/scheduled tasks on the OpenClaw gateway path (IM/自动化); in Work sessions, `agent_loop` carries the iteration cadence instead |
-| Nudge / direction injection | the parent session steers between loop iterations by editing state files |
+| Protocol mechanism          | Concrete tool                                                                                        |
+| --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Orchestrator loop (`/loop`) | `agent_loop` tool — start a goal-mode loop, one iteration per research cycle                         |
+| Work agent (`Agent tool`)   | `subagent` tool — single / parallel / chain delegation to researcher-scout-planner-reviewer profiles |
+| Fresh session per iteration | each `subagent` call is an isolated session with no shared conversation memory                       |
+| Durable heartbeat watchdog  | SQLite-backed scheduled tasks; in Work sessions, `agent_loop` carries the iteration cadence instead  |
+| Nudge / direction injection | the parent session steers between loop iterations by editing state files                             |
 
 State files and logs below are tool-agnostic: they are what makes every iteration resumable.
 
@@ -61,6 +61,7 @@ The common cause of all three is missing engineering scaffolding, not insufficie
       [Task A]      [Task B]      [Task C]   ← each its own fresh session
 
 Core design decisions:
+
 - Separate execution from evaluation — the agent doing the work does not judge its own progress; stall determination is made by the orchestration layer based on quantitative metrics.
 - Fresh session over resume — context accumulation is the primary cause of cognitive loops. Each iteration starts with fresh context; state is injected via files.
 - Enforced direction diversity — before each iteration, read the list of tried directions; a new direction must differ from all history.
@@ -93,8 +94,8 @@ Log line format: {"ts":"...", "source":"...", "level":"info|warn|error|decision"
     #    (4) write results back to state files; (5) call agent_loop next.
     #    Zero interaction.
 
-    # 3. On the OpenClaw gateway path (IM/scheduled tasks), register a durable
-    # heartbeat watchdog (survives across sessions):
+    # 3. Register a durable SQLite-backed scheduled-task heartbeat watchdog
+    # (survives across sessions):
     # hourly patrol: write a timestamp; check each loop's last_seen against interval×3,
     # restart if exceeded; check each task's progress for stalls over 2h, nudge if stalled.
     # Zero interaction. In Work sessions, agent_loop itself is the cadence — keep
@@ -102,12 +103,12 @@ Log line format: {"ts":"...", "source":"...", "level":"info|warn|error|decision"
 
 ## 6. Stall Detection & Pivoting
 
-| Mechanism | Rule |
-|-----------|------|
-| Stall detection | an iteration with 0 new findings or a metric drop → stale_count + 1 |
-| Forced pivot | stale_count >= 2 → change a structural constraint, not tactical parameters; >= 4 → flag for human attention |
-| Direction diversity | a new direction must differ from every tried one; after a stall, inject a perturbation strategy |
-| Round cap | a single work session caps at 15 rounds or 30 minutes |
+| Mechanism           | Rule                                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Stall detection     | an iteration with 0 new findings or a metric drop → stale_count + 1                                         |
+| Forced pivot        | stale_count >= 2 → change a structural constraint, not tactical parameters; >= 4 → flag for human attention |
+| Direction diversity | a new direction must differ from every tried one; after a stall, inject a perturbation strategy             |
+| Round cap           | a single work session caps at 15 rounds or 30 minutes                                                       |
 
 "Pivot structure, not tactics" comes from practice: when a task stalls repeatedly within a frame, the decisive gain usually comes from correcting the environment/structural constraint itself, not from tuning strategy parameters harder inside the existing frame.
 
@@ -115,11 +116,11 @@ Log line format: {"ts":"...", "source":"...", "level":"info|warn|error|decision"
 
 The business loop is itself unreliable and needs an independent guardian layer. Three mutually-checking layers (V3):
 
-| Layer | Form | Depends on | Role |
-|-------|------|------------|------|
-| L0 | resident shell guard | no session | heartbeat stale > 2h → spin up an emergency patrol via a headless agent |
-| L1 | durable cron, hourly | a living interactive session | check each loop's last_seen, restart timed-out loops, detect stalling and nudge |
-| L2 | business loop | each its own session | first line of each callback updates its own last_seen |
+| Layer | Form                 | Depends on                   | Role                                                                            |
+| ----- | -------------------- | ---------------------------- | ------------------------------------------------------------------------------- |
+| L0    | resident shell guard | no session                   | heartbeat stale > 2h → spin up an emergency patrol via a headless agent         |
+| L1    | durable cron, hourly | a living interactive session | check each loop's last_seen, restart timed-out loops, detect stalling and nudge |
+| L2    | business loop        | each its own session         | first line of each callback updates its own last_seen                           |
 
 Any one layer dying can be detected and recovered by another.
 
@@ -129,12 +130,12 @@ Stall detection: if progress has no update for over 2 hours and the last output 
 
 All patterns below are expressed with the `subagent` tool: one call per work agent, `parallel` mode for fan-out, `chain` mode for staged pipelines (later steps receive earlier output via `{previous}`).
 
-| Pattern | Use | Key idea |
-|---------|-----|----------|
-| A Goal-driven | research iteration | inject tried directions, require verifiable findings, write back to findings.jsonl |
-| B Parallel exploration | complex sub-problems | one `subagent` parallel call: investigation, refutation, cross-domain analogy |
-| C Experiment run | long compute jobs | `chain` mode: submit → minute-level polling → auto-diagnose errors, fix, resubmit |
-| D Verification | post-iteration QA | an independent `reviewer` subagent audits the evidence chain of findings |
+| Pattern                | Use                  | Key idea                                                                           |
+| ---------------------- | -------------------- | ---------------------------------------------------------------------------------- |
+| A Goal-driven          | research iteration   | inject tried directions, require verifiable findings, write back to findings.jsonl |
+| B Parallel exploration | complex sub-problems | one `subagent` parallel call: investigation, refutation, cross-domain analogy      |
+| C Experiment run       | long compute jobs    | `chain` mode: submit → minute-level polling → auto-diagnose errors, fix, resubmit  |
+| D Verification         | post-iteration QA    | an independent `reviewer` subagent audits the evidence chain of findings           |
 
 A subagent task prompt should include: background, a verifiable deliverable, working directory, file/line caps, and completion criteria.
 
@@ -151,14 +152,15 @@ A subagent task prompt should include: background, a verifiable deliverable, wor
 
 The framework has carried several heterogeneous tasks: academic paper writing, long-horizon research, etc. Paper-track output:
 
-| Paper | Pages | Citations | Self-rated |
-|-------|-------|-----------|------------|
-| Autonomous Research Agents | 59 | 228 | 8.0/10 |
-| Continual Learning | 65 | 326 | 8.0/10 |
-| Long-Horizon Decision-Making | 55 | 384 | 8.0/10 |
-| Self-Play (285B RL experiment + theory hardening) | 75 | 217 | 8.6/10 |
+| Paper                                             | Pages | Citations | Self-rated |
+| ------------------------------------------------- | ----- | --------- | ---------- |
+| Autonomous Research Agents                        | 59    | 228       | 8.0/10     |
+| Continual Learning                                | 65    | 326       | 8.0/10     |
+| Long-Horizon Decision-Making                      | 55    | 384       | 8.0/10     |
+| Self-Play (285B RL experiment + theory hardening) | 75    | 217       | 8.6/10     |
 
 Limits:
+
 1. Scores come from in-framework multi-persona simulated review; comparable only longitudinally within the same protocol, not an external quality claim.
 2. The longest continuous run on record was 72 hours, with 6 directional human inputs during it — zero operational intervention, directional intervention retained.
 3. Fabricated citations and data artifacts originate from the LLM itself; the framework makes external checking a mechanical step in the process, it does not remove the error source.

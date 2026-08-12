@@ -113,24 +113,7 @@ export const AppConfigIpc = {
 } as const;
 export type AppConfigIpc = (typeof AppConfigIpc)[keyof typeof AppConfigIpc];
 
-// ─── OpenClaw Engine ────────────────────────────────────────────────────────
-export const OpenClawEngineIpc = {
-  GetStatus: 'openclaw:engine:getStatus',
-  Install: 'openclaw:engine:install',
-  RetryInstall: 'openclaw:engine:retryInstall',
-  RestartGateway: 'openclaw:engine:restartGateway',
-  OnProgress: 'openclaw:engine:onProgress',
-} as const;
-export type OpenClawEngineIpc = (typeof OpenClawEngineIpc)[keyof typeof OpenClawEngineIpc];
-
-// ─── OpenClaw renderer bridge ───────────────────────────────────────────────
-export const OpenClawBridgeIpc = {
-  AskUser: 'openclaw:bridge:askUser',
-  AskUserDismiss: 'openclaw:bridge:askUserDismiss',
-  RespondAskUser: 'openclaw:bridge:respondAskUser',
-} as const;
-export type OpenClawBridgeIpc = (typeof OpenClawBridgeIpc)[keyof typeof OpenClawBridgeIpc];
-
+// ─── Agent Engine ──────────────────────────────────────────────────────────
 // ─── Cowork Session ─────────────────────────────────────────────────────────
 export const CoworkSessionIpc = {
   Start: 'cowork:session:start',
@@ -141,8 +124,8 @@ export const CoworkSessionIpc = {
   DeleteBatch: 'cowork:session:deleteBatch',
   Pin: 'cowork:session:pin',
   Rename: 'cowork:session:rename',
+  UpdateModel: 'cowork:session:updateModel',
   Get: 'cowork:session:get',
-  GatewaySessionId: 'cowork:session:gatewaySessionId',
   RemoteManaged: 'cowork:session:remoteManaged',
   List: 'cowork:session:list',
   GetMessages: 'cowork:session:getMessages',
@@ -274,19 +257,17 @@ export const ImIpc = {
   // Status
   StatusGet: 'im:status:get',
   GetLocalIp: 'im:getLocalIp',
-  OpenClawConfigSchema: 'im:openclaw:config-schema',
-  // Weixin
-  WeixinQrLoginStart: 'im:weixin:qr-login-start',
-  WeixinQrLoginWait: 'im:weixin:qr-login-wait',
-  // Pairing
-  PairingList: 'im:pairing:list',
-  PairingApprove: 'im:pairing:approve',
-  PairingReject: 'im:pairing:reject',
   // Events
   StatusChange: 'im:status:change',
   MessageReceived: 'im:message:received',
 } as const;
 export type ImIpc = (typeof ImIpc)[keyof typeof ImIpc];
+
+export const WeixinInstallIpc = {
+  Start: 'im:weixin:login:start',
+  Poll: 'im:weixin:login:poll',
+} as const;
+export type WeixinInstallIpc = (typeof WeixinInstallIpc)[keyof typeof WeixinInstallIpc];
 
 // ─── IM Multi-Instance factories ────────────────────────────────────────────
 export const ImInstanceIpc = {
@@ -322,8 +303,6 @@ export type CommunityAuthIpc = (typeof CommunityAuthIpc)[keyof typeof CommunityA
 
 // ─── Feishu Install ─────────────────────────────────────────────────────────
 export const FeishuInstallIpc = {
-  Qrcode: 'feishu:install:qrcode',
-  Poll: 'feishu:install:poll',
   Verify: 'feishu:install:verify',
 } as const;
 export type FeishuInstallIpc = (typeof FeishuInstallIpc)[keyof typeof FeishuInstallIpc];

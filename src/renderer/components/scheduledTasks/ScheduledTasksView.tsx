@@ -17,7 +17,6 @@ import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
-import { useGatewayReady } from '../cowork/useGatewayReady';
 import WindowTitleBar from '../window/WindowTitleBar';
 import AllRunsHistory from './AllRunsHistory';
 import DeleteConfirmModal from './DeleteConfirmModal';
@@ -54,7 +53,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const viewMode = useSelector((state: RootState) => state.scheduledTask.viewMode);
   const selectedTaskId = useSelector((state: RootState) => state.scheduledTask.selectedTaskId);
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
-  const gatewayReady = useGatewayReady();
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
   const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
@@ -155,11 +153,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!gatewayReady) {
-      setInitialDataLoaded(false);
-      return;
-    }
-
     let cancelled = false;
     const loadTasks = scheduledTaskService.isInitialized
       ? scheduledTaskService.loadTasks()
@@ -174,7 +167,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [gatewayReady]);
+  }, []);
 
   const openCreateModal = useCallback((prefill?: TaskTemplateValues) => {
     setCreatePrefill(prefill);
@@ -212,7 +205,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     }
   }, []);
 
-  if (!gatewayReady || !initialDataLoaded) {
+  if (!initialDataLoaded) {
     return (
       <div className="flex h-full items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">

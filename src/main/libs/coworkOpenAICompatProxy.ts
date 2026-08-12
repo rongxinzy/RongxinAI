@@ -2307,7 +2307,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
-  // Dedicated Copilot passthrough route. OpenClaw is configured with
+  // Dedicated Copilot passthrough route. The agent runtime is configured with
   // baseUrl = http://127.0.0.1:PORT/v1/copilot so it sends requests here.
   // This route manages the Copilot token lifecycle independently of upstreamConfig
   // and injects the required IDE headers (Editor-Version etc.) before forwarding
@@ -2412,7 +2412,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
-  // OpenClaw sends requests to /v1/chat/completions (OpenAI format) when using
+  // The agent runtime sends requests to /v1/chat/completions when using
   // the zhiyuan provider. Transparently proxy these requests to the upstream with
   // IDE headers injected (needed for GitHub Copilot).
   if (
