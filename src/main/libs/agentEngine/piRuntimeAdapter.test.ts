@@ -55,6 +55,7 @@ const hoisted = vi.hoisted(() => {
       this.reload = vi.fn().mockResolvedValue(undefined);
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
+    mockApplyApplicationRuntimeEnv: vi.fn(),
     mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
     mockGetModel: vi.fn((provider: string, modelId: string) => ({
       provider,
@@ -172,6 +173,7 @@ const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
+const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
@@ -201,6 +203,7 @@ vi.mock('../coworkUtil', async importOriginal => {
   const actual = await importOriginal<typeof import('../coworkUtil')>();
   return {
     ...actual,
+    applyApplicationRuntimeEnv: hoisted.mockApplyApplicationRuntimeEnv,
     resolveGitBashPathForPi: vi.fn(() => undefined),
   };
 });
@@ -232,6 +235,7 @@ describe('PiRuntimeAdapter', () => {
   };
 
   beforeEach(() => {
+    mockApplyApplicationRuntimeEnv.mockClear();
     vi.clearAllMocks();
     mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
     adapter = new PiRuntimeAdapter();
@@ -249,6 +253,9 @@ describe('PiRuntimeAdapter', () => {
   describe('startSession', () => {
     it('should create a session and subscribe to events', async () => {
       await adapter.startSession('test', 'Hello Pi');
+      await adapter.startSession('test-second', 'Hello again');
+      expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledOnce();
+      expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledWith(process.env);
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
     });
