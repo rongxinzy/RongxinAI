@@ -152,6 +152,8 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
         setProgress(nextProgress);
         if (nextProgress.phase === 'failed') {
           setError(nextProgress.error || i18nService.t('localInferenceRuntimeMissing'));
+        } else if (nextProgress.phase === 'cancelled') {
+          setError(undefined);
         } else if (nextProgress.phase === 'done') {
           setError(undefined);
         }
@@ -198,7 +200,14 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
       ...(current ?? { modelId: RUNTIME_PROGRESS_KEY }),
       phase: 'cancelling',
     }));
-    await window.electron.llamacpp.cancelRuntimeInstall();
+    const result = await window.electron.llamacpp.cancelRuntimeInstall();
+    if (!result.cancelled) {
+      setProgress(current =>
+        current?.phase === 'cancelling'
+          ? { ...current, phase: 'cancelled' }
+          : current,
+      );
+    }
   };
 
   return (

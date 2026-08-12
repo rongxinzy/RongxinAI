@@ -571,6 +571,9 @@ export async function installLlamaCppBackend(input: {
   onProgress?: BackendInstallProgressReporter;
 }): Promise<LlamaCppRuntimeInstallResult> {
   const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
+  if (input.signal?.aborted) {
+    return { ...failedInstall('Download cancelled.'), cancelled: true };
+  }
   const entry = findManifestEntry(manifest, input.ref);
   if (!entry) {
     return failedInstall(`llama.cpp backend is not available: ${input.ref.versionBackend}`);
@@ -639,9 +642,11 @@ export async function installLlamaCppBackend(input: {
       throw new Error(`Backend archive does not contain ${executableName}.`);
     }
 
+    throwIfDownloadCancelled(input.signal);
     fs.rmSync(backendDir, { recursive: true, force: true });
     fs.mkdirSync(getManagedBackendBinDir(backendDir), { recursive: true });
     copyDirectoryContents(path.dirname(extractedExecutable), getManagedBackendBinDir(backendDir));
+    throwIfDownloadCancelled(input.signal);
 
     for (const companion of entry.companions ?? []) {
       reportProgress({ phase: 'downloading' });
@@ -667,8 +672,10 @@ export async function installLlamaCppBackend(input: {
         findRuntimePayloadDirectory(companionExtractDir),
         getManagedBackendBinDir(backendDir),
       );
+      throwIfDownloadCancelled(input.signal);
     }
 
+    throwIfDownloadCancelled(input.signal);
     reportProgress({ phase: 'detecting', message: 'verifying' });
     const installedExecutablePath = getLlamaCppBackendExecutablePath(
       input.runtimeRoot,
@@ -680,6 +687,7 @@ export async function installLlamaCppBackend(input: {
     }
     if (input.platform !== 'win32') fs.chmodSync(installedExecutablePath, 0o755);
 
+    throwIfDownloadCancelled(input.signal);
     writeBackendBuildInfo(backendDir, {
       ...input.ref,
       target: input.ref.backend,
@@ -690,6 +698,7 @@ export async function installLlamaCppBackend(input: {
       cudaMajor: entry.cudaMajor,
       installedAt: new Date().toISOString(),
     });
+    throwIfDownloadCancelled(input.signal);
     if (input.switchCurrent !== false) syncCurrentBackend(input.runtimeRoot, input.ref);
     // Retain partial archives for a failed or cancelled resumable download, but
     // do not keep completed archives after the backend is installed.

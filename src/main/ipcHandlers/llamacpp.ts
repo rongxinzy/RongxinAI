@@ -382,9 +382,15 @@ export function registerLlamaCppIpcHandlers(
     runRuntimeInstall(signal => manager.installRuntime({ signal })),
   );
   ipcMain.handle(LlamaCppIpcChannel.CancelRuntimeInstall, async () => {
-    const cancelled = Boolean(runtimeInstallController && !runtimeInstallController.signal.aborted);
-    runtimeInstallController?.abort();
-    return { success: true as const, cancelled };
+    const controller = runtimeInstallController;
+    const install = activeRuntimeInstall;
+    if (!controller || controller.signal.aborted || !install) {
+      return { success: true as const, cancelled: false };
+    }
+
+    controller.abort();
+    const result = await install.catch((): RuntimeInstallResult | undefined => undefined);
+    return { success: true as const, cancelled: Boolean(result?.cancelled) };
   });
   ipcMain.handle(LlamaCppIpcChannel.UninstallRuntime, async () => manager.uninstallRuntime());
   ipcMain.handle(LlamaCppIpcChannel.ListRuntimeDevices, async (_event, input: unknown) => {
