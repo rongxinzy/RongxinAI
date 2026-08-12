@@ -36,6 +36,7 @@ import {
   SkillsIpc,
   StoreIpc,
   WindowIpc,
+  WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import type { CoworkPermissionMode, CoworkSessionMode } from '../shared/cowork/constants';
 import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
@@ -666,8 +667,11 @@ contextBridge.exposeInMainWorld('electron', {
 
     getStatus: () => ipcRenderer.invoke(ImIpc.StatusGet),
     getLocalIp: () => ipcRenderer.invoke(ImIpc.GetLocalIp) as Promise<string>,
+    weixinLoginStart: () => ipcRenderer.invoke(WeixinInstallIpc.Start),
+    weixinLoginPoll: (qrcode: string) => ipcRenderer.invoke(WeixinInstallIpc.Poll, qrcode),
     // Multi-Instance
-    addDingTalkInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.dingtalkAdd, name),
+    addDingTalkInstance: (name: string, workspaceId: string) =>
+      ipcRenderer.invoke(ImInstanceIpc.dingtalkAdd, name, workspaceId),
     deleteDingTalkInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.dingtalkDelete, instanceId),
     setDingTalkInstanceConfig: (
@@ -676,7 +680,8 @@ contextBridge.exposeInMainWorld('electron', {
       options?: { syncGateway?: boolean },
     ) => ipcRenderer.invoke(ImInstanceIpc.dingtalkSetConfig, instanceId, config, options),
 
-    addQQInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.qqAdd, name),
+    addQQInstance: (name: string, workspaceId: string) =>
+      ipcRenderer.invoke(ImInstanceIpc.qqAdd, name, workspaceId),
     deleteQQInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.qqDelete, instanceId),
     setQQInstanceConfig: (
@@ -685,7 +690,8 @@ contextBridge.exposeInMainWorld('electron', {
       options?: { syncGateway?: boolean },
     ) => ipcRenderer.invoke(ImInstanceIpc.qqSetConfig, instanceId, config, options),
 
-    addFeishuInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.feishuAdd, name),
+    addFeishuInstance: (name: string, workspaceId: string) =>
+      ipcRenderer.invoke(ImInstanceIpc.feishuAdd, name, workspaceId),
     deleteFeishuInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.feishuDelete, instanceId),
     setFeishuInstanceConfig: (
@@ -694,7 +700,8 @@ contextBridge.exposeInMainWorld('electron', {
       options?: { syncGateway?: boolean },
     ) => ipcRenderer.invoke(ImInstanceIpc.feishuSetConfig, instanceId, config, options),
 
-    addWecomInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.wecomAdd, name),
+    addWecomInstance: (name: string, workspaceId: string) =>
+      ipcRenderer.invoke(ImInstanceIpc.wecomAdd, name, workspaceId),
     deleteWecomInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.wecomDelete, instanceId),
     setWecomInstanceConfig: (
@@ -703,7 +710,8 @@ contextBridge.exposeInMainWorld('electron', {
       options?: { syncGateway?: boolean },
     ) => ipcRenderer.invoke(ImInstanceIpc.wecomSetConfig, instanceId, config, options),
 
-    addTelegramInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.telegramAdd, name),
+    addTelegramInstance: (name: string, workspaceId: string) =>
+      ipcRenderer.invoke(ImInstanceIpc.telegramAdd, name, workspaceId),
     deleteTelegramInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.telegramDelete, instanceId),
     setTelegramInstanceConfig: (
@@ -712,7 +720,8 @@ contextBridge.exposeInMainWorld('electron', {
       options?: { syncGateway?: boolean },
     ) => ipcRenderer.invoke(ImInstanceIpc.telegramSetConfig, instanceId, config, options),
 
-    addDiscordInstance: (name: string) => ipcRenderer.invoke(ImInstanceIpc.discordAdd, name),
+    addDiscordInstance: (name: string, workspaceId: string) =>
+      ipcRenderer.invoke(ImInstanceIpc.discordAdd, name, workspaceId),
     deleteDiscordInstance: (instanceId: string) =>
       ipcRenderer.invoke(ImInstanceIpc.discordDelete, instanceId),
     setDiscordInstanceConfig: (

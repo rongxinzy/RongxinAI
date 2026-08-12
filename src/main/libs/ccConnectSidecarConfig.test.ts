@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { serializeCcConnectCronSidecarConfig, serializeCcConnectSidecarConfig } from './ccConnectSidecarConfig';
+import { serializeCcConnectSidecarConfig } from './ccConnectSidecarConfig';
 import { SchedulerClockAccount } from '../../scheduledTask/ccConnectCronClient';
 
 const base = {
@@ -30,19 +30,28 @@ test('accepts qqbot, the cc-connect QQ adapter identifier', () => {
   })).not.toThrow();
 });
 
+test('serializes multiple account projects into one channel runtime', () => {
+  const config = serializeCcConnectSidecarConfig({ ...base, projects: [
+    { accountId: 'a', platform: 'dingtalk', options: { client_id: 'id-a', client_secret: 'secret-a' } },
+    { accountId: 'b', platform: 'dingtalk', options: { client_id: 'id-b', client_secret: 'secret-b' } },
+  ] });
+  expect(config.match(/\[\[projects\]\]/g)).toHaveLength(2);
+  expect(config).toContain('name = "a"');
+  expect(config).toContain('name = "b"');
+});
+
 test('rejects remote control planes, unsupported platforms, and unsafe option keys', () => {
   expect(() => serializeCcConnectSidecarConfig({ ...base, bridgeUrl: 'http://10.0.0.1:1234', projects: [] })).toThrow('loopback');
-  expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [] })).toThrow('exactly one project');
-  expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [
-    { accountId: 'a', platform: 'qq', options: {} },
-    { accountId: 'b', platform: 'qq', options: {} },
-  ] })).toThrow('exactly one project');
+  expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [] })).toThrow('requires a project');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [{ accountId: 'a', platform: 'slack', options: {} }] })).toThrow('Unsupported');
   expect(() => serializeCcConnectSidecarConfig({ ...base, projects: [{ accountId: 'a', platform: 'qq', options: { 'bad.key': 'x' } }] })).toThrow('Unsafe');
 });
 
 test('serializes a credential-free scheduler clock without channel platforms', () => {
-  const config = serializeCcConnectCronSidecarConfig({ ...base, accountId: SchedulerClockAccount });
+  const config = serializeCcConnectSidecarConfig({
+    ...base,
+    projects: [{ accountId: SchedulerClockAccount }],
+  });
   expect(config).toContain(`name = "${SchedulerClockAccount}"`);
   expect(config).toContain('cron_control_listen = "127.0.0.1:0"');
   expect(config).not.toContain('[[projects.platforms]]');

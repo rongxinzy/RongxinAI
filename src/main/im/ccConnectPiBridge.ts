@@ -53,28 +53,31 @@ export class CcConnectPiBridge {
   ) => Promise<void>;
   private readonly turnCoordinator: ChannelTurnCoordinator;
 
-  async runTurn(request: CcConnectTurnRequest): Promise<{ content: string }> {
+  async runTurn(
+    request: CcConnectTurnRequest,
+    signal?: AbortSignal,
+  ): Promise<{ content: string }> {
     if (!SUPPORTED_PLATFORMS.has(request.message.platform)) {
       throw new Error(
         `Unsupported cc-connect platform: ${request.message.platform}`,
       );
     }
     const platform = request.message.platform === 'qqbot' ? 'qq' : request.message.platform as Platform;
+    const nativeConversationId = resolveNativeConversationId(request.message);
     const conversationId = getCcConnectScopedConversationId(
-      request.project,
-      request.message.channelId,
+      request.accountId,
+      nativeConversationId,
     );
     this.imStore.setCcConnectSessionKey(
-      request.project,
+      request.accountId,
       request.message.platform,
-      request.message.channelId,
+      nativeConversationId,
       request.message.sessionKey,
     );
     const message: IMMessage = {
       platform,
       messageId: request.message.messageId,
-      // cc-connect project names are generated from the stable ChannelAccount
-      // id. Scope the persisted Pi session by that id so two bots in the same
+      // Scope the persisted Pi session by the stable ChannelAccount id so two bots in the same
       // platform conversation can never resume one another's session.
       conversationId,
       senderId: request.message.userId,
@@ -82,24 +85,39 @@ export class CcConnectPiBridge {
       groupName: request.message.chatName,
       content: request.message.content,
       chatType:
-        request.message.channelId === request.message.userId
+        nativeConversationId === request.message.userId
           ? "direct"
           : "group",
       timestamp: request.message.userMessageTimeMs ?? Date.now(),
     };
     const content = await this.turnCoordinator.run({
       platform: request.message.platform,
-      accountId: request.project,
-      conversationId: request.message.channelId,
+      accountId: request.accountId,
+      conversationId: nativeConversationId,
       messageId: request.message.messageId,
       payload: JSON.stringify(request),
-    }, () => this.handler.processMessage(message));
+    }, () => this.handler.processMessage(
+      message,
+      signal,
+      this.imStore.getChannelAccountWorkspaceId(request.accountId) ?? undefined,
+    ), signal);
     return { content };
   }
 
   async runCronTrigger(trigger: CcConnectCronTrigger): Promise<void> {
     await this.onCronTrigger(trigger);
   }
+}
+
+function resolveNativeConversationId(message: CcConnectTurnRequest['message']): string {
+  const explicit = message.channelId?.trim();
+  if (explicit) return explicit;
+  const parts = message.sessionKey.split(':').map(part => part.trim()).filter(Boolean);
+  if (parts.length < 2) throw new Error('cc-connect channel conversation is required');
+  if (message.platform === 'dingtalk' && parts.length >= 3 && ['d', 'g'].includes(parts[1])) {
+    return parts[2];
+  }
+  return parts[1];
 }
 
 /** Stable, unambiguous storage key for a cc-connect account conversation. */

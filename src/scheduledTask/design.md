@@ -32,14 +32,14 @@ sidecar 向回环 bridge 发送：
 ```json
 {
   "requestId": "...",
-  "project": "__zhiyuan_scheduler__",
+  "accountId": "__zhiyuan_scheduler__",
   "taskId": "...",
   "scheduleVersion": "sha256...",
   "scheduledAt": "2026-08-11T01:00:00.000Z"
 }
 ```
 
-`project` 必须是内部专用的 `__zhiyuan_scheduler__`。投递账号不参与时钟身份：它仅用于任务执行后的渠道/会话路由。Runtime 先校验时钟身份与 `scheduleVersion`，再以 `(taskId, scheduleVersion, scheduledAt)` 原子 claim Run；重复、过期或来自渠道 sidecar 的 trigger 不会执行 Pi。
+`accountId` 必须是内部专用的 `__zhiyuan_scheduler__`。投递账号不参与时钟身份：它仅用于任务执行后的渠道/会话路由。Runtime 先校验时钟身份与 `scheduleVersion`，再以 `(taskId, scheduleVersion, scheduledAt)` 原子 claim Run；重复、过期或来自渠道 sidecar 的 trigger 不会执行 Pi。
 
 ## 进程恢复
 

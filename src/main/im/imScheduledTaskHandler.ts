@@ -99,7 +99,6 @@ export interface ParsedIMScheduledTaskRequest {
 export interface IMScheduledTaskCreationResult {
   id: string;
   name: string;
-  agentId: string | null;
   sessionKey: string | null;
   payloadText: string;
   scheduleAt: string;

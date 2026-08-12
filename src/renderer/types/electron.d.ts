@@ -981,7 +981,7 @@ interface IElectronAPI {
   im: {
     getConfig: () => Promise<{ success: boolean; config?: IMGatewayConfig; error?: string }>;
     setConfig: (
-      config: Partial<IMGatewayConfig>,
+      config: IMGatewayConfigPatch,
       options?: { syncGateway?: boolean },
     ) => Promise<{ success: boolean; error?: string }>;
     syncConfig: () => Promise<{ success: boolean; error?: string }>;
@@ -993,8 +993,22 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; result?: IMConnectivityTestResult; error?: string }>;
     getStatus: () => Promise<{ success: boolean; status?: IMGatewayStatus; error?: string }>;
     getLocalIp: () => Promise<string>;
+    weixinLoginStart: () => Promise<{
+      success: boolean;
+      status?: 'wait';
+      qrcode?: string;
+      qrcodeUrl?: string;
+      message?: string;
+    }>;
+    weixinLoginPoll: (qrcode: string) => Promise<{
+      success: boolean;
+      status: 'wait' | 'scaned' | 'confirmed' | 'expired';
+      accountId?: string;
+      message?: string;
+    }>;
     addQQInstance: (
       name: string,
+      workspaceId: string,
     ) => Promise<{ success: boolean; instance?: QQInstanceConfig; error?: string }>;
     deleteQQInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setQQInstanceConfig: (
@@ -1004,6 +1018,7 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; error?: string }>;
     addFeishuInstance: (
       name: string,
+      workspaceId: string,
     ) => Promise<{ success: boolean; instance?: FeishuInstanceConfig; error?: string }>;
     deleteFeishuInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setFeishuInstanceConfig: (
@@ -1013,6 +1028,7 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; error?: string }>;
     addDingTalkInstance: (
       name: string,
+      workspaceId: string,
     ) => Promise<{ success: boolean; instance?: DingTalkInstanceConfig; error?: string }>;
     deleteDingTalkInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setDingTalkInstanceConfig: (
@@ -1022,6 +1038,7 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; error?: string }>;
     addWecomInstance: (
       name: string,
+      workspaceId: string,
     ) => Promise<{ success: boolean; instance?: WecomInstanceConfig; error?: string }>;
     deleteWecomInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setWecomInstanceConfig: (
@@ -1031,6 +1048,7 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; error?: string }>;
     addTelegramInstance: (
       name: string,
+      workspaceId: string,
     ) => Promise<{ success: boolean; instance?: TelegramInstanceConfig; error?: string }>;
     deleteTelegramInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setTelegramInstanceConfig: (
@@ -1040,6 +1058,7 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; error?: string }>;
     addDiscordInstance: (
       name: string,
+      workspaceId: string,
     ) => Promise<{ success: boolean; instance?: DiscordInstanceConfig; error?: string }>;
     deleteDiscordInstance: (instanceId: string) => Promise<{ success: boolean; error?: string }>;
     setDiscordInstanceConfig: (
@@ -1273,6 +1292,10 @@ interface IMGatewayConfig {
   settings: IMSettings;
 }
 
+type IMGatewayConfigPatch = Omit<Partial<IMGatewayConfig>, 'weixin'> & {
+  weixin?: Partial<WeixinChannelConfig>;
+};
+
 interface DingTalkChannelConfig {
   enabled: boolean;
   clientId: string;
@@ -1291,6 +1314,7 @@ interface DingTalkChannelConfig {
 interface DingTalkInstanceConfig extends DingTalkChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 interface DingTalkInstanceStatus extends DingTalkGatewayStatus {
@@ -1346,6 +1370,7 @@ interface FeishuChannelConfig {
 interface FeishuInstanceConfig extends FeishuChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 interface FeishuInstanceStatus extends FeishuGatewayStatus {
@@ -1389,6 +1414,7 @@ interface TelegramChannelConfig {
 interface TelegramInstanceConfig extends TelegramChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 interface TelegramInstanceStatus extends TelegramGatewayStatus {
@@ -1442,6 +1468,7 @@ interface QQConfig {
 interface QQInstanceConfig extends QQConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 interface QQMultiInstanceConfig {
@@ -1472,6 +1499,7 @@ interface WecomConfig {
 interface WecomInstanceConfig extends WecomConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 interface WecomMultiInstanceConfig {
@@ -1490,6 +1518,9 @@ interface WecomMultiInstanceStatus {
 interface WeixinChannelConfig {
   enabled: boolean;
   accountId: string;
+  workspaceId: string;
+  token: string;
+  baseUrl: string;
   dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled';
   allowFrom: string[];
   groupPolicy: 'open' | 'allowlist' | 'disabled';
@@ -1583,6 +1614,7 @@ interface DiscordGatewayStatus {
 interface DiscordInstanceConfig extends DiscordChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 interface DiscordInstanceStatus extends DiscordGatewayStatus {

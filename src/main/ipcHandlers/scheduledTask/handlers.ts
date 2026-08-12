@@ -25,12 +25,11 @@ export interface ScheduledTaskHandlerDeps {
             | undefined;
           listSessionMappings: (
             platform: string,
-            agentId?: string,
+            accountId?: string,
           ) => Array<{
             imConversationId: string;
             platform: string;
             coworkSessionId: string;
-            agentId: string;
             lastActiveAt: string;
           }>;
         }

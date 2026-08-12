@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { ChannelInboxStatus, type ChannelInboxEvent, type ChannelInboxRecord } from './channelInboxStore';
 import { ChannelTurnCoordinator } from './channelTurnCoordinator';
@@ -56,4 +56,28 @@ test('serializes one conversation while allowing bounded cross-conversation work
   ]);
   expect(peak).toBe(2);
   expect(order.indexOf('start:2')).toBeGreaterThan(order.indexOf('end:1'));
+});
+
+test('does not execute a queued turn after its bridge request is cancelled', async () => {
+  const inbox = new FakeInbox();
+  const coordinator = new ChannelTurnCoordinator(inbox, 1);
+  let releaseFirst!: () => void;
+  const first = coordinator.run(event('1'), async () => {
+    await new Promise<void>(resolve => { releaseFirst = resolve; });
+    return 'first';
+  });
+  await vi.waitFor(() => expect(releaseFirst).toBeTypeOf('function'));
+
+  const controller = new AbortController();
+  let secondExecuted = false;
+  const second = coordinator.run(event('2'), async () => {
+    secondExecuted = true;
+    return 'second';
+  }, controller.signal);
+  controller.abort();
+  releaseFirst();
+
+  await expect(first).resolves.toBe('first');
+  await expect(second).rejects.toThrow('cancelled before execution');
+  expect(secondExecuted).toBe(false);
 });

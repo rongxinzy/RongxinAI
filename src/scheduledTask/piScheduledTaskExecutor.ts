@@ -1,6 +1,8 @@
 import type { CoworkStore } from '../main/coworkStore';
 import type { CoworkError } from '../common/coworkError';
 import type { PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
+import { getDefaultConversationWorkspacePath } from '../main/defaultConversationWorkspace';
+import { parseManagedSessionKey } from '../main/libs/channelSessionKey';
 
 import { PayloadKind, SessionTarget } from './constants';
 import type { ScheduledTask, ScheduledTaskRun } from './types';
@@ -30,7 +32,6 @@ export class PiScheduledTaskExecutor {
       skillIds: session.activeSkillIds,
       workspaceRoot: session.cwd,
       sessionMode: session.mode,
-      agentId: session.agentId,
       expertIds: session.experts.map(expert => expert.expertId),
       modelOverride: session.modelOverride || undefined,
       // Scheduled runs have no foreground permission UI. Their creator opted
@@ -51,20 +52,23 @@ export class PiScheduledTaskExecutor {
 
   private resolveSession(task: ScheduledTask) {
     if (task.sessionTarget === SessionTarget.Main && task.sessionKey) {
-      const existing = this.coworkStore.getSession(task.sessionKey);
+      const sessionId = parseManagedSessionKey(task.sessionKey)?.sessionId ?? task.sessionKey;
+      const existing = this.coworkStore.getSession(sessionId);
       if (existing) return existing;
     }
     const config = this.coworkStore.getConfig();
-    const agent = this.coworkStore.getAgent(task.agentId);
+    const workspace = task.workspaceId ? this.coworkStore.getWorkspace(task.workspaceId) : null;
     return this.coworkStore.createSession(
       `Scheduled: ${task.name}`,
-      agent?.workingDirectory.trim() || config.workingDirectory,
-      agent?.systemPrompt.trim() || config.systemPrompt,
+      workspace?.path || getDefaultConversationWorkspacePath(),
+      config.systemPrompt,
       config.executionMode,
-      agent?.skillIds ?? [],
-      task.agentId,
-      agent?.model ?? '',
+      [],
+      'main',
+      task.payload.kind === PayloadKind.AgentTurn ? (task.payload.model ?? '') : '',
       'work',
+      undefined,
+      workspace?.id,
     );
   }
 

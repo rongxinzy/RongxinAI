@@ -26,7 +26,7 @@ export interface PolicyTaskModel {
   wakeMode: WakeMode;
   payload: unknown;
   delivery: PolicyDelivery;
-  agentId: string | null;
+  workspaceId: string | null;
   sessionKey: string | null;
   state: unknown;
   createdAt: string;
@@ -45,7 +45,7 @@ export interface PolicyTaskInput {
   wakeMode?: WakeMode;
   payload?: unknown;
   delivery?: PolicyDelivery;
-  agentId?: string | null;
+  workspaceId?: string | null;
   sessionKey?: string | null;
 }
 

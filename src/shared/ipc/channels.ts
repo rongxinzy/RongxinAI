@@ -262,6 +262,12 @@ export const ImIpc = {
 } as const;
 export type ImIpc = (typeof ImIpc)[keyof typeof ImIpc];
 
+export const WeixinInstallIpc = {
+  Start: 'im:weixin:login:start',
+  Poll: 'im:weixin:login:poll',
+} as const;
+export type WeixinInstallIpc = (typeof WeixinInstallIpc)[keyof typeof WeixinInstallIpc];
+
 // ─── IM Multi-Instance factories ────────────────────────────────────────────
 export const ImInstanceIpc = {
   dingtalkAdd: 'im:dingtalk:instance:add',
