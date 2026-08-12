@@ -28,8 +28,17 @@ export const mergeSessionsIntoWorkspacePreviews = (
 
   const next = { ...current };
   sessionsByWorkspace.forEach((sessions, workspaceId) => {
+    const incomingIds = new Set(sessions.map(session => session.id));
     next[workspaceId] = mergeSessionSummaries(
-      (current[workspaceId] ?? []).filter(session => session.workspaceId === workspaceId),
+      // Temporary sessions (`temp-*`) are frontend-only UI identities. They
+      // never exist in the backend, so once they leave the Redux session list
+      // they must also leave the preview — otherwise a stale temp entry stays
+      // visible as a ghost running session that fails to load on click.
+      (current[workspaceId] ?? []).filter(
+        session =>
+          session.workspaceId === workspaceId &&
+          (!session.id.startsWith('temp-') || incomingIds.has(session.id)),
+      ),
       sessions,
     );
   });
