@@ -4973,7 +4973,7 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(
-    'im:gateway:test',
+    ImIpc.GatewayTest,
     async (
       _event,
       platform: Platform,
