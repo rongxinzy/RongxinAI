@@ -1,17 +1,29 @@
 {
   "name": "data-analyst",
-  "version": "1.0.0",
-  "description": "A data analysis expert for statistics, visualization, and business intelligence.",
+  "version": "2.0.0",
+  "description": "Decision-oriented data analysis expert: data quality review, metric diagnostics, KPI reporting, chart selection, and executive-ready analysis reports.",
   "author": {
     "name": "ZhiYuanAgent",
     "email": "dev@zhiyuan.com"
   },
-
   "expertType": "agent",
   "agentName": "data-analyst",
-
-  "agents": ["./agents/data-analyst.md"],
-
+  "agents": [
+    "./agents/data-analyst.md"
+  ],
+  "skills": [
+    "./skills/data-quality-review",
+    "./skills/metric-diagnosis",
+    "./skills/analytics-report"
+  ],
+  "skillIds": [
+    "xlsx",
+    "code-to-chart",
+    "database-inspector",
+    "saas-metrics-coach",
+    "web-search",
+    "deep-research"
+  ],
   "displayName": {
     "en": "Data Analyst",
     "zh": "数据分析专家"
@@ -21,32 +33,41 @@
     "zh": "资深数据分析师"
   },
   "displayDescription": {
-    "en": "Expert in data analysis, statistical modeling, and business intelligence. Turns raw data into actionable insights with clear visualizations.",
-    "zh": "精通数据分析、统计建模和商业智能，将原始数据转化为可落地的洞察与直观的可视化报告。"
+    "en": "Transforms raw data into decision-ready insights: validates data quality, diagnoses metric movements, designs charts, and delivers answer-first analysis reports with explicit confidence levels.",
+    "zh": "把原始数据转化为可决策的洞察：先验证数据质量，再诊断指标异动、选择图表，输出答案先行、带置信度的分析报告。"
   },
   "categoryId": "04-DataAI",
   "defaultInitPrompt": {
-    "zh": "帮我分析这份销售数据并找出趋势",
-    "en": "Help me analyze this sales data and identify trends"
+    "zh": "帮我分析这份销售数据，先检查数据质量，再诊断上月销售额下降的原因。",
+    "en": "Analyze this sales dataset: first assess data quality, then diagnose why last month's revenue dropped."
   },
   "plugin": "data-analyst",
   "tags": [
-    { "en": "Data Analysis", "zh": "数据分析" },
-    { "en": "Statistics", "zh": "统计分析" },
-    { "en": "Visualization", "zh": "数据可视化" }
+    {
+      "en": "Data Analysis",
+      "zh": "数据分析"
+    },
+    {
+      "en": "Metric Diagnostics",
+      "zh": "指标诊断"
+    },
+    {
+      "en": "Reporting",
+      "zh": "报告撰写"
+    }
   ],
   "quickPrompts": [
     {
-      "en": "Help me analyze this sales data and identify trends",
-      "zh": "帮我分析这份销售数据并找出趋势"
+      "zh": "帮我分析这份销售数据，先检查数据质量，再诊断上月销售额下降的原因。",
+      "en": "Analyze this sales dataset: first assess data quality, then diagnose why last month's revenue dropped."
     },
     {
-      "en": "Create a dashboard plan for tracking key metrics",
-      "zh": "为关键指标设计一个仪表盘方案"
+      "zh": "为什么这个月活跃用户下降了？帮我诊断驱动因素。",
+      "en": "Why did active users drop this month? Diagnose the drivers."
     },
     {
-      "en": "Run A/B test analysis on these experiment results",
-      "zh": "对这些实验结果进行 A/B 测试分析"
+      "zh": "帮我写一份管理层周报，结论先行。",
+      "en": "Write an executive weekly report, answer-first."
     }
   ]
 }
