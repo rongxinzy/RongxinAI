@@ -1,3 +1,43 @@
+import type { AppConfig } from '../config';
+
+export function hasSettingsValueChanged(current: unknown, next: unknown): boolean {
+  return JSON.stringify(current) !== JSON.stringify(next);
+}
+
+export function buildAppSettingsSavePatch(input: {
+  current: AppConfig;
+  theme: AppConfig['theme'];
+  language: AppConfig['language'];
+  useSystemProxy: boolean;
+  sqliteAutoBackupEnabled: boolean;
+  shortcuts: NonNullable<AppConfig['shortcuts']>;
+  providers: AppConfig['providers'];
+  api: AppConfig['api'];
+  model: AppConfig['model'];
+}): Partial<AppConfig> {
+  const patch: Partial<AppConfig> = {};
+
+  if (input.current.theme !== input.theme) patch.theme = input.theme;
+  if (input.current.language !== input.language) patch.language = input.language;
+  if (input.current.useSystemProxy !== input.useSystemProxy) {
+    patch.useSystemProxy = input.useSystemProxy;
+  }
+  if ((input.current.sqliteAutoBackupEnabled ?? false) !== input.sqliteAutoBackupEnabled) {
+    patch.sqliteAutoBackupEnabled = input.sqliteAutoBackupEnabled;
+  }
+  if (hasSettingsValueChanged(input.current.shortcuts, input.shortcuts)) {
+    patch.shortcuts = input.shortcuts;
+  }
+
+  if (hasSettingsValueChanged(input.current.providers, input.providers)) {
+    patch.providers = input.providers;
+    patch.api = input.api;
+    patch.model = input.model;
+  }
+
+  return patch;
+}
+
 export function getSettingsSaveErrorMessage(
   error: unknown,
   appConfigSaved: boolean,

@@ -73,7 +73,7 @@ import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
 import { reconcileDefaultModelConfig } from '../services/modelConfigReconciliation';
 import { mergeDiscoveredProviderModels } from '../services/providerModelDiscovery';
-import { getSettingsSaveErrorMessage } from '../services/settingsSave';
+import { buildAppSettingsSavePatch, getSettingsSaveErrorMessage } from '../services/settingsSave';
 import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
 import { selectCoworkConfig } from '../store/selectors/coworkSelectors';
@@ -2044,23 +2044,25 @@ const Settings: React.FC<SettingsProps> = ({
         ? firstEnabledProvider[1]
         : normalizedProviders[activeProvider];
 
-      await configService.updateConfig({
-        api: {
-          key: primaryProvider.apiKey,
-          baseUrl: primaryProvider.baseUrl,
-        },
-        providers: normalizedProviders, // Save all providers configuration
-        model: reconcileDefaultModelConfig(configService.getConfig(), normalizedProviders),
+      const currentAppConfig = configService.getConfig();
+      const appConfigPatch = buildAppSettingsSavePatch({
+        current: currentAppConfig,
         theme,
         language,
         useSystemProxy,
         sqliteAutoBackupEnabled,
         shortcuts,
-        app: {
-          ...configService.getConfig().app,
+        providers: normalizedProviders,
+        api: {
+          key: primaryProvider.apiKey,
+          baseUrl: primaryProvider.baseUrl,
         },
+        model: reconcileDefaultModelConfig(currentAppConfig, normalizedProviders),
       });
-      appConfigSaved = true;
+      if (Object.keys(appConfigPatch).length > 0) {
+        await configService.updateConfig(appConfigPatch);
+        appConfigSaved = true;
+      }
 
       // 应用主题
       themeService.setTheme(theme);
@@ -2107,9 +2109,8 @@ const Settings: React.FC<SettingsProps> = ({
         }
       }
 
-      // Persist channel account configuration even if the user changed tabs before saving.
-      const syncSucceeded = await imService.saveAndSyncConfig();
-      if (!syncSucceeded) {
+      const channelConfigSynced = await imService.syncPendingConfig();
+      if (!channelConfigSynced) {
         throw new Error(i18nService.t('coworkConfigSaveFailed'));
       }
 
