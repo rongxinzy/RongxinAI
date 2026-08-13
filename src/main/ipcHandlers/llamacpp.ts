@@ -172,6 +172,18 @@ function toUserFacingLlamaCppModelLoadError(error: unknown): Error {
   return new Error(t(getLlamaCppModelLoadFailureI18nKey(reason)));
 }
 
+function throwIfLlamaCppModelLoadCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+}
+
+async function unloadCancelledLlamaCppModel(manager: LlamaCppManager, modelName: string): Promise<void> {
+  try {
+    await (await manager.client()).unloadModel(modelName, 10_000);
+  } catch (error) {
+    console.warn(`[LlamaCpp] failed to unload cancelled model startup ${modelName}:`, error);
+  }
+}
+
 export async function waitForLlamaCppModelUnloadConfirmation(input: {
   modelName: string;
   listRunningModels: () => Promise<Awaited<ReturnType<LlamaCppManager['listRunningModels']>>>;
@@ -291,6 +303,7 @@ export function registerLlamaCppIpcHandlers(
     broadcast,
   });
   const loadModelLock = new LlamaCppModelLoadLock();
+  let activeModelLoad: { modelName: string; controller: AbortController } | null = null;
   const serviceTransitionLock = new LlamaCppServiceTransitionLock();
   const runServiceTransition = async <T>(action: () => Promise<T>): Promise<T> =>
     await serviceTransitionLock.runExclusive(
@@ -575,6 +588,8 @@ export function registerLlamaCppIpcHandlers(
     return await loadModelLock.runExclusive(
       modelName,
       async () => {
+        const controller = new AbortController();
+        activeModelLoad = { modelName, controller };
         const store = options.getStore();
         const serviceConfig = getLlamaCppServiceConfig(store);
         const inputWithPreferences = applyStoredModelPreferencesToLaunchInput(store, input);
@@ -593,6 +608,7 @@ export function registerLlamaCppIpcHandlers(
             reason: LlamaCppServiceStartupReason.LoadModel,
             logger: createLlamaCppServiceStartupLaunchLogger(launchLogger),
           });
+          throwIfLlamaCppModelLoadCancelled(controller.signal);
           if (serviceStartupResult.success === false) {
             launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, {
               code: serviceStartupResult.code,
@@ -607,6 +623,7 @@ export function registerLlamaCppIpcHandlers(
           processOutputPhase = LlamaCppModelLaunchLogPhase.LoadingModel;
 
           const runningModels = await manager.listRunningModels();
+          throwIfLlamaCppModelLoadCancelled(controller.signal);
           const loadLimitViolation = getLlamaCppLoadedModelLimitViolation({
             modelsMax: serviceConfig.modelsMax,
             runningModels,
@@ -622,6 +639,7 @@ export function registerLlamaCppIpcHandlers(
           }
 
           const localModels = await manager.listLocalModels();
+          throwIfLlamaCppModelLoadCancelled(controller.signal);
           const targetModel = localModels.find(
             model =>
               model.name === modelName || model.id === modelName || model.model === modelName,
@@ -656,10 +674,12 @@ export function registerLlamaCppIpcHandlers(
               memoryPolicy: serviceConfig.memoryPolicy,
               memoryBudgetPercent: serviceConfig.memoryBudgetPercent,
               modelSizeBytes: targetModel?.size,
+              signal: controller.signal,
               onLog: launchLogger.report,
               loadModel: async (
                 loadInput: LlamaCppModelLaunchInput,
-              ): Promise<LlamaCppModelLaunchResult> => manager.loadModel(loadInput),
+              ): Promise<LlamaCppModelLaunchResult> =>
+                manager.loadModel(loadInput, { signal: controller.signal }),
               listModels: (timeoutMs: number): Promise<LlamaCppModel[]> =>
                 manager.listRouterModels(timeoutMs),
               listRunningModels: (): Promise<LlamaCppRunningModel[]> => manager.listRunningModels(),
@@ -674,11 +694,20 @@ export function registerLlamaCppIpcHandlers(
             });
             return result;
           } catch (error) {
+            if (controller.signal.aborted) {
+              await unloadCancelledLlamaCppModel(manager, modelName);
+              await refreshRunningModelBindings();
+              launchLogger.info(LlamaCppModelLaunchLogPhase.Failed, 'Model startup cancelled');
+              throw new Error(t('llamacppModelLoadCancelled'));
+            }
             launchLogger.error(LlamaCppModelLaunchLogPhase.Failed, undefined, error);
             throw toUserFacingLlamaCppModelLoadError(error);
           }
         } finally {
           unsubscribeProcessOutput();
+          if (activeModelLoad?.controller === controller) {
+            activeModelLoad = null;
+          }
         }
       },
       () => {
@@ -690,6 +719,24 @@ export function registerLlamaCppIpcHandlers(
         return new Error(t('llamacppModelLoadInProgress'));
       },
     );
+  });
+  ipcMain.handle(LlamaCppIpcChannel.CancelModelLoad, async (_event, input: unknown) => {
+    const activeLoad = activeModelLoad;
+    const requestedModelName = typeof input === 'string' ? input.trim() : '';
+    if (
+      !activeLoad ||
+      activeLoad.controller.signal.aborted ||
+      (requestedModelName && requestedModelName !== activeLoad.modelName)
+    ) {
+      return { success: true, cancelled: false };
+    }
+
+    activeLoad.controller.abort();
+    return {
+      success: true,
+      cancelled: true,
+      modelName: activeLoad.modelName,
+    };
   });
   ipcMain.handle(LlamaCppIpcChannel.UnloadModel, async (_event, name: string) => {
     const modelName = name.trim();
