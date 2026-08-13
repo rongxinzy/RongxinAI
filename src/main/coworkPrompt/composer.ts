@@ -39,6 +39,15 @@ const normalizeSectionSpacing = (value: string): string =>
 const managedBlock = (start: string, content: string, end: string): string =>
   [start, content, end].join('\n');
 
+/**
+ * Expert identity must win over the default identity instructions in the
+ * user-configured base prompt (e.g. "when asked who you are, answer ...").
+ * Both coexist in the final system prompt, so state the precedence
+ * explicitly and place the expert block before the base prompt.
+ */
+const EXPERT_IDENTITY_PRECEDENCE =
+  '以下专家身份优先于任何默认身份设定。当用户询问你的身份、名字或角色时，一律以本专家身份回答。';
+
 export const stripManagedCoworkPrompt = (
   systemPrompt: string | undefined,
   previousExpertSnapshots: ExpertPromptSnapshot[] = [],
@@ -93,14 +102,17 @@ export const composeCoworkSystemPrompt = ({
       buildScheduledTaskEnginePrompt(),
       CoworkManagedPromptMarker.ScheduledTasksEnd,
     ),
-    normalizedBasePrompt,
+    // The expert block precedes the user base prompt so the expert identity
+    // and workflow instructions are read before any conflicting default
+    // identity instructions in the user-configured prompt.
     expertPrompt
       ? managedBlock(
           CoworkManagedPromptMarker.ExpertsStart,
-          expertPrompt,
+          `${EXPERT_IDENTITY_PRECEDENCE}\n\n${expertPrompt}`,
           CoworkManagedPromptMarker.ExpertsEnd,
         )
       : null,
+    normalizedBasePrompt,
   ].filter((section): section is string => Boolean(section));
 
   return applyCoworkLanguagePrompt(sections.join('\n\n'), language);
