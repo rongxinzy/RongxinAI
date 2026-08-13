@@ -40,6 +40,7 @@ const {
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
   computeWindowsResourceComponentId,
+  getWindowsResourceArchiveCompression,
   getWindowsResourceComponents,
   isWindowsResourceComponentReusable,
   sha256File,
@@ -102,14 +103,17 @@ function resolveWindows7zaPath() {
 function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
   const stagingRoot = mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-component-7z-'));
   const stagedPrefix = path.join(stagingRoot, component.prefix);
+  const temporaryArchivePath = `${archivePath}.${process.pid}.packing`;
   try {
     // A junction keeps the archive layout stable without copying a multi-hundred-MB
     // component into a temporary staging directory.  The archive is created from
     // the relative prefix only, so it never contains an absolute build-machine path.
     symlinkSync(component.dir, stagedPrefix, 'junction');
+    const compression = getWindowsResourceArchiveCompression(component);
+    rmSync(temporaryArchivePath, { force: true });
     const result = spawnSync(
       sevenZipPath,
-      ['a', '-t7z', '-mx=9', '-m0=lzma2', '-ms=off', '-mmt=on', archivePath, component.prefix],
+      ['a', '-t7z', ...compression.sevenZipArgs, temporaryArchivePath, component.prefix],
       {
         cwd: stagingRoot,
         encoding: 'utf8',
@@ -123,7 +127,10 @@ function packWindowsResourceComponent7z(component, archivePath, sevenZipPath) {
           (result.error?.message || result.stderr || result.stdout || `exit ${result.status}`),
       );
     }
+    rmSync(archivePath, { force: true });
+    renameSync(temporaryArchivePath, archivePath);
   } finally {
+    rmSync(temporaryArchivePath, { force: true });
     rmSync(stagingRoot, { recursive: true, force: true });
   }
 }
@@ -529,10 +536,9 @@ async function beforePack(context) {
         const startedAt = Date.now();
         packWindowsResourceComponent7z(component, archivePath, sevenZipPath);
         console.log(
-          `[electron-builder-hooks] Packed ${component.key} ${contentId} in ${(
-            (Date.now() - startedAt) /
-            1000
-          ).toFixed(1)}s`,
+          `[electron-builder-hooks] Packed ${component.key} ${contentId} with ${
+            getWindowsResourceArchiveCompression(component).id
+          } in ${((Date.now() - startedAt) / 1000).toFixed(1)}s`,
         );
       }
 
@@ -593,4 +599,5 @@ module.exports = {
   afterPack,
   configureMacAutoUpdateMetadata,
   ensureBundledChannelRuntime,
+  packWindowsResourceComponent7z,
 };

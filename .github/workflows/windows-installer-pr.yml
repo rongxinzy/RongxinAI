@@ -78,6 +78,14 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-installer-size-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
+      - name: Benchmark shared Skill Python solid compression
+        id: skill-python-compression
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/benchmark-skill-python-compression.ps1
+          -ProjectRoot ${{ github.workspace }}
+          -RequireQualified
       - name: Verify embedded runtimes with a clean PATH
         shell: powershell
         run: >-
