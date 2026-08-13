@@ -275,7 +275,9 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(sizeSmoke, /\$_\.archiveSizeBytes/);
   assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
-  assert.match(sizeSmoke, /1GB/);
+  assert.match(sizeSmoke, /MaximumInstallerBytes = 425MB/);
+  assert.match(sizeSmoke, /MaximumComponentBytes = 220MB/);
+  assert.match(sizeSmoke, /MaximumNonComponentBytes = 220MB/);
 });
 
 test("DOCX smoke validator accepts the bundled Markdown converter output", () => {
