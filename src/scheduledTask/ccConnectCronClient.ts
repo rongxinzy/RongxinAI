@@ -14,7 +14,10 @@ export type CcConnectCronTask = {
 
 /** Minimal authenticated control-plane client; it never sends payloads or commands. */
 export class CcConnectCronClient {
-  constructor(private readonly baseUrl: string, private readonly token: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly token: string,
+  ) {}
 
   async upsert(task: CcConnectCronTask): Promise<void> {
     await this.request('/v1/cc-connect/cron/tasks', {
@@ -37,14 +40,27 @@ export class CcConnectCronClient {
   async healthCheck(expectedPid?: number): Promise<CcConnectHealth> {
     const response = await this.request('/v1/cc-connect/cron/health', { method: 'GET' }, 200);
     const health: unknown = await response.json();
-    if (!isCcConnectHealth(health) || !health.capabilities.includes(CcConnectProtocol.Capability.TriggerOnlyCron)) {
+    const requiredCapabilities = [
+      CcConnectProtocol.Capability.TriggerOnlyCron,
+      CcConnectProtocol.Capability.ChannelPolicy,
+      CcConnectProtocol.Capability.MediaReply,
+      CcConnectProtocol.Capability.RuntimeActivity,
+    ];
+    if (
+      !isCcConnectHealth(health) ||
+      requiredCapabilities.some(capability => !health.capabilities.includes(capability))
+    ) {
       throw new Error('cc-connect returned an incompatible health contract');
     }
     if (expectedPid !== undefined && health.pid !== expectedPid) {
-      throw new Error(`cc-connect health PID ${health.pid} does not match child PID ${expectedPid}`);
+      throw new Error(
+        `cc-connect health PID ${health.pid} does not match child PID ${expectedPid}`,
+      );
     }
     if (health.parentPid !== process.pid) {
-      throw new Error(`cc-connect parent PID ${health.parentPid} does not match desktop PID ${process.pid}`);
+      throw new Error(
+        `cc-connect parent PID ${health.parentPid} does not match desktop PID ${process.pid}`,
+      );
     }
     return health;
   }
@@ -59,7 +75,8 @@ export class CcConnectCronClient {
         ...init.headers,
       },
     });
-    if (response.status !== expectedStatus) throw new Error(`cc-connect cron control returned HTTP ${response.status}`);
+    if (response.status !== expectedStatus)
+      throw new Error(`cc-connect cron control returned HTTP ${response.status}`);
     return response;
   }
 }
