@@ -74,6 +74,7 @@ function validateDeck(deckPath) {
     const background = resolveColor(page.background ?? '$background', colors);
     if (!HEX.test(background ?? '')) add('error', 'page background must resolve to #RRGGBB', pageLabel);
     const textElements = [];
+    let pageTextArea = 0;
     for (const element of page.elements) {
       const label = `${pageLabel}:${element?.id ?? '<missing-id>'}`;
       if (!element?.id || typeof element.id !== 'string') { add('error', 'element id is required', label); continue; }
@@ -116,8 +117,17 @@ function validateDeck(deckPath) {
           const minimum = element.role === 'caption' ? 12 : 18;
           if (fontSize < minimum) add('error', `font size ${fontSize}pt is below the ${minimum}pt minimum`, label);
           const metrics = textMetrics(element.text, fontSize, width, element.lineHeight ?? style.lineHeight, element.wrap);
-          if (element.wrap === false && metrics.width > width) add('error', 'single-line text overflows its width', label);
-          if (metrics.height > height) add('error', 'text overflows its height', label);
+          const fontPixels = fontSize * (96 / 72);
+          const linePixels = fontPixels * Math.max(element.lineHeight ?? style.lineHeight ?? 1.3, 1.3);
+          pageTextArea += Math.min(metrics.width, width) * metrics.height;
+          if (element.wrap === false && metrics.width > width) {
+            add('error', `single-line text overflows its width by ${Math.ceil(metrics.width - width)}px; widen the element or shorten the text`, label);
+          }
+          if (metrics.height > height) {
+            const linesFit = Math.max(1, Math.floor(height / linePixels));
+            const linesShort = Math.max(1, metrics.lines - linesFit);
+            add('error', `text overflows its height by ${Math.ceil(metrics.height - height)}px (about ${linesShort} line(s)); increase height, shorten the text, or lower the font size`, label);
+          }
           if (height > metrics.height * 3 && !element.allowUnderfill) add('warning', 'text box is substantially underfilled; tighten bounds or improve composition', label);
         }
         const color = resolveColor(element.color ?? style.color ?? '$text', colors);
@@ -146,6 +156,15 @@ function validateDeck(deckPath) {
     }
     for (let i = 0; i < textElements.length; i += 1) for (let j = i + 1; j < textElements.length; j += 1) {
       if (!textElements[i].allowOverlap && !textElements[j].allowOverlap && intersects(textElements[i].bounds, textElements[j].bounds)) add('error', `text overlaps ${textElements[j].id}`, `${pageLabel}:${textElements[i].id}`);
+    }
+    // Structural feasibility: if the rendered text area alone exceeds the
+    // usable canvas area, no bounds adjustment can make the page fit. Report
+    // it as a content-budget error so the model reduces content or splits the
+    // page instead of re-tweaking bounds.
+    const safeArea = Math.max(canvas.width - 2 * safeMargin, 1) * Math.max(canvas.height - 2 * safeMargin, 1);
+    if (pageTextArea > safeArea) {
+      const overBy = Math.ceil((pageTextArea / safeArea - 1) * 100);
+      add('error', `page text content exceeds the available canvas budget by ${overBy}%; bounds adjustments cannot fix this — reduce the text, split the page, or use a denser layout`, pageLabel);
     }
   }
   return { deck, errors, warnings };
