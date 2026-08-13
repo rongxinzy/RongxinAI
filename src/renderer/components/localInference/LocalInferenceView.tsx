@@ -13,7 +13,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { Cpu, FolderOpen, Globe, MemoryStick, PanelLeft, Pencil, Settings2 } from 'lucide-react';
+import { MemoryStick, PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
