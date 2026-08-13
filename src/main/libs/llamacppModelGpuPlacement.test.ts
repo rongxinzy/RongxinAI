@@ -29,10 +29,10 @@ describe('llamacppModelGpuPlacement', () => {
       mode: LlamaCppModelGpuPlacementMode.Auto,
     });
     expect(result.success && result.input.options?.gpuLayers).toBe('auto');
-    expect(result.success && result.input.options?.device).toBeUndefined();
+    expect(result.success && result.input.options?.device).toBe('0');
   });
 
-  test('keeps a CPU runtime on the CPU path while retaining automatic layer selection', () => {
+  test('keeps a CPU runtime launch input unchanged', () => {
     const result = planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput(),
       runtimeBackend: LlamaCppRuntimeBackend.Cpu,
@@ -40,7 +40,7 @@ describe('llamacppModelGpuPlacement', () => {
     });
 
     expect(result).toMatchObject({ success: true, mode: LlamaCppModelGpuPlacementMode.Cpu });
-    expect(result.success && result.input.options?.gpuLayers).toBe('auto');
+    expect(result.success && result.input).toEqual(modelLaunchInput({ model: 'qwen.gguf' }));
   });
 
   test('does not alter explicit GPU placement', () => {

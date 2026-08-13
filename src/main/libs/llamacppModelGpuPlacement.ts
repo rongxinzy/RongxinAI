@@ -74,12 +74,22 @@ export function planLlamaCppModelGpuPlacement(
     };
   }
 
+  if (!isGpuRuntime(input)) {
+    return {
+      success: true,
+      mode: LlamaCppModelGpuPlacementMode.Cpu,
+      input: input.launchInput,
+    };
+  }
+
+  const probeFailure = getGpuProbeFailure(input);
+  if (probeFailure) return probeFailure;
+
+  const selectedGpuIndexes = selectGpuIndexes(input);
   return {
     success: true,
-    mode: isGpuRuntime(input)
-      ? LlamaCppModelGpuPlacementMode.Auto
-      : LlamaCppModelGpuPlacementMode.Cpu,
-    input: withLlamaCppAutoGpuLayers(input.launchInput),
+    mode: LlamaCppModelGpuPlacementMode.Auto,
+    input: withLlamaCppAutoGpuLayers(input.launchInput, selectedGpuIndexes),
   };
 }
 
@@ -153,11 +163,78 @@ function isGpuRuntime(input: LlamaCppModelGpuPlacementInput): boolean {
   return Boolean(input.runtimeCapabilities?.gpuDeviceCount);
 }
 
-function withLlamaCppAutoGpuLayers(input: LlamaCppModelLaunchInput): LlamaCppModelLaunchInput {
+function getGpuProbeFailure(
+  input: LlamaCppModelGpuPlacementInput,
+): Extract<LlamaCppModelGpuPlacementResult, { success: false }> | null {
+  if (input.runtimeCapabilities?.deviceProbeSucceeded === false) {
+    return {
+      success: false,
+      reason: LlamaCppModelLoadFailureReason.GpuProbeFailed,
+      detail: input.nvidiaSnapshot?.error ?? 'The llama.cpp runtime failed to probe GPU devices.',
+    };
+  }
+
+  if (
+    input.runtimeCapabilities?.deviceProbeSucceeded === true &&
+    input.runtimeCapabilities.gpuDeviceCount === 0
+  ) {
+    return {
+      success: false,
+      reason: LlamaCppModelLoadFailureReason.GpuNotFound,
+      detail: 'The selected GPU runtime reported no available GPU devices.',
+    };
+  }
+
+  if (!input.nvidiaSnapshot?.available) {
+    return {
+      success: false,
+      reason: LlamaCppModelLoadFailureReason.GpuProbeFailed,
+      detail: input.nvidiaSnapshot?.error ?? 'GPU memory snapshot is unavailable.',
+    };
+  }
+
+  if (input.nvidiaSnapshot.gpus.length === 0) {
+    return {
+      success: false,
+      reason: LlamaCppModelLoadFailureReason.GpuNotFound,
+      detail: 'No GPU devices were detected for the selected GPU runtime.',
+    };
+  }
+
+  return null;
+}
+
+function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
+  const candidates = (input.nvidiaSnapshot?.gpus ?? [])
+    .filter(gpu => Number.isFinite(gpu.memoryFreeMiB) && (gpu.memoryFreeMiB ?? -1) >= 0)
+    .sort((left, right) => (right.memoryFreeMiB ?? 0) - (left.memoryFreeMiB ?? 0));
+  const requiredMemoryMiB = estimateRequiredLlamaCppModelVramMiB({
+    modelSizeBytes: input.modelSizeBytes,
+    ctxSize: input.launchInput.options?.ctxSize,
+  });
+  const selected: number[] = [];
+  let availableMemoryMiB = 0;
+
+  for (const candidate of candidates) {
+    selected.push(candidate.index);
+    availableMemoryMiB += candidate.memoryFreeMiB ?? 0;
+    if (availableMemoryMiB >= requiredMemoryMiB) return selected;
+  }
+
+  // Keep every available GPU visible when VRAM alone cannot hold the model.
+  // llama.cpp can then choose a partial layer offload and use system memory.
+  return selected;
+}
+
+function withLlamaCppAutoGpuLayers(
+  input: LlamaCppModelLaunchInput,
+  selectedGpuIndexes: number[],
+): LlamaCppModelLaunchInput {
   return {
     ...input,
     options: {
       ...input.options,
+      device: selectedGpuIndexes.join(','),
       gpuLayers: input.options?.gpuLayers ?? LlamaCppModelGpuLayerSelection.Auto,
     },
   };
