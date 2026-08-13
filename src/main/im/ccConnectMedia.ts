@@ -142,8 +142,8 @@ function safeFileName(
 ): string {
   const fallbackExtension = extensionForMimeType(mimeType);
   const fallback = `${type}-${index + 1}${fallbackExtension}`;
-  const base = path
-    .basename(value?.trim() || fallback)
+  const portableBaseName = (value?.trim() || fallback).split(/[\\/]/).pop() || fallback;
+  const base = portableBaseName
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_')
     .replace(/[. ]+$/g, '')
     .slice(0, 160);
