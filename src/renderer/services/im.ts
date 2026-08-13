@@ -48,10 +48,27 @@ import type {
   WecomInstanceConfig,
 } from '../types/im';
 
+export class PendingIMConfigSync {
+  private pending = false;
+
+  markPending(): void {
+    this.pending = true;
+  }
+
+  markSynced(): void {
+    this.pending = false;
+  }
+
+  get isPending(): boolean {
+    return this.pending;
+  }
+}
+
 class IMService {
   private statusUnsubscribe: (() => void) | null = null;
   private messageUnsubscribe: (() => void) | null = null;
   private initPromise: Promise<void> | null = null;
+  private readonly pendingConfigSync = new PendingIMConfigSync();
 
   /**
    * Initialize IM service (with concurrency guard to prevent duplicate init)
@@ -144,6 +161,7 @@ class IMService {
         syncGateway: true,
       });
       if (result.success) {
+        this.pendingConfigSync.markSynced();
         // Reload config to get merged values
         await this.loadConfig();
         return true;
@@ -170,6 +188,7 @@ class IMService {
         syncGateway: false,
       });
       if (result.success) {
+        this.pendingConfigSync.markPending();
         return true;
       } else {
         console.error('[IM Service] Failed to persist config:', result.error);
@@ -182,12 +201,14 @@ class IMService {
   }
 
   /**
-   * Reconcile persisted IM account configuration with channel sidecars.
-   * Called from the global Settings Save button.
+   * Apply configuration persisted without a gateway restart. Returns immediately
+   * when no channel configuration has changed since the last successful sync.
    */
-  async saveAndSyncConfig(): Promise<boolean> {
+  async syncPendingConfig(): Promise<boolean> {
+    if (!this.pendingConfigSync.isPending) return true;
     try {
       const result: IMGatewayResult = await window.electron.im.syncConfig();
+      if (result.success) this.pendingConfigSync.markSynced();
       return result.success;
     } catch (error) {
       console.error('[IM Service] Failed to sync IM config:', error);
