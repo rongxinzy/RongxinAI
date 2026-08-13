@@ -121,10 +121,7 @@ import {
 import { setLanguage, t } from './i18n';
 import { IMGatewayConfig } from './im';
 import { ChannelAccountManager } from './im/channelAccountManager';
-import {
-  type IMGatewayConfigPatch,
-  sanitizeRendererIMConfigPatch,
-} from './im/configPatch';
+import { type IMGatewayConfigPatch, sanitizeRendererIMConfigPatch } from './im/configPatch';
 import type {
   DingTalkInstanceConfig,
   DiscordInstanceConfig,
@@ -1065,14 +1062,19 @@ const applyCcConnectPlatformStatuses = (
       ccConnectChannelReadyAccounts.add(status.accountId);
       ccConnectChannelErrors.delete(status.accountId);
     } else if (status.state === 'unavailable') {
-      ccConnectChannelErrors.set(status.accountId, status.lastError || 'Channel platform is unavailable');
+      ccConnectChannelErrors.set(
+        status.accountId,
+        status.lastError || 'Channel platform is unavailable',
+      );
     }
   }
 };
 
 const refreshCcConnectPlatformStatuses = async (): Promise<void> => {
   if (!ccConnectRuntimeControlClient || !ccConnectSidecarManager?.running) return;
-  const health = await ccConnectRuntimeControlClient.healthCheck(ccConnectSidecarManager.pid ?? undefined);
+  const health = await ccConnectRuntimeControlClient.healthCheck(
+    ccConnectSidecarManager.pid ?? undefined,
+  );
   applyCcConnectPlatformStatuses(health.platforms);
 };
 
@@ -1161,9 +1163,8 @@ const startCcConnectRuntime = async (
 };
 
 const loadCcConnectChannelAccounts = () => {
-  const accounts = listCcConnectAccountConfigs(
-    new IMStore(getStore().getDatabase()),
-    workspaceId => Boolean(getCoworkStore().getWorkspace(workspaceId)),
+  const accounts = listCcConnectAccountConfigs(new IMStore(getStore().getDatabase()), workspaceId =>
+    Boolean(getCoworkStore().getWorkspace(workspaceId)),
   );
   console.log(`[ChannelRuntime] Found ${accounts.length} enabled channel account(s)`);
   return accounts;
@@ -1173,11 +1174,7 @@ const loadCcConnectChannelAccounts = () => {
 const reconcileCcConnectChannelSidecarsNow = async (): Promise<void> => {
   const accounts = loadCcConnectChannelAccounts();
   const signature = JSON.stringify(accounts);
-  if (
-    signature === ccConnectRuntimeConfigSignature &&
-    ccConnectSidecarManager?.running
-  )
-    return;
+  if (signature === ccConnectRuntimeConfigSignature && ccConnectSidecarManager?.running) return;
   ccConnectRuntimeStopping = true;
   if (ccConnectRuntimeRestartTimer) clearTimeout(ccConnectRuntimeRestartTimer);
   ccConnectRuntimeRestartTimer = null;
@@ -1186,7 +1183,8 @@ const reconcileCcConnectChannelSidecarsNow = async (): Promise<void> => {
     ccConnectSidecarManager = null;
     ccConnectRuntimeControlClient = null;
     deferredCcConnectCronClient?.detach(SchedulerClockAccount);
-    for (const accountId of ccConnectDeliveryAccounts) ccConnectDeliveryTransport?.detach(accountId);
+    for (const accountId of ccConnectDeliveryAccounts)
+      ccConnectDeliveryTransport?.detach(accountId);
     ccConnectDeliveryAccounts.clear();
     ccConnectChannelReadyAccounts.clear();
     ccConnectRuntimeConfigSignature = '';
@@ -1930,7 +1928,6 @@ const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpert
   const normalizedExpertIds = normalizeSingleExpertIds(expertIds);
   const snapshots: CoworkSessionExpertInput[] = [];
   for (const expertId of normalizedExpertIds) {
-
     const expert = getAgentManager().getAgent(expertId);
     if (
       !expert ||
@@ -2171,6 +2168,24 @@ if (!gotTheLock) {
   const COMMUNITY_AUTH_ORIGIN = 'https://account.rongxzyai.com';
   const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
+
+  type CommunityAuthPayload = Record<string, unknown>;
+
+  async function readCommunityAuthPayload(
+    response: Response,
+  ): Promise<CommunityAuthPayload | null> {
+    const rawText = await response.text();
+    if (!rawText) return null;
+
+    try {
+      const payload: unknown = JSON.parse(rawText);
+      return payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? (payload as CommunityAuthPayload)
+        : null;
+    } catch {
+      return null;
+    }
+  }
 
   /** Parse a zhiyuan:// deep link for the pending community login. */
   const handleDeepLink = (url: string) => {
@@ -2490,28 +2505,30 @@ if (!gotTheLock) {
           redirect_uri: 'zhiyuan://auth/callback',
         }),
       });
-      const payload = (await response.json()) as {
-        access_token?: string;
-        refresh_token?: string;
-        user?: { id?: string; email?: string };
-      };
-      if (
-        !response.ok ||
-        !payload.access_token ||
-        !payload.refresh_token ||
-        !payload.user?.id ||
-        !payload.user.email
-      ) {
+      const payload = await readCommunityAuthPayload(response);
+      const accessToken = typeof payload?.access_token === 'string' ? payload.access_token : null;
+      const refreshToken =
+        typeof payload?.refresh_token === 'string' ? payload.refresh_token : null;
+      const user =
+        payload?.user && typeof payload.user === 'object' && !Array.isArray(payload.user)
+          ? (payload.user as CommunityAuthPayload)
+          : null;
+      const userId = typeof user?.id === 'string' ? user.id : null;
+      const userEmail = typeof user?.email === 'string' ? user.email : null;
+      if (!response.ok || !accessToken || !refreshToken || !userId || !userEmail) {
+        console.warn(
+          `[CommunityAuth] token exchange returned an invalid response with status ${response.status}`,
+        );
         throw new Error('Token exchange failed');
       }
       saveCommunitySession({
-        accessToken: payload.access_token,
-        refreshToken: payload.refresh_token,
-        user: { id: payload.user.id, email: payload.user.email },
+        accessToken,
+        refreshToken,
+        user: { id: userId, email: userEmail },
       });
       mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: true,
-        user: { id: payload.user.id, email: payload.user.email, name: payload.user.email },
+        user: { id: userId, email: userEmail, name: userEmail },
       });
       if (mainWindow?.isMinimized()) mainWindow.restore();
       if (mainWindow && !mainWindow.isVisible()) mainWindow.show();
@@ -2523,7 +2540,7 @@ if (!gotTheLock) {
       );
       mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: false,
-        error: '登录未完成，请重试。',
+        error: t('communityAuthLoginIncomplete'),
       });
     }
   }
@@ -2546,22 +2563,22 @@ if (!gotTheLock) {
           code_challenge_method: 'S256',
         }),
       });
-      const payload = (await response.json()) as { login_url?: string; error?: string };
-      if (
-        !response.ok ||
-        !payload.login_url ||
-        !payload.login_url.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)
-      ) {
-        return { success: false, error: payload.error || '无法开始登录，请稍后重试。' };
+      const payload = await readCommunityAuthPayload(response);
+      const loginUrl = typeof payload?.login_url === 'string' ? payload.login_url : null;
+      if (!response.ok || !loginUrl || !loginUrl.startsWith(`${COMMUNITY_AUTH_ORIGIN}/`)) {
+        console.warn(
+          `[CommunityAuth] login initialization returned an invalid response with status ${response.status}`,
+        );
+        return { success: false, error: t('communityAuthServiceUnavailable') };
       }
       pendingCommunityLogin = { state, verifier, expiresAt: Date.now() + 10 * 60 * 1000 };
-      await shell.openExternal(payload.login_url);
+      await shell.openExternal(loginUrl);
       return { success: true };
     } catch (error) {
       console.error('[Auth] login failed:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to open login',
+        error: t('communityAuthServiceUnavailable'),
       };
     }
   });
@@ -3503,133 +3520,127 @@ if (!gotTheLock) {
     });
   });
 
-  ipcMain.handle(
-    CoworkSessionIpc.Continue,
-    async (_event, rawOptions: unknown) => {
-      try {
-        const options = CoworkSessionContinueSchema.input.parse(rawOptions);
-        // Work sessions use Pi (SDK mode, instant availability).
-        const runtime = getPiRuntimeAdapter();
-        const store = getCoworkStore();
-        let existingSession = store.getSession(options.sessionId);
-        if (existingSession) {
-          const previousExpertSnapshots = existingSession.experts;
-          const expertSnapshots =
-            options.expertIds === undefined ||
-            haveSameExpertIds(previousExpertSnapshots, options.expertIds)
-              ? previousExpertSnapshots.slice(0, 1)
-              : resolveSessionExpertSnapshots(options.expertIds);
-          const nextSystemPrompt = composeCoworkSystemPrompt({
-            basePrompt: existingSession.systemPrompt || options.systemPrompt,
-            expertSnapshots,
-            previousExpertSnapshots,
+  ipcMain.handle(CoworkSessionIpc.Continue, async (_event, rawOptions: unknown) => {
+    try {
+      const options = CoworkSessionContinueSchema.input.parse(rawOptions);
+      // Work sessions use Pi (SDK mode, instant availability).
+      const runtime = getPiRuntimeAdapter();
+      const store = getCoworkStore();
+      let existingSession = store.getSession(options.sessionId);
+      if (existingSession) {
+        const previousExpertSnapshots = existingSession.experts;
+        const expertSnapshots =
+          options.expertIds === undefined ||
+          haveSameExpertIds(previousExpertSnapshots, options.expertIds)
+            ? previousExpertSnapshots.slice(0, 1)
+            : resolveSessionExpertSnapshots(options.expertIds);
+        const nextSystemPrompt = composeCoworkSystemPrompt({
+          basePrompt: existingSession.systemPrompt || options.systemPrompt,
+          expertSnapshots,
+          previousExpertSnapshots,
+          language: resolveCoworkPromptLanguage(),
+        });
+        const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
+        if (expertsChanged) {
+          store.replaceSessionExperts(options.sessionId, expertSnapshots);
+        }
+        if (nextSystemPrompt !== existingSession.systemPrompt) {
+          store.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt });
+        }
+        if (expertsChanged || nextSystemPrompt !== existingSession.systemPrompt) {
+          existingSession = store.getSession(options.sessionId);
+        }
+      }
+      if (options.imageAttachments?.length) {
+        console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
+          sessionId: options.sessionId,
+          count: options.imageAttachments.length,
+          details: options.imageAttachments.map(img => ({
+            name: img.name,
+            mimeType: img.mimeType,
+            base64Length: img.base64Data?.length ?? 0,
+          })),
+        });
+      }
+
+      const continuationSkillState = resolveCoworkContinuationSkillState({
+        activeSkillIds: options.activeSkillIds,
+        savedSkillIds: existingSession?.activeSkillIds,
+        expertSkillIds: (existingSession?.experts || []).flatMap(expert => expert.skillIds),
+      });
+
+      // Persist explicit selections, including [] when the user clears session skills.
+      if (continuationSkillState.sessionSkillIds !== undefined) {
+        try {
+          store.updateSession(options.sessionId, {
+            activeSkillIds: continuationSkillState.sessionSkillIds,
+          });
+        } catch (error) {
+          console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
+        }
+      }
+
+      const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
+
+      const runtimeSystemPrompt = existingSession
+        ? existingSession.systemPrompt
+        : composeCoworkSystemPrompt({
+            basePrompt: options.systemPrompt,
             language: resolveCoworkPromptLanguage(),
           });
-          const expertsChanged = !haveSameExpertSnapshots(previousExpertSnapshots, expertSnapshots);
-          if (expertsChanged) {
-            store.replaceSessionExperts(options.sessionId, expertSnapshots);
-          }
-          if (nextSystemPrompt !== existingSession.systemPrompt) {
-            store.updateSession(options.sessionId, { systemPrompt: nextSystemPrompt });
-          }
-          if (expertsChanged || nextSystemPrompt !== existingSession.systemPrompt) {
-            existingSession = store.getSession(options.sessionId);
-          }
-        }
-        if (options.imageAttachments?.length) {
-          console.log('[Cowork:ContinueSession] imageAttachments received via IPC:', {
-            sessionId: options.sessionId,
-            count: options.imageAttachments.length,
-            details: options.imageAttachments.map(img => ({
-              name: img.name,
-              mimeType: img.mimeType,
-              base64Length: img.base64Data?.length ?? 0,
-            })),
-          });
-        }
 
-        const continuationSkillState = resolveCoworkContinuationSkillState({
-          activeSkillIds: options.activeSkillIds,
-          savedSkillIds: existingSession?.activeSkillIds,
-          expertSkillIds: (existingSession?.experts || []).flatMap(expert => expert.skillIds),
+      if (existingSession && options.prompt.trim()) {
+        store.touchWorkspace(existingSession.workspaceId);
+      }
+
+      runtime
+        .continueSession(options.sessionId, options.prompt, {
+          systemPrompt: runtimeSystemPrompt,
+          skillIds: runtimeSkillIds,
+          sessionMode:
+            existingSession?.mode === CoworkSessionMode.Chat
+              ? CoworkSessionMode.Chat
+              : CoworkSessionMode.Work,
+          goalMode: options.goalMode,
+          imageAttachments: options.imageAttachments,
+          fileAttachments: options.fileAttachments,
+          workspaceRoot: existingSession?.cwd,
+          agentId: existingSession?.agentId,
+          expertIds: existingSession?.experts.map(expert => expert.expertId),
+          modelOverride: existingSession?.modelOverride,
+          autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
+        })
+        .catch(error => {
+          console.error('[Cowork] continue error:', error);
+          try {
+            // The engine router already emits an 'error' event (handled at line ~990)
+            // which sends cowork:stream:error to the renderer. Only send here if the
+            // session hasn't been marked as error yet, to avoid duplicate messages.
+            const existing = getCoworkStore().getSession(options.sessionId);
+            if (existing?.status === 'error') return;
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            const windows = BrowserWindow.getAllWindows();
+            windows.forEach(win => {
+              if (win.isDestroyed()) return;
+              win.webContents.send(CoworkStreamIpc.Error, {
+                sessionId: options.sessionId,
+                error: errorMessage,
+              });
+            });
+          } catch (handlerError) {
+            console.error('[Cowork] failed to send error notification to renderer:', handlerError);
+          }
         });
 
-        // Persist explicit selections, including [] when the user clears session skills.
-        if (continuationSkillState.sessionSkillIds !== undefined) {
-          try {
-            store.updateSession(options.sessionId, {
-              activeSkillIds: continuationSkillState.sessionSkillIds,
-            });
-          } catch (error) {
-            console.error('[Cowork:ContinueSession] failed to persist activeSkillIds:', error);
-          }
-        }
-
-        const runtimeSkillIds = continuationSkillState.runtimeSkillIds;
-
-        const runtimeSystemPrompt = existingSession
-          ? existingSession.systemPrompt
-          : composeCoworkSystemPrompt({
-              basePrompt: options.systemPrompt,
-              language: resolveCoworkPromptLanguage(),
-            });
-
-        if (existingSession && options.prompt.trim()) {
-          store.touchWorkspace(existingSession.workspaceId);
-        }
-
-        runtime
-          .continueSession(options.sessionId, options.prompt, {
-            systemPrompt: runtimeSystemPrompt,
-            skillIds: runtimeSkillIds,
-            sessionMode:
-              existingSession?.mode === CoworkSessionMode.Chat
-                ? CoworkSessionMode.Chat
-                : CoworkSessionMode.Work,
-            goalMode: options.goalMode,
-            imageAttachments: options.imageAttachments,
-            fileAttachments: options.fileAttachments,
-            workspaceRoot: existingSession?.cwd,
-            agentId: existingSession?.agentId,
-            expertIds: existingSession?.experts.map(expert => expert.expertId),
-            modelOverride: existingSession?.modelOverride,
-            autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
-          })
-          .catch(error => {
-            console.error('[Cowork] continue error:', error);
-            try {
-              // The engine router already emits an 'error' event (handled at line ~990)
-              // which sends cowork:stream:error to the renderer. Only send here if the
-              // session hasn't been marked as error yet, to avoid duplicate messages.
-              const existing = getCoworkStore().getSession(options.sessionId);
-              if (existing?.status === 'error') return;
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              const windows = BrowserWindow.getAllWindows();
-              windows.forEach(win => {
-                if (win.isDestroyed()) return;
-                win.webContents.send(CoworkStreamIpc.Error, {
-                  sessionId: options.sessionId,
-                  error: errorMessage,
-                });
-              });
-            } catch (handlerError) {
-              console.error(
-                '[Cowork] failed to send error notification to renderer:',
-                handlerError,
-              );
-            }
-          });
-
-        const session = getCoworkStore().getSession(options.sessionId);
-        return { success: true, session };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to continue session',
-        };
-      }
-    },
-  );
+      const session = getCoworkStore().getSession(options.sessionId);
+      return { success: true, session };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to continue session',
+      };
+    }
+  });
 
   ipcMain.handle(CoworkQueueIpc.List, async (_event, rawInput: unknown) => {
     try {
@@ -4952,9 +4963,7 @@ if (!gotTheLock) {
             ccConnectSidecarManager?.running === true &&
             ccConnectChannelReadyAccounts.has(instanceId),
           lastError:
-            ccConnectChannelErrors.get(instanceId) ??
-            ccConnectSidecarManager?.lastError ??
-            null,
+            ccConnectChannelErrors.get(instanceId) ?? ccConnectSidecarManager?.lastError ?? null,
         };
       });
       return { success: true, status };

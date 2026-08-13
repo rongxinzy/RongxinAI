@@ -294,6 +294,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailTestSuccess: '连接测试成功！',
     emailTestFailed: '连接测试失败：{error}',
 
+    // Community account authentication
+    communityAuthLoginIncomplete: '登录未完成，请重试。',
+    communityAuthServiceUnavailable: '登录服务暂时不可用，请稍后重试。',
+
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
   en: {
@@ -626,6 +630,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     testConnection: 'Test Connection',
     emailTestSuccess: 'Connection test successful!',
     emailTestFailed: 'Connection test failed: {error}',
+
+    // Community account authentication
+    communityAuthLoginIncomplete: 'Login was not completed. Please try again.',
+    communityAuthServiceUnavailable:
+      'The login service is temporarily unavailable. Please try again later.',
 
     'enterprise.updateBlocked': 'Updates are managed by enterprise',
   },
