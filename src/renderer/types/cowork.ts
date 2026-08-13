@@ -5,7 +5,10 @@ import type {
   CoworkSessionMode,
 } from '../../shared/cowork/constants';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
-import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
+import type {
+  CoworkMessageExpertIdentity,
+  CoworkSessionExpertSnapshot,
+} from '../../shared/cowork/sessionExperts';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 
 export interface CoworkImageAttachment {
@@ -70,6 +73,8 @@ export interface CoworkMessageMetadata {
   model?: string;
   modelProviderKey?: string;
   agentName?: string;
+  /** Experts that were active for the turn that produced this message. */
+  experts?: CoworkMessageExpertIdentity[];
   interruption?: CoworkSessionInterruption;
   [key: string]: unknown;
 }

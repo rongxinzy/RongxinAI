@@ -54,6 +54,7 @@ import {
   type CoworkSessionExpertInput,
   type CoworkSessionExpertSnapshot,
   CoworkSessionExpertSource,
+  normalizeSingleExpertIds,
 } from '../shared/cowork/sessionExperts';
 import {
   ApiIpc,
@@ -79,6 +80,7 @@ import {
 import {
   ApiFetchSchema,
   ApiStreamSchema,
+  CoworkSessionContinueSchema,
   CoworkSessionStartSchema,
   CoworkSessionUpdateModelSchema,
   ProjectCreateDirectorySchema,
@@ -1917,7 +1919,7 @@ const haveSameExpertIds = (
   experts: CoworkSessionExpertSnapshot[],
   requestedExpertIds: string[],
 ): boolean => {
-  const normalizedIds = [...new Set(requestedExpertIds.map(id => id.trim()).filter(Boolean))];
+  const normalizedIds = normalizeSingleExpertIds(requestedExpertIds);
   return (
     experts.length === normalizedIds.length &&
     experts.every((expert, index) => expert.expertId === normalizedIds[index])
@@ -1925,12 +1927,9 @@ const haveSameExpertIds = (
 };
 
 const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpertInput[] => {
+  const normalizedExpertIds = normalizeSingleExpertIds(expertIds);
   const snapshots: CoworkSessionExpertInput[] = [];
-  const seen = new Set<string>();
-  for (const rawExpertId of expertIds) {
-    const expertId = rawExpertId.trim();
-    if (!expertId || seen.has(expertId)) continue;
-    seen.add(expertId);
+  for (const expertId of normalizedExpertIds) {
 
     const expert = getAgentManager().getAgent(expertId);
     if (
@@ -3406,6 +3405,13 @@ if (!gotTheLock) {
 
         // Build metadata, include imageAttachments if present
         const messageMetadata: Record<string, unknown> = {};
+        if (expertSnapshots.length > 0) {
+          messageMetadata.experts = expertSnapshots.map(expert => ({
+            expertId: expert.expertId,
+            expertName: expert.expertName,
+            presetId: expert.packageId,
+          }));
+        }
         if (options.activeSkillIds?.length) {
           messageMetadata.skillIds = options.activeSkillIds;
         }
@@ -3499,26 +3505,9 @@ if (!gotTheLock) {
 
   ipcMain.handle(
     CoworkSessionIpc.Continue,
-    async (
-      _event,
-      options: {
-        sessionId: string;
-        prompt: string;
-        systemPrompt?: string;
-        activeSkillIds?: string[];
-        goalMode?: boolean;
-        expertIds?: string[];
-        permissionMode?: CoworkPermissionMode;
-        imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
-        fileAttachments?: Array<{
-          name: string;
-          path: string;
-          extension: string;
-          isImage?: boolean;
-        }>;
-      },
-    ) => {
+    async (_event, rawOptions: unknown) => {
       try {
+        const options = CoworkSessionContinueSchema.input.parse(rawOptions);
         // Work sessions use Pi (SDK mode, instant availability).
         const runtime = getPiRuntimeAdapter();
         const store = getCoworkStore();
@@ -3528,7 +3517,7 @@ if (!gotTheLock) {
           const expertSnapshots =
             options.expertIds === undefined ||
             haveSameExpertIds(previousExpertSnapshots, options.expertIds)
-              ? previousExpertSnapshots
+              ? previousExpertSnapshots.slice(0, 1)
               : resolveSessionExpertSnapshots(options.expertIds);
           const nextSystemPrompt = composeCoworkSystemPrompt({
             basePrompt: existingSession.systemPrompt || options.systemPrompt,
@@ -6622,7 +6611,10 @@ if (!gotTheLock) {
           sessionMode: session.mode,
           workspaceRoot: session.cwd,
           agentId: session.agentId,
-          expertIds: resumeInput?.expertIds ?? session.experts.map(expert => expert.expertId),
+          expertIds:
+            resumeInput?.expertIds === undefined
+              ? session.experts.slice(0, 1).map(expert => expert.expertId)
+              : normalizeSingleExpertIds(resumeInput.expertIds),
           modelOverride: session.modelOverride,
           autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
           goalMode: resumeInput?.goalMode,

@@ -12,6 +12,7 @@ import React from 'react';
 import type { CoworkErrorKind } from '../../../../common/coworkError';
 import { getUserErrorI18nKey } from '../../../../common/coworkError';
 import { getScheduledReminderDisplayText } from '../../../../scheduledTask/reminderText';
+import type { CoworkMessageExpertIdentity } from '../../../../shared/cowork/sessionExperts';
 import {
   CoworkInterruptionCause,
   type CoworkSessionInterruption,
@@ -35,6 +36,7 @@ import { getToolResultLineCount, getVisibleAssistantItems } from '../helpers/mes
 import { getThinkingPresentation } from '../helpers/thinkingPresentation';
 import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
 import { AssistantBubble } from './AssistantBubble';
+import { ExpertAvatar } from '../../expert/expertAvatars';
 import { ExecutionSummary } from './ExecutionSummary';
 import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
 import { TypingDots } from './StreamingBar';
@@ -50,6 +52,18 @@ const getInterruptionMessage = (interruption: CoworkSessionInterruption): string
     default:
       return i18nService.t('coworkInterruptionUserStop');
   }
+};
+
+export const getTurnPrimaryExpert = (
+  turn: ConversationTurn,
+): CoworkMessageExpertIdentity | undefined => {
+  const userExperts = turn.userMessage?.metadata?.experts;
+  if (Array.isArray(userExperts)) return userExperts[0];
+
+  const assistantItem = turn.assistantItems.find(
+    item => item.type === 'assistant' && Array.isArray(item.message.metadata?.experts),
+  );
+  return assistantItem?.type === 'assistant' ? assistantItem.message.metadata?.experts?.[0] : undefined;
 };
 
 const TurnBlockComponent: React.FC<{
@@ -81,6 +95,7 @@ const TurnBlockComponent: React.FC<{
   expandToolResults = false,
 }) => {
   const visibleAssistantItems = getVisibleAssistantItems(turn.assistantItems);
+  const primaryExpert = getTurnPrimaryExpert(turn);
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
@@ -411,6 +426,20 @@ const TurnBlockComponent: React.FC<{
       <div className="max-w-5xl min-w-[320px] mx-auto">
         <div className="flex items-start gap-3">
           <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              {primaryExpert ? (
+                <>
+                  <ExpertAvatar
+                    name={primaryExpert.presetId}
+                    label={primaryExpert.expertName}
+                    className="size-7 rounded-full border-0"
+                  />
+                  <span className="truncate">{primaryExpert.expertName}</span>
+                </>
+              ) : (
+                <span>{i18nService.t('cowork')}</span>
+              )}
+            </div>
             {finalAnswerItem && executionItems.length > 0 && (
               <ExecutionSummary summary={executionSummary} persistKey={`execsummary-${turn.id}`}>
                 {executionItems.map((item, index) => {

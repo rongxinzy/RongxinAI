@@ -409,6 +409,8 @@ export interface CoworkMessageMetadata {
   model?: string;
   modelProviderKey?: string;
   agentName?: string;
+  /** Experts that were active for the turn that produced this message. */
+  experts?: import('../shared/cowork/sessionExperts').CoworkMessageExpertIdentity[];
   interruption?: import('../shared/cowork/interruption').CoworkSessionInterruption;
   [key: string]: unknown;
 }
