@@ -76,6 +76,11 @@ type ReadyUpdateCache = {
   sha512: string;
 };
 
+type PendingReadyUpdate = ReadyUpdateCache & {
+  info: AppUpdateInfo;
+  source: AppUpdateSource;
+};
+
 type VerifiedUpdate = {
   envelope: unknown;
   info: AppUpdateInfo;
@@ -130,6 +135,8 @@ export class AppUpdateCoordinator {
   private downloadCancellation: CancellationToken | null = null;
   private currentSignedEnvelope: unknown | null = null;
   private downloadedFilePath: string | null = null;
+  private pendingReadyUpdate: PendingReadyUpdate | null = null;
+  private readyFreshnessPromise: Promise<VerifiedUpdate | null> | null = null;
   private readonly onDownloadProgress = (progress: ProgressInfo): void =>
     this.handleDownloadProgress(progress);
   private readonly onUpdateDownloaded = (event: { downloadedFile: string }): void => {
@@ -151,6 +158,9 @@ export class AppUpdateCoordinator {
     this.updater.on('update-downloaded', this.onUpdateDownloaded);
     this.updater.on('error', this.onUpdaterError);
     this.restoreReadyUpdate();
+    if (this.pendingReadyUpdate) {
+      void this.recheckPendingReadyUpdate().then(update => this.startSupersedingUpdate(update));
+    }
   }
 
   /** Release global autoUpdater listeners when a coordinator is replaced in tests or embedding code. */
@@ -168,6 +178,18 @@ export class AppUpdateCoordinator {
   async checkNow(options: { manual?: boolean } = {}): Promise<AppUpdateCheckResult> {
     if (this.clearStateIfUpdatesDisabled()) {
       return { success: true, state: { ...this.state }, updateFound: false };
+    }
+    if (this.readyFreshnessPromise) {
+      await this.readyFreshnessPromise;
+      const state = this.getState();
+      return {
+        success: state.status !== AppUpdateStatus.Error,
+        state,
+        updateFound: state.info !== null,
+        ...(state.status === AppUpdateStatus.Error && state.errorMessage
+          ? { error: state.errorMessage }
+          : {}),
+      };
     }
     if (this.checkPromise) return this.checkPromise;
     // Do not let the periodic checker replace an active download state. Apart
@@ -190,6 +212,11 @@ export class AppUpdateCoordinator {
 
   async retryDownload(): Promise<AppUpdateRuntimeState> {
     if (this.clearStateIfUpdatesDisabled()) return { ...this.state };
+    if (this.pendingReadyUpdate) {
+      const update = await this.recheckPendingReadyUpdate();
+      this.startSupersedingUpdate(update);
+      return this.getState();
+    }
     const info = this.state.info;
     const target = this.resolveUpdateTarget();
     if (!info || !target || this.state.status === AppUpdateStatus.Installing) {
@@ -277,6 +304,34 @@ export class AppUpdateCoordinator {
       return { success: false, state: this.getState(), error: 'No verified update is ready' };
     }
 
+    // Ready is emitted at the end of the download promise, just before its
+    // finally handler clears the active transfer. Drain that promise so a
+    // newly discovered version can start downloading during the final check.
+    if (this.downloadPromise) await this.downloadPromise;
+    if (this.readyFreshnessPromise) await this.readyFreshnessPromise;
+
+    const freshness = await this.checkNow({ manual: true });
+    const freshState = freshness.state;
+    if (!freshness.success) {
+      return {
+        success: false,
+        state: freshState,
+        error: `Unable to confirm the latest update: ${freshness.error ?? 'update check failed'}`,
+      };
+    }
+    if (
+      freshState.status !== AppUpdateStatus.Ready ||
+      freshState.info?.latestVersion !== info.latestVersion ||
+      freshState.readyFileHash !== readyFileHash ||
+      freshState.readyFilePath !== readyFilePath
+    ) {
+      return {
+        success: false,
+        state: freshState,
+        error: 'A newer update is available and must be downloaded before installation',
+      };
+    }
+
     try {
       const stat = await fs.promises.stat(readyFilePath);
       if (!stat.isFile() || stat.size === 0) {
@@ -347,12 +402,7 @@ export class AppUpdateCoordinator {
         });
         return { success: true, state, updateFound: true };
       }
-      this.configureUpdater(update.target);
-      const result = await this.updater.checkForUpdates();
-      if (!result?.isUpdateAvailable) {
-        throw new Error('The electron updater feed does not contain the signed update');
-      }
-      this.assertUpdaterMatchesSignedManifest(result.updateInfo, update.info);
+      await this.assertElectronUpdaterFeed(update);
 
       if (
         previousReady?.info?.latestVersion === update.info.latestVersion &&
@@ -363,7 +413,7 @@ export class AppUpdateCoordinator {
         return { success: true, state: this.setState(previousReady), updateFound: true };
       }
 
-      const state = this.setState({
+      this.setState({
         ...initialState(),
         status: AppUpdateStatus.Available,
         source,
@@ -371,7 +421,7 @@ export class AppUpdateCoordinator {
         lastCheckedAt: Date.now(),
       });
       this.startBackgroundDownload(update, source);
-      return { success: true, state, updateFound: true };
+      return { success: true, state: this.getState(), updateFound: true };
     } catch (error) {
       console.warn(
         '[AppUpdate] update check failed:',
@@ -409,6 +459,7 @@ export class AppUpdateCoordinator {
       info,
       lastCheckedAt: this.state.lastCheckedAt,
     });
+    let supersedingUpdate: VerifiedUpdate | null = null;
     this.downloadPromise = this.updater
       .downloadUpdate(cancellation)
       .then(async filePaths => {
@@ -430,16 +481,15 @@ export class AppUpdateCoordinator {
           filePath: downloadedFile,
           sha512,
         };
-        this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, readyUpdate);
-        this.currentSignedEnvelope = envelope;
+        this.pendingReadyUpdate = { ...readyUpdate, info, source };
         this.setState({
           ...initialState(),
-          status: AppUpdateStatus.Ready,
+          status: AppUpdateStatus.Checking,
           source,
           info,
-          readyFilePath: downloadedFile,
-          readyFileHash: sha512,
+          lastCheckedAt: this.state.lastCheckedAt,
         });
+        supersedingUpdate = await this.recheckPendingReadyUpdate();
       })
       .catch(error => {
         // cancelDownload already restored Available. Cancellation is not an error.
@@ -462,7 +512,120 @@ export class AppUpdateCoordinator {
       .finally(() => {
         if (this.downloadCancellation === cancellation) this.downloadCancellation = null;
         this.downloadPromise = null;
+        this.startSupersedingUpdate(supersedingUpdate);
       });
+  }
+
+  private recheckPendingReadyUpdate(): Promise<VerifiedUpdate | null> {
+    if (this.readyFreshnessPromise) return this.readyFreshnessPromise;
+    this.readyFreshnessPromise = this.performPendingReadyRecheck().finally(() => {
+      this.readyFreshnessPromise = null;
+    });
+    return this.readyFreshnessPromise;
+  }
+
+  private async performPendingReadyRecheck(): Promise<VerifiedUpdate | null> {
+    const pending = this.pendingReadyUpdate;
+    if (!pending) return null;
+    this.setState({
+      ...initialState(),
+      status: AppUpdateStatus.Checking,
+      source: pending.source,
+      info: pending.info,
+      lastCheckedAt: this.state.lastCheckedAt,
+    });
+    try {
+      const latest = await this.fetchUpdateInfo(this.resolveCurrentVersion());
+      if (this.pendingReadyUpdate !== pending) return null;
+      if (!latest) {
+        this.pendingReadyUpdate = null;
+        this.currentSignedEnvelope = null;
+        this.store.delete(READY_UPDATE_CACHE_KEY);
+        this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.UpToDate,
+          lastCheckedAt: Date.now(),
+        });
+        return null;
+      }
+      await this.assertElectronUpdaterFeed(latest);
+      if (this.isSameUpdate(pending.info, latest.info)) {
+        const readyUpdate: ReadyUpdateCache = {
+          envelope: latest.envelope,
+          filePath: pending.filePath,
+          sha512: pending.sha512,
+        };
+        this.store.set<ReadyUpdateCache>(READY_UPDATE_CACHE_KEY, readyUpdate);
+        this.pendingReadyUpdate = null;
+        this.currentSignedEnvelope = latest.envelope;
+        this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.Ready,
+          source: pending.source,
+          info: latest.info,
+          lastCheckedAt: Date.now(),
+          readyFilePath: pending.filePath,
+          readyFileHash: pending.sha512,
+        });
+        return null;
+      }
+
+      this.pendingReadyUpdate = null;
+      this.currentSignedEnvelope = latest.envelope;
+      this.store.delete(READY_UPDATE_CACHE_KEY);
+      this.setState({
+        ...initialState(),
+        status: AppUpdateStatus.Available,
+        source: pending.source,
+        info: latest.info,
+        lastCheckedAt: Date.now(),
+      });
+      return latest;
+    } catch (error) {
+      if (this.pendingReadyUpdate === pending) {
+        const message = error instanceof Error ? error.message : 'Update freshness check failed';
+        console.warn('[AppUpdate] ready update freshness check failed:', message);
+        this.setState({
+          ...initialState(),
+          status: AppUpdateStatus.Error,
+          source: pending.source,
+          info: pending.info,
+          lastCheckedAt: this.state.lastCheckedAt,
+          errorMessage: `Unable to confirm the latest update: ${message}`,
+        });
+      }
+      return null;
+    }
+  }
+
+  private startSupersedingUpdate(update: VerifiedUpdate | null): void {
+    if (!update || update.info.manualDownloadOnly) return;
+    if (
+      this.state.status !== AppUpdateStatus.Available ||
+      this.state.info?.latestVersion !== update.info.latestVersion
+    ) {
+      return;
+    }
+    this.startBackgroundDownload(update, this.state.source ?? AppUpdateSource.Auto);
+  }
+
+  private isSameUpdate(left: AppUpdateInfo, right: AppUpdateInfo): boolean {
+    return (
+      left.latestVersion === right.latestVersion &&
+      left.expectedUpdaterFileName === right.expectedUpdaterFileName &&
+      left.expectedUpdaterSha512 === right.expectedUpdaterSha512 &&
+      left.manualDownloadOnly === right.manualDownloadOnly
+    );
+  }
+
+  private async assertElectronUpdaterFeed(update: VerifiedUpdate): Promise<void> {
+    if (update.info.manualDownloadOnly) return;
+    this.configureUpdater(update.target);
+    const result = await this.updater.checkForUpdates();
+    if (!result?.isUpdateAvailable) {
+      throw new Error('The electron updater feed does not contain the signed update');
+    }
+    this.assertUpdaterMatchesSignedManifest(result.updateInfo, update.info);
   }
 
   private handleDownloadProgress(progress: ProgressInfo): void {
@@ -560,13 +723,17 @@ export class AppUpdateCoordinator {
       }
       this.currentSignedEnvelope = ready.envelope;
       this.downloadedFilePath = resolvedFile;
+      this.pendingReadyUpdate = {
+        ...ready,
+        filePath: resolvedFile,
+        info,
+        source: AppUpdateSource.Auto,
+      };
       this.state = {
         ...initialState(),
-        status: AppUpdateStatus.Ready,
+        status: AppUpdateStatus.Checking,
         source: AppUpdateSource.Auto,
         info,
-        readyFilePath: resolvedFile,
-        readyFileHash: ready.sha512,
       };
     } catch {
       this.store.delete(READY_UPDATE_CACHE_KEY);
@@ -747,6 +914,7 @@ export class AppUpdateCoordinator {
     this.downloadCancellation = null;
     this.currentSignedEnvelope = null;
     this.downloadedFilePath = null;
+    this.pendingReadyUpdate = null;
     this.store.delete(READY_UPDATE_CACHE_KEY);
     if (this.state.status !== AppUpdateStatus.Idle || this.state.info !== null) {
       this.setState(initialState());
