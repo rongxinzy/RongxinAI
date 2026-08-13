@@ -69,7 +69,9 @@ vi.mock('electron', () => ({
   shell: { openExternal: electronMocks.openExternal },
 }));
 
-vi.mock('./appUpdateInstaller', () => ({ installWindowsNsis: vi.fn() }));
+const installerMocks = vi.hoisted(() => ({ installWindowsNsis: vi.fn() }));
+
+vi.mock('./appUpdateInstaller', () => installerMocks);
 
 import { AppUpdateCoordinator } from './appUpdateCoordinator';
 
@@ -184,6 +186,7 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockReset();
     vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockReset();
     vi.mocked(updaterMocks.autoUpdater.quitAndInstall).mockReset();
+    installerMocks.installWindowsNsis.mockReset();
     electronMocks.getAppPath.mockReturnValue(process.cwd());
     electronMocks.isPackaged = false;
     electronMocks.openExternal.mockReset();
@@ -335,6 +338,39 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(coordinator.getState().readyFilePath).toBeNull();
     finishFreshnessCheck?.(new Response(JSON.stringify(envelope), { status: 200 }));
     await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+  });
+
+  test('uses the Windows NSIS handoff after the final freshness check', async () => {
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' });
+    Object.defineProperty(process, 'arch', { configurable: true, value: 'x64' });
+    const installerFile = path.join(path.dirname(downloadedFile), 'ZhiYuan.Setup.exe');
+    await fs.promises.rename(downloadedFile, installerFile);
+    downloadedFile = installerFile;
+    const envelope = signedManifest(privateKey, {
+      updaterSha512,
+      platform: 'win32',
+      arch: 'x64',
+      variant: 'lite',
+      updaterFilename: 'ZhiYuan.Setup.exe',
+    });
+    vi.stubGlobal('fetch', manifestFetch(envelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates).mockResolvedValue({
+      isUpdateAvailable: true,
+      updateInfo: updaterInfo('2026.7.2', updaterSha512, 'ZhiYuan.Setup.exe'),
+    });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate).mockImplementation(async () => {
+      updaterMocks.emit('update-downloaded', { downloadedFile });
+      return [downloadedFile];
+    });
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(true);
+    expect(installerMocks.installWindowsNsis).toHaveBeenCalledWith(installerFile);
+    expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
 
   test('rejects a v2 feed whose version or checksum is not authorized by the signed manifest', async () => {
