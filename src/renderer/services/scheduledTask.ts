@@ -273,8 +273,7 @@ export class ScheduledTaskService {
   async preflight(id: string): Promise<{
     hasChannel: boolean;
     channel?: string;
-    lastDeliveryErrors?: string[] | null;
-    consecutiveErrors?: number;
+    latestDelivery?: import('../../scheduledTask/types').ScheduledTaskDeliveryRecord | null;
   } | null> {
     const api = window.electron?.scheduledTasks;
     if (!api) return null;
@@ -284,6 +283,19 @@ export class ScheduledTaskService {
       return result.success ? (result.preflight ?? null) : null;
     } catch {
       return null;
+    }
+  }
+
+  async listDeliveries(
+    runId: string,
+  ): Promise<import('../../scheduledTask/types').ScheduledTaskDeliveryRecord[]> {
+    const api = window.electron?.scheduledTasks;
+    if (!api) return [];
+    try {
+      const result = await api.listDeliveries(runId);
+      return result.success && result.deliveries ? result.deliveries : [];
+    } catch {
+      return [];
     }
   }
 

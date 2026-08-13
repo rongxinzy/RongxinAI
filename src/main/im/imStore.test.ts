@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import { getCcConnectScopedConversationId } from './ccConnectConversationId';
 import { IMStore } from './imStore';
 
 class FakeDb {
@@ -125,6 +126,12 @@ class FakeDb {
             .filter(([key]) => key.startsWith(prefix))
             .map(([key, value]) => ({ key, value }));
         }
+        if (sql.includes('FROM channel_session_mappings')) {
+          const rows = Array.from(this.mappings.values());
+          return sql.includes('WHERE platform = ?')
+            ? rows.filter(row => row.platform === String(params[0]))
+            : rows;
+        }
         return [];
       },
     };
@@ -208,4 +215,25 @@ test('IMStore persists transport session keys in channel session mappings', () =
   expect(store.getSessionMapping('bot-1:direct:user-1', 'weixin')?.transportSessionKey).toBe(
     'weixin:bot-1:direct:user-2',
   );
+});
+
+test('IMStore filters scoped conversations by complete channel account ID', () => {
+  const db = new FakeDb();
+  const store = new IMStore(db as unknown as ConstructorParameters<typeof IMStore>[0]);
+  const firstAccount = 'eb74163d-9aaa-4186-a526-36f249ca883b';
+  const secondAccount = 'eb74163d-9aaa-4186-a526-000000000000';
+  store.createSessionMapping(
+    getCcConnectScopedConversationId(firstAccount, 'group:one'),
+    'dingtalk',
+    'cowork-1',
+  );
+  store.createSessionMapping(
+    getCcConnectScopedConversationId(secondAccount, 'group:two'),
+    'dingtalk',
+    'cowork-2',
+  );
+
+  expect(store.listSessionMappings('dingtalk', firstAccount)).toMatchObject([
+    { coworkSessionId: 'cowork-1' },
+  ]);
 });

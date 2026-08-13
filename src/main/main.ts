@@ -223,7 +223,8 @@ import {
 import { getLogFilePath, getRecentMainLogEntries, initLogger } from './logger';
 import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
-import { CcConnectPiBridge, parseCcConnectScopedConversationId } from './im/ccConnectPiBridge';
+import { parseCcConnectScopedConversationId } from './im/ccConnectConversationId';
+import { CcConnectPiBridge } from './im/ccConnectPiBridge';
 import { ChannelInboxStore } from './im/channelInboxStore';
 import { ChannelTurnCoordinator } from './im/channelTurnCoordinator';
 import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandler';
@@ -4728,11 +4729,7 @@ if (!gotTheLock) {
         listSessionMappings: (platform: string, accountId?: string) =>
           getIMGatewayManager()
             .getIMStore()
-            .listSessionMappings(platform as Platform, accountId)
-            .map(mapping => ({
-              ...mapping,
-              lastActiveAt: String(mapping.lastActiveAt),
-            })),
+            .listSessionMappings(platform as Platform, accountId),
       }),
     }),
   });

@@ -80,6 +80,14 @@ export const TaskStatus = {
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
 
+export const DeliveryStatus = {
+  Pending: 'pending',
+  Success: 'success',
+  Error: 'error',
+  Skipped: 'skipped',
+} as const;
+export type DeliveryStatus = (typeof DeliveryStatus)[keyof typeof DeliveryStatus];
+
 // ─── Default Agent ID ───────────────────────────────────────────────────────
 
 // ─── Policy Run-Behavior Descriptions ───────────────────────────────────────
@@ -101,6 +109,7 @@ export const IpcChannel = {
   RunManually: 'scheduledTask:runManually',
   Stop: 'scheduledTask:stop',
   ListRuns: 'scheduledTask:listRuns',
+  ListDeliveries: 'scheduledTask:listDeliveries',
   CountRuns: 'scheduledTask:countRuns',
   ListAllRuns: 'scheduledTask:listAllRuns',
   ResolveSession: 'scheduledTask:resolveSession',

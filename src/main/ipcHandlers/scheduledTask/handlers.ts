@@ -8,6 +8,8 @@ import {
 } from '../../../scheduledTask/constants';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { PlatformRegistry } from '../../../shared/platform';
+import { tryParseCcConnectScopedConversationId } from '../../im/ccConnectConversationId';
+import { t } from '../../i18n';
 import { listScheduledTaskChannels } from './helpers';
 
 export interface ScheduledTaskHandlerDeps {
@@ -30,7 +32,7 @@ export interface ScheduledTaskHandlerDeps {
             imConversationId: string;
             platform: string;
             coworkSessionId: string;
-            lastActiveAt: string;
+            lastActiveAt: number;
           }>;
         }
       | undefined;
@@ -40,7 +42,7 @@ export interface ScheduledTaskHandlerDeps {
 /**
  * Normalizes an announce-mode delivery payload for local channel delivery.
  * Mutates `normalizedInput` in place: sets sessionTarget, converts SystemEvent
- * payloads to AgentTurn, and strips IM subtype prefixes from delivery.to.
+ * payloads to AgentTurn, and restores native pi-connect conversation IDs.
  */
 async function applyAnnounceDeliveryNormalization(
   normalizedInput: Record<string, any>,
@@ -60,19 +62,24 @@ async function applyAnnounceDeliveryNormalization(
     };
   }
 
-  // Strip IM subtype prefix (e.g. "direct:ou_xxx" -> "ou_xxx").
-  // Use lastIndexOf to handle IDs that contain colons themselves.
-  const rawTo = delivery.to;
-  const colonIdx = rawTo.lastIndexOf(':');
-  if (colonIdx > 0) {
-    delivery.to = rawTo.slice(colonIdx + 1);
-    console.debug(
-      '[ScheduledTask] stripped IM subtype prefix from delivery.to:',
-      rawTo,
-      '->',
-      delivery.to,
-    );
+  const scopedConversation = tryParseCcConnectScopedConversationId(delivery.to);
+  if (scopedConversation) {
+    const [accountId, conversationId] = scopedConversation;
+    if (delivery.accountId && delivery.accountId !== accountId) {
+      throw new Error(t('scheduledTaskDeliveryAccountMismatch'));
+    }
+    delivery.accountId = delivery.accountId ?? accountId;
+    delivery.to = conversationId;
   }
+}
+
+function cloneScheduledTaskInput<T extends Record<string, any>>(input: T): T {
+  if (!input || typeof input !== 'object') return {} as T;
+  const normalized: Record<string, any> = { ...input };
+  if (Object.hasOwn(normalized, 'delivery') && normalized.delivery) {
+    normalized.delivery = { ...normalized.delivery };
+  }
+  return normalized as T;
 }
 
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {
@@ -104,12 +111,11 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
 
   ipcMain.handle(ScheduledTaskIpc.Create, async (_event, input: any) => {
     try {
-      const normalizedInput = input && typeof input === 'object' ? { ...input } : {};
-      console.debug('[ScheduledTask] create input:', JSON.stringify(normalizedInput, null, 2));
+      const normalizedInput = cloneScheduledTaskInput(input);
       await applyAnnounceDeliveryNormalization(normalizedInput);
 
       const task = await getCronJobService().addJob(normalizedInput);
-      console.log('[IPC][scheduledTask:create] result task id:', task?.id, 'name:', task?.name);
+      console.log(`[ScheduledTask] created task ${task.id}`);
       return { success: true, task };
     } catch (error) {
       return {
@@ -121,16 +127,11 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
 
   ipcMain.handle(ScheduledTaskIpc.Update, async (_event, id: string, input: any) => {
     try {
-      const normalizedInput = input && typeof input === 'object' ? { ...input } : {};
-      console.debug(
-        '[ScheduledTask] update input id:',
-        id,
-        JSON.stringify(normalizedInput, null, 2),
-      );
+      const normalizedInput = cloneScheduledTaskInput(input);
       await applyAnnounceDeliveryNormalization(normalizedInput);
 
       const task = await getCronJobService().updateJob(id, normalizedInput);
-      console.log('[IPC][scheduledTask:update] result task id:', task?.id, 'name:', task?.name);
+      console.log(`[ScheduledTask] updated task ${task.id}`);
       return { success: true, task };
     } catch (error) {
       return {
@@ -201,6 +202,18 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
     },
   );
 
+  ipcMain.handle(ScheduledTaskIpc.ListDeliveries, async (_event, runId: string) => {
+    try {
+      const deliveries = await getCronJobService().listDeliveries(runId);
+      return { success: true, deliveries };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to list deliveries',
+      };
+    }
+  });
+
   ipcMain.handle(ScheduledTaskIpc.CountRuns, async (_event, taskId: string) => {
     try {
       const count = await getCronJobService().countRuns(taskId);
@@ -269,19 +282,17 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         return { success: true, preflight: { hasChannel: false } };
       }
 
-      // Check recent runs for delivery failures indicating channel issues.
-      const recentRuns = await getCronJobService().listRuns(taskId, 5, 0, { status: 'error' });
-      const deliveryErrors = recentRuns
-        .filter(r => r.error?.includes('channel') || r.error?.includes('delivery'))
-        .map(r => r.error!);
+      const [latestRun] = await getCronJobService().listRuns(taskId, 1);
+      const [latestDelivery] = latestRun
+        ? await getCronJobService().listDeliveries(latestRun.id)
+        : [];
 
       return {
         success: true,
         preflight: {
           hasChannel: true,
           channel,
-          lastDeliveryErrors: deliveryErrors.length > 0 ? deliveryErrors.slice(0, 3) : null,
-          consecutiveErrors: task.state.consecutiveErrors,
+          latestDelivery: latestDelivery ?? null,
         },
       };
     } catch (error) {
@@ -302,7 +313,8 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         if (!imStore) return { success: true, conversations: [] };
         const mappings = imStore.listSessionMappings(platform, filterAccountId ?? accountId);
         const conversations = mappings.map(m => ({
-          conversationId: m.imConversationId,
+          conversationId:
+            tryParseCcConnectScopedConversationId(m.imConversationId)?.[1] ?? m.imConversationId,
           platform: m.platform,
           coworkSessionId: m.coworkSessionId,
           lastActiveAt: m.lastActiveAt,
