@@ -18,6 +18,7 @@ export const LlamaCppIpcChannel = {
   GetModelPreferences: 'llamacpp:model-preferences:get',
   SetModelPreference: 'llamacpp:model-preference:set',
   LoadModel: 'llamacpp:load-model',
+  CancelModelLoad: 'llamacpp:model-load:cancel',
   UnloadModel: 'llamacpp:unload-model',
   InstallModel: 'llamacpp:install-model',
   CancelInstall: 'llamacpp:cancel-install',

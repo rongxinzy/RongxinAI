@@ -88,6 +88,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     llamacppLoadModelNotFound: '未找到模型文件，请重新下载或导入模型。',
     llamacppLoadModelServiceUnavailable: '本地推理服务异常，请稍后重试。',
     llamacppLoadModelStartupTimeout: '模型加载时间过长，请稍后重试或降低模型配置。',
+    llamacppModelLoadCancelled: '模型启动已取消。',
     llamacppLoadModelUnknown: '模型加载失败，请稍后重试。',
     llamacppModelLoadInProgress: '已有模型正在加载，请等待完成后再试。',
     llamacppServiceStartupPortInUse:
@@ -392,6 +393,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'The local inference service is unavailable. Please try again later.',
     llamacppLoadModelStartupTimeout:
       'Model loading took too long. Try again later or lower the model configuration.',
+    llamacppModelLoadCancelled: 'Model startup was cancelled.',
     llamacppLoadModelUnknown: 'Model loading failed. Please try again later.',
     llamacppModelLoadInProgress: 'A model is already loading. Wait for it to finish and try again.',
     llamacppServiceStartupPortInUse:

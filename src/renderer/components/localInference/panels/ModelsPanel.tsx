@@ -39,6 +39,7 @@ import type {
 import { ProviderName } from '../../../../shared/providers';
 import logIconUrl from '../../../assets/localInference/log.svg';
 import { i18nService } from '../../../services/i18n';
+import { BreathingDot } from '../components/BreathingDot';
 import {
   AnthropicIcon,
   DeepSeekIcon,
@@ -99,11 +100,13 @@ const modelCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal 
 type ModelsPanelProps = {
   loading: boolean;
   loadingModelName: string | null;
+  cancellingModelLoad: boolean;
   unloadingModelName: string | null;
   localModels: LlamaCppModel[];
   runningModels: LlamaCppRunningModel[];
   modelPreferences: LlamaCppModelPreferences;
   onLoadModel: (model: LlamaCppModel) => void;
+  onCancelModelLoad: (modelName: string) => void;
   onUnload: (modelName: string) => void;
   onDelete: (modelName: string) => void;
   onConfigureContext: (model: LlamaCppModel) => void;
@@ -124,8 +127,10 @@ type ModelCardProps = {
   preference?: LlamaCppModelPreference;
   loading: boolean;
   loadingModel: boolean;
+  cancellingModelLoad: boolean;
   unloading: boolean;
   onLoadModel: () => void;
+  onCancelModelLoad: () => void;
   onConfigureContext: () => void;
   onUnload: () => void;
   onDelete: () => void;
@@ -146,11 +151,13 @@ type ModelCardEntry = {
 export function ModelsPanel({
   loading,
   loadingModelName,
+  cancellingModelLoad,
   unloadingModelName,
   localModels,
   runningModels,
   modelPreferences,
   onLoadModel,
+  onCancelModelLoad,
   onUnload,
   onDelete,
   onConfigureContext,
@@ -323,8 +330,10 @@ export function ModelsPanel({
                   preference={modelPreferences[model.name]}
                   loading={loading}
                   loadingModel={loadingModelName === model.name}
+                  cancellingModelLoad={cancellingModelLoad}
                   unloading={unloadingModelName === model.name}
                   onLoadModel={() => onLoadModel(model)}
+                  onCancelModelLoad={() => onCancelModelLoad(model.name)}
                   onConfigureContext={() => onConfigureContext(model)}
                   onUnload={() => onUnload(model.name)}
                   onDelete={() => setPendingDeleteModel(model)}
@@ -441,8 +450,10 @@ function ModelCard({
   preference,
   loading,
   loadingModel,
+  cancellingModelLoad,
   unloading,
   onLoadModel,
+  onCancelModelLoad,
   onConfigureContext,
   onUnload,
   onDelete,
@@ -493,10 +504,14 @@ function ModelCard({
       >
         <div className={cn('absolute inset-x-0 top-0 h-0.5 bg-transparent')} />
         {isRunning ? (
-          <span
-            aria-label={i18nService.t('localInferenceStatus_running')}
-            className="absolute right-3 top-3 size-2 rounded-full bg-(--zy-success) animate-pulse"
-          />
+          <span className="absolute right-3 top-3">
+            <BreathingDot
+              color="var(--zy-success)"
+              duration={2}
+              label={i18nService.t('localInferenceStatus_running')}
+              size={8}
+            />
+          </span>
         ) : null}
         {loadingModel || unloading ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--zy-background)_84%,transparent)] backdrop-blur-[1px]">
@@ -631,7 +646,23 @@ function ModelCard({
               'absolute bottom-4 right-4',
             )}
           >
-            {isRunning ? (
+            {loadingModel ? (
+              <Button21st
+                type="button"
+                variant="danger"
+                size="sm"
+                className="h-8 min-w-16 px-3"
+                isDisabled={cancellingModelLoad}
+              data-local-inference-cancel-load-button="true"
+              onClick={onCancelModelLoad}
+            >
+                {i18nService.t(
+                  cancellingModelLoad
+                    ? 'localInferenceModelCancelling'
+                    : 'localInferenceCancelModelLoad',
+                )}
+              </Button21st>
+            ) : isRunning ? (
               <Button21st
                 type="button"
                 variant="danger"
