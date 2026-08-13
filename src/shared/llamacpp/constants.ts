@@ -75,6 +75,14 @@ export const LlamaCppRuntimeCudaMajor = {
 export type LlamaCppRuntimeCudaMajor =
   (typeof LlamaCppRuntimeCudaMajor)[keyof typeof LlamaCppRuntimeCudaMajor];
 
+export const LlamaCppMemoryPolicy = {
+  Auto: 'auto',
+  Manual: 'manual',
+} as const;
+
+export type LlamaCppMemoryPolicy =
+  (typeof LlamaCppMemoryPolicy)[keyof typeof LlamaCppMemoryPolicy];
+
 export const LlamaCppServiceConfigFieldKey = {
   ModelsMax: 'modelsMax',
   ModelsAutoload: 'modelsAutoload',
