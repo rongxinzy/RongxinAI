@@ -612,6 +612,45 @@ describe('AppUpdateCoordinator electron-updater bridge', () => {
     expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
   });
 
+  test('does not reuse a ready file when the signed updater filename changes', async () => {
+    const readyEnvelope = signedManifest(privateKey, { updaterSha512 });
+    const renamedEnvelope = signedManifest(privateKey, {
+      updaterSha512,
+      updaterFilename: 'ZhiYuan-renamed.zip',
+    });
+    vi.stubGlobal('fetch', manifestFetch(readyEnvelope, readyEnvelope, renamedEnvelope));
+    vi.mocked(updaterMocks.autoUpdater.checkForUpdates)
+      .mockResolvedValueOnce({
+        isUpdateAvailable: true,
+        updateInfo: updaterInfo('2026.7.2', updaterSha512),
+      })
+      .mockResolvedValueOnce({
+        isUpdateAvailable: true,
+        updateInfo: updaterInfo('2026.7.2', updaterSha512),
+      })
+      .mockResolvedValueOnce({
+        isUpdateAvailable: true,
+        updateInfo: updaterInfo('2026.7.2', updaterSha512, 'ZhiYuan-renamed.zip'),
+      });
+    vi.mocked(updaterMocks.autoUpdater.downloadUpdate)
+      .mockImplementationOnce(async () => {
+        updaterMocks.emit('update-downloaded', { downloadedFile });
+        return [downloadedFile];
+      })
+      .mockImplementationOnce(() => new Promise(() => {}));
+    const coordinator = new AppUpdateCoordinator(new MemoryStore() as unknown as SqliteStore);
+    await coordinator.checkNow();
+    await vi.waitFor(() => expect(coordinator.getState().status).toBe(AppUpdateStatus.Ready));
+
+    const result = await coordinator.installReadyUpdate();
+
+    expect(result.success).toBe(false);
+    expect(result.state.status).toBe(AppUpdateStatus.Downloading);
+    expect(result.state.info?.expectedUpdaterFileName).toBe('ZhiYuan-renamed.zip');
+    expect(updaterMocks.autoUpdater.downloadUpdate).toHaveBeenCalledTimes(2);
+    expect(updaterMocks.autoUpdater.quitAndInstall).not.toHaveBeenCalled();
+  });
+
   test('revokes an active download when enterprise policy disables updates', async () => {
     const envelope = signedManifest(privateKey, { updaterSha512 });
     vi.stubGlobal('fetch', manifestFetch(envelope));
