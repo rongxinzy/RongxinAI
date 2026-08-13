@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 
+import { LlamaCppMemoryPolicy } from './constants';
 import {
   applyAutomaticLlamaCppServiceDefaults,
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
@@ -20,6 +21,8 @@ test('llama.cpp service defaults are explicit and stable', () => {
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
+    memoryPolicy: LlamaCppMemoryPolicy.Auto,
+    memoryBudgetPercent: 50,
   });
 });
 

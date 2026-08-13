@@ -8,42 +8,6 @@
   },
   "license": "AGPL-3.0-only",
   "version": "2026.7.16",
-  "openclaw": {
-    "version": "v2026.4.14",
-    "repo": "https://github.com/openclaw/openclaw.git",
-    "plugins": [
-      {
-        "id": "dingtalk-connector",
-        "npm": "@dingtalk-real-ai/dingtalk-connector",
-        "version": "0.8.16",
-        "integrity": "sha512-xqz8/Fr1+u2J1nsWohWtigVZdnUd17tQwzitpzYbuUH2l5sWxKYPA/F+VmVGqXB9IB+iU7ewoArf+55K3w91fw=="
-      },
-      {
-        "id": "openclaw-lark",
-        "npm": "@larksuite/openclaw-lark",
-        "version": "2026.4.8",
-        "integrity": "sha512-HHIwDBQPtEZSLHHCnV52ip5WL8mag/qBUucIyH+pbyMHAAXyKtPHTfXFGTm1/HVMC0ZH2km5f11QvNyy85SDGw=="
-      },
-      {
-        "id": "wecom-openclaw-plugin",
-        "npm": "@wecom/wecom-openclaw-plugin",
-        "version": "2026.4.22",
-        "integrity": "sha512-scrJJ6LEm+b68MO9E5TKvIF7jDB5CDpf0RWT5C5V0WcqX7ZNfGsc6om6D3DZknOs0iPylzCbHCGu8vwbeVXzjA=="
-      },
-      {
-        "id": "openclaw-weixin",
-        "npm": "@tencent-weixin/openclaw-weixin",
-        "version": "2.4.3",
-        "integrity": "sha512-dPQbidUNWigC6V10vGW4i+GLH09x+6zUhafZRjuxkJ9GDu8o62WBsnUTojp4KqUH756hz+t2v9khiCRSi0dBDw=="
-      },
-      {
-        "id": "clawemail-email",
-        "npm": "@clawemail/email",
-        "version": "0.9.12",
-        "integrity": "sha512-J4mah1UWyVXX9hbTPfZb+5u2awj1k0XZigpjvGuSH2nGokAaI54a+3G+GRxeX+BoODNSBWyU7Nay2Whi4cbajg=="
-      }
-    ]
-  },
   "llamacpp": {
     "runtimeRepo": "https://github.com/ggml-org/llama.cpp.git",
     "runtimeReleaseTag": "b9244",
@@ -80,6 +44,23 @@
       "linux-arm64": "e84230533527e97547d34dfe7b9117a2e36810e1e364c437256c0d86017a7116"
     }
   },
+  "channelRuntime": {
+    "version": "zhiyuan-sidecar-v1",
+    "repo": "rongxinzy/pi-connect",
+    "sourceRevision": "dcbff6603d39c0dc88877b91bb3e5442a2ec17da",
+    "runtimeAssets": {
+      "mac-x64": "cc-connect-sidecar-darwin-amd64",
+      "mac-arm64": "cc-connect-sidecar-darwin-arm64",
+      "win-x64": "cc-connect-sidecar-windows-amd64.exe",
+      "linux-x64": "cc-connect-sidecar-linux-amd64"
+    },
+    "runtimeChecksums": {
+      "mac-x64": "67d068e20b46499f99c2cf51f7ff38b115d26b5708ae0c3cfaf80f439986225b",
+      "mac-arm64": "2753cc1a345c48a76c25be0c6f581077039d41b26edef31cd78c917d9c93fa22",
+      "win-x64": "de7d99b503cdea36abe89127fe31b893f83e5a114f8389d6dd1738129280ee98",
+      "linux-x64": "13996aa4e62ef817baf8898c44dd480705a59774b48213d90863dcd1bd7184d1"
+    }
+  },
   "main": "dist-electron/main.js",
   "engines": {
     "node": ">=24 <25"
@@ -97,6 +78,7 @@
     "test": "node scripts/test-with-native-restore.cjs",
     "test:bundle-budget": "node scripts/check-renderer-bundle-budget.cjs",
     "check:supply-chain-inputs": "node scripts/ci/check-supply-chain-inputs.mjs",
+    "check:openclaw-decoupling": "node scripts/ci/check-openclaw-decoupling.mjs",
     "test:visual-blind-review": "node tests/visualBlindReview.test.mjs",
     "test:sqlite-backup:seed": "node tests/sqlite-backup/generate-large-db.cjs",
     "preview": "vite preview",
@@ -110,20 +92,19 @@
     "prepare:modelscope-tokens": "node scripts/write-modelscope-token-resource.cjs",
     "prepare:update-release": "node scripts/prepare-update-release.cjs",
     "start:electron": "cross-env NODE_ENV=development ELECTRON_START_URL=http://localhost:5175 electron .",
-    "electron:dev": "bun run engram:runtime:host && rimraf dist-electron && bun run compile:electron && concurrently \"vite --port 5175\" \"wait-on -l -t 120000 -d 20000 -i 1000 -s 1 http://localhost:5175 && wait-on -l -t 120000 -i 1000 dist-electron/.electron-ready && bun run start:electron\"",
-    "electron:dev:openclaw": "bun run openclaw:runtime:host && bun run llamacpp:runtime:host && bun run electron:dev",
+    "electron:dev": "bun run channel:runtime:download && bun run engram:runtime:host && rimraf dist-electron && bun run compile:electron && concurrently \"vite --port 5175\" \"wait-on -l -t 120000 -d 20000 -i 1000 -s 1 http://localhost:5175 && wait-on -l -t 120000 -i 1000 dist-electron/.electron-ready && bun run start:electron\"",
     "postinstall": "patch-package && electron-builder install-app-deps",
-    "pack": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:host && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder --dir",
-    "dist": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:host && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder",
-    "dist:mac": "npm run prepare:modelscope-tokens && npm run engram:runtime:mac-arm64 && electron-builder --mac --config electron-builder.json --publish never",
-    "predist:mac": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:mac-arm64 && npm run engram:runtime:mac-arm64",
-    "dist:mac:x64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:mac-x64 && npm run engram:runtime:mac-x64 && npm run prepare:modelscope-tokens && electron-builder --mac --x64",
-    "dist:mac:arm64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:mac-arm64 && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --arm64",
-    "dist:mac:universal": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run openclaw:runtime:mac-arm64 && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --universal",
+    "pack": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:download && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder --dir",
+    "dist": "npm run setup:uv-runtime && npm run setup:python-runtime && npm run setup:posix-uv-runtime && npm run setup:posix-python-runtime && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:download && npm run engram:runtime:host && npm run prepare:modelscope-tokens && electron-builder",
+    "dist:mac": "npm run prepare:modelscope-tokens && npm run channel:runtime:mac-arm64 && npm run engram:runtime:mac-arm64 && electron-builder --mac --config electron-builder.json --publish never",
+    "predist:mac": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-arm64 && npm run engram:runtime:mac-arm64",
+    "dist:mac:x64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-x64 && npm run engram:runtime:mac-x64 && npm run prepare:modelscope-tokens && electron-builder --mac --x64",
+    "dist:mac:arm64": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-arm64 && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --arm64",
+    "dist:mac:universal": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-universal && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --universal",
     "dist:win": "npm run dist:win:offline",
-    "dist:win:offline": "npm run openclaw:runtime:win-x64 && npm run engram:runtime:win-x64 && npm run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && npm run build && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
+    "dist:win:offline": "npm run channel:runtime:win-x64 && npm run engram:runtime:win-x64 && npm run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && npm run build && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
     "dist:win:lite": "npm run dist:win:offline",
-    "predist:linux": "npm run openclaw:runtime:linux-x64 && npm run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && npm run prepare:update-release",
+    "predist:linux": "npm run channel:runtime:linux-x64 && npm run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && npm run prepare:update-release",
     "dist:linux": "npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:linux-x64 && npm run prepare:modelscope-tokens && electron-builder --linux --publish never",
     "clean:release": "rimraf release",
     "generate:tray-icons": "node scripts/generate-tray-icons.js",
@@ -136,21 +117,14 @@
     "setup:posix-python-runtime": "node scripts/setup-mac-python-runtime.js",
     "setup:skill-python-runtime": "node scripts/setup-skill-python-runtime.js",
     "validate:skills": "node scripts/validate-skill-frontmatter.cjs",
-    "openclaw:ensure": "node scripts/ensure-openclaw-version.cjs",
-    "openclaw:patch": "node scripts/apply-openclaw-patches.cjs",
-    "openclaw:plugins": "node scripts/ensure-openclaw-plugins.cjs",
-    "openclaw:extensions:local": "node scripts/sync-local-openclaw-extensions.cjs",
-    "openclaw:bundle": "node scripts/bundle-openclaw-gateway.cjs",
-    "openclaw:precompile": "node scripts/precompile-openclaw-extensions.cjs",
-    "openclaw:channel-deps": "node scripts/install-openclaw-channel-deps.cjs",
-    "openclaw:prune": "node scripts/prune-openclaw-runtime.cjs",
-    "openclaw:runtime:host": "node scripts/openclaw-runtime-host.cjs",
-    "openclaw:runtime:mac-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs mac-arm64 && node scripts/sync-openclaw-runtime-current.cjs mac-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
-    "openclaw:runtime:mac-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs mac-x64 && node scripts/sync-openclaw-runtime-current.cjs mac-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
-    "openclaw:runtime:win-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs win-x64 && node scripts/sync-openclaw-runtime-current.cjs win-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
-    "openclaw:runtime:win-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs win-arm64 && node scripts/sync-openclaw-runtime-current.cjs win-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
-    "openclaw:runtime:linux-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs linux-x64 && node scripts/sync-openclaw-runtime-current.cjs linux-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
-    "openclaw:runtime:linux-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs linux-arm64 && node scripts/sync-openclaw-runtime-current.cjs linux-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions:local && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune",
+    "channel:runtime:host": "node scripts/channel-runtime-host.cjs",
+    "channel:runtime:download": "node scripts/download-channel-runtime.cjs",
+    "channel:runtime:mac-x64": "node scripts/download-channel-runtime.cjs mac-x64",
+    "channel:runtime:mac-arm64": "node scripts/download-channel-runtime.cjs mac-arm64",
+    "channel:runtime:mac-universal": "node scripts/download-channel-runtime.cjs mac-x64 && node scripts/download-channel-runtime.cjs mac-arm64",
+    "channel:runtime:win-x64": "node scripts/download-channel-runtime.cjs win-x64",
+    "channel:runtime:linux-x64": "node scripts/download-channel-runtime.cjs linux-x64",
+    "channel:runtime:smoke": "node scripts/channel-runtime-smoke.cjs",
     "engram:runtime:host": "node scripts/download-engram-runtime.cjs",
     "engram:runtime:mac-x64": "node scripts/download-engram-runtime.cjs mac-x64",
     "engram:runtime:mac-arm64": "node scripts/download-engram-runtime.cjs mac-arm64",
@@ -205,7 +179,6 @@
     "@electron/remote": "^2.0.12",
     "@firecrawl/anydoc": "0.1.3",
     "@fontsource-variable/geist": "^5.2.9",
-    "@larksuite/openclaw-lark-tools": "~1.0.26",
     "@larksuiteoapi/node-sdk": "^1.58.0",
     "@melloware/react-logviewer": "^6.5.5",
     "@modelcontextprotocol/sdk": "^1.27.1",

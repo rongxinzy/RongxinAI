@@ -5,7 +5,6 @@ import {
   getUserErrorI18nKey,
 } from '../../common/coworkError';
 import { classifyErrorKey } from '../../common/coworkErrorClassify';
-import type { OpenClawSessionPatch } from '../../common/openclawSession';
 import {
   COWORK_MESSAGE_HISTORY_PAGE_SIZE,
   COWORK_SESSION_PAGE_SIZE,
@@ -19,7 +18,6 @@ import {
   addSession,
   appendSessions,
   clearCurrentSession,
-  clearPendingPermissions,
   clearPendingPermissionsForSession,
   deleteSession as deleteSessionAction,
   deleteSessions as deleteSessionsAction,
@@ -51,8 +49,6 @@ import type {
   CoworkSessionResult,
   CoworkStartOptions,
   CoworkUserMemoryEntry,
-  OpenClawEngineStatus,
-  OpenClawSessionPolicyConfig,
 } from '../types/cowork';
 import { i18nService } from './i18n';
 import { respondToPermissionByOrigin } from './coworkPermissionRouting';
@@ -72,9 +68,6 @@ const classifyError = (error: string | CoworkError): string => {
 class CoworkService {
   private streamListenerCleanups: Array<() => void> = [];
   private initialized = false;
-  private openClawStatus: OpenClawEngineStatus | null = null;
-  private openClawStatusListeners = new Set<(status: OpenClawEngineStatus) => void>();
-  private openClawEngineListenerAttached = false;
   private latestLoadSessionsRequestId = 0;
   private latestLoadChatSessionsRequestId = 0;
   private latestLoadSessionRequestId = 0;
@@ -94,7 +87,6 @@ class CoworkService {
 
     // Set up stream listeners
     this.setupStreamListeners();
-    this.setupOpenClawBridgeListeners();
 
     this.initialized = true;
   }
@@ -291,52 +283,9 @@ class CoworkService {
     this.streamListenerCleanups.push(sessionsChangedCleanup);
   }
 
-  private setupOpenClawBridgeListeners(): void {
-    const bridge = window.electron?.openclaw?.bridge;
-    if (!bridge) return;
-
-    const askUserCleanup = bridge.onAskUser(({ sessionId, request }) => {
-      store.dispatch(
-        enqueuePendingPermission({
-          origin: CoworkPermissionOrigin.OpenClawBridge,
-          sessionId,
-          toolName: request.toolName,
-          toolInput: request.toolInput,
-          requestId: request.requestId,
-          toolUseId: request.toolUseId ?? null,
-        }),
-      );
-    });
-    const askUserDismissCleanup = bridge.onAskUserDismiss(({ requestId }) => {
-      store.dispatch(dequeuePendingPermission({ requestId }));
-    });
-
-    this.streamListenerCleanups.push(askUserCleanup, askUserDismissCleanup);
-  }
-
-  private setupOpenClawEngineListeners(): void {
-    if (this.openClawEngineListenerAttached) return;
-    const engineApi = window.electron?.openclaw?.engine;
-    if (!engineApi?.onProgress) return;
-
-    const statusCleanup = engineApi.onProgress(status => {
-      this.notifyOpenClawStatus(status);
-    });
-    this.streamListenerCleanups.push(statusCleanup);
-    this.openClawEngineListenerAttached = true;
-  }
-
-  private notifyOpenClawStatus(status: OpenClawEngineStatus): void {
-    this.openClawStatus = status;
-    this.openClawStatusListeners.forEach(listener => {
-      listener(status);
-    });
-  }
-
   private cleanupListeners(): void {
     this.streamListenerCleanups.forEach(cleanup => cleanup());
     this.streamListenerCleanups = [];
-    this.openClawEngineListenerAttached = false;
   }
 
   async loadSessions(agentId?: string, workspaceId?: string): Promise<void> {
@@ -425,36 +374,11 @@ class CoworkService {
   }
 
   async loadConfig(): Promise<void> {
-    const [coworkResult, sessionPolicyResult] = await Promise.all([
-      window.electron?.cowork?.getConfig(),
-      window.electron?.openclaw?.sessionPolicy?.get?.(),
-    ]);
+    const coworkResult = await window.electron?.cowork?.getConfig();
 
     if (coworkResult?.success && coworkResult.config) {
-      store.dispatch(
-        setConfig({
-          ...coworkResult.config,
-          openClawSessionPolicy:
-            sessionPolicyResult?.success && sessionPolicyResult.config
-              ? sessionPolicyResult.config
-              : { keepAlive: '30d' },
-        }),
-      );
+      store.dispatch(setConfig(coworkResult.config));
     }
-  }
-
-  async loadOpenClawEngineStatus(): Promise<OpenClawEngineStatus | null> {
-    this.setupOpenClawEngineListeners();
-    const engineApi = window.electron?.openclaw?.engine;
-    if (!engineApi?.getStatus) {
-      return null;
-    }
-    const result = await engineApi.getStatus();
-    if (result?.success && result.status) {
-      this.notifyOpenClawStatus(result.status);
-      return result.status;
-    }
-    return this.openClawStatus;
   }
 
   async startSession(
@@ -510,6 +434,7 @@ class CoworkService {
       expertIds: options.expertIds,
       permissionMode: options.permissionMode,
       imageAttachments: options.imageAttachments,
+      fileAttachments: options.fileAttachments,
     });
     if (!result.success) {
       if (result.code !== ENGINE_NOT_READY_CODE) {
@@ -732,8 +657,7 @@ class CoworkService {
     const requestId = ++this.latestLoadSessionRequestId;
 
     const result = await cowork.getSession(sessionId);
-    if (result.success && result.session) {
-      // Keep only the latest session load result to avoid stale async overwrites.
+    if (result.success && result.session) {      // Keep only the latest session load result to avoid stale async overwrites.
       if (requestId !== this.latestLoadSessionRequestId) {
         return result.session;
       }
@@ -769,6 +693,10 @@ class CoworkService {
       return result.session;
     }
 
+    // The session no longer exists in the backend (e.g. a stale temp-* entry
+    // leaked into the sidebar). Remove it from Redux so the ghost disappears
+    // instead of surfacing a load error on every click.
+    store.dispatch(deleteSessionAction(sessionId));
     console.error('Failed to load session:', result.error);
     return null;
   }
@@ -801,17 +729,17 @@ class CoworkService {
     return false;
   }
 
-  async patchSession(
+  async updateSessionModel(
     sessionId: string,
-    patch: OpenClawSessionPatch,
+    modelOverride: string,
   ): Promise<CoworkSession | null> {
-    const sessionApi = window.electron?.openclaw?.session;
-    if (!sessionApi?.patch) {
-      console.error('OpenClaw session patch API not available');
+    const sessionApi = window.electron?.cowork?.updateSessionModel;
+    if (!sessionApi) {
+      console.error('Session model update API is not available');
       return null;
     }
 
-    const result = await sessionApi.patch({ sessionId, patch });
+    const result = await sessionApi({ sessionId, modelOverride });
     if (result.success && result.session) {
       const currentSessionId = store.getState().cowork.currentSessionId;
       if (currentSessionId === sessionId) {
@@ -834,7 +762,6 @@ class CoworkService {
 
     const response = await respondToPermissionByOrigin(permission, result, {
       respondToPi: window.electron?.cowork?.respondToPermission,
-      respondToOpenClaw: window.electron?.openclaw?.bridge?.respondToAskUser,
     });
     if (response.success) {
       store.dispatch(dequeuePendingPermission({ requestId }));
@@ -850,38 +777,13 @@ class CoworkService {
     if (!cowork) return false;
 
     const currentConfig = store.getState().cowork.config;
-    const engineChanged =
-      config.agentEngine !== undefined && config.agentEngine !== currentConfig.agentEngine;
     const result = await cowork.setConfig(config);
     if (result.success) {
       store.dispatch(setConfig({ ...currentConfig, ...config }));
-      if (engineChanged) {
-        store.dispatch(clearPendingPermissions());
-      }
       return true;
     }
 
     console.error('Failed to update config:', result.error);
-    return false;
-  }
-
-  async updateSessionPolicy(config: OpenClawSessionPolicyConfig): Promise<boolean> {
-    const sessionPolicyApi = window.electron?.openclaw?.sessionPolicy;
-    if (!sessionPolicyApi) return false;
-
-    const currentConfig = store.getState().cowork.config;
-    const result = await sessionPolicyApi.set(config);
-    if (result.success) {
-      store.dispatch(
-        setConfig({
-          ...currentConfig,
-          openClawSessionPolicy: result.config ?? config,
-        }),
-      );
-      return true;
-    }
-
-    console.error('Failed to update OpenClaw session policy:', result.error);
     return false;
   }
 
@@ -977,60 +879,6 @@ class CoworkService {
     return Boolean(result?.success);
   }
 
-  onOpenClawEngineStatus(callback: (status: OpenClawEngineStatus) => void): () => void {
-    this.setupOpenClawEngineListeners();
-    this.openClawStatusListeners.add(callback);
-    if (this.openClawStatus) {
-      callback(this.openClawStatus);
-    }
-    return () => {
-      this.openClawStatusListeners.delete(callback);
-    };
-  }
-
-  async getOpenClawEngineStatus(): Promise<OpenClawEngineStatus | null> {
-    return this.loadOpenClawEngineStatus();
-  }
-
-  async installOpenClawEngine(): Promise<OpenClawEngineStatus | null> {
-    const engineApi = window.electron?.openclaw?.engine;
-    if (!engineApi?.install) {
-      return null;
-    }
-    const result = await engineApi.install();
-    if (result?.status) {
-      this.notifyOpenClawStatus(result.status);
-      return result.status;
-    }
-    return this.openClawStatus;
-  }
-
-  async retryOpenClawInstall(): Promise<OpenClawEngineStatus | null> {
-    const engineApi = window.electron?.openclaw?.engine;
-    if (!engineApi?.retryInstall) {
-      return null;
-    }
-    const result = await engineApi.retryInstall();
-    if (result?.status) {
-      this.notifyOpenClawStatus(result.status);
-      return result.status;
-    }
-    return this.openClawStatus;
-  }
-
-  async restartOpenClawGateway(): Promise<OpenClawEngineStatus | null> {
-    const engineApi = window.electron?.openclaw?.engine;
-    if (!engineApi?.restartGateway) {
-      return null;
-    }
-    const result = await engineApi.restartGateway();
-    if (result?.status) {
-      this.notifyOpenClawStatus(result.status);
-      return result.status;
-    }
-    return this.openClawStatus;
-  }
-
   async generateSessionTitle(prompt: string | null): Promise<string | null> {
     if (!window.electron?.generateSessionTitle) {
       return null;
@@ -1051,7 +899,6 @@ class CoworkService {
 
   destroy(): void {
     this.cleanupListeners();
-    this.openClawStatusListeners.clear();
     this.initialized = false;
   }
 }

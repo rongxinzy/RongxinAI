@@ -55,6 +55,7 @@ const hoisted = vi.hoisted(() => {
       this.reload = vi.fn().mockResolvedValue(undefined);
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
+    mockApplyApplicationRuntimeEnv: vi.fn(),
     mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
     mockGetModel: vi.fn((provider: string, modelId: string) => ({
       provider,
@@ -172,6 +173,7 @@ const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
 const mockResolveRawApiConfig = hoisted.mockResolveRawApiConfig;
 const mockResolveRawApiConfigForModelRef = hoisted.mockResolveRawApiConfigForModelRef;
 const mockRegisterPiOpenAICompatUpstream = hoisted.mockRegisterPiOpenAICompatUpstream;
+const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
@@ -201,6 +203,7 @@ vi.mock('../coworkUtil', async importOriginal => {
   const actual = await importOriginal<typeof import('../coworkUtil')>();
   return {
     ...actual,
+    applyApplicationRuntimeEnv: hoisted.mockApplyApplicationRuntimeEnv,
     resolveGitBashPathForPi: vi.fn(() => undefined),
   };
 });
@@ -232,6 +235,7 @@ describe('PiRuntimeAdapter', () => {
   };
 
   beforeEach(() => {
+    mockApplyApplicationRuntimeEnv.mockClear();
     vi.clearAllMocks();
     mockModelRuntimeCreate.mockResolvedValue(mockModelRuntime);
     adapter = new PiRuntimeAdapter();
@@ -249,6 +253,9 @@ describe('PiRuntimeAdapter', () => {
   describe('startSession', () => {
     it('should create a session and subscribe to events', async () => {
       await adapter.startSession('test', 'Hello Pi');
+      await adapter.startSession('test-second', 'Hello again');
+      expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledOnce();
+      expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledWith(process.env);
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
     });
@@ -1154,6 +1161,61 @@ describe('PiRuntimeAdapter', () => {
       await adapter.continueSession('test', 'Second');
       // prompt() called twice total (once for start, once for continue)
       expect(mockSession.prompt).toHaveBeenCalledTimes(2);
+    });
+
+    it('recreates the session after MCP discovery refreshes its tool topology', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [{ server: 'Supabase', name: 'list_projects', description: 'List projects' }],
+      } as never);
+      await adapter.startSession('test', 'First');
+
+      adapter.refreshMcpTools();
+      await adapter.continueSession('test', 'Use Supabase');
+
+      expect(mockSession.abort).toHaveBeenCalledOnce();
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      const replacementOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(replacementOptions.customTools?.map(tool => tool.name)).toContain('mcp');
+    });
+
+    it('persists the selected expert on a continuation user message', async () => {
+      const addMessage = vi.fn((_sessionId: string, message: Record<string, unknown>) => message);
+
+      await adapter.startSession('test', 'First', { expertIds: ['expert-a'] });
+      adapter.setCoworkStore({
+        addMessage,
+        getSession: vi.fn(() => ({
+          experts: [
+            {
+              expertId: 'expert-a',
+              expertName: 'Expert A',
+              packageId: 'package-a',
+            },
+          ],
+        })),
+        updateSession: vi.fn(),
+      } as unknown as CoworkStore);
+
+      await adapter.continueSession('test', 'Second', { expertIds: ['expert-a'] });
+
+      expect(addMessage).toHaveBeenCalledWith(
+        'test',
+        expect.objectContaining({
+          type: 'user',
+          content: 'Second',
+          metadata: {
+            experts: [
+              {
+                expertId: 'expert-a',
+                expertName: 'Expert A',
+                presetId: 'package-a',
+              },
+            ],
+          },
+        }),
+      );
     });
 
     it('should reload an active session when its system prompt changes', async () => {
@@ -2678,7 +2740,9 @@ describe('PiRuntimeAdapter', () => {
 
       const steered = await adapter.steerPendingMessage('queue-session', queued.item!.id);
       expect(steered.success).toBe(true);
-      expect(mockSession.steer).toHaveBeenCalledWith('Change direction');
+      expect(mockSession.prompt).toHaveBeenCalledWith('Change direction', {
+        streamingBehavior: 'steer',
+      });
       expect(adapter.listPendingMessages('queue-session')).toEqual([]);
     });
 

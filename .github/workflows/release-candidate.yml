@@ -1,0 +1,383 @@
+name: Build release candidate (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Final SemVer embedded in the candidate, without a v prefix'
+        required: true
+        type: string
+      source_ref:
+        description: 'Commit, tag, or branch reachable from main'
+        required: true
+        default: 'main'
+        type: string
+
+concurrency:
+  group: zhiyuan-release-candidate-${{ inputs.release_version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  prepare-candidate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
+      commit: ${{ steps.identity.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+      - name: Resolve immutable candidate identity
+        id: identity
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]] || { echo 'Release candidates must be dispatched from main' >&2; exit 1; }
+          if [[ ! "$RELEASE_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo 'release_version must be a SemVer value without a v prefix' >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          source_commit="$(git rev-parse HEAD)"
+          if ! git merge-base --is-ancestor "$source_commit" origin/main; then
+            echo 'source_ref must resolve to a commit reachable from origin/main' >&2
+            exit 1
+          fi
+          echo "version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
+          echo "commit=$source_commit" >> "$GITHUB_OUTPUT"
+          {
+            echo '### Release candidate identity'
+            echo
+            echo "- version: \`$RELEASE_VERSION\`"
+            echo "- source commit: \`$source_commit\`"
+            echo "- candidate run: \`$GITHUB_RUN_ID\`"
+            echo '- external publication: disabled'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  quality:
+    needs: prepare-candidate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-candidate.outputs.commit }}
+      - uses: actions/setup-node@v6
+        with: { node-version: '24.x' }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: '1.3.14' }
+      - name: Restore Bun and Electron caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: candidate-quality-${{ runner.os }}-1.3.14-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            candidate-quality-${{ runner.os }}-1.3.14-
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Verify npm package signatures
+        shell: bash
+        run: |
+          set -euo pipefail
+          for lockfile in \
+            SKILLs/presentation-studio/package-lock.json \
+            SKILLs/web-search/package-lock.json \
+            scripts/release/package-lock.json; do
+            directory="$(dirname "$lockfile")"
+            npm --prefix "$directory" ci --ignore-scripts
+            npm --prefix "$directory" audit signatures --package-lock-only --ignore-scripts
+          done
+      - name: Validate source and dependency policy
+        run: |
+          bun run validate:skills
+          bun run check:openclaw-decoupling
+          bun run check:supply-chain-inputs
+          bun run lint
+      - name: Compile and test
+        run: |
+          bun run compile:electron
+          bun run test
+
+  build-candidate:
+    needs: [prepare-candidate, quality]
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: windows
+            runner: windows-latest
+            target: win32-x64-lite
+            runtime_target: win-x64
+          - platform: macos
+            runner: macos-latest
+            target: darwin-arm64-default
+            runtime_target: mac-arm64
+          - platform: linux
+            runner: ubuntu-latest
+            target: linux-x64-default
+            runtime_target: linux-x64
+    runs-on: ${{ matrix.runner }}
+    environment: release
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-candidate.outputs.commit }}
+      - uses: actions/setup-node@v6
+        with: { node-version: '24.x' }
+      - uses: oven-sh/setup-bun@v2
+        with: { bun-version: '1.3.14' }
+      - name: Restore bundled runtime cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            resources/python-win
+            resources/uv-win
+            resources/python-mac
+            resources/uv-mac
+            resources/python-linux
+            resources/uv-linux
+            resources/uv-archives
+          key: bundled-runtimes-${{ runner.os }}-${{ matrix.runtime_target }}-${{ hashFiles('scripts/setup-python-runtime.js', 'scripts/setup-uv-runtime.js', 'scripts/setup-mac-python-runtime.js', 'scripts/setup-mac-uv-runtime.js', 'electron-builder.json') }}
+      - name: Restore packaging caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            vendor/channel-runtime
+          key: candidate-packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          restore-keys: |
+            candidate-packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
+      - name: Install Electron system dependencies
+        if: ${{ matrix.platform == 'linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
+            libxss1 libxtst6 libuuid1 xdg-utils xvfb
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - name: Set up Windows runtimes
+        if: ${{ matrix.platform == 'windows' }}
+        run: |
+          bun run setup:uv-runtime
+          bun run setup:python-runtime
+      - name: Set up POSIX runtimes
+        if: ${{ matrix.platform != 'windows' }}
+        run: |
+          bun run setup:posix-uv-runtime
+          bun run setup:posix-python-runtime
+      - name: Build Windows candidate
+        if: ${{ matrix.platform == 'windows' }}
+        run: bun run dist:win:lite
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-candidate.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Validate optional macOS signing credentials
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          values=("$CSC_LINK" "$CSC_KEY_PASSWORD" "$APPLE_ID" "$APPLE_APP_SPECIFIC_PASSWORD" "$APPLE_TEAM_ID")
+          provided=0
+          for value in "${values[@]}"; do [[ -n "$value" ]] && provided=$((provided + 1)); done
+          if [[ $provided -eq 0 ]]; then
+            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=false' >> "$GITHUB_ENV"
+            echo 'CSC_IDENTITY_AUTO_DISCOVERY=false' >> "$GITHUB_ENV"
+            echo '::warning title=Unsigned macOS candidate::Apple signing credentials are unavailable.'
+          elif [[ $provided -ne ${#values[@]} ]]; then
+            echo 'macOS signing credentials are only partially configured' >&2
+            exit 1
+          else
+            echo 'ZHIYUAN_MAC_AUTO_UPDATE_ENABLED=true' >> "$GITHUB_ENV"
+            echo 'CSC_IDENTITY_AUTO_DISCOVERY=true' >> "$GITHUB_ENV"
+          fi
+        env:
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Build unsigned macOS candidate
+        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED != 'true' }}
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-candidate.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Build signed macOS candidate
+        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
+        run: node scripts/ensure-build-version.js && bun run prepare:update-release && bun run dist:mac
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-candidate.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify signed and notarized macOS candidate
+        if: ${{ matrix.platform == 'macos' && env.ZHIYUAN_MAC_AUTO_UPDATE_ENABLED == 'true' }}
+        shell: bash
+        run: |
+          app_path="$(find release -maxdepth 3 -type d -name '*.app' -print -quit)"
+          [[ -n "$app_path" ]] || { echo 'Packaged macOS app was not found' >&2; exit 1; }
+          codesign --verify --deep --strict --verbose=2 "$app_path"
+          xcrun stapler validate "$app_path"
+          spctl --assess --type execute --verbose=4 "$app_path"
+      - name: Build Linux candidate
+        if: ${{ matrix.platform == 'linux' }}
+        run: bun run dist:linux
+        env:
+          APP_BUILD_VERSION: ${{ needs.prepare-candidate.outputs.version }}
+          UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
+          UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
+          MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify Windows candidate size and runtimes
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Verify Windows cold install, cache-hit upgrade, and uninstall
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/windows-installer-smoke.ps1
+          -ProjectRoot '${{ github.workspace }}'
+      - name: Verify the Linux renderer
+        if: ${{ matrix.platform == 'linux' }}
+        run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
+      - name: Assemble Windows candidate payload
+        if: ${{ matrix.platform == 'windows' }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          installers=(release/*.exe)
+          blockmaps=(release/*.exe.blockmap)
+          [[ ${#installers[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one Windows installer and blockmap' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' win32 x64 lite \
+            release/latest.yml release/electron-updater/latest.yml
+          node scripts/release/create-release-candidate.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' \
+            '${{ needs.prepare-candidate.outputs.commit }}' \
+            '${{ github.run_id }}' candidate candidate-win32-x64-lite.json \
+            "${installers[0]}:win32:x64:lite:installer" \
+            "${installers[0]}:win32:x64:lite:updater" \
+            "${blockmaps[0]}:win32:x64:lite:blockmap" \
+            'release/electron-updater/latest.yml:win32:x64:lite:metadata'
+      - name: Assemble macOS candidate payload
+        if: ${{ matrix.platform == 'macos' }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          dmgs=(release/*.dmg)
+          zips=(release/*.zip)
+          blockmaps=(release/*.zip.blockmap)
+          [[ ${#dmgs[@]} -eq 1 && ${#zips[@]} -eq 1 && ${#blockmaps[@]} -eq 1 ]] || { echo 'Expected one macOS DMG, ZIP, and blockmap' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' darwin arm64 default \
+            release/latest-mac.yml release/electron-updater/latest-mac.yml
+          node scripts/release/create-release-candidate.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' \
+            '${{ needs.prepare-candidate.outputs.commit }}' \
+            '${{ github.run_id }}' candidate candidate-darwin-arm64-default.json \
+            "${dmgs[0]}:darwin:arm64:default:installer" \
+            "${zips[0]}:darwin:arm64:default:updater" \
+            "${blockmaps[0]}:darwin:arm64:default:blockmap" \
+            'release/electron-updater/latest-mac.yml:darwin:arm64:default:metadata'
+      - name: Assemble Linux candidate payload
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          debs=(release/*.deb)
+          appimages=(release/*.AppImage)
+          [[ ${#debs[@]} -eq 1 && ${#appimages[@]} -eq 1 ]] || { echo 'Expected one Linux deb and AppImage' >&2; exit 1; }
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' linux x64 appimage \
+            release/latest-linux.yml release/electron-updater/latest-linux.yml
+          node scripts/release/normalize-electron-updater-metadata.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' linux x64 deb \
+            release/latest-linux.yml release/electron-updater/deb/latest-linux.yml
+          node scripts/release/create-release-candidate.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' \
+            '${{ needs.prepare-candidate.outputs.commit }}' \
+            '${{ github.run_id }}' candidate candidate-linux-x64.json \
+            "${debs[0]}:linux:x64:deb:installer" \
+            "${debs[0]}:linux:x64:deb:updater" \
+            'release/electron-updater/deb/latest-linux.yml:linux:x64:deb:metadata' \
+            "${appimages[0]}:linux:x64:appimage:installer" \
+            "${appimages[0]}:linux:x64:appimage:updater" \
+            'release/electron-updater/latest-linux.yml:linux:x64:appimage:metadata'
+      - name: Upload candidate payload
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-${{ needs.prepare-candidate.outputs.version }}-${{ matrix.target }}
+          path: candidate
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload candidate manifest for cross-platform verification
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-candidate-manifest-${{ matrix.target }}
+          path: candidate/candidate-*.json
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-candidate:
+    needs: [prepare-candidate, build-candidate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare-candidate.outputs.commit }}
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-candidate-manifest-*
+          path: candidate-manifests
+          merge-multiple: true
+      - name: Verify candidate completeness and identity
+        shell: bash
+        run: |
+          mapfile -t manifests < <(find candidate-manifests -type f -name 'candidate-*.json' | sort)
+          [[ ${#manifests[@]} -eq 3 ]] || { echo 'Expected exactly three platform candidate manifests' >&2; exit 1; }
+          node scripts/release/verify-release-candidate.mjs \
+            '${{ needs.prepare-candidate.outputs.version }}' \
+            '${{ needs.prepare-candidate.outputs.commit }}' \
+            '${{ github.run_id }}' \
+            "${manifests[@]}"
+      - name: Publish candidate verification summary
+        shell: bash
+        run: |
+          {
+            echo '### Candidate ready for manual verification'
+            echo
+            echo "- version: \`${{ needs.prepare-candidate.outputs.version }}\`"
+            echo "- source commit: \`${{ needs.prepare-candidate.outputs.commit }}\`"
+            echo "- candidate run ID: \`${{ github.run_id }}\`"
+            echo '- retention: 7 days'
+            echo '- R2/Cloudflare upload: not performed'
+            echo
+            echo 'Use the candidate run ID for the promotion workflow after the exact installers have been validated.'
+          } >> "$GITHUB_STEP_SUMMARY"

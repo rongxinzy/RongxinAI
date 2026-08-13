@@ -8,6 +8,9 @@ const installerSmokeScriptPath = path.resolve('scripts/ci/windows-installer-smok
 const elevatedActionsScriptPath = path.resolve('scripts/nsis-elevated-actions.ps1');
 const offlineComponentsPath = path.resolve('scripts/nsis-offline-components.json');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
+const componentArchiveValidatorPath = path.resolve(
+  'scripts/installer/validate-component-archive.ps1',
+);
 
 describe('NSIS offline resource and local inference flow', () => {
   test('declares the installer as DPI-aware for high-DPI displays', () => {
@@ -21,16 +24,36 @@ describe('NSIS offline resource and local inference flow', () => {
 
     const cacheMissIndex = installerScript.indexOf('ComponentCacheMiss_${TOKEN}:');
     const payloadIndex = installerScript.indexOf(
-      'File /oname=component-${KEY}.tar "${PROJECT_DIR}\\build-tar\\windows-components\\${KEY}.tar"',
+      'File /oname=component-${KEY}.7z "${PROJECT_DIR}\\build-tar\\windows-components\\${KEY}.7z"',
     );
     expect(cacheMissIndex).toBeGreaterThan(-1);
     expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
     expect(installerScript.match(/!insertmacro EnsureOfflineComponent /g)).toHaveLength(7);
     expect(installerScript).toContain('phase=component-cache-hit');
     expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
+    expect(installerScript).toContain('File /oname=7za.exe');
+    expect(installerScript).toContain('component-${KEY}.7z');
+    expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
+    expect(installerScript).toContain('SetCompress off');
+    expect(installerScript).toContain('SetCompress auto');
+    expect(installerScript).toContain('File /oname=validate-component-archive.ps1');
+    expect(installerScript).toContain('-File \"$PLUGINSDIR\\validate-component-archive.ps1\"');
+    expect(installerScript).toContain('phase=component-archive-unsafe');
     expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
+  });
+
+  test('normalizes 7-Zip entry separators before enforcing the component prefix', () => {
+    const validatorScript = fs.readFileSync(componentArchiveValidatorPath, 'utf8');
+
+    expect(validatorScript).toContain("$entry.Replace('\\', '/')");
+    expect(validatorScript).toContain(
+      '$normalizedEntry.StartsWith("$normalizedPrefix/", [System.StringComparison]::Ordinal)',
+    );
+    expect(validatorScript).toContain("$normalizedEntry -match '(^|/)\\.\\.(/|$)'");
+    expect(validatorScript).toContain("$value -and $value -ne '-'");
+    expect(validatorScript).not.toContain('-like');
   });
 
   test('uses per-user installation and rolls back pointer changes after normal failures', () => {
@@ -40,7 +63,22 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('RequestExecutionLevel admin');
     expect(installerScript).toContain('current.next');
     expect(installerScript).toContain('current.previous');
+    expect(installerScript).toContain('component-manifest.json');
+    expect(installerScript).not.toContain('component-targets.txt');
+    expect(installerScript).toContain('$$ErrorActionPreference = \\"Stop\\"');
+    expect(installerScript).toContain('Set-StrictMode -Version Latest');
+    expect(installerScript).toContain('Missing prepared component target:');
+    expect(installerScript).toContain(
+      'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
+    );
+    expect(installerScript).toContain(
+      'New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop',
+    );
     expect(installerScript).toContain('component-switch-state.txt');
+    expect(installerScript).toContain('Keep the journal in the persistent cache');
+    expect(installerScript).toContain('Join-Path $$runtimeRoot \\"component-switch-state.txt\\"');
+    expect(installerScript).toContain('^[^=|]+\\\\|(?:True|False)\\\\z');
+    expect(installerScript).not.toContain('(?:True|False)$$');
     expect(installerScript).toContain('phase=component-set-rollback');
     expect(installerScript).toContain('phase=component-cleanup-complete');
     expect(installerScript).not.toContain('离线组件原子切换失败');
@@ -62,7 +100,7 @@ describe('NSIS offline resource and local inference flow', () => {
       'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
     );
     expect(offlineComponents).toEqual([
-      { key: 'openclaw', prefix: 'cfmind' },
+      { key: 'channel-runtime', prefix: 'channel-runtime' },
       { key: 'skills', prefix: 'SKILLs' },
       { key: 'mcps', prefix: 'MCPs' },
       { key: 'portable-git', prefix: 'mingit' },
@@ -88,8 +126,9 @@ describe('NSIS offline resource and local inference flow', () => {
 
   test('seeks to the end before appending installer timing records', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
+    const normalizedInstallerScript = installerScript.replace(/\r\n/g, '\n');
 
-    expect(installerScript).toContain(
+    expect(normalizedInstallerScript).toContain(
       '!macro OpenTimingLogForAppend HANDLE\n' +
         '  ; NSIS append mode preserves existing data but starts at offset zero.\n' +
         '  FileOpen ${HANDLE} "$APPDATA\\ZhiYuanAgent\\install-timing.log" a\n' +
@@ -99,7 +138,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(18);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(19);
   });
 
   test('records optional local inference intent without downloading in NSIS', () => {

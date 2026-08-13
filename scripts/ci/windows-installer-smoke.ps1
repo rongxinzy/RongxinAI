@@ -103,7 +103,7 @@ $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\zhiyuan-agent'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'ZhiYuanAgent\runtimes'
 $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
 $managedDefenderMarker = Join-Path $env:APPDATA 'ZhiYuanAgent\defender-exclusion-managed'
-$componentKeys = @('openclaw', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
+$componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
 
 try {
   Invoke-Installer $installer 'cold installation' 2700 $timingLog

@@ -76,4 +76,74 @@ describe('UserBubble', () => {
     expect(screen.getByText('文档')).toBeInTheDocument();
     expect(screen.queryByText('minimax-docx')).not.toBeInTheDocument();
   });
+
+  test('renders a local preview for an image kept as a file attachment', async () => {
+    Object.defineProperty(window, 'electron', {
+      configurable: true,
+      value: {
+        dialog: {
+          readFileAsDataUrl: vi.fn().mockResolvedValue({
+            success: true,
+            dataUrl: 'data:image/png;base64,aGVsbG8=',
+          }),
+        },
+      },
+    });
+
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          metadata: {
+            fileAttachments: [
+              {
+                name: 'reference.png',
+                path: '/tmp/reference.png',
+                extension: 'PNG',
+                isImage: true,
+              },
+            ],
+          },
+        }}
+        skills={[]}
+      />,
+    );
+
+    const preview = await screen.findByAltText('reference.png');
+    expect(preview).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8=');
+    expect(screen.queryByText('PNG')).not.toBeInTheDocument();
+  });
+
+  test('restores an attachment card from a legacy Windows input-file prompt line', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content: '输入文件：C:\\Users\\whz\\Downloads\\brief.docx\n\n请总结这份文件',
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getByText('brief.docx')).toBeInTheDocument();
+    expect(screen.getByText('DOCX')).toBeInTheDocument();
+    expect(screen.getByText('请总结这份文件')).toBeInTheDocument();
+    expect(screen.queryByText(/输入文件：C:/)).not.toBeInTheDocument();
+  });
+
+  test('restores an attachment from an English UNC prompt line after language changes', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          content: String.raw`Input Files: \\nas\shared\contract.docx`,
+        }}
+        skills={[]}
+      />,
+    );
+
+    expect(screen.getByText('contract.docx')).toBeInTheDocument();
+    expect(screen.getByText('DOCX')).toBeInTheDocument();
+    expect(screen.queryByText(/Input Files:/)).not.toBeInTheDocument();
+  });
 });

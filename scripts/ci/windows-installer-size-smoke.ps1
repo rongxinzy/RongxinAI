@@ -1,5 +1,8 @@
 param(
-  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
+  [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
+  [int64]$MaximumInstallerBytes = 425MB,
+  [int64]$MaximumComponentBytes = 220MB,
+  [int64]$MaximumNonComponentBytes = 220MB
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,22 +27,33 @@ if ($null -eq $componentBytes -or $componentBytes -le 0) {
 
 $installer = $installers[0]
 $installerBytes = [int64]$installer.Length
-# The installer embeds the component archives plus the Electron application. A
-# 1GB envelope catches accidental payload duplication without inventing a
-# brittle release-size baseline before the first Windows build is available.
-$maximumBytes = $componentBytes + 1GB
-if ($installerBytes -gt $maximumBytes) {
-  throw "Installer is unexpectedly large: $installerBytes bytes (maximum $maximumBytes bytes; component archive bytes $componentBytes)"
+$nonComponentBytes = $installerBytes - $componentBytes
+if ($componentBytes -gt $MaximumComponentBytes) {
+  throw "Windows component archives are unexpectedly large: $componentBytes bytes (maximum $MaximumComponentBytes bytes)"
+}
+if ($nonComponentBytes -gt $MaximumNonComponentBytes) {
+  throw "Windows installer non-component payload is unexpectedly large: $nonComponentBytes bytes (maximum $MaximumNonComponentBytes bytes)"
+}
+if ($installerBytes -gt $MaximumInstallerBytes) {
+  throw "Windows installer is unexpectedly large: $installerBytes bytes (maximum $MaximumInstallerBytes bytes; component archive bytes $componentBytes)"
 }
 
+$componentSummary = @($manifest.components | ForEach-Object {
+  "- component ``$($_.key)``: $([int64]$_.archiveSizeBytes) bytes ($($_.archiveCompression))"
+})
 $summary = @(
   '### Windows installer size',
   '',
   "- installer: ``$($installer.Name)``",
   "- installer bytes: $installerBytes",
   "- component archive bytes: $componentBytes",
-  "- safety ceiling: $maximumBytes"
-) -join [Environment]::NewLine
+  "- non-component bytes: $nonComponentBytes",
+  "- installer ceiling: $MaximumInstallerBytes",
+  "- component ceiling: $MaximumComponentBytes",
+  "- non-component ceiling: $MaximumNonComponentBytes",
+  ''
+) + $componentSummary
+$summary = $summary -join [Environment]::NewLine
 Write-Host $summary
 if ($env:GITHUB_STEP_SUMMARY) {
   Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value $summary -Encoding UTF8

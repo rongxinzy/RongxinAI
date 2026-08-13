@@ -77,13 +77,6 @@
     $$source = \"$INSTDIR\resources\SKILLs\";\
     $$destination = \"$APPDATA\ZhiYuanAgent\SKILLs\";\
     $$config = Join-Path $$source \"skills.config.json\";\
-    $$weixinAccounts = @(\
-      (Join-Path $$env:USERPROFILE \".openclaw\openclaw-weixin\accounts\"),\
-      (Join-Path $$env:APPDATA \"ZhiYuanAgent\openclaw\state\openclaw-weixin\accounts\")\
-    );\
-    foreach ($$directory in $$weixinAccounts) {\
-      if (Test-Path $$directory) { Remove-Item -Path $$directory -Recurse -Force -ErrorAction SilentlyContinue }\
-    };\
     if (Test-Path $$source) {\
       New-Item -ItemType Directory -Path $$destination -Force | Out-Null;\
       $$bundled = @(try {\
@@ -188,16 +181,25 @@
     RMDir /r "$R3"
     CreateDirectory "$R3"
     SetOutPath "$PLUGINSDIR"
-    File /oname=component-${KEY}.tar "${PROJECT_DIR}\build-tar\windows-components\${KEY}.tar"
+    SetCompress off
+    File /oname=component-${KEY}.7z "${PROJECT_DIR}\build-tar\windows-components\${KEY}.7z"
+    SetCompress auto
 
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.tar\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.7z\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
     Pop $0
     Pop $1
     StrCmp $0 "0" 0 ComponentHashFailed_${TOKEN}
     StrCpy $1 $1 64
     StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
 
-    nsExec::ExecToStack '"$SYSDIR\tar.exe" -xf "$PLUGINSDIR\component-${KEY}.tar" -C "$R3"'
+    ; Validate every archive entry before extraction. Keep the parser in a
+    ; standalone script so PowerShell path semantics are not changed by NSIS quoting.
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-component-archive.ps1" -ArchivePath "$PLUGINSDIR\component-${KEY}.7z" -SevenZipPath "$PLUGINSDIR\7za.exe" -Prefix "${PREFIX}"'
+    Pop $0
+    Pop $1
+    StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
+
+    nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
     Pop $0
     Pop $1
     StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
@@ -217,6 +219,13 @@
     FileClose $2
     Goto OfflineComponentInstallFailed
 
+  ComponentArchiveUnsafe_${TOKEN}:
+    StrCpy $R9 "${LABEL} archive contains an unsafe path or link metadata."
+    !insertmacro OpenTimingLogForAppend $2
+    FileWrite $2 "phase=component-archive-unsafe component=${KEY} exit=$0 output=$1$\r$\n"
+    FileClose $2
+    Goto OfflineComponentInstallFailed
+
   ComponentExtracted_${TOKEN}:
     IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
     nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
@@ -231,7 +240,7 @@
     RMDir /r "$R2"
     Rename "$R3" "$R2"
     IfErrors ComponentCommitFailed_${TOKEN}
-    Delete "$PLUGINSDIR\component-${KEY}.tar"
+    Delete "$PLUGINSDIR\component-${KEY}.7z"
     Goto ComponentReady_${TOKEN}
 
   ComponentVerificationFailed_${TOKEN}:
@@ -259,14 +268,35 @@
   CreateDirectory "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
   SetOutPath "$PLUGINSDIR"
   !insertmacro ExtractElevatedActionScript
+  File /oname=7za.exe "${PROJECT_DIR}\node_modules\7zip-bin\win\x64\7za.exe"
+  File /oname=7za.sha256 "${PROJECT_DIR}\build-tar\windows-components\7za.sha256"
+  File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
+  File /oname=recover-component-switch.ps1 "${PROJECT_DIR}\scripts\installer\recover-component-switch.ps1"
+  File /oname=validate-component-archive.ps1 "${PROJECT_DIR}\scripts\installer\validate-component-archive.ps1"
   ; Embed the routing table as a compile-time asset. Building it incrementally
   ; with NSIS FileWrite can split the skill-python key on Windows runners.
   File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
-  Delete "$PLUGINSDIR\component-switch-state.txt"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\7za.exe\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 OfflineComponentInstallFailed
+  FileOpen $2 "$PLUGINSDIR\7za.sha256" r
+  IfErrors OfflineComponentInstallFailed
+  FileRead $2 $R7
+  FileClose $2
+  StrCpy $R7 $R7 64
+  StrCpy $1 $1 64
+  StrCmp $1 $R7 0 OfflineComponentInstallFailed
+  ; Keep the journal in the persistent cache: $PLUGINSDIR is deleted after a forced quit.
+  ; A separate script avoids NSIS macro expansion corrupting PowerShell quotes.
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\recover-component-switch.ps1" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" 0 OfflineComponentInstallFailed
 
   ; Defender exclusion is optional and requires explicit, informed consent.
   ; Keep the scope limited to the immutable component cache; never exclude
-  ; user-created Skills, OpenClaw state, model data, or the full install tree.
+  ; user-created Skills, channel state, model data, or the full install tree.
   DetailPrint "[Installer] Checking Microsoft Defender exclusion"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
@@ -321,36 +351,48 @@
 
   DefenderExclusionDone:
 
-  !insertmacro EnsureOfflineComponent OPENCLAW "openclaw" "cfmind" "cfmind\package.json" "OpenClaw 离线运行环境"
+  !insertmacro EnsureOfflineComponent CHANNEL_RUNTIME "channel-runtime" "channel-runtime" "channel-runtime\cc-connect-sidecar.exe" "频道运行环境"
   !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
   !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
   !insertmacro EnsureOfflineComponent PORTABLE_GIT "portable-git" "mingit" "mingit\usr\bin\bash.exe" "PortableGit"
   !insertmacro EnsureOfflineComponent PYTHON "python" "python-win" "python-win\python.exe" "Python 离线运行环境"
-  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\xlsx\Scripts\python.exe" "Skill Python 离线环境"
+  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\layers\shared\Scripts\python.exe" "Skill Python dependency layer"
   !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
 
   DetailPrint "[Installer] Activating offline components"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = \"Stop\";\
+    Set-StrictMode -Version Latest;\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
-    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
-    $$rows = @($$rows | ForEach-Object {\
-      if ($$_.key -notmatch \"^[a-z0-9-]+\z\" -or $$_.prefix -notmatch \"^[A-Za-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$_.key + \".version\");\
+    $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
+    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
+    $$targets = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
+    $$rows = @($$targets | ForEach-Object {\
+      $$targetRow = $$_;\
+      if ($$targetRow.key -notmatch \"^[a-z0-9-]+\z\" -or $$targetRow.prefix -notmatch \"^[A-Za-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
+      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$targetRow.key + \".version\");\
       $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$_.key };\
-      [pscustomobject]@{ Key = $$_.key; Prefix = $$_.prefix; Id = $$id }\
+      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$targetRow.key };\
+      $$manifestEntry = @($$manifest.components | Where-Object { $$_.key -eq $$targetRow.key });\
+      if ($$manifestEntry.Count -ne 1 -or $$manifestEntry[0].prefix -ne $$targetRow.prefix -or $$manifestEntry[0].contentId -ne $$id) { throw \"Component manifest mismatch: $$($$targetRow.key)\" };\
+      [pscustomobject]@{ Key = [string]$$targetRow.key; Prefix = [string]$$targetRow.prefix; Id = $$id }\
     });\
     $$prepared = @();\
     $$switched = @();\
     try {\
+      if ($$rows.Count -ne 7) { throw \"Invalid component manifest: expected 7 components, got $$($$rows.Count)\" };\
+      if (@($$rows.Key | Sort-Object -Unique).Count -ne 7) { throw \"Invalid component manifest: duplicate component key\" };\
       foreach ($$row in $$rows) {\
         $$root = Join-Path $$runtimeRoot $$row.Key;\
         $$target = Join-Path $$root $$row.Id;\
+        $$complete = Join-Path $$target \".complete\";\
+        if (-not (Test-Path -LiteralPath $$target) -or -not (Test-Path -LiteralPath $$complete)) { throw \"Missing prepared component target: $$target\" };\
+        $$completeId = (Get-Content -LiteralPath $$complete -Raw).Substring(0, 64);\
+        if ($$completeId -ne $$row.Id) { throw \"Prepared component id mismatch: $$($$row.Key)\" };\
         $$current = Join-Path $$root \"current\";\
         $$next = Join-Path $$root \"current.next\";\
         $$previous = Join-Path $$root \"current.previous\";\
-        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" };\
+        if ((Test-Path -LiteralPath $$previous) -and -not (Test-Path -LiteralPath $$current)) { Rename-Item -LiteralPath $$previous -NewName \"current\" -ErrorAction Stop };\
         foreach ($$stale in @($$next, $$previous)) {\
           if (Test-Path -LiteralPath $$stale) {\
             $$item = Get-Item -LiteralPath $$stale -Force;\
@@ -358,8 +400,8 @@
             [IO.Directory]::Delete($$stale)\
           }\
         };\
-        if (-not (Test-Path -LiteralPath $$target -PathType Container)) { throw \"Missing component version: $$target\" };\
         New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop | Out-Null;\
+        if (-not (Test-Path -LiteralPath $$next)) { throw \"Failed to prepare component junction: $$next\" };\
         $$prepared += [pscustomobject]@{ Row = $$row; Current = $$current; Next = $$next; Previous = $$previous }\
       };\
       foreach ($$entry in $$prepared) {\
@@ -396,9 +438,12 @@
   DetailPrint "[Installer] Connecting bundled runtimes"
   SetOutPath "$INSTDIR"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
+    $$ErrorActionPreference = \"Stop\";\
+    Set-StrictMode -Version Latest;\
     $$resourceRoot = \"$INSTDIR\resources\";\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
+    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
+    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Prefix = [string]$$_.prefix } });\
     foreach ($$row in $$rows) {\
       $$link = Join-Path $$resourceRoot $$row.Prefix;\
       $$target = Join-Path (Join-Path (Join-Path $$runtimeRoot $$row.Key) \"current\") $$row.Prefix;\
@@ -411,7 +456,7 @@
           Remove-Item -LiteralPath $$link -Recurse -Force;\
         }\
       };\
-      New-Item -ItemType Junction -Path $$link -Target $$target -Force | Out-Null;\
+      New-Item -ItemType Junction -Path $$link -Target $$target -Force -ErrorAction Stop | Out-Null;\
     }"'
   Pop $0
   Pop $1
@@ -426,7 +471,7 @@
   DetailPrint "[Installer] Verifying bundled runtimes"
   IfFileExists "$INSTDIR\resources\python-win\python.exe" 0 InstalledRuntimeVerificationFailed
   IfFileExists "$INSTDIR\resources\uv-win\uv.exe" 0 InstalledRuntimeVerificationFailed
-  IfFileExists "$INSTDIR\resources\cfmind\package.json" 0 InstalledRuntimeVerificationFailed
+  IfFileExists "$INSTDIR\resources\channel-runtime\cc-connect-sidecar.exe" 0 InstalledRuntimeVerificationFailed
   Goto OfflineComponentsReady
   InstalledRuntimeVerificationFailed:
     StrCpy $R9 "离线运行环境连接校验失败。请重新运行安装器。"
@@ -435,9 +480,9 @@
   OfflineComponentInstallFailed:
     nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
       $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-      $$statePath = \"$PLUGINSDIR\component-switch-state.txt\";\
+      $$statePath = Join-Path $$runtimeRoot \"component-switch-state.txt\";\
       if (Test-Path -LiteralPath $$statePath) {\
-        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ });\
+        $$states = @(Get-Content -LiteralPath $$statePath | Where-Object { $$_ -match \"^[^=|]+\\|(?:True|False)\\z\" });\
         [array]::Reverse($$states);\
         foreach ($$state in $$states) {\
           $$parts = $$state.Split(\"|\");\
@@ -504,7 +549,7 @@
   ; Remove known junctions explicitly before recursive deletion. This prevents
   ; an old installation cleanup from ever walking into an immutable shared pack.
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
-    $$names = @("cfmind", "SKILLs", "MCPs", "mingit", "python-win", "skill-python", "uv-win");\
+    $$names = @("channel-runtime", "SKILLs", "MCPs", "mingit", "python-win", "skill-python", "uv-win");\
     Get-ChildItem -Path "$INSTDIR.old*" -Directory -ErrorAction SilentlyContinue | ForEach-Object {\
       $$oldResources = Join-Path $$_.FullName "resources";\
       foreach ($$name in $$names) {\
@@ -526,14 +571,8 @@
   System::Call 'kernel32::GetTickCount()i .r7'
   nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "\
     $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    $$rows = @((Get-Content -LiteralPath \"$PLUGINSDIR\component-targets.json\" -Raw -ErrorAction Stop | ConvertFrom-Json));\
-    $$rows = @($$rows | ForEach-Object {\
-      if ($$_.key -notmatch \"^[a-z0-9-]+\z\") { throw \"Invalid component target entry\" };\
-      $$idPath = Join-Path \"$PLUGINSDIR\" (\"component-\" + $$_.key + \".version\");\
-      $$id = (Get-Content -LiteralPath $$idPath -Raw -ErrorAction Stop).Trim();\
-      if ($$id -notmatch \"^[0-9a-f]{64}\z\") { throw \"Invalid component content ID for \" + $$_.key };\
-      [pscustomobject]@{ Key = $$_.key; Id = $$id }\
-    });\
+    $$manifest = Get-Content -LiteralPath \"$PLUGINSDIR\component-manifest.json\" -Raw | ConvertFrom-Json;\
+    $$rows = @($$manifest.components | ForEach-Object { [pscustomobject]@{ Key = [string]$$_.key; Id = [string]$$_.contentId } });\
     foreach ($$row in $$rows) {\
       $$root = Join-Path $$runtimeRoot $$row.Key;\
       foreach ($$pointerName in @(\"current.previous\", \"current.next\")) {\
@@ -558,7 +597,7 @@
   !insertmacro OpenTimingLogForAppend $2
   FileWrite $2 "phase=component-cleanup-complete elapsed_ms=$5 exit=$0$\r$\n"
   FileClose $2
-  Delete "$PLUGINSDIR\component-switch-state.txt"
+  Delete "$LOCALAPPDATA\ZhiYuanAgent\runtimes\component-switch-state.txt"
 
   FileOpen $2 "$APPDATA\ZhiYuanAgent\install-start-tick.txt" r
   IfErrors InstallTimingDone

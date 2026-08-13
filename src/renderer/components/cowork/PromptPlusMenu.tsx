@@ -25,6 +25,7 @@ import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
 import { toggleActiveSkill } from '../../store/slices/skillSlice';
+import { ExpertAvatar } from '../expert/expertAvatars';
 import {
   PlusMenuExpertGlyphIcon,
   PlusMenuExpertsIcon,
@@ -112,7 +113,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
       if (!experts) return;
       const next = experts.selectedExpertIds.includes(expertId)
         ? experts.selectedExpertIds.filter(id => id !== expertId)
-        : [...experts.selectedExpertIds, expertId];
+        : [expertId];
       experts.onChange(next);
     },
     [experts],
@@ -325,7 +326,11 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                   closeOnClick={false}
                   onCheckedChange={() => handleToggleExpert(expert.id)}
                 >
-                  <PlusMenuExpertGlyphIcon className="size-4" />
+                  <ExpertAvatar
+                    name={expert.presetId}
+                    label={expert.name}
+                    className="size-4 rounded-sm border-0"
+                  />
                   <span className="truncate">{expert.name}</span>
                 </DropdownMenuCheckboxItem>
               ))}

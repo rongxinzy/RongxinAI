@@ -16,5 +16,9 @@ export function isCcConnectHealth(value: unknown): value is CcConnectHealth {
   const health = value as Partial<CcConnectHealth>;
   return health.protocolVersion === CcConnectProtocol.Version &&
     Number.isInteger(health.pid) && Number.isInteger(health.parentPid) &&
-    Array.isArray(health.capabilities) && health.capabilities.every(item => typeof item === 'string');
+    Array.isArray(health.capabilities) && health.capabilities.every(item => typeof item === 'string') &&
+    Array.isArray(health.platforms) && health.platforms.every(item =>
+      !!item && typeof item.accountId === 'string' && typeof item.platform === 'string' &&
+      ['starting', 'ready', 'unavailable'].includes(item.state) &&
+      (item.lastError === undefined || typeof item.lastError === 'string'));
 }

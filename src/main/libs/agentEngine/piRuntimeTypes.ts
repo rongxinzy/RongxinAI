@@ -8,12 +8,9 @@ import type { CoworkSessionInterruption } from '../../../shared/cowork/interrupt
 /**
  * Pi-native workbench runtime types (issue #225).
  *
- * Pi is the sole execution kernel for Work / Chat and owns its session,
- * event and approval types. It must not implement or reference the
- * OpenClaw `CoworkRuntime` glue interface — that interface stays inside
- * the OpenClaw Channel/Cron domain (see `./types.ts`). Shared payload
- * primitives (messages, tool activity, errors) come from the store/shared
- * layers, not from the OpenClaw runtime abstraction.
+ * Pi is the sole execution kernel for Work, Chat, Channel and Cron runs and
+ * owns its session, event and approval types. Shared payload primitives
+ * come from the store and shared layers instead of a second runtime abstraction.
  */
 
 export type PiPermissionResult =
@@ -50,6 +47,7 @@ export interface PiRuntimeEvents {
   permissionDismiss: (requestId: string) => void;
   complete: (sessionId: string, claudeSessionId: string | null) => void;
   error: (sessionId: string, error: CoworkError) => void;
+  sessionStopped: (sessionId: string) => void;
   sessionInterrupted: (event: CoworkSessionInterruption) => void;
   queueUpdated: (sessionId: string, items: CoworkPendingMessage[]) => void;
 }
@@ -76,7 +74,7 @@ export type PiStartOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
-  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+  fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
@@ -97,7 +95,7 @@ export type PiContinueOptions = {
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
   imageAttachments?: PiImageAttachment[];
-  fileAttachments?: Array<{ name: string; path: string; extension: string }>;
+  fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */
   workspaceRoot?: string;
   agentId?: string;
@@ -137,6 +135,10 @@ export interface PiRuntime {
   enqueuePendingMessage(
     sessionId: string,
     text: string,
+    imageAttachments?: PiImageAttachment[],
+    fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>,
+    skillIds?: string[],
+    skillPrompt?: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string };
   updatePendingMessage(
     sessionId: string,

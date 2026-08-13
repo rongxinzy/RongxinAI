@@ -66,6 +66,8 @@ export function buildDeclareArtifactTool(): Record<string, unknown> {
         };
       }
       const role = params.role === 'intermediate' ? 'intermediate' : 'deliverable';
+      const title = text(params.title);
+      const kind = text(params.kind);
       const fileName = filePath.split(/[/\\]/).pop() || filePath;
       return {
         content: [
@@ -74,7 +76,12 @@ export function buildDeclareArtifactTool(): Record<string, unknown> {
             text: `Artifact declared: ${fileName} (${role})`,
           },
         ],
-        details: { filePath, role },
+        details: {
+          filePath,
+          role,
+          ...(title ? { title } : {}),
+          ...(kind ? { kind } : {}),
+        },
       };
     },
   };

@@ -53,7 +53,7 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
   const toggleExpert = (expertId: string) => {
     const next = selected.has(expertId)
       ? selectedExpertIds.filter(id => id !== expertId)
-      : [...selectedExpertIds, expertId];
+      : [expertId];
     onChange(next);
   };
 

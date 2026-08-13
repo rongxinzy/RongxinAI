@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 
 import { listCcConnectAccountConfigs } from './ccConnectAccountConfig';
 
-const disabled = { enabled: false, instanceId: 'disabled0000', botToken: '', clientId: '', clientSecret: '', appId: '', appSecret: '', botId: '', secret: '', allowFrom: [], proxy: '', domain: 'feishu' };
+const disabled = { enabled: false, instanceId: 'disabled0000', workspaceId: 'workspace-1', botToken: '', clientId: '', clientSecret: '', appId: '', appSecret: '', botId: '', secret: '', allowFrom: [], proxy: '', domain: 'feishu' };
 
 test('maps only enabled accounts with complete, platform-native credentials', () => {
   const accounts = listCcConnectAccountConfigs({
@@ -12,14 +12,44 @@ test('maps only enabled accounts with complete, platform-native credentials', ()
     getFeishuInstances: () => [{ ...disabled, enabled: true, instanceId: 'feishu-123456', appId: 'app', appSecret: 'secret', domain: 'lark' }],
     getQQInstances: () => [{ ...disabled, enabled: true, instanceId: 'qq-123456', appId: 'app', appSecret: 'secret' }],
     getWecomInstances: () => [{ ...disabled, enabled: true, instanceId: 'wecom-123456', botId: 'bot', secret: 'secret' }, { ...disabled, enabled: true, instanceId: 'bad-123456', botId: 'bot' }],
+    getWeixinConfig: () => ({ enabled: true, accountId: 'weixin-account', workspaceId: 'workspace-1', token: 'weixin-token', baseUrl: 'https://ilinkai.weixin.qq.com', allowFrom: ['wx-user'] }),
   } as never);
   expect(accounts).toEqual(expect.arrayContaining([
-    expect.objectContaining({ accountId: 'telegram', platform: 'telegram', options: expect.objectContaining({ token: 'token', allow_from: ['42'] }) }),
-    expect.objectContaining({ accountId: 'discord-', platform: 'discord' }),
-    expect.objectContaining({ accountId: 'dingtalk', platform: 'dingtalk' }),
-    expect.objectContaining({ accountId: 'feishu-1', platform: 'feishu', options: expect.objectContaining({ domain: 'lark' }) }),
-    expect.objectContaining({ accountId: 'qq-12345', platform: 'qqbot' }),
-    expect.objectContaining({ accountId: 'wecom-12', platform: 'wecom' }),
+    expect.objectContaining({ accountId: 'telegram-123456', platform: 'telegram', options: expect.objectContaining({ token: 'token', allow_from: '42' }) }),
+    expect.objectContaining({ accountId: 'discord-123456', platform: 'discord' }),
+    expect.objectContaining({ accountId: 'dingtalk-123456', platform: 'dingtalk' }),
+    expect.objectContaining({ accountId: 'feishu-123456', platform: 'feishu', options: expect.objectContaining({ domain: 'lark' }) }),
+    expect.objectContaining({ accountId: 'qq-123456', platform: 'qqbot' }),
+    expect.objectContaining({ accountId: 'wecom-123456', platform: 'wecom', options: expect.objectContaining({ mode: 'websocket', bot_id: 'bot', bot_secret: 'secret' }) }),
+    expect.objectContaining({ accountId: 'weixin-account', platform: 'weixin', options: expect.objectContaining({ token: 'weixin-token', allow_from: 'wx-user' }) }),
   ]));
-  expect(accounts).toHaveLength(6);
+  expect(accounts).toHaveLength(7);
+});
+
+test('omits enabled accounts without a workspace binding', () => {
+  const accounts = listCcConnectAccountConfigs({
+    getTelegramInstances: () => [{ ...disabled, enabled: true, workspaceId: '', botToken: 'token' }],
+    getDiscordInstances: () => [],
+    getDingTalkInstances: () => [],
+    getFeishuInstances: () => [],
+    getQQInstances: () => [],
+    getWecomInstances: () => [],
+    getWeixinConfig: () => ({ enabled: true, accountId: 'weixin-account', workspaceId: '', token: 'token' }),
+  } as never);
+
+  expect(accounts).toEqual([]);
+});
+
+test('omits enabled accounts whose workspace no longer exists', () => {
+  const accounts = listCcConnectAccountConfigs({
+    getTelegramInstances: () => [{ ...disabled, enabled: true, botToken: 'token' }],
+    getDiscordInstances: () => [],
+    getDingTalkInstances: () => [],
+    getFeishuInstances: () => [],
+    getQQInstances: () => [],
+    getWecomInstances: () => [],
+    getWeixinConfig: () => ({ enabled: false }),
+  } as never, () => false);
+
+  expect(accounts).toEqual([]);
 });

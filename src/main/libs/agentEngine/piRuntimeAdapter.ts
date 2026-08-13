@@ -22,7 +22,11 @@ import * as os from 'os';
 import path from 'path';
 
 import { classifyCoworkError, type CoworkError } from '../../../common/coworkError';
-import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import {
+  CoworkSessionExpertSource,
+  normalizeSingleExpertIds,
+  type CoworkMessageExpertIdentity,
+} from '../../../shared/cowork/sessionExperts';
 import {
   CoworkQueueDelivery,
   type CoworkPendingMessage,
@@ -76,7 +80,7 @@ import {
   resolveRawApiConfig,
   resolveRawApiConfigForModelRef,
 } from '../claudeSettings';
-import { getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
+import { applyApplicationRuntimeEnv, getSkillsRoot, resolveGitBashPathForPi } from '../coworkUtil';
 import type { McpServerManager } from '../mcpServerManager';
 import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewRenderer';
 import {
@@ -218,6 +222,8 @@ interface ActivePiSession {
   requestedSystemPrompt: string;
   requestedSkillIds: string[] | undefined;
   requestedExpertIds: string[];
+  /** Experts selected for the current turn, retained when messages are persisted. */
+  turnExperts: CoworkMessageExpertIdentity[];
   resourceState: PiResourceState;
   /** Message id for the visible answer (text) bubble of the current turn. */
   assistantMessageId: string | null;
@@ -273,6 +279,8 @@ interface ActivePiSession {
   turnFailed: boolean;
   /** Prevents duplicate queue drains when Pi emits multiple settled events. */
   queueFlushInFlight: boolean;
+  /** MCP tool manifest generation captured when this Pi session was created. */
+  mcpToolManifestGeneration: number;
 }
 
 // ── Dynamic imports ──
@@ -310,6 +318,8 @@ interface PiResourceState {
   skillIds: string[] | undefined;
   maxOutputTokens: number;
   fileToolsEnabled: boolean;
+  /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
+  expertSkillDirs: string[];
 }
 
 interface InitializingPiSession {
@@ -431,7 +441,7 @@ const MESSAGE_UPDATE_THROTTLE_MS = 200;
 /**
  * How often streaming content is written to SQLite. better-sqlite3 is synchronous
  * and blocks the main-process event loop, so writing on every Pi frame causes
- * visible streaming jank. We throttle store writes (like the OpenClaw adapter)
+ * visible streaming jank. Store writes are throttled
  * and flush the latest content on finalize.
  */
 const STORE_UPDATE_THROTTLE_MS = 250;
@@ -440,11 +450,6 @@ const normalizeSkillIds = (skillIds: string[] | undefined): string[] | undefined
   skillIds === undefined
     ? undefined
     : [...new Set(skillIds.map(skillId => skillId.trim()).filter(Boolean))].sort();
-
-const normalizeExpertIds = (expertIds: string[] | undefined): string[] =>
-  expertIds === undefined
-    ? []
-    : [...new Set(expertIds.map(expertId => expertId.trim()).filter(Boolean))];
 
 const haveSameStringList = (left: string[] | undefined, right: string[] | undefined): boolean =>
   left === right ||
@@ -459,6 +464,11 @@ const haveSameStringList = (left: string[] | undefined, right: string[] | undefi
 // Pi's bash tool.  Pi executes commands via spawn + pipe, so TTY-aware
 // tools won't emit escape sequences without this env var.
 if (!process.env.FORCE_COLOR) process.env.FORCE_COLOR = '1';
+
+// Pi's bash tool inherits the main-process environment. Initialize the
+// application-managed runtime once so later session creation cannot duplicate
+// PATH entries in process.env.
+let hasAppliedApplicationRuntimeEnv = false;
 
 export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private readonly activeSessions = new Map<string, ActivePiSession>();
@@ -475,6 +485,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   >();
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
+  /**
+   * Pi custom tools are fixed when a session is created. Bump this whenever
+   * MCP discovery changes so the next user turn recreates an outdated session
+   * with the current MCP proxy topology.
+   */
+  private mcpToolManifestGeneration = 0;
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
@@ -514,6 +530,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   setMcpServerManager(mgr: McpServerManager): void {
     this.mcpServerManager = mgr;
     this.mcpInjected = true;
+    this.mcpToolManifestGeneration += 1;
+  }
+  refreshMcpTools(): void {
+    this.mcpToolManifestGeneration += 1;
   }
   hasMcpServerManager(): boolean {
     return this.mcpInjected;
@@ -557,6 +577,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!hasContent) {
       throw new Error('Prompt is required.');
     }
+    const expertIds = normalizeSingleExpertIds(options.expertIds);
 
     if (this.activeSessions.has(sessionId) || this.initializingSessions.has(sessionId)) {
       this.stopActiveSession(sessionId, 'The session was replaced by a new run.', false);
@@ -585,7 +606,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         type: 'user',
         content: prompt,
         timestamp: Date.now(),
-        metadata: options.skillIds?.length ? { skillIds: options.skillIds } : undefined,
+        metadata:
+          options.skillIds?.length || expertIds.length
+            ? {
+                ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
+                ...(expertIds.length
+                  ? {
+                      experts: (this.store?.getSession(sessionId)?.experts ?? [])
+                        .filter(expert => expertIds.includes(expert.expertId))
+                        .map(expert => ({
+                          expertId: expert.expertId,
+                          expertName: expert.expertName,
+                          presetId: expert.packageId,
+                        })),
+                    }
+                  : {}),
+              }
+            : undefined,
       };
       const persisted = this.store ? this.store.addMessage(sessionId, userMsg) : userMsg;
       this.emit('message', sessionId, persisted);
@@ -598,6 +635,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
     try {
       const workspaceRoot = options.workspaceRoot || process.cwd();
+      // Pi's built-in bash tool snapshots process.env when it executes. Give
+      // that snapshot the same app-managed Node/npm, Python, uv, and Git Bash
+      // PATH configuration used by direct Skill execution.
+      if (!hasAppliedApplicationRuntimeEnv) {
+        applyApplicationRuntimeEnv(process.env as Record<string, string | undefined>);
+        hasAppliedApplicationRuntimeEnv = true;
+      }
       const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
 
       // System prompt — user config only. Skills are discovered and appended
@@ -610,6 +654,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: normalizeSkillIds(options.skillIds),
         maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
         fileToolsEnabled: options.confirmationMode !== 'text',
+        expertSkillDirs: this.resolveExpertPresetSkillDirs(options.expertIds),
       };
 
       const shortcutKindForContract = isAcademicResearchSkillSet(resourceState.skillIds)
@@ -815,8 +860,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // the team member agents alongside the built-in profiles.
       let subagentPresetId: string | undefined;
       if (this.store) {
-        const candidateAgentIds = options.expertIds?.length
-          ? options.expertIds
+        const candidateAgentIds = expertIds.length
+          ? expertIds
           : options.agentId
             ? [options.agentId]
             : [];
@@ -853,6 +898,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               skillIds,
               maxOutputTokens,
               fileToolsEnabled: true,
+              expertSkillDirs: [],
             },
             {
               sessionId,
@@ -933,7 +979,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         harnessModelProfile,
         requestedSystemPrompt: basePrompt,
         requestedSkillIds: resourceState.skillIds,
-        requestedExpertIds: normalizeExpertIds(options.expertIds),
+        requestedExpertIds: expertIds,
+        turnExperts: (this.store?.getSession(sessionId)?.experts ?? [])
+          .filter(expert => expertIds.includes(expert.expertId))
+          .map(expert => ({
+            expertId: expert.expertId,
+            expertName: expert.expertName,
+            presetId: expert.packageId,
+          })),
         resourceState,
         assistantMessageId: null,
         thinkingMessageId: null,
@@ -965,15 +1018,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         isRunning: true,
         turnFailed: false,
         queueFlushInFlight: false,
+        mcpToolManifestGeneration: this.mcpToolManifestGeneration,
       };
       activeSession = active;
 
       // Subscribe to Pi events before sending the prompt
       active.unsubscribe = session.subscribe(event => {
-        if (
-          abortController.signal.aborted ||
-          this.activeSessions.get(sessionId) !== active
-        ) {
+        if (abortController.signal.aborted || this.activeSessions.get(sessionId) !== active) {
           return;
         }
         this.handlePiEvent(sessionId, active, event);
@@ -1027,6 +1078,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         this.activeSessions.delete(sessionId);
       }
       if (abortController.signal.aborted) {
+        this.emit('sessionStopped', sessionId);
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -1034,9 +1086,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       this.emit('error', sessionId, classifyCoworkError(message));
       throw error;
     } finally {
-      if (
-        this.initializingSessions.get(sessionId)?.generation === initialization.generation
-      ) {
+      if (this.initializingSessions.get(sessionId)?.generation === initialization.generation) {
         this.initializingSessions.delete(sessionId);
       }
     }
@@ -1047,6 +1097,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     prompt: string,
     options: PiContinueOptions = {},
   ): Promise<void> {
+    const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
     const active = this.activeSessions.get(sessionId);
     if (!active || active.aborted) {
       if (active?.aborted) {
@@ -1062,7 +1113,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ...options,
         skipInitialUserMessage: options._skipUserMessage,
         systemPrompt: options.systemPrompt ?? storedSession?.systemPrompt,
-        expertIds: options.expertIds ?? storedSession?.experts.map(expert => expert.expertId),
+        expertIds:
+          options.expertIds === undefined
+            ? storedSession?.experts.slice(0, 1).map(expert => expert.expertId)
+            : explicitExpertIds,
         workspaceRoot: options.workspaceRoot ?? storedSession?.cwd,
         agentId: options.agentId ?? storedSession?.agentId,
         modelOverride: options.modelOverride ?? storedSession?.modelOverride,
@@ -1070,12 +1124,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         _piPromptOverride: piPrompt,
       });
     }
-
-    if (options.autoApprove !== undefined) {
-      active.autoApprove = Boolean(options.autoApprove);
-    }
-    active.isRunning = true;
-    active.turnFailed = false;
 
     const requestedSystemPrompt = options.systemPrompt?.trim();
     const requestedSkillIds =
@@ -1085,7 +1133,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const requestedExpertIds =
       options.expertIds === undefined
         ? active.requestedExpertIds
-        : normalizeExpertIds(options.expertIds);
+        : explicitExpertIds;
     const requestedSessionMode =
       options.sessionMode ??
       (active.workbenchContract.kind === WorkbenchContractKind.Chat
@@ -1100,11 +1148,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     });
     const productionWorkflowTopologyChanged =
       productionWorkflowEnabled !== active.productionWorkflowEnabled;
+    const mcpToolTopologyChanged =
+      active.mcpToolManifestGeneration !== this.mcpToolManifestGeneration;
     if (
       !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
-      productionWorkflowTopologyChanged
+      productionWorkflowTopologyChanged ||
+      mcpToolTopologyChanged
     ) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
+      if (mcpToolTopologyChanged) {
+        console.log('[PiRuntime] recreating session after MCP tool manifest refresh');
+      }
       this.disposeSessionForRecreation(sessionId, active);
       return this.startSession(sessionId, prompt, {
         ...options,
@@ -1116,6 +1170,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         _piPromptOverride: buildPiConversationPrompt(history, prompt),
       });
     }
+
+    if (options.autoApprove !== undefined) {
+      active.autoApprove = Boolean(options.autoApprove);
+    }
+    active.isRunning = true;
+    active.turnFailed = false;
 
     const nextSystemPrompt = requestedSystemPrompt ?? active.requestedSystemPrompt;
     const promptChanged = nextSystemPrompt !== active.requestedSystemPrompt;
@@ -1217,6 +1277,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.writeTokenLimitRecovery.reset();
     active.pendingError = null;
     active.turnFailed = false;
+    active.turnExperts = (this.store?.getSession(sessionId)?.experts ?? [])
+      .filter(expert => active.requestedExpertIds.includes(expert.expertId))
+      .map(expert => ({
+        expertId: expert.expertId,
+        expertName: expert.expertName,
+        presetId: expert.packageId,
+      }));
 
     // Emit user message (persisted to SQLite, same as startSession).
     if (!options._skipUserMessage) {
@@ -1229,7 +1296,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           options.skillIds?.length ||
           options._queueDelivery ||
           options.imageAttachments?.length ||
-          options.fileAttachments?.length
+          options.fileAttachments?.length ||
+          active.turnExperts.length
             ? {
                 ...(options.skillIds?.length ? { skillIds: options.skillIds } : {}),
                 ...(options._queueDelivery ? { queueDelivery: options._queueDelivery } : {}),
@@ -1239,6 +1307,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 ...(options.fileAttachments?.length
                   ? { fileAttachments: options.fileAttachments }
                   : {}),
+                ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
               }
             : undefined,
       };
@@ -1301,6 +1370,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     } catch (error) {
       active.isRunning = false;
       if (active.abortController.signal.aborted) {
+        this.emit('sessionStopped', sessionId);
         return;
       }
       const message = error instanceof Error ? error.message : String(error);
@@ -1416,6 +1486,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     void active.piSession.abort();
     this.workbenchTaskService?.pauseRun?.(sessionId, reason);
     this.clearApprovalsBySession(sessionId);
+    this.emit('sessionStopped', sessionId);
     if (cause) this.recordSessionInterruption(sessionId, cause);
 
     // A user stop ends the current turn without cancelling messages already
@@ -1539,6 +1610,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   enqueuePendingMessage(
     sessionId: string,
     text: string,
+    imageAttachments?: PiContinueOptions['imageAttachments'],
+    fileAttachments?: PiContinueOptions['fileAttachments'],
+    skillIds?: string[],
+    skillPrompt?: string,
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
     const active = this.activeSessions.get(sessionId);
     if (!this.isWorkSession(sessionId, active)) {
@@ -1553,6 +1628,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionId,
       normalizedText,
       CoworkQueueDelivery.FollowUp,
+      imageAttachments,
+      fileAttachments,
+      skillIds,
+      skillPrompt,
     );
     this.emitQueueUpdated(sessionId);
     return { success: true, item };
@@ -1602,8 +1681,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     if (!item) return { success: false, error: 'Pending message was not found.' };
     this.emitQueueUpdated(sessionId);
     try {
-      await active.piSession.steer(item.text);
-      this.persistQueuedUserMessage(sessionId, item.text, CoworkQueueDelivery.Steer);
+      await sendPiPrompt(
+        active.piSession,
+        item.skillPrompt ? `${item.skillPrompt}\n\n${item.text}` : item.text,
+        item.imageAttachments,
+        active.capabilities,
+        'steer',
+      );
+      this.persistQueuedUserMessage(sessionId, item, CoworkQueueDelivery.Steer);
       active.isRunning = true;
       this.pendingMessageQueue.finishDelivery(item.id);
       return { success: true, item };
@@ -1635,6 +1720,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionMode: CoworkSessionMode.Work,
         _queueDelivery: CoworkQueueDelivery.FollowUp,
         _streamingBehavior: 'followUp',
+        imageAttachments: item.imageAttachments,
+        fileAttachments: item.fileAttachments,
+        skillIds: item.skillIds,
       });
       this.pendingMessageQueue.finishDelivery(item.id);
       return { success: true, item };
@@ -1653,15 +1741,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   private persistQueuedUserMessage(
     sessionId: string,
-    text: string,
+    item: CoworkPendingMessage,
     delivery: CoworkQueueDelivery,
   ): CoworkMessage {
     const message: CoworkMessage = {
       id: randomUUID(),
       type: 'user',
-      content: text,
+      content: item.text,
       timestamp: Date.now(),
-      metadata: { queueDelivery: delivery },
+      metadata: {
+        queueDelivery: delivery,
+        ...(item.skillIds?.length ? { skillIds: item.skillIds } : {}),
+        ...(item.imageAttachments?.length ? { imageAttachments: item.imageAttachments } : {}),
+        ...(item.fileAttachments?.length ? { fileAttachments: item.fileAttachments } : {}),
+      },
     };
     const persisted = this.store ? this.store.addMessage(sessionId, message) : message;
     this.emit('message', sessionId, persisted);
@@ -1689,6 +1782,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           sessionMode: CoworkSessionMode.Work,
           _queueDelivery: CoworkQueueDelivery.FollowUp,
           _streamingBehavior: 'followUp',
+          imageAttachments: next.imageAttachments,
+          fileAttachments: next.fileAttachments,
+          skillIds: next.skillIds,
         });
         this.pendingMessageQueue.finishDelivery(next.id);
       } catch (error) {
@@ -1761,7 +1857,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // never from the developer's global ~/.agents/skills (which would leak
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
       noSkills: true,
-      additionalSkillPaths: this.resolveZhiyuanSkillDirs(),
+      additionalSkillPaths: [
+        ...this.resolveZhiyuanSkillDirs(),
+        ...resourceState.expertSkillDirs,
+      ],
       skillsOverride: (base: {
         skills: Array<{ name?: string; id?: string }>;
         diagnostics: unknown[];
@@ -1848,6 +1947,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     push(getSkillsRoot());
     if (!app.isPackaged) {
       push(path.join(app.getPath('userData'), 'SKILLs'));
+    }
+    return dirs;
+  }
+
+  /**
+   * Bundled preset skill directories for the session's selected experts.
+   * File-sourced like regular skills: editing a preset SKILL.md takes effect
+   * on the next session. Falls back to the imported userData copies when the
+   * preset directory is not present in this build.
+   */
+  private resolveExpertPresetSkillDirs(expertIds: string[] | undefined): string[] {
+    const dirs: string[] = [];
+    if (!expertIds?.length) return dirs;
+    const skillsRoot = getSkillsRoot();
+    for (const expertId of expertIds) {
+      const agent = this.store?.getAgent(expertId);
+      const presetId = agent?.presetId?.trim();
+      if (!presetId) continue;
+      const dir = path.join(
+        skillsRoot,
+        'zhiyuan-expert-manager',
+        'presets',
+        presetId,
+        'skills',
+      );
+      if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
     }
     return dirs;
   }
@@ -2026,7 +2151,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'tool_execution_start': {
         // Agent invoked a tool → emit a tool_use message so the UI renders the tool card.
-        // Mirrors OpenClaw adapter's tool_use construction.
+        // Preserve the shared tool_use message shape.
         if (!event.toolCallId || !event.toolName) break;
         const runningActivity = active.toolActivityTracker.upsert(
           {
@@ -2209,11 +2334,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         }
         if (active.workbenchRunId && this.workbenchTaskService) {
           const workflowSnapshot = active.productionWorkflowEnabled
-            ? active.researchRun
-              ? active.researchRun.getSnapshot()
-              : active.shortcutWorkflow
-                ? active.shortcutWorkflow.getSnapshot()
-                : active.workExecution?.getSnapshot() || null
+            ? active.productionLoop
+              ? active.productionLoop.getSnapshot()
+              : active.researchRun
+                ? active.researchRun.getSnapshot()
+                : active.shortcutWorkflow
+                  ? active.shortcutWorkflow.getSnapshot()
+                  : active.workExecution?.getSnapshot() || null
             : null;
           this.workbenchTaskService.completeRun({
             sessionId,
@@ -2337,7 +2464,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       metadata:
         kind === 'thinking'
           ? { isStreaming: true, isFinal: false, isThinking: true }
-          : { isStreaming: true, isFinal: false },
+          : {
+              isStreaming: true,
+              isFinal: false,
+              ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+            },
     };
     if (kind === 'thinking') {
       active.thinkingLifecycle.start(seed.timestamp);
@@ -2360,7 +2491,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     const metadata =
       kind === 'thinking'
         ? { isStreaming: true, isFinal: false, isThinking: true }
-        : { isStreaming: true, isFinal: false };
+        : {
+            isStreaming: true,
+            isFinal: false,
+            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+          };
     if (kind === 'thinking') {
       active.thinkingLifecycle.markContentStreaming();
     }
@@ -2389,7 +2524,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             isThinking: true,
             ...(thinkingDurationMs !== undefined && { thinkingDurationMs }),
           }
-        : { isStreaming: false, isFinal: true };
+        : {
+            isStreaming: false,
+            isFinal: true,
+            ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
+          };
     if (this.store) {
       this.store.updateMessage(sessionId, messageId, { content, metadata });
     }
@@ -2413,6 +2552,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       isStreaming: false,
       isFinal: true,
       isFinalAnswer: true,
+      ...(active.turnExperts.length ? { experts: active.turnExperts } : {}),
     };
     if (this.store) {
       const message = this.store
@@ -2690,16 +2830,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
     if (!this.mcpServerManager) return null;
-    const manifest = this.mcpServerManager.toolManifest;
-    if (manifest.length === 0) return null;
+    if (this.mcpServerManager.toolManifest.length === 0) return null;
 
     const mgr = this.mcpServerManager;
-
-    const toolIndex = manifest.map(e => ({
-      server: e.server,
-      name: e.name,
-      description: e.description,
-    }));
+    const getManifest = () => mgr.toolManifest;
 
     const buildStatusLine = (): string => {
       const servers = this.mcpServerManager?.toolManifest ?? [];
@@ -2756,6 +2890,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // content = undefined, which breaks the next LLM turn with
         // "content is not iterable". See agent-loop.ts createToolResultMessage.
         try {
+          const manifest = getManifest();
+          const toolIndex = manifest.map(e => ({
+            server: e.server,
+            name: e.name,
+            description: e.description,
+          }));
           const tool = typeof params.tool === 'string' ? params.tool : undefined;
           const argsStr = typeof params.args === 'string' ? params.args : undefined;
           const server = typeof params.server === 'string' ? params.server : undefined;
@@ -2920,16 +3060,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   ): WorkbenchTaskContract {
     const research = managedWorkflow && isAcademicResearchSkillSet(skillIds);
     const shortcut = research ? null : resolveShortcutWorkflowKind(skillIds);
+    const kind =
+      sessionMode === 'chat'
+        ? WorkbenchContractKind.Chat
+        : research
+          ? WorkbenchContractKind.Research
+          : managedWorkflow && shortcut
+            ? WorkbenchContractKind.Shortcut
+            : WorkbenchContractKind.GenericWork;
     return {
-      kind:
-        sessionMode === 'chat'
-          ? WorkbenchContractKind.Chat
-          : research
-            ? WorkbenchContractKind.Research
-            : managedWorkflow && shortcut
-              ? WorkbenchContractKind.Shortcut
-              : WorkbenchContractKind.GenericWork,
-      requiresUserAcceptance: sessionMode !== 'chat' && !research && !(managedWorkflow && shortcut),
+      kind,
+      // Generic work without the production workflow (simple questions, trivial
+      // requests) is gated by the baseline checks alone and never needs manual
+      // acceptance. The production workflow owns the acceptance gate instead.
+      requiresUserAcceptance:
+        sessionMode !== 'chat' &&
+        kind === WorkbenchContractKind.GenericWork &&
+        managedWorkflow,
       metadata: {
         productionWorkflowEnabled: managedWorkflow,
         ...(skillIds?.length ? { skillIds } : {}),

@@ -40,6 +40,10 @@ export class PiPendingMessageQueue {
     sessionId: string,
     text: string,
     delivery: CoworkQueueDeliveryType = CoworkQueueDelivery.FollowUp,
+    imageAttachments?: CoworkPendingMessage['imageAttachments'],
+    fileAttachments?: CoworkPendingMessage['fileAttachments'],
+    skillIds?: CoworkPendingMessage['skillIds'],
+    skillPrompt?: CoworkPendingMessage['skillPrompt'],
   ): CoworkPendingMessage {
     const item: CoworkPendingMessage = {
       id: randomUUID(),
@@ -47,6 +51,10 @@ export class PiPendingMessageQueue {
       delivery,
       createdAt: Date.now(),
       status: CoworkQueueItemStatus.Pending,
+      ...(imageAttachments?.length ? { imageAttachments } : {}),
+      ...(fileAttachments?.length ? { fileAttachments } : {}),
+      ...(skillIds?.length ? { skillIds } : {}),
+      ...(skillPrompt ? { skillPrompt } : {}),
     };
     const items = this.itemsBySession.get(sessionId) ?? [];
     items.push(item);

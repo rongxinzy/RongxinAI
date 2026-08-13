@@ -12,6 +12,11 @@ const LANGUAGE_TYPES: Record<string, CoworkArtifactType> = {
   mermaid: 'mermaid',
   jsx: 'code',
   tsx: 'code',
+  // The declare_artifact tool advertises these kinds directly. Keep them
+  // mapped so an explicit declaration wins over extension inference.
+  code: 'code',
+  document: 'document',
+  image: 'image',
   markdown: 'markdown',
   md: 'markdown',
   text: 'text',
@@ -169,7 +174,10 @@ function collectCodeBlocks(messages: CoworkArtifactMessage[]): CoworkArtifactCan
           content: block.content,
           language: artifactType === 'code' ? block.language : undefined,
           source: CoworkArtifactSource.CodeBlock,
-          role: CoworkArtifactRole.Deliverable,
+          // Code blocks are inline evidence, not final outputs. Deliverable
+          // identity must come from an explicit declare_artifact call so the
+          // end-of-turn deliverables strip stays meaningful.
+          role: CoworkArtifactRole.Intermediate,
           declared: false,
           createdAt: message.timestamp,
         },

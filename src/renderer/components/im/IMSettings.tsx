@@ -56,6 +56,7 @@ import {
 } from '../../types/im';
 import { getVisibleIMPlatforms } from '../../utils/regionFilter';
 import Modal from '../common/Modal';
+import { ChannelWorkspaceField } from './ChannelWorkspaceField';
 import DingTalkInstanceSettings from './DingTalkInstanceSettings';
 import DiscordInstanceSettings from './DiscordInstanceSettings';
 import FeishuInstanceSettings from './FeishuInstanceSettings';
@@ -63,6 +64,7 @@ import { IMField, IMSelectField, IMStatusAlert } from './IMFormControls';
 import QQInstanceSettings from './QQInstanceSettings';
 import TelegramInstanceSettings from './TelegramInstanceSettings';
 import WecomInstanceSettings from './WecomInstanceSettings';
+import { WeixinLoginPanel } from './WeixinLoginPanel';
 
 // Reusable guide card component for platform setup instructions
 const PlatformGuide: React.FC<{
@@ -99,6 +101,7 @@ const PlatformGuide: React.FC<{
 const IMSettings: React.FC = () => {
   const dispatch = useDispatch();
   const { config, status, isLoading } = useSelector((state: RootState) => state.im);
+  const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
   const [activePlatform, setActivePlatform] = useState<Platform>('weixin');
   const [activeQQInstanceId, setActiveQQInstanceId] = useState<string | null>(null);
   const [qqExpanded, setQqExpanded] = useState(false);
@@ -303,7 +306,7 @@ const IMSettings: React.FC = () => {
       if (platform === 'weixin') {
         const newEnabled = !weixinConfig.enabled;
         const success = await imService.updateConfig({
-          weixin: { ...weixinConfig, enabled: newEnabled },
+          weixin: { enabled: newEnabled },
         });
         if (success) {
           dispatch(setWeixinConfig({ enabled: newEnabled }));
@@ -514,10 +517,7 @@ const IMSettings: React.FC = () => {
 
     // Persist Weixin config and test connectivity.
     if (platform === 'weixin') {
-      await imService.persistConfig({ weixin: weixinConfig });
-      const result = await runConnectivityTest(platform, {
-        weixin: weixinConfig,
-      } as Partial<IMGatewayConfig>);
+      const result = await runConnectivityTest(platform);
       if (!weixinConfig.enabled && result) {
         const authCheck = result.checks.find(c => c.code === 'auth_check');
         if (authCheck && authCheck.level === 'pass') {
@@ -1263,6 +1263,16 @@ const IMSettings: React.FC = () => {
               s => s.instanceId === activeDingTalkInstanceId,
             );
             return (
+              <div className="flex flex-col gap-4">
+              <ChannelWorkspaceField
+                accountId={selectedInstance.instanceId}
+                workspaceId={selectedInstance.workspaceId}
+                workspaces={workspaces}
+                onChange={workspaceId => {
+                  dispatch(setDingTalkInstanceConfig({ instanceId: activeDingTalkInstanceId, config: { workspaceId } }));
+                  void imService.updateDingTalkInstanceConfig(activeDingTalkInstanceId, { workspaceId });
+                }}
+              />
               <DingTalkInstanceSettings
                 instance={selectedInstance}
                 instanceStatus={selectedStatus}
@@ -1334,6 +1344,7 @@ const IMSettings: React.FC = () => {
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
               />
+              </div>
             );
           })()}
 
@@ -1381,6 +1392,16 @@ const IMSettings: React.FC = () => {
               s => s.instanceId === activeFeishuInstanceId,
             );
             return (
+              <div className="flex flex-col gap-4">
+              <ChannelWorkspaceField
+                accountId={selectedInstance.instanceId}
+                workspaceId={selectedInstance.workspaceId}
+                workspaces={workspaces}
+                onChange={workspaceId => {
+                  dispatch(setFeishuInstanceConfig({ instanceId: activeFeishuInstanceId, config: { workspaceId } }));
+                  void imService.updateFeishuInstanceConfig(activeFeishuInstanceId, { workspaceId });
+                }}
+              />
               <FeishuInstanceSettings
                 instance={selectedInstance}
                 instanceStatus={selectedStatus}
@@ -1446,6 +1467,7 @@ const IMSettings: React.FC = () => {
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
               />
+              </div>
             );
           })()}
 
@@ -1493,6 +1515,16 @@ const IMSettings: React.FC = () => {
               s => s.instanceId === activeQQInstanceId,
             );
             return (
+              <div className="flex flex-col gap-4">
+              <ChannelWorkspaceField
+                accountId={selectedInstance.instanceId}
+                workspaceId={selectedInstance.workspaceId}
+                workspaces={workspaces}
+                onChange={workspaceId => {
+                  dispatch(setQQInstanceConfig({ instanceId: activeQQInstanceId, config: { workspaceId } }));
+                  void imService.updateQQInstanceConfig(activeQQInstanceId, { workspaceId });
+                }}
+              />
               <QQInstanceSettings
                 instance={selectedInstance}
                 instanceStatus={selectedStatus}
@@ -1549,6 +1581,7 @@ const IMSettings: React.FC = () => {
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
               />
+              </div>
             );
           })()}
 
@@ -1598,6 +1631,16 @@ const IMSettings: React.FC = () => {
               s => s.instanceId === activeTelegramInstanceId,
             );
             return (
+              <div className="flex flex-col gap-4">
+              <ChannelWorkspaceField
+                accountId={selectedInstance.instanceId}
+                workspaceId={selectedInstance.workspaceId}
+                workspaces={workspaces}
+                onChange={workspaceId => {
+                  dispatch(setTelegramInstanceConfig({ instanceId: activeTelegramInstanceId, config: { workspaceId } }));
+                  void imService.updateTelegramInstanceConfig(activeTelegramInstanceId, { workspaceId });
+                }}
+              />
               <TelegramInstanceSettings
                 instance={selectedInstance}
                 instanceStatus={selectedStatus}
@@ -1668,6 +1711,7 @@ const IMSettings: React.FC = () => {
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
               />
+              </div>
             );
           })()}
 
@@ -1715,6 +1759,16 @@ const IMSettings: React.FC = () => {
               s => s.instanceId === activeDiscordInstanceId,
             );
             return (
+              <div className="flex flex-col gap-4">
+              <ChannelWorkspaceField
+                accountId={selectedInstance.instanceId}
+                workspaceId={selectedInstance.workspaceId}
+                workspaces={workspaces}
+                onChange={workspaceId => {
+                  dispatch(setDiscordInstanceConfig({ instanceId: activeDiscordInstanceId, config: { workspaceId } }));
+                  void imService.updateDiscordInstanceConfig(activeDiscordInstanceId, { workspaceId });
+                }}
+              />
               <DiscordInstanceSettings
                 instance={selectedInstance}
                 instanceStatus={selectedStatus}
@@ -1783,12 +1837,22 @@ const IMSettings: React.FC = () => {
                 testingPlatform={testingPlatform}
                 connectivityResults={connectivityResults}
               />
+              </div>
             );
           })()}
 
         {/* Weixin (微信) Settings */}
         {activePlatform === 'weixin' && (
           <div className="flex flex-col gap-3">
+            <ChannelWorkspaceField
+              accountId={weixinConfig.accountId || 'weixin'}
+              workspaceId={weixinConfig.workspaceId}
+              workspaces={workspaces}
+              onChange={workspaceId => {
+                dispatch(setWeixinConfig({ workspaceId }));
+                void imService.updateConfig({ weixin: { workspaceId } });
+              }}
+            />
             {/* Platform Guide */}
             <PlatformGuide
               steps={[
@@ -1797,6 +1861,14 @@ const IMSettings: React.FC = () => {
                 i18nService.t('imWeixinGuideStep3'),
               ]}
               guideUrl={PlatformRegistry.guideUrl('weixin')}
+            />
+
+            <WeixinLoginPanel
+              onConfirmed={async () => {
+                await imService.loadConfig();
+                await imService.loadStatus();
+                dispatch(clearError());
+              }}
             />
 
             {/* Connectivity test */}
@@ -1834,7 +1906,7 @@ const IMSettings: React.FC = () => {
                   onValueChange={value => {
                     const update = { dmPolicy: value as WeixinChannelConfig['dmPolicy'] };
                     void imService.updateConfig({
-                      weixin: { ...weixinConfig, ...update },
+                      weixin: update,
                     });
                   }}
                 />
@@ -1855,7 +1927,7 @@ const IMSettings: React.FC = () => {
                             const newIds = [...weixinConfig.allowFrom, id];
                             setWeixinAllowFromInput('');
                             void imService.updateConfig({
-                              weixin: { ...weixinConfig, allowFrom: newIds },
+                              weixin: { allowFrom: newIds },
                             });
                           }
                         }
@@ -1873,7 +1945,7 @@ const IMSettings: React.FC = () => {
                           const newIds = [...weixinConfig.allowFrom, id];
                           setWeixinAllowFromInput('');
                           void imService.updateConfig({
-                            weixin: { ...weixinConfig, allowFrom: newIds },
+                            weixin: { allowFrom: newIds },
                           });
                         }
                       }}
@@ -1899,7 +1971,7 @@ const IMSettings: React.FC = () => {
                                 uid => uid !== id,
                               );
                               void imService.updateConfig({
-                                weixin: { ...weixinConfig, allowFrom: newIds },
+                                weixin: { allowFrom: newIds },
                               });
                             }}
                           >
@@ -1928,6 +2000,16 @@ const IMSettings: React.FC = () => {
 
             if (activeWecomInstance) {
               return (
+                <div className="flex flex-col gap-4">
+                <ChannelWorkspaceField
+                  accountId={activeWecomInstance.instanceId}
+                  workspaceId={activeWecomInstance.workspaceId}
+                  workspaces={workspaces}
+                  onChange={workspaceId => {
+                    dispatch(setWecomInstanceConfig({ instanceId: activeWecomInstanceId!, config: { workspaceId } }));
+                    void imService.updateWecomInstanceConfig(activeWecomInstanceId!, { workspaceId });
+                  }}
+                />
                 <WecomInstanceSettings
                   instance={activeWecomInstance}
                   instanceStatus={activeWecomStatus}
@@ -2017,6 +2099,7 @@ const IMSettings: React.FC = () => {
                     connectivityResults as Record<string, IMConnectivityTestResult>
                   }
                 />
+                </div>
               );
             }
 

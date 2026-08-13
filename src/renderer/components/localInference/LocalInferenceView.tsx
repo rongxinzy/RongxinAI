@@ -13,7 +13,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { Cpu, FolderOpen, Globe, PanelLeft, Pencil, Settings2 } from 'lucide-react';
+import { Cpu, FolderOpen, Globe, MemoryStick, PanelLeft, Pencil, Settings2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -32,9 +32,14 @@ import type {
 import { createMarketplaceHardwareProfile, withMarketplaceScore, type MarketplaceHardwareProfile } from '../../../shared/marketplace/scoring';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
+import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
+import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
+import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
+import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
+import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
@@ -51,6 +56,7 @@ import {
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
+import { useLocalInferenceMemorySettings } from './hooks/useLocalInferenceMemorySettings';
 import { useMarketplaceRecommendations } from './hooks/useMarketplaceRecommendations';
 import { shouldCloseLaunchLogPanelForModel, useModelLaunchLogs } from './hooks/useModelLaunchLogs';
 import { MarketplacePanel } from './panels/MarketplacePanel';
@@ -636,6 +642,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     onRestartStatus: handleRestartStatus,
     showToast,
   });
+  const {
+    memorySettingsOpen,
+    draftMemoryPolicy,
+    draftMemoryBudgetPercent,
+    systemMemorySnapshot,
+    setDraftMemoryPolicy,
+    setDraftMemoryBudgetPercent,
+    openMemorySettings,
+    closeMemorySettings,
+    saveMemorySettings,
+  } = useLocalInferenceMemorySettings({ runAction, showToast });
 
   useEffect(() => {
     marketplaceQueryRef.current = marketplaceQuery;
@@ -1018,19 +1035,23 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                           className={`${localInferenceCompactButtonClass} min-w-32 hover:bg-background dark:hover:bg-background`}
                           size="default"
                         >
-                          <Settings2 data-icon="inline-start" />
+                          <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
                           {i18nService.t('localInferenceSettings')}
                         </Button>
                       }
                     />
                     <DropdownMenuContent align="end" className="min-w-32">
                       <DropdownMenuItem onClick={() => setRuntimeSettingsOpen(true)}>
-                        <Cpu data-icon="inline-start" />
+                        <SidebarAnimatedCpuIcon />
                         {i18nService.t('localInferenceRuntimeSettings')}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={openAccessSettings}>
-                        <Globe data-icon="inline-start" />
+                        <LocalInferenceAnimatedWifiPenIcon />
                         {i18nService.t('localInferenceAccessMenuItem')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={openMemorySettings}>
+                        <MemoryStick data-icon="inline-start" />
+                        {i18nService.t('localInferenceMemoryMenuItem')}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
@@ -1038,7 +1059,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                           setLibrarySettingsOpen(true);
                         }}
                       >
-                        <FolderOpen data-icon="inline-start" />
+                        <LocalInferenceAnimatedFolderDownIcon />
                         {i18nService.t('localInferenceLibraryMenuItem')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -1143,6 +1164,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onPortChange={setDraftPort}
         onClose={closeAccessSettings}
         onSave={saveAccessSettings}
+      />
+      <LocalInferenceMemorySettingsDialog
+        isOpen={memorySettingsOpen}
+        saving={loading}
+        policy={draftMemoryPolicy}
+        memoryBudgetPercent={draftMemoryBudgetPercent}
+        systemMemorySnapshot={systemMemorySnapshot}
+        onPolicyChange={setDraftMemoryPolicy}
+        onMemoryBudgetPercentChange={setDraftMemoryBudgetPercent}
+        onClose={closeMemorySettings}
+        onSave={saveMemorySettings}
       />
       <ModelContextSettingsModal
         isOpen={Boolean(contextModel)}

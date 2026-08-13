@@ -5,9 +5,11 @@ import type {
   CoworkSessionMode,
 } from '../../shared/cowork/constants';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
-import type { CoworkSessionExpertSnapshot } from '../../shared/cowork/sessionExperts';
+import type {
+  CoworkMessageExpertIdentity,
+  CoworkSessionExpertSnapshot,
+} from '../../shared/cowork/sessionExperts';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
-import type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
 
 export interface CoworkImageAttachment {
   name: string;
@@ -19,6 +21,8 @@ export interface CoworkFileAttachment {
   name: string;
   path: string;
   extension: string;
+  /** Keeps image rendering independent from whether the selected model accepts vision input. */
+  isImage?: boolean;
 }
 
 // Cowork session status
@@ -37,21 +41,6 @@ export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result
 
 // Cowork execution mode
 export type CoworkExecutionMode = 'auto' | 'local' | 'sandbox';
-export type CoworkAgentEngine = 'openclaw' | 'pi';
-
-export const OpenClawSessionKeepAlive = {
-  OneDay: '1d',
-  SevenDays: '7d',
-  ThirtyDays: '30d',
-  OneYear: '365d',
-} as const;
-
-export type OpenClawSessionKeepAlive =
-  (typeof OpenClawSessionKeepAlive)[keyof typeof OpenClawSessionKeepAlive];
-
-export interface OpenClawSessionPolicyConfig {
-  keepAlive: OpenClawSessionKeepAlive;
-}
 
 // Cowork message metadata
 export interface CoworkMessageMetadata {
@@ -84,6 +73,8 @@ export interface CoworkMessageMetadata {
   model?: string;
   modelProviderKey?: string;
   agentName?: string;
+  /** Experts that were active for the turn that produced this message. */
+  experts?: CoworkMessageExpertIdentity[];
   interruption?: CoworkSessionInterruption;
   [key: string]: unknown;
 }
@@ -109,7 +100,7 @@ export interface CoworkSession {
   title: string;
   claudeSessionId: string | null;
   status: CoworkSessionStatus;
-  /** Session mode: 'work' (PI/OpenClaw) or 'chat' (direct LLM via apiService) */
+  /** Session mode: 'work' (Pi) or 'chat' (direct LLM via apiService) */
   mode?: 'work' | 'chat';
   pinned: boolean;
   pinOrder?: number | null;
@@ -137,7 +128,6 @@ export interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: CoworkExecutionMode;
-  agentEngine: CoworkAgentEngine;
   memoryEnabled: boolean;
   memoryImplicitUpdateEnabled: boolean;
   memoryLlmJudgeEnabled: boolean;
@@ -153,7 +143,6 @@ export interface CoworkConfig {
   embeddingVectorWeight: number;
   embeddingRemoteBaseUrl: string;
   embeddingRemoteApiKey: string;
-  openClawSessionPolicy: OpenClawSessionPolicyConfig;
 }
 
 export type CoworkConfigUpdate = Partial<
@@ -161,7 +150,6 @@ export type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
-    | 'agentEngine'
     | 'memoryEnabled'
     | 'memoryImplicitUpdateEnabled'
     | 'memoryLlmJudgeEnabled'
@@ -185,16 +173,6 @@ export interface CoworkApiConfig {
   baseURL: string;
   model: string;
   apiType?: 'anthropic' | 'openai';
-}
-
-export type { OpenClawEnginePhase } from '../../shared/openclaw/constants';
-
-export interface OpenClawEngineStatus {
-  phase: OpenClawEnginePhase;
-  version: string | null;
-  progressPercent?: number;
-  message?: string;
-  canRetry: boolean;
 }
 
 export interface CoworkUserMemoryEntry {

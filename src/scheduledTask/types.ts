@@ -64,10 +64,8 @@ export interface ScheduledTask {
   wakeMode: WakeMode;
   payload: ScheduledTaskPayload;
   delivery: ScheduledTaskDelivery;
-  /** Agent whose system prompt, skills, working directory, and identity are
-   *  inherited when the task runs.  Required — a task is always bound to an
-   *  agent. */
-  agentId: string;
+  /** Workspace whose configuration and working directory are inherited when the task runs. */
+  workspaceId: string | null;
   sessionKey: string | null;
   /** Changes whenever a trigger-affecting task definition changes. */
   scheduleVersion?: string;
@@ -118,9 +116,8 @@ export interface ScheduledTaskInput {
   wakeMode: WakeMode;
   payload: ScheduledTaskPayload;
   delivery?: ScheduledTaskDelivery;
-  /** Agent whose system prompt, skills, working directory, and identity are
-   *  inherited when the task runs.  Required. */
-  agentId: string;
+  /** Workspace whose configuration and working directory are inherited when the task runs. */
+  workspaceId?: string | null;
   sessionKey?: string | null;
 }
 

@@ -12,6 +12,10 @@ if (!outputPath || !releaseVersion || !commitSha || specs.length === 0) {
 const keyId = process.env.UPDATE_MANIFEST_KEY_ID;
 const privateKeyBase64 = process.env.UPDATE_MANIFEST_PRIVATE_KEY_BASE64;
 if (!keyId || !privateKeyBase64) throw new Error('Update signing secrets are required');
+const pipelineId = process.env.UPDATE_SOURCE_PIPELINE_ID ?? process.env.GITHUB_RUN_ID ?? 'local';
+if (!/^(?:local|[1-9][0-9]*)$/.test(pipelineId)) {
+  throw new Error(`Invalid update source pipeline ID: ${pipelineId}`);
+}
 
 const REQUIRED_RELEASE_TARGETS = new Set([
   'win32:x64:lite',
@@ -184,7 +188,7 @@ const manifests = installerArtifacts.map(({ platform, arch, variant, filename, s
     },
     source: {
       commitSha,
-      pipelineId: process.env.GITHUB_RUN_ID ?? 'local',
+      pipelineId,
     },
   };
   const payloadBytes = Buffer.from(JSON.stringify(payload));

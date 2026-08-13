@@ -38,6 +38,7 @@ export const MAX_DINGTALK_INSTANCES = 5;
 export interface DingTalkInstanceConfig extends DingTalkChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 export interface DingTalkInstanceStatus extends DingTalkGatewayStatus {
@@ -112,6 +113,7 @@ export const MAX_FEISHU_INSTANCES = 5;
 export interface FeishuInstanceConfig extends FeishuChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 export interface FeishuInstanceStatus extends FeishuGatewayStatus {
@@ -172,6 +174,7 @@ export const MAX_TELEGRAM_INSTANCES = 5;
 export interface TelegramInstanceConfig extends TelegramChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 export interface TelegramInstanceStatus extends TelegramGatewayStatus {
@@ -225,6 +228,7 @@ export const MAX_DISCORD_INSTANCES = 5;
 export interface DiscordInstanceConfig extends DiscordChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 export interface DiscordInstanceStatus extends DiscordGatewayStatus {
@@ -274,6 +278,7 @@ export const MAX_QQ_INSTANCES = 5;
 export interface QQInstanceConfig extends QQChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 export interface QQInstanceStatus extends QQGatewayStatus {
@@ -322,6 +327,7 @@ export const MAX_WECOM_INSTANCES = 5;
 export interface WecomInstanceConfig extends WecomChannelConfig {
   instanceId: string;
   instanceName: string;
+  workspaceId: string;
 }
 
 export interface WecomInstanceStatus extends WecomGatewayStatus {
@@ -342,6 +348,9 @@ export interface WecomMultiInstanceStatus {
 export interface WeixinChannelConfig {
   enabled: boolean;
   accountId: string;
+  workspaceId: string;
+  token: string;
+  baseUrl: string;
   dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled';
   allowFrom: string[];
   groupPolicy: 'open' | 'allowlist' | 'disabled';
@@ -372,11 +381,13 @@ export interface IMGatewayConfig {
   settings: IMSettings;
 }
 
+export type IMGatewayConfigPatch = Omit<Partial<IMGatewayConfig>, 'weixin'> & {
+  weixin?: Partial<WeixinChannelConfig>;
+};
+
 export interface IMSettings {
   systemPrompt?: string;
   skillsEnabled: boolean;
-  /** Per-platform agent binding. Key = platform name, value = agent ID. Absent or 'main' = default. */
-  platformAgentBindings?: Record<string, string>;
 }
 
 export interface IMGatewayStatus {
@@ -614,6 +625,9 @@ export const DEFAULT_WECOM_MULTI_INSTANCE_CONFIG: WecomMultiInstanceConfig = { i
 export const DEFAULT_WEIXIN_CONFIG: WeixinChannelConfig = {
   enabled: false,
   accountId: '',
+  workspaceId: '',
+  token: '',
+  baseUrl: 'https://ilinkai.weixin.qq.com',
   dmPolicy: 'open',
   allowFrom: [],
   groupPolicy: 'open',
