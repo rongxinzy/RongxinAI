@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 
 import {
   DeliveryMode,
+  DeliveryStatus,
   PayloadKind,
   ScheduleKind,
   SessionTarget,
@@ -68,7 +69,7 @@ test('persists Delivery attempts beside the canonical Run', () => {
     channel: 'telegram',
     to: '42',
     accountId: 'telegram-work',
-    status: 'success',
+    status: DeliveryStatus.Success,
     deliveredAt: '2026-08-11T06:00:01.000Z',
     receiptId: 'delivery-42',
     error: null,

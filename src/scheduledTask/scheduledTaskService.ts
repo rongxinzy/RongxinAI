@@ -1,4 +1,10 @@
-import type { ScheduledTask, ScheduledTaskInput, ScheduledTaskRun, ScheduledTaskRunWithName } from './types';
+import type {
+  ScheduledTask,
+  ScheduledTaskDeliveryRecord,
+  ScheduledTaskInput,
+  ScheduledTaskRun,
+  ScheduledTaskRunWithName,
+} from './types';
 import type { RunFilter } from './types';
 
 /** Renderer-facing task service. Implementations must not make a runtime authoritative. */
@@ -10,9 +16,19 @@ export interface ScheduledTaskService {
   getJob(id: string): Promise<ScheduledTask | null>;
   toggleJob(id: string, enabled: boolean): Promise<ScheduledTask>;
   runJob(id: string): Promise<void>;
-  listRuns(taskId: string, limit?: number, offset?: number, filter?: RunFilter): Promise<ScheduledTaskRun[]>;
+  listRuns(
+    taskId: string,
+    limit?: number,
+    offset?: number,
+    filter?: RunFilter,
+  ): Promise<ScheduledTaskRun[]>;
+  listDeliveries(runId: string): Promise<ScheduledTaskDeliveryRecord[]>;
   countRuns(taskId: string): Promise<number>;
-  listAllRuns(limit?: number, offset?: number, filter?: RunFilter): Promise<ScheduledTaskRunWithName[]>;
+  listAllRuns(
+    limit?: number,
+    offset?: number,
+    filter?: RunFilter,
+  ): Promise<ScheduledTaskRunWithName[]>;
   getJobNameSync(jobId: string): string | null;
   hasRunningJobs(): boolean;
   startPolling(): void;
