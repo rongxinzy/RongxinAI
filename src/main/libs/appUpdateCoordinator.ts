@@ -405,7 +405,8 @@ export class AppUpdateCoordinator {
       await this.assertElectronUpdaterFeed(update);
 
       if (
-        previousReady?.info?.latestVersion === update.info.latestVersion &&
+        previousReady?.info &&
+        this.isSameUpdate(previousReady.info, update.info) &&
         previousReady.readyFileHash === update.info.expectedUpdaterSha512 &&
         previousReady.readyFilePath
       ) {

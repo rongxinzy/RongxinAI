@@ -5147,14 +5147,14 @@ const Settings: React.FC<SettingsProps> = ({
                     {i18nService.t('updateSectionTitle')}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    {update?.info?.latestVersion
-                      ? `v${update.info.latestVersion}`
+                    {update?.status === AppUpdateStatus.Checking
+                      ? i18nService.t('updateChecking')
                       : update?.status === AppUpdateStatus.UpToDate
                         ? i18nService.t('updateUpToDate')
-                        : update?.status === AppUpdateStatus.Checking
-                          ? i18nService.t('updateChecking')
-                          : update?.status === AppUpdateStatus.Error
-                            ? i18nService.t('updateCheckFailed')
+                        : update?.status === AppUpdateStatus.Error
+                          ? i18nService.t('updateCheckFailed')
+                          : update?.info?.latestVersion
+                            ? `v${update.info.latestVersion}`
                             : i18nService.t('updateNotChecked')}
                   </span>
                 </div>
