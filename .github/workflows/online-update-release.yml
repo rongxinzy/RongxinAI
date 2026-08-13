@@ -270,6 +270,9 @@ jobs:
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+      - name: Verify packaged app version
+        shell: bash
+        run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare-release.outputs.version }}'
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
