@@ -401,6 +401,12 @@ export type LlamaCppModelLaunchResult = {
   warning?: string;
 };
 
+export type LlamaCppCancelModelLoadResult = {
+  success: true;
+  cancelled: boolean;
+  modelName?: string;
+};
+
 export type LlamaCppModelUnloadResult = {
   success: true;
   runningModels: LlamaCppRunningModel[];

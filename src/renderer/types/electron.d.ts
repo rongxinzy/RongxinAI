@@ -14,6 +14,7 @@ import type {
   ProviderModelDiscoveryResult,
 } from '../../shared/providers';
 import type {
+  LlamaCppCancelModelLoadResult,
   LlamaCppCancelInstallResult,
   LlamaCppImportModelFilesResult,
   LlamaCppInstallModelInput,
@@ -514,6 +515,7 @@ interface IElectronAPI {
       input: LlamaCppSetModelPreferenceInput,
     ) => Promise<LlamaCppModelPreferences>;
     loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
+    cancelModelLoad: (modelName?: string) => Promise<LlamaCppCancelModelLoadResult>;
     unloadModel: (name: string) => Promise<LlamaCppModelUnloadResult>;
     getLatestModelLaunchLogSession: (
       input?: LlamaCppLatestModelLaunchLogSessionInput,
