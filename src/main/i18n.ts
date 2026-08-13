@@ -16,6 +16,7 @@ export type LanguageType = 'zh' | 'en';
 
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    scheduledTaskDeliveryAccountMismatch: '频道账号与所选会话不匹配',
     // Tray menu
     trayShowWindow: '打开知远',
     trayNewTask: '新建任务',
@@ -302,6 +303,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
   en: {
+    scheduledTaskDeliveryAccountMismatch:
+      'The channel account does not match the selected conversation',
     // Tray menu
     trayShowWindow: 'Open 知远',
     trayNewTask: 'New Task',

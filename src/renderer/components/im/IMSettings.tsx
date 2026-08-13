@@ -241,6 +241,7 @@ const IMSettings: React.FC = () => {
   const runConnectivityTest = async (
     platform: Platform,
     configOverride?: Partial<IMGatewayConfig>,
+    accountId?: string,
   ): Promise<IMConnectivityTestResult | null> => {
     setConnectivityResults(prev => {
       const { [platform]: _, ...remaining } = prev;
@@ -252,7 +253,11 @@ const IMSettings: React.FC = () => {
     });
 
     try {
-    const result = await imService.testGateway(platform, configOverride);
+    if (!(await imService.syncPendingConfig())) {
+      setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
+      return null;
+    }
+    const result = await imService.testGateway(platform, configOverride, accountId);
     if (result) {
       setConnectivityResults(prev => ({ ...prev, [platform]: result }));
       } else {
@@ -416,7 +421,7 @@ const IMSettings: React.FC = () => {
       await imService.persistConfig({ telegram: tgMultiConfig });
       const result = await runConnectivityTest(platform, {
         telegram: tgMultiConfig,
-      } as Partial<IMGatewayConfig>);
+      } as Partial<IMGatewayConfig>, activeTelegramInstanceId ?? undefined);
       // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
       if (activeTelegramInstanceId && result) {
         const inst = tgMultiConfig.instances.find(i => i.instanceId === activeTelegramInstanceId);
@@ -443,7 +448,7 @@ const IMSettings: React.FC = () => {
       await imService.persistConfig({ dingtalk: dingtalkMultiConfig });
       const result = await runConnectivityTest(platform, {
         dingtalk: dingtalkMultiConfig,
-      } as Partial<IMGatewayConfig>);
+      } as Partial<IMGatewayConfig>, activeDingTalkInstanceId ?? undefined);
       // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
       if (activeDingTalkInstanceId && result) {
         const inst = dingtalkMultiConfig.instances.find(
@@ -472,7 +477,7 @@ const IMSettings: React.FC = () => {
       await imService.persistConfig({ qq: qqMultiConfig });
       const result = await runConnectivityTest(platform, {
         qq: qqMultiConfig,
-      } as Partial<IMGatewayConfig>);
+      } as Partial<IMGatewayConfig>, activeQQInstanceId ?? undefined);
       // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
       if (activeQQInstanceId && result) {
         const inst = qqMultiConfig.instances.find(i => i.instanceId === activeQQInstanceId);
@@ -495,7 +500,7 @@ const IMSettings: React.FC = () => {
       await imService.persistConfig({ wecom: wecomMultiConfig });
       const result = await runConnectivityTest(platform, {
         wecom: wecomMultiConfig,
-      } as Partial<IMGatewayConfig>);
+      } as Partial<IMGatewayConfig>, activeWecomInstanceId ?? undefined);
       // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
       if (activeWecomInstanceId && result) {
         const inst = wecomMultiConfig.instances.find(i => i.instanceId === activeWecomInstanceId);
@@ -532,7 +537,7 @@ const IMSettings: React.FC = () => {
       await imService.persistConfig({ feishu: feishuMultiConfig });
       const result = await runConnectivityTest(platform, {
         feishu: feishuMultiConfig,
-      } as Partial<IMGatewayConfig>);
+      } as Partial<IMGatewayConfig>, activeFeishuInstanceId ?? undefined);
       // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
       if (activeFeishuInstanceId && result) {
           const inst = feishuMultiConfig.instances.find(
@@ -558,7 +563,7 @@ const IMSettings: React.FC = () => {
       await imService.persistConfig({ discord: discordMultiConfig });
       const result = await runConnectivityTest(platform, {
         discord: discordMultiConfig,
-      } as Partial<IMGatewayConfig>);
+      } as Partial<IMGatewayConfig>, activeDiscordInstanceId ?? undefined);
       if (activeDiscordInstanceId && result) {
         const inst = discordMultiConfig.instances.find(
           i => i.instanceId === activeDiscordInstanceId,

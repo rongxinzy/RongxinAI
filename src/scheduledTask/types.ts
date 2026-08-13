@@ -1,4 +1,10 @@
-import type { DeliveryMode, SessionTarget, TaskStatus, WakeMode } from './constants';
+import type {
+  DeliveryMode,
+  DeliveryStatus,
+  SessionTarget,
+  TaskStatus,
+  WakeMode,
+} from './constants';
 
 export interface ScheduleAt {
   kind: 'at';
@@ -100,7 +106,7 @@ export interface ScheduledTaskDeliveryRecord {
   channel: string | null;
   to: string | null;
   accountId: string | null;
-  status: 'pending' | 'success' | 'error' | 'skipped';
+  status: DeliveryStatus;
   attemptedAt: string;
   deliveredAt: string | null;
   receiptId: string | null;

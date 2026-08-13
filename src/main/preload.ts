@@ -440,8 +440,7 @@ contextBridge.exposeInMainWorld('electron', {
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       skillIds?: string[];
       skillPrompt?: string;
-    }) =>
-      ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
+    }) => ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
     updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Update, options),
     deletePendingMessage: (options: { sessionId: string; itemId: string }) =>
@@ -680,8 +679,8 @@ contextBridge.exposeInMainWorld('electron', {
 
     startGateway: (platform: Platform) => ipcRenderer.invoke(ImIpc.GatewayStart, platform),
     stopGateway: (platform: Platform) => ipcRenderer.invoke(ImIpc.GatewayStop, platform),
-    testGateway: (platform: Platform, configOverride?: unknown) =>
-      ipcRenderer.invoke(ImIpc.GatewayTest, platform, configOverride),
+    testGateway: (platform: Platform, configOverride?: unknown, accountId?: string) =>
+      ipcRenderer.invoke(ImIpc.GatewayTest, platform, configOverride, accountId),
 
     getStatus: () => ipcRenderer.invoke(ImIpc.StatusGet),
     getLocalIp: () => ipcRenderer.invoke(ImIpc.GetLocalIp) as Promise<string>,
@@ -778,6 +777,7 @@ contextBridge.exposeInMainWorld('electron', {
 
     listRuns: (taskId: string, limit?: number, offset?: number, filter?: unknown) =>
       ipcRenderer.invoke(ScheduledTaskIpc.ListRuns, taskId, limit, offset, filter),
+    listDeliveries: (runId: string) => ipcRenderer.invoke(ScheduledTaskIpc.ListDeliveries, runId),
     countRuns: (taskId: string) => ipcRenderer.invoke(ScheduledTaskIpc.CountRuns, taskId),
     listAllRuns: (limit?: number, offset?: number, filter?: unknown) =>
       ipcRenderer.invoke(ScheduledTaskIpc.ListAllRuns, limit, offset, filter),
