@@ -4116,15 +4116,44 @@ if (!gotTheLock) {
         path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'),
       );
       const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
-      const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, { dbPath });
-
       const agentManager = getAgentManager();
+
+      // Re-importing an installed preset upgrades it in place: existing
+      // agents are updated, packaged skills are refreshed, and the stale
+      // preset registry entry is replaced.
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(expertDir, 'plugin.json'), 'utf-8'),
+      ) as { name?: unknown };
+      const isUpgrade =
+        typeof packageJson.name === 'string' &&
+        agentManager.listAgents().some(agent => agent.presetId === packageJson.name);
+      const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, {
+        dbPath,
+        update: isUpgrade,
+      });
+
       const defaultModel = resolveDefaultAgentModelRef();
       const agentIds: string[] = [];
 
       for (const request of requests) {
-        const agent = agentManager.createAgent(request, defaultModel);
-        agentIds.push(agent.id);
+        // Re-importing an installed preset upgrades it in place instead of
+        // failing on the duplicate name — preset updates (system prompt,
+        // skills, workflow) must reach already-installed experts.
+        const existing = agentManager.getAgent(request.id);
+        if (existing) {
+          agentManager.updateAgent(existing.id, {
+            name: request.name,
+            description: request.description,
+            systemPrompt: request.systemPrompt,
+            identity: request.identity,
+            icon: request.icon,
+            skillIds: request.skillIds ?? [],
+          });
+          agentIds.push(existing.id);
+        } else {
+          const agent = agentManager.createAgent(request, defaultModel);
+          agentIds.push(agent.id);
+        }
       }
 
       // Write to expert-packages/registry.json in userData
