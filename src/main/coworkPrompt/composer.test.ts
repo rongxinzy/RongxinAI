@@ -54,6 +54,21 @@ test('keeps the selected expert SOP exactly once', () => {
   expect(prompt).not.toContain(ZhiyuanIdentityPrompt);
 });
 
+test('places the expert block before the base prompt with identity precedence', () => {
+  const selectedExpert = expert('Follow expert A SOP.');
+  const composed = composeCoworkSystemPrompt({
+    basePrompt: 'Base prompt',
+    expertSnapshots: [selectedExpert],
+    language: 'zh',
+  });
+
+  const expertStart = composed.indexOf('<cowork-managed-experts>');
+  const baseStart = composed.indexOf('Base prompt');
+  expect(expertStart).toBeGreaterThan(-1);
+  expect(baseStart).toBeGreaterThan(expertStart);
+  expect(composed).toContain('以下专家身份优先于任何默认身份设定');
+});
+
 test('removes the previous expert SOP when the selected expert changes', () => {
   const previousExpert = expert('Follow expert A SOP.');
   const nextExpert = expert('Follow expert B SOP.');
