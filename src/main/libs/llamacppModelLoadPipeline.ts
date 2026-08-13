@@ -1,5 +1,6 @@
-﻿import type { NvidiaSmiSnapshot } from '../../shared/hardware';
+﻿import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
+  LlamaCppMemoryPolicy,
   LlamaCppModel,
   LlamaCppModelLaunchInput,
   LlamaCppModelLaunchResult,
@@ -36,6 +37,9 @@ export type LlamaCppModelLoadPipelineInput = {
   runtimeBackend?: LlamaCppRuntimeBackend;
   runtimeCapabilities?: LlamaCppRuntimeCapabilities | null;
   nvidiaSnapshot?: NvidiaSmiSnapshot | null;
+  systemMemorySnapshot?: SystemMemorySnapshot | null;
+  memoryPolicy?: LlamaCppMemoryPolicy;
+  memoryBudgetPercent?: number;
   modelSizeBytes?: number;
   loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
   listModels: (timeoutMs: number) => Promise<LlamaCppModel[]>;
@@ -120,6 +124,9 @@ function applyGpuPlacement(input: LlamaCppModelLoadPipelineInput): LlamaCppModel
     runtimeBackend: input.runtimeBackend,
     runtimeCapabilities: input.runtimeCapabilities,
     nvidiaSnapshot: input.nvidiaSnapshot,
+    systemMemorySnapshot: input.systemMemorySnapshot,
+    memoryPolicy: input.memoryPolicy,
+    memoryBudgetPercent: input.memoryBudgetPercent,
     modelSizeBytes: input.modelSizeBytes,
   });
 

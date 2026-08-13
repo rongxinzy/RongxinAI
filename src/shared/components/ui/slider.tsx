@@ -23,7 +23,7 @@ function Slider({ className, ...props }: SliderPrimitive.Root.Props<number>) {
         </SliderPrimitive.Track>
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
-          className="size-4 rounded-full border-2 border-primary bg-background shadow-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="size-4 rounded-full border-2 border-primary bg-background shadow-sm outline-none transition-transform duration-100 group-hover/slider:scale-105 focus-visible:ring-2 focus-visible:ring-ring/50"
         />
       </SliderPrimitive.Control>
     </SliderPrimitive.Root>
