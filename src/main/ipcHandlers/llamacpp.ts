@@ -102,34 +102,6 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
 
 const LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE = { min: 10, max: 90 } as const;
 
-export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return (
-    reason === 'llamacpp-model-loaded' ||
-    reason === 'llamacpp-model-unloaded' ||
-    reason === 'llamacpp-model-launched' ||
-    reason === 'llamacpp-model-stopped' ||
-    reason === 'llamacpp-model-visibility-refresh'
-  );
-}
-
-export function shouldSyncOpenClawForRunningModelRefresh(input: {
-  reason: string;
-  runningModelsChanged: boolean;
-  appConfigChanged: boolean;
-  appConfig: LlamaCppOpenClawAppConfig;
-}): boolean {
-  const llamaCppEnabled = isProviderEnabled(
-    ProviderName.LlamaCpp,
-    input.appConfig.providers?.[ProviderName.LlamaCpp],
-  );
-
-  return (
-    llamaCppEnabled &&
-    (input.runningModelsChanged || input.appConfigChanged) &&
-    shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
-  );
-}
-
 export function getLlamaCppLoadedModelLimitViolation(input: {
   modelsMax: string | undefined;
   runningModels: Array<{ name?: string; model?: string }>;
