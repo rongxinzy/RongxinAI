@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 
 import { parseMediaMarkers, stripMediaMarkers } from './channelMediaMarkers';
@@ -24,6 +25,7 @@ test('retains malformed legacy media markers as text', () => {
 });
 
 test('converts file URLs into native absolute paths', () => {
-  const markers = parseMediaMarkers('![chart](file:///C:/output/chart.png)');
-  expect(markers[0]?.path).toMatch(/^[A-Za-z]:[\\/]output[\\/]chart\.png$/);
+  const fileUrl = 'file:///C:/output/chart.png';
+  const markers = parseMediaMarkers(`![chart](${fileUrl})`);
+  expect(markers[0]?.path).toBe(fileURLToPath(fileUrl));
 });
