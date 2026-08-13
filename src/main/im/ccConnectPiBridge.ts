@@ -1,29 +1,36 @@
-import type { CoworkStore } from "../coworkStore";
-import type { PiRuntimeAdapter } from "../libs/agentEngine";
+import type { CoworkStore } from '../coworkStore';
+import type { PiRuntimeAdapter } from '../libs/agentEngine';
 import type {
   CcConnectCronTrigger,
   CcConnectTurnRequest,
-} from "../libs/ccConnectBridgeServer";
-import { IMCoworkHandler } from "./imCoworkHandler";
+  CcConnectTurnResponse,
+} from '../libs/ccConnectBridgeServer';
+import { buildCcConnectTurnResponse, persistCcConnectMedia } from './ccConnectMedia';
+import { IMCoworkHandler } from './imCoworkHandler';
 import type { ChannelTurnCoordinator } from './channelTurnCoordinator';
-import type { IMStore } from "./imStore";
-import type { IMScheduledTaskRequestDetector, IMScheduledTaskCreationResult, ParsedIMScheduledTaskRequest } from "./imScheduledTaskHandler";
-import type { IMMessage, Platform } from "./types";
+import type { IMStore } from './imStore';
+import type {
+  IMScheduledTaskRequestDetector,
+  IMScheduledTaskCreationResult,
+  ParsedIMScheduledTaskRequest,
+} from './imScheduledTaskHandler';
+import type { IMMessage, Platform } from './types';
 
 const SUPPORTED_PLATFORMS = new Set<string>([
-  "telegram",
-  "discord",
-  "dingtalk",
-  "feishu",
-  "qq",
-  "qqbot",
-  "wecom",
-  "weixin",
+  'telegram',
+  'discord',
+  'dingtalk',
+  'feishu',
+  'qq',
+  'qqbot',
+  'wecom',
+  'weixin',
 ]);
 
 export class CcConnectPiBridge {
   private readonly handler: IMCoworkHandler;
   private readonly imStore: IMStore;
+  private readonly coworkStore: CoworkStore;
 
   constructor(options: {
     runtime: PiRuntimeAdapter;
@@ -32,11 +39,16 @@ export class CcConnectPiBridge {
     getSkillsPrompt: () => Promise<string | null>;
     onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
     detectScheduledTaskRequest?: IMScheduledTaskRequestDetector;
-    createScheduledTask?: (input: { sessionId: string; message: IMMessage; request: ParsedIMScheduledTaskRequest }) => Promise<IMScheduledTaskCreationResult>;
+    createScheduledTask?: (input: {
+      sessionId: string;
+      message: IMMessage;
+      request: ParsedIMScheduledTaskRequest;
+    }) => Promise<IMScheduledTaskCreationResult>;
     turnCoordinator: ChannelTurnCoordinator;
   }) {
     this.onCronTrigger = options.onCronTrigger;
     this.imStore = options.imStore;
+    this.coworkStore = options.coworkStore;
     this.turnCoordinator = options.turnCoordinator;
     this.handler = new IMCoworkHandler({
       coworkRuntime: options.runtime,
@@ -48,21 +60,18 @@ export class CcConnectPiBridge {
     });
   }
 
-  private readonly onCronTrigger: (
-    trigger: CcConnectCronTrigger,
-  ) => Promise<void>;
+  private readonly onCronTrigger: (trigger: CcConnectCronTrigger) => Promise<void>;
   private readonly turnCoordinator: ChannelTurnCoordinator;
 
   async runTurn(
     request: CcConnectTurnRequest,
     signal?: AbortSignal,
-  ): Promise<{ content: string }> {
+  ): Promise<CcConnectTurnResponse> {
     if (!SUPPORTED_PLATFORMS.has(request.message.platform)) {
-      throw new Error(
-        `Unsupported cc-connect platform: ${request.message.platform}`,
-      );
+      throw new Error(`Unsupported cc-connect platform: ${request.message.platform}`);
     }
-    const platform = request.message.platform === 'qqbot' ? 'qq' : request.message.platform as Platform;
+    const platform =
+      request.message.platform === 'qqbot' ? 'qq' : (request.message.platform as Platform);
     const nativeConversationId = resolveNativeConversationId(request.message);
     const conversationId = getCcConnectScopedConversationId(
       request.accountId,
@@ -74,6 +83,17 @@ export class CcConnectPiBridge {
       nativeConversationId,
       request.message.sessionKey,
     );
+    const workspaceId = this.imStore.getChannelAccountWorkspaceId(request.accountId);
+    const workspace = workspaceId ? this.coworkStore.getWorkspace(workspaceId) : null;
+    if (!workspace) throw new Error('Channel account workspace is not configured');
+    const attachments = await persistCcConnectMedia({
+      workspacePath: workspace.path,
+      accountId: request.accountId,
+      messageId: request.message.messageId,
+      images: request.message.images,
+      files: request.message.files,
+      audio: request.message.audio,
+    });
     const message: IMMessage = {
       platform,
       messageId: request.message.messageId,
@@ -83,25 +103,23 @@ export class CcConnectPiBridge {
       senderId: request.message.userId,
       senderName: request.message.userName,
       groupName: request.message.chatName,
-      content: request.message.content,
-      chatType:
-        nativeConversationId === request.message.userId
-          ? "direct"
-          : "group",
+      content: mergeMessageContent(request.message.extraContent, request.message.content),
+      chatType: request.message.chatType,
       timestamp: request.message.userMessageTimeMs ?? Date.now(),
+      ...(attachments.length > 0 ? { attachments } : {}),
     };
-    const content = await this.turnCoordinator.run({
-      platform: request.message.platform,
-      accountId: request.accountId,
-      conversationId: nativeConversationId,
-      messageId: request.message.messageId,
-      payload: JSON.stringify(request),
-    }, () => this.handler.processMessage(
-      message,
+    const content = await this.turnCoordinator.run(
+      {
+        platform: request.message.platform,
+        accountId: request.accountId,
+        conversationId: nativeConversationId,
+        messageId: request.message.messageId,
+        payload: JSON.stringify(request),
+      },
+      () => this.handler.processMessage(message, signal, workspaceId ?? undefined),
       signal,
-      this.imStore.getChannelAccountWorkspaceId(request.accountId) ?? undefined,
-    ), signal);
-    return { content };
+    );
+    return buildCcConnectTurnResponse(content);
   }
 
   async runCronTrigger(trigger: CcConnectCronTrigger): Promise<void> {
@@ -109,10 +127,17 @@ export class CcConnectPiBridge {
   }
 }
 
+function mergeMessageContent(extraContent: string | undefined, content: string): string {
+  return [extraContent?.trim(), content.trim()].filter(Boolean).join('\n');
+}
+
 function resolveNativeConversationId(message: CcConnectTurnRequest['message']): string {
   const explicit = message.channelId?.trim();
   if (explicit) return explicit;
-  const parts = message.sessionKey.split(':').map(part => part.trim()).filter(Boolean);
+  const parts = message.sessionKey
+    .split(':')
+    .map(part => part.trim())
+    .filter(Boolean);
   if (parts.length < 2) throw new Error('cc-connect channel conversation is required');
   if (message.platform === 'dingtalk' && parts.length >= 3 && ['d', 'g'].includes(parts[1])) {
     return parts[2];
@@ -137,8 +162,14 @@ export function getCcConnectScopedConversationId(
 export function parseCcConnectScopedConversationId(value: string): [string, string] {
   if (!value.startsWith('cc-connect:')) throw new Error('invalid cc-connect conversation id');
   try {
-    const decoded = JSON.parse(Buffer.from(value.slice('cc-connect:'.length), 'base64url').toString('utf8'));
-    if (!Array.isArray(decoded) || decoded.length !== 2 || decoded.some(item => typeof item !== 'string' || !item.trim())) {
+    const decoded = JSON.parse(
+      Buffer.from(value.slice('cc-connect:'.length), 'base64url').toString('utf8'),
+    );
+    if (
+      !Array.isArray(decoded) ||
+      decoded.length !== 2 ||
+      decoded.some(item => typeof item !== 'string' || !item.trim())
+    ) {
       throw new Error('invalid cc-connect conversation id');
     }
     return [decoded[0], decoded[1]];

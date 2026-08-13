@@ -1,17 +1,17 @@
-import { afterEach, expect, test, vi } from "vitest";
+import { afterEach, expect, test, vi } from 'vitest';
 
-import { CcConnectBridgeServer } from "./ccConnectBridgeServer";
+import { CcConnectBridgeServer } from './ccConnectBridgeServer';
 import { createCcConnectProtocolHeaders } from '../../shared/ccConnect/protocol';
 
 const servers: CcConnectBridgeServer[] = [];
 
 afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => server.stop()));
+  await Promise.all(servers.splice(0).map(server => server.stop()));
 });
 
-test("accepts only an authenticated normalized channel turn", async () => {
-  const server = new CcConnectBridgeServer("secret", {
-    onTurn: async (request) => ({
+test('accepts only an authenticated normalized channel turn', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async request => ({
       content: `reply:${request.message.content}`,
     }),
     onCronTrigger: async () => undefined,
@@ -19,62 +19,63 @@ test("accepts only an authenticated normalized channel turn", async () => {
   servers.push(server);
   const url = await server.start();
   const body = {
-    requestId: "request-1",
-    accountId: "default",
+    requestId: 'request-1',
+    accountId: 'default',
     message: {
-      sessionKey: "telegram:chat",
-      platform: "telegram",
-      messageId: "1",
-      channelId: "chat",
-      userId: "user",
-      content: "hello",
+      sessionKey: 'telegram:chat',
+      platform: 'telegram',
+      messageId: '1',
+      channelId: 'chat',
+      userId: 'user',
+      chatType: 'direct',
+      content: 'hello',
     },
   };
   const unauthorized = await fetch(`${url}/v1/cc-connect/turn`, {
-    method: "POST",
+    method: 'POST',
     body: JSON.stringify(body),
   });
   expect(unauthorized.status).toBe(401);
   const accepted = await fetch(`${url}/v1/cc-connect/turn`, {
-    method: "POST",
+    method: 'POST',
     headers: {
-      authorization: "Bearer secret",
-      "content-type": "application/json",
+      authorization: 'Bearer secret',
+      'content-type': 'application/json',
       ...createCcConnectProtocolHeaders('request-1'),
     },
     body: JSON.stringify(body),
   });
   expect(accepted.status).toBe(200);
-  await expect(accepted.json()).resolves.toEqual({ content: "reply:hello" });
+  await expect(accepted.json()).resolves.toEqual({ content: 'reply:hello' });
 });
 
-test("requires a complete cron trigger identity", async () => {
+test('requires a complete cron trigger identity', async () => {
   const seen: string[] = [];
-  const server = new CcConnectBridgeServer("secret", {
-    onTurn: async () => ({ content: "unused" }),
-    onCronTrigger: async (trigger) => void seen.push(trigger.taskId),
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async () => ({ content: 'unused' }),
+    onCronTrigger: async trigger => void seen.push(trigger.taskId),
   });
   servers.push(server);
   const url = await server.start();
   const invalid = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
-    method: "POST",
-    headers: { authorization: "Bearer secret", ...createCcConnectProtocolHeaders('invalid') },
-    body: JSON.stringify({ taskId: "task" }),
+    method: 'POST',
+    headers: { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('invalid') },
+    body: JSON.stringify({ taskId: 'task' }),
   });
   expect(invalid.status).toBe(400);
   const accepted = await fetch(`${url}/v1/cc-connect/cron/trigger`, {
-    method: "POST",
-    headers: { authorization: "Bearer secret", ...createCcConnectProtocolHeaders('accepted') },
+    method: 'POST',
+    headers: { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('accepted') },
     body: JSON.stringify({
-      requestId: "r",
-      accountId: "p",
-      taskId: "task",
-      scheduleVersion: "v1",
+      requestId: 'r',
+      accountId: 'p',
+      taskId: 'task',
+      scheduleVersion: 'v1',
       scheduledAt: new Date().toISOString(),
     }),
   });
   expect(accepted.status).toBe(204);
-  expect(seen).toEqual(["task"]);
+  expect(seen).toEqual(['task']);
 });
 
 test('aborts the active turn when the sidecar disconnects', async () => {
@@ -82,7 +83,9 @@ test('aborts the active turn when the sidecar disconnects', async () => {
   const server = new CcConnectBridgeServer('secret', {
     onTurn: async (_request, signal) => {
       observedSignal = signal;
-      await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }));
+      await new Promise<void>(resolve =>
+        signal.addEventListener('abort', () => resolve(), { once: true }),
+      );
       throw new Error('cancelled');
     },
     onCronTrigger: async () => undefined,
@@ -106,6 +109,7 @@ test('aborts the active turn when the sidecar disconnects', async () => {
         platform: 'weixin',
         messageId: 'message',
         userId: 'user',
+        chatType: 'direct',
         content: 'hello',
       },
     }),
@@ -139,6 +143,7 @@ test('accepts a turn when the platform only supplies a session key', async () =>
         platform: 'dingtalk',
         messageId: 'message',
         userId: 'user',
+        chatType: 'group',
         content: 'hello',
       },
     }),
@@ -168,6 +173,7 @@ test('rejects the retired project identity field', async () => {
         platform: 'telegram',
         messageId: 'message',
         userId: 'user',
+        chatType: 'direct',
         content: 'hello',
       },
     }),
@@ -184,8 +190,85 @@ test('rejects replayed protocol nonces', async () => {
   const url = await server.start();
   const headers = { authorization: 'Bearer secret', ...createCcConnectProtocolHeaders('replay') };
   const body = JSON.stringify({
-    requestId: 'replay', accountId: 'p', taskId: 't', scheduleVersion: 'v1', scheduledAt: new Date().toISOString(),
+    requestId: 'replay',
+    accountId: 'p',
+    taskId: 't',
+    scheduleVersion: 'v1',
+    scheduledAt: new Date().toISOString(),
   });
-  expect((await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status).toBe(204);
-  expect((await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status).toBe(401);
+  expect(
+    (await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status,
+  ).toBe(204);
+  expect(
+    (await fetch(`${url}/v1/cc-connect/cron/trigger`, { method: 'POST', headers, body })).status,
+  ).toBe(401);
+});
+
+test('accepts media-only turns and attachment-only replies', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async request => ({
+      content: '',
+      attachments: [{ kind: 'image', path: `C:\\${request.message.images?.[0].FileName}` }],
+    }),
+    onCronTrigger: async () => undefined,
+  });
+  servers.push(server);
+  const url = await server.start();
+  const response = await fetch(`${url}/v1/cc-connect/turn`, {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer secret',
+      'content-type': 'application/json',
+      ...createCcConnectProtocolHeaders('media-only'),
+    },
+    body: JSON.stringify({
+      requestId: 'media-only',
+      accountId: 'account',
+      message: {
+        sessionKey: 'telegram:chat',
+        platform: 'telegram',
+        messageId: 'message',
+        userId: 'user',
+        chatType: 'direct',
+        content: '',
+        images: [{ MimeType: 'image/png', Data: 'aW1hZ2U=', FileName: 'image.png' }],
+      },
+    }),
+  });
+  expect(response.status).toBe(200);
+  await expect(response.json()).resolves.toMatchObject({
+    content: '',
+    attachments: [{ kind: 'image' }],
+  });
+});
+
+test('accepts a quoted-context-only turn', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async request => ({ content: request.message.extraContent ?? '' }),
+    onCronTrigger: async () => undefined,
+  });
+  servers.push(server);
+  const url = await server.start();
+  const response = await fetch(`${url}/v1/cc-connect/turn`, {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer secret',
+      'content-type': 'application/json',
+      ...createCcConnectProtocolHeaders('quoted-context'),
+    },
+    body: JSON.stringify({
+      requestId: 'quoted-context',
+      accountId: 'account',
+      message: {
+        sessionKey: 'feishu:chat',
+        platform: 'feishu',
+        messageId: 'message',
+        userId: 'user',
+        chatType: 'group',
+        content: '',
+        extraContent: '> quoted message',
+      },
+    }),
+  });
+  expect(response.status).toBe(200);
 });

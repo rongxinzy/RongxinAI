@@ -175,6 +175,7 @@ import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
 import { listCcConnectAccountConfigs } from './libs/ccConnectAccountConfig';
+import { CcConnectRuntimeStatusRegistry } from './libs/ccConnectRuntimeStatusRegistry';
 import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
 import { runCcConnectWeixinSetup } from './libs/ccConnectWeixinSetup';
 import { MCP_OAUTH_STORE_PREFIX, McpOAuthManager } from './libs/mcpOAuthManager';
@@ -889,8 +890,7 @@ const activeMcpAuthorizations = new Map<string, AbortController>();
 let imGatewayManager: ChannelAccountManager | null = null;
 let ccConnectBridgeServer: CcConnectBridgeServer | null = null;
 let ccConnectSidecarManager: CcConnectSidecarManager | null = null;
-const ccConnectChannelErrors = new Map<string, string>();
-const ccConnectChannelReadyAccounts = new Set<string>();
+const ccConnectRuntimeStatuses = new CcConnectRuntimeStatusRegistry();
 const ccConnectDeliveryAccounts = new Set<string>();
 let ccConnectRuntimeRestartTimer: NodeJS.Timeout | null = null;
 let ccConnectRuntimeStopping = false;
@@ -1057,18 +1057,7 @@ const waitForCcConnectCronControl = async (
 const applyCcConnectPlatformStatuses = (
   statuses: Awaited<ReturnType<CcConnectCronClient['healthCheck']>>['platforms'],
 ): void => {
-  ccConnectChannelReadyAccounts.clear();
-  for (const status of statuses) {
-    if (status.state === 'ready') {
-      ccConnectChannelReadyAccounts.add(status.accountId);
-      ccConnectChannelErrors.delete(status.accountId);
-    } else if (status.state === 'unavailable') {
-      ccConnectChannelErrors.set(
-        status.accountId,
-        status.lastError || 'Channel platform is unavailable',
-      );
-    }
-  }
+  ccConnectRuntimeStatuses.replace(statuses);
 };
 
 const refreshCcConnectPlatformStatuses = async (): Promise<void> => {
@@ -1101,10 +1090,10 @@ const startCcConnectRuntime = async (
     if (ccConnectSidecarManager === manager) ccConnectSidecarManager = null;
     deferredCcConnectCronClient?.detach(SchedulerClockAccount);
     for (const account of accounts) {
-      ccConnectChannelReadyAccounts.delete(account.accountId);
+      ccConnectRuntimeStatuses.delete(account.accountId);
       ccConnectDeliveryTransport?.detach(account.accountId);
       ccConnectDeliveryAccounts.delete(account.accountId);
-      ccConnectChannelErrors.set(
+      ccConnectRuntimeStatuses.markUnavailable(
         account.accountId,
         manager.lastError ?? `Channel runtime exited with code ${code ?? 'unknown'}`,
       );
@@ -1149,10 +1138,10 @@ const startCcConnectRuntime = async (
     ccConnectRuntimeControlClient = null;
     deferredCcConnectCronClient?.detach(SchedulerClockAccount);
     for (const account of accounts) {
-      ccConnectChannelReadyAccounts.delete(account.accountId);
+      ccConnectRuntimeStatuses.delete(account.accountId);
       ccConnectDeliveryTransport?.detach(account.accountId);
       ccConnectDeliveryAccounts.delete(account.accountId);
-      ccConnectChannelErrors.set(
+      ccConnectRuntimeStatuses.markUnavailable(
         account.accountId,
         error instanceof Error ? error.message : String(error),
       );
@@ -1187,7 +1176,7 @@ const reconcileCcConnectChannelSidecarsNow = async (): Promise<void> => {
     for (const accountId of ccConnectDeliveryAccounts)
       ccConnectDeliveryTransport?.detach(accountId);
     ccConnectDeliveryAccounts.clear();
-    ccConnectChannelReadyAccounts.clear();
+    ccConnectRuntimeStatuses.clear();
     ccConnectRuntimeConfigSignature = '';
   } finally {
     ccConnectRuntimeStopping = false;
@@ -5002,12 +4991,13 @@ if (!gotTheLock) {
     try {
       await refreshCcConnectPlatformStatuses();
       const status = getIMGatewayManager().getStatus(instanceId => {
+        const runtimeStatus = ccConnectRuntimeStatuses.get(
+          instanceId,
+          ccConnectSidecarManager?.lastError ?? null,
+        );
         return {
-          connected:
-            ccConnectSidecarManager?.running === true &&
-            ccConnectChannelReadyAccounts.has(instanceId),
-          lastError:
-            ccConnectChannelErrors.get(instanceId) ?? ccConnectSidecarManager?.lastError ?? null,
+          ...runtimeStatus,
+          connected: ccConnectSidecarManager?.running === true && runtimeStatus.connected,
         };
       });
       return { success: true, status };

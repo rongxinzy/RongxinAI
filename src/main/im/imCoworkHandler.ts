@@ -16,6 +16,7 @@ import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelat
 import { serializeForLog } from '../libs/sanitizeForLog';
 import { emitChannelRunEvent } from './channelRunEvents';
 import { buildIMMediaInstruction } from './imMediaInstruction';
+import { toPiAttachments } from './imPiAttachments';
 import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
 import {
   type IMScheduledTaskCreationResult,
@@ -216,6 +217,7 @@ export class IMCoworkHandler extends EventEmitter {
       });
 
       const formattedContent = this.formatMessageWithMedia(message);
+      const piAttachments = await toPiAttachments(message.attachments);
       const directScheduledTaskRequest =
         this.createScheduledTask && this.detectScheduledTaskRequest
           ? await this.detectScheduledTaskRequest(message)
@@ -306,6 +308,7 @@ export class IMCoworkHandler extends EventEmitter {
         if (isActive) {
           this.coworkRuntime
             .continueSession(coworkSessionId, formattedContent, {
+              ...piAttachments,
               systemPrompt,
               skillIds: session.activeSkillIds,
               workspaceRoot: session.cwd,
@@ -316,6 +319,7 @@ export class IMCoworkHandler extends EventEmitter {
         } else {
           this.coworkRuntime
             .startSession(coworkSessionId, formattedContent, {
+              ...piAttachments,
               systemPrompt,
               skillIds: session.activeSkillIds,
               workspaceRoot: session.cwd,
@@ -763,8 +767,7 @@ export class IMCoworkHandler extends EventEmitter {
     const nextAccumulator: MessageAccumulator = {
       runId: generateCorrelationId(),
       messages: [],
-      storeMessageCountAtStart:
-        firstMessageIndex >= 0 ? firstMessageIndex : storeMessages.length,
+      storeMessageCountAtStart: firstMessageIndex >= 0 ? firstMessageIndex : storeMessages.length,
       timeoutId,
       backgroundDelivery: {
         conversationId: conversation.conversationId,
