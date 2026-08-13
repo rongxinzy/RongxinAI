@@ -35,6 +35,7 @@ import {
 import type { TaskTemplateValues } from './TaskTemplateGallery';
 import TaskFormBody from './TaskFormBody';
 import TaskTimePicker from './TaskTimePicker';
+import { channelOptionValue, findChannelOption } from './channelOptionValue';
 import { formatScheduleLabel, type PlanType, scheduleToPlanInfo } from './utils';
 
 interface TaskFormProps {
@@ -289,7 +290,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
     if (savedChannel && isIMChannel(savedChannel) && !base.some(o => o.value === savedChannel)) {
       const platform = PlatformRegistry.platformOfChannel(savedChannel);
       const label = platform ? PlatformRegistry.get(platform).label : savedChannel;
-      base.push({ value: savedChannel, label });
+      base.push({ value: savedChannel, label, accountId: task?.delivery.accountId });
     }
     return base;
   });
@@ -338,7 +339,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
         // then append any saved channel that is not in the list (e.g. disabled platform).
         const next = [...channels];
         for (const saved of current) {
-          if (!next.some(item => item.value === saved.value)) {
+          if (!next.some(item => channelOptionValue(item) === channelOptionValue(saved))) {
             next.push(saved);
           }
         }
@@ -1040,12 +1041,20 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const renderNotifyRow = () => (
     <div className="flex items-center gap-3">
       <Select
-        value={form.notifyChannel}
+        value={
+          form.notifyChannel === 'none'
+            ? 'none'
+            : channelOptionValue({
+                value: form.notifyChannel,
+                accountId: form.notifyAccountId,
+              })
+        }
         onValueChange={value => {
+          const selected = findChannelOption(channelOptions, value);
           updateForm({
-            notifyChannel: value ?? 'none',
+            notifyChannel: selected?.value ?? 'none',
             notifyTo: '',
-            notifyAccountId: undefined,
+            notifyAccountId: selected?.accountId,
           });
         }}
       >
@@ -1055,7 +1064,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
               ? i18nService.t('scheduledTasksFormNotifyChannelNone')
               : (() => {
                   const channel = channelOptions.find(
-                    option => option.value === form.notifyChannel,
+                    option =>
+                      option.value === form.notifyChannel &&
+                      option.accountId === form.notifyAccountId,
                   );
                   return channel ? getNotifyChannelLabel(channel) : form.notifyChannel;
                 })()}
@@ -1071,7 +1082,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
               return (
                 <SelectItem
                   key={`${channel.value}:${channel.accountId ?? ''}`}
-                  value={channel.value}
+                  value={channelOptionValue(channel)}
                 >
                   {displayName}
                 </SelectItem>

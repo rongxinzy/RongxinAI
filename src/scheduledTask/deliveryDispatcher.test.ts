@@ -1,7 +1,14 @@
 import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
-import { DeliveryMode, PayloadKind, ScheduleKind, SessionTarget, WakeMode } from './constants';
+import {
+  DeliveryMode,
+  DeliveryStatus,
+  PayloadKind,
+  ScheduleKind,
+  SessionTarget,
+  WakeMode,
+} from './constants';
 import { ScheduledTaskDeliveryDispatcher } from './deliveryDispatcher';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 
@@ -37,7 +44,7 @@ test('persists a skipped Delivery for mode none without calling the channel tran
     run,
     'done',
   );
-  expect(delivery).toMatchObject({ status: 'skipped', deliveredAt: null });
+  expect(delivery).toMatchObject({ status: DeliveryStatus.Skipped, deliveredAt: null });
   expect(transport.send).not.toHaveBeenCalled();
   expect(store.listDeliveries(run.id)).toEqual([delivery]);
 });
@@ -46,12 +53,12 @@ test('records the sidecar receipt or error against the same pending Delivery', a
   const { store, task, run, transport } = setup(DeliveryMode.Announce);
   const dispatcher = new ScheduledTaskDeliveryDispatcher(store, transport);
   await expect(dispatcher.dispatch(task, run, 'done')).resolves.toMatchObject({
-    status: 'success',
+    status: DeliveryStatus.Success,
     receiptId: 'receipt-1',
   });
   transport.send.mockRejectedValueOnce(new Error('channel unavailable'));
   await expect(dispatcher.dispatch(task, run, 'retry')).resolves.toMatchObject({
-    status: 'error',
+    status: DeliveryStatus.Error,
     error: 'channel unavailable',
   });
   expect(store.listDeliveries(run.id)).toHaveLength(2);

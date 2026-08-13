@@ -1,4 +1,4 @@
-import { DeliveryMode } from './constants';
+import { DeliveryMode, DeliveryStatus } from './constants';
 import { SqliteScheduledTaskStore } from './sqliteScheduledTaskStore';
 import type { ScheduledTask, ScheduledTaskDeliveryRecord, ScheduledTaskRun } from './types';
 
@@ -20,7 +20,11 @@ export class ScheduledTaskDeliveryDispatcher {
     private readonly transport: SchedulerDeliveryTransport,
   ) {}
 
-  async dispatch(task: ScheduledTask, run: ScheduledTaskRun, output: string | null): Promise<ScheduledTaskDeliveryRecord> {
+  async dispatch(
+    task: ScheduledTask,
+    run: ScheduledTaskRun,
+    output: string | null,
+  ): Promise<ScheduledTaskDeliveryRecord> {
     const delivery = this.store.createDelivery({
       runId: run.id,
       taskId: task.id,
@@ -28,29 +32,40 @@ export class ScheduledTaskDeliveryDispatcher {
       channel: task.delivery.channel ?? null,
       to: task.delivery.to ?? null,
       accountId: task.delivery.accountId ?? null,
-      status: 'pending',
+      status: DeliveryStatus.Pending,
       deliveredAt: null,
       receiptId: null,
       error: null,
     });
     if (task.delivery.mode === DeliveryMode.None) {
       return this.store.finishDelivery(delivery.id, {
-        status: 'skipped', deliveredAt: null, receiptId: null, error: null,
+        status: DeliveryStatus.Skipped,
+        deliveredAt: null,
+        receiptId: null,
+        error: null,
       });
     }
     if (!output?.trim()) {
       return this.store.finishDelivery(delivery.id, {
-        status: 'error', deliveredAt: null, receiptId: null, error: 'Pi completed without user-visible output',
+        status: DeliveryStatus.Error,
+        deliveredAt: null,
+        receiptId: null,
+        error: 'Pi completed without user-visible output',
       });
     }
     try {
       const receipt = await this.transport.send({ task, run, content: output });
       return this.store.finishDelivery(delivery.id, {
-        status: 'success', deliveredAt: new Date().toISOString(), receiptId: receipt.receiptId ?? null, error: null,
+        status: DeliveryStatus.Success,
+        deliveredAt: new Date().toISOString(),
+        receiptId: receipt.receiptId ?? null,
+        error: null,
       });
     } catch (error) {
       return this.store.finishDelivery(delivery.id, {
-        status: 'error', deliveredAt: null, receiptId: null,
+        status: DeliveryStatus.Error,
+        deliveredAt: null,
+        receiptId: null,
         error: error instanceof Error ? error.message : String(error),
       });
     }

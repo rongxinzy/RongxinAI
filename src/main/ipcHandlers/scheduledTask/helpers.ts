@@ -66,10 +66,10 @@ export function listScheduledTaskChannels(): Array<{
         .filter(inst => inst && typeof inst === 'object' && (inst as { enabled?: boolean }).enabled)
         .map(inst => {
           const i = inst as { instanceId?: string; instanceName?: string };
-          const accountId = (i.instanceId ?? '').slice(0, 8);
+          const accountId = (i.instanceId ?? '').trim();
           return {
             accountId,
-            instanceName: i.instanceName || (accountId ?? (i.instanceId ?? '').slice(0, 8)),
+            instanceName: i.instanceName || accountId,
             filterAccountId: accountId || undefined,
           };
         })

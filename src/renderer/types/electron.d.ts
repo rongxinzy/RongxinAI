@@ -1010,6 +1010,7 @@ interface IElectronAPI {
     testGateway: (
       platform: Platform,
       configOverride?: Partial<IMGatewayConfig>,
+      accountId?: string,
     ) => Promise<{ success: boolean; result?: IMConnectivityTestResult; error?: string }>;
     getStatus: () => Promise<{ success: boolean; status?: IMGatewayStatus; error?: string }>;
     getLocalIp: () => Promise<string>;
@@ -1131,8 +1132,7 @@ interface IElectronAPI {
       preflight?: {
         hasChannel: boolean;
         channel?: string;
-        lastDeliveryErrors?: string[] | null;
-        consecutiveErrors?: number;
+        latestDelivery?: import('../../scheduledTask/types').ScheduledTaskDeliveryRecord | null;
       };
     }>;
     listRuns: (
@@ -1143,6 +1143,11 @@ interface IElectronAPI {
     ) => Promise<{
       success: boolean;
       runs?: import('../../scheduledTask/types').ScheduledTaskRun[];
+      error?: string;
+    }>;
+    listDeliveries: (runId: string) => Promise<{
+      success: boolean;
+      deliveries?: import('../../scheduledTask/types').ScheduledTaskDeliveryRecord[];
       error?: string;
     }>;
     countRuns: (taskId: string) => Promise<{ success: boolean; count?: number; error?: string }>;

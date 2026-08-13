@@ -1,8 +1,15 @@
 import Database from 'better-sqlite3';
 
 import { t } from '../i18n';
+import type { CcConnectAccountRuntimeStatus } from '../libs/ccConnectRuntimeStatusRegistry';
 import { fetchJsonWithTimeout } from './http';
 import { IMStore } from './imStore';
+import {
+  appendRuntimeConnectivity,
+  resolveConnectivityAccount,
+  selectConnectivityInstance,
+} from './channelConnectivity';
+import { ConnectivityCheckCode, ConnectivityCheckLevel } from './constants';
 import type { IMGatewayConfigPatch } from './configPatch';
 import type {
   IMConnectivityCheck,
@@ -14,10 +21,15 @@ import type {
 
 const CONNECTIVITY_TIMEOUT_MS = 10_000;
 
+export type ChannelRuntimeProbe = (accountId: string) => Promise<CcConnectAccountRuntimeStatus>;
+
 export class ChannelAccountManager {
   private readonly imStore: IMStore;
 
-  constructor(db: Database.Database) {
+  constructor(
+    db: Database.Database,
+    private readonly runtimeProbe?: ChannelRuntimeProbe,
+  ) {
     this.imStore = new IMStore(db);
   }
 
@@ -133,35 +145,57 @@ export class ChannelAccountManager {
   async testGateway(
     platform: Platform,
     configOverride?: Partial<IMGatewayConfig>,
+    accountId?: string,
   ): Promise<IMConnectivityTestResult> {
     const config = { ...this.getConfig(), ...configOverride } as IMGatewayConfig;
     const testedAt = Date.now();
     const checks: IMConnectivityCheck[] = [];
     try {
-      const message = await this.probe(platform, config);
-      checks.push({ code: 'auth_check', level: 'pass', message });
+      const message = await this.probe(platform, config, accountId);
+      checks.push({
+        code: ConnectivityCheckCode.Auth,
+        level: ConnectivityCheckLevel.Pass,
+        message,
+      });
     } catch (error) {
       checks.push({
-        code: 'auth_check',
-        level: 'fail',
+        code: ConnectivityCheckCode.Auth,
+        level: ConnectivityCheckLevel.Fail,
         message: t('imAuthFailed', {
           error: error instanceof Error ? error.message : String(error),
         }),
         suggestion: t('imAuthFailedSuggestion'),
       });
     }
-    return {
+    const result: IMConnectivityTestResult = {
       platform,
       testedAt,
-      verdict: checks.some(check => check.level === 'fail') ? 'fail' : 'pass',
+      verdict: checks.some(check => check.level === ConnectivityCheckLevel.Fail)
+        ? ConnectivityCheckLevel.Fail
+        : ConnectivityCheckLevel.Pass,
       checks,
     };
+    if (!this.runtimeProbe) return result;
+
+    const account = resolveConnectivityAccount(platform, config, accountId);
+    if (!account.enabled || !account.accountId) {
+      return appendRuntimeConnectivity(result, account, null);
+    }
+    try {
+      const runtimeStatus = await this.runtimeProbe(account.accountId);
+      return appendRuntimeConnectivity(result, account, runtimeStatus);
+    } catch (error) {
+      return appendRuntimeConnectivity(result, account, null, error);
+    }
   }
 
-  private async probe(platform: Platform, config: IMGatewayConfig): Promise<string> {
+  private async probe(
+    platform: Platform,
+    config: IMGatewayConfig,
+    accountId?: string,
+  ): Promise<string> {
     if (platform === 'telegram') {
-      const instance =
-        config.telegram.instances.find(item => item.enabled) ?? config.telegram.instances[0];
+      const instance = selectConnectivityInstance(config.telegram.instances, accountId);
       if (!instance?.botToken) throw new Error('Bot token is required.');
       const result = await fetchJsonWithTimeout<{ ok?: boolean; description?: string }>(
         `https://api.telegram.org/bot${instance.botToken}/getMe`,
@@ -170,8 +204,7 @@ export class ChannelAccountManager {
       );
       if (!result.ok) throw new Error(result.description || 'Telegram authentication failed.');
     } else if (platform === 'discord') {
-      const instance =
-        config.discord.instances.find(item => item.enabled) ?? config.discord.instances[0];
+      const instance = selectConnectivityInstance(config.discord.instances, accountId);
       if (!instance?.botToken) throw new Error('Bot token is required.');
       await fetchJsonWithTimeout(
         'https://discord.com/api/v10/users/@me',
@@ -181,20 +214,18 @@ export class ChannelAccountManager {
         CONNECTIVITY_TIMEOUT_MS,
       );
     } else if (platform === 'feishu') {
-      const instance =
-        config.feishu.instances.find(item => item.enabled) ?? config.feishu.instances[0];
+      const instance = selectConnectivityInstance(config.feishu.instances, accountId);
       if (!instance?.appId || !instance.appSecret) throw new Error('App credentials are required.');
       const result = await this.verifyFeishuCredentials(instance.appId, instance.appSecret);
       if (!result.success) throw new Error(result.error || 'Feishu authentication failed.');
     } else if (platform === 'dingtalk') {
-      const instance =
-        config.dingtalk.instances.find(item => item.enabled) ?? config.dingtalk.instances[0];
+      const instance = selectConnectivityInstance(config.dingtalk.instances, accountId);
       if (!instance?.clientId || !instance.clientSecret)
         throw new Error('App credentials are required.');
       const result = await this.verifyDingTalkCredentials(instance.clientId, instance.clientSecret);
       if (!result.success) throw new Error(result.error || 'DingTalk authentication failed.');
     } else if (platform === 'qq') {
-      const instance = config.qq.instances.find(item => item.enabled) ?? config.qq.instances[0];
+      const instance = selectConnectivityInstance(config.qq.instances, accountId);
       if (!instance?.appId || !instance.appSecret) throw new Error('App credentials are required.');
       await fetchJsonWithTimeout(
         'https://bots.qq.com/app/getAppAccessToken',
@@ -206,8 +237,7 @@ export class ChannelAccountManager {
         CONNECTIVITY_TIMEOUT_MS,
       );
     } else if (platform === 'wecom') {
-      const instance =
-        config.wecom.instances.find(item => item.enabled) ?? config.wecom.instances[0];
+      const instance = selectConnectivityInstance(config.wecom.instances, accountId);
       if (!instance?.botId || !instance.secret) throw new Error('Bot credentials are required.');
     } else if (!config.weixin.accountId) {
       throw new Error('Weixin account is not configured.');

@@ -223,7 +223,8 @@ import {
 import { getLogFilePath, getRecentMainLogEntries, initLogger } from './logger';
 import type { McpServerFormData } from './mcpStore';
 import { McpStore } from './mcpStore';
-import { CcConnectPiBridge, parseCcConnectScopedConversationId } from './im/ccConnectPiBridge';
+import { parseCcConnectScopedConversationId } from './im/ccConnectConversationId';
+import { CcConnectPiBridge } from './im/ccConnectPiBridge';
 import { ChannelInboxStore } from './im/channelInboxStore';
 import { ChannelTurnCoordinator } from './im/channelTurnCoordinator';
 import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandler';
@@ -1882,7 +1883,10 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
 
 const getIMGatewayManager = () => {
   if (!imGatewayManager) {
-    imGatewayManager = new ChannelAccountManager(getStore().getDatabase());
+    imGatewayManager = new ChannelAccountManager(getStore().getDatabase(), async accountId => {
+      await refreshCcConnectPlatformStatuses();
+      return ccConnectRuntimeStatuses.get(accountId, ccConnectSidecarManager?.lastError ?? null);
+    });
   }
   return imGatewayManager;
 };
@@ -4728,11 +4732,7 @@ if (!gotTheLock) {
         listSessionMappings: (platform: string, accountId?: string) =>
           getIMGatewayManager()
             .getIMStore()
-            .listSessionMappings(platform as Platform, accountId)
-            .map(mapping => ({
-              ...mapping,
-              lastActiveAt: String(mapping.lastActiveAt),
-            })),
+            .listSessionMappings(platform as Platform, accountId),
       }),
     }),
   });
@@ -4973,10 +4973,15 @@ if (!gotTheLock) {
   });
 
   ipcMain.handle(
-    'im:gateway:test',
-    async (_event, platform: Platform, configOverride?: Partial<IMGatewayConfig>) => {
+    ImIpc.GatewayTest,
+    async (
+      _event,
+      platform: Platform,
+      configOverride?: Partial<IMGatewayConfig>,
+      accountId?: string,
+    ) => {
       try {
-        const result = await getIMGatewayManager().testGateway(platform, configOverride);
+        const result = await getIMGatewayManager().testGateway(platform, configOverride, accountId);
         return { success: true, result };
       } catch (error) {
         return {

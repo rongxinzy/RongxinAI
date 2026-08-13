@@ -1,11 +1,13 @@
 import { Badge } from '@shared/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
 import { Spinner } from '@shared/components/ui/spinner';
-import { Play, Trash2 } from 'lucide-react';
+import { CircleAlert, Play, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import type { ScheduledTask } from '../../../scheduledTask/types';
+import { DeliveryStatus } from '../../../scheduledTask/constants';
+import type { ScheduledTask, ScheduledTaskDeliveryRecord } from '../../../scheduledTask/types';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
@@ -29,16 +31,41 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
   const [preflight, setPreflight] = useState<{
     hasChannel: boolean;
     channel?: string;
-    lastDeliveryErrors?: string[] | null;
-    consecutiveErrors?: number;
+    latestDelivery?: ScheduledTaskDeliveryRecord | null;
   } | null>(null);
 
   useEffect(() => {
-    void scheduledTaskService.preflight(task.id).then(setPreflight);
-  }, [task.id]);
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const refreshPreflight = async (allowRetry: boolean): Promise<void> => {
+      const result = await scheduledTaskService.preflight(task.id);
+      if (cancelled) return;
+      setPreflight(result);
+      if (allowRetry && task.state.lastRunAtMs && result?.hasChannel && !result.latestDelivery) {
+        retryTimer = setTimeout(() => void refreshPreflight(false), 500);
+      }
+    };
+    void refreshPreflight(true);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [task.id, task.state.lastRunAtMs]);
 
   const statusLabel = i18nService.t(getStatusLabelKey(task.state.lastStatus));
   const statusTone = getStatusTone(task.state.lastStatus);
+  const latestDelivery = preflight?.latestDelivery;
+  const deliveryStatusLabel = latestDelivery
+    ? i18nService.t(
+        latestDelivery.status === DeliveryStatus.Success
+          ? 'scheduledTasksDeliveryStatusSuccess'
+          : latestDelivery.status === DeliveryStatus.Error
+            ? 'scheduledTasksDeliveryStatusError'
+            : latestDelivery.status === DeliveryStatus.Pending
+              ? 'scheduledTasksDeliveryStatusPending'
+              : 'scheduledTasksDeliveryStatusSkipped',
+      )
+    : i18nService.t('scheduledTasksDeliveryStatusNone');
   const promptText = task.payload.kind === 'systemEvent' ? task.payload.text : task.payload.message;
   const taskModelRef = task.payload.kind === 'agentTurn' ? task.payload.model : undefined;
   const taskModelLabel = taskModelRef
@@ -131,24 +158,19 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
         </div>
       </div>
 
-      {preflight?.hasChannel &&
-        preflight.lastDeliveryErrors &&
-        preflight.lastDeliveryErrors.length > 0 && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-destructive">
-                Channel delivery issue detected
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-destructive/80">{preflight.lastDeliveryErrors[0]}</p>
-          </div>
-        )}
+      {latestDelivery?.status === DeliveryStatus.Error && (
+        <Alert variant="destructive">
+          <CircleAlert />
+          <AlertTitle>{i18nService.t('scheduledTasksDeliveryIssue')}</AlertTitle>
+          {latestDelivery.error && <AlertDescription>{latestDelivery.error}</AlertDescription>}
+        </Alert>
+      )}
 
       <div className={sectionClass}>
         <h3 className={sectionTitleClass}>{i18nService.t('scheduledTasksStatus')}</h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <div className={labelClass}>{i18nService.t('scheduledTasksLastRun')}</div>
+            <div className={labelClass}>{i18nService.t('scheduledTasksExecutionStatus')}</div>
             <div className={`${valueClass} ${statusTone}`}>
               {statusLabel}
               {task.state.lastRunAtMs && (
@@ -158,6 +180,19 @@ const TaskDetail: React.FC<TaskDetailProps> = ({ task, onRequestDelete }) => {
               )}
             </div>
           </div>
+          {preflight?.hasChannel && (
+            <div>
+              <div className={labelClass}>{i18nService.t('scheduledTasksDeliveryStatus')}</div>
+              <div className={valueClass}>
+                {deliveryStatusLabel}
+                {latestDelivery?.attemptedAt && (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({formatDateTime(new Date(latestDelivery.attemptedAt))})
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
           <div>
             <div className={labelClass}>{i18nService.t('scheduledTasksNextRun')}</div>
             <div className={valueClass}>

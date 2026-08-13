@@ -5,6 +5,7 @@
 
 import Database from 'better-sqlite3';
 
+import { tryParseCcConnectScopedConversationId } from './ccConnectConversationId';
 import type { IMGatewayConfigPatch } from './configPatch';
 
 import {
@@ -98,7 +99,6 @@ export class IMStore {
     `,
       )
       .run();
-
   }
   private getConfigValue<T>(key: string): T | undefined {
     const row = this.db.prepare('SELECT value FROM im_config WHERE key = ?').get(key) as
@@ -833,32 +833,12 @@ export class IMStore {
       .run(coworkSessionId);
   }
 
-  /**
-   * List all session mappings for a platform, optionally filtered by IM bot accountId.
-   *
-   * The accountId is encoded as the first segment of im_conversation_id before
-   * the peer subtype suffix (for example "c9c41984:direct:ou_xxx").
-   * Filtering by accountId therefore requires no schema migration.
-   */
+  /** List session mappings, optionally scoped to the owning pi-connect account. */
   listSessionMappings(platform?: Platform, accountId?: string): IMSessionMapping[] {
     let query: string;
     let params: unknown[];
 
-    if (platform && accountId) {
-      const directPrefixes = new Set<string>([accountId]);
-
-      // Include direct conversations owned by this bot instance (prefix matches accountId)
-      // and all group conversations for the platform, since group membership per-bot
-      // is not yet stored — group: prefix is a temporary heuristic until im_account_id
-      // column is introduced.
-      const directClauses = Array.from(directPrefixes).map(() => 'im_conversation_id LIKE ?');
-      query = `SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at
-        FROM channel_session_mappings
-        WHERE platform = ?
-          AND (${directClauses.join(' OR ')} OR im_conversation_id LIKE 'group:%')
-        ORDER BY last_active_at DESC`;
-      params = [platform, ...Array.from(directPrefixes).map(prefix => `${prefix}:%`)];
-    } else if (platform) {
+    if (platform) {
       query =
         'SELECT im_conversation_id, platform, cowork_session_id, transport_session_key, created_at, last_active_at FROM channel_session_mappings WHERE platform = ? ORDER BY last_active_at DESC';
       params = [platform];
@@ -869,14 +849,19 @@ export class IMStore {
     }
 
     const rows = this.db.prepare(query).all(...params) as SessionMappingRow[];
-    return rows.map(row => ({
-      imConversationId: row.im_conversation_id,
-      platform: row.platform as Platform,
-      coworkSessionId: row.cowork_session_id,
-      ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
-      createdAt: row.created_at,
-      lastActiveAt: row.last_active_at,
-    }));
+    return rows
+      .filter(row => {
+        if (!accountId) return true;
+        return tryParseCcConnectScopedConversationId(row.im_conversation_id)?.[0] === accountId;
+      })
+      .map(row => ({
+        imConversationId: row.im_conversation_id,
+        platform: row.platform as Platform,
+        coworkSessionId: row.cowork_session_id,
+        ...(row.transport_session_key ? { transportSessionKey: row.transport_session_key } : {}),
+        createdAt: row.created_at,
+        lastActiveAt: row.last_active_at,
+      }));
   }
 }
 
