@@ -5144,17 +5144,17 @@ const Settings: React.FC<SettingsProps> = ({
               <div className="px-4 py-3 border-b border-border space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-foreground">
-                    {i18nService.t('updateReadyTitle')}
+                    {i18nService.t('updateSectionTitle')}
                   </span>
                   <span className="text-sm text-muted-foreground">
-                    {update?.info?.latestVersion
-                      ? `v${update.info.latestVersion}`
+                    {update?.status === AppUpdateStatus.Checking
+                      ? i18nService.t('updateChecking')
                       : update?.status === AppUpdateStatus.UpToDate
                         ? i18nService.t('updateUpToDate')
-                        : update?.status === AppUpdateStatus.Checking
-                          ? i18nService.t('updateChecking')
-                          : update?.status === AppUpdateStatus.Error
-                            ? i18nService.t('updateCheckFailed')
+                        : update?.status === AppUpdateStatus.Error
+                          ? i18nService.t('updateCheckFailed')
+                          : update?.info?.latestVersion
+                            ? `v${update.info.latestVersion}`
                             : i18nService.t('updateNotChecked')}
                   </span>
                 </div>
@@ -5195,7 +5195,20 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                   </>
                 ) : update?.status === AppUpdateStatus.Ready ? (
-                  <Button size="sm" onClick={() => void window.electron.appUpdate.installReady()}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      void window.electron.appUpdate.installReady().then(result => {
+                        if (!result.success) {
+                          window.dispatchEvent(
+                            new CustomEvent('app:showToast', {
+                              detail: result.error || i18nService.t('updateInstallFailed'),
+                            }),
+                          );
+                        }
+                      });
+                    }}
+                  >
                     {i18nService.t('updateReadyConfirm')}
                   </Button>
                 ) : update?.status === AppUpdateStatus.Error && update.info ? (
