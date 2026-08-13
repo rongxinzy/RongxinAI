@@ -40,6 +40,23 @@ function shouldExclude(entryPath) {
 const WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION = 4;
 const WINDOWS_RESOURCE_ARCHIVE_EXTENSION = '.7z';
 const WINDOWS_RESOURCE_ARCHIVE_FORMAT = '7z';
+const WINDOWS_RESOURCE_ARCHIVE_COMPRESSION = {
+  NonSolid: {
+    id: 'lzma2-mx9-nonsolid-v1',
+    sevenZipArgs: ['-mx=9', '-m0=lzma2', '-ms=off', '-mmt=on'],
+  },
+  Solid: {
+    id: 'lzma2-mx9-solid-v1',
+    sevenZipArgs: ['-mx=9', '-m0=lzma2', '-ms=on', '-mmt=on'],
+  },
+};
+const SOLID_ARCHIVE_COMPONENT_KEYS = new Set(['portable-git', 'python', 'skill-python']);
+
+function getWindowsResourceArchiveCompression(component) {
+  return SOLID_ARCHIVE_COMPONENT_KEYS.has(component.key)
+    ? WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.Solid
+    : WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.NonSolid;
+}
 
 function getWindowsResourceComponents(projectRoot) {
   return [
@@ -173,6 +190,7 @@ function buildWindowsResourceComponentManifest(
   archiveSizeBytes,
   sentinelSha256,
 ) {
+  const compression = getWindowsResourceArchiveCompression(component);
   return {
     version: WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION,
     key: component.key,
@@ -182,6 +200,7 @@ function buildWindowsResourceComponentManifest(
     contentId,
     archive: component.key + WINDOWS_RESOURCE_ARCHIVE_EXTENSION,
     archiveFormat: WINDOWS_RESOURCE_ARCHIVE_FORMAT,
+    archiveCompression: compression.id,
     archiveSha256,
     archiveSizeBytes,
     sentinelSha256,
@@ -200,6 +219,7 @@ function isWindowsResourceComponentReusable(manifestPath, archivePath, contentId
       saved.contentId === contentId &&
       saved.archive === component.key + WINDOWS_RESOURCE_ARCHIVE_EXTENSION &&
       saved.archiveFormat === WINDOWS_RESOURCE_ARCHIVE_FORMAT &&
+      saved.archiveCompression === getWindowsResourceArchiveCompression(component).id &&
       typeof saved.archiveSha256 === 'string' &&
       saved.archiveSha256 === sha256File(archivePath) &&
       saved.archiveSizeBytes === fs.statSync(archivePath).size
@@ -222,10 +242,12 @@ module.exports = {
   WINDOWS_RESOURCE_COMPONENT_SCHEMA_VERSION,
   WINDOWS_RESOURCE_ARCHIVE_EXTENSION,
   WINDOWS_RESOURCE_ARCHIVE_FORMAT,
+  WINDOWS_RESOURCE_ARCHIVE_COMPRESSION,
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
   computeWindowsResourceComponentId,
   getWindowsResourceComponents,
+  getWindowsResourceArchiveCompression,
   isWindowsResourceComponentReusable,
   sha256File,
 };
