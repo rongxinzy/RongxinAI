@@ -52,3 +52,50 @@ test('combines shared and packaged skills for business expert presets', () => {
     'variance-analysis',
   ]);
 });
+
+test('combines shared and packaged skills for skill-based workflow presets', () => {
+  expect(resolvePresetSkillIds('data-analyst')).toEqual([
+    'xlsx',
+    'code-to-chart',
+    'database-inspector',
+    'saas-metrics-coach',
+    'web-search',
+    'deep-research',
+    'data-quality-review',
+    'metric-diagnosis',
+    'analytics-report',
+  ]);
+
+  expect(resolvePresetSkillIds('react-dev')).toEqual([
+    'frontend-design',
+    'git-repo-audit',
+    'code-safety-audit',
+    'code-arch-optimizer',
+    'web-security-audit',
+    'log-diagnostic',
+    'smart-commit-gen',
+    'react-component-blueprint',
+    'react-troubleshooting',
+  ]);
+
+  expect(resolvePresetSkillIds('content-writer')).toEqual([
+    'web-search',
+    'deep-research',
+    'copywriting',
+    'copy-editor',
+    'ad-copywriter',
+    'ad-creative',
+    'viral-writer',
+    'marketing-writer',
+    'campaign-planner',
+    'customer-reply-craft',
+    'churn-prevention',
+    'ecom-copy-assistant',
+    'humanizer-zh',
+    'content-research-writer',
+    'meeting-recap',
+    'process-doc',
+    'xindaya-translator',
+    'content-brief',
+  ]);
+});
