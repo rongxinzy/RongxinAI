@@ -38,6 +38,7 @@ export type LlamaCppModelLoadRetryInput<T> = {
   ) => Promise<T>;
   listRunningModels?: () => Promise<LlamaCppRunningModel[]>;
   unloadModel?: (modelName: string) => Promise<void>;
+  signal?: AbortSignal;
   maxRetries?: number;
   minContextSize?: number;
   onLog?: LlamaCppModelLaunchLogReporter;
@@ -66,6 +67,7 @@ export async function loadLlamaCppModelWithRetry<T>(
   let currentInput = normalizeModelLoadInput(input.initialInput);
 
   for (let attemptIndex = 0; attemptIndex <= maxRetries; attemptIndex += 1) {
+    throwIfAborted(input.signal);
     input.onLog?.({
       level: LlamaCppModelLaunchLogLevel.Info,
       phase: LlamaCppModelLaunchLogPhase.LoadingModel,
@@ -83,6 +85,7 @@ export async function loadLlamaCppModelWithRetry<T>(
         finalInput: currentInput,
       };
     } catch (error) {
+      throwIfAborted(input.signal);
       const failureReason = classifyLlamaCppModelLoadError(error);
       attempts.push({ attemptIndex, input: currentInput, failureReason });
 
@@ -108,6 +111,10 @@ export async function loadLlamaCppModelWithRetry<T>(
   throw new LlamaCppModelLoadError({
     reason: classifyLlamaCppModelLoadError(undefined),
   });
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
 }
 
 function describeRetryAttempt(

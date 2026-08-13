@@ -164,6 +164,25 @@ describe('LlamaCppClient', () => {
     await expect(client.loadModel({ model: 'missing' })).rejects.toThrow('HTTP 404');
   });
 
+  test('passes an external cancellation signal to the load request', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn(async (_url: string, options: RequestInit) => {
+      expect(options.signal).toBeDefined();
+      controller.abort();
+      if (options.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      return await new Promise<Response>((_resolve, reject) => {
+        options.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new LlamaCppClient();
+
+    await expect(client.loadModel({ model: 'qwen3:8b' }, { signal: controller.signal })).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   test('waits for the target model to become ready after requesting a load', async () => {
     vi.stubGlobal(
       'fetch',

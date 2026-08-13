@@ -67,10 +67,11 @@ export class LlamaCppClient {
     return { version: 'llama.cpp' };
   }
 
-  async listModels(): Promise<LlamaCppModel[]> {
+  async listModels(options: { signal?: AbortSignal } = {}): Promise<LlamaCppModel[]> {
     const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models?reload=1', {
       method: 'GET',
       timeoutMs: this.loadTimeoutMs ?? 30_000,
+      signal: options.signal,
     });
     return (payload.data ?? []).map(model =>
       toLlamaCppModel(
@@ -100,20 +101,24 @@ export class LlamaCppClient {
     throw new Error('Model file deletion is managed by the llama.cpp manager.');
   }
 
-  async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
+  async loadModel(
+    input: LlamaCppModelLaunchInput,
+    options: { signal?: AbortSignal } = {},
+  ): Promise<LlamaCppModelLaunchResult> {
     const modelName = input.model.trim();
     const timeoutMs = this.loadTimeoutMs ?? LLAMACPP_MODEL_LOAD_TIMEOUT_MS;
     await this.requestJson('/models/load', {
       method: 'POST',
       timeoutMs,
+      signal: options.signal,
       body: JSON.stringify({ model: input.model }),
     });
     if (typeof input.options?.ctxSize === 'number' && input.options.ctxSize > 0) {
       this.lastLoadRuntimeContextByModel.set(modelName, input.options.ctxSize);
     }
-    const runningModels = await this.waitForModelReady(modelName, timeoutMs);
+    const runningModels = await this.waitForModelReady(modelName, timeoutMs, options.signal);
     try {
-      await this.probeModelInference(modelName);
+      await this.probeModelInference(modelName, options.signal);
     } catch (error) {
       // Treat a failed inference probe as a failed load so UI and server state stay aligned.
       await this.unloadModel(modelName).catch((): undefined => undefined);
@@ -133,10 +138,11 @@ export class LlamaCppClient {
     });
   }
 
-  private async listModelsWithTimeout(timeoutMs: number): Promise<LlamaCppModel[]> {
+  private async listModelsWithTimeout(timeoutMs: number, signal?: AbortSignal): Promise<LlamaCppModel[]> {
     const payload = await this.requestJson<{ data?: LlamaCppRouterModel[] }>('/models', {
       method: 'GET',
       timeoutMs: timeoutMs || this.loadTimeoutMs || 30_000,
+      signal,
     });
     return (payload.data ?? []).map(model =>
       toLlamaCppModel(
@@ -152,6 +158,7 @@ export class LlamaCppClient {
   private async waitForModelReady(
     modelName: string,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<LlamaCppRunningModel[]> {
     const deadline = Date.now() + timeoutMs;
     while (true) {
@@ -161,6 +168,7 @@ export class LlamaCppClient {
       }
       const models = await this.listModelsWithTimeout(
         Math.min(remainingMs, LLAMACPP_MODEL_READY_POLL_REQUEST_TIMEOUT_MS),
+        signal,
       );
       const targetModel = models.find(model => matchesModelName(model, modelName));
       if (
@@ -176,7 +184,7 @@ export class LlamaCppClient {
       if (nextWaitMs <= 0) {
         throw new Error(`llama.cpp model ${modelName} did not become ready before timeout`);
       }
-      await waitFor(Math.min(LLAMACPP_MODEL_READY_POLL_INTERVAL_MS, nextWaitMs));
+      await waitFor(Math.min(LLAMACPP_MODEL_READY_POLL_INTERVAL_MS, nextWaitMs), signal);
     }
   }
 
@@ -184,13 +192,14 @@ export class LlamaCppClient {
    * A loaded router entry does not prove the model can complete a request.
    * Run a minimal OpenAI-compatible request before exposing it as ready.
    */
-  private async probeModelInference(modelName: string): Promise<void> {
+  private async probeModelInference(modelName: string, signal?: AbortSignal): Promise<void> {
     await this.requestJson('/v1/chat/completions', {
       method: 'POST',
       timeoutMs: Math.min(
         this.loadTimeoutMs ?? LLAMACPP_MODEL_LOAD_TIMEOUT_MS,
         LLAMACPP_MODEL_INFERENCE_PROBE_TIMEOUT_MS,
       ),
+      signal,
       body: JSON.stringify({
         model: modelName,
         messages: [
@@ -350,8 +359,20 @@ function matchesModelName(model: LlamaCppModel, modelName: string): boolean {
   });
 }
 
-function waitFor(delayMs: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, delayMs));
+function waitFor(delayMs: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+  return new Promise((resolve, reject) => {
+    const complete = () => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    };
+    const onAbort = () => {
+      clearTimeout(timeout);
+      reject(signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+    };
+    const timeout = setTimeout(complete, delayMs);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 function formatParameterCount(value: number): string {

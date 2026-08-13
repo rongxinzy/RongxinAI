@@ -208,6 +208,8 @@ contextBridge.exposeInMainWorld('electron', {
     setModelPreference: (input: unknown) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.SetModelPreference, input),
     loadModel: (input: unknown) => ipcRenderer.invoke(LlamaCppIpcChannel.LoadModel, input),
+    cancelModelLoad: (modelName?: string) =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.CancelModelLoad, modelName),
     unloadModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.UnloadModel, name),
     getLatestModelLaunchLogSession: (input?: unknown) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.GetLatestModelLaunchLogSession, input),
