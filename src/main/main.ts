@@ -230,6 +230,7 @@ import { IMStore } from './im/imStore';
 import { configureRendererStartup } from './rendererStartup';
 import { SkillManager } from './skillManager';
 import { listPresetExperts } from './presetExpertCatalog';
+import { resolveBundledPresetExpertSnapshot } from './presetExpertSnapshot';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { StartupProfiler } from './startupProfiler';
@@ -1936,12 +1937,26 @@ const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpert
     ) {
       throw new Error(`Expert '${expertId}' is not installed or is not an expert package agent`);
     }
-    const promptSnapshot = expert.systemPrompt.trim();
+    let promptSnapshot = expert.systemPrompt.trim();
+    const packageId = expert.presetId.trim() || expert.id;
+    let skillIds = [...expert.skillIds];
+
+    // Bundled presets are file-sourced like regular skills: the preset
+    // markdown is read live on every session so editing the preset takes
+    // effect without re-importing. The DB snapshot remains the fallback
+    // when the preset directory is missing or unreadable.
+    if (expert.presetId.trim()) {
+      const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
+      const liveSnapshot = resolveBundledPresetExpertSnapshot(bundledSkillsRoot, packageId);
+      if (liveSnapshot) {
+        promptSnapshot = liveSnapshot.promptSnapshot;
+        skillIds = liveSnapshot.skillIds;
+      }
+    }
+
     if (!promptSnapshot) {
       throw new Error(`Expert '${expertId}' has an empty system prompt`);
     }
-    const packageId = expert.presetId.trim() || expert.id;
-    const skillIds = [...expert.skillIds];
     const contentHash = crypto
       .createHash('sha256')
       .update(JSON.stringify({ packageId, expertId: expert.id, promptSnapshot, skillIds }))
