@@ -280,6 +280,28 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(sizeSmoke, /MaximumNonComponentBytes = 220MB/);
 });
 
+test("manual release candidates preserve immutable artifacts without publishing them", () => {
+  const workflow = readFileSync(
+    path.join(root, ".github", "workflows", "release-candidate.yml"),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /release_version:/);
+  assert.match(workflow, /source_ref:/);
+  assert.match(workflow, /git merge-base --is-ancestor/);
+  assert.match(workflow, /APP_BUILD_VERSION:/);
+  assert.match(workflow, /create-release-candidate\.mjs/);
+  assert.match(workflow, /verify-release-candidate\.mjs/);
+  assert.match(workflow, /windows-installer-size-smoke\.ps1/);
+  assert.match(workflow, /windows-installer-smoke\.ps1/);
+  assert.match(workflow, /retention-days: 7/);
+  assert.doesNotMatch(workflow, /R2_(?:BUCKET|ACCESS_KEY)/);
+  assert.doesNotMatch(workflow, /CLOUDFLARE_ACCOUNT_ID/);
+  assert.doesNotMatch(workflow, /aws s3/);
+  assert.doesNotMatch(workflow, /upload-update-artifacts\.mjs/);
+});
+
 test("DOCX smoke validator accepts the bundled Markdown converter output", () => {
   const workspace = mkdtempSync(path.join(tmpdir(), "zhiyuan-docx-smoke-"));
   const markdown = path.join(workspace, "smoke.md");
