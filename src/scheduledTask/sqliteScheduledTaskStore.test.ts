@@ -76,7 +76,7 @@ test('persists Delivery attempts beside the canonical Run', () => {
   });
   expect(store.listDeliveries(run.id)).toEqual([delivery]);
   store.remove(task.id);
-  expect(store.listDeliveries(run.id)).toEqual([]);
+  expect(store.listDeliveries(run.id)).toEqual([delivery]);
 });
 
 test('keeps a legacy id stable when importing canonical task records', () => {

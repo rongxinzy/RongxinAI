@@ -7,14 +7,13 @@ import { EventEmitter } from 'events';
 
 import { type CoworkError, CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
-import { ChannelRunStatus, ChannelRunTrigger } from '../../shared/channelRun/constants';
-import { buildChannelRunSummary } from '../../shared/channelRun/summary';
+import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
+import type { ActivityService } from '../activity/activityService';
 import { t } from '../i18n';
 import type { PermissionRequest, PermissionResult, PiRuntime } from '../libs/agentEngine/types';
 import { generateCorrelationId, runWithCorrelationId } from '../libs/logCorrelation';
 import { serializeForLog } from '../libs/sanitizeForLog';
-import { emitChannelRunEvent } from './channelRunEvents';
 import { buildIMMediaInstruction } from './imMediaInstruction';
 import { toPiAttachments } from './imPiAttachments';
 import { analyzeIMReply, DEFAULT_IM_EMPTY_REPLY } from './imReplyGuard';
@@ -70,6 +69,7 @@ export interface IMCoworkHandlerOptions {
     request: ParsedIMScheduledTaskRequest;
   }) => Promise<IMScheduledTaskCreationResult>;
   sendAsyncReply?: (platform: Platform, conversationId: string, text: string) => Promise<boolean>;
+  activityService?: ActivityService;
 }
 
 export class IMCoworkHandler extends EventEmitter {
@@ -88,6 +88,7 @@ export class IMCoworkHandler extends EventEmitter {
     conversationId: string,
     text: string,
   ) => Promise<boolean>;
+  private activityService?: ActivityService;
 
   // Track active sessions' message accumulation
   private messageAccumulators: Map<string, MessageAccumulator> = new Map();
@@ -113,6 +114,7 @@ export class IMCoworkHandler extends EventEmitter {
     this.detectScheduledTaskRequest = options.detectScheduledTaskRequest;
     this.createScheduledTask = options.createScheduledTask;
     this.sendAsyncReply = options.sendAsyncReply;
+    this.activityService = options.activityService;
 
     this.initializeMappedSessions();
     this.setupEventListeners();
@@ -241,7 +243,7 @@ export class IMCoworkHandler extends EventEmitter {
         this.emitAccumulatorRunEvent(
           coworkSessionId,
           accumulator,
-          ChannelRunStatus.Failed,
+          ActivityStatus.Failed,
           undefined,
           'Channel request was cancelled',
         );
@@ -254,18 +256,15 @@ export class IMCoworkHandler extends EventEmitter {
         return await responsePromise;
       }
 
-      // Project the run lifecycle to the renderer (read-only; issue #225).
-      emitChannelRunEvent(
-        buildChannelRunSummary({
-          runId: cid,
-          sessionId: coworkSessionId,
-          platform: message.platform,
-          conversationId: message.conversationId,
-          trigger: ChannelRunTrigger.Channel,
-          status: ChannelRunStatus.Started,
-          input: formattedContent,
-        }),
-      );
+      this.activityService?.upsertBestEffort({
+        id: cid,
+        source: ActivitySource.Channel,
+        status: ActivityStatus.Running,
+        sessionId: coworkSessionId,
+        platform: message.platform,
+        conversationId: message.conversationId,
+        inputPreview: formattedContent,
+      });
 
       const onSessionStartError = (error: unknown) => {
         this.rejectAccumulator(
@@ -688,7 +687,7 @@ export class IMCoworkHandler extends EventEmitter {
           clearTimeout(existingAccumulator.timeoutId);
         }
         this.messageAccumulators.delete(sessionId);
-        this.emitAccumulatorRunEvent(sessionId, existingAccumulator, ChannelRunStatus.Failed);
+        this.emitAccumulatorRunEvent(sessionId, existingAccumulator, ActivityStatus.Failed);
         existingAccumulator.reject?.(new Error('Replaced by a newer IM request'));
       }
 
@@ -702,7 +701,7 @@ export class IMCoworkHandler extends EventEmitter {
             this.emitAccumulatorRunEvent(
               sessionId,
               accumulator,
-              ChannelRunStatus.Failed,
+              ActivityStatus.Failed,
               undefined,
               '处理超时，已返回部分结果',
             );
@@ -711,7 +710,7 @@ export class IMCoworkHandler extends EventEmitter {
             this.emitAccumulatorRunEvent(
               sessionId,
               accumulator,
-              ChannelRunStatus.Failed,
+              ActivityStatus.Failed,
               undefined,
               '处理超时，请稍后重试',
             );
@@ -756,7 +755,7 @@ export class IMCoworkHandler extends EventEmitter {
       this.emitAccumulatorRunEvent(
         sessionId,
         accumulator,
-        ChannelRunStatus.Failed,
+        ActivityStatus.Failed,
         undefined,
         '处理超时，请稍后重试',
       );
@@ -785,7 +784,7 @@ export class IMCoworkHandler extends EventEmitter {
     this.emitAccumulatorRunEvent(
       sessionId,
       accumulator,
-      ChannelRunStatus.Failed,
+      ActivityStatus.Failed,
       undefined,
       error.message,
     );
@@ -795,7 +794,7 @@ export class IMCoworkHandler extends EventEmitter {
   private emitAccumulatorRunEvent(
     sessionId: string,
     accumulator: MessageAccumulator,
-    status: ChannelRunStatus,
+    status: ActivityStatus,
     reply?: string,
     error?: string,
   ): void {
@@ -804,18 +803,16 @@ export class IMCoworkHandler extends EventEmitter {
     if (accumulator.backgroundDelivery) return;
     const conversation =
       accumulator.backgroundDelivery ?? this.sessionConversationMap.get(sessionId);
-    emitChannelRunEvent(
-      buildChannelRunSummary({
-        runId: accumulator.runId,
-        sessionId,
-        platform: conversation?.platform ?? '',
-        conversationId: conversation?.conversationId ?? '',
-        trigger: ChannelRunTrigger.Channel,
-        status,
-        reply,
-        error,
-      }),
-    );
+    this.activityService?.upsertBestEffort({
+      id: accumulator.runId,
+      source: ActivitySource.Channel,
+      status,
+      sessionId,
+      platform: conversation?.platform,
+      conversationId: conversation?.conversationId,
+      replyPreview: reply,
+      errorMessage: error,
+    });
   }
 
   private clearPendingPermissionByKey(key: string): PendingIMPermission | null {
@@ -933,7 +930,7 @@ export class IMCoworkHandler extends EventEmitter {
           messages: [],
           backgroundDelivery: pending.backgroundDelivery,
         },
-        ChannelRunStatus.Failed,
+        ActivityStatus.Failed,
         undefined,
         '该确认请求已过期，请重新发送任务。',
       );
@@ -953,7 +950,7 @@ export class IMCoworkHandler extends EventEmitter {
           messages: [],
           backgroundDelivery: pending.backgroundDelivery,
         },
-        ChannelRunStatus.Failed,
+        ActivityStatus.Failed,
         undefined,
         '已拒绝本次操作，任务未继续执行。',
       );
@@ -1023,7 +1020,7 @@ export class IMCoworkHandler extends EventEmitter {
           messages: [],
           backgroundDelivery: currentPending.backgroundDelivery,
         },
-        ChannelRunStatus.Failed,
+        ActivityStatus.Failed,
         undefined,
         '确认请求等待超时，任务未继续执行。',
       );
@@ -1108,7 +1105,7 @@ export class IMCoworkHandler extends EventEmitter {
 
     this.cleanupAccumulator(sessionId);
 
-    this.emitAccumulatorRunEvent(sessionId, accumulator, ChannelRunStatus.Completed, replyText);
+    this.emitAccumulatorRunEvent(sessionId, accumulator, ActivityStatus.Completed, replyText);
 
     if (accumulator.backgroundDelivery) {
       if (!this.sendAsyncReply || !replyText || replyText === '处理完成，但没有生成回复。') {
@@ -1165,7 +1162,7 @@ export class IMCoworkHandler extends EventEmitter {
     this.emitAccumulatorRunEvent(
       sessionId,
       accumulator,
-      ChannelRunStatus.Failed,
+      ActivityStatus.Failed,
       undefined,
       replyText,
     );
@@ -1219,7 +1216,7 @@ export class IMCoworkHandler extends EventEmitter {
     this.emitAccumulatorRunEvent(
       sessionId,
       accumulator,
-      ChannelRunStatus.Failed,
+      ActivityStatus.Failed,
       undefined,
       t('imSessionStoppedReply'),
     );

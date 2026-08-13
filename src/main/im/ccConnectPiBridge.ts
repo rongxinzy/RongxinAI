@@ -8,6 +8,7 @@ import type {
 import { getCcConnectScopedConversationId } from './ccConnectConversationId';
 import { buildCcConnectTurnResponse, persistCcConnectMedia } from './ccConnectMedia';
 import { IMCoworkHandler } from './imCoworkHandler';
+import type { ActivityService } from '../activity/activityService';
 import type { ChannelTurnCoordinator } from './channelTurnCoordinator';
 import type { IMStore } from './imStore';
 import type {
@@ -46,6 +47,7 @@ export class CcConnectPiBridge {
       request: ParsedIMScheduledTaskRequest;
     }) => Promise<IMScheduledTaskCreationResult>;
     turnCoordinator: ChannelTurnCoordinator;
+    activityService: ActivityService;
   }) {
     this.onCronTrigger = options.onCronTrigger;
     this.imStore = options.imStore;
@@ -58,6 +60,7 @@ export class CcConnectPiBridge {
       getSkillsPrompt: options.getSkillsPrompt,
       detectScheduledTaskRequest: options.detectScheduledTaskRequest,
       createScheduledTask: options.createScheduledTask,
+      activityService: options.activityService,
     });
   }
 
