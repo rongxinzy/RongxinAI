@@ -1010,6 +1010,7 @@ interface IElectronAPI {
     testGateway: (
       platform: Platform,
       configOverride?: Partial<IMGatewayConfig>,
+      accountId?: string,
     ) => Promise<{ success: boolean; result?: IMConnectivityTestResult; error?: string }>;
     getStatus: () => Promise<{ success: boolean; status?: IMGatewayStatus; error?: string }>;
     getLocalIp: () => Promise<string>;

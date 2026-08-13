@@ -1883,7 +1883,10 @@ const refreshMcpBridge = (): Promise<{ tools: number; error?: string }> => {
 
 const getIMGatewayManager = () => {
   if (!imGatewayManager) {
-    imGatewayManager = new ChannelAccountManager(getStore().getDatabase());
+    imGatewayManager = new ChannelAccountManager(getStore().getDatabase(), async accountId => {
+      await refreshCcConnectPlatformStatuses();
+      return ccConnectRuntimeStatuses.get(accountId, ccConnectSidecarManager?.lastError ?? null);
+    });
   }
   return imGatewayManager;
 };
@@ -4971,9 +4974,14 @@ if (!gotTheLock) {
 
   ipcMain.handle(
     'im:gateway:test',
-    async (_event, platform: Platform, configOverride?: Partial<IMGatewayConfig>) => {
+    async (
+      _event,
+      platform: Platform,
+      configOverride?: Partial<IMGatewayConfig>,
+      accountId?: string,
+    ) => {
       try {
-        const result = await getIMGatewayManager().testGateway(platform, configOverride);
+        const result = await getIMGatewayManager().testGateway(platform, configOverride, accountId);
         return { success: true, result };
       } catch (error) {
         return {
