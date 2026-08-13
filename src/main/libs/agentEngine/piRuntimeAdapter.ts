@@ -318,6 +318,8 @@ interface PiResourceState {
   skillIds: string[] | undefined;
   maxOutputTokens: number;
   fileToolsEnabled: boolean;
+  /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
+  expertSkillDirs: string[];
 }
 
 interface InitializingPiSession {
@@ -652,6 +654,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: normalizeSkillIds(options.skillIds),
         maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
         fileToolsEnabled: options.confirmationMode !== 'text',
+        expertSkillDirs: this.resolveExpertPresetSkillDirs(options.expertIds),
       };
 
       const shortcutKindForContract = isAcademicResearchSkillSet(resourceState.skillIds)
@@ -895,6 +898,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               skillIds,
               maxOutputTokens,
               fileToolsEnabled: true,
+              expertSkillDirs: [],
             },
             {
               sessionId,
@@ -1853,7 +1857,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // never from the developer's global ~/.agents/skills (which would leak
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
       noSkills: true,
-      additionalSkillPaths: this.resolveZhiyuanSkillDirs(),
+      additionalSkillPaths: [
+        ...this.resolveZhiyuanSkillDirs(),
+        ...resourceState.expertSkillDirs,
+      ],
       skillsOverride: (base: {
         skills: Array<{ name?: string; id?: string }>;
         diagnostics: unknown[];
@@ -1940,6 +1947,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     push(getSkillsRoot());
     if (!app.isPackaged) {
       push(path.join(app.getPath('userData'), 'SKILLs'));
+    }
+    return dirs;
+  }
+
+  /**
+   * Bundled preset skill directories for the session's selected experts.
+   * File-sourced like regular skills: editing a preset SKILL.md takes effect
+   * on the next session. Falls back to the imported userData copies when the
+   * preset directory is not present in this build.
+   */
+  private resolveExpertPresetSkillDirs(expertIds: string[] | undefined): string[] {
+    const dirs: string[] = [];
+    if (!expertIds?.length) return dirs;
+    const skillsRoot = getSkillsRoot();
+    for (const expertId of expertIds) {
+      const agent = this.store?.getAgent(expertId);
+      const presetId = agent?.presetId?.trim();
+      if (!presetId) continue;
+      const dir = path.join(
+        skillsRoot,
+        'zhiyuan-expert-manager',
+        'presets',
+        presetId,
+        'skills',
+      );
+      if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
     }
     return dirs;
   }
