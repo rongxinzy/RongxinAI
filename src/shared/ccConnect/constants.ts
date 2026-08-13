@@ -11,6 +11,9 @@ export const CcConnectProtocol = {
     ChannelTransport: 'channel-transport',
     Delivery: 'delivery',
     TriggerOnlyCron: 'trigger-only-cron',
+    ChannelPolicy: 'channel-policy',
+    MediaReply: 'media-reply',
+    RuntimeActivity: 'runtime-activity',
   },
 } as const;
 
@@ -30,4 +33,7 @@ export type CcConnectPlatformStatus = {
   platform: string;
   state: 'starting' | 'ready' | 'unavailable';
   lastError?: string;
+  startedAt?: string;
+  lastInboundAt?: string;
+  lastOutboundAt?: string;
 };
