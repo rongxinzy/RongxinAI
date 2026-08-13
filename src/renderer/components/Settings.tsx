@@ -5195,7 +5195,20 @@ const Settings: React.FC<SettingsProps> = ({
                     </div>
                   </>
                 ) : update?.status === AppUpdateStatus.Ready ? (
-                  <Button size="sm" onClick={() => void window.electron.appUpdate.installReady()}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      void window.electron.appUpdate.installReady().then(result => {
+                        if (!result.success) {
+                          window.dispatchEvent(
+                            new CustomEvent('app:showToast', {
+                              detail: result.error || i18nService.t('updateInstallFailed'),
+                            }),
+                          );
+                        }
+                      });
+                    }}
+                  >
                     {i18nService.t('updateReadyConfirm')}
                   </Button>
                 ) : update?.status === AppUpdateStatus.Error && update.info ? (
