@@ -230,6 +230,7 @@ import { IMStore } from './im/imStore';
 import { configureRendererStartup } from './rendererStartup';
 import { SkillManager } from './skillManager';
 import { listPresetExperts } from './presetExpertCatalog';
+import { resolveBundledPresetExpertSnapshot } from './presetExpertSnapshot';
 import { getSkillServiceManager } from './skillServices';
 import { SqliteStore } from './sqliteStore';
 import { StartupProfiler } from './startupProfiler';
@@ -1936,12 +1937,26 @@ const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpert
     ) {
       throw new Error(`Expert '${expertId}' is not installed or is not an expert package agent`);
     }
-    const promptSnapshot = expert.systemPrompt.trim();
+    let promptSnapshot = expert.systemPrompt.trim();
+    const packageId = expert.presetId.trim() || expert.id;
+    let skillIds = [...expert.skillIds];
+
+    // Bundled presets are file-sourced like regular skills: the preset
+    // markdown is read live on every session so editing the preset takes
+    // effect without re-importing. The DB snapshot remains the fallback
+    // when the preset directory is missing or unreadable.
+    if (expert.presetId.trim()) {
+      const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
+      const liveSnapshot = resolveBundledPresetExpertSnapshot(bundledSkillsRoot, packageId);
+      if (liveSnapshot) {
+        promptSnapshot = liveSnapshot.promptSnapshot;
+        skillIds = liveSnapshot.skillIds;
+      }
+    }
+
     if (!promptSnapshot) {
       throw new Error(`Expert '${expertId}' has an empty system prompt`);
     }
-    const packageId = expert.presetId.trim() || expert.id;
-    const skillIds = [...expert.skillIds];
     const contentHash = crypto
       .createHash('sha256')
       .update(JSON.stringify({ packageId, expertId: expert.id, promptSnapshot, skillIds }))
@@ -4116,15 +4131,44 @@ if (!gotTheLock) {
         path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'),
       );
       const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
-      const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, { dbPath });
-
       const agentManager = getAgentManager();
+
+      // Re-importing an installed preset upgrades it in place: existing
+      // agents are updated, packaged skills are refreshed, and the stale
+      // preset registry entry is replaced.
+      const packageJson = JSON.parse(
+        fs.readFileSync(path.join(expertDir, 'plugin.json'), 'utf-8'),
+      ) as { name?: unknown };
+      const isUpgrade =
+        typeof packageJson.name === 'string' &&
+        agentManager.listAgents().some(agent => agent.presetId === packageJson.name);
+      const { pluginJson, requests, piSyncedFiles } = parseExpertPackage(expertDir, {
+        dbPath,
+        update: isUpgrade,
+      });
+
       const defaultModel = resolveDefaultAgentModelRef();
       const agentIds: string[] = [];
 
       for (const request of requests) {
-        const agent = agentManager.createAgent(request, defaultModel);
-        agentIds.push(agent.id);
+        // Re-importing an installed preset upgrades it in place instead of
+        // failing on the duplicate name — preset updates (system prompt,
+        // skills, workflow) must reach already-installed experts.
+        const existing = agentManager.getAgent(request.id);
+        if (existing) {
+          agentManager.updateAgent(existing.id, {
+            name: request.name,
+            description: request.description,
+            systemPrompt: request.systemPrompt,
+            identity: request.identity,
+            icon: request.icon,
+            skillIds: request.skillIds ?? [],
+          });
+          agentIds.push(existing.id);
+        } else {
+          const agent = agentManager.createAgent(request, defaultModel);
+          agentIds.push(agent.id);
+        }
       }
 
       // Write to expert-packages/registry.json in userData
