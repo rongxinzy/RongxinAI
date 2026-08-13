@@ -468,10 +468,14 @@ const TurnBlockComponent: React.FC<{
               </ChainOfThought>
             )}
             {showTypingIndicator && <TypingDots />}
-            {artifacts?.some(artifact => artifact.role === ArtifactRole.Deliverable) && (
+            {artifacts?.some(
+              artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
+            ) && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {artifacts
-                  .filter(artifact => artifact.role === ArtifactRole.Deliverable)
+                  .filter(
+                    artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
+                  )
                   .map(artifact => (
                     <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
                   ))}

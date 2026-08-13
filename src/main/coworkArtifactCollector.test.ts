@@ -103,6 +103,45 @@ describe('collectSessionArtifactCandidates', () => {
     });
   });
 
+  test('declared kind code/document/image wins over extension inference', () => {
+    const candidates = collectSessionArtifactCandidates([
+      message('declare-code', 1, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolInput: { filePath: 'D:/output/notes.md', kind: 'code' },
+      }),
+      message('declare-document', 2, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolInput: { filePath: 'D:/output/report.txt', kind: 'document' },
+      }),
+      message('declare-image', 3, 'tool_use', '', {
+        toolName: 'declare_artifact',
+        toolInput: { filePath: 'D:/output/icon.svg', kind: 'image' },
+      }),
+    ]);
+
+    expect(candidates.map(candidate => candidate.artifact.type)).toEqual([
+      'code',
+      'document',
+      'image',
+    ]);
+  });
+
+  test('marks assistant code blocks as intermediate, not deliverable', () => {
+    const [candidate] = collectSessionArtifactCandidates([
+      message(
+        'assistant-1',
+        1,
+        'assistant',
+        '```artifact:html title="Preview"\n<h1>Hello</h1>\n```',
+      ),
+    ]);
+
+    expect(candidate.artifact).toMatchObject({
+      role: CoworkArtifactRole.Intermediate,
+      declared: false,
+    });
+  });
+
   test('collects supported assistant code blocks with stable keys and content', () => {
     const [candidate] = collectSessionArtifactCandidates([
       message(
