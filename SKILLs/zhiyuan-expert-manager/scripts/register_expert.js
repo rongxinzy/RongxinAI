@@ -139,6 +139,41 @@ function agentNameExists(db, name) {
   return !!row;
 }
 
+function findAgentByName(db, name) {
+  return db
+    .prepare(
+      'SELECT id, name FROM agents WHERE LOWER(name) = LOWER(?) AND is_default = 0 LIMIT 1',
+    )
+    .get(name.trim());
+}
+
+function updateAgentFromRequest(db, existingId, request) {
+  const now = Date.now();
+  db.prepare(`
+    UPDATE agents SET
+      description = ?,
+      system_prompt = ?,
+      identity = ?,
+      icon = ?,
+      skill_ids = ?,
+      source = ?,
+      preset_id = ?,
+      updated_at = ?
+    WHERE id = ?
+  `).run(
+    request.description,
+    request.systemPrompt,
+    request.identity,
+    request.icon,
+    JSON.stringify(request.skillIds || []),
+    request.source,
+    request.presetId,
+    now,
+    existingId,
+  );
+  return existingId;
+}
+
 function makeUniqueAgentId(db, baseId) {
   if (!agentIdExists(db, baseId)) return baseId;
   return `${baseId}-${Date.now()}`;
@@ -226,7 +261,7 @@ function validatePackagePaths(pluginJson, expertDir) {
   }
 }
 
-function copySkillsToUserData(pluginJson, expertDir, userDataSkillsDir) {
+function copySkillsToUserData(pluginJson, expertDir, userDataSkillsDir, overwrite = false) {
   if (!pluginJson.skills || !Array.isArray(pluginJson.skills)) return;
   fs.mkdirSync(userDataSkillsDir, { recursive: true });
 
@@ -234,7 +269,10 @@ function copySkillsToUserData(pluginJson, expertDir, userDataSkillsDir) {
     const src = resolvePackagePath(expertDir, skillPath, 'skill');
     const skillName = path.basename(src);
     const dest = path.join(userDataSkillsDir, skillName);
-    if (fs.existsSync(dest)) continue; // Do not overwrite existing skills
+    // Create mode preserves user-installed skill copies. Upgrade mode must
+    // refresh the packaged skills so updated workflows take effect.
+    if (fs.existsSync(dest) && !overwrite) continue;
+    if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
     copyDirRecursive(src, dest);
   }
 }
@@ -510,7 +548,7 @@ function parseExpertPackage(expertDir, options = {}) {
   // Copy skills to userData/SKILLs
   const userDataDir = path.dirname(options.dbPath || getDefaultDbPath());
   const userDataSkillsDir = path.join(userDataDir, 'SKILLs');
-  copySkillsToUserData(pluginJson, expertPath, userDataSkillsDir);
+  copySkillsToUserData(pluginJson, expertPath, userDataSkillsDir, Boolean(options.update));
 
   // Sync agent MDs to pi agents directory for subagent discovery
   // (Team members and single agents alike — any expert agent can be a subagent target)
@@ -638,8 +676,15 @@ function registerExpert(expertDir, options = {}) {
 
     for (const request of requests) {
       const name = request.name;
-      if (agentNameExists(db, name)) {
-        throw new Error(`Agent name '${name}' already exists`);
+      const existing = findAgentByName(db, name);
+      if (existing) {
+        if (!options.update) {
+          throw new Error(
+            `Agent name '${name}' already exists. Re-run with --update to upgrade the installed preset.`,
+          );
+        }
+        agentIds.push(updateAgentFromRequest(db, existing.id, request));
+        continue;
       }
       const agentId = makeUniqueAgentId(db, request.id);
       const now = Date.now();
@@ -674,7 +719,9 @@ function registerExpert(expertDir, options = {}) {
       fs.writeFileSync(path.join(expertPath, '.created-by-session'), options.sessionId, 'utf-8');
     }
 
-    console.log(`✅ Registered ${pluginJson.expertType} expert '${pluginJson.name}' with agents:`);
+    console.log(
+      `✅ ${options.update ? 'Upgraded' : 'Registered'} ${pluginJson.expertType} expert '${pluginJson.name}' with agents:`,
+    );
     for (const id of agentIds) {
       console.log(`   • ${id}`);
     }
@@ -692,8 +739,9 @@ function registerExpert(expertDir, options = {}) {
 
 function printUsage() {
   console.log(
-    'Usage: node register_expert.js <path/to/expert-dir> [--db-path <sqlite.db>] [--session-id <id>]',
+    'Usage: node register_expert.js <path/to/expert-dir> [--db-path <sqlite.db>] [--session-id <id>] [--update]',
   );
+  console.log('  --update  Upgrade an installed expert by name instead of failing on duplicates.');
 }
 
 function main() {
@@ -713,6 +761,10 @@ function main() {
   const sessionIdIndex = process.argv.indexOf('--session-id');
   if (sessionIdIndex !== -1 && sessionIdIndex + 1 < process.argv.length) {
     options.sessionId = process.argv[sessionIdIndex + 1];
+  }
+
+  if (process.argv.includes('--update')) {
+    options.update = true;
   }
 
   try {

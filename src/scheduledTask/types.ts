@@ -64,11 +64,11 @@ export interface ScheduledTask {
   wakeMode: WakeMode;
   payload: ScheduledTaskPayload;
   delivery: ScheduledTaskDelivery;
-  /** Agent whose system prompt, skills, working directory, and identity are
-   *  inherited when the task runs.  Required — a task is always bound to an
-   *  agent. */
-  agentId: string;
+  /** Workspace whose configuration and working directory are inherited when the task runs. */
+  workspaceId: string | null;
   sessionKey: string | null;
+  /** Changes whenever a trigger-affecting task definition changes. */
+  scheduleVersion?: string;
   state: TaskState;
   createdAt: string;
   updatedAt: string;
@@ -91,6 +91,22 @@ export interface ScheduledTaskRunWithName extends ScheduledTaskRun {
   taskPayload?: string;
 }
 
+/** Immutable result of one attempt to deliver a completed canonical Run. */
+export interface ScheduledTaskDeliveryRecord {
+  id: string;
+  runId: string;
+  taskId: string;
+  mode: DeliveryMode;
+  channel: string | null;
+  to: string | null;
+  accountId: string | null;
+  status: 'pending' | 'success' | 'error' | 'skipped';
+  attemptedAt: string;
+  deliveredAt: string | null;
+  receiptId: string | null;
+  error: string | null;
+}
+
 export interface ScheduledTaskInput {
   name: string;
   description: string;
@@ -100,9 +116,8 @@ export interface ScheduledTaskInput {
   wakeMode: WakeMode;
   payload: ScheduledTaskPayload;
   delivery?: ScheduledTaskDelivery;
-  /** Agent whose system prompt, skills, working directory, and identity are
-   *  inherited when the task runs.  Required. */
-  agentId: string;
+  /** Workspace whose configuration and working directory are inherited when the task runs. */
+  workspaceId?: string | null;
   sessionKey?: string | null;
 }
 
@@ -123,8 +138,8 @@ export interface ScheduledTaskChannelOption {
    *  account identity such as appKey:accid. */
   accountId?: string;
   /** Optional account identifier used only when querying local conversation
-   *  mappings. Some plugins persist a different routing-safe account prefix
-   *  than the delivery-time accountId expected by OpenClaw. */
+   *  mappings. Some adapters persist a different routing-safe account prefix
+   *  than the delivery-time accountId. */
   filterAccountId?: string;
 }
 

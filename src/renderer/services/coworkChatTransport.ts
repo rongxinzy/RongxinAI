@@ -58,7 +58,7 @@ function extractImages(
  * Key design decisions:
  *
  * 1. `tool_use` messages are emitted with `providerExecuted: true` —
- *    the agent (Pi/OpenClaw) executed the tool server-side, so the client
+ *    the Pi agent executed the tool server-side, so the client
  *    does NOT need to call `addToolOutput`.
  *
  * 2. `tool_result` messages are emitted as `tool-output-available` chunks,

@@ -26,12 +26,12 @@ import type {
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 import {
-  buildOpenClawModelValidationTargets,
-  resolveFirstUnsupportedOpenClawModel,
-  resolveOpenClawModelSupportMessageKey,
-} from '../../utils/openclawModelSupport';
+  buildAgentModelValidationTargets,
+  resolveFirstUnsupportedAgentModel,
+  resolveAgentModelSupportMessageKey,
+} from '../../utils/agentModelSupport';
 import type { TaskTemplateValues } from './TaskTemplateGallery';
 import TaskFormBody from './TaskFormBody';
 import TaskTimePicker from './TaskTimePicker';
@@ -94,7 +94,7 @@ interface FormState {
   cronMode: 'builder' | 'raw';
   cronBuilder: CronBuilder;
   notifyAccountId: string | undefined;
-  agentId: string;
+  workspaceId: string;
   modelId: string;
 }
 
@@ -127,7 +127,7 @@ const DEFAULT_FORM_STATE: FormState = {
   cronMode: 'builder',
   cronBuilder: { ...DEFAULT_CRON_BUILDER },
   notifyAccountId: undefined,
-  agentId: 'main',
+  workspaceId: '',
   modelId: '',
 };
 
@@ -199,7 +199,7 @@ function createFormState(task?: ScheduledTask, prefill?: TaskTemplateValues): Fo
     cronMode: 'builder',
     cronBuilder: parsedBuilder,
     notifyAccountId: task.delivery.accountId,
-    agentId: task.agentId || '',
+    workspaceId: task.workspaceId || '',
     modelId: task.payload.kind === 'agentTurn' ? (task.payload.model ?? '') : '',
   };
 }
@@ -280,7 +280,8 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const initialFormRef = useRef<string>(JSON.stringify(createFormState(task, prefill)));
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
-  const agents = useSelector((state: RootState) => state.agent.agents);
+  const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
+  const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
 
   const [channelOptions, setChannelOptions] = useState<ScheduledTaskChannelOption[]>(() => {
     const base: ScheduledTaskChannelOption[] = [];
@@ -316,6 +317,17 @@ const TaskForm: React.FC<TaskFormProps> = ({
     initialFormRef.current = JSON.stringify(nextForm);
     setForm(nextForm);
   }, [task, prefill]);
+
+  useEffect(() => {
+    if (form.workspaceId) return;
+    const workspaceId = currentWorkspaceId ?? workspaces.find(item => !item.isHidden)?.id ?? '';
+    if (!workspaceId) return;
+    setForm(current => (current.workspaceId ? current : { ...current, workspaceId }));
+    const initial = JSON.parse(initialFormRef.current) as FormState;
+    if (!initial.workspaceId) {
+      initialFormRef.current = JSON.stringify({ ...initial, workspaceId });
+    }
+  }, [form.workspaceId, currentWorkspaceId, workspaces]);
 
   useEffect(() => {
     let cancelled = false;
@@ -394,6 +406,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
     if (!form.modelId) {
       nextErrors.modelId = i18nService.t('scheduledTasksFormValidationModelRequired');
     }
+    if (!form.workspaceId) {
+      nextErrors.workspaceId = i18nService.t('scheduledTasksFormValidationWorkspaceRequired');
+    }
     if (!form.payloadText.trim()) {
       nextErrors.payloadText = i18nService.t('scheduledTasksFormValidationPromptRequired');
     }
@@ -444,27 +459,17 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const handleSubmit = async () => {
     if (!validate()) return;
 
-    let agentRecord: Awaited<
-      ReturnType<NonNullable<typeof window.electron>['agents']['get']>
-    > | null = null;
-    if (form.agentId) {
-      try {
-        agentRecord = await window.electron?.agents?.get(form.agentId);
-      } catch {
-        agentRecord = null;
-      }
-    }
-    const defaultModelRef = defaultSelectedModel ? toOpenClawModelRef(defaultSelectedModel) : '';
-    const unsupportedModel = resolveFirstUnsupportedOpenClawModel(
-      buildOpenClawModelValidationTargets({
-        primaryModelRef: form.modelId || agentRecord?.model || selectedAgent?.model || '',
+    const defaultModelRef = defaultSelectedModel ? toAgentModelRef(defaultSelectedModel) : '';
+    const unsupportedModel = resolveFirstUnsupportedAgentModel(
+      buildAgentModelValidationTargets({
+        primaryModelRef: form.modelId,
         fallbackModelRef: defaultModelRef,
-        triageOverride: form.modelId ? null : (agentRecord?.triageOverride ?? null),
+        triageOverride: null,
       }),
       availableModels,
     );
     if (unsupportedModel) {
-      setSubmitError(i18nService.t(resolveOpenClawModelSupportMessageKey(unsupportedModel.reason)));
+      setSubmitError(i18nService.t(resolveAgentModelSupportMessageKey(unsupportedModel.reason)));
       return;
     }
 
@@ -480,7 +485,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
         schedule,
         sessionTarget: 'isolated',
         wakeMode: 'now',
-        agentId: form.agentId,
+        workspaceId: form.workspaceId,
         payload: {
           kind: 'agentTurn',
           message: form.payloadText.trim(),
@@ -513,9 +518,6 @@ const TaskForm: React.FC<TaskFormProps> = ({
       setSubmitting(false);
     }
   };
-
-  // Resolve the selected agent's configured model for display
-  const selectedAgent = agents.find(a => a.id === form.agentId) ?? null;
 
   const getNotifyChannelLabel = (channel: ScheduledTaskChannelOption): string => {
     const platform = PlatformRegistry.platformOfChannel(channel.value);
@@ -1066,16 +1068,12 @@ const TaskForm: React.FC<TaskFormProps> = ({
             </SelectItem>
             {channelOptions.map(channel => {
               const displayName = getNotifyChannelLabel(channel);
-              const unsupported = channel.value === 'openclaw-weixin';
               return (
                 <SelectItem
                   key={`${channel.value}:${channel.accountId ?? ''}`}
                   value={channel.value}
-                  disabled={unsupported}
                 >
-                  {unsupported
-                    ? `${displayName} (${i18nService.t('scheduledTasksChannelUnsupported')})`
-                    : displayName}
+                  {displayName}
                 </SelectItem>
               );
             })}
@@ -1121,16 +1119,21 @@ const TaskForm: React.FC<TaskFormProps> = ({
           mode={mode}
           name={form.name}
           modelId={form.modelId}
+          workspaceId={form.workspaceId}
           payloadText={form.payloadText}
           errors={errors}
           modelOptions={availableModels.map(model => ({
-            value: toOpenClawModelRef(model),
+            value: toAgentModelRef(model),
             label: model.name,
           }))}
+          workspaceOptions={workspaces
+            .filter(workspace => !workspace.isHidden)
+            .map(workspace => ({ value: workspace.id, label: workspace.name }))}
           scheduleControl={renderScheduleRow()}
           notificationControl={renderNotifyRow()}
           onNameChange={name => updateForm({ name: name.slice(0, TASK_NAME_MAX_LENGTH) })}
           onModelChange={modelId => updateForm({ modelId })}
+          onWorkspaceChange={workspaceId => updateForm({ workspaceId })}
           onPayloadTextChange={payloadText => updateForm({ payloadText })}
         />
       </div>

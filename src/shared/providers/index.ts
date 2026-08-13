@@ -5,8 +5,8 @@ export {
   ApiFormat,
   AuthType,
   ModelCapabilityStatus,
-  OpenClawApi,
-  OpenClawProviderId,
+  AgentApi,
+  AgentProviderId,
   ProviderName,
   ProviderRegistry,
 } from './constants';

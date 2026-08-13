@@ -20,6 +20,7 @@ import {
 } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
+import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { RootState } from '../../store';
 import {
@@ -55,7 +56,6 @@ import type {
 } from '../../types/cowork';
 import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
 import WindowTitleBar from '../window/WindowTitleBar';
-import { ArtifactPanelIcon } from './components/StreamingBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import {
@@ -101,6 +101,7 @@ import { useConversationRailScrollSync } from './hooks/useConversationRailScroll
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
+import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
 import { WorkbenchTaskStatusBar } from './WorkbenchTaskStatus';
 
@@ -222,7 +223,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
 
   const sessionId = currentSession?.id;
   const recoverableTaskId = useRecoverableWorkbenchTaskId(sessionId);
-  const [gatewaySessionId, setGatewaySessionId] = useState<string | null>(null);
 
   const handleResumeTask = useCallback(
     (interruption: CoworkSessionInterruption) => {
@@ -232,15 +232,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     [onResumeTask],
   );
 
-  useEffect(() => {
-    if (sessionId) {
-      window.electron.cowork.getGatewaySessionId(sessionId).then(res => {
-        if (res.success) setGatewaySessionId(res.gatewaySessionId);
-      });
-    } else {
-      setGatewaySessionId(null);
-    }
-  }, [sessionId]);
 
   // Rail navigation states
   const [currentRailIndex, setCurrentRailIndex] = useState(-1);
@@ -1155,14 +1146,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             <>
               <h1 className="text-sm leading-none font-medium text-foreground truncate max-w-[400px]">
                 {currentSession.title || i18nService.t('coworkNewSession')}
-                {process.env.NODE_ENV === 'development' && gatewaySessionId && (
-                  <span
-                    className="non-draggable text-[10px] text-muted-foreground ml-1.5 font-mono select-text cursor-text"
-                    onPointerDown={e => e.stopPropagation()}
-                  >
-                    {gatewaySessionId.slice(0, 8)}
-                  </span>
-                )}
               </h1>
               {sessionId && <WorkbenchTaskStatusBar sessionId={sessionId} />}
             </>
@@ -1179,7 +1162,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             aria-label={i18nService.t('artifactPanelToggle')}
             disabled={isSessionSwitching}
           >
-            <ArtifactPanelIcon className="h-4 w-4" open={!isSessionSwitching && isPanelOpen} />
+            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isPanelOpen} />
           </Button>
 
           <WindowTitleBar inline className="ml-1" />
@@ -1288,6 +1271,11 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                           permission={inlineQuestionPermission}
                           onRespond={onRespondToInlineQuestion}
                         />
+                      </div>
+                    )}
+                    {sessionId && (
+                      <div className="px-3 pt-3">
+                        <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
                       </div>
                     )}
                     <div className="h-20" />

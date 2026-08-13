@@ -1,8 +1,8 @@
 /**
  * Channel/Cron run lifecycle events (issue #225 step 3).
  *
- * Channel-triggered runs (IM messages) and Cron-triggered runs execute
- * inside the OpenClaw domain and are NOT cowork workbench sessions. These
+ * Channel-triggered runs (IM messages) and Cron-triggered runs execute through
+ * the Pi kernel and are NOT cowork workbench sessions. These
  * events expose them to the renderer as a read-only projection for the
  * future activity feed, on their own IPC channel instead of cowork:stream:*.
  */

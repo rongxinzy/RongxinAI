@@ -149,8 +149,8 @@
         "filter": ["**/*"]
       },
       {
-        "from": "vendor/openclaw-runtime/current",
-        "to": "cfmind",
+        "from": "vendor/channel-runtime/current",
+        "to": "channel-runtime",
         "filter": [
           "**/*",
           "!**/*.map",
@@ -265,8 +265,8 @@
         ]
       },
       {
-        "from": "vendor/openclaw-runtime/current",
-        "to": "cfmind",
+        "from": "vendor/channel-runtime/current",
+        "to": "channel-runtime",
         "filter": [
           "**/*",
           "!**/*.map",

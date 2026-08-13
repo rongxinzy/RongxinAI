@@ -4,7 +4,6 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 
 const npmLockfiles = [
-  'package-lock.json',
   'SKILLs/presentation-studio/package-lock.json',
   'SKILLs/web-search/package-lock.json',
   'scripts/release/package-lock.json',

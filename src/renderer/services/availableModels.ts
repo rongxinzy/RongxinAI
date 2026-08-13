@@ -7,7 +7,7 @@ import {
 } from '../../shared/providers';
 import { type AppConfig, getProviderDisplayName } from '../config';
 import type { Model } from '../store/slices/modelSlice';
-import { getRunningModelOpenClawEligibility } from '../utils/llamacppOpenClawEligibility';
+import { getRunningModelAgentEligibility } from '../utils/llamacppAgentEligibility';
 
 export const LLAMACPP_RUNNING_MODELS_CHANGED_EVENT = 'llamacpp:running-models-changed';
 
@@ -59,7 +59,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
         name: model.name,
         provider: getProviderDisplayName(providerName, providerConfig),
         providerKey: providerName,
-        openClawProviderId: ProviderRegistry.getOpenClawProviderId(providerName),
+        agentProviderId: ProviderRegistry.getAgentProviderId(providerName),
         supportsImage,
         capabilities: ProviderRegistry.resolveModelCapabilities(
           providerName,
@@ -91,17 +91,17 @@ export function buildLlamaCppRunningModels(
     if (!name) {
       return;
     }
-    const eligibility = getRunningModelOpenClawEligibility(model);
+    const eligibility = getRunningModelAgentEligibility(model);
     models.push({
       id: name,
       name,
       provider: 'llama.cpp',
       providerKey: ProviderName.LlamaCpp,
-      openClawProviderId: ProviderRegistry.getOpenClawProviderId(ProviderName.LlamaCpp),
+      agentProviderId: ProviderRegistry.getAgentProviderId(ProviderName.LlamaCpp),
       supportsImage: false,
       capabilities: preferences[name]?.capabilities,
       supportsThinkingToggle: model.supportsThinkingToggle,
-      llamaCppOpenClawEligibility: eligibility,
+      llamaCppAgentEligibility: eligibility,
       llamaCppRuntimeContextWindow: eligibility.runtimeContextWindow,
       llamaCppTrainedContextWindow: eligibility.trainedContextWindow,
     });

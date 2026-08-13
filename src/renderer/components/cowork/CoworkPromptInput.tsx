@@ -43,7 +43,7 @@ import { clearActiveSkills, setSkills } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import { CoworkFileAttachment, CoworkImageAttachment } from '../../types/cowork';
 import { Skill } from '../../types/skill';
-import { toOpenClawModelRef } from '../../utils/openclawModelRef';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 import ActiveMcpBadge from '../mcp/ActiveMcpBadge';
 import {
   resolveAgentModelSelection,
@@ -260,7 +260,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       !isDirectChat &&
       (currentSession?.mode ?? CoworkSessionMode.Work) === CoworkSessionMode.Work;
     const persistedExpertIds = useMemo(
-      () => currentSession?.experts?.map(expert => expert.expertId) ?? [],
+      () => currentSession?.experts?.slice(0, 1).map(expert => expert.expertId) ?? [],
       [currentSession?.experts],
     );
     const [selectedExpertIds, setSelectedExpertIds] = useState<string[]>(() =>
@@ -352,7 +352,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           dispatch(setDefaultSelectedModel(nextModel));
           return;
         }
-        const modelRef = toOpenClawModelRef(nextModel);
+        const modelRef = toAgentModelRef(nextModel);
         // Always update the agent-level model selection so that CoworkView's
         // currentAgentSelectedModel (used to build ChatChatTransport) reflects
         // the user's latest choice — even when switching model inside a session.
@@ -364,7 +364,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
           setIsPatchingModel(true);
           dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: modelRef }));
           try {
-            const ok = await coworkService.patchSession(sessionId, { model: modelRef });
+            const ok = await coworkService.updateSessionModel(sessionId, modelRef);
             if (reqId !== modelPatchRequestIdRef.current) return;
             if (!ok) {
               dispatch(updateCurrentSessionModelOverride({ sessionId, modelOverride: prev }));
@@ -580,6 +580,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             isImage: attachment.isImage,
             hasDataUrl: !!attachment.dataUrl,
           });
+          const dotIndex = attachment.name.lastIndexOf('.');
+          fileAtts.push({
+            name: attachment.name,
+            path: attachment.path,
+            extension: dotIndex >= 0 ? attachment.name.slice(dotIndex + 1).toUpperCase() : 'FILE',
+            isImage: true,
+          });
         } else {
           const dotIndex = attachment.name.lastIndexOf('.');
           fileAtts.push({
@@ -596,7 +603,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       // Note: inline/clipboard images have pseudo-paths starting with 'inline:' and are excluded.
       // Note: image attachments that already carry base64 data are excluded — their content
       // is delivered via the attachments parameter of chat.send. Including the file path
-      // would trigger OpenClaw's Native-image detection, which rejects paths outside allowed
+      // would trigger native image-path detection, which rejects paths outside allowed
       // directories and can drop the base64 image during sanitization (macOS-only bug).
       const attachmentLines = attachments
         .filter(a => !a.path.startsWith('inline:') && !(a.isImage && a.dataUrl))
@@ -886,7 +893,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   '[CoworkPromptInput] handleIncomingFiles: native image fallback to path-only (no dataUrl)',
                   { nativePath },
                 );
-                addAttachment(nativePath);
+                addAttachment(nativePath, { isImage: true });
               } else {
                 // No native path (clipboard/drag from browser):
                 // 1. Read as dataUrl for preview + base64 vision
@@ -941,13 +948,13 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
 
           // Non-image file or model doesn't support images: use original flow
           if (nativePath) {
-            addAttachment(nativePath);
+            addAttachment(nativePath, fileIsImage ? { isImage: true } : undefined);
             continue;
           }
 
           const stagedPath = await saveInlineFile(file);
           if (stagedPath) {
-            addAttachment(stagedPath);
+            addAttachment(stagedPath, fileIsImage ? { isImage: true } : undefined);
           }
         }
         if (hasImageWithoutVision) {
@@ -1007,7 +1014,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               hasImageWithoutVision = true;
             }
           }
-          addAttachment(filePath);
+          addAttachment(filePath, isImagePath(filePath) ? { isImage: true } : undefined);
         }
         if (hasImageWithoutVision) {
           setImageVisionHint(true);

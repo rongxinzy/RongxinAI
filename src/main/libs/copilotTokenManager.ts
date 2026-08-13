@@ -7,14 +7,14 @@
  * 3. Handles on-demand refresh when auth errors are detected
  * 4. Pushes updated tokens to all renderer windows via IPC
  *
- * Modeled after OpenClaw's RuntimeAuthState + scheduleRuntimeAuthRefresh mechanism.
+ * Maintains short-lived Copilot credentials with scheduled refresh.
  */
 
 import { BrowserWindow } from 'electron';
 
 import { getCopilotToken } from './githubCopilotAuth';
 
-/** Refresh 5 minutes before expiry (same as OpenClaw's RUNTIME_AUTH_REFRESH_MARGIN_MS). */
+/** Refresh five minutes before expiry. */
 const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 /** Minimum delay between refresh attempts to avoid tight loops. */
 const MIN_REFRESH_DELAY_MS = 10 * 1000;
@@ -150,7 +150,7 @@ export async function refreshCopilotTokenNow(): Promise<TokenState> {
       // Push updated token to all renderer windows
       broadcastTokenUpdate(token, baseUrl);
 
-      // Notify external listeners (e.g. OpenClaw cache sync)
+      // Notify compatibility proxy listeners.
       for (const cb of onTokenRefreshCallbacks) {
         try {
           cb(tokenState!);

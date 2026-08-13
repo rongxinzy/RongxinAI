@@ -30,7 +30,7 @@ export const CoworkErrorKind = {
   GatewayDisconnected: 'gateway_disconnected',
   /** Gateway draining for restart */
   GatewayDraining: 'gateway_draining',
-  /** OpenClaw engine not ready (compiling / starting / error) */
+  /** Agent runtime not ready (starting or recovering) */
   EngineNotReady: 'engine_not_ready',
   /** Network error (ECONNREFUSED, ENOTFOUND, ETIMEDOUT) */
   NetworkError: 'network_error',
@@ -360,5 +360,5 @@ export function getUserErrorI18nKey(kind: CoworkErrorKind): string {
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-/** Error code returned by IPC when the OpenClaw engine is not ready. */
+/** Error code returned by IPC when the agent runtime is not ready. */
 export const ENGINE_NOT_READY_CODE = 'ENGINE_NOT_READY' as const;

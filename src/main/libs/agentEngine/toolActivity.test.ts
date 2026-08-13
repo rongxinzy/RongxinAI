@@ -5,7 +5,7 @@ import {
   CoworkToolActivityPhase,
 } from '../../../shared/cowork/toolActivity';
 import {
-  extractOpenClawPreparingToolActivities,
+  extractAgentPreparingToolActivities,
   getPiPreparingToolActivity,
   ToolActivityTracker,
   toToolActivityInput,
@@ -38,8 +38,8 @@ test('extracts Pi tool calls from partial argument snapshots', () => {
   });
 });
 
-test('extracts nested OpenClaw tool call blocks without tool results', () => {
-  const activities = extractOpenClawPreparingToolActivities({
+test('extracts nested runtime tool call blocks without tool results', () => {
+  const activities = extractAgentPreparingToolActivities({
     stream: 'assistant',
     data: {
       message: {

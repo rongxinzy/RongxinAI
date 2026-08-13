@@ -131,7 +131,7 @@ describe('online update release tools', () => {
     const result = runScript(
       'publish-update-manifest.mjs',
       [manifestPath, version, 'b'.repeat(40), '--metadata', metadataPath],
-      releaseEnvironment,
+      { ...releaseEnvironment, UPDATE_SOURCE_PIPELINE_ID: '123456789' },
     );
     expect(result.stderr).toBe('');
     expect(result.status).toBe(0);
@@ -145,6 +145,7 @@ describe('online update release tools', () => {
     expect(payloads.map(payload => payload.artifact.sha256)).toEqual(
       artifacts.filter(artifact => !artifact.kind || artifact.kind === 'installer').map(artifact => artifact.sha256),
     );
+    expect(payloads.every(payload => payload.source.pipelineId === '123456789')).toBe(true);
     expect(payloads.find(payload => payload.artifact.platform === 'darwin').artifact.updater.filename).toBe(
       'installer.zip',
     );

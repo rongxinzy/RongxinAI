@@ -1,4 +1,5 @@
 import type { NvidiaSmiSnapshot } from '../hardware';
+import { LlamaCppMemoryPolicy } from './constants';
 import type { LlamaCppServiceConfig } from './types';
 
 const LLAMACPP_DEFAULT_CONTEXT_HIGH_VRAM_MIB = 20 * 1024;
@@ -16,6 +17,8 @@ export const DEFAULT_LLAMACPP_SERVICE_CONFIG: LlamaCppServiceConfig = {
   batchSize: '512',
   ubatchSize: '512',
   gpuLayers: 'auto',
+  memoryPolicy: LlamaCppMemoryPolicy.Auto,
+  memoryBudgetPercent: 50,
 };
 
 export function resolveAutomaticLlamaCppContextSize(

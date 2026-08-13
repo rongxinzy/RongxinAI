@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { OpenClawProviderId, ProviderName } from '../../../shared/providers';
+import { AgentProviderId, ProviderName } from '../../../shared/providers';
 import type { Model } from '../../store/slices/modelSlice';
 import { resolveAgentModelSelection, resolveEffectiveModel } from './agentModelSelection';
 
@@ -54,7 +54,7 @@ describe('resolveAgentModelSelection', () => {
     expect(result.hasInvalidExplicitModel).toBe(false);
   });
 
-  test('falls back to the global model in openclaw when agent model is empty', () => {
+  test('falls back to the global model when agent model is empty', () => {
     const result = resolveAgentModelSelection({
       agentModel: '',
       availableModels: models,
@@ -117,7 +117,7 @@ describe('resolveAgentModelSelection', () => {
 
   test('keeps explicit llama.cpp selection for work chat', () => {
     const result = resolveAgentModelSelection({
-      agentModel: `${OpenClawProviderId.LlamaCpp}/qwen-local`,
+      agentModel: `${AgentProviderId.LlamaCpp}/qwen-local`,
       availableModels: [...models, ineligibleLlamaCppModel],
       fallbackModel: models[0],
     });

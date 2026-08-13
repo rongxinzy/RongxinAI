@@ -17,7 +17,7 @@ import { i18nService } from '../../services/i18n';
 import type {
   DingTalkInstanceConfig,
   DingTalkInstanceStatus,
-  DingTalkOpenClawConfig,
+  DingTalkChannelConfig,
   IMConnectivityTestResult,
 } from '../../types/im';
 import {
@@ -32,8 +32,8 @@ import {
 interface DingTalkInstanceSettingsProps {
   instance: DingTalkInstanceConfig;
   instanceStatus: DingTalkInstanceStatus | undefined;
-  onConfigChange: (update: Partial<DingTalkOpenClawConfig>) => void;
-  onSave: (override?: Partial<DingTalkOpenClawConfig>) => Promise<void>;
+  onConfigChange: (update: Partial<DingTalkChannelConfig>) => void;
+  onSave: (override?: Partial<DingTalkChannelConfig>) => Promise<void>;
   onRename: (newName: string) => void;
   onDelete: () => void;
   onToggleEnabled: () => void;
@@ -70,87 +70,6 @@ const PlatformGuide: React.FC<{
     )}
   </div>
 );
-
-// Pairing section component
-const PairingSection: React.FC<{
-  platform: string;
-}> = ({ platform }) => {
-  const [pairingCodeInput, setPairingCodeInput] = useState('');
-  const [pairingStatus, setPairingStatus] = useState<{
-    type: 'success' | 'error';
-    message: string;
-  } | null>(null);
-
-  const handleApprovePairing = async (code: string) => {
-    setPairingStatus(null);
-    try {
-      const result = await window.electron.im.approvePairingCode(platform, code);
-      if (result.success) {
-        setPairingStatus({
-          type: 'success',
-          message: i18nService.t('imPairingCodeApproved').replace('{code}', code),
-        });
-      } else {
-        setPairingStatus({
-          type: 'error',
-          message: result.error || i18nService.t('imPairingCodeInvalid'),
-        });
-      }
-    } catch {
-      setPairingStatus({ type: 'error', message: i18nService.t('imPairingCodeInvalid') });
-    }
-  };
-
-  return (
-    <IMField id={`${platform}-pairing-code`} label={i18nService.t('imPairingApproval')}>
-      <div className="flex gap-2">
-        <Input
-          id={`${platform}-pairing-code`}
-          type="text"
-          value={pairingCodeInput}
-          onChange={e => {
-            setPairingCodeInput(e.target.value.toUpperCase());
-            if (pairingStatus) setPairingStatus(null);
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              const code = pairingCodeInput.trim();
-              if (code) {
-                void handleApprovePairing(code).then(() => {
-                  setPairingCodeInput('');
-                });
-              }
-            }
-          }}
-          className="flex-1 font-mono uppercase tracking-widest"
-          placeholder={i18nService.t('imPairingCodePlaceholder')}
-          maxLength={8}
-        />
-        <Button
-          type="button"
-          variant="default"
-          size="sm"
-          onClick={() => {
-            const code = pairingCodeInput.trim();
-            if (code) {
-              void handleApprovePairing(code).then(() => {
-                setPairingCodeInput('');
-              });
-            }
-          }}
-        >
-          {i18nService.t('imPairingApprove')}
-        </Button>
-      </div>
-      {pairingStatus && (
-        <IMStatusAlert error={pairingStatus.type === 'error'}>
-          {pairingStatus.message}
-        </IMStatusAlert>
-      )}
-    </IMField>
-  );
-};
 
 const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
   instance,
@@ -489,14 +408,13 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
               { value: 'allowlist', label: i18nService.t('imDmPolicyAllowlist') },
             ]}
             onValueChange={value => {
-              const update = { dmPolicy: value as DingTalkOpenClawConfig['dmPolicy'] };
+              const update = { dmPolicy: value as DingTalkChannelConfig['dmPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}
           />
 
           {/* Pairing Requests (shown when dmPolicy is 'pairing') */}
-          {instance.dmPolicy === 'pairing' && <PairingSection platform="dingtalk" />}
 
           {/* Allow From (User IDs) */}
           <IMField
@@ -578,7 +496,7 @@ const DingTalkInstanceSettings: React.FC<DingTalkInstanceSettingsProps> = ({
               { value: 'allowlist', label: i18nService.t('imGroupPolicyAllowlist') },
             ]}
             onValueChange={value => {
-              const update = { groupPolicy: value as DingTalkOpenClawConfig['groupPolicy'] };
+              const update = { groupPolicy: value as DingTalkChannelConfig['groupPolicy'] };
               onConfigChange(update);
               void onSave(update);
             }}

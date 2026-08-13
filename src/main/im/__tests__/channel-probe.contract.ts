@@ -36,7 +36,7 @@ const VALID_CHECK_CODES: ReadonlySet<string> = new Set<IMConnectivityCheckCode>(
   'discord_group_requires_mention',
   'telegram_privacy_mode_hint',
   'dingtalk_bot_membership_hint',
-  'openclaw_gateway_not_running',
+  'channel_runtime_not_running',
   'qq_guild_mention_hint',
   'qq_mention_hint',
   'weixin_not_logged_in',
@@ -83,7 +83,7 @@ const AUTH_EQUIVALENT_CODES: ReadonlySet<string> = new Set([
   'weixin_not_logged_in',
   'weixin_account_missing',
   // When the Gateway is not running, no auth check is possible
-  'openclaw_gateway_not_running',
+  'channel_runtime_not_running',
 ]);
 
 export function validateAuthCoverage(checks: IMConnectivityCheck[]): void {

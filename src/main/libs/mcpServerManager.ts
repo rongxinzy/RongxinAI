@@ -1,6 +1,6 @@
 /**
  * McpServerManager — manages MCP server lifecycles and tool discovery
- * for the OpenClaw MCP Bridge.
+ * for the in-process Pi runtime.
  *
  * Starts enabled MCP servers via MCP SDK transports (stdio, SSE, Streamable HTTP),
  * discovers available tools, and routes tool calls to the correct server.

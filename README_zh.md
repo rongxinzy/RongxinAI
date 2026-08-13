@@ -34,13 +34,13 @@
 
 ## 为什么选择能执行的本地优先 AI Agent
 
-| 你的需求 | 知远的处理方式 |
-| --- | --- |
-| 不只给建议，而是完成工作 | 读写文件、运行终端、操作浏览器并制作文档 |
-| 敏感操作仍由人控制 | 展示工具状态，高风险操作按次请求批准 |
-| 需要本地模型与隐私空间 | 安装并运行 GGUF 模型，可调上下文、GPU offload、线程与服务生命周期 |
-| 把经验变成可复用流程 | 组合 42 个内置技能、自定义技能、MCP 服务与定时任务 |
-| 离开电脑也能收到结果 | 通过微信、企微、钉钉、飞书/Lark、QQ 或邮件投递结果 |
+| 你的需求                 | 知远的处理方式                                                    |
+| ------------------------ | ----------------------------------------------------------------- |
+| 不只给建议，而是完成工作 | 读写文件、运行终端、操作浏览器并制作文档                          |
+| 敏感操作仍由人控制       | 展示工具状态，高风险操作按次请求批准                              |
+| 需要本地模型与隐私空间   | 安装并运行 GGUF 模型，可调上下文、GPU offload、线程与服务生命周期 |
+| 把经验变成可复用流程     | 组合 42 个内置技能、自定义技能、MCP 服务与定时任务                |
+| 离开电脑也能收到结果     | 通过微信、企微、钉钉、飞书/Lark、QQ 或邮件投递结果                |
 
 典型场景包括代码仓库调研、文档与表格处理、浏览器操作、周期简报、收件箱清理、本地模型实验和企业内部工具自动化。
 
@@ -86,13 +86,13 @@
 
 任务从 Renderer 通过受控 IPC 发送到内置 Agent 运行时。消息、权限请求、工具状态和完成事件会实时流回界面。
 
-| 事件 | 说明 |
-| --- | --- |
-| `message` | 会话新增消息 |
-| `messageUpdate` | 流式内容增量更新 |
+| 事件                | 说明             |
+| ------------------- | ---------------- |
+| `message`           | 会话新增消息     |
+| `messageUpdate`     | 流式内容增量更新 |
 | `permissionRequest` | 工具调用需要审批 |
-| `complete` | 会话执行完成 |
-| `error` | 会话执行失败 |
+| `complete`          | 会话执行完成     |
+| `error`             | 会话执行失败     |
 
 ### 本地推理与模型市场
 
@@ -126,14 +126,8 @@ bun run electron:dev
 # 下载当前主机对应的 llama.cpp 运行时
 bun run llamacpp:runtime:download
 
-# 获取并构建当前主机对应的固定版本 Agent 运行时
-bun run openclaw:runtime:host
-```
-
-或者同时准备内置 Agent 运行时和本地推理运行时，并启动 Electron：
-
-```bash
-bun run electron:dev:openclaw
+# 下载当前主机对应的记忆运行时
+bun run engram:runtime:host
 ```
 
 ### 构建、测试与打包
@@ -152,18 +146,18 @@ bun run dist:linux
 
 ## 技术栈
 
-| 层 | 技术 |
-| --- | --- |
-| 桌面框架 | Electron 40 |
-| 前端 | React 19 + TypeScript 7 |
-| 构建 | Vite 8（Rolldown） |
-| 样式 | Tailwind CSS 4 |
-| 工具链 | Bun、oxlint、oxfmt |
-| 状态管理 | Redux Toolkit |
-| Agent 运行时 | 自研 |
-| 本地推理 | 自研、兼容 GGUF 模型 |
-| 存储 | better-sqlite3 |
-| 渲染 | react-markdown、Mermaid、KaTeX |
+| 层           | 技术                           |
+| ------------ | ------------------------------ |
+| 桌面框架     | Electron 40                    |
+| 前端         | React 19 + TypeScript 7        |
+| 构建         | Vite 8（Rolldown）             |
+| 样式         | Tailwind CSS 4                 |
+| 工具链       | Bun、oxlint、oxfmt             |
+| 状态管理     | Redux Toolkit                  |
+| Agent 运行时 | 自研                           |
+| 本地推理     | 自研、兼容 GGUF 模型           |
+| 存储         | better-sqlite3                 |
+| 渲染         | react-markdown、Mermaid、KaTeX |
 
 ## 社区与贡献
 

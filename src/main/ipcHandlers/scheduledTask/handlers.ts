@@ -6,12 +6,12 @@ import {
   PayloadKind as STPayloadKind,
   SessionTarget as STSessionTarget,
 } from '../../../scheduledTask/constants';
-import type { CronJobService } from '../../../scheduledTask/cronJobService';
+import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { PlatformRegistry } from '../../../shared/platform';
 import { listScheduledTaskChannels } from './helpers';
 
 export interface ScheduledTaskHandlerDeps {
-  getCronJobService: () => CronJobService;
+  getCronJobService: () => ScheduledTaskService;
   getIMGatewayManager: () => {
     getIMStore: () =>
       | {
@@ -25,37 +25,25 @@ export interface ScheduledTaskHandlerDeps {
             | undefined;
           listSessionMappings: (
             platform: string,
-            agentId?: string,
+            accountId?: string,
           ) => Array<{
             imConversationId: string;
             platform: string;
             coworkSessionId: string;
-            agentId: string;
             lastActiveAt: string;
           }>;
         }
       | undefined;
-    primeConversationReplyRoute: (
-      platform: string,
-      conversationId: string,
-      coworkSessionId: string,
-    ) => Promise<void>;
-  } | null;
-  getOpenClawChannelGateway: () => {
-    getGatewayClient: () => unknown;
-    fetchSessionByKey: (sessionKey: string) => Promise<unknown>;
   } | null;
 }
 
 /**
- * Normalizes an announce-mode delivery payload for OpenClaw native delivery.
+ * Normalizes an announce-mode delivery payload for local channel delivery.
  * Mutates `normalizedInput` in place: sets sessionTarget, converts SystemEvent
- * payloads to AgentTurn, strips IM subtype prefixes from delivery.to, and primes
- * the DingTalk reply route when needed.
+ * payloads to AgentTurn, and strips IM subtype prefixes from delivery.to.
  */
 async function applyAnnounceDeliveryNormalization(
   normalizedInput: Record<string, any>,
-  getIMGatewayManager: ScheduledTaskHandlerDeps['getIMGatewayManager'],
 ): Promise<void> {
   const delivery = normalizedInput.delivery;
   if (!(delivery && delivery.mode === STDeliveryMode.Announce && delivery.channel && delivery.to)) {
@@ -85,22 +73,10 @@ async function applyAnnounceDeliveryNormalization(
       delivery.to,
     );
   }
-
-  if (platform === 'dingtalk') {
-    const imStore = getIMGatewayManager()?.getIMStore();
-    const mapping = imStore?.getSessionMapping(rawTo, platform);
-    if (mapping) {
-      await getIMGatewayManager()!.primeConversationReplyRoute(
-        platform,
-        rawTo,
-        mapping.coworkSessionId,
-      );
-    }
-  }
 }
 
 export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): void {
-  const { getCronJobService, getIMGatewayManager, getOpenClawChannelGateway } = deps;
+  const { getCronJobService, getIMGatewayManager } = deps;
 
   ipcMain.handle(ScheduledTaskIpc.List, async () => {
     try {
@@ -130,7 +106,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
     try {
       const normalizedInput = input && typeof input === 'object' ? { ...input } : {};
       console.debug('[ScheduledTask] create input:', JSON.stringify(normalizedInput, null, 2));
-      await applyAnnounceDeliveryNormalization(normalizedInput, getIMGatewayManager);
+      await applyAnnounceDeliveryNormalization(normalizedInput);
 
       const task = await getCronJobService().addJob(normalizedInput);
       console.log('[IPC][scheduledTask:create] result task id:', task?.id, 'name:', task?.name);
@@ -151,7 +127,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
         id,
         JSON.stringify(normalizedInput, null, 2),
       );
-      await applyAnnounceDeliveryNormalization(normalizedInput, getIMGatewayManager);
+      await applyAnnounceDeliveryNormalization(normalizedInput);
 
       const task = await getCronJobService().updateJob(id, normalizedInput);
       console.log('[IPC][scheduledTask:update] result task id:', task?.id, 'name:', task?.name);
@@ -200,8 +176,7 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
   });
 
   ipcMain.handle(ScheduledTaskIpc.Stop, async (_event, _id: string) => {
-    // OpenClaw doesn't expose a direct stop API for running cron jobs
-    // The job will complete or timeout on its own
+    // A claimed Pi Run is allowed to finish or time out on its own.
     return { success: true, result: false };
   });
 
@@ -261,9 +236,9 @@ export function registerScheduledTaskHandlers(deps: ScheduledTaskHandlerDeps): v
   ipcMain.handle(ScheduledTaskIpc.ResolveSession, async (_event, sessionKey: string) => {
     try {
       if (!sessionKey) return { success: true, session: null };
-      // Fetch session history from OpenClaw (returns transient session, not persisted)
-      const session = await getOpenClawChannelGateway()?.fetchSessionByKey(sessionKey);
-      return { success: true, session: session ?? null };
+      // Canonical Runs store their Pi session id directly. There is no remote
+      // scheduler session authority to query by an opaque legacy session key.
+      return { success: true, session: null };
     } catch (error) {
       return {
         success: false,

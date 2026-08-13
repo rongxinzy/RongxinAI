@@ -126,6 +126,41 @@ test("publish verification uses portable jq flags and preserves updater filename
   );
 });
 
+test("release supply-chain gates track every checked-in npm lockfile", () => {
+  const trackedLockfiles = execFileSync(
+    "git",
+    ["ls-files", "*package-lock.json"],
+    { cwd: root, encoding: "utf8" },
+  )
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .sort();
+  const policy = readFileSync(
+    path.join(root, "scripts", "ci", "check-supply-chain-inputs.mjs"),
+    "utf8",
+  );
+  const workflow = readFileSync(
+    path.join(root, ".github", "workflows", "online-update-release.yml"),
+    "utf8",
+  );
+  const policyLockfiles = Array.from(
+    policy.matchAll(/^\s+'([^']+package-lock\.json)',?$/gm),
+    (match) => match[1],
+  ).sort();
+  const signatureStep = workflow.slice(
+    workflow.indexOf("- name: Verify npm package signatures"),
+    workflow.indexOf("- name: Enforce approved package sources"),
+  );
+  const workflowLockfiles = Array.from(
+    signatureStep.matchAll(/^\s+([^\s]+package-lock\.json)(?: \\|; do)?$/gm),
+    (match) => match[1],
+  ).sort();
+
+  assert.deepEqual(policyLockfiles, trackedLockfiles);
+  assert.deepEqual(workflowLockfiles, trackedLockfiles);
+});
+
 test("unsigned macOS release builds do not receive empty signing credentials", () => {
   const workflow = readFileSync(
     path.join(root, ".github", "workflows", "online-update-release.yml"),
@@ -182,8 +217,10 @@ test("Windows release workflow runs the clean-path bundled runtime gate", () => 
     path.join(root, "scripts", "ci", "windows-runtime-smoke.ps1"),
     "utf8",
   );
-  assert.match(smoke, /skill-python\\xlsx/);
-  assert.match(smoke, /skill-python\\pdf/);
+  assert.match(smoke, /skill-python\\layers\\shared\\Scripts\\python\.exe/);
+  assert.doesNotMatch(smoke, /skill-python\\(?:xlsx|pdf)\\Scripts\\python\.exe/);
+  assert.match(smoke, /bundled XLSX dependency probe/);
+  assert.match(smoke, /bundled PDF dependency probe/);
   assert.match(smoke, /markdown_to_docx\.mjs/);
   assert.match(smoke, /docx\\scripts\\markdown_to_docx\.mjs/);
   assert.match(smoke, /electron-builder\.json/);
@@ -215,7 +252,7 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(workflow, /paths:/);
   assert.match(workflow, /"scripts\/\*\*"/);
   assert.match(workflow, /runs-on: windows-latest/);
-  assert.match(workflow, /bun run dist:win:offline/);
+  assert.match(workflow, /@\('run', 'dist:win:offline'\)/);
   assert.match(workflow, /windows-runtime-smoke\.ps1/);
   assert.match(workflow, /windows-installer-size-smoke\.ps1/);
   assert.match(workflow, /windows-installer-smoke\.ps1/);
@@ -238,7 +275,96 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(sizeSmoke, /\$_\.archiveSizeBytes/);
   assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
-  assert.match(sizeSmoke, /1GB/);
+  assert.match(sizeSmoke, /MaximumInstallerBytes = 425MB/);
+  assert.match(sizeSmoke, /MaximumComponentBytes = 220MB/);
+  assert.match(sizeSmoke, /MaximumNonComponentBytes = 220MB/);
+});
+
+test("manual release candidates preserve immutable artifacts without publishing them", () => {
+  const workflow = readFileSync(
+    path.join(root, ".github", "workflows", "release-candidate.yml"),
+    "utf8",
+  );
+
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /release_version:/);
+  assert.match(workflow, /source_ref:/);
+  assert.match(workflow, /GITHUB_REF.*refs\/heads\/main/);
+  assert.match(workflow, /git merge-base --is-ancestor/);
+  assert.match(workflow, /APP_BUILD_VERSION:/);
+  assert.match(workflow, /create-release-candidate\.mjs/);
+  assert.match(workflow, /verify-release-candidate\.mjs/);
+  assert.match(workflow, /windows-installer-size-smoke\.ps1/);
+  assert.match(workflow, /windows-installer-smoke\.ps1/);
+  assert.match(workflow, /retention-days: 7/);
+  assert.doesNotMatch(workflow, /R2_(?:BUCKET|ACCESS_KEY)/);
+  assert.doesNotMatch(workflow, /CLOUDFLARE_ACCOUNT_ID/);
+  assert.doesNotMatch(workflow, /aws s3/);
+  assert.doesNotMatch(workflow, /upload-update-artifacts\.mjs/);
+});
+
+test("manual candidate promotion verifies exact artifacts before protected publication", () => {
+  const workflowPath = path.join(
+    root,
+    ".github",
+    "workflows",
+    "release-candidate-promotion.yml",
+  );
+  const workflowText = readFileSync(workflowPath, "utf8");
+  const preflightStart = workflowText.indexOf("  preflight:");
+  const promoteStart = workflowText.indexOf("  promote:");
+  assert.ok(preflightStart >= 0 && promoteStart > preflightStart);
+  const preflight = workflowText.slice(preflightStart, promoteStart);
+  const promote = workflowText.slice(promoteStart);
+
+  assert.match(workflowText, /workflow_dispatch:/);
+  assert.match(workflowText, /candidate_run_id:/);
+  assert.match(workflowText, /release_version:/);
+  assert.match(workflowText, /source_commit:/);
+  assert.match(promote, /needs: preflight/);
+  assert.match(promote, /environment: release/);
+  assert.match(promote, /ref: main/);
+  assert.match(preflight, /release-candidate\.yml/);
+  assert.match(preflight, /workflow_dispatch/);
+  assert.match(preflight, /head_branch.*main/);
+  assert.match(preflight, /run-id/);
+  assert.match(preflight, /verify-release-candidate\.mjs/);
+  assert.doesNotMatch(
+    preflight,
+    /R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY|aws s3/,
+  );
+  assert.match(promote, /run-id/);
+  assert.match(promote, /Configure protected R2 access/);
+  assert.ok(
+    promote.indexOf("Configure protected R2 access") >
+      promote.lastIndexOf("actions/download-artifact@v8"),
+  );
+  assert.match(promote, /upload-release-candidate\.mjs/);
+  assert.match(promote, /publish-update-manifest\.mjs/);
+  assert.match(
+    promote,
+    /UPDATE_SOURCE_PIPELINE_ID: \$\{\{ inputs\.candidate_run_id \}\}/,
+  );
+  assert.match(promote, /--if-none-match/);
+  assert.match(promote, /--if-match/);
+  assert.match(promote, /verify-published-update\.mjs/);
+
+  const uploader = readFileSync(
+    path.join(root, "scripts", "release", "upload-release-candidate.mjs"),
+    "utf8",
+  );
+  assert.match(uploader, /verifyCandidateManifests/);
+  assert.match(
+    uploader,
+    /Immutable object already exists with different content/,
+  );
+
+  const tagRelease = readFileSync(
+    path.join(root, ".github", "workflows", "online-update-release.yml"),
+    "utf8",
+  );
+  assert.match(tagRelease, /tags:/);
+  assert.match(tagRelease, /publish-update-manifest\.mjs/);
 });
 
 test("DOCX smoke validator accepts the bundled Markdown converter output", () => {

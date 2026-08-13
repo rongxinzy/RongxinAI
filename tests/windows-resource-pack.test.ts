@@ -8,6 +8,8 @@ import {
   buildWindowsResourceBundleManifest,
   buildWindowsResourceComponentManifest,
   computeWindowsResourceComponentId,
+  getWindowsResourceComponents,
+  getWindowsResourceArchiveCompression,
   isWindowsResourceComponentReusable,
   sha256File,
 } from '../scripts/windows-resource-pack.cjs';
@@ -35,6 +37,37 @@ afterEach(() => {
 });
 
 describe('Windows offline component identity', () => {
+  test('uses cc-connect as the first of exactly seven cached components', () => {
+    const components = getWindowsResourceComponents(process.cwd());
+    expect(components).toHaveLength(7);
+    expect(components[0]).toMatchObject({
+      key: 'channel-runtime',
+      prefix: 'channel-runtime',
+      sentinel: 'channel-runtime/cc-connect-sidecar.exe',
+    });
+    expect(components.map(component => component.key)).not.toContain('openclaw');
+  });
+
+  test('uses solid compression only for benchmarked multi-file runtimes', () => {
+    const components = getWindowsResourceComponents(process.cwd());
+    const compressionByKey = Object.fromEntries(
+      components.map(component => [
+        component.key,
+        getWindowsResourceArchiveCompression(component).id,
+      ]),
+    );
+
+    expect(compressionByKey).toMatchObject({
+      'channel-runtime': 'lzma2-mx9-nonsolid-v1',
+      skills: 'lzma2-mx9-nonsolid-v1',
+      mcps: 'lzma2-mx9-nonsolid-v1',
+      'portable-git': 'lzma2-mx9-solid-v1',
+      python: 'lzma2-mx9-solid-v1',
+      'skill-python': 'lzma2-mx9-solid-v1',
+      uv: 'lzma2-mx9-nonsolid-v1',
+    });
+  });
+
   test('is stable when only source mtimes change', () => {
     const component = createComponent();
     const before = computeWindowsResourceComponentId(component);
@@ -59,7 +92,7 @@ describe('Windows offline component identity', () => {
   test('reuses only an archive whose manifest, size, and SHA-256 still match', () => {
     const component = createComponent();
     const contentId = computeWindowsResourceComponentId(component);
-    const archivePath = path.join(component.dir, 'runtime.tar');
+    const archivePath = path.join(component.dir, 'runtime.7z');
     const manifestPath = path.join(component.dir, 'manifest.json');
     fs.writeFileSync(archivePath, 'archive-v1');
     const manifest = buildWindowsResourceComponentManifest(
@@ -82,7 +115,7 @@ describe('Windows offline component identity', () => {
 
   test('records a digest for the component health-check file', () => {
     const component = createComponent();
-    const archivePath = path.join(component.dir, 'runtime.tar');
+    const archivePath = path.join(component.dir, 'runtime.7z');
     fs.writeFileSync(archivePath, 'archive-v1');
     const manifest = buildWindowsResourceComponentManifest(
       component,
@@ -95,6 +128,32 @@ describe('Windows offline component identity', () => {
     expect(manifest.sentinelSha256).toBe(
       sha256File(path.join(component.dir, 'nested', 'runtime.exe')),
     );
+    expect(manifest.archive).toBe('runtime.7z');
+    expect(manifest.archiveFormat).toBe('7z');
+    expect(manifest.archiveCompression).toBe('lzma2-mx9-nonsolid-v1');
+  });
+
+  test('does not reuse an archive created with a different compression profile', () => {
+    const component = createComponent('portable-git');
+    const contentId = computeWindowsResourceComponentId(component);
+    const archivePath = path.join(component.dir, 'portable-git.7z');
+    const manifestPath = path.join(component.dir, 'manifest.json');
+    fs.writeFileSync(archivePath, 'archive-v1');
+    const manifest = buildWindowsResourceComponentManifest(
+      component,
+      contentId,
+      sha256File(archivePath),
+      fs.statSync(archivePath).size,
+      sha256File(path.join(component.dir, 'nested', 'runtime.exe')),
+    );
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({ ...manifest, archiveCompression: 'lzma2-mx9-nonsolid-v1' }),
+    );
+
+    expect(
+      isWindowsResourceComponentReusable(manifestPath, archivePath, contentId, component),
+    ).toBe(false);
   });
 
   test('marks the aggregate manifest as offline and llama.cpp-free', () => {

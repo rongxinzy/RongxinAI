@@ -5,8 +5,8 @@
  *   1. Open https://auth.openai.com/oauth/authorize in the user's browser
  *   2. Listen on http://127.0.0.1:1455/auth/callback for the redirect
  *   3. Exchange the authorization code for access/refresh/id tokens
- *   4. Persist the result to <CODEX_HOME>/auth.json so the OpenClaw runtime
- *      (which reads the same file) automatically routes OpenAI calls to
+ *   4. Persist the result to <CODEX_HOME>/auth.json so the Pi provider route
+ *      can automatically route OpenAI calls to
  *      https://chatgpt.com/backend-api/codex/responses with the OAuth bearer token.
  *
  * The fixed redirect URI (http://127.0.0.1:1455/auth/callback) is required —
@@ -117,7 +117,7 @@ function trimNonEmpty(value: unknown): string | undefined {
 }
 
 /**
- * The directory we point OpenClaw's CODEX_HOME at. Using a per-app subdirectory
+ * The application-owned CODEX_HOME. Using a per-app subdirectory
  * (rather than the user's real ~/.codex) avoids overwriting an existing Codex
  * CLI login.
  */
@@ -268,7 +268,7 @@ async function exchangeCodeForTokens(params: {
 /**
  * Run the interactive ChatGPT OAuth login. Returns the resulting tokens once
  * the user completes the flow in the browser. Side-effect: writes
- * <CODEX_HOME>/auth.json so the OpenClaw runtime can pick it up.
+ * <CODEX_HOME>/auth.json so the Pi provider route can use it.
  */
 export function startOpenAICodexLogin(): Promise<CodexOAuthTokens> {
   if (activeLogin) {
@@ -405,8 +405,8 @@ export function cancelOpenAICodexLogin(): void {
 }
 
 /**
- * Remove the persisted ChatGPT credentials. After this OpenClaw will fall back
- * to the user's API key (or no auth at all).
+ * Remove the persisted ChatGPT credentials. The provider then falls back to
+ * the user's API key, when configured.
  */
 export function logoutOpenAICodex(): void {
   try {

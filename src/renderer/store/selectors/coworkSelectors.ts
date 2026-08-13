@@ -39,8 +39,6 @@ export const selectUnreadSessionIds = (state: RootState) => state.cowork.unreadS
 // These compute new values from the store and use createSelector to avoid
 // returning new object references when the inputs haven't changed.
 
-export const selectAgentEngine = createSelector(selectCoworkConfig, config => config.agentEngine);
-
 export const resolveDisplayedSessionId = (
   currentSessionId: string | null,
   loadingSessionId: string | null,
@@ -50,11 +48,6 @@ export const selectDisplayedSessionId = createSelector(
   selectCurrentSessionId,
   selectLoadingSessionId,
   resolveDisplayedSessionId,
-);
-
-export const selectIsOpenClawEngine = createSelector(
-  selectAgentEngine,
-  engine => engine === 'openclaw',
 );
 
 export const selectCurrentMessages = createSelector(

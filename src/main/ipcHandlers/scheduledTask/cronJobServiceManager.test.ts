@@ -1,39 +1,12 @@
 import { expect, test, vi } from 'vitest';
 
-vi.mock('electron', () => ({
-  BrowserWindow: {
-    getAllWindows: () => [],
-  },
-}));
-
 import { getCronJobService, initCronJobServiceManager } from './cronJobServiceManager';
 
-test('forwards gateway lifecycle events to the cron job service', () => {
-  let disconnectCallback: ((reason: string) => void) | null = null;
-  let reconnectCallback: (() => void) | null = null;
-
+test('uses the canonical scheduler service without an Agent runtime fallback', () => {
+  const canonical = { listJobs: vi.fn() };
   initCronJobServiceManager({
-    getOpenClawChannelGateway: () => ({
-      getGatewayClient: () => null,
-      ensureReady: async () => {},
-      onGatewayDisconnect: callback => {
-        disconnectCallback = callback;
-        return () => {};
-      },
-      onGatewayReconnect: callback => {
-        reconnectCallback = callback;
-        return () => {};
-      },
-    }),
+    getScheduledTaskService: () => canonical as never,
   });
 
-  const service = getCronJobService();
-  const handleDisconnected = vi.spyOn(service, 'handleGatewayDisconnected');
-  const handleConnected = vi.spyOn(service, 'handleGatewayConnected');
-
-  (disconnectCallback as ((reason: string) => void) | null)?.('connection closed');
-  (reconnectCallback as (() => void) | null)?.();
-
-  expect(handleDisconnected).toHaveBeenCalledOnce();
-  expect(handleConnected).toHaveBeenCalledOnce();
+  expect(getCronJobService()).toBe(canonical);
 });

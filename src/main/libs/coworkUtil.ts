@@ -5,7 +5,6 @@ import {
   existsSync,
   mkdirSync,
   readdirSync,
-  realpathSync,
   statSync,
   writeFileSync,
 } from 'fs';
@@ -1091,7 +1090,14 @@ function applyDomesticPackageMirrorDefaults(env: Record<string, string | undefin
   }
 }
 
-function applyPackagedEnvOverrides(
+/**
+ * Add application-managed command runtimes to a subprocess environment.
+ *
+ * This deliberately does not add provider credentials. Callers that need the
+ * app's Node/npm shim, managed Python, uv, and Windows Git Bash PATH handling
+ * can use it without exposing a session's API configuration globally.
+ */
+export function applyApplicationRuntimeEnv(
   env: Record<string, string | undefined>,
   options: EnhancedEnvOptions = {},
 ): void {
@@ -1274,31 +1280,6 @@ function applyPackagedEnvOverrides(
       );
     }
 
-    // In dev mode, add openclaw runtime's node_modules to NODE_PATH so exec tool
-    // can access shared packages like sharp.
-    const devRuntimeNodeModules = (() => {
-      const candidates = [
-        join(app.getAppPath(), 'vendor', 'openclaw-runtime', 'current', 'node_modules'),
-        join(process.cwd(), 'vendor', 'openclaw-runtime', 'current', 'node_modules'),
-      ];
-      for (const c of candidates) {
-        try {
-          const resolved = realpathSync(c);
-          if (existsSync(resolved)) return resolved;
-        } catch {
-          /* symlink target missing — skip */
-        }
-      }
-      return null;
-    })();
-    if (devRuntimeNodeModules) {
-      env.NODE_PATH = appendEnvPath(env.NODE_PATH, [devRuntimeNodeModules]);
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        `Dev mode: added openclaw runtime node_modules to NODE_PATH: ${devRuntimeNodeModules}`,
-      );
-    }
     return;
   }
 
@@ -1402,7 +1383,6 @@ function applyPackagedEnvOverrides(
   const nodePaths = [
     join(resourcesPath, 'app.asar', 'node_modules'),
     join(resourcesPath, 'app.asar.unpacked', 'node_modules'),
-    join(resourcesPath, 'cfmind', 'node_modules'),
   ].filter(nodePath => existsSync(nodePath));
 
   if (nodePaths.length > 0) {
@@ -1554,7 +1534,7 @@ export async function getEnhancedEnv(
   const config = getCurrentApiConfig(target);
   const env = config ? buildEnvForConfig(config) : { ...process.env };
 
-  applyPackagedEnvOverrides(env, options);
+  applyApplicationRuntimeEnv(env, options);
 
   // Inject SKILLs directory path for skill scripts.
   // On Windows, normalise backslashes to forward slashes so the value is usable

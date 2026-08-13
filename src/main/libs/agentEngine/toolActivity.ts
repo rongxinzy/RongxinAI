@@ -124,7 +124,7 @@ const isToolCallBlock = (record: Record<string, unknown>): boolean => {
   return type === 'toolcall' || type === 'tooluse' || type === 'functioncall';
 };
 
-const getOpenClawToolActivity = (
+const getAgentToolActivity = (
   block: Record<string, unknown>,
 ): PreparingToolActivity | null => {
   const functionRecord = isRecord(block.function) ? block.function : undefined;
@@ -141,7 +141,7 @@ const getOpenClawToolActivity = (
   };
 };
 
-const OPENCLAW_NESTED_KEYS = [
+const AGENT_NESTED_KEYS = [
   'content',
   'data',
   'message',
@@ -150,7 +150,7 @@ const OPENCLAW_NESTED_KEYS = [
   'response',
 ] as const;
 
-export const extractOpenClawPreparingToolActivities = (
+export const extractAgentPreparingToolActivities = (
   payload: unknown,
 ): PreparingToolActivity[] => {
   const activities = new Map<string, PreparingToolActivity>();
@@ -166,10 +166,10 @@ export const extractOpenClawPreparingToolActivities = (
     }
     if (!isRecord(value)) return;
     if (isToolCallBlock(value)) {
-      const activity = getOpenClawToolActivity(value);
+      const activity = getAgentToolActivity(value);
       if (activity) activities.set(activity.toolCallId, activity);
     }
-    for (const key of OPENCLAW_NESTED_KEYS) {
+    for (const key of AGENT_NESTED_KEYS) {
       if (value[key] !== undefined) visit(value[key], depth + 1);
     }
   };

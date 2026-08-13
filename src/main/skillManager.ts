@@ -1069,7 +1069,7 @@ const isNpmPackageSpec = (source: string): boolean => {
 
 /**
  * Download and extract an npm package using `npm pack`.
- * Similar to openclaw's plugin install: npm pack 鈫?extract .tgz 鈫?return path.
+ * The tarball is extracted into the managed plugin directory.
  */
 const downloadNpmPackage = async (spec: string, tempRoot: string): Promise<string> => {
   const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, ['pack', spec, '--ignore-scripts', '--json']);
@@ -2582,7 +2582,7 @@ export class SkillManager {
       // On Windows, fs.watch (ReadDirectoryChangesW) frequently reports null
       // filenames for unrelated filesystem activity (AV scans, search indexing,
       // timestamp updates).  Ignoring null filenames avoids false
-      // skills-changed 鈫?syncOpenClawConfig chains that can trigger unwanted
+      // skills-changed listener chains that can trigger unwanted
       // Gateway restarts.  Legitimate skill changes always go through explicit
       // code paths (installSkill, deleteSkill, etc.) that call
       // notifySkillsChanged directly.
@@ -2674,7 +2674,7 @@ export class SkillManager {
         win.webContents.send('skills:changed');
       }
     });
-    // Notify external listeners (e.g. OpenClaw AGENTS.md sync)
+    // Notify listeners that synchronize agent workspace metadata.
     for (const listener of this.changeListeners) {
       try {
         listener();

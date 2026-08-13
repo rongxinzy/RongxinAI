@@ -12,7 +12,7 @@ const RUN_HISTORY_LIMIT_PER_TRIGGER = 50;
 export interface ActivityState {
   /**
    * Read-only projection of Channel/Cron run lifecycle events, newest
-   * first (issue #225). These are OpenClaw-domain runs — they never become
+   * first (issue #225). These are Channel/Cron runs; they never become
    * cowork sessions; the activity feed only displays them.
    */
   channelRuns: ChannelRunSummary[];

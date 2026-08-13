@@ -311,6 +311,22 @@ export class ProductionLoopController {
     );
   }
 
+  /** Compact snapshot for the workbench completion verification chain. */
+  getSnapshot(): Record<string, unknown> {
+    this.refresh();
+    return {
+      phase: this.state.phase,
+      status: this.state.status,
+      skipped: Boolean(this.state.skip),
+      planItems: this.state.planItems.map(item => ({
+        status: item.status,
+        title: item.title,
+      })),
+      inspections: this.state.inspections.length,
+      revisions: this.state.revisions.length,
+    };
+  }
+
   private refresh(): void {
     this.state = this.service.getState(this.state.runId);
   }

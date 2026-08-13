@@ -20,29 +20,13 @@ const createPermission = (origin: CoworkPermissionRequest['origin']): CoworkPerm
 describe('respondToPermissionByOrigin', () => {
   test('routes Pi workbench permissions to the cowork responder', async () => {
     const respondToPi = vi.fn().mockResolvedValue({ success: true });
-    const respondToOpenClaw = vi.fn().mockResolvedValue({ success: true });
 
     await respondToPermissionByOrigin(
       createPermission(CoworkPermissionOrigin.PiWorkbench),
       result,
-      { respondToPi, respondToOpenClaw },
+      { respondToPi },
     );
 
     expect(respondToPi).toHaveBeenCalledWith({ requestId: 'request-1', result });
-    expect(respondToOpenClaw).not.toHaveBeenCalled();
-  });
-
-  test('routes OpenClaw AskUser permissions to the dedicated bridge responder', async () => {
-    const respondToPi = vi.fn().mockResolvedValue({ success: true });
-    const respondToOpenClaw = vi.fn().mockResolvedValue({ success: true });
-
-    await respondToPermissionByOrigin(
-      createPermission(CoworkPermissionOrigin.OpenClawBridge),
-      result,
-      { respondToPi, respondToOpenClaw },
-    );
-
-    expect(respondToOpenClaw).toHaveBeenCalledWith({ requestId: 'request-1', result });
-    expect(respondToPi).not.toHaveBeenCalled();
   });
 });

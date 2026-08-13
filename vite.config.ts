@@ -73,11 +73,6 @@ export default defineConfig(async () => ({
                         'utf-8-validate',
                       ];
                       if (staticExternals.includes(id)) return true;
-                      if (
-                        id.startsWith('@larksuite/openclaw-lark-tools') ||
-                        id.startsWith('@larksuite/openclaw-lark')
-                      )
-                        return true;
                       return false;
                     },
                     output: {
@@ -154,7 +149,7 @@ export default defineConfig(async () => ({
     },
   },
   optimizeDeps: {
-    exclude: ['electron', '@larksuite/openclaw-lark-tools', '@larksuite/openclaw-lark'],
+    exclude: ['electron'],
     esbuildOptions: {
       define: {
         __VERSION__: JSON.stringify(katexVersion),

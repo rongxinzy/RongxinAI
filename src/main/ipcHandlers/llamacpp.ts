@@ -28,13 +28,12 @@ import {
   LlamaCppModelLaunchLogPhase,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
+  LlamaCppMemoryPolicy,
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
 import {
-  isProviderEnabled,
   ModelCapabilityStatus,
   parseLlamaCppRuntimeCapabilities,
-  ProviderName,
   type ModelCapabilities,
 } from '../../shared/providers';
 import { t } from '../i18n';
@@ -60,10 +59,10 @@ import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
 import {
   buildLlamaCppRunningModelBinding,
-  type LlamaCppOpenClawAppConfig,
+  type LlamaCppAgentAppConfig,
   removeLlamaCppModelFromAppConfig,
   upsertLlamaCppProviderInAppConfig,
-} from '../libs/llamacppOpenClawBinding';
+} from '../libs/llamacppAgentBinding';
 import {
   ensureLlamaCppServiceRunning,
   getLlamaCppServiceStartupFailureI18nKey,
@@ -72,6 +71,7 @@ import {
 import { applyLlamaCppServiceTransition } from '../libs/llamacppServiceTransition';
 import { LlamaCppServiceTransitionLock } from '../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
+import { getSystemMemorySnapshot } from '../libs/systemMemory';
 import type { SqliteStore } from '../sqliteStore';
 import { registerLlamaCppModelLaunchLogIpcHandlers } from './llamacppModelLaunchLogs';
 
@@ -100,33 +100,7 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   mainGpu: DEFAULT_LLAMACPP_SERVICE_CONFIG.mainGpu ?? '0',
 } as const;
 
-export function shouldSyncOpenClawAfterRunningModelRefresh(reason: string): boolean {
-  return (
-    reason === 'llamacpp-model-loaded' ||
-    reason === 'llamacpp-model-unloaded' ||
-    reason === 'llamacpp-model-launched' ||
-    reason === 'llamacpp-model-stopped' ||
-    reason === 'llamacpp-model-visibility-refresh'
-  );
-}
-
-export function shouldSyncOpenClawForRunningModelRefresh(input: {
-  reason: string;
-  runningModelsChanged: boolean;
-  appConfigChanged: boolean;
-  appConfig: LlamaCppOpenClawAppConfig;
-}): boolean {
-  const llamaCppEnabled = isProviderEnabled(
-    ProviderName.LlamaCpp,
-    input.appConfig.providers?.[ProviderName.LlamaCpp],
-  );
-
-  return (
-    llamaCppEnabled &&
-    (input.runningModelsChanged || input.appConfigChanged) &&
-    shouldSyncOpenClawAfterRunningModelRefresh(input.reason)
-  );
-}
+const LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE = { min: 10, max: 90 } as const;
 
 export function getLlamaCppLoadedModelLimitViolation(input: {
   modelsMax: string | undefined;
@@ -249,16 +223,10 @@ export function registerLlamaCppIpcHandlers(
   manager: LlamaCppManager,
   options: {
     getStore: () => SqliteStore;
-    syncOpenClawConfig: (options: {
-      reason: string;
-      restartGatewayIfRunning?: boolean;
-      forceGatewayRestartIfRunning?: boolean;
-    }) => Promise<{ success: boolean; error?: string }>;
   },
 ): void {
   const updateRunningModelBindings = async (
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
-    reason: string,
   ): Promise<void> => {
     const store = options.getStore();
     const modelPreferences = getLlamaCppModelPreferences(store);
@@ -288,40 +256,24 @@ export function registerLlamaCppIpcHandlers(
         }),
       )
     ).filter((model): model is NonNullable<typeof model> => Boolean(model));
-    const runningModelsChanged = updateLlamaCppRunningModels(bindingModels);
-    const current = store.get<LlamaCppOpenClawAppConfig>('app_config') ?? {};
+    updateLlamaCppRunningModels(bindingModels);
+    const current = store.get<LlamaCppAgentAppConfig>('app_config') ?? {};
     const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
     if (appConfigUpdate.changed) {
       store.set('app_config', appConfigUpdate.config);
     }
-    if (
-      shouldSyncOpenClawForRunningModelRefresh({
-        reason,
-        runningModelsChanged,
-        appConfigChanged: appConfigUpdate.changed,
-        appConfig: appConfigUpdate.config,
-      })
-    ) {
-      await options.syncOpenClawConfig({
-        reason,
-        restartGatewayIfRunning: true,
-        forceGatewayRestartIfRunning: true,
-      });
-    }
   };
 
-  const refreshRunningModelBindings = async (
-    reason = 'llamacpp-model-visibility-refresh',
-  ): Promise<void> => {
+  const refreshRunningModelBindings = async (): Promise<void> => {
     if (bindingRefreshSuppressed) return;
     const refreshGeneration = bindingRefreshGeneration;
     try {
       const runningModels = await manager.listRunningModels();
       if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
-      await updateRunningModelBindings(runningModels, reason);
+      await updateRunningModelBindings(runningModels);
     } catch {
       if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
-      await updateRunningModelBindings([], reason);
+      await updateRunningModelBindings([]);
     }
   };
 
@@ -463,7 +415,7 @@ export function registerLlamaCppIpcHandlers(
           start: () => manager.start(),
           applyConfig: () => undefined,
           clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
+          refreshBindings: () => refreshRunningModelBindings(),
           setBindingRefreshSuppressed: suppressed => {
             bindingRefreshSuppressed = suppressed;
             if (suppressed) bindingRefreshGeneration += 1;
@@ -511,7 +463,7 @@ export function registerLlamaCppIpcHandlers(
             store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
           },
           clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: () => refreshRunningModelBindings('llamacpp-model-visibility-refresh'),
+          refreshBindings: () => refreshRunningModelBindings(),
           setBindingRefreshSuppressed: suppressed => {
             bindingRefreshSuppressed = suppressed;
             if (suppressed) bindingRefreshGeneration += 1;
@@ -550,7 +502,7 @@ export function registerLlamaCppIpcHandlers(
         modelPreferences;
       store.set(LLAMACPP_MODEL_PREFERENCES_KEY, nextPreferences);
     }
-    const current = store.get<LlamaCppOpenClawAppConfig>('app_config');
+    const current = store.get<LlamaCppAgentAppConfig>('app_config');
     if (!current) return result;
 
     const next = removeLlamaCppModelFromAppConfig(current, result.removedModelName);
@@ -700,6 +652,9 @@ export function registerLlamaCppIpcHandlers(
                 serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
               runtimeCapabilities,
               nvidiaSnapshot,
+              systemMemorySnapshot: getSystemMemorySnapshot(),
+              memoryPolicy: serviceConfig.memoryPolicy,
+              memoryBudgetPercent: serviceConfig.memoryBudgetPercent,
               modelSizeBytes: targetModel?.size,
               onLog: launchLogger.report,
               loadModel: async (
@@ -713,7 +668,7 @@ export function registerLlamaCppIpcHandlers(
                 await (await manager.client()).unloadModel(unloadModelName);
               },
             });
-            await refreshRunningModelBindings('llamacpp-model-loaded');
+            await refreshRunningModelBindings();
             launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
               runningModelCount: result.runningModels.length,
             });
@@ -750,10 +705,7 @@ export function registerLlamaCppIpcHandlers(
       modelName,
       listRunningModels: () => manager.listRunningModels(),
     });
-    await updateRunningModelBindings(
-      confirmation.runningModels,
-      confirmation.confirmed ? 'llamacpp-model-unloaded' : 'llamacpp-model-visibility-refresh',
-    );
+    await updateRunningModelBindings(confirmation.runningModels);
     for (const clearedModelName of getLlamaCppModelLogClearNames(modelName, unloadingModel)) {
       clearModelLaunchLog(clearedModelName);
     }
@@ -1022,6 +974,11 @@ export function sanitizeLlamaCppServiceConfig(
   const runtimeVersion = config?.runtimeVersion?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
+  const memoryPolicy = config?.memoryPolicy;
+  const memoryBudgetPercent = normalizeIntegerNumber(config?.memoryBudgetPercent, {
+    min: LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE.min,
+    max: LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE.max,
+  });
   const sanitizedModelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
     min: modelsMaxRange.min,
     max: modelsMaxRange.max,
@@ -1113,6 +1070,10 @@ export function sanitizeLlamaCppServiceConfig(
     next.runtimeVersion = runtimeVersion;
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
   if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
+  if (memoryPolicy === LlamaCppMemoryPolicy.Auto || memoryPolicy === LlamaCppMemoryPolicy.Manual) {
+    next.memoryPolicy = memoryPolicy;
+  }
+  if (memoryBudgetPercent !== undefined) next.memoryBudgetPercent = memoryBudgetPercent;
   if (modelsMax) next.modelsMax = modelsMax;
   if (modelsAutoload !== undefined && modelsMax === '1') {
     if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
@@ -1186,6 +1147,15 @@ function normalizeIntegerString(value: string | undefined): string | undefined {
   if (!trimmed) return undefined;
   if (!/^\d+$/.test(trimmed)) return undefined;
   return trimmed;
+}
+
+function normalizeIntegerNumber(
+  value: number | undefined,
+  range: { min: number; max: number },
+): number | undefined {
+  if (!Number.isInteger(value)) return undefined;
+  if (value < range.min || value > range.max) return undefined;
+  return value;
 }
 
 function normalizeIntegerStringWithDefault(
