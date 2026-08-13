@@ -13,7 +13,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { PanelLeft, Pencil } from 'lucide-react';
+import { Cpu, FolderOpen, Globe, MemoryStick, PanelLeft, Pencil, Settings2 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -39,6 +39,7 @@ import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimated
 import WindowTitleBar from '../window/WindowTitleBar';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
+import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
@@ -55,6 +56,7 @@ import {
 } from './constants';
 import { useI18nLanguage } from './hooks/useI18nLanguage';
 import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccessSettings';
+import { useLocalInferenceMemorySettings } from './hooks/useLocalInferenceMemorySettings';
 import { useMarketplaceRecommendations } from './hooks/useMarketplaceRecommendations';
 import { shouldCloseLaunchLogPanelForModel, useModelLaunchLogs } from './hooks/useModelLaunchLogs';
 import { MarketplacePanel } from './panels/MarketplacePanel';
@@ -640,6 +642,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     onRestartStatus: handleRestartStatus,
     showToast,
   });
+  const {
+    memorySettingsOpen,
+    draftMemoryPolicy,
+    draftMemoryBudgetPercent,
+    systemMemorySnapshot,
+    setDraftMemoryPolicy,
+    setDraftMemoryBudgetPercent,
+    openMemorySettings,
+    closeMemorySettings,
+    saveMemorySettings,
+  } = useLocalInferenceMemorySettings({ runAction, showToast });
 
   useEffect(() => {
     marketplaceQueryRef.current = marketplaceQuery;
@@ -1036,6 +1049,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                         <LocalInferenceAnimatedWifiPenIcon />
                         {i18nService.t('localInferenceAccessMenuItem')}
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={openMemorySettings}>
+                        <MemoryStick data-icon="inline-start" />
+                        {i18nService.t('localInferenceMemoryMenuItem')}
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {
                           setDraftModelsDir(modelsDir);
@@ -1147,6 +1164,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onPortChange={setDraftPort}
         onClose={closeAccessSettings}
         onSave={saveAccessSettings}
+      />
+      <LocalInferenceMemorySettingsDialog
+        isOpen={memorySettingsOpen}
+        saving={loading}
+        policy={draftMemoryPolicy}
+        memoryBudgetPercent={draftMemoryBudgetPercent}
+        systemMemorySnapshot={systemMemorySnapshot}
+        onPolicyChange={setDraftMemoryPolicy}
+        onMemoryBudgetPercentChange={setDraftMemoryBudgetPercent}
+        onClose={closeMemorySettings}
+        onSave={saveMemorySettings}
       />
       <ModelContextSettingsModal
         isOpen={Boolean(contextModel)}

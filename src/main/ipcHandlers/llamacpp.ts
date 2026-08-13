@@ -28,6 +28,7 @@ import {
   LlamaCppModelLaunchLogPhase,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
+  LlamaCppMemoryPolicy,
   LlamaCppStructuredServiceFieldKey,
 } from '../../shared/llamacpp';
 import {
@@ -70,6 +71,7 @@ import {
 import { applyLlamaCppServiceTransition } from '../libs/llamacppServiceTransition';
 import { LlamaCppServiceTransitionLock } from '../libs/llamacppServiceTransitionLock';
 import { getNvidiaSmiSnapshot } from '../libs/nvidiaSmi';
+import { getSystemMemorySnapshot } from '../libs/systemMemory';
 import type { SqliteStore } from '../sqliteStore';
 import { registerLlamaCppModelLaunchLogIpcHandlers } from './llamacppModelLaunchLogs';
 
@@ -97,6 +99,8 @@ const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   threadsBatch: DEFAULT_LLAMACPP_SERVICE_CONFIG.threadsBatch ?? '-1',
   mainGpu: DEFAULT_LLAMACPP_SERVICE_CONFIG.mainGpu ?? '0',
 } as const;
+
+const LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE = { min: 10, max: 90 } as const;
 
 export function getLlamaCppLoadedModelLimitViolation(input: {
   modelsMax: string | undefined;
@@ -648,6 +652,9 @@ export function registerLlamaCppIpcHandlers(
                 serviceStartupResult.serviceStatus.runtimeBackend ?? serviceConfig.runtimeBackend,
               runtimeCapabilities,
               nvidiaSnapshot,
+              systemMemorySnapshot: getSystemMemorySnapshot(),
+              memoryPolicy: serviceConfig.memoryPolicy,
+              memoryBudgetPercent: serviceConfig.memoryBudgetPercent,
               modelSizeBytes: targetModel?.size,
               onLog: launchLogger.report,
               loadModel: async (
@@ -967,6 +974,11 @@ export function sanitizeLlamaCppServiceConfig(
   const runtimeVersion = config?.runtimeVersion?.trim();
   const runtimeBackend = config?.runtimeBackend;
   const runtimeCudaMajor = config?.runtimeCudaMajor;
+  const memoryPolicy = config?.memoryPolicy;
+  const memoryBudgetPercent = normalizeIntegerNumber(config?.memoryBudgetPercent, {
+    min: LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE.min,
+    max: LLAMACPP_MEMORY_BUDGET_PERCENT_RANGE.max,
+  });
   const sanitizedModelsMax = normalizeIntegerStringWithDefault(config?.modelsMax, {
     min: modelsMaxRange.min,
     max: modelsMaxRange.max,
@@ -1058,6 +1070,10 @@ export function sanitizeLlamaCppServiceConfig(
     next.runtimeVersion = runtimeVersion;
   if (isRuntimeBackend(runtimeBackend)) next.runtimeBackend = runtimeBackend;
   if (isRuntimeCudaMajor(runtimeCudaMajor)) next.runtimeCudaMajor = runtimeCudaMajor;
+  if (memoryPolicy === LlamaCppMemoryPolicy.Auto || memoryPolicy === LlamaCppMemoryPolicy.Manual) {
+    next.memoryPolicy = memoryPolicy;
+  }
+  if (memoryBudgetPercent !== undefined) next.memoryBudgetPercent = memoryBudgetPercent;
   if (modelsMax) next.modelsMax = modelsMax;
   if (modelsAutoload !== undefined && modelsMax === '1') {
     if (typeof modelsAutoload === 'boolean') next.modelsAutoload = modelsAutoload;
@@ -1131,6 +1147,15 @@ function normalizeIntegerString(value: string | undefined): string | undefined {
   if (!trimmed) return undefined;
   if (!/^\d+$/.test(trimmed)) return undefined;
   return trimmed;
+}
+
+function normalizeIntegerNumber(
+  value: number | undefined,
+  range: { min: number; max: number },
+): number | undefined {
+  if (!Number.isInteger(value)) return undefined;
+  if (value < range.min || value > range.max) return undefined;
+  return value;
 }
 
 function normalizeIntegerStringWithDefault(
