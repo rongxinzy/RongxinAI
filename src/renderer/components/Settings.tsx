@@ -5144,7 +5144,7 @@ const Settings: React.FC<SettingsProps> = ({
               <div className="px-4 py-3 border-b border-border space-y-2">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm text-foreground">
-                    {i18nService.t('updateReadyTitle')}
+                    {i18nService.t('updateSectionTitle')}
                   </span>
                   <span className="text-sm text-muted-foreground">
                     {update?.info?.latestVersion
