@@ -2217,7 +2217,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imConnectivityVerdict_fail: '不可用',
     imConnectivityCheckTitle_missing_credentials: '配置项缺失',
     imConnectivityCheckTitle_auth_check: '凭证鉴权',
-    imConnectivityCheckTitle_gateway_running: 'IM 渠道启用状态',
+    imConnectivityCheckTitle_gateway_running: '频道运行时',
+    imConnectivityCheckTitle_channel_runtime_not_running: '频道运行时',
     imConnectivityCheckTitle_inbound_activity: '入站消息活动',
     imConnectivityCheckTitle_outbound_activity: '出站消息活动',
     imConnectivityCheckTitle_platform_last_error: '平台最近错误',
@@ -2232,6 +2233,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imConnectivityCheckSuggestion_auth_check: '核对平台凭证、应用权限和发布状态。',
     imConnectivityCheckSuggestion_gateway_running:
       '若显示未启用，请点击对应 IM 渠道胶囊按钮启用；启用后确认网络可访问平台服务。',
+    imConnectivityCheckSuggestion_channel_runtime_not_running:
+      '请启用该频道，并检查频道运行时、网络与平台侧连接配置。',
     imConnectivityCheckSuggestion_inbound_activity: '向机器人发一条测试消息；群聊场景请 @机器人。',
     imConnectivityCheckSuggestion_outbound_activity:
       '检查机器人发消息权限、可见范围和会话回包权限。',
@@ -5213,7 +5216,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     imConnectivityVerdict_fail: 'Unavailable',
     imConnectivityCheckTitle_missing_credentials: 'Missing Credentials',
     imConnectivityCheckTitle_auth_check: 'Credential Authentication',
-    imConnectivityCheckTitle_gateway_running: 'IM Channel Enablement',
+    imConnectivityCheckTitle_gateway_running: 'Channel Runtime',
+    imConnectivityCheckTitle_channel_runtime_not_running: 'Channel Runtime',
     imConnectivityCheckTitle_inbound_activity: 'Inbound Message Activity',
     imConnectivityCheckTitle_outbound_activity: 'Outbound Message Activity',
     imConnectivityCheckTitle_platform_last_error: 'Recent Platform Error',
@@ -5230,6 +5234,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'Verify credentials, permissions, and app release status.',
     imConnectivityCheckSuggestion_gateway_running:
       'If disabled, click the IM channel pill to enable it, then verify platform endpoints are reachable.',
+    imConnectivityCheckSuggestion_channel_runtime_not_running:
+      'Enable the channel, then check the channel runtime, network, and platform connection settings.',
     imConnectivityCheckSuggestion_inbound_activity:
       'Send a test message to the bot; mention it in group chats.',
     imConnectivityCheckSuggestion_outbound_activity:

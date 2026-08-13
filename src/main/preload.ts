@@ -679,8 +679,8 @@ contextBridge.exposeInMainWorld('electron', {
 
     startGateway: (platform: Platform) => ipcRenderer.invoke(ImIpc.GatewayStart, platform),
     stopGateway: (platform: Platform) => ipcRenderer.invoke(ImIpc.GatewayStop, platform),
-    testGateway: (platform: Platform, configOverride?: unknown) =>
-      ipcRenderer.invoke(ImIpc.GatewayTest, platform, configOverride),
+    testGateway: (platform: Platform, configOverride?: unknown, accountId?: string) =>
+      ipcRenderer.invoke(ImIpc.GatewayTest, platform, configOverride, accountId),
 
     getStatus: () => ipcRenderer.invoke(ImIpc.StatusGet),
     getLocalIp: () => ipcRenderer.invoke(ImIpc.GetLocalIp) as Promise<string>,

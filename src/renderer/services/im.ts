@@ -270,12 +270,14 @@ class IMService {
   async testGateway(
     platform: Platform,
     configOverride?: Partial<IMGatewayConfig>,
+    accountId?: string,
   ): Promise<IMConnectivityTestResult | null> {
     try {
       store.dispatch(setLoading(true));
       const result: IMConnectivityTestResponse = await window.electron.im.testGateway(
         platform,
         configOverride,
+        accountId,
       );
       if (result.success && result.result) {
         return result.result;
