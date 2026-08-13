@@ -4,6 +4,7 @@ import {
   LlamaCppIpcChannel,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
+  LlamaCppMemoryPolicy,
 } from '../../shared/llamacpp';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import {
@@ -115,7 +116,25 @@ test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while k
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
+    memoryPolicy: LlamaCppMemoryPolicy.Auto,
+    memoryBudgetPercent: 50,
   });
+});
+
+test('sanitizeLlamaCppServiceConfig keeps a valid manual memory budget and defaults invalid policies to auto', () => {
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      memoryPolicy: LlamaCppMemoryPolicy.Manual,
+      memoryBudgetPercent: 50,
+    }),
+  ).toEqual({ memoryPolicy: LlamaCppMemoryPolicy.Manual, memoryBudgetPercent: 50 });
+
+  expect(
+    sanitizeLlamaCppServiceConfig({
+      memoryPolicy: 'invalid' as LlamaCppMemoryPolicy,
+      memoryBudgetPercent: 91,
+    }),
+  ).toEqual({});
 });
 
 test('sanitizeLlamaCppServiceConfig disables autoload unless modelsMax is one', () => {
@@ -310,6 +329,8 @@ test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not 
     batchSize: '512',
     ubatchSize: '512',
     gpuLayers: 'auto',
+    memoryPolicy: LlamaCppMemoryPolicy.Auto,
+    memoryBudgetPercent: 50,
   });
 });
 

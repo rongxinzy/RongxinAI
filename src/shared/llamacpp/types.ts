@@ -3,6 +3,7 @@ import type {
   LlamaCppModelLaunchLogPhase,
   LlamaCppModelLaunchLogSessionStatus,
   LlamaCppModelLaunchLogSource,
+  LlamaCppMemoryPolicy,
   LlamaCppRuntimeBackend,
   LlamaCppRuntimeCudaMajor,
   LlamaCppServiceConfigFieldKey,
@@ -284,6 +285,8 @@ export type LlamaCppServiceConfig = {
   runtimeVersion?: string;
   runtimeBackend?: LlamaCppRuntimeBackend;
   runtimeCudaMajor?: LlamaCppRuntimeCudaMajor;
+  memoryPolicy?: LlamaCppMemoryPolicy;
+  memoryBudgetPercent?: number;
   modelsMax?: string;
   modelsAutoload?: boolean;
   timeout?: string;
