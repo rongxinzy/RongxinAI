@@ -1,17 +1,16 @@
 {
   "name": "content-writer",
-  "version": "1.0.0",
-  "description": "A professional content creation expert for articles, copywriting, and creative writing.",
+  "version": "2.0.0",
+  "description": "Content creation expert: brief-first writing workflow routing to ad copy, social, e-commerce, long-form, and polish skills.",
   "author": {
     "name": "ZhiYuanAgent",
     "email": "dev@zhiyuan.com"
   },
-
   "expertType": "agent",
   "agentName": "content-writer",
-
-  "agents": ["./agents/content-writer.md"],
-
+  "agents": [
+    "./agents/content-writer.md"
+  ],
   "displayName": {
     "en": "Content Writer",
     "zh": "文案创作专家"
@@ -21,8 +20,8 @@
     "zh": "资深内容策划师"
   },
   "displayDescription": {
-    "en": "Professional content writer for articles, marketing copy, social media, and creative storytelling. Delivers polished, audience-targeted content.",
-    "zh": "专业文案创作，涵盖文章撰写、营销文案、社交媒体和创意故事，输出面向目标受众的精炼内容。"
+    "en": "Brief-first content creation: confirms audience and objective, routes to the right writing skill, and delivers polished, source-backed copy.",
+    "zh": "先简报后动笔：先确认受众与目标，再路由到匹配的写作技能，输出来源可查、语气一致的成品文案。"
   },
   "categoryId": "06-ContentCreative",
   "defaultInitPrompt": {
@@ -31,19 +30,53 @@
   },
   "plugin": "content-writer",
   "tags": [
-    { "en": "Copywriting", "zh": "文案写作" },
-    { "en": "Marketing", "zh": "营销推广" },
-    { "en": "Creative", "zh": "创意内容" }
-  ],
-  "quickPrompts": [
-    { "en": "Help me write a product launch announcement", "zh": "帮我写一篇产品发布公告" },
     {
-      "en": "Write a WeChat official account article about AI",
-      "zh": "写一篇关于 AI 的微信公众号文章"
+      "en": "Copywriting",
+      "zh": "文案创作"
     },
     {
-      "en": "Create 5 social media post ideas for our new feature",
-      "zh": "为新功能创作 5 条社交媒体文案"
+      "en": "Content Strategy",
+      "zh": "内容策划"
+    },
+    {
+      "en": "Editing",
+      "zh": "润色改写"
     }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "帮我写一篇产品发布公告",
+      "en": "Help me write a product launch announcement"
+    },
+    {
+      "zh": "写一篇行业趋势长文，先给内容简报。",
+      "en": "Write a long-form industry trend article, starting with a content brief."
+    },
+    {
+      "zh": "把这段文案改得更像官方新闻稿。",
+      "en": "Rewrite this copy to read like an official press release."
+    }
+  ],
+  "skills": [
+    "./skills/content-brief"
+  ],
+  "skillIds": [
+    "web-search",
+    "deep-research",
+    "copywriting",
+    "copy-editor",
+    "ad-copywriter",
+    "ad-creative",
+    "viral-writer",
+    "marketing-writer",
+    "campaign-planner",
+    "customer-reply-craft",
+    "churn-prevention",
+    "ecom-copy-assistant",
+    "humanizer-zh",
+    "content-research-writer",
+    "meeting-recap",
+    "process-doc",
+    "xindaya-translator"
   ]
 }

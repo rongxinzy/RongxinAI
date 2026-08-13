@@ -1,17 +1,16 @@
 {
   "name": "react-dev",
-  "version": "1.0.0",
-  "description": "A React development expert specializing in TypeScript, hooks, and component architecture.",
+  "version": "2.0.0",
+  "description": "React development expert: component blueprints, defect diagnosis, refactoring, code review, and frontend architecture for TypeScript + Tailwind projects.",
   "author": {
     "name": "ZhiYuanAgent",
     "email": "dev@zhiyuan.com"
   },
-
   "expertType": "agent",
   "agentName": "react-dev",
-
-  "agents": ["./agents/react-dev.md"],
-
+  "agents": [
+    "./agents/react-dev.md"
+  ],
   "displayName": {
     "en": "React Developer",
     "zh": "React 开发专家"
@@ -21,8 +20,8 @@
     "zh": "高级前端工程师"
   },
   "displayDescription": {
-    "en": "Specializes in React, TypeScript, and modern frontend architecture. Helps with component design, state management, and performance optimization.",
-    "zh": "精通 React、TypeScript 和现代前端架构，擅长组件设计、状态管理和性能优化。"
+    "en": "Builds reviewable React components with interface-first design, evidence-based defect diagnosis, and checklists for a11y, performance, and design-system compliance.",
+    "zh": "接口先于实现、证据先于猜测地交付 React 组件：标准组件蓝图、缺陷定位与重构审查，覆盖 a11y、性能与设计规范自检。"
   },
   "categoryId": "02-Engineering",
   "defaultInitPrompt": {
@@ -31,16 +30,44 @@
   },
   "plugin": "react-dev",
   "tags": [
-    { "en": "React", "zh": "React" },
-    { "en": "TypeScript", "zh": "TypeScript" },
-    { "en": "Frontend", "zh": "前端开发" }
+    {
+      "en": "Frontend",
+      "zh": "前端开发"
+    },
+    {
+      "en": "Component Design",
+      "zh": "组件设计"
+    },
+    {
+      "en": "Code Review",
+      "zh": "代码审查"
+    }
   ],
   "quickPrompts": [
-    { "en": "Help me design a React component", "zh": "帮我设计一个 React 组件" },
-    { "en": "Review this component and suggest improvements", "zh": "审查这个组件并提出改进建议" },
     {
-      "en": "Refactor this code to use modern React patterns",
-      "zh": "用现代 React 模式重构这段代码"
+      "zh": "帮我设计一个 React 组件",
+      "en": "Help me design a React component"
+    },
+    {
+      "zh": "这个列表滚动卡顿，帮我定位根因并优化。",
+      "en": "This list scrolls poorly. Diagnose the root cause and optimize."
+    },
+    {
+      "zh": "审查这份组件代码，按严重程度列出问题。",
+      "en": "Review this component code and rank issues by severity."
     }
+  ],
+  "skills": [
+    "./skills/react-component-blueprint",
+    "./skills/react-troubleshooting"
+  ],
+  "skillIds": [
+    "frontend-design",
+    "git-repo-audit",
+    "code-safety-audit",
+    "code-arch-optimizer",
+    "web-security-audit",
+    "log-diagnostic",
+    "smart-commit-gen"
   ]
 }
