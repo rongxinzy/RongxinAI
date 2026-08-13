@@ -41,6 +41,7 @@ export type LlamaCppModelLoadPipelineInput = {
   memoryPolicy?: LlamaCppMemoryPolicy;
   memoryBudgetPercent?: number;
   modelSizeBytes?: number;
+  signal?: AbortSignal;
   loadModel: (input: LlamaCppModelLaunchInput) => Promise<LlamaCppModelLaunchResult>;
   listModels: (timeoutMs: number) => Promise<LlamaCppModel[]>;
   listRunningModels: () => Promise<LlamaCppRunningModel[]>;
@@ -61,6 +62,7 @@ export type LlamaCppModelLoadPipelineInput = {
 export async function loadLlamaCppModelThroughPipeline(
   input: LlamaCppModelLoadPipelineInput,
 ): Promise<LlamaCppModelLoadPipelineResult> {
+  throwIfAborted(input.signal);
   const modelName = input.launchInput.model.trim();
   if (!modelName) {
     throw new LlamaCppModelLoadError({
@@ -82,11 +84,14 @@ export async function loadLlamaCppModelThroughPipeline(
     },
     maxRetries: input.maxRetries,
     minContextSize: input.minContextSize,
+    signal: input.signal,
     listRunningModels: input.listRunningModels,
     unloadModel: input.unloadModel,
     onLog: input.onLog,
     attemptLoad: async attemptInput => {
+      throwIfAborted(input.signal);
       const loadResult = await input.loadModel(attemptInput);
+      throwIfAborted(input.signal);
       const settleResult = await settleLlamaCppModelStartup({
         modelName,
         detectService: input.detectService,
@@ -95,6 +100,7 @@ export async function loadLlamaCppModelThroughPipeline(
         deadlineMs,
         pollIntervalMs: LlamaCppModelLoadPipelineDefaults.StartupPollIntervalMs,
         requestTimeoutMs: LlamaCppModelLoadPipelineDefaults.StartupRequestTimeoutMs,
+        signal: input.signal,
         onLog: input.onLog,
       });
 
@@ -154,4 +160,8 @@ function mapSettleStatusToFailureReason(
     case LlamaCppModelStartupSettleStatus.Failed:
       return LlamaCppModelLoadFailureReason.Unknown;
   }
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
 }

@@ -113,6 +113,24 @@ describe('llamacppModelLoadRetry', () => {
 
     expect(unloadModel).not.toHaveBeenCalled();
   });
+
+  test('stops without retrying when the load is cancelled', async () => {
+    const controller = new AbortController();
+    const attemptLoad = vi.fn(async () => {
+      controller.abort();
+      throw new Error('request aborted');
+    });
+
+    await expect(
+      loadLlamaCppModelWithRetry({
+        initialInput: inputWithContext(4096),
+        attemptLoad,
+        signal: controller.signal,
+      }),
+    ).rejects.toThrow();
+
+    expect(attemptLoad).toHaveBeenCalledTimes(1);
+  });
 });
 
 function inputWithContext(ctxSize: number): LlamaCppModelLaunchInput {

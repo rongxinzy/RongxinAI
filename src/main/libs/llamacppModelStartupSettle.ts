@@ -67,6 +67,7 @@ export type LlamaCppModelStartupSettleInput = {
   requestTimeoutMs?: number;
   now?: () => number;
   wait?: (delayMs: number) => Promise<void>;
+  signal?: AbortSignal;
   onLog?: LlamaCppModelLaunchLogReporter;
 };
 
@@ -106,6 +107,7 @@ export async function settleLlamaCppModelStartup(
   let lastObservedState: LlamaCppModelStartupObservedState | null = null;
 
   while (true) {
+    throwIfAborted(input.signal);
     // Each iteration first verifies service health, then reads the model table.
     // This separates service failures from model-level loading states.
     const remainingMs = Math.max(0, deadlineMs - now());
@@ -163,7 +165,11 @@ export async function settleLlamaCppModelStartup(
       });
     }
 
-    await wait(Math.min(pollIntervalMs, Math.max(1, deadlineMs - now())));
+    await waitWithSignal(
+      Math.min(pollIntervalMs, Math.max(1, deadlineMs - now())),
+      wait,
+      input.signal,
+    );
   }
 }
 
@@ -353,4 +359,25 @@ function matchesModelName(model: LlamaCppModel, modelName: string): boolean {
 
 function defaultWait(delayMs: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, delayMs));
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw signal.reason ?? new DOMException('Aborted', 'AbortError');
+}
+
+function waitWithSignal(
+  delayMs: number,
+  wait: (delayMs: number) => Promise<void>,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!signal) return wait(delayMs);
+  throwIfAborted(signal);
+  let onAbort: (() => void) | undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([wait(delayMs), aborted]).finally(() => {
+    if (onAbort) signal.removeEventListener('abort', onAbort);
+  });
 }

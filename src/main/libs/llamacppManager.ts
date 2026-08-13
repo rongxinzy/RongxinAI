@@ -1006,15 +1006,18 @@ export class LlamaCppManager extends EventEmitter {
     this.clearLastLoadedModel();
   }
 
-  async loadModel(input: LlamaCppModelLaunchInput): Promise<LlamaCppModelLaunchResult> {
+  async loadModel(
+    input: LlamaCppModelLaunchInput,
+    options: RequestOptions = {},
+  ): Promise<LlamaCppModelLaunchResult> {
     const localModels = await this.listLocalModels().catch(() => [] as LlamaCppModel[]);
     const resolvedInput = await this.resolveModelLoadInput(input, localModels);
     const modelName = resolvedInput.model.trim();
     if (!modelName) throw new Error('Model name is required');
     await this.writeModelPreset(resolvedInput, localModels);
     const client = await this.client();
-    await client.listModels();
-    const result = await client.loadModel(resolvedInput);
+    await client.listModels({ signal: options.signal });
+    const result = await client.loadModel(resolvedInput, options);
     this.persistLastLoadedModel(modelName);
     const resolvedRuntimeContextLength = resolvedInput.options?.ctxSize;
     if (resolvedRuntimeContextLength) {

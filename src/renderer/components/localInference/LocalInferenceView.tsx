@@ -13,7 +13,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { Cpu, FolderOpen, Globe, MemoryStick, PanelLeft, Pencil, Settings2 } from 'lucide-react';
+import { MemoryStick, PanelLeft, Pencil } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -162,6 +162,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [contextModel, setContextModel] = useState<OllamaModel | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingModelName, setLoadingModelName] = useState<string | null>(null);
+  const [cancellingModelLoad, setCancellingModelLoad] = useState(false);
+  const cancelledModelLoadRef = useRef(false);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [activePullName, setActivePullName] = useState<string | null>(null);
@@ -787,6 +789,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const modelName = model.name;
     if (loadingModelNameRef.current) return;
     loadingModelNameRef.current = modelName;
+    cancelledModelLoadRef.current = false;
     setLoadingModelName(modelName);
     launchLogs.beginModelLaunch(modelName, { visible: false });
     void runAction(async () => {
@@ -804,13 +807,41 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         }
       } catch (loadError) {
         launchLogs.markModelLaunchFailed();
+        if (cancelledModelLoadRef.current) {
+          await refreshRunningModels();
+          notifyLlamaCppRunningModelsChanged();
+          return;
+        }
         throw loadError;
       } finally {
         loadingModelNameRef.current = null;
         setLoadingModelName(current => (current === modelName ? null : current));
+        setCancellingModelLoad(false);
+        cancelledModelLoadRef.current = false;
       }
     });
-  }, [launchLogs, runAction, showToast]);
+  }, [launchLogs, refreshRunningModels, runAction, showToast]);
+
+  const handleCancelModelLoad = useCallback(() => {
+    const modelName = loadingModelNameRef.current;
+    if (!modelName || cancellingModelLoad) return;
+    cancelledModelLoadRef.current = true;
+    setCancellingModelLoad(true);
+    void runAction(async () => {
+      try {
+        const result = await window.electron.llamacpp.cancelModelLoad(modelName);
+        if (!result.cancelled) {
+          cancelledModelLoadRef.current = false;
+          setCancellingModelLoad(false);
+          return;
+        }
+      } catch (error) {
+        cancelledModelLoadRef.current = false;
+        setCancellingModelLoad(false);
+        throw error;
+      }
+    });
+  }, [cancellingModelLoad, runAction]);
 
   const handleMarketplaceOpenInstalled = useCallback(
     (model: MarketplaceModel) => {
@@ -1077,6 +1108,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 <ModelsPanel
                   loading={loading}
                   loadingModelName={loadingModelName}
+                  cancellingModelLoad={cancellingModelLoad}
                   unloadingModelName={unloadingModelName}
                   localModels={localModels}
                   runningModels={runningModels}
@@ -1084,6 +1116,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   onLoadModel={model => {
                     handleLoadModel(model);
                   }}
+                  onCancelModelLoad={handleCancelModelLoad}
                   onUnload={handleUnload}
                   onDelete={handleDelete}
                   onConfigureContext={model => {
