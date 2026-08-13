@@ -192,21 +192,9 @@
     StrCpy $1 $1 64
     StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
 
-    ; Validate every archive entry before extraction. The first Path entry is
-    ; the archive itself; all remaining paths must stay under the component prefix.
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-      $$ErrorActionPreference = \"Stop\";\
-      Set-StrictMode -Version Latest;\
-      $$lines = & \"$PLUGINSDIR\7za.exe\" l -slt \"$PLUGINSDIR\component-${KEY}.7z\";\
-      if ($$LASTEXITCODE -ne 0) { throw \"7za list failed: $$LASTEXITCODE\" };\
-      $$paths = @($$lines | Where-Object { $$_ -match \"^Path = \" } | ForEach-Object { $$_.Substring(7) });\
-      if ($$paths.Count -lt 2) { throw \"Archive has no entries\" };\
-      $$entries = @($$paths | Select-Object -Skip 1);\
-      foreach ($$entry in $$entries) {\
-        if ([string]::IsNullOrWhiteSpace($$entry) -or $$entry -match \"^(?:[A-Za-z]:|[\\\\/])\" -or $$entry -match \"(^|[\\\\/])\\.\\.([\\\\/]|$$)\" -or $$entry -match \":\") { throw \"Unsafe archive entry: $$entry\" };\
-        if (-not ($$entry -eq \"${PREFIX}\" -or $$entry -like \"${PREFIX}\\*\" -or $$entry -like \"${PREFIX}/*\")) { throw \"Unexpected archive entry: $$entry\" }\
-      };\
-      if (@($$lines | Where-Object { $$_ -match \"^(Symbolic Link|Hard Link|Reparse Point) = \" }).Count -gt 0) { throw \"Archive contains link metadata\" }"'
+    ; Validate every archive entry before extraction. Keep the parser in a
+    ; standalone script so PowerShell path semantics are not changed by NSIS quoting.
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-component-archive.ps1" -ArchivePath "$PLUGINSDIR\component-${KEY}.7z" -SevenZipPath "$PLUGINSDIR\7za.exe" -Prefix "${PREFIX}"'
     Pop $0
     Pop $1
     StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
@@ -284,6 +272,7 @@
   File /oname=7za.sha256 "${PROJECT_DIR}\build-tar\windows-components\7za.sha256"
   File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
   File /oname=recover-component-switch.ps1 "${PROJECT_DIR}\scripts\installer\recover-component-switch.ps1"
+  File /oname=validate-component-archive.ps1 "${PROJECT_DIR}\scripts\installer\validate-component-archive.ps1"
   ; Embed the routing table as a compile-time asset. Building it incrementally
   ; with NSIS FileWrite can split the skill-python key on Windows runners.
   File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"

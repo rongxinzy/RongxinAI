@@ -8,6 +8,9 @@ const installerSmokeScriptPath = path.resolve('scripts/ci/windows-installer-smok
 const elevatedActionsScriptPath = path.resolve('scripts/nsis-elevated-actions.ps1');
 const offlineComponentsPath = path.resolve('scripts/nsis-offline-components.json');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
+const componentArchiveValidatorPath = path.resolve(
+  'scripts/installer/validate-component-archive.ps1',
+);
 
 describe('NSIS offline resource and local inference flow', () => {
   test('declares the installer as DPI-aware for high-DPI displays', () => {
@@ -33,13 +36,24 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
     expect(installerScript).toContain('SetCompress off');
     expect(installerScript).toContain('SetCompress auto');
-    expect(installerScript).toContain('l -slt');
-    expect(installerScript).toContain('Unsafe archive entry:');
-    expect(installerScript).toContain('Archive contains link metadata');
+    expect(installerScript).toContain('File /oname=validate-component-archive.ps1');
+    expect(installerScript).toContain('-File \"$PLUGINSDIR\\validate-component-archive.ps1\"');
     expect(installerScript).toContain('phase=component-archive-unsafe');
     expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
+  });
+
+  test('normalizes 7-Zip entry separators before enforcing the component prefix', () => {
+    const validatorScript = fs.readFileSync(componentArchiveValidatorPath, 'utf8');
+
+    expect(validatorScript).toContain("$entry.Replace('\\', '/')");
+    expect(validatorScript).toContain(
+      '$normalizedEntry.StartsWith("$normalizedPrefix/", [System.StringComparison]::Ordinal)',
+    );
+    expect(validatorScript).toContain("$normalizedEntry -match '(^|/)\\.\\.(/|$)'");
+    expect(validatorScript).toContain("$value -and $value -ne '-'");
+    expect(validatorScript).not.toContain('-like');
   });
 
   test('uses per-user installation and rolls back pointer changes after normal failures', () => {
