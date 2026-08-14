@@ -526,7 +526,6 @@ export interface CoworkConfig {
   memoryLlmJudgeEnabled: boolean;
   memoryGuardLevel: CoworkMemoryGuardLevel;
   memoryUserMemoriesMaxItems: number;
-  skipMissedJobs: boolean;
   permissionMode: CoworkPermissionModeType;
   permissionModeBySession: Record<string, CoworkPermissionModeType>;
   embeddingEnabled: boolean;
@@ -548,7 +547,6 @@ export type CoworkConfigUpdate = Partial<
     | 'memoryLlmJudgeEnabled'
     | 'memoryGuardLevel'
     | 'memoryUserMemoriesMaxItems'
-    | 'skipMissedJobs'
     | 'permissionMode'
     | 'permissionModeBySession'
     | 'embeddingEnabled'
@@ -1648,7 +1646,6 @@ export class CoworkStore {
       'memoryLlmJudgeEnabled',
       'memoryGuardLevel',
       'memoryUserMemoriesMaxItems',
-      'skipMissedJobs',
       'permissionMode',
       'permissionModeBySession',
       'embeddingEnabled',
@@ -1682,7 +1679,6 @@ export class CoworkStore {
       memoryUserMemoriesMaxItems: clampMemoryUserMemoriesMaxItems(
         Number(cfg.get('memoryUserMemoriesMaxItems')),
       ),
-      skipMissedJobs: parseBooleanConfig(cfg.get('skipMissedJobs'), true),
       permissionMode: normalizePermissionMode(cfg.get('permissionMode')),
       permissionModeBySession: (() => {
         try {
@@ -1745,9 +1741,6 @@ export class CoworkStore {
         String(clampMemoryUserMemoriesMaxItems(config.memoryUserMemoriesMaxItems)),
         now,
       );
-    }
-    if (config.skipMissedJobs !== undefined) {
-      this.upsertConfig('skipMissedJobs', config.skipMissedJobs ? '1' : '0', now);
     }
     if (config.permissionMode !== undefined) {
       this.upsertConfig('permissionMode', normalizePermissionMode(config.permissionMode), now);

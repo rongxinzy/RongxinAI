@@ -75,7 +75,6 @@ const initialState: CoworkState = {
     memoryLlmJudgeEnabled: false,
     memoryGuardLevel: 'strict',
     memoryUserMemoriesMaxItems: 12,
-    skipMissedJobs: true,
     permissionMode: CoworkPermissionMode.Ask,
     permissionModeBySession: {},
     embeddingEnabled: false,

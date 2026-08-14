@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { Switch } from '@shared/components/ui/switch';
 import { Cable, LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -17,7 +18,6 @@ import {
   McpServerConfig,
   McpServerFormData,
 } from '../../types/mcp';
-import Modal from '../common/Modal';
 import ErrorMessage from '../ErrorMessage';
 import { ListPagination } from '../common/ListPagination';
 import {
@@ -1140,41 +1140,17 @@ const McpManager: React.FC<McpManagerProps> = ({
         </div>
       </div>
 
-      {/* Delete confirmation modal */}
       {pendingDelete && (
-        <Modal
-          onClose={handleCancelDelete}
-          overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          className="w-full max-w-sm mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-5"
-        >
-          <div className="text-lg font-semibold text-foreground">
-            {i18nService.t('deleteMcpServer')}
-          </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {i18nService.t('mcpDeleteConfirm').replace('{name}', pendingDelete.name)}
-          </p>
-          {actionError && <div className="mt-3 text-xs text-red-500">{actionError}</div>}
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancelDelete}
-              disabled={isDeleting}
-              className="h-8 px-3 text-xs"
-            >
-              {i18nService.t('cancel')}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={handleConfirmDelete}
-              disabled={isDeleting}
-              className="h-8 px-3 text-xs"
-            >
-              {i18nService.t('confirmDelete')}
-            </Button>
-          </div>
-        </Modal>
+        <DestructiveConfirmDialog
+          open
+          title={i18nService.t('deleteMcpServer')}
+          description={i18nService.t('mcpDeleteConfirm').replace('{name}', pendingDelete.name)}
+          cancelLabel={i18nService.t('cancel')}
+          confirmLabel={i18nService.t('confirmDelete')}
+          isConfirming={isDeleting}
+          onCancel={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+        />
       )}
 
       {/* Edit / Registry-install form modal */}

@@ -1,9 +1,9 @@
 import { Button } from '@shared/components/ui/button';
 import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { Input } from '@shared/components/ui/input';
 import { Label } from '@shared/components/ui/label';
 import { useReducedMotion } from 'motion/react';
-import { TriangleAlert } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useDispatch } from 'react-redux';
@@ -200,32 +200,15 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
         onOpenChange={setIsCreateProjectOpen}
         onCreated={path => void handleProjectCreated(path)}
       />
-      <Dialog
+      <DestructiveConfirmDialog
         open={workspacePendingRemoval !== null}
-        onOpenChange={open => {
-          if (!open) setWorkspacePendingRemoval(null);
-        }}
-      >
-        <DialogContent className="max-w-sm" showCloseButton={false}>
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-red-100 p-2 dark:bg-red-900/30">
-              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
-            </div>
-            <h2 className="text-base font-semibold">{i18nService.t('removeProjectDialogTitle')}</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {i18nService.t('removeProjectDialogDescription')}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setWorkspacePendingRemoval(null)}>
-              {i18nService.t('cancel')}
-            </Button>
-            <Button variant="destructive" onClick={() => void handleConfirmRemoveWorkspace()}>
-              {i18nService.t('removeProject')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title={i18nService.t('removeProjectDialogTitle')}
+        description={i18nService.t('removeProjectDialogDescription')}
+        cancelLabel={i18nService.t('cancel')}
+        confirmLabel={i18nService.t('removeProject')}
+        onCancel={() => setWorkspacePendingRemoval(null)}
+        onConfirm={() => void handleConfirmRemoveWorkspace()}
+      />
       <Dialog
         open={workspacePendingRename !== null}
         onOpenChange={open => {

@@ -18,6 +18,7 @@ import {
 } from '@shared/components/ui/empty';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/components/ui/hover-card';
 import { Spinner } from '@shared/components/ui/spinner';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { cn } from '@shared/lib/utils';
 import { ArrowRight, Box, Clock3, Ellipsis, Settings2, Trash2 } from 'lucide-react';
 import {
@@ -54,7 +55,7 @@ import {
   XiaomiIcon,
   ZhipuIcon,
 } from '../../icons/providers';
-import { localInferenceCompactButtonClass, localInferenceMutedTextClass } from '../constants';
+import { localInferenceMutedTextClass } from '../constants';
 import {
   readLocalModelOrder,
   reconcileLocalModelOrder,
@@ -62,7 +63,6 @@ import {
   writeLocalModelOrder,
 } from '../utils/modelOrder';
 import { ListPagination } from '../../common/ListPagination';
-import Modal from '../../common/Modal';
 import { type LocalModelProvider, resolveLocalModelProvider } from '../utils/modelProvider';
 import { formatBytes, formatDate } from '../utils/progress';
 
@@ -269,6 +269,11 @@ export function ModelsPanel({
   const pendingDeleteDisplayName = pendingDeleteModel
     ? getModelDisplayName(pendingDeleteModel.name)
     : '';
+  const deleteConfirmationMessage = pendingDeleteRunningModel
+    ? i18nService.t('localInferenceDeleteRunningBlocked')
+    : i18nService
+        .t('localInferenceDeleteConfirmMessage')
+        .replace('{name}', pendingDeleteDisplayName);
   const pendingDeleteBusy =
     loading || (!!pendingDeleteModel && unloadingModelName === pendingDeleteModel.name);
 
@@ -390,49 +395,16 @@ export function ModelsPanel({
       </section>
 
       {pendingDeleteModel ? (
-        <Modal
-          isOpen={Boolean(pendingDeleteModel)}
-          onClose={handleCancelDelete}
-          className="w-full max-w-sm rounded-2xl border border-border bg-surface p-0 shadow-2xl"
-        >
-          <div className="flex flex-col gap-5 p-6">
-            <div className="flex flex-col gap-2">
-              <h2 className="text-base font-semibold text-foreground">
-                {i18nService.t('confirmDelete')}
-              </h2>
-              <p className={cn('text-sm leading-6', localInferenceMutedTextClass)}>
-                {pendingDeleteRunningModel
-                  ? i18nService.t('localInferenceDeleteRunningBlocked')
-                  : i18nService
-                      .t('localInferenceDeleteConfirmMessage')
-                      .replace('{name}', pendingDeleteDisplayName)}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className={localInferenceCompactButtonClass}
-                data-local-inference-delete-confirm-action-button="true"
-                onClick={handleCancelDelete}
-              >
-                {i18nService.t('cancel')}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                className={localInferenceCompactButtonClass}
-                disabled={pendingDeleteBusy || Boolean(pendingDeleteRunningModel)}
-                data-local-inference-delete-confirm-action-button="true"
-                data-local-inference-delete-confirm-button="true"
-                onClick={handleConfirmDelete}
-              >
-                {i18nService.t('delete')}
-              </Button>
-            </div>
-          </div>
-        </Modal>
+        <DestructiveConfirmDialog
+          open
+          title={i18nService.t('confirmDelete')}
+          description={deleteConfirmationMessage}
+          cancelLabel={i18nService.t('cancel')}
+          confirmLabel={i18nService.t('delete')}
+          confirmDisabled={pendingDeleteBusy || Boolean(pendingDeleteRunningModel)}
+          onCancel={handleCancelDelete}
+          onConfirm={handleConfirmDelete}
+        />
       ) : null}
     </div>
   );

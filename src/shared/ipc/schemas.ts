@@ -369,7 +369,6 @@ export const CoworkConfigSetSchema = {
     memoryLlmJudgeEnabled: z.boolean().optional(),
     memoryGuardLevel: z.enum(['strict', 'standard', 'relaxed']).optional(),
     memoryUserMemoriesMaxItems: z.number().int().min(1).max(60).optional(),
-    skipMissedJobs: z.boolean().optional(),
     embeddingEnabled: z.boolean().optional(),
     embeddingProvider: z.string().optional(),
     embeddingModel: z.string().optional(),

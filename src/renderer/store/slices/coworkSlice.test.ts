@@ -47,12 +47,6 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   ...overrides,
 });
 
-test('defaults scheduler recovery policy to skip missed jobs', () => {
-  const state = coworkReducer(undefined, { type: 'init' });
-
-  expect(state.config.skipMissedJobs).toBe(true);
-});
-
 test('setConfig loads Pi-owned cowork configuration', () => {
   const state = coworkReducer(
     undefined,
@@ -65,7 +59,6 @@ test('setConfig loads Pi-owned cowork configuration', () => {
       memoryLlmJudgeEnabled: false,
       memoryGuardLevel: 'strict',
       memoryUserMemoriesMaxItems: 12,
-      skipMissedJobs: false,
       permissionMode: CoworkPermissionMode.Ask,
       embeddingEnabled: false,
       embeddingProvider: 'openai',
@@ -77,7 +70,6 @@ test('setConfig loads Pi-owned cowork configuration', () => {
     }),
   );
 
-  expect(state.config.skipMissedJobs).toBe(false);
   expect(state.config.workingDirectory).toBe('/tmp');
 });
 

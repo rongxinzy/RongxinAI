@@ -13,7 +13,8 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { MemoryStick, PanelLeft, Pencil } from 'lucide-react';
+import { PanelLeft, Pencil } from 'lucide-react';
+import { useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type {
@@ -34,6 +35,9 @@ import { notifyLlamaCppRunningModelsChanged } from '../../services/availableMode
 import { i18nService } from '../../services/i18n';
 import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
 import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
+import {
+  GalleryThumbnailsIcon,
+} from '../icons/GalleryThumbnailsIcon';
 import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
 import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
@@ -105,6 +109,11 @@ type MarketplacePageCache = {
   cursors: Map<number, string | undefined>;
 };
 
+type AnimatedIconHandle = {
+  startAnimation: () => void;
+  stopAnimation: () => void;
+};
+
 function marketplacePageCacheKey(params: MarketplaceSearchParams): string {
   return JSON.stringify({
     query: params.query ?? '',
@@ -135,11 +144,28 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
+  const prefersReducedMotion = useReducedMotion();
+  const runtimeSettingsIconRef = useRef<AnimatedIconHandle>(null);
+  const accessSettingsIconRef = useRef<AnimatedIconHandle>(null);
+  const memorySettingsIconRef = useRef<AnimatedIconHandle>(null);
+  const librarySettingsIconRef = useRef<AnimatedIconHandle>(null);
   const restoredSessionRef = useRef<LocalInferenceSessionState | null>(null);
   if (restoredSessionRef.current === null) {
     restoredSessionRef.current = readLocalInferenceSessionState();
   }
   const restoredSession = restoredSessionRef.current;
+  const startMenuIconAnimation = useCallback(
+    (iconRef: React.RefObject<AnimatedIconHandle | null>) => {
+      if (!prefersReducedMotion) iconRef.current?.startAnimation();
+    },
+    [prefersReducedMotion],
+  );
+  const stopMenuIconAnimation = useCallback(
+    (iconRef: React.RefObject<AnimatedIconHandle | null>) => {
+      iconRef.current?.stopAnimation();
+    },
+    [],
+  );
   const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
@@ -1072,16 +1098,31 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                       }
                     />
                     <DropdownMenuContent align="end" className="min-w-32">
-                      <DropdownMenuItem onClick={() => setRuntimeSettingsOpen(true)}>
-                        <SidebarAnimatedCpuIcon />
+                      <DropdownMenuItem
+                        onClick={() => setRuntimeSettingsOpen(true)}
+                        onFocus={() => startMenuIconAnimation(runtimeSettingsIconRef)}
+                        onMouseEnter={() => startMenuIconAnimation(runtimeSettingsIconRef)}
+                        onMouseLeave={() => stopMenuIconAnimation(runtimeSettingsIconRef)}
+                      >
+                        <SidebarAnimatedCpuIcon ref={runtimeSettingsIconRef} />
                         {i18nService.t('localInferenceRuntimeSettings')}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={openAccessSettings}>
-                        <LocalInferenceAnimatedWifiPenIcon />
+                      <DropdownMenuItem
+                        onClick={openAccessSettings}
+                        onFocus={() => startMenuIconAnimation(accessSettingsIconRef)}
+                        onMouseEnter={() => startMenuIconAnimation(accessSettingsIconRef)}
+                        onMouseLeave={() => stopMenuIconAnimation(accessSettingsIconRef)}
+                      >
+                        <LocalInferenceAnimatedWifiPenIcon ref={accessSettingsIconRef} />
                         {i18nService.t('localInferenceAccessMenuItem')}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={openMemorySettings}>
-                        <MemoryStick data-icon="inline-start" />
+                      <DropdownMenuItem
+                        onClick={openMemorySettings}
+                        onFocus={() => startMenuIconAnimation(memorySettingsIconRef)}
+                        onMouseEnter={() => startMenuIconAnimation(memorySettingsIconRef)}
+                        onMouseLeave={() => stopMenuIconAnimation(memorySettingsIconRef)}
+                      >
+                        <GalleryThumbnailsIcon ref={memorySettingsIconRef} />
                         {i18nService.t('localInferenceMemoryMenuItem')}
                       </DropdownMenuItem>
                       <DropdownMenuItem
@@ -1089,8 +1130,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                           setDraftModelsDir(modelsDir);
                           setLibrarySettingsOpen(true);
                         }}
+                        onFocus={() => startMenuIconAnimation(librarySettingsIconRef)}
+                        onMouseEnter={() => startMenuIconAnimation(librarySettingsIconRef)}
+                        onMouseLeave={() => stopMenuIconAnimation(librarySettingsIconRef)}
                       >
-                        <LocalInferenceAnimatedFolderDownIcon />
+                        <LocalInferenceAnimatedFolderDownIcon ref={librarySettingsIconRef} />
                         {i18nService.t('localInferenceLibraryMenuItem')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
