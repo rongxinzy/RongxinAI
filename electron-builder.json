@@ -14,12 +14,12 @@
     {
       "from": "dist",
       "to": "dist",
-      "filter": ["**/*"]
+      "filter": ["**/*", "!**/*.map"]
     },
     {
       "from": "dist-electron",
       "to": "dist-electron",
-      "filter": ["**/*"]
+      "filter": ["**/*", "!**/*.map"]
     },
     "!**/*.map",
     "!**/*.d.ts",
@@ -42,7 +42,11 @@
     "!**/*.spec.*",
     "!**/tests/**",
     "!**/test/**",
-    "!**/__tests__/**"
+    "!**/__tests__/**",
+    "!node_modules/npm/docs/**",
+    "!node_modules/npm/man/**",
+    "!node_modules/better-sqlite3/src/**",
+    "!node_modules/better-sqlite3/deps/**"
   ],
   "extraResources": [
     {
@@ -307,6 +311,7 @@
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
   "electronVersion": "40.2.1",
+  "electronLanguages": ["en-US", "zh-CN", "zh-TW", "ja", "ko", "fr", "es", "es-419"],
   "electronUpdaterCompatibility": ">=6.0.0",
   "detectUpdateChannel": false,
   "generateUpdatesFilesForAllChannels": false,
