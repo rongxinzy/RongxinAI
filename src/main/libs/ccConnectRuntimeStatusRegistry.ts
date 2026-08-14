@@ -50,8 +50,8 @@ export class CcConnectRuntimeStatusRegistry {
     this.statuses.clear();
   }
 
-  get(accountId: string, fallbackError: string | null = null): CcConnectAccountRuntimeStatus {
-    return this.statuses.get(accountId) ?? { ...EMPTY_STATUS, lastError: fallbackError };
+  get(accountId: string): CcConnectAccountRuntimeStatus {
+    return this.statuses.get(accountId) ?? { ...EMPTY_STATUS };
   }
 }
 

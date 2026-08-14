@@ -15,6 +15,22 @@ export function selectConnectivityInstance<T extends ChannelInstance>(
     : (instances.find(item => item.enabled) ?? instances[0]);
 }
 
+export function resolveFeishuAuthEndpoint(domain: string): string {
+  const service = domain.trim();
+  if (!service || service.toLowerCase() === 'feishu') {
+    return 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
+  }
+  if (service.toLowerCase() === 'lark') {
+    return 'https://open.larksuite.com/open-apis/auth/v3/tenant_access_token/internal';
+  }
+
+  const baseUrl = new URL(service);
+  if (baseUrl.protocol !== 'https:' && baseUrl.protocol !== 'http:') {
+    throw new Error('Feishu service domain must use HTTP or HTTPS.');
+  }
+  return new URL('/open-apis/auth/v3/tenant_access_token/internal', baseUrl).toString();
+}
+
 export function resolveConnectivityAccount(
   platform: Platform,
   config: IMGatewayConfig,
