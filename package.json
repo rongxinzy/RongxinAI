@@ -45,9 +45,9 @@
     }
   },
   "channelRuntime": {
-    "version": "zhiyuan-sidecar-v1",
+    "version": "zhiyuan-sidecar-v2",
     "repo": "rongxinzy/pi-connect",
-    "sourceRevision": "dcbff6603d39c0dc88877b91bb3e5442a2ec17da",
+    "sourceRevision": "413cbcafe154b3da87e27d2c48392be5500366a6",
     "runtimeAssets": {
       "mac-x64": "cc-connect-sidecar-darwin-amd64",
       "mac-arm64": "cc-connect-sidecar-darwin-arm64",
@@ -55,10 +55,10 @@
       "linux-x64": "cc-connect-sidecar-linux-amd64"
     },
     "runtimeChecksums": {
-      "mac-x64": "67d068e20b46499f99c2cf51f7ff38b115d26b5708ae0c3cfaf80f439986225b",
-      "mac-arm64": "2753cc1a345c48a76c25be0c6f581077039d41b26edef31cd78c917d9c93fa22",
-      "win-x64": "de7d99b503cdea36abe89127fe31b893f83e5a114f8389d6dd1738129280ee98",
-      "linux-x64": "13996aa4e62ef817baf8898c44dd480705a59774b48213d90863dcd1bd7184d1"
+      "mac-x64": "be25d3496a36f2001f7479d6a49ccd3964a754c9ba6b9cd1dda35af39e4ffb92",
+      "mac-arm64": "8eab491878cb5c38efff7bfb5934b8437b3f8e51007283e6cf9528629bb276f8",
+      "win-x64": "f78f2807ecc7d7ec0254cf64e1e47446e492e3036078a5b42b84e7fca277c566",
+      "linux-x64": "5d32d35a69433072100ab20f01d7fff8b3c8ebde3225e66139b5b6c984c6eba5"
     }
   },
   "main": "dist-electron/main.js",

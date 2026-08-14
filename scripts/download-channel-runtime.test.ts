@@ -55,7 +55,7 @@ describe('Channel runtime downloader', () => {
   beforeEach(() => {
     rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'channel-runtime-root-'));
     config = {
-      version: 'zhiyuan-sidecar-v1',
+      version: 'zhiyuan-sidecar-v2',
       repo: 'rongxinzy/pi-connect',
       sourceRevision: 'a'.repeat(40),
       runtimeAssets: { [targetId]: 'sidecar.exe' },
