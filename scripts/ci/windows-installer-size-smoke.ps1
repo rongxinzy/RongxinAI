@@ -1,8 +1,8 @@
 param(
   [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
-  [int64]$MaximumInstallerBytes = 425MB,
-  [int64]$MaximumComponentBytes = 220MB,
-  [int64]$MaximumNonComponentBytes = 220MB
+  [int64]$MaximumInstallerBytes = 315MB,
+  [int64]$MaximumComponentBytes = 165MB,
+  [int64]$MaximumNonComponentBytes = 150MB
 )
 
 $ErrorActionPreference = 'Stop'
