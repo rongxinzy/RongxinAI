@@ -46,3 +46,27 @@ test('serializes rolling writes for the same session', async () => {
   await expect(Promise.all([first, second])).resolves.toEqual([1, 2]);
   expect(saveSessionSummary).toHaveBeenCalledTimes(2);
 });
+
+test('reduces markdown-heavy outcomes to one bounded conclusion sentence', () => {
+  const summary = buildSessionSummary([
+    message('user', 'Fix session memory isolation.'),
+    message(
+      'assistant',
+      [
+        '## Result',
+        '| Session | Secret |',
+        '| --- | --- |',
+        '| other | private table data |',
+        '**Fixed session isolation.** Additional implementation details should not be copied.',
+        '```ts',
+        'const privateData = true;',
+        '```',
+      ].join('\n'),
+    ),
+  ]);
+
+  expect(summary).toContain('Latest outcome: Fixed session isolation.');
+  expect(summary).not.toContain('private table data');
+  expect(summary).not.toContain('Additional implementation details');
+  expect(summary).not.toContain('privateData');
+});

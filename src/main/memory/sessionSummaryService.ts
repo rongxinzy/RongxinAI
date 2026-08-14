@@ -4,7 +4,7 @@ import type { ProjectMemoryService } from './projectMemoryService';
 const MAX_SUMMARY_MESSAGES = 8;
 const MAX_SOURCE_MESSAGES = 32;
 const MAX_OBJECTIVE_CHARACTERS = 320;
-const MAX_OUTCOME_CHARACTERS = 720;
+const MAX_OUTCOME_CHARACTERS = 240;
 const MAX_EARLIER_TOPIC_CHARACTERS = 160;
 
 export class SessionSummaryService {
@@ -61,13 +61,35 @@ export function buildSessionSummary(messages: CoworkMessage[]): string | null {
     .map(message => summarizeText(message.content, MAX_EARLIER_TOPIC_CHARACTERS));
   return [
     `Session objective: ${summarizeText(objective.content, MAX_OBJECTIVE_CHARACTERS)}`,
-    `Latest outcome: ${summarizeText(outcome.content, MAX_OUTCOME_CHARACTERS)}`,
+    `Latest outcome: ${summarizeText(outcome.content, MAX_OUTCOME_CHARACTERS, true)}`,
     ...(earlierTopics.length > 0 ? [`Earlier topics: ${earlierTopics.join(' | ')}`] : []),
   ].join('\n');
 }
 
-function summarizeText(value: string, limit: number): string {
-  const normalized = value.replace(/\s+/g, ' ').trim();
+function summarizeText(value: string, limit: number, firstSentenceOnly = false): string {
+  const normalized = extractNaturalLanguage(value, firstSentenceOnly);
   if (normalized.length <= limit) return normalized;
   return `${normalized.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
+function extractNaturalLanguage(value: string, firstSentenceOnly: boolean): string {
+  const paragraphs = value
+    .replace(/```[\s\S]*?```/g, ' ')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+    .filter(line => !/^#{1,6}\s/.test(line))
+    .filter(line => !/^\|.*\|$/.test(line))
+    .filter(line => !/^\s*[-:|]+\s*$/.test(line))
+    .map(line =>
+      line
+        .replace(/^[-*+]\s+/, '')
+        .replace(/^\d+[.)]\s+/, '')
+        .replace(/[*_~`]+/g, '')
+        .trim(),
+    )
+    .filter(Boolean);
+  const normalized = paragraphs.join(' ').replace(/\s+/g, ' ').trim();
+  if (!firstSentenceOnly) return normalized;
+  return normalized.match(/^.*?[.!?。！？](?:\s|$)/u)?.[0]?.trim() || normalized;
 }
