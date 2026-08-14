@@ -133,7 +133,6 @@ export interface CoworkConfig {
   memoryLlmJudgeEnabled: boolean;
   memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
   memoryUserMemoriesMaxItems: number;
-  skipMissedJobs: boolean;
   permissionMode: CoworkPermissionMode;
   permissionModeBySession?: Record<string, CoworkPermissionMode>;
   embeddingEnabled: boolean;
@@ -155,7 +154,6 @@ export type CoworkConfigUpdate = Partial<
     | 'memoryLlmJudgeEnabled'
     | 'memoryGuardLevel'
     | 'memoryUserMemoriesMaxItems'
-    | 'skipMissedJobs'
     | 'permissionMode'
     | 'permissionModeBySession'
     | 'embeddingEnabled'

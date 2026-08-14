@@ -1,4 +1,5 @@
 import { Button } from '@shared/components/ui/button';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { Input } from '@shared/components/ui/input';
 import {
   Popover,
@@ -980,51 +981,24 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
           </div>
         ))}
 
-      {skillsPendingDelete.length > 0 &&
-        createPortal(
-          <Modal
-            onClose={handleCancelDeleteSkill}
-            overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            className="w-full max-w-sm mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-5"
-          >
-            <div className="text-lg font-semibold text-foreground">
-              {i18nService.t('deleteSkill')}
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {skillsPendingDelete.length === 1
-                ? i18nService.t('skillDeleteConfirm').replace('{name}', skillsPendingDelete[0].name)
-                : i18nService
-                    .t('skillBatchDeleteConfirm')
-                    .replace('{count}', String(skillsPendingDelete.length))}
-            </p>
-            {skillActionError && (
-              <div className="mt-3 text-xs text-red-500">{skillActionError}</div>
-            )}
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCancelDeleteSkill}
-                disabled={isDeletingSkill}
-                className="px-3 py-1.5 text-xs rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {i18nService.t('cancel')}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={handleConfirmDeleteSkill}
-                disabled={isDeletingSkill}
-                className="px-3 py-1.5 text-xs rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {i18nService.t('confirmDelete')}
-              </Button>
-            </div>
-          </Modal>,
-          document.body,
-        )}
+      {skillsPendingDelete.length > 0 && (
+        <DestructiveConfirmDialog
+          open
+          title={i18nService.t('deleteSkill')}
+          description={
+            skillsPendingDelete.length === 1
+              ? i18nService.t('skillDeleteConfirm').replace('{name}', skillsPendingDelete[0].name)
+              : i18nService
+                  .t('skillBatchDeleteConfirm')
+                  .replace('{count}', String(skillsPendingDelete.length))
+          }
+          cancelLabel={i18nService.t('cancel')}
+          confirmLabel={i18nService.t('confirmDelete')}
+          isConfirming={isDeletingSkill}
+          onCancel={handleCancelDeleteSkill}
+          onConfirm={handleConfirmDeleteSkill}
+        />
+      )}
 
       {isRemoteImportOpen &&
         createPortal(

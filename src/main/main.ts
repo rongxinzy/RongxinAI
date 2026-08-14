@@ -4614,7 +4614,6 @@ if (!gotTheLock) {
         memoryLlmJudgeEnabled?: boolean;
         memoryGuardLevel?: 'strict' | 'standard' | 'relaxed';
         memoryUserMemoriesMaxItems?: number;
-        skipMissedJobs?: boolean;
         permissionMode?: CoworkPermissionMode;
         permissionModeBySession?: Record<string, CoworkPermissionMode>;
         embeddingEnabled?: boolean;
@@ -4658,8 +4657,6 @@ if (!gotTheLock) {
                 ),
               )
             : undefined;
-        const normalizedSkipMissedJobs =
-          typeof config.skipMissedJobs === 'boolean' ? config.skipMissedJobs : undefined;
         const normalizedPermissionMode =
           config.permissionMode === CoworkPermissionMode.Ask ||
           config.permissionMode === CoworkPermissionMode.AllowAll
@@ -4683,7 +4680,6 @@ if (!gotTheLock) {
           memoryLlmJudgeEnabled: normalizedMemoryLlmJudgeEnabled,
           memoryGuardLevel: normalizedMemoryGuardLevel,
           memoryUserMemoriesMaxItems: normalizedMemoryUserMemoriesMaxItems,
-          skipMissedJobs: normalizedSkipMissedJobs,
           permissionMode: normalizedPermissionMode,
           permissionModeBySession: normalizedPermissionModeBySession,
           ...normalizedEmbedding,

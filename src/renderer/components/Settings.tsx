@@ -82,6 +82,7 @@ import type {
   CoworkUserMemoryEntry,
 } from '../types/cowork';
 import Modal from './common/Modal';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
 import ErrorMessage from './ErrorMessage';
 import { GitHubCopilotIcon } from './icons/providers';
@@ -743,6 +744,7 @@ const Settings: React.FC<SettingsProps> = ({
   const [isTestResultModalOpen, setIsTestResultModalOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<ProviderType | null>(null);
+  const [pendingDeleteModel, setPendingDeleteModel] = useState<{ id: string; name: string } | null>(null);
   const [isImportingProviders, setIsImportingProviders] = useState(false);
   const [isExportingProviders, setIsExportingProviders] = useState(false);
   // Global triage defaults — Agent-level settings are per-Agent in AgentSettingsPanel
@@ -915,9 +917,6 @@ const Settings: React.FC<SettingsProps> = ({
   const [coworkMemoryLlmJudgeEnabled, setCoworkMemoryLlmJudgeEnabled] = useState<boolean>(
     coworkConfig.memoryLlmJudgeEnabled ?? false,
   );
-  const [skipMissedJobs, setSkipMissedJobs] = useState<boolean>(
-    coworkConfig.skipMissedJobs ?? true,
-  );
   const [embeddingEnabled, setEmbeddingEnabled] = useState<boolean>(
     coworkConfig.embeddingEnabled ?? false,
   );
@@ -975,7 +974,6 @@ const Settings: React.FC<SettingsProps> = ({
   useEffect(() => {
     setCoworkMemoryEnabled(coworkConfig.memoryEnabled ?? true);
     setCoworkMemoryLlmJudgeEnabled(coworkConfig.memoryLlmJudgeEnabled ?? false);
-    setSkipMissedJobs(coworkConfig.skipMissedJobs ?? true);
     setEmbeddingEnabled(coworkConfig.embeddingEnabled ?? false);
     setEmbeddingProvider(coworkConfig.embeddingProvider ?? 'openai');
     setEmbeddingModel(coworkConfig.embeddingModel ?? '');
@@ -986,7 +984,6 @@ const Settings: React.FC<SettingsProps> = ({
   }, [
     coworkConfig.memoryEnabled,
     coworkConfig.memoryLlmJudgeEnabled,
-    coworkConfig.skipMissedJobs,
     coworkConfig.embeddingEnabled,
     coworkConfig.embeddingProvider,
     coworkConfig.embeddingModel,
@@ -1750,7 +1747,6 @@ const Settings: React.FC<SettingsProps> = ({
   const hasCoworkConfigChanges =
     coworkMemoryEnabled !== coworkConfig.memoryEnabled ||
     coworkMemoryLlmJudgeEnabled !== coworkConfig.memoryLlmJudgeEnabled ||
-    skipMissedJobs !== (coworkConfig.skipMissedJobs ?? true) ||
     embeddingEnabled !== (coworkConfig.embeddingEnabled ?? false) ||
     embeddingProvider !== (coworkConfig.embeddingProvider ?? 'openai') ||
     embeddingModel !== (coworkConfig.embeddingModel ?? '') ||
@@ -2083,7 +2079,6 @@ const Settings: React.FC<SettingsProps> = ({
         const updated = await coworkService.updateConfig({
           memoryEnabled: coworkMemoryEnabled,
           memoryLlmJudgeEnabled: coworkMemoryLlmJudgeEnabled,
-          skipMissedJobs,
           embeddingEnabled,
           embeddingProvider,
           embeddingModel,
@@ -2217,6 +2212,14 @@ const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteModel = (modelId: string) => {
     if (!providers[activeProvider].models) return;
+    const model = providers[activeProvider].models.find(item => item.id === modelId);
+    if (!model) return;
+    setPendingDeleteModel({ id: modelId, name: model.name });
+  };
+
+  const confirmDeleteModel = () => {
+    if (!pendingDeleteModel || !providers[activeProvider].models) return;
+    const modelId = pendingDeleteModel.id;
 
     const updatedModels = providers[activeProvider].models.filter(model => model.id !== modelId);
 
@@ -2227,6 +2230,7 @@ const Settings: React.FC<SettingsProps> = ({
         models: updatedModels,
       },
     }));
+    setPendingDeleteModel(null);
   };
 
   const handleSaveLlamaCapability = async (
@@ -3222,21 +3226,6 @@ const Settings: React.FC<SettingsProps> = ({
               </label>
             </div>
 
-            {/* Skip Missed Jobs Section */}
-            <div>
-              <h4 className="text-sm font-medium text-foreground mb-3">
-                {i18nService.t('skipMissedJobs')}
-              </h4>
-              <label className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  {i18nService.t('skipMissedJobsDescription')}
-                </span>
-                <Switch
-                  checked={skipMissedJobs}
-                  onCheckedChange={next => setSkipMissedJobs(next)}
-                />
-              </label>
-            </div>
           </div>
         );
 
@@ -5495,41 +5484,25 @@ const Settings: React.FC<SettingsProps> = ({
           </div>
         )}
 
-        {pendingDeleteProvider && (
-          <div
-            className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 px-4 rounded-2xl"
-            onClick={() => setPendingDeleteProvider(null)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              onClick={e => e.stopPropagation()}
-              className="w-full max-w-sm rounded-2xl dark:bg-claude-darkSurface bg-claude-bg dark:border-claude-darkBorder border-claude-border border shadow-modal p-4"
-            >
-              <p className="text-sm dark:text-claude-darkText text-claude-text">
-                {i18nService.t('confirmDeleteCustomProvider')}
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPendingDeleteProvider(null)}
-                >
-                  {i18nService.t('cancel')}
-                </Button>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={confirmDeleteCustomProvider}
-                >
-                  {i18nService.t('deleteCustomProvider')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <DestructiveConfirmDialog
+          open={pendingDeleteProvider !== null}
+          title={i18nService.t('deleteCustomProvider')}
+          description={i18nService.t('confirmDeleteCustomProvider')}
+          cancelLabel={i18nService.t('cancel')}
+          confirmLabel={i18nService.t('deleteCustomProvider')}
+          onCancel={() => setPendingDeleteProvider(null)}
+          onConfirm={confirmDeleteCustomProvider}
+        />
+
+        <DestructiveConfirmDialog
+          open={pendingDeleteModel !== null}
+          title={i18nService.t('confirmDelete')}
+          description={pendingDeleteModel ? `${i18nService.t('delete')} "${pendingDeleteModel.name}"?` : ''}
+          cancelLabel={i18nService.t('cancel')}
+          confirmLabel={i18nService.t('delete')}
+          onCancel={() => setPendingDeleteModel(null)}
+          onConfirm={confirmDeleteModel}
+        />
 
         {(isAddingModel || isEditingModel) && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 px-4 rounded-2xl">

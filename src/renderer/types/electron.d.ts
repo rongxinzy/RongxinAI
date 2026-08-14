@@ -135,7 +135,6 @@ interface CoworkConfig {
   memoryLlmJudgeEnabled: boolean;
   memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
   memoryUserMemoriesMaxItems: number;
-  skipMissedJobs: boolean;
   permissionMode: CoworkPermissionMode;
   embeddingEnabled: boolean;
   embeddingProvider: string;
@@ -156,7 +155,6 @@ type CoworkConfigUpdate = Partial<
     | 'memoryLlmJudgeEnabled'
     | 'memoryGuardLevel'
     | 'memoryUserMemoriesMaxItems'
-    | 'skipMissedJobs'
     | 'permissionMode'
     | 'embeddingEnabled'
     | 'embeddingProvider'
