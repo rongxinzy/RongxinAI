@@ -21,7 +21,7 @@ function createFixture() {
         {
           key: 'portable-git',
           archiveSizeBytes: 40,
-          archiveCompression: 'lzma2-mx9-solid-v1',
+          archiveCompression: 'lzma-bcj2-d128m-mx9-solid-v1',
         },
       ],
     }),
@@ -68,7 +68,7 @@ describe.skipIf(process.platform !== 'win32')('Windows installer size smoke chec
     const result = runSizeCheck(createFixture(), 100, 40, 60);
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('lzma2-mx9-solid-v1');
+    expect(result.stdout).toContain('lzma-bcj2-d128m-mx9-solid-v1');
     expect(result.stdout).toContain('non-component bytes: 60');
   });
 

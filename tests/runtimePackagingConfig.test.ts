@@ -74,9 +74,17 @@ test("unpacks AnyDoc native bindings from the application archive", () => {
   assert.ok(config.asarUnpack?.includes("node_modules/@firecrawl/**"));
 
   const viteConfig = readFileSync(path.join(root, "vite.config.ts"), "utf8");
+  const runtimeDependencies = readFileSync(
+    path.join(root, "scripts", "electron-runtime-dependencies.mjs"),
+    "utf8",
+  );
   assert.match(
     viteConfig,
-    /staticExternals\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/,
+    /ELECTRON_MAIN_EXTERNALS\.includes\(id\)/,
+  );
+  assert.match(
+    runtimeDependencies,
+    /ELECTRON_MAIN_EXTERNALS\s*=\s*\[[\s\S]*['"]@firecrawl\/anydoc['"]/,
   );
 });
 
@@ -250,6 +258,7 @@ test("installer-related pull requests build and exercise the Windows installer",
   );
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /paths:/);
+  assert.match(workflow, /"vite\.config\.ts"/);
   assert.match(workflow, /"scripts\/\*\*"/);
   assert.match(workflow, /runs-on: windows-latest/);
   assert.match(workflow, /@\('run', 'dist:win:offline'\)/);
@@ -275,9 +284,9 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(sizeSmoke, /\$_\.archiveSizeBytes/);
   assert.doesNotMatch(sizeSmoke, /\$_\.archiveBytes\b/);
   assert.match(sizeSmoke, /component archive bytes/);
-  assert.match(sizeSmoke, /MaximumInstallerBytes = 425MB/);
-  assert.match(sizeSmoke, /MaximumComponentBytes = 220MB/);
-  assert.match(sizeSmoke, /MaximumNonComponentBytes = 220MB/);
+  assert.match(sizeSmoke, /MaximumInstallerBytes = 315MB/);
+  assert.match(sizeSmoke, /MaximumComponentBytes = 165MB/);
+  assert.match(sizeSmoke, /MaximumNonComponentBytes = 150MB/);
 });
 
 test("manual release candidates preserve immutable artifacts without publishing them", () => {
