@@ -1058,6 +1058,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const projectMemoryContext = await buildProjectMemoryContextSafe(
         this.projectMemoryService,
         workspaceRoot,
+        sessionId,
         prompt,
       );
       if (this.activeSessions.get(sessionId) !== active || abortController.signal.aborted) return;
@@ -1361,6 +1362,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const projectMemoryContext = await buildProjectMemoryContextSafe(
         this.projectMemoryService,
         active.workspaceRoot,
+        sessionId,
         prompt,
       );
       if (projectMemoryContext) nextPrompt = `${projectMemoryContext}\n\n${nextPrompt}`;

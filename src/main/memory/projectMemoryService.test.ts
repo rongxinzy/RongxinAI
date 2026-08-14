@@ -33,8 +33,8 @@ class FakeRepository {
     return this.items.filter(item => item.status === MemoryOutboxStatus.Pending);
   }
 
-  filterRecallableMemoryIds(_projectId: string, memoryIds: number[]) {
-    return new Set(memoryIds);
+  filterRecallableMemoryIds(input: { memoryIds: number[] }) {
+    return new Set(input.memoryIds);
   }
 
   listManaged() {
@@ -169,6 +169,7 @@ test('enforces the project context token budget', async () => {
 
   const context = await service.buildProjectContext({
     workingDirectory: 'alpha',
+    sessionId: 'session-1',
     query: 'database',
     tokenBudget: 30,
   });
@@ -279,18 +280,28 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
   vi.useRealTimers();
 });
 
-test('injects session recall under its own context budget', async () => {
+test('injects only the current session recall under its own context budget', async () => {
   const adapter = {
-    recall: vi.fn(async (input: { scope: string }) =>
+    recall: vi.fn(async (input: { scope: string; limit: number }) =>
       input.scope === EngramMemoryScope.Session
         ? [
+            ...Array.from({ length: 8 }, (_, index) => ({
+              id: 100 + index,
+              session_id: `other-session-${index}`,
+              type: EngramObservationType.SessionSummary,
+              title: 'Other session summary',
+              content: 'Private result from another session.',
+              updated_at: '2026-08-12T00:00:00.000Z',
+            })),
             {
               id: 31,
+              session_id: 'session-1',
+              type: EngramObservationType.SessionSummary,
               title: 'Session summary',
               content: 'The previous session fixed CJK recall.',
               updated_at: '2026-08-11T00:00:00.000Z',
             },
-          ]
+          ].slice(0, input.limit)
         : [],
     ),
   };
@@ -301,8 +312,54 @@ test('injects session recall under its own context budget', async () => {
   );
 
   await expect(
-    service.buildProjectContext({ workingDirectory: 'alpha', query: 'CJK recall' }),
+    service.buildProjectContext({
+      workingDirectory: 'alpha',
+      sessionId: 'session-1',
+      query: 'CJK recall',
+    }),
   ).resolves.toContain('Session:\n- [memory:31]');
+  expect(adapter.recall).toHaveBeenCalledWith(
+    expect.objectContaining({ scope: EngramMemoryScope.Session, limit: 20 }),
+  );
+  await expect(
+    service.recallSession({
+      workingDirectory: 'alpha',
+      sessionId: 'session-1',
+      query: 'CJK recall',
+    }),
+  ).resolves.toEqual([expect.objectContaining({ id: 31 })]);
+});
+
+test('excludes session summaries returned by project recall', async () => {
+  const adapter = {
+    recall: vi.fn(async () => [
+      {
+        id: 51,
+        session_id: 'session-2',
+        type: EngramObservationType.SessionSummary,
+        title: 'Leaked session summary',
+        content: 'Private result from another session.',
+        updated_at: '2026-08-11T00:00:00.000Z',
+      },
+      {
+        id: 52,
+        session_id: 'session-2',
+        type: EngramObservationType.Decision,
+        title: 'Project decision',
+        content: 'Use SQLite.',
+        updated_at: '2026-08-11T00:00:00.000Z',
+      },
+    ]),
+  };
+  const service = new ProjectMemoryService(
+    new FakeRepository() as never,
+    adapter as never,
+    identityFor,
+  );
+
+  await expect(
+    service.recallProject({ workingDirectory: 'alpha', query: 'database' }),
+  ).resolves.toEqual([expect.objectContaining({ id: 52 })]);
 });
 
 test('counts CJK characters conservatively against context budgets', async () => {
@@ -322,6 +379,7 @@ test('counts CJK characters conservatively against context budgets', async () =>
   await expect(
     service.buildProjectContext({
       workingDirectory: 'alpha',
+      sessionId: 'session-1',
       query: 'budget',
       tokenBudget: 30,
     }),
