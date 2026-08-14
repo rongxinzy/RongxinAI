@@ -5,7 +5,8 @@ import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
-import { ChannelRunIpc, type ChannelRunSummary } from '../shared/channelRun/constants';
+import { ActivityIpc } from '../shared/activity/constants';
+import type { ActivityRun } from '../shared/activity/types';
 import {
   ApiIpc,
   AppConfigIpc,
@@ -851,9 +852,8 @@ contextBridge.exposeInMainWorld('electron', {
     status: () => ipcRenderer.invoke(OpenAICodexOAuthIpc.Status),
   },
 
-  // Read-only Channel/Cron run lifecycle projection (issue #225)
-  channelRun: {
-    onRunEvent: (callback: (summary: ChannelRunSummary) => void) =>
-      onPush(ChannelRunIpc.RunEvent, callback),
+  activity: {
+    list: () => ipcRenderer.invoke(ActivityIpc.List),
+    onUpdated: (callback: (run: ActivityRun) => void) => onPush(ActivityIpc.Updated, callback),
   },
 });

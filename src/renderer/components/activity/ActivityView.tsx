@@ -6,7 +6,8 @@ import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
-import { selectActivityRuns, type ActivityRun } from '../../store/selectors/activitySelectors';
+import { selectActivityRuns } from '../../store/selectors/activitySelectors';
+import type { ActivityRun } from '../../../shared/activity/types';
 import WindowTitleBar from '../window/WindowTitleBar';
 import ActivityRunRow from './ActivityRunRow';
 import { ActivityStatusFilter, ActivityTriggerFilter } from './constants';
@@ -51,7 +52,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   const filteredRuns = useMemo(
     () =>
       runs.filter(run => {
-        if (triggerFilter !== ActivityTriggerFilter.All && run.trigger !== triggerFilter) {
+        if (triggerFilter !== ActivityTriggerFilter.All && run.source !== triggerFilter) {
           return false;
         }
         if (statusFilter !== ActivityStatusFilter.All && run.status !== statusFilter) {

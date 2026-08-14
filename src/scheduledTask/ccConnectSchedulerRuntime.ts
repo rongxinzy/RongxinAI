@@ -1,4 +1,6 @@
 import { TaskStatus } from './constants';
+import { ActivitySource, ActivityStatus } from '../shared/activity/constants';
+import type { ActivityService } from '../main/activity/activityService';
 import { SchedulerClockAccount, type CcConnectCronTask } from './ccConnectCronClient';
 import type { ScheduledTaskDeliveryDispatcher } from './deliveryDispatcher';
 import type { SchedulerRuntime } from './schedulerRuntime';
@@ -20,6 +22,7 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
     private readonly client: TriggerClient,
     private readonly execute: (task: ScheduledTask, run: ScheduledTaskRun) => Promise<{ sessionId?: string | null; output?: string | null }>,
     private readonly deliveryDispatcher?: ScheduledTaskDeliveryDispatcher,
+    private readonly activityService?: ActivityService,
   ) {}
 
   async reconcile(tasks: readonly ScheduledTask[]): Promise<void> {
@@ -72,9 +75,11 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
   }
 
   private async executeAndFinish(task: ScheduledTask, run: ScheduledTaskRun): Promise<void> {
+    this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Running, startedAt: Date.parse(run.startedAt), taskName: task.name, inputPreview: task.payload.kind === 'agentTurn' ? task.payload.message : task.payload.text });
     try {
       const result = await this.execute(task, run);
       const completedRun = this.store.finishRun(run.id, { status: TaskStatus.Success, sessionId: result.sessionId ?? null });
+      this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Completed, taskName: task.name, sessionId: result.sessionId ?? undefined, replyPreview: result.output ?? undefined });
       // Delivery is independently durable and best effort: a channel failure
       // must not turn a Pi-successful Run into an execution failure.
       try {
@@ -83,10 +88,12 @@ export class CcConnectSchedulerRuntime implements SchedulerRuntime {
         console.error(`[Scheduler] Failed to persist Delivery for run ${run.id}:`, error);
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       this.store.finishRun(run.id, {
         status: TaskStatus.Error,
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       });
+      this.activityService?.upsertBestEffort({ id: run.id, source: ActivitySource.ScheduledTask, status: ActivityStatus.Failed, taskName: task.name, errorMessage: message });
       throw error;
     }
   }

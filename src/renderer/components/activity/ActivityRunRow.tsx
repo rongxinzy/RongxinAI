@@ -3,10 +3,10 @@ import { CalendarClock, ChevronDown, MessageSquare } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import React, { useState } from 'react';
 
-import { ChannelRunStatus, ChannelRunTrigger } from '../../../shared/channelRun/constants';
+import { ActivitySource, ActivityStatus } from '../../../shared/activity/constants';
 import { PlatformRegistry, type Platform } from '../../../shared/platform';
 import { i18nService } from '../../services/i18n';
-import type { ActivityRun } from '../../store/selectors/activitySelectors';
+import type { ActivityRun } from '../../../shared/activity/types';
 import { formatActivityClockTime } from './utils';
 
 interface ActivityRunRowProps {
@@ -17,7 +17,7 @@ interface ActivityRunRowProps {
 
 /** Resolve the quiet left-hand label: cron runs name the trigger, channel runs name the platform. */
 const sourceLabel = (run: ActivityRun): string => {
-  if (run.trigger === ChannelRunTrigger.Cron) {
+  if (run.source === ActivitySource.ScheduledTask) {
     return run.taskName || i18nService.t('activityTriggerCron');
   }
   return run.platform ? i18nService.t(run.platform) : i18nService.t('activityTriggerChannel');
@@ -27,12 +27,12 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
   const prefersReducedMotion = useReducedMotion();
   const [errorExpanded, setErrorExpanded] = useState(false);
 
-  const isRunning = run.status === ChannelRunStatus.Started;
-  const isFailed = run.status === ChannelRunStatus.Failed;
+  const isRunning = run.status === ActivityStatus.Running;
+  const isFailed = run.status === ActivityStatus.Failed;
   const hasExpandableError = isFailed && Boolean(run.errorMessage);
-  const TriggerIcon = run.trigger === ChannelRunTrigger.Cron ? CalendarClock : MessageSquare;
+  const TriggerIcon = run.source === ActivitySource.ScheduledTask ? CalendarClock : MessageSquare;
   const platform =
-    run.trigger === ChannelRunTrigger.Channel &&
+    run.source === ActivitySource.Channel &&
     PlatformRegistry.platforms.includes(run.platform as Platform)
     ? (run.platform as Platform)
     : null;

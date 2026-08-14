@@ -37,6 +37,9 @@ import { CcConnectDeliveryTransport } from '../scheduledTask/ccConnectDeliveryTr
 import { ScheduledTaskDeliveryDispatcher } from '../scheduledTask/deliveryDispatcher';
 import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecutor';
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
+import { ActivityService } from './activity/activityService';
+import { registerActivityIpcHandlers } from './activity/ipcHandlers';
+import { ActivitySource, ActivityStatus } from '../shared/activity/constants';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import {
   APP_UPDATE_POLL_INTERVAL_MS,
@@ -900,6 +903,7 @@ let ccConnectRuntimeConfigSignature = '';
 let ccConnectRuntimeControlClient: CcConnectCronClient | null = null;
 let ccConnectPiBridge: CcConnectPiBridge | null = null;
 let canonicalScheduledTaskService: CanonicalScheduledTaskService | null = null;
+let activityService: ActivityService | null = null;
 let canonicalSchedulerRuntime: CcConnectSchedulerRuntime | null = null;
 let deferredCcConnectCronClient: DeferredCcConnectCronClient | null = null;
 let ccConnectDeliveryTransport: CcConnectDeliveryTransport | null = null;
@@ -949,11 +953,13 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
       new IMStore(getStore().getDatabase()),
     );
     const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
+    activityService ??= new ActivityService(getStore().getDatabase());
     canonicalSchedulerRuntime = new CcConnectSchedulerRuntime(
       taskStore,
       deferredCcConnectCronClient,
       executor.execute.bind(executor),
       new ScheduledTaskDeliveryDispatcher(taskStore, ccConnectDeliveryTransport),
+      activityService,
     );
     canonicalScheduledTaskService = new CanonicalScheduledTaskService(
       taskStore,
@@ -971,6 +977,7 @@ const startCcConnectBridge = async (): Promise<void> => {
     coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
     turnCoordinator: new ChannelTurnCoordinator(new ChannelInboxStore(getStore().getDatabase())),
+    activityService: activityService ?? (activityService = new ActivityService(getStore().getDatabase())),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
     detectScheduledTaskRequest: createIMScheduledTaskRequestDetector({
       getLLMConfig: getScheduledTaskDetectorConfig,
@@ -4713,6 +4720,11 @@ if (!gotTheLock) {
 
   // ==================== Scheduled Task IPC Handlers (canonical SQLite + Pi) ====================
 
+  registerActivityIpcHandlers(() => {
+    activityService ??= new ActivityService(getStore().getDatabase());
+    return activityService;
+  });
+
   initCronJobServiceManager({
     getScheduledTaskService: getCanonicalScheduledTaskService,
   });
@@ -6629,9 +6641,23 @@ if (!gotTheLock) {
     if (resetCount > 0) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
     }
+    activityService ??= new ActivityService(getStore().getDatabase());
+    const prunedActivityRuns = activityService.pruneExpired();
+    if (prunedActivityRuns > 0) {
+      console.log(`[Activity] removed ${prunedActivityRuns} expired activity run(s)`);
+    }
     const recoveredScheduledRuns = new SqliteScheduledTaskStore(
       getStore().getDatabase(),
-    ).recoverInterruptedRuns();
+    ).recoverInterruptedRuns(run => {
+      activityService?.upsertBestEffort({
+        id: run.id,
+        source: ActivitySource.ScheduledTask,
+        status: ActivityStatus.Failed,
+        startedAt: Date.parse(run.startedAt),
+        updatedAt: Date.parse(run.finishedAt ?? run.startedAt),
+        errorMessage: run.error ?? undefined,
+      });
+    });
     if (recoveredScheduledRuns > 0) {
       console.warn(`[Scheduler] marked ${recoveredScheduledRuns} interrupted Run(s) as failed`);
     }

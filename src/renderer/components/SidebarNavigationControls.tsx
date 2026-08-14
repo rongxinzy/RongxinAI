@@ -8,7 +8,7 @@ import { useSelector } from 'react-redux';
 import { i18nService } from '../services/i18n';
 import { workspaceService } from '../services/workspace';
 import type { RootState } from '../store';
-import { selectHasActiveChannelRun } from '../store/selectors/activitySelectors';
+import { selectHasActiveActivityRun } from '../store/selectors/activitySelectors';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
 import {
@@ -78,7 +78,7 @@ export const SidebarNavigationControls = ({
   workMode,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
-  const hasActiveChannelRun = useSelector((state: RootState) => selectHasActiveChannelRun(state));
+  const hasActiveActivityRun = useSelector((state: RootState) => selectHasActiveActivityRun(state));
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
   const scheduledTasksIconRef = useRef<SidebarAnimatedAlarmClockIconHandle>(null);
   const activityIconRef = useRef<SidebarAnimatedActivityIconHandle>(null);
@@ -217,7 +217,7 @@ export const SidebarNavigationControls = ({
         >
           <SidebarAnimatedActivityIcon ref={activityIconRef} />
           {i18nService.t('activityTitle')}
-          {hasActiveChannelRun && (
+          {hasActiveActivityRun && (
             <span
               className="ml-auto size-1.5 rounded-full bg-primary motion-safe:animate-pulse"
               aria-hidden="true"
