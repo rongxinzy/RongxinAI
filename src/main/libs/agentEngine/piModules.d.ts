@@ -20,6 +20,7 @@ declare module '@earendil-works/pi-coding-agent' {
 
   export class SettingsManager {
     static create(cwd: string, agentDir?: string): SettingsManager;
+    static inMemory(): SettingsManager;
     applyOverrides(overrides: { shellPath?: string }): void;
     getShellPath(): string | undefined;
   }

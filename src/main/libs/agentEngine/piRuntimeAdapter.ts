@@ -290,6 +290,7 @@ interface PiModules {
   DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
   SettingsManager?: {
     create(cwd: string, agentDir?: string): PiSettingsManager;
+    inMemory?(): PiSettingsManager;
   };
   getAgentDir: () => string;
   getModel: (provider: string, modelId: string) => unknown;
@@ -740,6 +741,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
 
+      console.debug(`[PiRuntime] loading isolated resources for session ${sessionId}`);
       const settingsManager = this.createPiSettingsManager(pi, workspaceRoot);
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
@@ -955,6 +957,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionOptions.noTools = 'all';
       }
 
+      console.debug(`[PiRuntime] creating agent session for ${sessionId}`);
       const result = await pi.createAgentSession(sessionOptions);
       const session = result.session;
       if (!isCurrentInitialization()) {
@@ -1064,6 +1067,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // open. Do not revive an aborted Pi turn when that question resolves.
       if (abortController.signal.aborted) return;
 
+      console.debug(`[PiRuntime] dispatching initial prompt for session ${sessionId}`);
       await sendPiPrompt(
         session,
         initialPrompt,
@@ -1824,7 +1828,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   private createPiSettingsManager(pi: PiModules, cwd: string): PiSettingsManager | null {
     if (!pi.SettingsManager) return null;
-    return pi.SettingsManager.create(cwd, pi.getAgentDir());
+    // Cowork owns its runtime configuration. Loading Pi's user/project settings here can
+    // trigger package installation or third-party extensions that differ between machines.
+    return pi.SettingsManager.inMemory?.() ?? pi.SettingsManager.create(cwd, pi.getAgentDir());
   }
 
   private applyPiShellOverride(settingsManager: PiSettingsManager | null): void {
@@ -1856,7 +1862,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // ZhiYuanAgent skills come exclusively from the app-managed SKILLs dirs —
       // never from the developer's global ~/.agents/skills (which would leak
       // dev-only tooling skills like ai-sdk/shadcn into user sessions).
+      noExtensions: true,
       noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
       additionalSkillPaths: [
         ...this.resolveZhiyuanSkillDirs(),
         ...resourceState.expertSkillDirs,
