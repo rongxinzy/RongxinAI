@@ -1,6 +1,12 @@
+import Database from 'better-sqlite3';
 import { expect, test, vi } from 'vitest';
 
-import { MemoryLifecycleStatus, MemoryScope } from '../../shared/memory';
+import {
+  MemoryKind,
+  MemoryLifecycleStatus,
+  MemoryScope,
+  MemorySourceKind,
+} from '../../shared/memory';
 import { MemoryRepository } from './repository';
 
 test('creates the link and outbox schema without importing the memory kernel database', () => {
@@ -19,49 +25,69 @@ test('creates the link and outbox schema without importing the memory kernel dat
   expect(schema).toContain('idx_memory_outbox_pending');
 });
 
-test('authorizes recall by projected scope and current session', () => {
-  const all = vi.fn(() => [{ memory_id: 17 }]);
-  const prepare = vi.fn((sql: string) => {
-    if (sql.includes('SELECT memory_id')) return { all };
-    if (sql.includes('PRAGMA table_info')) return { all: vi.fn(() => []) };
-    return { run: vi.fn() };
-  });
-  const repository = new MemoryRepository({ exec: vi.fn(), prepare } as never);
-
-  expect(
-    repository.filterRecallableMemoryIds({
+test('authorizes recall against projected scope, session, and lifecycle state', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+  const createLink = (
+    memoryId: number,
+    scope: MemoryScope,
+    sessionId: string,
+    expiresAt?: string,
+  ) =>
+    repository.createLink({
+      id: `link-${memoryId}`,
+      memoryId,
       projectId: 'project-a',
-      memoryIds: [16, 17],
-      scope: MemoryScope.Session,
-      sessionId: 'session-a',
-    }),
-  ).toEqual(new Set([17]));
+      scope,
+      sessionId,
+      sourceKind:
+        scope === MemoryScope.Session ? MemorySourceKind.SessionSummary : MemorySourceKind.Explicit,
+      title: `Memory ${memoryId}`,
+      content: `Content ${memoryId}`,
+      kind: scope === MemoryScope.Session ? MemoryKind.SessionSummary : MemoryKind.Decision,
+      expiresAt,
+    });
 
-  const recallSql = prepare.mock.calls.find(([sql]) => String(sql).includes('SELECT memory_id'))?.[0];
-  expect(recallSql).toContain('scope = ?');
-  expect(recallSql).toContain('session_id = ?');
-  expect(all).toHaveBeenCalledWith(
-    'project-a',
-    MemoryLifecycleStatus.Active,
-    MemoryScope.Session,
-    16,
-    17,
-    'session-a',
-  );
-});
+  try {
+    createLink(1, MemoryScope.Project, 'session-origin');
+    createLink(2, MemoryScope.Session, 'session-a');
+    createLink(3, MemoryScope.Session, 'session-b');
+    const archivedLinkId = createLink(4, MemoryScope.Project, 'session-origin');
+    createLink(5, MemoryScope.Project, 'session-origin', '2000-01-01T00:00:00.000Z');
+    repository.setLinkStatus(archivedLinkId, MemoryLifecycleStatus.Archived);
+    const memoryIds = [1, 2, 3, 4, 5];
 
-test('rejects session recall without a current session id', () => {
-  const prepare = vi.fn((sql: string) => ({
-    run: vi.fn(),
-    all: vi.fn(() => (sql.includes('PRAGMA table_info') ? [] : undefined)),
-  }));
-  const repository = new MemoryRepository({ exec: vi.fn(), prepare } as never);
-
-  expect(
-    repository.filterRecallableMemoryIds({
-      projectId: 'project-a',
-      memoryIds: [17],
-      scope: MemoryScope.Session,
-    }),
-  ).toEqual(new Set());
+    expect(
+      repository.filterRecallableMemoryIds({
+        projectId: 'project-a',
+        memoryIds,
+        scope: MemoryScope.Project,
+      }),
+    ).toEqual(new Set([1]));
+    expect(
+      repository.filterRecallableMemoryIds({
+        projectId: 'project-a',
+        memoryIds,
+        scope: MemoryScope.Session,
+        sessionId: 'session-a',
+      }),
+    ).toEqual(new Set([2]));
+    expect(
+      repository.filterRecallableMemoryIds({
+        projectId: 'project-a',
+        memoryIds,
+        scope: MemoryScope.Session,
+        sessionId: 'session-b',
+      }),
+    ).toEqual(new Set([3]));
+    expect(
+      repository.filterRecallableMemoryIds({
+        projectId: 'project-a',
+        memoryIds,
+        scope: MemoryScope.Session,
+      }),
+    ).toEqual(new Set());
+  } finally {
+    db.close();
+  }
 });

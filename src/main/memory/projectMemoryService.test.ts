@@ -282,9 +282,17 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
 
 test('injects only the current session recall under its own context budget', async () => {
   const adapter = {
-    recall: vi.fn(async (input: { scope: string }) =>
+    recall: vi.fn(async (input: { scope: string; limit: number }) =>
       input.scope === EngramMemoryScope.Session
         ? [
+            ...Array.from({ length: 8 }, (_, index) => ({
+              id: 100 + index,
+              session_id: `other-session-${index}`,
+              type: EngramObservationType.SessionSummary,
+              title: 'Other session summary',
+              content: 'Private result from another session.',
+              updated_at: '2026-08-12T00:00:00.000Z',
+            })),
             {
               id: 31,
               session_id: 'session-1',
@@ -293,15 +301,7 @@ test('injects only the current session recall under its own context budget', asy
               content: 'The previous session fixed CJK recall.',
               updated_at: '2026-08-11T00:00:00.000Z',
             },
-            {
-              id: 32,
-              session_id: 'session-2',
-              type: EngramObservationType.SessionSummary,
-              title: 'Other session summary',
-              content: 'Private result from another session.',
-              updated_at: '2026-08-11T00:00:00.000Z',
-            },
-          ]
+          ].slice(0, input.limit)
         : [],
     ),
   };
@@ -318,13 +318,16 @@ test('injects only the current session recall under its own context budget', asy
       query: 'CJK recall',
     }),
   ).resolves.toContain('Session:\n- [memory:31]');
+  expect(adapter.recall).toHaveBeenCalledWith(
+    expect.objectContaining({ scope: EngramMemoryScope.Session, limit: 20 }),
+  );
   await expect(
     service.recallSession({
       workingDirectory: 'alpha',
       sessionId: 'session-1',
       query: 'CJK recall',
     }),
-  ).resolves.not.toContainEqual(expect.objectContaining({ id: 32 }));
+  ).resolves.toEqual([expect.objectContaining({ id: 31 })]);
 });
 
 test('excludes session summaries returned by project recall', async () => {

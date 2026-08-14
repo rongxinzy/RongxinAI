@@ -29,6 +29,7 @@ import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
 const DEFAULT_PROJECT_RECALL_TOKEN_BUDGET = 900;
 const DEFAULT_PERSONAL_RECALL_TOKEN_BUDGET = 250;
 const DEFAULT_SESSION_RECALL_TOKEN_BUDGET = 350;
+const MAX_ENGRAM_RECALL_LIMIT = 20;
 
 interface ConfirmPayload {
   sessionId: string;
@@ -385,13 +386,14 @@ export class ProjectMemoryService {
     const plan = planRecallQuery(input.query);
     if (!plan.exactQuery) return [];
     const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
+    const retrievalLimit = input.scope === MemoryScope.Session ? MAX_ENGRAM_RECALL_LIMIT : limit;
     let observations = this.filterRecallable(
       input,
       await this.adapter.recall({
         query: plan.exactQuery,
         project: input.projectId,
         scope: input.scope,
-        limit,
+        limit: retrievalLimit,
         matchMode: EngramSearchMatchMode.All,
       }),
     );
@@ -402,7 +404,7 @@ export class ProjectMemoryService {
           query: plan.broadQuery,
           project: input.projectId,
           scope: input.scope,
-          limit,
+          limit: retrievalLimit,
           matchMode: EngramSearchMatchMode.Any,
         }),
       );
@@ -410,7 +412,11 @@ export class ProjectMemoryService {
     if (observations.length === 0 && plan.explicitMemoryIntent) {
       observations = this.filterRecallable(
         input,
-        await this.adapter.recent({ project: input.projectId, scope: input.scope, limit }),
+        await this.adapter.recent({
+          project: input.projectId,
+          scope: input.scope,
+          limit: retrievalLimit,
+        }),
       );
     }
     const unique = [

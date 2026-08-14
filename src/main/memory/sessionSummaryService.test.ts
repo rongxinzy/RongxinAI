@@ -70,3 +70,28 @@ test('reduces markdown-heavy outcomes to one bounded conclusion sentence', () =>
   expect(summary).not.toContain('Additional implementation details');
   expect(summary).not.toContain('privateData');
 });
+
+test('ends Chinese outcomes at punctuation without requiring whitespace', () => {
+  const summary = buildSessionSummary([
+    message('user', '修复会话记忆隔离。'),
+    message('assistant', '已完成会话隔离。后续实现细节不应进入摘要。'),
+  ]);
+
+  expect(summary).toContain('Latest outcome: 已完成会话隔离。');
+  expect(summary).not.toContain('后续实现细节');
+});
+
+test('keeps heading text and skips summaries with no natural-language outcome', () => {
+  expect(
+    buildSessionSummary([
+      message('user', 'Fix recall.'),
+      message('assistant', '## Isolation fixed.\n| Key | Value |\n| --- | --- |'),
+    ]),
+  ).toContain('Latest outcome: Isolation fixed.');
+  expect(
+    buildSessionSummary([
+      message('user', 'Run code.'),
+      message('assistant', '```ts\nconst result = true;\n```'),
+    ]),
+  ).toBeNull();
+});

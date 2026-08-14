@@ -59,9 +59,12 @@ export function buildSessionSummary(messages: CoworkMessage[]): string | null {
     .slice(0, -1)
     .slice(-3)
     .map(message => summarizeText(message.content, MAX_EARLIER_TOPIC_CHARACTERS));
+  const objectiveSummary = summarizeText(objective.content, MAX_OBJECTIVE_CHARACTERS);
+  const outcomeSummary = summarizeText(outcome.content, MAX_OUTCOME_CHARACTERS, true);
+  if (!objectiveSummary || !outcomeSummary) return null;
   return [
-    `Session objective: ${summarizeText(objective.content, MAX_OBJECTIVE_CHARACTERS)}`,
-    `Latest outcome: ${summarizeText(outcome.content, MAX_OUTCOME_CHARACTERS, true)}`,
+    `Session objective: ${objectiveSummary}`,
+    `Latest outcome: ${outcomeSummary}`,
     ...(earlierTopics.length > 0 ? [`Earlier topics: ${earlierTopics.join(' | ')}`] : []),
   ].join('\n');
 }
@@ -78,11 +81,11 @@ function extractNaturalLanguage(value: string, firstSentenceOnly: boolean): stri
     .split(/\r?\n/)
     .map(line => line.trim())
     .filter(line => line.length > 0)
-    .filter(line => !/^#{1,6}\s/.test(line))
     .filter(line => !/^\|.*\|$/.test(line))
     .filter(line => !/^\s*[-:|]+\s*$/.test(line))
     .map(line =>
       line
+        .replace(/^#{1,6}\s+/, '')
         .replace(/^[-*+]\s+/, '')
         .replace(/^\d+[.)]\s+/, '')
         .replace(/[*_~`]+/g, '')
@@ -91,5 +94,9 @@ function extractNaturalLanguage(value: string, firstSentenceOnly: boolean): stri
     .filter(Boolean);
   const normalized = paragraphs.join(' ').replace(/\s+/g, ' ').trim();
   if (!firstSentenceOnly) return normalized;
-  return normalized.match(/^.*?[.!?。！？](?:\s|$)/u)?.[0]?.trim() || normalized;
+  for (const paragraph of paragraphs) {
+    const sentence = paragraph.match(/^.*?(?:[。！？]|[.!?](?=\s|$))/u)?.[0]?.trim();
+    if (sentence) return sentence;
+  }
+  return normalized;
 }
