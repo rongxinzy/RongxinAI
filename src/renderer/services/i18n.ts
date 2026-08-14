@@ -6,6 +6,10 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    localInferenceBackendSwitchRequiresStoppedService: '请先停止本地推理服务，再切换后端。',
+    localInferenceBackendInUse: '正在使用',
+    localInferenceCudaRequiresNvidiaGpu:
+      'CUDA 后端需要 NVIDIA 显卡，请切换到 CPU 后端。',
     localInferenceSettings: '本地模型设置',
     localInferenceRuntimeSettings: '运行环境',
     localInferenceAccessMenuItem: '访问',
@@ -2852,6 +2856,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     emailDeleting: '删除中...',
   },
   en: {
+    localInferenceBackendSwitchRequiresStoppedService:
+      'Stop the local inference service before switching backends.',
+    localInferenceBackendInUse: 'In use',
     localInferenceSettings: 'Local Settings',
     localInferenceRuntimeSettings: 'Runtime',
     localInferenceAccessMenuItem: 'Access',
@@ -3208,6 +3215,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceRuntimeInstalling: 'Installing…',
     localInferenceRuntimeMissing:
       'Failed to install local inference. Check the network and try again.',
+    localInferenceCudaRequiresNvidiaGpu:
+      'The CUDA backend requires an NVIDIA GPU. Please select the CPU backend.',
     localInferenceServiceNeedsBackendInstall:
       'Install a backend in local inference Config before starting the service.',
     localInferenceServiceNeedsBackendSwitch:
