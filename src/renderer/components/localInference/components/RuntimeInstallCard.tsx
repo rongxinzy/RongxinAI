@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
-import { Download, RotateCcw, X } from 'lucide-react';
+import { ArrowRightLeft, Check, Download, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
@@ -25,6 +25,7 @@ import type {
   LlamaCppInstallProgress,
   LlamaCppStatusSnapshot,
 } from '../../../../shared/llamacpp';
+import { LlamaCppBackendError } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
 import { InstallProgressBar } from './Common';
 import { BreathingDot } from './BreathingDot';
@@ -32,6 +33,16 @@ import { formatBytes, formatInstallProgressSummary } from '../utils/progress';
 
 const RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const handledInstallerRequests = new Set<string>();
+
+function translateRuntimeError(error: string | undefined): string | undefined {
+  if (error === LlamaCppBackendError.CudaRequiresNvidiaGpu) {
+    return i18nService.t('localInferenceCudaRequiresNvidiaGpu');
+  }
+  if (error === LlamaCppBackendError.SwitchRequiresStoppedService) {
+    return i18nService.t('localInferenceBackendSwitchRequiresStoppedService');
+  }
+  return error;
+}
 
 function formatCompactBytes(value: number): string {
   return formatBytes(value).replace(' ', '');
@@ -120,13 +131,13 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
           ? await window.electron.llamacpp.installBackend(backend)
           : await window.electron.llamacpp.install();
         if (!result.success && !result.cancelled) {
-          setError(result.error || i18nService.t('localInferenceRuntimeMissing'));
+          setError(translateRuntimeError(result.error) || i18nService.t('localInferenceRuntimeMissing'));
         }
         await loadMetadata();
       } catch (installError) {
         setError(
           installError instanceof Error
-            ? installError.message
+            ? translateRuntimeError(installError.message)
             : i18nService.t('localInferenceRuntimeMissing'),
         );
         setProgress(current => ({
@@ -151,7 +162,7 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
         if (nextProgress.modelId !== RUNTIME_PROGRESS_KEY) return;
         setProgress(nextProgress);
         if (nextProgress.phase === 'failed') {
-          setError(nextProgress.error || i18nService.t('localInferenceRuntimeMissing'));
+          setError(translateRuntimeError(nextProgress.error) || i18nService.t('localInferenceRuntimeMissing'));
         } else if (nextProgress.phase === 'cancelled') {
           setError(undefined);
         } else if (nextProgress.phase === 'done') {
@@ -178,6 +189,8 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
 
   const summary = progress ? formatInstallProgressSummary(progress) : null;
   const ready = isInstalled(status);
+  const selectedInstalled = Boolean(selectedBackend?.installed);
+  const selectedCurrent = Boolean(selectedBackend?.current);
   const serviceRunning = status?.status === 'running';
   const serviceProgramAvailable = ready || Boolean(status?.executablePath);
   const serviceStatusLabel = serviceRunning
@@ -206,6 +219,24 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
         current?.phase === 'cancelling'
           ? { ...current, phase: 'cancelled' }
           : current,
+      );
+    }
+  };
+
+  const switchBackend = async () => {
+    if (active || !selectedBackend) return;
+    setError(undefined);
+    try {
+      const result = await window.electron.llamacpp.setBackendSelection(selectedBackend);
+      if (!result.success) {
+        setError(translateRuntimeError(result.error) || i18nService.t('localInferenceRuntimeMissing'));
+      }
+      await loadMetadata();
+    } catch (switchError) {
+      setError(
+        switchError instanceof Error
+          ? switchError.message
+          : i18nService.t('localInferenceRuntimeMissing'),
       );
     }
   };
@@ -283,8 +314,12 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
           {progress ? <InstallProgressBar progress={progress} /> : null}
           {summary ? (
             <div className="text-xs text-muted-foreground">
-              {summary.phase ? `${summary.phase} · ` : ''}
-              {summary.primary}
+              {progress?.phase === 'failed' || summary.phase === summary.primary
+                ? ''
+                : summary.phase
+                  ? `${summary.phase} · `
+                  : ''}
+              {progress?.phase === 'failed' ? '' : summary.primary}
             </div>
           ) : null}
           {error ? <div className="text-xs text-destructive">{error}</div> : null}
@@ -307,7 +342,7 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
           <Button type="button" variant="outline" size="sm" disabled>
             {i18nService.t('localInferenceRuntimeInstalling')}
           </Button>
-        ) : (
+        ) : !selectedInstalled ? (
           <Button21st
             type="button"
             variant="primary"
@@ -318,8 +353,18 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
             {error ? <RotateCcw data-icon="inline-start" /> : <Download data-icon="inline-start" />}
             {error
               ? i18nService.t('localInferenceRuntimeRetry')
-              : i18nService.t('localInferenceBackendUpdate')}
+              : i18nService.t('localInferenceInstall')}
           </Button21st>
+        ) : selectedCurrent ? (
+          <Button type="button" variant="outline" size="sm" disabled>
+            <Check data-icon="inline-start" />
+            {i18nService.t('localInferenceBackendInUse')}
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={() => void switchBackend()}>
+            <ArrowRightLeft data-icon="inline-start" />
+            {i18nService.t('localInferenceBackendSwitch')}
+          </Button>
         )}
       </CardFooter>
     </Card>

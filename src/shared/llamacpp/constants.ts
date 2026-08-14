@@ -84,6 +84,13 @@ export const LlamaCppMemoryPolicy = {
 export type LlamaCppMemoryPolicy =
   (typeof LlamaCppMemoryPolicy)[keyof typeof LlamaCppMemoryPolicy];
 
+export const LlamaCppBackendError = {
+  CudaRequiresNvidiaGpu: 'cuda-requires-nvidia-gpu',
+  SwitchRequiresStoppedService: 'backend-switch-requires-stopped-service',
+} as const;
+export type LlamaCppBackendError =
+  (typeof LlamaCppBackendError)[keyof typeof LlamaCppBackendError];
+
 export const LlamaCppServiceConfigFieldKey = {
   ModelsMax: 'modelsMax',
   ModelsAutoload: 'modelsAutoload',

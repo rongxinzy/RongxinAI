@@ -807,7 +807,7 @@ describe('llamacpp backend manager', () => {
       ).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'installing')).toBe(true);
       expect(progressEvents.some(progress => progress.phase === 'detecting')).toBe(true);
-      expect(progressEvents.some(progress => progress.phase === 'done')).toBe(true);
+      expect(progressEvents.some(progress => progress.phase === 'done')).toBe(false);
       expect(server.requests.some(request => request.method === 'GET')).toBe(true);
       expect(server.requests.some(request => request.range === `bytes=${partialSize}-`)).toBe(true);
     } finally {

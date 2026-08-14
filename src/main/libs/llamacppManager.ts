@@ -23,6 +23,7 @@ import type {
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
 import {
   applyAutomaticLlamaCppServiceDefaults,
+  LlamaCppBackendError,
   resolveLlamaCppLaunchContext,
 } from '../../shared/llamacpp';
 import {
@@ -545,6 +546,16 @@ export class LlamaCppManager extends EventEmitter {
     ref: LlamaCppBackendRef,
     options: { signal?: AbortSignal } = {},
   ): Promise<LlamaCppRuntimeInstallResult> {
+    if (this.status.status === 'running' || this.status.status === 'starting') {
+      return {
+        success: false,
+        error: LlamaCppBackendError.SwitchRequiresStoppedService,
+        plan: {
+          kind: 'needs-manual',
+          message: LlamaCppBackendError.SwitchRequiresStoppedService,
+        },
+      };
+    }
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     const installedExecutablePath = getLlamaCppBackendExecutablePath(
       runtimeRoot,
@@ -553,11 +564,14 @@ export class LlamaCppManager extends EventEmitter {
     );
     const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
     const hasNvidiaGpu = Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0);
-    this.emit('install-progress', {
-      phase: 'starting',
-      modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
-      modelName: ref.versionBackend,
-    } satisfies LlamaCppInstallProgress);
+    const backendAlreadyInstalled = fs.existsSync(installedExecutablePath);
+    if (!backendAlreadyInstalled) {
+      this.emit('install-progress', {
+        phase: 'starting',
+        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+        modelName: ref.versionBackend,
+      } satisfies LlamaCppInstallProgress);
+    }
     const compatibilityError = await getLlamaCppBackendCompatibilityError({
       runtimeRoot,
       ref,
@@ -566,12 +580,14 @@ export class LlamaCppManager extends EventEmitter {
       hasNvidiaGpu,
     });
     if (compatibilityError) {
-      this.emit('install-progress', {
-        phase: 'failed',
-        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
-        modelName: ref.versionBackend,
-        error: compatibilityError,
-      } satisfies LlamaCppInstallProgress);
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: compatibilityError,
+        } satisfies LlamaCppInstallProgress);
+      }
       return {
         success: false,
         error: compatibilityError,
@@ -581,7 +597,7 @@ export class LlamaCppManager extends EventEmitter {
         },
       };
     }
-    const result: LlamaCppRuntimeInstallResult = fs.existsSync(installedExecutablePath)
+    const result: LlamaCppRuntimeInstallResult = backendAlreadyInstalled
       ? (() => {
           return {
             success: true,
@@ -620,12 +636,14 @@ export class LlamaCppManager extends EventEmitter {
       if (backendRequiresDeviceValidation(ref)) {
         const deviceResult = await this.listRuntimeDevices(ref);
         if (!deviceResult.success) {
-          this.emit('install-progress', {
-            phase: 'failed',
-            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
-            modelName: ref.versionBackend,
-            error: deviceResult.error || 'Backend device validation failed.',
-          } satisfies LlamaCppInstallProgress);
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: deviceResult.error || 'Backend device validation failed.',
+            } satisfies LlamaCppInstallProgress);
+          }
           return {
             ...result,
             success: false,
@@ -634,12 +652,14 @@ export class LlamaCppManager extends EventEmitter {
         }
         const validationError = validateBackendDevices(ref, deviceResult.devices);
         if (validationError) {
-          this.emit('install-progress', {
-            phase: 'failed',
-            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
-            modelName: ref.versionBackend,
-            error: validationError,
-          } satisfies LlamaCppInstallProgress);
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: validationError,
+            } satisfies LlamaCppInstallProgress);
+          }
           return {
             ...result,
             success: false,
@@ -655,19 +675,23 @@ export class LlamaCppManager extends EventEmitter {
         executablePath: currentExecutablePath,
         managedByApp: false,
       });
-      this.emit('install-progress', {
-        phase: 'done',
-        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
-        modelName: ref.versionBackend,
-        percent: 100,
-      } satisfies LlamaCppInstallProgress);
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: 'done',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          percent: 100,
+        } satisfies LlamaCppInstallProgress);
+      }
     } else {
-      this.emit('install-progress', {
-        phase: result.cancelled ? 'cancelled' : 'failed',
-        modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
-        modelName: ref.versionBackend,
-        error: result.cancelled ? undefined : 'error' in result ? result.error : undefined,
-      } satisfies LlamaCppInstallProgress);
+      if (!backendAlreadyInstalled) {
+        this.emit('install-progress', {
+          phase: result.cancelled ? 'cancelled' : 'failed',
+          modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+          modelName: ref.versionBackend,
+          error: result.cancelled ? undefined : 'error' in result ? result.error : undefined,
+        } satisfies LlamaCppInstallProgress);
+      }
     }
     return result;
   }

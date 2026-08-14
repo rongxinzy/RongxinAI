@@ -19,7 +19,7 @@ import type {
   LlamaCppServiceConfig,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
-import { LlamaCppRuntimeBackend } from '../../shared/llamacpp';
+import { LlamaCppBackendError, LlamaCppRuntimeBackend } from '../../shared/llamacpp';
 import { readBundledLlamaCppBackendManifest } from './llamacppBackendResources';
 import { listLlamaCppRuntimeDevices } from './llamacppManager';
 import { LlamaCppRuntimeTargetId } from './llamacppRuntimeConstants';
@@ -354,11 +354,12 @@ export async function listLlamaCppBackends(input: {
     .filter(ref => !remoteKeys.has(ref.versionBackend))
     .map(ref => {
       const buildInfo = readBackendBuildInfo(getLlamaCppBackendDir(input.runtimeRoot, ref));
+      const accelerator = inferBackendAccelerator(ref.backend);
       return {
         ...ref,
         platform: String(buildInfo?.platform ?? input.platform),
         arch: String(buildInfo?.arch ?? input.arch),
-        accelerator: inferBackendAccelerator(ref.backend),
+        accelerator,
         cudaMajor: ref.backend.includes('cuda-12') ? ('12' as const) : undefined,
         installed: true,
         recommended: recommended?.versionBackend === ref.versionBackend,
@@ -703,7 +704,9 @@ export async function installLlamaCppBackend(input: {
     // Retain partial archives for a failed or cancelled resumable download, but
     // do not keep completed archives after the backend is installed.
     fs.rmSync(downloadDir, { recursive: true, force: true });
-    reportProgress({ phase: 'done', percent: 100 });
+    // The manager validates GPU devices after this function returns. Keep the
+    // install in the verification phase until that validation succeeds.
+    reportProgress({ phase: 'detecting', message: 'verifying' });
 
     return {
       success: true,
@@ -731,20 +734,6 @@ export async function installLlamaCppBackend(input: {
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
-}
-
-export async function updateLlamaCppBackend(input: {
-  runtimeRoot: string;
-  platform: NodeJS.Platform;
-  arch: string;
-  hasNvidiaGpu: boolean;
-  config?: LlamaCppServiceConfig;
-  manifest?: LlamaCppBackendManifest;
-}): Promise<LlamaCppRuntimeInstallResult> {
-  const manifest = input.manifest ?? (await fetchLlamaCppBackendManifest());
-  const recommended = recommendLlamaCppBackend({ ...input, manifest });
-  if (!recommended) return failedInstall('No compatible llama.cpp backend is available.');
-  return await installLlamaCppBackend({ ...input, manifest, ref: recommended });
 }
 
 export function uninstallLlamaCppBackend(input: {
@@ -1119,7 +1108,7 @@ function validateBackendForMachine(
     return `Backend ${entry.backend} does not match current architecture ${arch}.`;
   }
   if (entry.accelerator === 'cuda' && !hasNvidiaGpu) {
-    return 'CUDA backend requires an NVIDIA GPU.';
+    return LlamaCppBackendError.CudaRequiresNvidiaGpu;
   }
   if (entry.accelerator === 'vulkan') {
     return 'Vulkan backend will validate device availability after installation.';
