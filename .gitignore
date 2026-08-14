@@ -95,3 +95,7 @@ ppt-assets/
 *.pptx
 documents.md
 reasonix.toml
+
+# App runtime output
+cowork/
+logs/

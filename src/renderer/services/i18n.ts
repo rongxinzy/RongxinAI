@@ -89,7 +89,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceContextSaved: '模型上下文已保存',
     localInferenceContextSavedReloadRequired: '模型上下文已保存，重新加载后生效',
     localInferenceContextInvalid: '请输入有效的上下文长度',
-    localInferenceDeleteConfirmMessage: '确定要删除模型“{name}”吗？此操作不可撤销。',
+    localInferenceDeleteConfirmMessage: '确认删除模型“{name}”？',
     localInferenceDeleteRunningBlocked: '该模型当前正在运行，请先卸载后再删除。',
     localInferenceServiceConfigRestartAppRequired:
       '当前应用主进程还未加载服务参数能力，请重启应用后再保存。',
@@ -1332,8 +1332,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workspaceNoWorkspaces: '还没有项目',
     removeProject: '移除项目',
     removeProjectDialogTitle: '移除项目',
-    removeProjectDialogDescription:
-      '移除后，项目将从列表中消失，其中的任务记录会一并删除；磁盘上的文件不会被删除。',
+    removeProjectDialogDescription: '确定移除项目及其任务记录？',
     defaultAgentDisplayName: '主项目',
     myAgentSidebarPinned: '置顶',
     myAgentSidebarExpandMore: '展开显示',
@@ -1711,7 +1710,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     deleteSession: '删除',
     turnIndex: '对话索引',
     deleteTaskConfirmTitle: '确认删除任务',
-    deleteTaskConfirmMessage: '此操作无法撤销，任务的所有消息记录将被永久删除。',
+    deleteTaskConfirmMessage: '确定删除此任务及其消息记录？',
     batchOperations: '批量操作',
     batchSelectAll: '全选',
     batchDelete: '删除',
@@ -2452,8 +2451,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     sqliteAutoBackupEnabledDescription: '开启后将自动备份数据，并在启动时尝试恢复损坏的数据',
     preventSleep: '防止休眠',
     preventSleepDescription: '防止系统将应用进程挂起（无法阻止系统睡眠或关闭显示器）',
-    skipMissedJobs: '跳过未执行任务',
-    skipMissedJobsDescription: '启动时跳过离线期间未触发的定时任务，不补充执行（保存后生效）',
 
     // 定时任务
     scheduledTasks: '自动化',
@@ -2943,7 +2940,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceContextSaved: 'Model context saved',
     localInferenceContextSavedReloadRequired: 'Model context saved. Reload the model to apply it.',
     localInferenceContextInvalid: 'Enter a valid context length',
-    localInferenceDeleteConfirmMessage: 'Delete model "{name}"? This action cannot be undone.',
+    localInferenceDeleteConfirmMessage: 'Confirm deletion of model "{name}"?',
     localInferenceDeleteRunningBlocked:
       'This model is currently running. Unload it before deleting.',
     localInferenceServiceConfigRestartAppRequired:
@@ -4319,8 +4316,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     workspaceNoWorkspaces: 'No projects yet',
     removeProject: 'Remove project',
     removeProjectDialogTitle: 'Remove project',
-    removeProjectDialogDescription:
-      'After removal, the project will disappear from the list and its task records will be deleted. Files on disk will not be deleted.',
+    removeProjectDialogDescription: 'Remove this project and its task records?',
     defaultAgentDisplayName: 'Primary Project',
     myAgentSidebarPinned: 'Pinned',
     myAgentSidebarExpandMore: 'Show more',
@@ -4708,8 +4704,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     deleteSession: 'Delete',
     turnIndex: 'Turn index',
     deleteTaskConfirmTitle: 'Confirm Deletion',
-    deleteTaskConfirmMessage:
-      'This action cannot be undone. All messages in this task will be permanently deleted.',
+    deleteTaskConfirmMessage: 'Delete this task and its message history?',
     batchOperations: 'Batch Operations',
     batchSelectAll: 'Select All',
     batchDelete: 'Delete',
@@ -5478,9 +5473,6 @@ const translations: Record<LanguageType, Record<string, string>> = {
     preventSleep: 'Prevent Sleep',
     preventSleepDescription:
       'Prevent the system from suspending the app process (does not block system sleep or display off)',
-    skipMissedJobs: 'Skip Missed Scheduled Jobs',
-    skipMissedJobsDescription:
-      'Skip jobs that were missed while the app was offline (applies after Save)',
 
     // Scheduled Tasks
     scheduledTasks: 'Automation',

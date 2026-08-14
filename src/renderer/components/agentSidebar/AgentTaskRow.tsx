@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +16,6 @@ import {
   Pin,
   Share,
   Trash2,
-  TriangleAlert,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
@@ -243,38 +242,18 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         </div>
       )}
 
-      <Dialog
+      <DestructiveConfirmDialog
         open={showConfirmDelete}
-        onOpenChange={o => {
-          if (!o) setShowConfirmDelete(false);
+        title={i18nService.t('deleteTaskConfirmTitle')}
+        description={i18nService.t('deleteTaskConfirmMessage')}
+        cancelLabel={i18nService.t('cancel')}
+        confirmLabel={i18nService.t('deleteSession')}
+        onCancel={() => setShowConfirmDelete(false)}
+        onConfirm={() => {
+          setShowConfirmDelete(false);
+          void onDelete();
         }}
-      >
-        <DialogContent className="max-w-sm" showCloseButton={false}>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
-            </div>
-            <h2 className="text-base font-semibold">{i18nService.t('deleteTaskConfirmTitle')}</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {i18nService.t('deleteTaskConfirmMessage')}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmDelete(false)}>
-              {i18nService.t('cancel')}
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => {
-                setShowConfirmDelete(false);
-                void onDelete();
-              }}
-            >
-              {i18nService.t('deleteSession')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
     </div>
   );
 };

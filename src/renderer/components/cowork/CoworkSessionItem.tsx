@@ -1,13 +1,13 @@
 import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter } from '@shared/components/ui/dialog';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
-import { Ellipsis, ListChecks, Pencil, Pin, Trash2, TriangleAlert } from 'lucide-react';
+import { Ellipsis, ListChecks, Pencil, Pin, Trash2 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -377,33 +377,15 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <Dialog
+      <DestructiveConfirmDialog
         open={showConfirmDelete}
-        onOpenChange={open => {
-          if (!open) handleCancelDelete();
-        }}
-      >
-        <DialogContent className="max-w-sm" showCloseButton={false}>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-              <TriangleAlert className="h-5 w-5 text-red-600 dark:text-red-500" />
-            </div>
-            <h2 className="text-base font-semibold">{i18nService.t('deleteTaskConfirmTitle')}</h2>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {i18nService.t('deleteTaskConfirmMessage')}
-          </p>
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCancelDelete}>
-              {i18nService.t('cancel')}
-            </Button>
-            <Button variant="destructive" onClick={handleConfirmDelete}>
-              {i18nService.t('deleteSession')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        title={i18nService.t('deleteTaskConfirmTitle')}
+        description={i18nService.t('deleteTaskConfirmMessage')}
+        cancelLabel={i18nService.t('cancel')}
+        confirmLabel={i18nService.t('deleteSession')}
+        onCancel={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };
