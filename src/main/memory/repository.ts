@@ -67,6 +67,13 @@ export interface MemoryRecallMetadata {
   updatedAt: string;
 }
 
+export interface RecallableMemoryFilter {
+  projectId: string;
+  memoryIds: number[];
+  scope: MemoryScope;
+  sessionId?: string;
+}
+
 interface MemoryOutboxRow {
   id: string;
   link_id: string | null;
@@ -318,16 +325,26 @@ export class MemoryRepository {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
-  filterRecallableMemoryIds(projectId: string, memoryIds: number[]): Set<number> {
-    if (memoryIds.length === 0) return new Set();
+  filterRecallableMemoryIds(input: RecallableMemoryFilter): Set<number> {
+    if (input.memoryIds.length === 0) return new Set();
     this.expireDue();
-    const placeholders = memoryIds.map(() => '?').join(', ');
+    const placeholders = input.memoryIds.map(() => '?').join(', ');
+    const sessionClause = input.scope === MemoryScope.Session ? ' AND session_id = ?' : '';
+    if (input.scope === MemoryScope.Session && !input.sessionId) return new Set();
+    const parameters = [
+      input.projectId,
+      MemoryLifecycleStatus.Active,
+      input.scope,
+      ...input.memoryIds,
+      ...(input.scope === MemoryScope.Session ? [input.sessionId] : []),
+    ];
     const rows = this.db
       .prepare(
         `SELECT memory_id FROM memory_links
-         WHERE project_id = ? AND status = ? AND memory_id IN (${placeholders})`,
+         WHERE project_id = ? AND status = ? AND scope = ?
+           AND memory_id IN (${placeholders})${sessionClause}`,
       )
-      .all(projectId, MemoryLifecycleStatus.Active, ...memoryIds) as Array<{ memory_id: number }>;
+      .all(...parameters) as Array<{ memory_id: number }>;
     return new Set(rows.map(row => row.memory_id));
   }
 

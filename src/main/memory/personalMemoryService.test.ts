@@ -105,8 +105,10 @@ class PersonalRepositoryFake {
     }
   }
 
-  filterRecallableMemoryIds(_projectId: string, ids: number[]) {
-    return new Set(ids.filter(id => [...this.links.values()].some(link => link.memoryId === id)));
+  filterRecallableMemoryIds(input: { memoryIds: number[] }) {
+    return new Set(
+      input.memoryIds.filter(id => [...this.links.values()].some(link => link.memoryId === id)),
+    );
   }
 }
 
