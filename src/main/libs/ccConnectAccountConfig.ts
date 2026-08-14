@@ -2,7 +2,7 @@ import type { IMStore } from '../im/imStore';
 
 export type CcConnectAccountConfig = {
   accountId: string;
-  platform: 'telegram' | 'discord' | 'dingtalk' | 'feishu' | 'qqbot' | 'wecom' | 'weixin';
+  platform: 'telegram' | 'discord' | 'dingtalk' | 'feishu' | 'lark' | 'qqbot' | 'wecom' | 'weixin';
   options: Readonly<Record<string, string | number | boolean | readonly string[]>>;
 };
 
@@ -73,27 +73,19 @@ export function listCcConnectAccountConfigs(
           ]
         : [],
     ),
-    ...store.getFeishuInstances().flatMap(instance =>
-      enabled(
-        instance.enabled,
-        workspaceExists,
-        instance.workspaceId,
-        instance.appId,
-        instance.appSecret,
-      )
-        ? [
-            {
-              accountId: accountId(instance.instanceId),
-              platform: 'feishu' as const,
-              options: channelOptions(instance, {
-                app_id: instance.appId,
-                app_secret: instance.appSecret,
-                domain: instance.domain,
-              }),
-            },
-          ]
-        : [],
-    ),
+    ...store
+      .getFeishuInstances()
+      .flatMap(instance =>
+        enabled(
+          instance.enabled,
+          workspaceExists,
+          instance.workspaceId,
+          instance.appId,
+          instance.appSecret,
+        )
+          ? [feishuAccountConfig(instance)]
+          : [],
+      ),
     ...store.getQQInstances().flatMap(instance =>
       enabled(
         instance.enabled,
@@ -155,6 +147,32 @@ export function listCcConnectAccountConfigs(
         ]
       : []),
   ];
+}
+
+function feishuAccountConfig(instance: {
+  instanceId: string;
+  appId: string;
+  appSecret: string;
+  domain: string;
+  dmPolicy?: string;
+  allowFrom?: readonly string[];
+  groupPolicy?: string;
+  groupAllowFrom?: readonly string[];
+  mediaMaxMb?: number;
+}): CcConnectAccountConfig {
+  const domain = instance.domain.trim();
+  const service = domain.toLowerCase();
+  const logicalService = service === 'feishu' || service === 'lark';
+  return {
+    accountId: accountId(instance.instanceId),
+    platform: service === 'lark' ? 'lark' : 'feishu',
+    options: channelOptions(instance, {
+      app_id: instance.appId,
+      app_secret: instance.appSecret,
+      // pi-connect reserves domain for an absolute custom API base URL.
+      domain: logicalService ? undefined : domain,
+    }),
+  };
 }
 
 function accountId(instanceId: string): string {

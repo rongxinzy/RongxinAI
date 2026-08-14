@@ -178,6 +178,7 @@ import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
 import { listCcConnectAccountConfigs } from './libs/ccConnectAccountConfig';
+import { resolveCcConnectAccountRuntimeStatus } from './libs/ccConnectAccountRuntimeStatus';
 import { CcConnectRuntimeStatusRegistry } from './libs/ccConnectRuntimeStatusRegistry';
 import { CcConnectSidecarManager } from './libs/ccConnectSidecarManager';
 import { runCcConnectWeixinSetup } from './libs/ccConnectWeixinSetup';
@@ -1892,7 +1893,11 @@ const getIMGatewayManager = () => {
   if (!imGatewayManager) {
     imGatewayManager = new ChannelAccountManager(getStore().getDatabase(), async accountId => {
       await refreshCcConnectPlatformStatuses();
-      return ccConnectRuntimeStatuses.get(accountId, ccConnectSidecarManager?.lastError ?? null);
+      return resolveCcConnectAccountRuntimeStatus(
+        ccConnectRuntimeStatuses,
+        accountId,
+        ccConnectSidecarManager?.running === true,
+      );
     });
   }
   return imGatewayManager;
@@ -5004,18 +5009,15 @@ if (!gotTheLock) {
     },
   );
 
-  ipcMain.handle('im:status:get', async () => {
+  ipcMain.handle(ImIpc.StatusGet, async () => {
     try {
       await refreshCcConnectPlatformStatuses();
       const status = getIMGatewayManager().getStatus(instanceId => {
-        const runtimeStatus = ccConnectRuntimeStatuses.get(
+        return resolveCcConnectAccountRuntimeStatus(
+          ccConnectRuntimeStatuses,
           instanceId,
-          ccConnectSidecarManager?.lastError ?? null,
+          ccConnectSidecarManager?.running === true,
         );
-        return {
-          ...runtimeStatus,
-          connected: ccConnectSidecarManager?.running === true && runtimeStatus.connected,
-        };
       });
       return { success: true, status };
     } catch (error) {
