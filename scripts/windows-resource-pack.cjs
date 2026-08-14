@@ -49,10 +49,28 @@ const WINDOWS_RESOURCE_ARCHIVE_COMPRESSION = {
     id: 'lzma2-mx9-solid-v1',
     sevenZipArgs: ['-mx=9', '-m0=lzma2', '-ms=on', '-mmt=on'],
   },
+  PortableGitBcj2: {
+    id: 'lzma-bcj2-d128m-mx9-solid-v1',
+    sevenZipArgs: [
+      '-mx=9',
+      '-m0=BCJ2',
+      '-m1=LZMA:d=128m',
+      '-m2=LZMA:d=128m',
+      '-m3=LZMA:d=128m',
+      '-mb0:1',
+      '-mb0s1:2',
+      '-mb0s2:3',
+      '-ms=on',
+      '-mmt=on',
+    ],
+  },
 };
-const SOLID_ARCHIVE_COMPONENT_KEYS = new Set(['portable-git', 'python', 'skill-python']);
+const SOLID_ARCHIVE_COMPONENT_KEYS = new Set(['skills', 'mcps', 'python', 'skill-python']);
 
 function getWindowsResourceArchiveCompression(component) {
+  if (component.key === 'portable-git') {
+    return WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.PortableGitBcj2;
+  }
   return SOLID_ARCHIVE_COMPONENT_KEYS.has(component.key)
     ? WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.Solid
     : WINDOWS_RESOURCE_ARCHIVE_COMPRESSION.NonSolid;

@@ -8,6 +8,7 @@ on:
       - "bun.lock"
       - "package.json"
       - "electron-builder.json"
+      - "vite.config.ts"
       - "build/icons/**"
       - "build/installer-assets/**"
       - "scripts/**"
