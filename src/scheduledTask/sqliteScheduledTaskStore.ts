@@ -154,11 +154,7 @@ export class SqliteScheduledTaskStore {
   }
 
   remove(id: string): void {
-    this.db.transaction(() => {
-      this.db.prepare('DELETE FROM zhiyuan_scheduled_task_runs WHERE task_id = ?').run(id);
-      this.db.prepare('DELETE FROM zhiyuan_scheduled_task_deliveries WHERE task_id = ?').run(id);
-      this.db.prepare('DELETE FROM zhiyuan_scheduled_tasks WHERE id = ?').run(id);
-    })();
+    this.db.prepare('DELETE FROM zhiyuan_scheduled_tasks WHERE id = ?').run(id);
   }
 
   get(id: string): ScheduledTask | null {
@@ -370,7 +366,7 @@ export class SqliteScheduledTaskStore {
   }
 
   /** Makes crash-interrupted execution visible instead of leaving a permanent running Run. */
-  recoverInterruptedRuns(): number {
+  recoverInterruptedRuns(onRecovered?: (run: ScheduledTaskRun) => void): number {
     const finishedAt = new Date().toISOString();
     const rows = this.db
       .prepare("SELECT * FROM zhiyuan_scheduled_task_runs WHERE status = 'running'")
@@ -383,6 +379,7 @@ export class SqliteScheduledTaskStore {
           'UPDATE zhiyuan_scheduled_task_runs SET status = ?, finished_at = ?, duration_ms = ?, error = ? WHERE id = ?',
         )
         .run(TaskStatus.Error, finishedAt, durationMs, error, row.id);
+      onRecovered?.({ ...this.runFromRow(row), status: TaskStatus.Error, finishedAt, durationMs, error });
       const task = this.get(row.task_id);
       if (task) {
         const state: TaskState = {

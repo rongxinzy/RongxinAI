@@ -2,7 +2,7 @@
 
 ## 目标
 
-定时任务的定义、执行状态和审计记录全部由知远本地 SQLite 持有。`cc-connect` 是可丢弃的协议/时钟 sidecar，只能在到点时发送无负载 trigger；Pi 是唯一的 Agent 执行器。不存在 OpenClaw Cron 的兼容或回退路径。
+定时任务的定义、执行状态和审计记录全部由知远本地 SQLite 持有。`cc-connect` 是可丢弃的协议/时钟 sidecar，只能在到点时发送无负载 trigger；Pi 是唯一的 Agent 执行器。不存在旧调度系统的兼容或回退路径。
 
 ```mermaid
 flowchart LR

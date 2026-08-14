@@ -3,7 +3,7 @@ import EventEmitter from 'node:events';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { CoworkErrorKind } from '../../common/coworkError';
-import { ChannelRunIpc, ChannelRunStatus } from '../../shared/channelRun/constants';
+import { ActivityStatus } from '../../shared/activity/constants';
 import { IMCoworkHandler } from './imCoworkHandler';
 
 const electronMocks = vi.hoisted(() => ({
@@ -570,7 +570,13 @@ test('emits a matching terminal run event when a session fails while waiting for
   const runtime = new FakeRuntime();
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
-  const handler = new IMCoworkHandler({ coworkRuntime: runtime, coworkStore, imStore });
+  const activityUpdates: Array<Record<string, unknown>> = [];
+  const handler = new IMCoworkHandler({
+    coworkRuntime: runtime,
+    coworkStore,
+    imStore,
+    activityService: { upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run) } as any,
+  });
 
   const response = handler.processMessage(
     createMessage({ content: '删除临时文件' }),
@@ -592,16 +598,12 @@ test('emits a matching terminal run event when a session fails while waiting for
     message: 'connection lost',
   });
 
-  const runEvents = electronMocks.send.mock.calls
-    .filter(([channel]) => channel === ChannelRunIpc.RunEvent)
-    .map(([, summary]) => summary);
-
-  expect(runEvents).toHaveLength(2);
-  expect(runEvents.map(event => event.status)).toEqual([
-    ChannelRunStatus.Started,
-    ChannelRunStatus.Failed,
+  expect(activityUpdates).toHaveLength(2);
+  expect(activityUpdates.map(event => event.status)).toEqual([
+    ActivityStatus.Running,
+    ActivityStatus.Failed,
   ]);
-  expect(runEvents[1].runId).toBe(runEvents[0].runId);
+  expect(activityUpdates[1].id).toBe(activityUpdates[0].id);
 
   handler.destroy();
 });
@@ -611,6 +613,7 @@ test('closes a started run when existing-session setup fails before runtime exec
   const coworkStore = new FakeCoworkStore();
   const imStore = new FakeIMStore();
   let failSkillsPrompt = false;
+  const activityUpdates: Array<Record<string, unknown>> = [];
   const handler = new IMCoworkHandler({
     coworkRuntime: runtime,
     coworkStore,
@@ -619,6 +622,7 @@ test('closes a started run when existing-session setup fails before runtime exec
       if (failSkillsPrompt) throw new Error('skill prompt unavailable');
       return null;
     },
+    activityService: { upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run) } as any,
   });
 
   const firstResponse = handler.processMessage(
@@ -647,16 +651,13 @@ test('closes a started run when existing-session setup fails before runtime exec
     ),
   ).rejects.toThrow('skill prompt unavailable');
 
-  const runEvents = electronMocks.send.mock.calls
-    .filter(([channel]) => channel === ChannelRunIpc.RunEvent)
-    .map(([, summary]) => summary);
-  const secondRunEvents = runEvents.slice(-2);
-  expect(secondRunEvents.map(event => event.status)).toEqual([
-    ChannelRunStatus.Started,
-    ChannelRunStatus.Failed,
+  const secondRunUpdates = activityUpdates.slice(-2);
+  expect(secondRunUpdates.map(event => event.status)).toEqual([
+    ActivityStatus.Running,
+    ActivityStatus.Failed,
   ]);
-  expect(secondRunEvents[1].runId).toBe(secondRunEvents[0].runId);
-  expect(secondRunEvents[1].errorMessage).toBe('skill prompt unavailable');
+  expect(secondRunUpdates[1].id).toBe(secondRunUpdates[0].id);
+  expect(secondRunUpdates[1].errorMessage).toBe('skill prompt unavailable');
 
   handler.destroy();
 });

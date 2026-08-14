@@ -1,64 +1,39 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import {
-  ChannelRunStatus,
-  type ChannelRunSummary,
-  type ChannelRunTrigger,
-} from '../../../shared/channelRun/constants';
-
-/** Bound on how many rendered runs stay in memory for each trigger. */
-const RUN_HISTORY_LIMIT_PER_TRIGGER = 50;
+import type { ActivityRun } from '../../../shared/activity/types';
+import { shouldAcceptActivityUpdate } from '../../../shared/activity/ordering';
 
 export interface ActivityState {
-  /**
-   * Read-only projection of Channel/Cron run lifecycle events, newest
-   * first (issue #225). These are Channel/Cron runs; they never become
-   * cowork sessions; the activity feed only displays them.
-   */
-  channelRuns: ChannelRunSummary[];
+  runs: ActivityRun[];
 }
 
 const initialState: ActivityState = {
-  channelRuns: [],
+  runs: [],
 };
 
 const activitySlice = createSlice({
   name: 'activity',
   initialState,
   reducers: {
-    recordChannelRun(state, action: PayloadAction<ChannelRunSummary>) {
-      state.channelRuns.unshift(action.payload);
-
-      const retainedRunIds = new Set<string>();
-      const retainedStartedRunIds = new Set<string>();
-      const retainedTerminalRunIds = new Set<string>();
-      const counts = new Map<ChannelRunTrigger, number>();
-      const retainedEvents: ChannelRunSummary[] = [];
-      for (const event of state.channelRuns) {
-        const runKey = `${event.trigger}:${event.runId}`;
-        if (!retainedRunIds.has(runKey)) {
-          const count = counts.get(event.trigger) ?? 0;
-          if (count >= RUN_HISTORY_LIMIT_PER_TRIGGER) continue;
-          retainedRunIds.add(runKey);
-          counts.set(event.trigger, count + 1);
-        }
-
-        if (event.status === ChannelRunStatus.Started) {
-          if (retainedStartedRunIds.has(runKey)) continue;
-          retainedStartedRunIds.add(runKey);
-        } else {
-          if (retainedTerminalRunIds.has(runKey)) continue;
-          retainedTerminalRunIds.add(runKey);
-        }
-        retainedEvents.push(event);
+    hydrateRuns(state, action: PayloadAction<ActivityRun[]>) {
+      const byId = new Map(state.runs.map(run => [run.id, run]));
+      for (const run of action.payload) {
+        const current = byId.get(run.id);
+        if (!current || shouldAcceptActivityUpdate(current, run)) byId.set(run.id, run);
       }
-      state.channelRuns = retainedEvents;
+      state.runs = [...byId.values()].sort((a, b) => b.updatedAt - a.updatedAt);
     },
-    clearChannelRuns(state) {
-      state.channelRuns = [];
+    upsertRun(state, action: PayloadAction<ActivityRun>) {
+      const index = state.runs.findIndex(run => run.id === action.payload.id);
+      if (index >= 0) {
+        if (!shouldAcceptActivityUpdate(state.runs[index], action.payload)) return;
+        state.runs[index] = action.payload;
+      }
+      else state.runs.push(action.payload);
+      state.runs.sort((a, b) => b.updatedAt - a.updatedAt);
     },
   },
 });
 
-export const { recordChannelRun, clearChannelRuns } = activitySlice.actions;
+export const { hydrateRuns, upsertRun } = activitySlice.actions;
 export default activitySlice.reducer;

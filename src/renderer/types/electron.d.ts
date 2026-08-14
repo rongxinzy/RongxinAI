@@ -1,6 +1,6 @@
 import type { CoworkError } from '../../common/coworkError';
 import type { AppUpdateCheckResult, AppUpdateRuntimeState } from '../../shared/appUpdate/constants';
-import type { ChannelRunSummary } from '../../shared/channelRun/constants';
+import type { ActivityRun } from '../../shared/activity/types';
 import type { NvidiaSmiSnapshot, SystemMemorySnapshot } from '../../shared/hardware';
 import type {
   CoworkPermissionMode,
@@ -1301,8 +1301,9 @@ interface IElectronAPI {
     >;
   };
 
-  channelRun: {
-    onRunEvent: (callback: (summary: ChannelRunSummary) => void) => () => void;
+  activity: {
+    list: () => Promise<{ success: boolean; runs: ActivityRun[] }>;
+    onUpdated: (callback: (run: ActivityRun) => void) => () => void;
   };
 }
 
