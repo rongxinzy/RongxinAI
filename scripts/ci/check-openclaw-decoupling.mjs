@@ -3,8 +3,8 @@ import path from 'node:path';
 import process from 'node:process';
 
 const root = process.cwd();
-const expectedSidecarVersion = 'zhiyuan-sidecar-v1';
-const expectedSidecarRevision = 'dcbff6603d39c0dc88877b91bb3e5442a2ec17da';
+const expectedSidecarVersion = 'zhiyuan-sidecar-v2';
+const expectedSidecarRevision = '413cbcafe154b3da87e27d2c48392be5500366a6';
 const forbiddenRuntimePattern = /openclaw|cfmind/i;
 const forbiddenStoragePattern =
   /(?:\.openclaw|openclaw\.json|im_session_mappings|openclaw_session_key|telegramOpenClaw|feishuOpenClaw|dingtalkOpenClaw)/i;
