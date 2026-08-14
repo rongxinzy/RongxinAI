@@ -88,11 +88,7 @@ test('maps only enabled accounts with complete, platform-native credentials', ()
       }),
       expect.objectContaining({ accountId: 'discord-123456', platform: 'discord' }),
       expect.objectContaining({ accountId: 'dingtalk-123456', platform: 'dingtalk' }),
-      expect.objectContaining({
-        accountId: 'feishu-123456',
-        platform: 'feishu',
-        options: expect.objectContaining({ domain: 'lark' }),
-      }),
+      expect.objectContaining({ accountId: 'feishu-123456', platform: 'lark' }),
       expect.objectContaining({ accountId: 'qq-123456', platform: 'qqbot' }),
       expect.objectContaining({
         accountId: 'wecom-123456',
@@ -115,6 +111,51 @@ test('maps only enabled accounts with complete, platform-native credentials', ()
     ]),
   );
   expect(accounts).toHaveLength(7);
+  expect(
+    accounts.find(account => account.accountId === 'feishu-123456')?.options,
+  ).not.toHaveProperty('domain');
+});
+
+test('keeps custom Feishu API URLs separate from the service-region selector', () => {
+  const accounts = listCcConnectAccountConfigs({
+    getTelegramInstances: () => [],
+    getDiscordInstances: () => [],
+    getDingTalkInstances: () => [],
+    getFeishuInstances: () => [
+      {
+        ...disabled,
+        enabled: true,
+        instanceId: 'feishu-domestic',
+        appId: 'domestic-app',
+        appSecret: 'domestic-secret',
+        domain: 'feishu',
+      },
+      {
+        ...disabled,
+        enabled: true,
+        instanceId: 'feishu-custom',
+        appId: 'custom-app',
+        appSecret: 'custom-secret',
+        domain: 'https://open.example.invalid',
+      },
+    ],
+    getQQInstances: () => [],
+    getWecomInstances: () => [],
+    getWeixinConfig: () => ({ enabled: false }),
+  } as never);
+
+  expect(accounts).toEqual([
+    expect.objectContaining({
+      accountId: 'feishu-domestic',
+      platform: 'feishu',
+      options: expect.not.objectContaining({ domain: expect.anything() }),
+    }),
+    expect.objectContaining({
+      accountId: 'feishu-custom',
+      platform: 'feishu',
+      options: expect.objectContaining({ domain: 'https://open.example.invalid' }),
+    }),
+  ]);
 });
 
 test('omits enabled accounts without a workspace binding', () => {

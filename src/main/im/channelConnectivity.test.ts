@@ -3,10 +3,20 @@ import { expect, test } from 'vitest';
 import type { IMGatewayConfig } from './types';
 import {
   appendRuntimeConnectivity,
+  resolveFeishuAuthEndpoint,
   resolveConnectivityAccount,
   selectConnectivityInstance,
 } from './channelConnectivity';
 import { ConnectivityCheckCode, ConnectivityCheckLevel } from './constants';
+
+test('uses the matching authentication endpoint for Feishu and Lark', () => {
+  expect(resolveFeishuAuthEndpoint('feishu')).toContain('open.feishu.cn');
+  expect(resolveFeishuAuthEndpoint('lark')).toContain('open.larksuite.com');
+  expect(resolveFeishuAuthEndpoint('https://open.example.invalid')).toBe(
+    'https://open.example.invalid/open-apis/auth/v3/tenant_access_token/internal',
+  );
+  expect(() => resolveFeishuAuthEndpoint('invalid-domain')).toThrow();
+});
 
 const config = {
   telegram: {
