@@ -46,10 +46,15 @@ const hoisted = vi.hoisted(() => {
     applyOverrides: vi.fn(),
     getShellPath: vi.fn(),
   }));
+  const mockSettingsManagerInMemory = vi.fn(() => ({
+    applyOverrides: vi.fn(),
+    getShellPath: vi.fn(),
+  }));
 
   return {
     mockSession,
     mockSettingsManagerCreate,
+    mockSettingsManagerInMemory,
     mockCreateAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
     mockDefaultResourceLoader: vi.fn(function (this: { reload: () => Promise<void> }) {
       this.reload = vi.fn().mockResolvedValue(undefined);
@@ -167,6 +172,7 @@ const mockSession = hoisted.mockSession;
 const mockCreateAgentSession = hoisted.mockCreateAgentSession;
 const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
 const mockSettingsManagerCreate = hoisted.mockSettingsManagerCreate;
+const mockSettingsManagerInMemory = hoisted.mockSettingsManagerInMemory;
 const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
@@ -178,7 +184,10 @@ const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
   DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
-  SettingsManager: { create: hoisted.mockSettingsManagerCreate },
+  SettingsManager: {
+    create: hoisted.mockSettingsManagerCreate,
+    inMemory: hoisted.mockSettingsManagerInMemory,
+  },
   getAgentDir: hoisted.mockGetAgentDir,
   ModelRuntime: {
     create: hoisted.mockModelRuntimeCreate,
@@ -769,6 +778,10 @@ describe('PiRuntimeAdapter', () => {
         expect.objectContaining({
           agentDir: '/tmp/pi-agent',
           cwd: process.cwd(),
+          noExtensions: true,
+          noPromptTemplates: true,
+          noSkills: true,
+          noThemes: true,
           appendSystemPromptOverride: expect.any(Function),
           systemPromptOverride: expect.any(Function),
         }),
@@ -787,11 +800,12 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).not.toHaveProperty('systemPrompt');
     });
 
-    it('shares one Pi SettingsManager with resource loading and the agent session', async () => {
+    it('shares one isolated Pi SettingsManager with resource loading and the agent session', async () => {
       await adapter.startSession('settings-manager', 'Hello Pi');
 
-      expect(mockSettingsManagerCreate).toHaveBeenCalledWith(process.cwd(), '/tmp/pi-agent');
-      const settingsManager = mockSettingsManagerCreate.mock.results[0]?.value;
+      expect(mockSettingsManagerInMemory).toHaveBeenCalledOnce();
+      expect(mockSettingsManagerCreate).not.toHaveBeenCalled();
+      const settingsManager = mockSettingsManagerInMemory.mock.results[0]?.value;
       expect(mockDefaultResourceLoader.mock.calls[0]?.[0]).toEqual(
         expect.objectContaining({ settingsManager }),
       );
