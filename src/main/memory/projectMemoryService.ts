@@ -29,6 +29,7 @@ import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
 const DEFAULT_PROJECT_RECALL_TOKEN_BUDGET = 900;
 const DEFAULT_PERSONAL_RECALL_TOKEN_BUDGET = 250;
 const DEFAULT_SESSION_RECALL_TOKEN_BUDGET = 350;
+const MAX_ENGRAM_RECALL_LIMIT = 20;
 
 interface ConfirmPayload {
   sessionId: string;
@@ -91,12 +92,18 @@ export class ProjectMemoryService {
     });
   }
 
-  async recallSession(input: { workingDirectory: string; query: string; limit?: number }) {
+  async recallSession(input: {
+    workingDirectory: string;
+    sessionId: string;
+    query: string;
+    limit?: number;
+  }) {
     const project = this.resolveIdentity(input.workingDirectory);
     return await this.recallScope({
       query: input.query,
       projectId: project.id,
       scope: MemoryScope.Session,
+      sessionId: input.sessionId,
       limit: input.limit,
     });
   }
@@ -121,6 +128,7 @@ export class ProjectMemoryService {
 
   async buildProjectContext(input: {
     workingDirectory: string;
+    sessionId: string;
     query: string;
     tokenBudget?: number;
   }): Promise<string> {
@@ -372,37 +380,43 @@ export class ProjectMemoryService {
     query: string;
     projectId: string;
     scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
+    sessionId?: string;
     limit?: number;
   }) {
     const plan = planRecallQuery(input.query);
     if (!plan.exactQuery) return [];
     const limit = Math.min(Math.max(input.limit ?? 8, 1), 20);
+    const retrievalLimit = input.scope === MemoryScope.Session ? MAX_ENGRAM_RECALL_LIMIT : limit;
     let observations = this.filterRecallable(
-      input.projectId,
+      input,
       await this.adapter.recall({
         query: plan.exactQuery,
         project: input.projectId,
         scope: input.scope,
-        limit,
+        limit: retrievalLimit,
         matchMode: EngramSearchMatchMode.All,
       }),
     );
     if (observations.length === 0 && plan.broadQuery) {
       observations = this.filterRecallable(
-        input.projectId,
+        input,
         await this.adapter.recall({
           query: plan.broadQuery,
           project: input.projectId,
           scope: input.scope,
-          limit,
+          limit: retrievalLimit,
           matchMode: EngramSearchMatchMode.Any,
         }),
       );
     }
     if (observations.length === 0 && plan.explicitMemoryIntent) {
       observations = this.filterRecallable(
-        input.projectId,
-        await this.adapter.recent({ project: input.projectId, scope: input.scope, limit }),
+        input,
+        await this.adapter.recent({
+          project: input.projectId,
+          scope: input.scope,
+          limit: retrievalLimit,
+        }),
       );
     }
     const unique = [
@@ -416,12 +430,27 @@ export class ProjectMemoryService {
     return rankRecallResults(plan.exactQuery, unique, metadata).slice(0, limit);
   }
 
-  private filterRecallable<T extends { id: number }>(projectId: string, observations: T[]): T[] {
-    const allowed = this.repository.filterRecallableMemoryIds(
-      projectId,
-      observations.map(observation => observation.id),
-    );
-    return observations.filter(observation => allowed.has(observation.id));
+  private filterRecallable<T extends { id: number; type?: string; session_id?: string }>(
+    input: {
+      projectId: string;
+      scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
+      sessionId?: string;
+    },
+    observations: T[],
+  ): T[] {
+    const observationsInScope = observations.filter(observation => {
+      if (input.scope === MemoryScope.Session) {
+        return Boolean(input.sessionId) && observation.session_id === input.sessionId;
+      }
+      return observation.type !== MemoryKind.SessionSummary;
+    });
+    const allowed = this.repository.filterRecallableMemoryIds({
+      projectId: input.projectId,
+      memoryIds: observationsInScope.map(observation => observation.id),
+      scope: input.scope,
+      sessionId: input.sessionId,
+    });
+    return observationsInScope.filter(observation => allowed.has(observation.id));
   }
 
   private findPending(id: string): MemoryOutboxItem | null {
@@ -588,11 +617,12 @@ function estimateMemoryTokens(value: string): number {
 export async function buildProjectMemoryContextSafe(
   service: ProjectMemoryService | null,
   workingDirectory: string,
+  sessionId: string,
   query: string,
 ): Promise<string> {
   if (!service) return '';
   try {
-    return await service.buildProjectContext({ workingDirectory, query });
+    return await service.buildProjectContext({ workingDirectory, sessionId, query });
   } catch (error) {
     console.warn('[ProjectMemory] Failed to recall project context:', error);
     return '';
