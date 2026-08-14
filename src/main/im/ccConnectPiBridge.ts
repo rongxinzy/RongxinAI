@@ -18,16 +18,21 @@ import type {
 } from './imScheduledTaskHandler';
 import type { IMMessage, Platform } from './types';
 
-const SUPPORTED_PLATFORMS = new Set<string>([
-  'telegram',
-  'discord',
-  'dingtalk',
-  'feishu',
-  'qq',
-  'qqbot',
-  'wecom',
-  'weixin',
-]);
+const PLATFORM_MAPPING = {
+  telegram: 'telegram',
+  discord: 'discord',
+  dingtalk: 'dingtalk',
+  feishu: 'feishu',
+  lark: 'feishu',
+  qq: 'qq',
+  qqbot: 'qq',
+  wecom: 'wecom',
+  weixin: 'weixin',
+} as const satisfies Readonly<Record<string, Platform>>;
+
+export function normalizeCcConnectPlatform(platform: string): Platform | null {
+  return PLATFORM_MAPPING[platform as keyof typeof PLATFORM_MAPPING] ?? null;
+}
 
 export class CcConnectPiBridge {
   private readonly handler: IMCoworkHandler;
@@ -71,11 +76,10 @@ export class CcConnectPiBridge {
     request: CcConnectTurnRequest,
     signal?: AbortSignal,
   ): Promise<CcConnectTurnResponse> {
-    if (!SUPPORTED_PLATFORMS.has(request.message.platform)) {
+    const platform = normalizeCcConnectPlatform(request.message.platform);
+    if (!platform) {
       throw new Error(`Unsupported cc-connect platform: ${request.message.platform}`);
     }
-    const platform =
-      request.message.platform === 'qqbot' ? 'qq' : (request.message.platform as Platform);
     const nativeConversationId = resolveNativeConversationId(request.message);
     const conversationId = getCcConnectScopedConversationId(
       request.accountId,

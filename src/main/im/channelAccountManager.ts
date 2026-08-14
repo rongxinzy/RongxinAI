@@ -6,6 +6,7 @@ import { fetchJsonWithTimeout } from './http';
 import { IMStore } from './imStore';
 import {
   appendRuntimeConnectivity,
+  resolveFeishuAuthEndpoint,
   resolveConnectivityAccount,
   selectConnectivityInstance,
 } from './channelConnectivity';
@@ -216,7 +217,11 @@ export class ChannelAccountManager {
     } else if (platform === 'feishu') {
       const instance = selectConnectivityInstance(config.feishu.instances, accountId);
       if (!instance?.appId || !instance.appSecret) throw new Error('App credentials are required.');
-      const result = await this.verifyFeishuCredentials(instance.appId, instance.appSecret);
+      const result = await this.verifyFeishuCredentials(
+        instance.appId,
+        instance.appSecret,
+        instance.domain,
+      );
       if (!result.success) throw new Error(result.error || 'Feishu authentication failed.');
     } else if (platform === 'dingtalk') {
       const instance = selectConnectivityInstance(config.dingtalk.instances, accountId);
@@ -248,10 +253,11 @@ export class ChannelAccountManager {
   async verifyFeishuCredentials(
     appId: string,
     appSecret: string,
+    domain = 'feishu',
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const result = await fetchJsonWithTimeout<{ code?: number; msg?: string }>(
-        'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+        resolveFeishuAuthEndpoint(domain),
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

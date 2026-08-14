@@ -1,6 +1,17 @@
 import { expect, test } from 'vitest';
 
-import { getCcConnectScopedConversationId, parseCcConnectScopedConversationId } from './ccConnectPiBridge';
+import {
+  getCcConnectScopedConversationId,
+  normalizeCcConnectPlatform,
+  parseCcConnectScopedConversationId,
+} from './ccConnectPiBridge';
+
+test('normalizes Lark transport events to the Feishu product channel', () => {
+  expect(normalizeCcConnectPlatform('lark')).toBe('feishu');
+  expect(normalizeCcConnectPlatform('feishu')).toBe('feishu');
+  expect(normalizeCcConnectPlatform('qqbot')).toBe('qq');
+  expect(normalizeCcConnectPlatform('unknown')).toBeNull();
+});
 
 test('separates the same platform conversation for distinct ChannelAccounts', () => {
   const first = getCcConnectScopedConversationId('telegram-primary', 'chat-1');

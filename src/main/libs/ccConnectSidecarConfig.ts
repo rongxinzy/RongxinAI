@@ -1,7 +1,15 @@
 import net from 'node:net';
 
 const SUPPORTED_PLATFORMS = new Set([
-  'telegram', 'discord', 'dingtalk', 'feishu', 'qq', 'qqbot', 'wecom', 'weixin',
+  'telegram',
+  'discord',
+  'dingtalk',
+  'feishu',
+  'lark',
+  'qq',
+  'qqbot',
+  'wecom',
+  'weixin',
 ]);
 
 type TomlValue = string | number | boolean | readonly string[];
@@ -39,9 +47,15 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
   const lines = [
     `data_dir = ${tomlString(config.dataDir)}`,
     '',
-    '[webhook]', 'enabled = false', '',
-    '[bridge]', 'enabled = false', '',
-    '[management]', 'enabled = false', '',
+    '[webhook]',
+    'enabled = false',
+    '',
+    '[bridge]',
+    'enabled = false',
+    '',
+    '[management]',
+    'enabled = false',
+    '',
   ];
 
   for (const project of config.projects) {
@@ -67,7 +81,9 @@ export function serializeCcConnectSidecarConfig(config: CcConnectSidecarConfig):
     );
     if (project.platform) {
       lines.push('[[projects.platforms]]', `type = ${tomlString(project.platform)}`);
-      const entries = Object.entries(project.options ?? {}).sort(([left], [right]) => left.localeCompare(right));
+      const entries = Object.entries(project.options ?? {}).sort(([left], [right]) =>
+        left.localeCompare(right),
+      );
       if (entries.length > 0) lines.push('[projects.platforms.options]');
       for (const [key, value] of entries) {
         if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
@@ -88,7 +104,11 @@ function assertNonEmpty(name: string, value: string): void {
 
 function assertLoopbackUrl(value: string): void {
   let url: URL;
-  try { url = new URL(value); } catch { throw new Error('cc-connect bridgeUrl must be a URL'); }
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error('cc-connect bridgeUrl must be a URL');
+  }
   if (!['http:', 'https:'].includes(url.protocol) || !isLoopback(url.hostname)) {
     throw new Error('cc-connect bridgeUrl must target loopback');
   }
@@ -105,7 +125,9 @@ function assertLoopbackListen(value: string): void {
 }
 
 function isLoopback(host: string): boolean {
-  return host === 'localhost' || net.isIP(host) > 0 && (host === '::1' || host.startsWith('127.'));
+  return (
+    host === 'localhost' || (net.isIP(host) > 0 && (host === '::1' || host.startsWith('127.')))
+  );
 }
 
 function tomlString(value: string): string {
