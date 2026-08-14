@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron';
 import type Database from 'better-sqlite3';
 
-import { ActivityIpc } from '../../shared/activity/constants';
+import { ActivityIpc, ActivityRetention } from '../../shared/activity/constants';
 import { shouldAcceptActivityUpdate } from '../../shared/activity/ordering';
 import type { ActivityRun, ActivityRunUpdate } from '../../shared/activity/types';
 
@@ -28,6 +28,14 @@ export class ActivityService {
   list(limit = 100): ActivityRun[] {
     return (this.db.prepare('SELECT * FROM zhiyuan_activity_runs ORDER BY updated_at DESC LIMIT ?').all(limit) as ActivityRow[])
       .map(row => this.fromRow(row));
+  }
+
+  /** Removes display-only snapshots that are outside the documented retention window. */
+  pruneExpired(nowMs = Date.now()): number {
+    const cutoffMs = nowMs - ActivityRetention.Milliseconds;
+    return this.db
+      .prepare('DELETE FROM zhiyuan_activity_runs WHERE updated_at < ?')
+      .run(cutoffMs).changes;
   }
 
   upsert(update: ActivityRunUpdate): ActivityRun {

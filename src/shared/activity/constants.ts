@@ -15,3 +15,9 @@ export const ActivityIpc = {
   List: 'activity:list',
   Updated: 'activity:updated',
 } as const;
+
+/** Activity snapshots remain available after their source task is removed. */
+export const ActivityRetention = {
+  Days: 180,
+  Milliseconds: 180 * 24 * 60 * 60 * 1000,
+} as const;

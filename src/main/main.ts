@@ -6641,6 +6641,11 @@ if (!gotTheLock) {
     if (resetCount > 0) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
     }
+    activityService ??= new ActivityService(getStore().getDatabase());
+    const prunedActivityRuns = activityService.pruneExpired();
+    if (prunedActivityRuns > 0) {
+      console.log(`[Activity] removed ${prunedActivityRuns} expired activity run(s)`);
+    }
     const recoveredScheduledRuns = new SqliteScheduledTaskStore(
       getStore().getDatabase(),
     ).recoverInterruptedRuns(run => {
