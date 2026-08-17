@@ -58,6 +58,7 @@ function setupDb(): void {
       active_skill_ids TEXT,
       workspace_id TEXT,
       agent_id TEXT NOT NULL DEFAULT 'main',
+      source TEXT NOT NULL DEFAULT 'manual',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

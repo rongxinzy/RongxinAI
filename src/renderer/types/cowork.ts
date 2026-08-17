@@ -234,6 +234,8 @@ export interface CoworkSessionSummary {
   pinOrder?: number | null;
   workspaceId?: string;
   agentId?: string;
+  /** Origin of the session: user-created, scheduled task, or IM channel. */
+  source?: 'manual' | 'scheduled' | 'im';
   createdAt: number;
   updatedAt: number;
 }

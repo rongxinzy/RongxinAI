@@ -104,6 +104,22 @@ export class SqliteStore {
       );
     `);
 
+    // Session source classification (manual | scheduled | im). Existing rows
+    // created before this column existed are backfilled from their title
+    // prefix (the previous convention: [定时]/[Cron]/Scheduled:).
+    try {
+      this.db.exec(`
+        ALTER TABLE cowork_sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
+      `);
+    } catch {
+      // Column already exists on upgraded databases; ignore.
+    }
+    this.db.exec(`
+      UPDATE cowork_sessions
+      SET source = 'scheduled'
+      WHERE title LIKE '[定时]%' OR title LIKE '[Cron]%' OR title LIKE 'Scheduled: %';
+    `);
+
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workspaces (
         id TEXT PRIMARY KEY,

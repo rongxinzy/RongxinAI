@@ -69,6 +69,8 @@ export class PiScheduledTaskExecutor {
       'work',
       undefined,
       workspace?.id,
+      [],
+      'scheduled',
     );
   }
 

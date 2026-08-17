@@ -16,7 +16,7 @@ import { WorkMode, type WorkMode as WorkModeType } from '../../store/workMode/co
 import type { CoworkSessionSummary } from '../../types/cowork';
 import { CoworkSessionStatusValue } from '../../types/cowork';
 import { isScratchWorkspacePath } from '../../utils/path';
-import { AgentSidebarIndicator, AgentSidebarPageSize, isScheduledSessionTitle } from './constants';
+import { AgentSidebarIndicator, AgentSidebarPageSize } from './constants';
 import type {
   AgentSidebarTaskNode,
   WorkspaceSidebarNode,
@@ -286,7 +286,7 @@ export const useWorkspaceSidebarState = (
             session =>
               isSessionOwnedByWorkspace(session, workspace.id) &&
               modeMatches(session, workMode) &&
-              isScheduledSessionTitle(session.title) === scheduled,
+              (session.source === 'scheduled') === scheduled,
           ),
         );
         const expanded = expandedWorkspaceIds.includes(workspace.id);
@@ -362,7 +362,7 @@ export const useWorkspaceSidebarState = (
         const tasks = sortTasks(
           (searchSource[node.id] ?? []).filter(
             session =>
-              isScheduledSessionTitle(session.title) === scheduled &&
+              (session.source === 'scheduled') === scheduled &&
               session.title.toLowerCase().includes(query),
           ),
         );

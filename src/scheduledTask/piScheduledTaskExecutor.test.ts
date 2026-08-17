@@ -115,6 +115,8 @@ test('runs a canonical task in its workspace and waits for complete', async () =
     'work',
     undefined,
     task.workspaceId,
+    [],
+    'scheduled',
   );
   expect(startSession).toHaveBeenCalledWith(
     session.id,
