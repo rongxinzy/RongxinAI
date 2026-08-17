@@ -3,6 +3,7 @@ import type {
   CoworkPermissionMode,
   CoworkPermissionOrigin,
   CoworkSessionMode,
+  CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPersistedArtifact } from '../../shared/cowork/artifacts';
 import type {
@@ -118,6 +119,7 @@ export interface CoworkSession {
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
+  source: CoworkSessionSource;
   experts?: CoworkSessionExpertSnapshot[];
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. 0 means loaded from the beginning. */
@@ -234,8 +236,7 @@ export interface CoworkSessionSummary {
   pinOrder?: number | null;
   workspaceId?: string;
   agentId?: string;
-  /** Origin of the session: user-created, scheduled task, or IM channel. */
-  source?: 'manual' | 'scheduled' | 'im';
+  source: CoworkSessionSource;
   createdAt: number;
   updatedAt: number;
 }

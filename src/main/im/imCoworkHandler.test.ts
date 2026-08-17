@@ -4,6 +4,7 @@ import { beforeEach, expect, test, vi } from 'vitest';
 
 import { CoworkErrorKind } from '../../common/coworkError';
 import { ActivityStatus } from '../../shared/activity/constants';
+import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { IMCoworkHandler } from './imCoworkHandler';
 
 const electronMocks = vi.hoisted(() => ({
@@ -39,7 +40,9 @@ class FakeRuntime extends EventEmitter {
     this.continueCalls.push({ sessionId, prompt, options });
   }
 
-  stopSession(sessionId: string) { this.stopCalls.push(sessionId); }
+  stopSession(sessionId: string) {
+    this.stopCalls.push(sessionId);
+  }
   stopAllSessions() {}
   respondToPermission() {}
   isSessionActive() {
@@ -88,6 +91,8 @@ class FakeCoworkStore {
     mode: 'work' | 'chat' = 'work',
     _id?: string,
     workspaceId = 'workspace-1',
+    _expertSnapshots: unknown[] = [],
+    source = CoworkSessionSource.Manual,
   ) {
     const id = `session-${++this.sessionCounter}`;
     const session = {
@@ -101,6 +106,7 @@ class FakeCoworkStore {
       modelOverride,
       mode,
       workspaceId,
+      source,
       claudeSessionId: null,
       status: 'idle',
       messages: [] as Array<Record<string, unknown>>,
@@ -469,6 +475,7 @@ test('IM turns use workspace session configuration without disabling Pi tools', 
     activeSkillIds: [],
     modelOverride: '',
     mode: 'work',
+    source: CoworkSessionSource.Im,
   });
   expect(runtime.startCalls[0].options).toMatchObject({
     skillIds: [],
@@ -575,7 +582,9 @@ test('emits a matching terminal run event when a session fails while waiting for
     coworkRuntime: runtime,
     coworkStore,
     imStore,
-    activityService: { upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run) } as any,
+    activityService: {
+      upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run),
+    } as any,
   });
 
   const response = handler.processMessage(
@@ -622,7 +631,9 @@ test('closes a started run when existing-session setup fails before runtime exec
       if (failSkillsPrompt) throw new Error('skill prompt unavailable');
       return null;
     },
-    activityService: { upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run) } as any,
+    activityService: {
+      upsertBestEffort: (run: Record<string, unknown>) => activityUpdates.push(run),
+    } as any,
   });
 
   const firstResponse = handler.processMessage(

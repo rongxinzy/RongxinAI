@@ -10,6 +10,7 @@ import {
   DefaultAgentProfile,
   encodeAgentAvatarIcon,
 } from '../shared/agent';
+import { CoworkSessionSource } from '../shared/cowork/constants';
 
 vi.mock('electron', () => ({
   app: {
@@ -199,6 +200,67 @@ test('adds agent pin columns during migration', async () => {
   ]);
 
   store.close();
+});
+
+test('backfills legacy scheduled sessions only when adding the source column', async () => {
+  const userDataPath = createTempUserDataPath();
+  createLegacyDatabase(userDataPath);
+  const legacyDb = new Database(path.join(userDataPath, DB_FILENAME));
+  const now = Date.now();
+  legacyDb.exec(`
+    CREATE TABLE cowork_sessions (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      claude_session_id TEXT,
+      status TEXT NOT NULL DEFAULT 'idle',
+      mode TEXT NOT NULL DEFAULT 'work',
+      cwd TEXT NOT NULL,
+      system_prompt TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+  const insertLegacySession = legacyDb.prepare(`
+    INSERT INTO cowork_sessions
+      (id, title, status, mode, cwd, system_prompt, created_at, updated_at)
+    VALUES (?, ?, 'idle', 'work', '/repo', '', ?, ?)
+  `);
+  insertLegacySession.run('scheduled-cn', ' [定时]日报', now, now);
+  insertLegacySession.run('scheduled-en', '[Cron] report', now, now);
+  insertLegacySession.run('scheduled-executor', 'Scheduled: report', now, now);
+  insertLegacySession.run('manual', 'ordinary conversation', now, now);
+  legacyDb.close();
+
+  const store = await SqliteStore.create(userDataPath);
+  const migratedRows = store
+    .getDatabase()
+    .prepare('SELECT id, source FROM cowork_sessions ORDER BY id')
+    .all() as Array<{ id: string; source: string }>;
+
+  expect(migratedRows).toEqual([
+    { id: 'manual', source: CoworkSessionSource.Manual },
+    { id: 'scheduled-cn', source: CoworkSessionSource.Scheduled },
+    { id: 'scheduled-en', source: CoworkSessionSource.Scheduled },
+    { id: 'scheduled-executor', source: CoworkSessionSource.Scheduled },
+  ]);
+
+  store
+    .getDatabase()
+    .prepare(
+      `INSERT INTO cowork_sessions
+        (id, title, status, mode, pinned, cwd, system_prompt, source, created_at, updated_at)
+       VALUES (?, ?, 'idle', 'work', 0, '/repo', '', ?, ?, ?)`,
+    )
+    .run('manual-prefixed', '[Cron] user-authored title', CoworkSessionSource.Manual, now, now);
+  store.close();
+
+  const reopenedStore = await SqliteStore.create(userDataPath);
+  const reopenedRow = reopenedStore
+    .getDatabase()
+    .prepare('SELECT source FROM cowork_sessions WHERE id = ?')
+    .get('manual-prefixed') as { source: string };
+  expect(reopenedRow.source).toBe(CoworkSessionSource.Manual);
+  reopenedStore.close();
 });
 
 test('creates the artifact index after adding sequence to legacy messages', async () => {
