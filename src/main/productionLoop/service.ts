@@ -25,6 +25,7 @@ import {
   type WorkbenchJsonObject,
 } from '../../shared/workbenchTask';
 import type { ProductionLoopMeasurement, ProductionLoopStore } from './ports';
+import { getProductionReviewContractRefs } from './reviewContract';
 import { assertProductionLoopTransition } from './stateMachine';
 
 const MAX_CRITIC_OUTPUT_LENGTH = 8_000;
@@ -68,7 +69,11 @@ const parseJsonRecord = (output: string): Record<string, unknown> => {
   throw new Error('No JSON object found in critic output.');
 };
 
-const parseCriticPayload = (output: string, isError: boolean): CriticPayload => {
+const parseCriticPayload = (
+  output: string,
+  isError: boolean,
+  allowedContractRefs: ReadonlySet<string>,
+): CriticPayload => {
   if (isError) {
     return {
       verdict: ProductionCriticVerdict.Revise,
@@ -105,13 +110,17 @@ const parseCriticPayload = (output: string, isError: boolean): CriticPayload => 
       ) {
         throw new Error('Critic finding severity is invalid.');
       }
-      if (raw.evidence !== undefined && typeof raw.evidence !== 'string') {
-        throw new Error('Critic finding evidence must be a string.');
+      if (typeof raw.contractRef !== 'string' || !allowedContractRefs.has(raw.contractRef.trim())) {
+        throw new Error('Critic finding contractRef is missing or invalid.');
+      }
+      if (typeof raw.evidence !== 'string' || !raw.evidence.trim()) {
+        throw new Error('Critic finding evidence is required.');
       }
       return {
         severity: raw.severity as ProductionCriticSeverity,
+        contractRef: raw.contractRef.trim(),
         summary: raw.summary.trim(),
-        evidence: typeof raw.evidence === 'string' ? raw.evidence.trim() : undefined,
+        evidence: raw.evidence.trim(),
       };
     });
     if (verdict === ProductionCriticVerdict.Pass && findings.length > 0) {
@@ -520,7 +529,7 @@ export class ProductionLoopService {
         });
         return;
       }
-      const result = parseCriticPayload(output, isError);
+      const result = parseCriticPayload(output, isError, getProductionReviewContractRefs(state));
       state.critic.findings = result.findings;
       state.critic.passed = result.verdict === ProductionCriticVerdict.Pass;
       state.progressVersion += 1;
