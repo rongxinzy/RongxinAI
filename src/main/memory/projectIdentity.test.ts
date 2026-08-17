@@ -1,44 +1,31 @@
 import path from 'path';
 import { expect, test } from 'vitest';
 
-import { normalizeGitRemote, resolveProjectIdentity } from './projectIdentity';
+import { workspaceIdForPath } from '../workspaceUtils';
+import { resolveProjectIdentity } from './projectIdentity';
 
-test('uses the normalized git origin so repository subdirectories share one identity', () => {
-  const gitRoot = path.resolve('workspace', 'repository');
-  const runGit = (_cwd: string, args: string[]) =>
-    args.includes('--show-toplevel') ? gitRoot : 'git@github.com:Example/Repository.git';
+test('uses the application workspace identity as the project identity', () => {
+  const workspaceRoot = path.resolve('workspace', 'repository');
+  const identity = resolveProjectIdentity(workspaceRoot);
 
-  const first = resolveProjectIdentity(path.join(gitRoot, 'src'), {
-    runGit,
-    realpath: candidate => candidate,
+  expect(identity).toEqual({
+    id: workspaceIdForPath(workspaceRoot),
+    displayName: 'repository',
+    root: workspaceRoot,
   });
-  const second = resolveProjectIdentity(path.join(gitRoot, 'tests'), {
-    runGit,
-    realpath: candidate => candidate,
-  });
-
-  expect(first.id).toBe(second.id);
-  expect(first.canonicalSource).toBe('git:github.com/example/repository');
 });
 
-test('keeps unrelated non-git directories isolated', () => {
-  const options = {
-    runGit: () => null,
-    realpath: (candidate: string) => path.resolve(candidate),
-    platform: 'win32' as const,
-  };
-
-  const first = resolveProjectIdentity('C:/projects/alpha', options);
-  const second = resolveProjectIdentity('C:/projects/beta', options);
+test('keeps separate workspace paths isolated even when they belong to one repository', () => {
+  const repositoryRoot = path.resolve('workspace', 'repository');
+  const first = resolveProjectIdentity(path.join(repositoryRoot, 'workspace-a'));
+  const second = resolveProjectIdentity(path.join(repositoryRoot, 'workspace-b'));
 
   expect(first.id).not.toBe(second.id);
 });
 
-test('normalizes common remote URL forms to the same canonical source', () => {
-  expect(normalizeGitRemote('https://github.com/Example/Repository.git')).toBe(
-    'github.com/example/repository',
-  );
-  expect(normalizeGitRemote('git@github.com:Example/Repository.git')).toBe(
-    'github.com/example/repository',
-  );
+test('maps task work directories back to their owning workspace', () => {
+  const workspaceRoot = path.resolve('workspace', 'repository');
+  const taskDirectory = path.join(workspaceRoot, '.zhiyuan-tasks', 'task-123');
+
+  expect(resolveProjectIdentity(taskDirectory)).toEqual(resolveProjectIdentity(workspaceRoot));
 });
