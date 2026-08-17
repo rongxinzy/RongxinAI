@@ -436,6 +436,8 @@ export interface CoworkConversationReplacementEntry {
   timestamp?: number;
 }
 
+export type CoworkSessionSource = 'manual' | 'scheduled' | 'im';
+
 export interface CoworkSession {
   id: string;
   title: string;
@@ -451,6 +453,8 @@ export interface CoworkSession {
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
+  /** Origin of the session: user-created, scheduled task, or IM channel. */
+  source: CoworkSessionSource;
   experts: CoworkSessionExpertSnapshot[];
   messages: CoworkMessage[];
   /** Offset of the first loaded message in the full message history. */
@@ -472,6 +476,7 @@ export interface CoworkSessionSummary {
   pinOrder?: number | null;
   workspaceId: string;
   agentId: string;
+  source: CoworkSessionSource;
   createdAt: number;
   updatedAt: number;
 }
@@ -773,6 +778,7 @@ export class CoworkStore {
     id?: string,
     workspaceId?: string,
     expertSnapshots: CoworkSessionExpertInput[] = [],
+    source: CoworkSessionSource = 'manual',
   ): CoworkSession {
     const sessionId = id || uuidv4();
     const now = Date.now();
@@ -785,8 +791,8 @@ export class CoworkStore {
     if (!workspace) throw new Error('Workspace not found');
 
     const insertSession = this.db.prepare(`
-      INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, pinned, created_at, updated_at)
-      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+      INSERT INTO cowork_sessions (id, title, claude_session_id, status, mode, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, pinned, source, created_at, updated_at)
+      VALUES (?, ?, NULL, 'idle', ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
     `);
     const insertExpert = this.db.prepare(`
       INSERT INTO cowork_session_experts
@@ -805,6 +811,7 @@ export class CoworkStore {
         JSON.stringify(activeSkillIds),
         workspace.id,
         agentId,
+        source,
         now,
         now,
       );
@@ -840,6 +847,7 @@ export class CoworkStore {
       activeSkillIds,
       workspaceId: workspace.id,
       agentId,
+      source,
       experts: expertSnapshots.map(expert => ({
         ...expert,
         capabilityPolicy: expert.capabilityPolicy ?? {},
@@ -873,13 +881,14 @@ export class CoworkStore {
       active_skill_ids?: string | null;
       workspace_id?: string | null;
       agent_id?: string | null;
+      source?: string | null;
       created_at: number;
       updated_at: number;
     }
 
     const row = this.getOne<SessionRow>(
       `
-      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, created_at, updated_at
+      SELECT id, title, claude_session_id, status, mode, pinned, pin_order, cwd, system_prompt, model_override, execution_mode, active_skill_ids, workspace_id, agent_id, source, created_at, updated_at
       FROM cowork_sessions
       WHERE id = ?
     `,
@@ -982,6 +991,7 @@ export class CoworkStore {
       activeSkillIds,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
+      source: (row.source as CoworkSessionSource) || 'manual',
       experts,
       messages,
       messagesOffset: messageOffset,
@@ -1196,6 +1206,7 @@ export class CoworkStore {
       cwd: string;
       workspace_id: string | null;
       agent_id: string | null;
+      source: string | null;
       created_at: number;
       updated_at: number;
     }
@@ -1217,7 +1228,7 @@ export class CoworkStore {
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const rows = this.getAll<SessionSummaryRow>(
       `
-        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, created_at, updated_at
+        SELECT id, title, status, mode, pinned, pin_order, cwd, workspace_id, agent_id, source, created_at, updated_at
         FROM cowork_sessions
         ${whereClause}
         ORDER BY pinned DESC,
@@ -1238,6 +1249,7 @@ export class CoworkStore {
       pinOrder: row.pin_order ?? null,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
+      source: (row.source as CoworkSessionSource) || 'manual',
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

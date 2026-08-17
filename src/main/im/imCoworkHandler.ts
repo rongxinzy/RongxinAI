@@ -418,6 +418,8 @@ export class IMCoworkHandler extends EventEmitter {
       'work',
       undefined,
       workspace.id,
+      undefined,
+      'im',
     );
 
     // Save mapping

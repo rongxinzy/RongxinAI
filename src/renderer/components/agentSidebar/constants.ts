@@ -16,9 +16,16 @@ export const AgentSidebarPageSize = {
   AllBatch: 100,
 } as const;
 
+/**
+ * Legacy title-prefix convention for scheduled sessions. New sessions carry
+ * an explicit `source` column instead; this predicate is retained only for
+ * backfilling pre-source databases (see the cowork_sessions migration) and
+ * must stay in sync with that SQL.
+ */
 export const ScheduledSessionTitlePrefix = {
   Chinese: '[定时]',
   English: '[Cron]',
+  Legacy: 'Scheduled: ',
 } as const;
 
 export const isScheduledSessionTitle = (title: string): boolean => {
