@@ -24,6 +24,8 @@
   <a href="README_zh.md">中文</a>
 </p>
 
+This project is maintained by Li Keran.
+
 <p align="center">
   <img src="public/readme/zhiyuan-ppt-demo.gif" alt="ZhiYuan Agent creating an introductory AI presentation from a natural-language request" width="960">
 </p>
