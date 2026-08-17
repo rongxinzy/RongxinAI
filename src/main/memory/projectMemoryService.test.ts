@@ -230,7 +230,7 @@ test('falls back to bounded recent active memory only for explicit memory intent
   });
 });
 
-test('lists only the current project and confirmed personal memories', () => {
+test('lists the current workspace, confirmed personal, and current-session memories', () => {
   const memories = [
     { id: 'project-current', projectId: 'project-alpha', scope: EngramMemoryScope.Project },
     { id: 'project-other', projectId: 'project-beta', scope: EngramMemoryScope.Project },
@@ -239,7 +239,18 @@ test('lists only the current project and confirmed personal memories', () => {
       projectId: 'personal://zhiyuan-agent/user',
       scope: EngramMemoryScope.Personal,
     },
-    { id: 'session', projectId: 'project-alpha', scope: EngramMemoryScope.Session },
+    {
+      id: 'session-current',
+      projectId: 'project-alpha',
+      scope: EngramMemoryScope.Session,
+      sessionId: 'session-a',
+    },
+    {
+      id: 'session-other',
+      projectId: 'project-alpha',
+      scope: EngramMemoryScope.Session,
+      sessionId: 'session-b',
+    },
   ];
   const service = new ProjectMemoryService(
     { listManaged: vi.fn(() => memories) } as never,
@@ -250,6 +261,11 @@ test('lists only the current project and confirmed personal memories', () => {
   expect(
     service.listRecallableMemories({ workingDirectory: 'alpha' }).map(memory => memory.id),
   ).toEqual(['project-current', 'personal']);
+  expect(
+    service
+      .listRecallableMemories({ workingDirectory: 'alpha', sessionId: 'session-a' })
+      .map(memory => memory.id),
+  ).toEqual(['project-current', 'personal', 'session-current']);
 });
 
 test('stores rolling session summaries with a 30 day expiration', async () => {

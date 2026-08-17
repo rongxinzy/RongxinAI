@@ -21,8 +21,109 @@ test('creates the link and outbox schema without importing the memory kernel dat
   expect(schema).toContain('project_root TEXT');
   expect(schema).toContain("scope TEXT NOT NULL DEFAULT 'personal'");
   expect(schema).toContain('superseded_by TEXT');
+  expect(schema).toContain('promoted_from_link_id TEXT');
+  expect(schema).toContain('promotion_source_project_id TEXT');
+  expect(schema).toContain('promotion_source_session_id TEXT');
   expect(schema).toContain('sensitivity TEXT');
   expect(schema).toContain('idx_memory_outbox_pending');
+});
+
+test('adds promotion provenance columns to an existing projection database', () => {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE memory_links (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      status TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE memory_candidates (id TEXT PRIMARY KEY);
+    CREATE TABLE memory_outbox (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      available_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
+
+  try {
+    new MemoryRepository(db);
+    const columnNames = (table: string) =>
+      new Set(
+        (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map(
+          column => column.name,
+        ),
+      );
+    const linkColumns = columnNames('memory_links');
+    const candidateColumns = columnNames('memory_candidates');
+    const promotionColumns = [
+      'promoted_from_link_id',
+      'promotion_source_project_id',
+      'promotion_source_session_id',
+    ];
+
+    expect(promotionColumns.every(column => linkColumns.has(column))).toBe(true);
+    expect(promotionColumns.every(column => candidateColumns.has(column))).toBe(true);
+  } finally {
+    db.close();
+  }
+});
+
+test('persists promotion provenance on candidates and confirmed links', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    const candidateId = repository.createPersonalCandidate({
+      id: 'candidate-promoted',
+      projectId: 'personal://zhiyuan-agent/user',
+      projectRoot: 'C:/personal-memory',
+      scope: MemoryScope.Personal,
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.ModelProposal,
+      title: 'Promoted preference',
+      content: 'Use SQLite for local state.',
+      kind: MemoryKind.Preference,
+      promotedFromLinkId: 'project-source',
+      promotionSourceProjectId: 'project-a',
+      promotionSourceSessionId: 'session-a',
+    });
+
+    expect(repository.getCandidate(candidateId)).toMatchObject({
+      promotedFromLinkId: 'project-source',
+      promotionSourceProjectId: 'project-a',
+      promotionSourceSessionId: 'session-a',
+    });
+    expect(repository.getCandidateDetails(candidateId)).toMatchObject({
+      promotedFromLinkId: 'project-source',
+      promotionSourceProjectId: 'project-a',
+      promotionSourceSessionId: 'session-a',
+    });
+
+    repository.createLink({
+      id: candidateId,
+      memoryId: 42,
+      projectId: 'personal://zhiyuan-agent/user',
+      scope: MemoryScope.Personal,
+      sessionId: 'personal:session-a',
+      sourceKind: MemorySourceKind.ModelProposal,
+      title: 'Promoted preference',
+      content: 'Use SQLite for local state.',
+      kind: MemoryKind.Preference,
+      promotedFromLinkId: 'project-source',
+      promotionSourceProjectId: 'project-a',
+      promotionSourceSessionId: 'session-a',
+    });
+
+    expect(repository.getLink(candidateId)).toMatchObject({
+      promotedFromLinkId: 'project-source',
+      promotionSourceProjectId: 'project-a',
+      promotionSourceSessionId: 'session-a',
+    });
+  } finally {
+    db.close();
+  }
 });
 
 test('authorizes recall against projected scope, session, and lifecycle state', () => {

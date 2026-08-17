@@ -28,6 +28,9 @@ export interface ManagedMemoryRecord {
   sensitivity: MemorySensitivity;
   expiresAt: string | null;
   supersededBy: string | null;
+  promotedFromLinkId: string | null;
+  promotionSourceProjectId: string | null;
+  promotionSourceSessionId: string | null;
   createdAt: string;
   updatedAt: string;
   deliveryStatus: MemoryDeliveryStatus | null;
