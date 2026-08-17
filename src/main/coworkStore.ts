@@ -405,6 +405,12 @@ export interface CoworkMessageMetadata {
     reasoningTokens?: number;
     totalTokens?: number;
   };
+  metrics?: {
+    requestStartedAt?: number;
+    firstVisibleTextAt?: number;
+    completedAt?: number;
+    toolDurationMs?: number;
+  };
   contextPercent?: number;
   model?: string;
   modelProviderKey?: string;

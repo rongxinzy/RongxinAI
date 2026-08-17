@@ -65,6 +65,7 @@ test('emits reasoning-end when reasoning stream finishes before content', async 
     'text-start',
     'text-delta',
     'text-delta',
+    'data-session-metrics',
     'text-end',
     'finish',
   ]);
@@ -92,6 +93,7 @@ test('emits the final result when the provider never reports streaming progress'
     'reasoning-end',
     'text-start',
     'text-delta',
+    'data-session-metrics',
     'text-end',
     'finish',
   ]);
@@ -154,6 +156,7 @@ test('keeps web search chunks outside reasoning and starts a new reasoning block
     'reasoning-end',
     'text-start',
     'text-delta',
+    'data-session-metrics',
     'text-end',
     'finish',
   ]);
