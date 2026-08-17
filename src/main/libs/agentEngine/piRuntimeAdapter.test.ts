@@ -828,7 +828,7 @@ describe('PiRuntimeAdapter', () => {
         }),
       );
       expect(mockGetModel).not.toHaveBeenCalled();
-      expect(mockModelRuntimeCreate).toHaveBeenCalledOnce();
+      expect(mockModelRuntimeCreate).toHaveBeenCalledWith({ allowModelNetwork: false });
       expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
         'llamacpp',
         expect.objectContaining({
@@ -859,7 +859,7 @@ describe('PiRuntimeAdapter', () => {
       // The built-in model stays on Pi's catalog, but the user's API key must
       // still be registered under the built-in provider id — otherwise the
       // session fails with "No API key found for <provider>".
-      expect(mockModelRuntimeCreate).toHaveBeenCalledOnce();
+      expect(mockModelRuntimeCreate).toHaveBeenCalledWith({ allowModelNetwork: false });
       expect(mockModelRuntime.registerProvider).not.toHaveBeenCalled();
       expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith('openai', 'sk-openai');
       expect(mockCreateAgentSession).toHaveBeenCalledWith(

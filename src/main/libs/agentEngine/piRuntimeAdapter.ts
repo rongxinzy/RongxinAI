@@ -54,7 +54,6 @@ import {
   type ModelCapabilities,
   ModelCapabilityStatus,
   ProviderModelPiApi,
-  ProviderName,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
@@ -111,6 +110,7 @@ import { extractPiSubagentExecutionMetadata } from './piSubagentExecution';
 import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
+import { resolvePiBuiltinProviderId } from './piProviderIds';
 import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
@@ -295,7 +295,7 @@ interface PiModules {
   getAgentDir: () => string;
   getModel: (provider: string, modelId: string) => unknown;
   ModelRuntime: {
-    create(): Promise<PiModelRuntime>;
+    create(options?: PiModelRuntimeCreateOptions): Promise<PiModelRuntime>;
   };
   completeSimple: (
     model: unknown,
@@ -336,6 +336,10 @@ interface PiModelRuntime {
     model: unknown,
     context: { messages: Array<{ role: string; content: string }> },
   ): Promise<{ content: Array<{ text: string }> }>;
+}
+
+interface PiModelRuntimeCreateOptions {
+  allowModelNetwork?: boolean;
 }
 
 type PiResolvedModel = {
@@ -3109,24 +3113,6 @@ const DEFAULT_PI_CLOUD_CONTEXT_WINDOW = 256000;
 const DEFAULT_PI_CLOUD_MAX_TOKENS = 32768;
 const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
 
-const PI_BUILTIN_PROVIDER_ID = {
-  [ProviderName.OpenAI]: 'openai',
-  [ProviderName.Anthropic]: 'anthropic',
-  [ProviderName.Gemini]: 'google',
-  [ProviderName.DeepSeek]: 'deepseek',
-  [ProviderName.Moonshot]: 'moonshotai-cn',
-  [ProviderName.Zhipu]: 'zai',
-  [ProviderName.Minimax]: 'minimax-cn',
-  [ProviderName.Xiaomi]: 'xiaomi',
-  [ProviderName.OpenRouter]: 'openrouter',
-  [ProviderName.Copilot]: 'github-copilot',
-} as const;
-
-function resolvePiBuiltinProviderId(providerName?: string): string | null {
-  if (!providerName) return null;
-  return PI_BUILTIN_PROVIDER_ID[providerName as keyof typeof PI_BUILTIN_PROVIDER_ID] ?? null;
-}
-
 function resolvePiCustomModelApi(resolution: ApiConfigResolution): ProviderModelPiApi {
   const configuredApi = resolution.providerMetadata?.piRuntime?.api;
   if (configuredApi) return configuredApi;
@@ -3261,12 +3247,14 @@ async function resolvePiCustomModelRuntime(
     if (!apiKey || !builtinProviderId) {
       return { modelRuntime: existingModelRuntime ?? null, customModel: null };
     }
-    const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
+    const modelRuntime =
+      existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
     await modelRuntime.setRuntimeApiKey(builtinProviderId, apiKey);
     return { modelRuntime, customModel: null };
   }
 
-  const modelRuntime = existingModelRuntime ?? (await pi.ModelRuntime.create());
+  const modelRuntime =
+    existingModelRuntime ?? (await pi.ModelRuntime.create({ allowModelNetwork: false }));
   const api = resolvePiCustomModelApi(resolution);
   const runtimeBaseUrl = await resolvePiCustomModelBaseUrl(resolution, api);
   const model = buildPiCustomModel(resolution, runtimeBaseUrl);
