@@ -107,7 +107,8 @@ export class CcConnectBridgeServer {
       if (request.method !== 'POST') return void response.writeHead(404).end();
       const body = await readJson(request);
       if (request.url === '/v1/cc-connect/turn') {
-        if (!isTurnRequest(normalizeMediaFields(body)))
+        const turnRequest = normalizeMediaFields(body);
+        if (!isTurnRequest(turnRequest))
           return void response.writeHead(400).end('invalid turn request');
         const abortController = new AbortController();
         const abortTurn = () => abortController.abort();
@@ -115,7 +116,7 @@ export class CcConnectBridgeServer {
         response.once('close', abortTurn);
         let result: CcConnectTurnResponse;
         try {
-          result = await this.handlers.onTurn(body, abortController.signal);
+          result = await this.handlers.onTurn(turnRequest, abortController.signal);
         } finally {
           request.off('aborted', abortTurn);
           response.off('close', abortTurn);
