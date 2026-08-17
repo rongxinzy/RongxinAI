@@ -86,11 +86,11 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
           <div className="max-w-[min(90vw,720px)] truncate rounded-full bg-black/35 px-3 py-1 text-center text-xs font-medium text-white/85 ring-1 ring-white/10">
             {label}
           </div>
-          <div className="flex max-h-full max-w-full items-center justify-center rounded-xl bg-white/95 p-1 shadow-2xl ring-1 ring-white/15">
+          <div className="flex max-h-full max-w-[75vw] items-center justify-center rounded-xl bg-white/95 p-1 shadow-2xl ring-1 ring-white/15">
             <img
               src={image.src}
               alt={image.alt ?? label}
-              className="block max-h-[calc(100vh-11rem)] max-w-[calc(100vw-3.5rem)] object-contain rounded-lg"
+              className="block max-h-[72vh] max-w-[min(75vw,960px)] object-contain rounded-lg"
               draggable={false}
             />
           </div>

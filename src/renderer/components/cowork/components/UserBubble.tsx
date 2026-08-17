@@ -128,7 +128,7 @@ const LocalImageAttachmentPreview: React.FC<{
       <img
         src={dataUrl}
         alt={file.name || 'image'}
-        className="block h-40 w-auto max-w-80 rounded-lg border border-border object-contain"
+        className="block h-36 w-64 max-w-full rounded-lg object-contain"
       />
     </Button>
   );
@@ -225,7 +225,7 @@ export const UserBubble: React.FC<{
                 <img
                   src={`data:${img.mimeType};base64,${img.base64Data}`}
                   alt={img.name || 'image'}
-                  className="block h-40 w-auto max-w-80 rounded-lg border border-border object-contain"
+                  className="block h-36 w-64 max-w-full rounded-lg object-contain"
                 />
               </Button>
             ))}
