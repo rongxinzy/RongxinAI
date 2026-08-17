@@ -77,6 +77,35 @@ describe('UserBubble', () => {
     expect(screen.queryByText('minimax-docx')).not.toBeInTheDocument();
   });
 
+  test('bounds inline image attachments to a compact preview', () => {
+    render(
+      <UserBubble
+        message={{
+          ...message,
+          metadata: {
+            imageAttachments: [
+              { name: 'screenshot.png', mimeType: 'image/png', base64Data: 'aW1hZ2U=' },
+            ],
+          },
+        }}
+        skills={[]}
+      />,
+    );
+
+    const image = screen.getByRole('img', { name: 'screenshot.png' });
+
+    expect(image).toHaveClass('h-36');
+    expect(image).toHaveClass('w-64');
+    expect(image).not.toHaveClass('border');
+    expect(image).not.toHaveClass('border-border');
+
+    fireEvent.click(image);
+
+    const expandedImage = screen.getAllByRole('img', { name: 'screenshot.png' })[1];
+    expect(expandedImage).toHaveClass('max-h-[72vh]');
+    expect(expandedImage).toHaveClass('max-w-[min(75vw,960px)]');
+  });
+
   test('renders a local preview for an image kept as a file attachment', async () => {
     Object.defineProperty(window, 'electron', {
       configurable: true,

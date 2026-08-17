@@ -6,6 +6,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+/* cowork/ is an ignored runtime-output directory name, so opt it into Tailwind scanning. */
+@source "./components/cowork";
+
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:where(.dark, .dark *));
