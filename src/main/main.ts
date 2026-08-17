@@ -148,6 +148,7 @@ import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
+import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
   getCurrentApiConfig,
@@ -806,6 +807,7 @@ process.on('exit', code => {
 let store: SqliteStore | null = null;
 let coworkStore: CoworkStore | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
+let piModelCatalogRefreshCoordinator: PiModelCatalogRefreshCoordinator | null = null;
 let workbenchTaskService: WorkbenchTaskService | null = null;
 let engramManager: EngramManager | null = null;
 let engramAdapter: ZhiYuanEngramAdapter | null = null;
@@ -6476,6 +6478,9 @@ if (!gotTheLock) {
     console.log('[Main] Stopping cowork sessions...');
     if (piRuntimeAdapter) piRuntimeAdapter.stopAllSessions();
 
+    await piModelCatalogRefreshCoordinator?.stop();
+    piModelCatalogRefreshCoordinator = null;
+
     await stopCoworkOpenAICompatProxy().catch(error => {
       console.error('Failed to stop OpenAI compatibility proxy:', error);
     });
@@ -6710,6 +6715,12 @@ if (!gotTheLock) {
     registerMemoryIpcHandlers({ getService: getProjectMemoryService });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
+    piModelCatalogRefreshCoordinator = new PiModelCatalogRefreshCoordinator({
+      resolveApiKeys: resolveAllProviderApiKeys,
+    });
+    getStore().onDidChange<AppConfigSettings>('app_config', () => {
+      piModelCatalogRefreshCoordinator?.notifyConfigurationChanged();
+    });
     registerLlamaCppIpcHandlers(getLlamaCppManager(), { getStore });
     registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
@@ -6862,6 +6873,7 @@ if (!gotTheLock) {
     createWindow();
     profiler.measure('createWindow');
     console.log('[Main] initApp: window created');
+    piModelCatalogRefreshCoordinator.start();
     startAppUpdatePolling();
 
     // ── Step 2-4: Skill bootstrap (non-blocking) ────────────────────
