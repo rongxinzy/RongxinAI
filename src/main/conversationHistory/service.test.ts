@@ -139,6 +139,5 @@ function identityFor(cwd: string): ProjectIdentity {
     id: `project-${project}`,
     displayName: project,
     root: cwd,
-    canonicalSource: `path:${cwd}`,
   };
 }
