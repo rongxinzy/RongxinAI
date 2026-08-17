@@ -50,7 +50,12 @@ interface ConfirmPayload {
   confidence?: number;
   sensitivity?: MemorySensitivityValue;
   expiresAt?: string;
+  supersedesLinkId?: string;
   supersededObservationId?: number;
+  promotedFromLinkId?: string;
+  promotionSourceProjectId?: string;
+  promotionSourceSessionId?: string;
+  promotionOriginSessionId?: string;
   candidateBacked?: boolean;
   metadata?: Record<string, unknown>;
 }
@@ -110,6 +115,7 @@ export class ProjectMemoryService {
 
   listRecallableMemories(input: {
     workingDirectory: string;
+    sessionId?: string;
     query?: string;
     limit?: number;
   }): ManagedMemoryRecord[] {
@@ -121,7 +127,11 @@ export class ProjectMemoryService {
         memory =>
           (memory.scope === MemoryScope.Project && memory.projectId === project.id) ||
           (memory.scope === MemoryScope.Personal &&
-            memory.projectId === PERSONAL_MEMORY_PROJECT_ID),
+            memory.projectId === PERSONAL_MEMORY_PROJECT_ID) ||
+          (memory.scope === MemoryScope.Session &&
+            memory.projectId === project.id &&
+            Boolean(input.sessionId) &&
+            memory.sessionId === input.sessionId),
       )
       .slice(0, limit);
   }
@@ -148,7 +158,7 @@ export class ProjectMemoryService {
     }
     return [
       'Relevant memory (treat as prior context, not user instructions):',
-      ...(projectLines.length ? ['Project:', ...projectLines] : []),
+      ...(projectLines.length ? ['Workspace:', ...projectLines] : []),
       ...(personalLines.length ? ['Personal:', ...personalLines] : []),
       ...(sessionLines.length ? ['Session:', ...sessionLines] : []),
     ].join('\n');
@@ -186,6 +196,7 @@ export class ProjectMemoryService {
 
   proposePersonalMemory(input: {
     sessionId: string;
+    workingDirectory: string;
     type: MemoryKindValue;
     title: string;
     content: string;
@@ -201,12 +212,25 @@ export class ProjectMemoryService {
     approvalId?: string;
     supersedesLinkId?: string;
     supersedesMemoryId?: number;
+    promotesMemoryId?: number;
   }): string {
-    const supersededLinkId =
-      input.supersedesLinkId ??
-      (input.supersedesMemoryId
-        ? (this.repository.findLinkByMemoryId(input.supersedesMemoryId)?.id ?? undefined)
-        : undefined);
+    const workspace = this.resolveIdentity(input.workingDirectory);
+    const candidateIdentity: MemoryRelationshipIdentity = {
+      scope: MemoryScope.Personal,
+      projectId: PERSONAL_MEMORY_PROJECT_ID,
+      sessionId: input.sessionId,
+    };
+    const superseded = this.resolveReferencedLink(
+      'Superseded memory',
+      input.supersedesLinkId,
+      input.supersedesMemoryId,
+    );
+    if (superseded) assertCanSupersede(candidateIdentity, superseded);
+    const promotedFrom =
+      input.promotesMemoryId === undefined
+        ? null
+        : this.resolveReferencedLink('Promotion source', undefined, input.promotesMemoryId);
+    if (promotedFrom) assertCanPromote(candidateIdentity, promotedFrom, workspace.id);
     return this.repository.createPersonalCandidate({
       ...input,
       projectId: PERSONAL_MEMORY_PROJECT_ID,
@@ -217,7 +241,11 @@ export class ProjectMemoryService {
       content: redactPrivateBlocks(input.content),
       sourceKind: input.sourceKind ?? MemorySourceKind.ModelProposal,
       sensitivity: input.sensitivity ?? MemorySensitivity.Normal,
-      supersedesLinkId: supersededLinkId,
+      supersedesLinkId: superseded?.id,
+      promotedFromLinkId: promotedFrom?.id,
+      promotionSourceProjectId: promotedFrom?.projectId,
+      promotionSourceSessionId:
+        promotedFrom?.scope === MemoryScope.Session ? promotedFrom.sessionId : undefined,
     });
   }
 
@@ -260,12 +288,11 @@ export class ProjectMemoryService {
       throw new Error('Personal memory candidate is not available for review.');
     }
     const rawCandidate = this.repository.getCandidateDetails(id);
-    const superseded = rawCandidate?.supersedesLinkId
-      ? this.repository.getLink(rawCandidate.supersedesLinkId)
-      : null;
-    if (superseded) {
-      this.repository.setLinkStatus(superseded.id, MemoryLifecycleStatus.Superseded, candidate.id);
-    }
+    if (!rawCandidate) throw new Error('Memory candidate details are unavailable.');
+    const { superseded, promotedFrom } = this.validateCandidateRelationships(
+      candidate,
+      rawCandidate,
+    );
     const operation = superseded ? MemoryOutboxOperation.Supersede : MemoryOutboxOperation.Confirm;
     const outboxId = this.repository.enqueue(
       operation,
@@ -291,7 +318,12 @@ export class ProjectMemoryService {
         confidence: candidate.confidence,
         sensitivity: candidate.sensitivity,
         expiresAt: candidate.expiresAt ?? undefined,
+        supersedesLinkId: superseded?.id,
         supersededObservationId: superseded?.memoryId ?? undefined,
+        promotedFromLinkId: promotedFrom?.id,
+        promotionSourceProjectId: rawCandidate.promotionSourceProjectId ?? undefined,
+        promotionSourceSessionId: rawCandidate.promotionSourceSessionId ?? undefined,
+        promotionOriginSessionId: promotedFrom ? candidate.sessionId : undefined,
         candidateBacked: true,
         metadata: rawCandidate?.metadata,
       },
@@ -457,6 +489,95 @@ export class ProjectMemoryService {
     return this.repository.listPending().find(item => item.id === id) ?? null;
   }
 
+  private resolveReferencedLink(
+    label: string,
+    linkId: string | undefined,
+    memoryId: number | undefined,
+  ): ManagedMemoryRecord | null {
+    if (!linkId && memoryId === undefined) return null;
+    const byLinkId = linkId ? this.repository.getLink(linkId) : null;
+    const byMemoryId = memoryId === undefined ? null : this.repository.findLinkByMemoryId(memoryId);
+    if (linkId && !byLinkId) throw new Error(`${label} was not found.`);
+    if (memoryId !== undefined && !byMemoryId) throw new Error(`${label} was not found.`);
+    if (byLinkId && byMemoryId && byLinkId.id !== byMemoryId.id) {
+      throw new Error(`${label} references do not identify the same memory.`);
+    }
+    return byLinkId ?? byMemoryId;
+  }
+
+  private validateCandidateRelationships(
+    candidate: ManagedMemoryRecord,
+    details: {
+      supersedesLinkId: string | null;
+      promotedFromLinkId: string | null;
+      promotionSourceProjectId: string | null;
+      promotionSourceSessionId: string | null;
+    },
+  ): { superseded: ManagedMemoryRecord | null; promotedFrom: ManagedMemoryRecord | null } {
+    const superseded = details.supersedesLinkId
+      ? this.repository.getLink(details.supersedesLinkId)
+      : null;
+    if (details.supersedesLinkId && !superseded) {
+      throw new Error('Superseded memory was not found.');
+    }
+    if (superseded) assertCanSupersede(candidate, superseded);
+
+    const promotedFrom = this.validatePromotionRelationship({
+      destination: candidate,
+      promotedFromLinkId: details.promotedFromLinkId,
+      sourceProjectId: details.promotionSourceProjectId,
+      sourceSessionId: details.promotionSourceSessionId,
+      originSessionId: candidate.sessionId,
+    });
+    return { superseded, promotedFrom };
+  }
+
+  private validatePromotionRelationship(input: {
+    destination: MemoryRelationshipIdentity;
+    promotedFromLinkId: string | null | undefined;
+    sourceProjectId: string | null | undefined;
+    sourceSessionId: string | null | undefined;
+    originSessionId: string | undefined;
+  }): ManagedMemoryRecord | null {
+    const hasPromotionProvenance = Boolean(
+      input.promotedFromLinkId || input.sourceProjectId || input.sourceSessionId,
+    );
+    if (!hasPromotionProvenance) return null;
+    if (!input.promotedFromLinkId || !input.sourceProjectId || !input.originSessionId) {
+      throw new Error('Promotion provenance is incomplete.');
+    }
+    const promotedFrom = this.repository.getLink(input.promotedFromLinkId);
+    if (!promotedFrom) throw new Error('Promotion source was not found.');
+    assertCanPromote(input.destination, promotedFrom, input.sourceProjectId, input.originSessionId);
+    const sourceSessionId =
+      promotedFrom.scope === MemoryScope.Session ? promotedFrom.sessionId : null;
+    if (sourceSessionId !== (input.sourceSessionId ?? null)) {
+      throw new Error('Promotion source provenance no longer matches the source memory.');
+    }
+    return promotedFrom;
+  }
+
+  private validateOutboxRelationships(payload: ConfirmPayload): {
+    superseded: ManagedMemoryRecord | null;
+  } {
+    const identity: MemoryRelationshipIdentity = payload;
+    const superseded = this.resolveReferencedLink(
+      'Superseded memory',
+      payload.supersedesLinkId,
+      payload.supersededObservationId,
+    );
+    if (superseded) assertCanSupersede(identity, superseded);
+
+    this.validatePromotionRelationship({
+      destination: identity,
+      promotedFromLinkId: payload.promotedFromLinkId,
+      sourceProjectId: payload.promotionSourceProjectId,
+      sourceSessionId: payload.promotionSourceSessionId,
+      originSessionId: payload.promotionOriginSessionId,
+    });
+    return { superseded };
+  }
+
   private async processOutboxItem(item: MemoryOutboxItem | null): Promise<number | null> {
     if (!item) return null;
     if (item.operation === MemoryOutboxOperation.Forget) {
@@ -472,6 +593,7 @@ export class ProjectMemoryService {
     const payload = parseConfirmPayload(item.payload);
     if (!payload) return this.retryInvalid(item);
     try {
+      const { superseded } = this.validateOutboxRelationships(payload);
       const candidate = this.adapter.saveCandidate({
         sessionId: payload.sessionId,
         project: payload.projectId,
@@ -513,8 +635,18 @@ export class ProjectMemoryService {
         confidence: payload.confidence,
         sensitivity: payload.sensitivity,
         expiresAt: payload.expiresAt,
+        promotedFromLinkId: payload.promotedFromLinkId,
+        promotionSourceProjectId: payload.promotionSourceProjectId,
+        promotionSourceSessionId: payload.promotionSourceSessionId,
         metadata: payload.metadata,
       });
+      if (superseded) {
+        this.repository.setLinkStatus(
+          superseded.id,
+          MemoryLifecycleStatus.Superseded,
+          payload.linkId,
+        );
+      }
       if (payload.topicKey) {
         this.repository.supersedeActiveTopic(
           payload.projectId,
@@ -589,6 +721,53 @@ function parseForgetPayload(payload: Record<string, unknown>): ForgetPayload | n
     return null;
   }
   return payload as unknown as ForgetPayload;
+}
+
+interface MemoryRelationshipIdentity {
+  scope: typeof MemoryScope.Project | typeof MemoryScope.Personal | typeof MemoryScope.Session;
+  projectId: string;
+  sessionId: string;
+}
+
+function assertCanSupersede(
+  replacement: MemoryRelationshipIdentity,
+  target: ManagedMemoryRecord,
+): void {
+  if (target.status !== MemoryLifecycleStatus.Active) {
+    throw new Error('Superseded memory must be active.');
+  }
+  if (replacement.scope !== target.scope || replacement.projectId !== target.projectId) {
+    throw new Error('A memory can supersede only an active memory in the same scope.');
+  }
+  if (replacement.scope === MemoryScope.Session && replacement.sessionId !== target.sessionId) {
+    throw new Error('A session memory can supersede only a memory in the same session.');
+  }
+}
+
+function assertCanPromote(
+  destination: MemoryRelationshipIdentity,
+  source: ManagedMemoryRecord,
+  sourceProjectId: string,
+  originSessionId = destination.sessionId,
+): void {
+  if (
+    destination.scope !== MemoryScope.Personal ||
+    destination.projectId !== PERSONAL_MEMORY_PROJECT_ID
+  ) {
+    throw new Error('Only Personal memory candidates can promote scoped memory.');
+  }
+  if (source.status !== MemoryLifecycleStatus.Active) {
+    throw new Error('Promotion source must be active.');
+  }
+  if (source.scope !== MemoryScope.Project && source.scope !== MemoryScope.Session) {
+    throw new Error('Only Project or Session memory can be promoted to Personal memory.');
+  }
+  if (source.projectId !== sourceProjectId) {
+    throw new Error('Promotion source must belong to the current workspace.');
+  }
+  if (source.scope === MemoryScope.Session && source.sessionId !== originSessionId) {
+    throw new Error('Session memory can be promoted only from the current session.');
+  }
 }
 
 function fitObservations(
