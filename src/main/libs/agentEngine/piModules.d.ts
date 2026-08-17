@@ -28,10 +28,14 @@ declare module '@earendil-works/pi-coding-agent' {
   export function getAgentDir(): string;
 
   export const ModelRuntime: {
-    create(): Promise<{
+    create(options?: { allowModelNetwork?: boolean }): Promise<{
       registerProvider(provider: string, config: Record<string, unknown>): void;
       setRuntimeApiKey(provider: string, apiKey: string): Promise<void>;
       getModel(provider: string, modelId: string): unknown;
+      refresh(options?: {
+        allowNetwork?: boolean;
+        signal?: AbortSignal;
+      }): Promise<{ aborted?: boolean; errors?: ReadonlyMap<string, unknown> }>;
       completeSimple(
         model: unknown,
         context: { messages: Array<{ role: string; content: string }> },
