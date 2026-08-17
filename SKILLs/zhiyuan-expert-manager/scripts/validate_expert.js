@@ -312,6 +312,27 @@ function validateAgentMd(mdPath, result) {
       `${path.basename(mdPath)}: body still contains many [TODO] placeholders (${todoCount})`,
     );
   }
+
+  if (/^\s*-\s+\[[ xX]\]\s+/m.test(body)) {
+    result.warn(
+      `${path.basename(mdPath)}: Markdown progress checklists conflict with runtime-owned production progress`,
+    );
+  }
+
+  const productionToolNames = [
+    'production_loop',
+    'commit_plan',
+    'update_plan_item',
+    'skip_workflow',
+  ];
+  const referencedProductionTools = productionToolNames.filter(toolName =>
+    new RegExp(`\\b${toolName}\\b`).test(body),
+  );
+  if (referencedProductionTools.length > 0) {
+    result.warn(
+      `${path.basename(mdPath)}: production workflow tools are runtime-owned (${referencedProductionTools.join(', ')})`,
+    );
+  }
 }
 
 function validateExpert(expertPath) {
@@ -380,4 +401,4 @@ if (require.main === module) {
   process.exit(main());
 }
 
-module.exports = { validateExpert, ValidationResult };
+module.exports = { validateAgentMd, validateExpert, ValidationResult };
