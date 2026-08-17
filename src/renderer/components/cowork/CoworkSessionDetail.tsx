@@ -948,7 +948,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const messages = currentSession?.messages;
   const todoQueue = useTodoQueueLifecycle({
     isStreaming,
-    messages: messages ?? [],
     sessionId,
   });
   const isAwaitingInlineQuestion = Boolean(inlineQuestionPermission && onRespondToInlineQuestion);

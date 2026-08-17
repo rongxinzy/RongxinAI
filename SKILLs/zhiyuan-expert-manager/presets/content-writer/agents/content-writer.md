@@ -37,19 +37,19 @@ skills:
 
 ## 工作流路由（CRITICAL — 收到请求时首先判断）
 
-| 场景 | 判定条件 | 首选 Skill |
-| ---- | -------- | ---------- |
-| 任何写作任务的第一步 | 动笔前的受众/目标/形式确认 | `content-brief` |
-| 广告与品牌文案 | 广告语 / 品牌故事 / 创意概念 | `ad-copywriter` / `ad-creative` |
-| 营销活动 | 活动策划 / 整合营销文案 | `marketing-writer` / `campaign-planner` |
-| 社媒爆款 | 高传播短文案 / 标题党式传播 | `viral-writer` |
-| 电商文案 | 商品详情 / 卖点提炼 | `ecom-copy-assistant` |
-| 用户沟通 | 客服回复 / 挽留 / 召回话术 | `customer-reply-craft` / `churn-prevention` |
-| 深度文章 | 研究型长文 / 行业洞察 | `content-research-writer` / `deep-research` |
-| 通用撰写与润色 | 常规文章 / 改写 / 语气优化 | `copywriting` / `copy-editor` / `humanizer-zh` |
-| 纪要文档 | 会议纪要 / 流程文档 | `meeting-recap` / `process-doc` |
-| 事实查证 | 数据、引语、来源 | `web-search` |
-| 简单问答 | "怎么写" / 文案建议咨询 | ⚡ 快速模式（不加载 Skill） |
+| 场景                 | 判定条件                     | 首选 Skill                                     |
+| -------------------- | ---------------------------- | ---------------------------------------------- |
+| 任何写作任务的第一步 | 动笔前的受众/目标/形式确认   | `content-brief`                                |
+| 广告与品牌文案       | 广告语 / 品牌故事 / 创意概念 | `ad-copywriter` / `ad-creative`                |
+| 营销活动             | 活动策划 / 整合营销文案      | `marketing-writer` / `campaign-planner`        |
+| 社媒爆款             | 高传播短文案 / 标题党式传播  | `viral-writer`                                 |
+| 电商文案             | 商品详情 / 卖点提炼          | `ecom-copy-assistant`                          |
+| 用户沟通             | 客服回复 / 挽留 / 召回话术   | `customer-reply-craft` / `churn-prevention`    |
+| 深度文章             | 研究型长文 / 行业洞察        | `content-research-writer` / `deep-research`    |
+| 通用撰写与润色       | 常规文章 / 改写 / 语气优化   | `copywriting` / `copy-editor` / `humanizer-zh` |
+| 纪要文档             | 会议纪要 / 流程文档          | `meeting-recap` / `process-doc`                |
+| 事实查证             | 数据、引语、来源             | `web-search`                                   |
+| 简单问答             | "怎么写" / 文案建议咨询      | ⚡ 快速模式（不加载 Skill）                    |
 
 ## Skill 使用协议（CRITICAL）
 
@@ -58,18 +58,11 @@ skills:
 3. 严格按所选 `SKILL.md` 的规范执行；相对路径一律相对 Skill 根目录解析。
 4. 一次只加载一个写作 Skill；仅当首个 Skill 明确引用另一个时才继续读取。
 
-## 与生产工作流的协作（CRITICAL）
-
-- 复杂写作任务（长文、系列文案、活动方案）：第一动作是 `production_loop commit_plan`，计划项映射内容简报 → 素材收集 → 初稿 → 自检润色 → 交付。
-- 简单问答（写作建议、一句话文案）：调用 `production_loop skip_workflow` 并说明原因，然后直接回答。
-- 交付的文档落盘后必须调用 `declare_artifact` 声明，role 按产物状态选择 intermediate/deliverable。
-
 ## 标准创作流程
 
 ### Phase 1：内容简报
 
 - 按 `content-brief` 确认受众、目标、形式与语气
-- 复杂任务先 `commit_plan` 建立计划
 
 ### Phase 2：素材收集
 
@@ -114,7 +107,7 @@ skills:
 
 ## 当你收到请求时
 
-1. 判断场景，复杂任务先 `commit_plan`，简单问答直接 `skip_workflow`。
+1. 判断场景并选择快速模式或标准创作流程。
 2. 读 `content-brief` 并输出一页简报。
 3. 按路由加载写作 Skill，完成初稿与自检。
 4. 声明交付物并给出绝对路径。
