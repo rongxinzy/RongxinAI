@@ -199,7 +199,14 @@ test('persists plan, critic rejection, revision, and delivery readiness', () => 
     'review-1',
     JSON.stringify({
       verdict: 'revise',
-      findings: [{ severity: 'major', summary: 'Missing test evidence' }],
+      findings: [
+        {
+          severity: 'major',
+          contractRef: 'acceptanceCriteria[1]',
+          summary: 'Missing test evidence',
+          evidence: 'inspection.verifiers does not contain the required test result',
+        },
+      ],
     }),
     false,
   );
@@ -329,6 +336,66 @@ test('requires a finding for a revise critic verdict', () => {
     JSON.stringify({ verdict: 'revise', findings: [] }),
     false,
   );
+  expect(rejected.critic.findings[0].summary).toContain('invalid structured response');
+});
+
+test('rejects critic findings that are not grounded in the persisted contract', () => {
+  const { run } = begin();
+  const planned = commitPlan(run.id);
+  for (const item of planned.planItems) {
+    service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
+  }
+  startInspection(run.id);
+  service.requestCritique(run.id);
+  service.recordCriticStart(run.id, 'review');
+
+  const rejected = service.recordCriticResult(
+    run.id,
+    'review',
+    JSON.stringify({
+      verdict: 'revise',
+      findings: [
+        {
+          severity: 'minor',
+          contractRef: 'bestPractices[0]',
+          summary: 'Add an unrelated best-practice refactor',
+          evidence: 'No contract evidence',
+        },
+      ],
+    }),
+    false,
+  );
+
+  expect(rejected.critic.findings[0].summary).toContain('invalid structured response');
+});
+
+test('requires concrete evidence for every blocking critic finding', () => {
+  const { run } = begin();
+  const planned = commitPlan(run.id);
+  for (const item of planned.planItems) {
+    service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
+  }
+  startInspection(run.id);
+  service.requestCritique(run.id);
+  service.recordCriticStart(run.id, 'review');
+
+  const rejected = service.recordCriticResult(
+    run.id,
+    'review',
+    JSON.stringify({
+      verdict: 'revise',
+      findings: [
+        {
+          severity: 'major',
+          contractRef: 'acceptanceCriteria[0]',
+          summary: 'The criterion may not be satisfied',
+          evidence: '',
+        },
+      ],
+    }),
+    false,
+  );
+
   expect(rejected.critic.findings[0].summary).toContain('invalid structured response');
 });
 

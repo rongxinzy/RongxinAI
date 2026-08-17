@@ -333,6 +333,13 @@ describe('buildPiSubagentTool', () => {
       expect(options.model).toMatchObject({ maxTokens: PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS });
       expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
         '/tmp/workspace',
+        expect.stringContaining('Do not add requirements'),
+        PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
+        undefined,
+        [expect.any(Function)],
+      );
+      expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+        '/tmp/workspace',
         expect.stringContaining('Do not repeat an exact range'),
         PRODUCTION_REVIEWER_MAX_OUTPUT_TOKENS,
         undefined,

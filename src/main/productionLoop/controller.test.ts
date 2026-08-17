@@ -198,10 +198,14 @@ test('builds the reviewer prompt from compact contract and execution evidence', 
   const prompt = controller.requestCriticPrompt();
 
   expect(prompt).toContain('compact persisted contract and execution evidence');
-  expect(prompt).toContain('"verifiers":[{"name":"preview","deterministic":true}]');
+  expect(prompt).toContain(
+    '"verifiers":[{"ref":"verifiers[0]","name":"preview","deterministic":true}]',
+  );
   expect(prompt).toContain('"inspection"');
   expect(prompt).toContain('Preview completed successfully.');
   expect(prompt).toContain('"observedExecution"');
+  expect(prompt).toContain('Do not introduce new requirements');
+  expect(prompt).toContain('"contractRef":"acceptanceCriteria[0]"');
 });
 
 test('uses structured execution errors instead of parsing result text', () => {
