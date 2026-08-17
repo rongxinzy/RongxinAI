@@ -2,15 +2,13 @@ import { expect, test } from 'vitest';
 
 import { ProductionPlanItemStatus } from '../../shared/productionLoop';
 import { PiSubagentToolName } from '../libs/agentEngine/piSubagentConstants';
-import { buildProductionReviewContract } from './reviewContract';
+import { buildProductionReviewContract, getProductionReviewContractRefs } from './reviewContract';
 
 const currentResults = Array.from({ length: 15 }, (_, index) => ({
   toolCallId: `current-${index}`,
   toolName: 'bash',
   output:
-    index === 14
-      ? `apiKey="top-secret-value" ${'x'.repeat(500)}`
-      : `verification output ${index}`,
+    index === 14 ? `apiKey="top-secret-value" ${'x'.repeat(500)}` : `verification output ${index}`,
   isError: false,
   progressVersion: 5,
   createdAt: 300 + index,
@@ -77,13 +75,31 @@ test('builds a complete bounded contract from the current revision', () => {
   });
 
   expect(contract).toMatchObject({
-    constraints: ['password=[REDACTED]', 'Keep the public API stable.'],
-    acceptanceCriteria: ['All deterministic checks pass.'],
-    artifacts: [
-      { kind: 'report', description: 'A final verification report.', required: true },
+    goal: {
+      ref: 'goal',
+      text: 'Ship the verified implementation without exposing Bearer [REDACTED]',
+    },
+    constraints: [
+      { ref: 'constraints[0]', text: 'password=[REDACTED]' },
+      { ref: 'constraints[1]', text: 'Keep the public API stable.' },
     ],
-    verifiers: [{ name: 'unit tests', deterministic: true }],
-    plan: [{ status: ProductionPlanItemStatus.Completed, title: 'Implement and verify' }],
+    acceptanceCriteria: [{ ref: 'acceptanceCriteria[0]', text: 'All deterministic checks pass.' }],
+    artifacts: [
+      {
+        ref: 'artifacts[0]',
+        kind: 'report',
+        description: 'A final verification report.',
+        required: true,
+      },
+    ],
+    verifiers: [{ ref: 'verifiers[0]', name: 'unit tests', deterministic: true }],
+    plan: [
+      {
+        ref: 'plan[0]',
+        status: ProductionPlanItemStatus.Completed,
+        title: 'Implement and verify',
+      },
+    ],
     inspection: {
       artifacts: [{ kind: 'report', reference: 'output/report.md' }],
       verifiers: [
@@ -96,9 +112,6 @@ test('builds a complete bounded contract from the current revision', () => {
       ],
     },
   });
-  expect(contract.goal).toBe(
-    'Ship the verified implementation without exposing Bearer [REDACTED]',
-  );
   expect(contract.observedExecution).toHaveLength(12);
   expect(contract.observedExecution[0].toolCallId).toBe('current-3');
   const latestObserved = contract.observedExecution[contract.observedExecution.length - 1];
@@ -108,6 +121,29 @@ test('builds a complete bounded contract from the current revision', () => {
   expect(JSON.stringify(contract)).not.toContain('top-secret-value');
   expect(JSON.stringify(contract)).not.toContain('stale evidence');
   expect(JSON.stringify(contract)).not.toContain('previous-reviewer');
+});
+
+test('exposes only explicit persisted contract entries as valid finding references', () => {
+  const state = {
+    goal: 'Ship the report',
+    constraints: ['Keep the API stable'],
+    acceptanceCriteria: ['Tests pass'],
+    expectedArtifacts: [{ kind: 'report', description: 'report.md', required: true }],
+    expectedVerifiers: [{ name: 'unit tests', deterministic: true }],
+    planItems: [{ id: 'item-1', title: 'Implement', status: ProductionPlanItemStatus.Completed }],
+    inspections: [],
+    revisions: [],
+    observedToolResults: [],
+  };
+
+  expect([...getProductionReviewContractRefs(state)]).toEqual([
+    'goal',
+    'constraints[0]',
+    'acceptanceCriteria[0]',
+    'artifacts[0]',
+    'verifiers[0]',
+    'plan[0]',
+  ]);
 });
 
 test('uses revision timestamps for persisted states without progress metadata', () => {

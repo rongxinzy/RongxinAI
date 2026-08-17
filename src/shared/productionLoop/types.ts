@@ -67,6 +67,8 @@ export interface ProductionInspectionEvidence {
 export interface ProductionCriticFinding {
   severity: ProductionCriticSeverity;
   summary: string;
+  /** Explicit persisted contract entry that this blocking finding violates. */
+  contractRef?: string;
   evidence?: string;
 }
 
