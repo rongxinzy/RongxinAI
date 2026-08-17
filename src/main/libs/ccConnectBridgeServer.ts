@@ -107,7 +107,8 @@ export class CcConnectBridgeServer {
       if (request.method !== 'POST') return void response.writeHead(404).end();
       const body = await readJson(request);
       if (request.url === '/v1/cc-connect/turn') {
-        if (!isTurnRequest(body)) return void response.writeHead(400).end('invalid turn request');
+        if (!isTurnRequest(normalizeMediaFields(body)))
+          return void response.writeHead(400).end('invalid turn request');
         const abortController = new AbortController();
         const abortTurn = () => abortController.abort();
         request.once('aborted', abortTurn);
@@ -152,6 +153,22 @@ async function readJson(request: http.IncomingMessage): Promise<unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The Go sidecar serializes turn messages from a map, so absent media is
+ * emitted as explicit JSON null ("images": null) rather than an omitted key.
+ * Normalize those nulls away before validation so the strict media checks
+ * below treat them exactly like undefined, while still rejecting malformed
+ * media payloads.
+ */
+function normalizeMediaFields(value: unknown): unknown {
+  if (!isRecord(value) || !isRecord(value.message)) return value;
+  const message = value.message;
+  for (const key of ['images', 'files', 'audio']) {
+    if (message[key] === null) delete message[key];
+  }
+  return value;
 }
 
 function nonEmptyString(value: unknown): value is string {
