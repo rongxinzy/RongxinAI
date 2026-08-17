@@ -170,7 +170,12 @@ import {
   startCoworkOpenAICompatProxy,
   stopCoworkOpenAICompatProxy,
 } from './libs/coworkOpenAICompatProxy';
-import { generateSessionTitle, getSkillsRoot, probeCoworkModelReadiness } from './libs/coworkUtil';
+import {
+  applyApplicationRuntimeEnv,
+  generateSessionTitle,
+  getSkillsRoot,
+  probeCoworkModelReadiness,
+} from './libs/coworkUtil';
 import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
@@ -1544,13 +1549,17 @@ const runFeishuCliCommand = (
   signal?: AbortSignal,
 ): Promise<string> =>
   new Promise((resolve, reject) => {
+    const env: Record<string, string | undefined> = { ...process.env };
+    // lark-cli's generated launcher invokes `node` through PATH. Use the
+    // application runtime here as well as for its initial npm installation.
+    applyApplicationRuntimeEnv(env);
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       cwd,
       shell: process.platform === 'win32' && command.toLowerCase().endsWith('.cmd'),
       env: {
-        ...process.env,
+        ...env,
         ...(args[0]?.toLowerCase().endsWith('npm-cli.js') ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
       },
     });
