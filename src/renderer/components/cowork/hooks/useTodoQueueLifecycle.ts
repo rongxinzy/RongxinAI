@@ -1,12 +1,6 @@
 import type { QueueTodo } from '@shared/components/ai-elements/queue';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { CoworkMessage } from '../../../types/cowork';
-import {
-  type ExtractedTodoList,
-  extractLatestTodoListFromMessages,
-  extractTodoListFromLatestAssistantMessage,
-} from '../../../utils/todoParser';
 import { useProductionPlanTodos } from './useProductionPlanTodos';
 
 export const TODO_COMPLETION_VISIBLE_MS = 3000;
@@ -14,11 +8,16 @@ export const TODO_DISMISS_ANIMATION_MS = 200;
 
 interface UseTodoQueueLifecycleOptions {
   isStreaming: boolean;
-  messages: CoworkMessage[];
   sessionId?: string;
 }
 
-interface DisplayedTodoList extends ExtractedTodoList {
+interface ProductionTodoList {
+  sourceMessageId: string;
+  sourceTimestamp: number;
+  todos: QueueTodo[];
+}
+
+interface DisplayedTodoList extends ProductionTodoList {
   sessionId: string;
 }
 
@@ -39,7 +38,7 @@ export function areTodosComplete(todos: QueueTodo[]): boolean {
 
 function toDisplayedTodoList(
   sessionId: string | undefined,
-  todoList: ExtractedTodoList | null,
+  todoList: ProductionTodoList | null,
 ): DisplayedTodoList | null {
   if (!sessionId || !todoList || areTodosComplete(todoList.todos)) return null;
   return { sessionId, ...todoList };
@@ -54,46 +53,25 @@ function getTodoStatusKey(todoList: DisplayedTodoList | null): string {
 
 export function useTodoQueueLifecycle({
   isStreaming,
-  messages,
   sessionId,
 }: UseTodoQueueLifecycleOptions): TodoQueueLifecycleState {
   const productionPlan = useProductionPlanTodos(sessionId);
-  const [initialTodoList] = useState<ExtractedTodoList | null>(null);
   const latestTodoList = useMemo(() => {
-    if (productionPlan === undefined) return null;
-    if (productionPlan) {
-      return productionPlan.todos.length > 0
-        ? {
-            sourceMessageId: `production-plan:${productionPlan.runId}`,
-            sourceTimestamp: productionPlan.progressVersion,
-            todos: productionPlan.todos,
-          }
-        : null;
-    }
-    return extractTodoListFromLatestAssistantMessage(messages);
-  }, [messages, productionPlan]);
-  const [displayedTodoList, setDisplayedTodoList] = useState<DisplayedTodoList | null>(() =>
-    toDisplayedTodoList(sessionId, initialTodoList),
-  );
+    if (!productionPlan || productionPlan.todos.length === 0) return null;
+    return {
+      sourceMessageId: `production-plan:${productionPlan.runId}`,
+      sourceTimestamp: productionPlan.progressVersion,
+      todos: productionPlan.todos,
+    };
+  }, [productionPlan]);
+  const [displayedTodoList, setDisplayedTodoList] = useState<DisplayedTodoList | null>(null);
   const displayedTodoListRef = useRef(displayedTodoList);
   displayedTodoListRef.current = displayedTodoList;
   const [isDismissing, setIsDismissing] = useState(false);
   const activeSessionIdRef = useRef(sessionId);
   const restoredSessionIdRef = useRef<string | undefined>(undefined);
-  const acceptedSourceRef = useRef<AcceptedTodoSource | null>(
-    sessionId && initialTodoList
-      ? {
-          sessionId,
-          sourceMessageId: initialTodoList.sourceMessageId,
-          sourceTimestamp: initialTodoList.sourceTimestamp,
-        }
-      : null,
-  );
-  const dismissedSourceIdRef = useRef<string | null>(
-    initialTodoList && areTodosComplete(initialTodoList.todos)
-      ? initialTodoList.sourceMessageId
-      : null,
-  );
+  const acceptedSourceRef = useRef<AcceptedTodoSource | null>(null);
+  const dismissedSourceIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let acceptedSource = acceptedSourceRef.current;
@@ -123,9 +101,7 @@ export function useTodoQueueLifecycle({
     if (restoredSessionIdRef.current !== sessionId) {
       if (productionPlan === undefined) return;
 
-      const restoredTodoList = productionPlan
-        ? latestTodoList
-        : extractLatestTodoListFromMessages(messages);
+      const restoredTodoList = latestTodoList;
       restoredSessionIdRef.current = sessionId;
       acceptedSourceRef.current = restoredTodoList
         ? {
@@ -144,7 +120,7 @@ export function useTodoQueueLifecycle({
     }
 
     if (!latestTodoList) {
-      if (productionPlan) {
+      if (productionPlan !== undefined) {
         setDisplayedTodoList(null);
         setIsDismissing(false);
       }
@@ -167,7 +143,7 @@ export function useTodoQueueLifecycle({
     if (!complete) dismissedSourceIdRef.current = null;
     setDisplayedTodoList({ sessionId, ...latestTodoList });
     setIsDismissing(false);
-  }, [latestTodoList, messages, productionPlan, sessionId]);
+  }, [latestTodoList, productionPlan, sessionId]);
 
   const todoStatusKey = getTodoStatusKey(displayedTodoList);
   const displayedSourceMessageId = displayedTodoList?.sourceMessageId;
