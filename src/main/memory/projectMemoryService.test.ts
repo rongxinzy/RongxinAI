@@ -75,7 +75,6 @@ function identityFor(cwd: string): ProjectIdentity {
     id: `project-${cwd}`,
     displayName: cwd,
     root: `/workspace/${cwd}`,
-    canonicalSource: `path:${cwd}`,
   };
 }
 
