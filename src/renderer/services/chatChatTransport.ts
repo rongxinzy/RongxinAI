@@ -91,6 +91,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
       }
     }
     const requestId = generateId();
+    const requestStartedAt = Date.now();
 
     return new ReadableStream<UIMessageChunk>({
       start(controller) {
@@ -99,6 +100,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
         let reasoningId: string | null = null;
         let lastContent = '';
         let lastReasoning = '';
+        let firstVisibleTextAt: number | undefined;
 
         const enqueue = (chunk: UIMessageChunk) => {
           if (!closed) controller.enqueue(chunk);
@@ -180,6 +182,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
           }
 
           if (contentDelta) {
+            firstVisibleTextAt ??= Date.now();
             if (!textId) {
               emitReasoningEnd();
               textId = generateId();
@@ -249,6 +252,14 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
                 },
               } as UIMessageChunk);
             }
+            enqueue({
+              type: 'data-session-metrics',
+              data: {
+                requestStartedAt,
+                ...(firstVisibleTextAt === undefined ? {} : { firstVisibleTextAt }),
+                completedAt: Date.now(),
+              },
+            } as UIMessageChunk);
             logDirectChat(`request ${requestId} completed`);
             close();
           })

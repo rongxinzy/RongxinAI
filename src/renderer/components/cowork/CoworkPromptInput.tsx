@@ -52,6 +52,7 @@ import {
 } from './agentModelSelection';
 import AttachmentCard from './AttachmentCard';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
+import { SessionStatsLine } from './SessionStatsLine';
 import { CoworkModelPicker } from './CoworkModelPicker';
 import FolderSelectorPopover from './FolderSelectorPopover';
 import InlineSkillPromptEditor from './InlineSkillPromptEditor';
@@ -1195,6 +1196,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     modelProviderKey={contextMessage?.metadata?.modelProviderKey}
                     selectedModelId={effectiveSelectedModel?.id}
                     selectedModelProviderKey={effectiveSelectedModel?.providerKey}
+                    messages={currentSession?.messages}
+                    systemPrompt={currentSession?.systemPrompt}
                   />
                   <CoworkModelPicker
                     models={availableModels}
@@ -1267,6 +1270,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       modelProviderKey={contextMessage?.metadata?.modelProviderKey}
                       selectedModelId={effectiveSelectedModel?.id}
                       selectedModelProviderKey={effectiveSelectedModel?.providerKey}
+                      messages={currentSession?.messages}
+                      systemPrompt={currentSession?.systemPrompt}
                     />
                     <CoworkModelPicker
                       models={availableModels}
@@ -1289,6 +1294,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
             />
           </PromptInputFooter>
         </PromptInput>
+        <SessionStatsLine messages={currentSession?.messages ?? []} />
         {showFolderSelector && (
           <div className="relative mt-1.5 flex justify-start">
             <FolderSelectorPopover

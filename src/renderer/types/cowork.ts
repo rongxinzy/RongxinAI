@@ -67,6 +67,13 @@ export interface CoworkMessageMetadata {
     reasoningTokens?: number;
     totalTokens?: number;
   };
+  /** Local runtime boundaries for a completed model request or tool call. */
+  metrics?: {
+    requestStartedAt?: number;
+    firstVisibleTextAt?: number;
+    completedAt?: number;
+    toolDurationMs?: number;
+  };
   contextPercent?: number;
   /** Current context measured by the agent runtime after this response. */
   contextUsage?: CoworkContextUsage;
