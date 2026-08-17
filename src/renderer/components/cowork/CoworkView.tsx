@@ -82,6 +82,7 @@ export interface CoworkViewProps {
 
 const DirectChatDataChunkType = {
   Context: 'data-context',
+  SessionMetrics: 'data-session-metrics',
 } as const;
 
 type DirectChatPart =
@@ -95,6 +96,12 @@ interface DirectChatContextData {
   inputTokens: number;
   outputTokens: number;
   usedTokens: number;
+}
+
+interface DirectChatSessionMetrics {
+  requestStartedAt: number;
+  firstVisibleTextAt?: number;
+  completedAt: number;
 }
 
 const isDirectChatContextData = (value: unknown): value is DirectChatContextData => {
@@ -132,6 +139,20 @@ const isDirectChatContextData = (value: unknown): value is DirectChatContextData
         Number.isFinite(cacheWriteTokens) &&
         cacheWriteTokens >= 0))
   );
+};
+
+const isDirectChatSessionMetrics = (value: unknown): value is DirectChatSessionMetrics => {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as Record<string, unknown>;
+  const start = data.requestStartedAt;
+  const first = data.firstVisibleTextAt;
+  const end = data.completedAt;
+  return typeof start === 'number'
+    && typeof end === 'number'
+    && Number.isFinite(start)
+    && Number.isFinite(end)
+    && end >= start
+    && (first === undefined || (typeof first === 'number' && Number.isFinite(first) && first >= start && first <= end));
 };
 
 const CoworkView: React.FC<CoworkViewProps> = ({
@@ -455,6 +476,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         let assistantContent = '';
         let assistantMessageAdded = false;
         let directContextData: DirectChatContextData | undefined;
+        let directSessionMetrics: DirectChatSessionMetrics | undefined;
         const finishThinking = () => {
           const finished = turnState.finishReasoning();
           if (!finished) return;
@@ -539,6 +561,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               case DirectChatDataChunkType.Context:
                 if (isDirectChatContextData(chunk.data)) {
                   directContextData = chunk.data;
+                }
+                break;
+              case DirectChatDataChunkType.SessionMetrics:
+                if (isDirectChatSessionMetrics(chunk.data)) {
+                  directSessionMetrics = chunk.data;
                 }
                 break;
               case 'text-start':
@@ -706,6 +733,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                     },
                   }
                 : {}),
+              ...(directSessionMetrics ? { metrics: directSessionMetrics } : {}),
             };
             turnState.updateAssistantMetadata(finalMetadata);
             dispatch(
@@ -951,6 +979,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       let assistantContent = '';
       let assistantMessageAdded = false;
       let directContextData: DirectChatContextData | undefined;
+      let directSessionMetrics: DirectChatSessionMetrics | undefined;
       const finishThinking = () => {
         const finished = turnState.finishReasoning();
         if (!finished) return;
@@ -1065,6 +1094,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
             case DirectChatDataChunkType.Context:
               if (isDirectChatContextData(chunk.data)) {
                 directContextData = chunk.data;
+              }
+              break;
+            case DirectChatDataChunkType.SessionMetrics:
+              if (isDirectChatSessionMetrics(chunk.data)) {
+                directSessionMetrics = chunk.data;
               }
               break;
             case 'text-start':
@@ -1216,6 +1250,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
                   },
                 }
               : {}),
+            ...(directSessionMetrics ? { metrics: directSessionMetrics } : {}),
           };
           turnState.updateAssistantMetadata(finalMetadata);
           dispatch(

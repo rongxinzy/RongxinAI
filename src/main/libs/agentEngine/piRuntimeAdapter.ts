@@ -237,6 +237,8 @@ interface ActivePiSession {
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
   lastCompletedAnswerText: string;
+  requestStartedAt: number | null;
+  firstVisibleTextAt: number | null;
   confirmationMode: 'modal' | 'text';
   unsubscribe: () => void;
   /** Set to true once stopSession has aborted the turn. continueSession must not
@@ -245,6 +247,7 @@ interface ActivePiSession {
   aborted: boolean;
   /** toolCallId → tool_result message id, for streaming updates + de-dup */
   toolResultMessageIdByCallId: Map<string, string>;
+  toolStartedAtByCallId: Map<string, number>;
   preparingToolCallIdByContentIndex: Map<number, string>;
   toolActivityTracker: ToolActivityTracker;
   /** Long-horizon agent loop controller for this session (agent_loop tool). */
@@ -998,10 +1001,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         thinkingLifecycle: new PiThinkingLifecycle(),
         lastCompletedAnswerMessageId: null,
         lastCompletedAnswerText: '',
+        requestStartedAt: null,
+        firstVisibleTextAt: null,
         confirmationMode: options.confirmationMode || 'modal',
         unsubscribe: () => {},
         aborted: false,
         toolResultMessageIdByCallId: new Map(),
+        toolStartedAtByCallId: new Map(),
         preparingToolCallIdByContentIndex: new Map(),
         toolActivityTracker: new ToolActivityTracker(),
         agentLoop,
@@ -1276,6 +1282,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.lastCompletedAnswerMessageId = null;
     active.lastCompletedAnswerText = '';
     active.toolResultMessageIdByCallId.clear();
+    active.toolStartedAtByCallId.clear();
     active.preparingToolCallIdByContentIndex.clear();
     const clearActivity = active.toolActivityTracker.clear();
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
@@ -1425,6 +1432,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     this.dismissAskUserQuestionsBySession(sessionId);
     active.agentLoop.stop();
     active.pendingError = null;
+    active.toolStartedAtByCallId.clear();
     const clearActivity = active.toolActivityTracker.clear();
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
     active.piSession.abortBash();
@@ -1480,6 +1488,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.agentLoop.stop();
     // Drop any deferred error without surfacing it — the user stopped the turn.
     active.pendingError = null;
+    active.toolStartedAtByCallId.clear();
     const clearActivity = active.toolActivityTracker.clear();
     if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
 
@@ -2029,6 +2038,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'turn_start':
         active.isRunning = true;
+        active.toolStartedAtByCallId.clear();
         active.preparingToolCallIdByContentIndex.clear();
         {
           const clearActivity = active.toolActivityTracker.clear();
@@ -2043,6 +2053,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         break;
 
       case 'message_start':
+        active.requestStartedAt = Date.now();
+        active.firstVisibleTextAt = null;
         break;
 
       case 'message_update': {
@@ -2084,6 +2096,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           this.finalizeActiveThinking(sessionId, active);
         }
         if (text && text !== active.answerText) {
+          active.firstVisibleTextAt ??= Date.now();
           this.finalizeActiveThinking(sessionId, active);
           active.answerText = text;
           this.streamInto(sessionId, active, 'answer', text);
@@ -2145,6 +2158,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               active.assistantMessageId,
               event.message.usage,
               event.message.model,
+              active.requestStartedAt,
+              active.firstVisibleTextAt,
             );
           }
 
@@ -2172,6 +2187,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           },
           CoworkToolActivityPhase.Running,
         );
+        active.toolStartedAtByCallId.set(event.toolCallId, Date.now());
         if (runningActivity) this.emit('toolActivity', sessionId, runningActivity);
         if (event.toolName === PiSubagentToolName) {
           active.productionLoop?.recordSubagentStart(event.toolCallId, event.args);
@@ -2252,8 +2268,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             isError: Boolean(event.isError),
             isStreaming: false,
             isFinal: true,
+            ...(active.toolStartedAtByCallId.has(event.toolCallId)
+              ? { metrics: { toolDurationMs: Math.max(0, Date.now() - (active.toolStartedAtByCallId.get(event.toolCallId) ?? Date.now())) } }
+              : {}),
           },
         };
+        active.toolStartedAtByCallId.delete(event.toolCallId);
         const emittedToolResult = this.store
           ? this.store.addMessage(sessionId, toolResultMsg)
           : toolResultMsg;
@@ -2269,6 +2289,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       case 'agent_end': {
         this.finalizeActiveThinking(sessionId, active);
+        active.toolStartedAtByCallId.clear();
         const clearActivity = active.toolActivityTracker.clear();
         if (clearActivity) this.emit('toolActivity', sessionId, clearActivity);
         // Failed attempt (deferred error pending): do not continue the agent
@@ -2313,6 +2334,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           active.lastCompletedAnswerMessageId = null;
           active.lastCompletedAnswerText = '';
           active.toolResultMessageIdByCallId.clear();
+          active.toolStartedAtByCallId.clear();
           active.piSession
             .prompt(loopDecision.nextPrompt, { streamingBehavior: 'followUp' })
             .catch(error => {
@@ -2586,6 +2608,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     messageId: string | null,
     piUsage: PiUsage | undefined,
     model: string | undefined,
+    requestStartedAt: number | null,
+    firstVisibleTextAt: number | null,
   ): void {
     if (!messageId) return;
     setTimeout(() => {
@@ -2615,6 +2639,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ...message?.metadata,
         contextUsage: usage,
         ...(model ? { model } : {}),
+        ...(requestStartedAt !== null
+          ? {
+              metrics: {
+                requestStartedAt,
+                ...(firstVisibleTextAt !== null ? { firstVisibleTextAt } : {}),
+                completedAt: Date.now(),
+              },
+            }
+          : {}),
         ...(piUsage
           ? {
               usage: {
