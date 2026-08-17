@@ -272,3 +272,88 @@ test('accepts a quoted-context-only turn', async () => {
   });
   expect(response.status).toBe(200);
 });
+
+test('accepts a text turn with null media fields from the Go sidecar', async () => {
+  let normalized: { images?: unknown; files?: unknown; audio?: unknown } | null = null;
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async request => {
+      normalized = {
+        images: request.message.images,
+        files: request.message.files,
+        audio: request.message.audio,
+      };
+      return { content: `reply:${request.message.content}` };
+    },
+    onCronTrigger: async () => undefined,
+  });
+  servers.push(server);
+  const url = await server.start();
+  // The Go sidecar marshals its turn message from a map, so absent media
+  // arrives as explicit null rather than omitted keys.
+  const response = await fetch(`${url}/v1/cc-connect/turn`, {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer secret',
+      'content-type': 'application/json',
+      ...createCcConnectProtocolHeaders('null-media'),
+    },
+    body: JSON.stringify({
+      requestId: 'null-media',
+      accountId: 'weixin-account',
+      message: {
+        sessionKey: 'weixin:dm:user',
+        platform: 'weixin',
+        messageId: 'message',
+        userId: 'user',
+        chatType: 'direct',
+        content: 'hello',
+        images: null,
+        files: null,
+        audio: null,
+        userMessageTimeMs: 0,
+      },
+    }),
+  });
+  expect(response.status).toBe(200);
+  await expect(response.json()).resolves.toEqual({ content: 'reply:hello' });
+  // The nulls are normalized before the handler runs, so downstream code
+  // never observes them.
+  expect(normalized).toEqual({ images: undefined, files: undefined, audio: undefined });
+});
+
+test('still rejects malformed media payloads', async () => {
+  const server = new CcConnectBridgeServer('secret', {
+    onTurn: async () => ({ content: 'unused' }),
+    onCronTrigger: async () => undefined,
+  });
+  servers.push(server);
+  const url = await server.start();
+  for (const malformed of [
+    { images: 'not-an-array' },
+    { files: [123] },
+    { audio: { MimeType: 'audio/amr' } },
+  ]) {
+    const response = await fetch(`${url}/v1/cc-connect/turn`, {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer secret',
+        'content-type': 'application/json',
+        ...createCcConnectProtocolHeaders('malformed-media'),
+      },
+      body: JSON.stringify({
+        requestId: 'malformed-media',
+        accountId: 'account',
+        message: {
+          sessionKey: 'weixin:dm:user',
+          platform: 'weixin',
+          messageId: 'message',
+          userId: 'user',
+          chatType: 'direct',
+          content: 'hello',
+          ...malformed,
+        },
+      }),
+    });
+    expect(response.status).toBe(400);
+  }
+});
