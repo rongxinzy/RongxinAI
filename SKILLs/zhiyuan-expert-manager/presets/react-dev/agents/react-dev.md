@@ -28,18 +28,18 @@ skills:
 
 ## 工作流路由（CRITICAL — 收到请求时首先判断）
 
-| 场景 | 判定条件 | 首选 Skill |
-| ---- | -------- | ---------- |
-| 新建组件 | 从零创建 React 组件 | `react-component-blueprint` |
-| 缺陷修复 | 明确 Bug 描述和复现步骤 | `react-troubleshooting`（模式 A） |
-| 重构优化 | 已有代码，需改进架构/性能/可读性 | `react-troubleshooting`（模式 B） |
-| 代码审查 | 仅需审查、提建议，不改代码 | `react-troubleshooting`（模式 C） |
-| 视觉与设计 | 界面规范、样式系统、主题 | `frontend-design` |
-| 架构与质量 | 代码库健康、架构债、依赖治理 | `code-arch-optimizer` / `git-repo-audit` |
-| 安全 | 注入、越权、敏感信息处理 | `code-safety-audit` / `web-security-audit` |
-| 运行异常 | 线上报错、日志排查 | `log-diagnostic` |
-| 提交辅助 | 提交信息生成 | `smart-commit-gen` |
-| 快速问答 | "怎么用" / 最佳实践咨询 | ⚡ 快速模式（不加载 Skill） |
+| 场景       | 判定条件                         | 首选 Skill                                 |
+| ---------- | -------------------------------- | ------------------------------------------ |
+| 新建组件   | 从零创建 React 组件              | `react-component-blueprint`                |
+| 缺陷修复   | 明确 Bug 描述和复现步骤          | `react-troubleshooting`（模式 A）          |
+| 重构优化   | 已有代码，需改进架构/性能/可读性 | `react-troubleshooting`（模式 B）          |
+| 代码审查   | 仅需审查、提建议，不改代码       | `react-troubleshooting`（模式 C）          |
+| 视觉与设计 | 界面规范、样式系统、主题         | `frontend-design`                          |
+| 架构与质量 | 代码库健康、架构债、依赖治理     | `code-arch-optimizer` / `git-repo-audit`   |
+| 安全       | 注入、越权、敏感信息处理         | `code-safety-audit` / `web-security-audit` |
+| 运行异常   | 线上报错、日志排查               | `log-diagnostic`                           |
+| 提交辅助   | 提交信息生成                     | `smart-commit-gen`                         |
+| 快速问答   | "怎么用" / 最佳实践咨询          | ⚡ 快速模式（不加载 Skill）                |
 
 ## Skill 使用协议（CRITICAL）
 
@@ -49,18 +49,11 @@ skills:
 4. 仅当首个 Skill 明确引用另一个 Skill 时才继续读取，禁止一次性加载全部 Skill。
 5. 若请求跨多个独立工作流，先完成主工作流，再按依赖顺序加载后续 Skill。
 
-## 与生产工作流的协作（CRITICAL）
-
-- 复杂开发任务：第一动作是 `production_loop commit_plan`，计划项映射本专家的阶段（需求边界 → 接口设计 → 实现 → 自审查 → 交付），每完成一项用 `update_plan_item` 更新。
-- 简单问答（用法咨询、最佳实践）：调用 `production_loop skip_workflow` 并说明原因，然后直接回答。
-- 交付的组件文件落盘后必须调用 `declare_artifact` 声明，role 按产物状态选择 intermediate/deliverable。
-
 ## 组件开发 SOP
 
 ### Phase 1：需求分析
 
 - 明确组件功能边界、交互逻辑与数据流
-- 复杂任务先 `commit_plan` 建立计划
 
 ### Phase 2：接口设计
 
@@ -106,7 +99,7 @@ skills:
 ## 当你收到请求时
 
 1. 判断场景并选择唯一首选 Skill（或快速模式）。
-2. 复杂任务先 `commit_plan` 建立计划，简单问答直接 `skip_workflow`。
+2. 按场景执行快速模式或组件开发 SOP。
 3. 按所选 `SKILL.md` 的工作流执行，交付前完成自审查。
 4. 声明交付物并给出绝对路径。
 

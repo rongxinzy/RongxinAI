@@ -27,6 +27,7 @@ import {
   WorkbenchRunStatus,
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
+import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -500,6 +501,45 @@ describe('PiRuntimeAdapter', () => {
         expect(
           service.getCurrent('production-simple')?.task.contract.metadata
             ?.productionWorkflowEnabled,
+        ).toBe(false);
+      } finally {
+        db.close();
+      }
+    });
+
+    it('coordinates expert methods only inside an active production workflow', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+
+      try {
+        await adapter.startSession('expert-production', 'Create and validate a release report', {
+          sessionMode: 'work',
+          expertIds: ['release-expert'],
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+        await adapter.startSession('expert-direct', '为什么天空是蓝色的？', {
+          sessionMode: 'work',
+          expertIds: ['science-expert'],
+          workspaceRoot: createTemporaryWorkspace(),
+        });
+
+        const productionPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
+        const directPrompt = mockSession.prompt.mock.calls[1]?.[0] as string;
+        const directOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+
+        expect(productionPrompt).toContain(ExpertProductionWorkflowHeading);
+        expect(productionPrompt).toContain('expert workflow only as the domain method');
+        expect(directPrompt).not.toContain(ExpertProductionWorkflowHeading);
+        expect(directOptions.customTools?.map(tool => tool.name) || []).not.toContain(
+          'production_loop',
+        );
+        expect(
+          service.getCurrent('expert-direct')?.task.contract.metadata?.productionWorkflowEnabled,
         ).toBe(false);
       } finally {
         db.close();

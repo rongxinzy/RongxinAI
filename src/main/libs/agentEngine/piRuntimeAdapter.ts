@@ -92,6 +92,7 @@ import {
 } from './piAskUserQuestion';
 import { PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
 import { buildPiConversationPrompt } from './piConversationContext';
+import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
 import { buildPiResearchStateTool } from './piResearchStateTool';
 import {
@@ -1063,7 +1064,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
       }
       if (productionLoop) {
-        initialPrompt = `${productionLoop.buildInitialPrompt()}\n\n${initialPrompt}`;
+        initialPrompt = prependProductionWorkflowPrompt(
+          initialPrompt,
+          productionLoop.buildInitialPrompt(),
+          expertIds.length > 0,
+        );
       }
       const projectMemoryContext = await buildProjectMemoryContextSafe(
         this.projectMemoryService,
@@ -1366,7 +1371,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
     }
     if (active.productionLoop && productionWorkflowEnabled) {
-      nextPrompt = `${active.productionLoop.buildInitialPrompt()}\n\n${nextPrompt}`;
+      nextPrompt = prependProductionWorkflowPrompt(
+        nextPrompt,
+        active.productionLoop.buildInitialPrompt(),
+        active.requestedExpertIds.length > 0,
+      );
     }
 
     try {
