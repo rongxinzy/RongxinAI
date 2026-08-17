@@ -31,7 +31,7 @@ interface CoworkSessionLayoutProps {
 }
 
 const panelTransitionClassName = cn(
-  'absolute inset-0 min-h-0 overflow-hidden transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
+  'absolute inset-0 flex min-h-0 flex-col overflow-hidden transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none',
   'data-starting-style:opacity-0 data-ending-style:opacity-0',
   'data-[activation-direction=right]:data-starting-style:translate-x-7',
   'data-[activation-direction=right]:data-ending-style:-translate-x-7',
