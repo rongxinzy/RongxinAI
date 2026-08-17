@@ -62,6 +62,9 @@ test('renders the title above tabs and preserves conversation state across tab s
   });
   const traceTab = screen.getByRole('tab', { name: i18nService.t('coworkTraceTab') });
   expect(conversationTab.getAttribute('aria-selected')).toBe('true');
+  expect(
+    screen.getByRole('tabpanel', { name: i18nService.t('coworkConversationTab') }),
+  ).toHaveClass('flex', 'flex-col');
 
   const draft = screen.getByRole('textbox', { name: 'conversation draft' });
   await user.type(draft, '保留草稿');
