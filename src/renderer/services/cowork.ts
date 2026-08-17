@@ -10,6 +10,7 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionOrigin,
   CoworkSessionMode,
+  type CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import { store } from '../store';
 import { setCurrentAgentId } from '../store/slices/agentSlice';
@@ -336,12 +337,14 @@ class CoworkService {
     workspaceId: string,
     limit: number,
     offset: number,
+    sources: CoworkSessionSource[],
   ): Promise<CoworkSessionListResult> {
     const result = await window.electron?.cowork?.listSessions({
       limit,
       offset,
       workspaceId: workspaceService.isWorkspaceApiAvailable() ? workspaceId : undefined,
       mode: CoworkSessionMode.Work,
+      sources,
     });
     return result ?? { success: false, error: 'Cowork IPC is unavailable' };
   }
@@ -657,7 +660,8 @@ class CoworkService {
     const requestId = ++this.latestLoadSessionRequestId;
 
     const result = await cowork.getSession(sessionId);
-    if (result.success && result.session) {      // Keep only the latest session load result to avoid stale async overwrites.
+    if (result.success && result.session) {
+      // Keep only the latest session load result to avoid stale async overwrites.
       if (requestId !== this.latestLoadSessionRequestId) {
         return result.session;
       }

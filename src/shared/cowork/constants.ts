@@ -14,6 +14,20 @@ export const CoworkSessionMode = {
 
 export type CoworkSessionMode = (typeof CoworkSessionMode)[keyof typeof CoworkSessionMode];
 
+export const CoworkSessionSource = {
+  Manual: 'manual',
+  Scheduled: 'scheduled',
+  Im: 'im',
+} as const;
+
+export type CoworkSessionSource = (typeof CoworkSessionSource)[keyof typeof CoworkSessionSource];
+
+export const CoworkScheduledSessionTitlePrefix = {
+  Chinese: '[定时]',
+  English: '[Cron]',
+  Legacy: 'Scheduled: ',
+} as const;
+
 /**
  * Desktop permission mode for cowork sessions.
  * Ask: the agent requests authorization before acting (current behavior).

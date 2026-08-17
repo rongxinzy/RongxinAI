@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { expect, test, vi } from 'vitest';
 
+import { CoworkSessionSource } from '../shared/cowork/constants';
+
 import {
   DeliveryMode,
   PayloadKind,
@@ -116,7 +118,7 @@ test('runs a canonical task in its workspace and waits for complete', async () =
     undefined,
     task.workspaceId,
     [],
-    'scheduled',
+    CoworkSessionSource.Scheduled,
   );
   expect(startSession).toHaveBeenCalledWith(
     session.id,

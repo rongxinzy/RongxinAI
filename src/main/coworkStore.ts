@@ -11,6 +11,7 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
   CoworkSessionMode,
+  CoworkSessionSource,
   type CoworkPermissionMode as CoworkPermissionModeType,
   type CoworkSessionMode as CoworkSessionModeType,
 } from '../shared/cowork/constants';
@@ -436,8 +437,6 @@ export interface CoworkConversationReplacementEntry {
   timestamp?: number;
 }
 
-export type CoworkSessionSource = 'manual' | 'scheduled' | 'im';
-
 export interface CoworkSession {
   id: string;
   title: string;
@@ -778,7 +777,7 @@ export class CoworkStore {
     id?: string,
     workspaceId?: string,
     expertSnapshots: CoworkSessionExpertInput[] = [],
-    source: CoworkSessionSource = 'manual',
+    source: CoworkSessionSource = CoworkSessionSource.Manual,
   ): CoworkSession {
     const sessionId = id || uuidv4();
     const now = Date.now();
@@ -991,7 +990,7 @@ export class CoworkStore {
       activeSkillIds,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
-      source: (row.source as CoworkSessionSource) || 'manual',
+      source: (row.source as CoworkSessionSource) || CoworkSessionSource.Manual,
       experts,
       messages,
       messagesOffset: messageOffset,
@@ -1167,7 +1166,12 @@ export class CoworkStore {
     return pinOrder;
   }
 
-  countSessions(agentId?: string, workspaceId?: string, mode?: CoworkSessionModeType): number {
+  countSessions(
+    agentId?: string,
+    workspaceId?: string,
+    mode?: CoworkSessionModeType,
+    sources?: readonly CoworkSessionSource[],
+  ): number {
     const filters: string[] = [];
     const params: string[] = [];
     if (workspaceId) {
@@ -1180,6 +1184,10 @@ export class CoworkStore {
     if (mode) {
       filters.push('mode = ?');
       params.push(mode);
+    }
+    if (sources?.length) {
+      filters.push(`source IN (${sources.map(() => '?').join(', ')})`);
+      params.push(...sources);
     }
 
     const whereClause = filters.length > 0 ? ` WHERE ${filters.join(' AND ')}` : '';
@@ -1195,6 +1203,7 @@ export class CoworkStore {
     agentId?: string,
     workspaceId?: string,
     mode?: CoworkSessionModeType,
+    sources?: readonly CoworkSessionSource[],
   ): CoworkSessionSummary[] {
     interface SessionSummaryRow {
       id: string;
@@ -1224,6 +1233,10 @@ export class CoworkStore {
       filters.push('mode = ?');
       params.push(mode);
     }
+    if (sources?.length) {
+      filters.push(`source IN (${sources.map(() => '?').join(', ')})`);
+      params.push(...sources);
+    }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const rows = this.getAll<SessionSummaryRow>(
@@ -1249,7 +1262,7 @@ export class CoworkStore {
       pinOrder: row.pin_order ?? null,
       workspaceId: row.workspace_id || this.ensureWorkspace(row.cwd).id,
       agentId: row.agent_id || 'main',
-      source: (row.source as CoworkSessionSource) || 'manual',
+      source: (row.source as CoworkSessionSource) || CoworkSessionSource.Manual,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }));

@@ -13,6 +13,7 @@ import {
   LegacyAgentName,
   normalizeAgentAvatarIcon,
 } from '../shared/agent';
+import { CoworkScheduledSessionTitlePrefix, CoworkSessionSource } from '../shared/cowork/constants';
 import { DB_FILENAME } from './appConstants';
 import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import {
@@ -99,26 +100,33 @@ export class SqliteStore {
         model_override TEXT NOT NULL DEFAULT '',
         execution_mode TEXT,
         workspace_id TEXT,
+        source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       );
     `);
 
-    // Session source classification (manual | scheduled | im). Existing rows
-    // created before this column existed are backfilled from their title
-    // prefix (the previous convention: [定时]/[Cron]/Scheduled:).
-    try {
-      this.db.exec(`
-        ALTER TABLE cowork_sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual';
-      `);
-    } catch {
-      // Column already exists on upgraded databases; ignore.
+    const sessionColumns = this.db.pragma('table_info(cowork_sessions)') as Array<{
+      name: string;
+    }>;
+    if (!sessionColumns.some(column => column.name === 'source')) {
+      this.db.transaction(() => {
+        this.db.exec(`
+          ALTER TABLE cowork_sessions
+          ADD COLUMN source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}';
+        `);
+        const prefixes = Object.values(CoworkScheduledSessionTitlePrefix);
+        this.db
+          .prepare(
+            `
+              UPDATE cowork_sessions
+              SET source = ?
+              WHERE ${prefixes.map(() => 'TRIM(title) LIKE ?').join(' OR ')}
+            `,
+          )
+          .run(CoworkSessionSource.Scheduled, ...prefixes.map(prefix => `${prefix}%`));
+      })();
     }
-    this.db.exec(`
-      UPDATE cowork_sessions
-      SET source = 'scheduled'
-      WHERE title LIKE '[定时]%' OR title LIKE '[Cron]%' OR title LIKE 'Scheduled: %';
-    `);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS workspaces (

@@ -1,14 +1,12 @@
 import { expect, test } from 'vitest';
 
+import { CoworkSessionSource } from '../../../shared/cowork/constants';
 import {
   type CoworkSessionStatus,
   CoworkSessionStatusValue,
   type CoworkSessionSummary,
 } from '../../types/cowork';
-import {
-  deriveAgentSidebarIndicator,
-  sortAgentSidebarTasks,
-} from './useAgentSidebarState';
+import { deriveAgentSidebarIndicator, sortAgentSidebarTasks } from './useAgentSidebarState';
 import { AgentSidebarIndicator } from './constants';
 
 const makeSession = (
@@ -25,6 +23,7 @@ const makeSession = (
   pinned,
   pinOrder,
   agentId: 'main',
+  source: CoworkSessionSource.Manual,
   createdAt,
   updatedAt,
 });

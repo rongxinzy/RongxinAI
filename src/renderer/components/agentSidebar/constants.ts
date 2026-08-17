@@ -22,11 +22,7 @@ export const AgentSidebarPageSize = {
  * backfilling pre-source databases (see the cowork_sessions migration) and
  * must stay in sync with that SQL.
  */
-export const ScheduledSessionTitlePrefix = {
-  Chinese: '[定时]',
-  English: '[Cron]',
-  Legacy: 'Scheduled: ',
-} as const;
+export const ScheduledSessionTitlePrefix = CoworkScheduledSessionTitlePrefix;
 
 export const isScheduledSessionTitle = (title: string): boolean => {
   const normalizedTitle = title.trim();
@@ -34,3 +30,4 @@ export const isScheduledSessionTitle = (title: string): boolean => {
     normalizedTitle.startsWith(prefix),
   );
 };
+import { CoworkScheduledSessionTitlePrefix } from '../../../shared/cowork/constants';

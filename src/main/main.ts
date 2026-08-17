@@ -52,6 +52,7 @@ import {
   COWORK_SESSION_PAGE_SIZE,
   CoworkPermissionMode,
   CoworkSessionMode,
+  type CoworkSessionSource,
 } from '../shared/cowork/constants';
 import {
   type CoworkSessionExpertInput,
@@ -985,7 +986,8 @@ const startCcConnectBridge = async (): Promise<void> => {
     coworkStore: getCoworkStore(),
     imStore: new IMStore(getStore().getDatabase()),
     turnCoordinator: new ChannelTurnCoordinator(new ChannelInboxStore(getStore().getDatabase())),
-    activityService: activityService ?? (activityService = new ActivityService(getStore().getDatabase())),
+    activityService:
+      activityService ?? (activityService = new ActivityService(getStore().getDatabase())),
     getSkillsPrompt: async () => getSkillManager().buildAutoRoutingPrompt(),
     detectScheduledTaskRequest: createIMScheduledTaskRequestDetector({
       getLLMConfig: getScheduledTaskDetectorConfig,
@@ -3996,6 +3998,7 @@ if (!gotTheLock) {
         agentId?: string;
         workspaceId?: string;
         mode?: CoworkSessionMode;
+        sources?: CoworkSessionSource[];
       },
     ) => {
       try {
@@ -4004,9 +4007,10 @@ if (!gotTheLock) {
         const agentId = options?.agentId;
         const workspaceId = options?.workspaceId;
         const mode = options?.mode;
+        const sources = options?.sources;
         const store = getCoworkStore();
         const sessions = store
-          .listSessions(limit, offset, agentId, workspaceId, mode)
+          .listSessions(limit, offset, agentId, workspaceId, mode, sources)
           .map(session => {
             const reconciledSession = reconcileWorkSessionRuntimeState(
               session,
@@ -4017,7 +4021,7 @@ if (!gotTheLock) {
             }
             return reconciledSession;
           });
-        const total = store.countSessions(agentId, workspaceId, mode);
+        const total = store.countSessions(agentId, workspaceId, mode, sources);
         return { success: true, sessions, hasMore: offset + sessions.length < total };
       } catch (error) {
         return {

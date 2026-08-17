@@ -159,6 +159,7 @@ const toSessionSummary = (session: CoworkSession): CoworkSessionSummary => ({
   pinOrder: session.pinOrder ?? null,
   workspaceId: session.workspaceId,
   agentId: session.agentId,
+  source: session.source,
   createdAt: session.createdAt,
   updatedAt: session.updatedAt,
 });

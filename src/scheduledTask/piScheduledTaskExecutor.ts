@@ -3,6 +3,7 @@ import type { CoworkError } from '../common/coworkError';
 import type { PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
 import { getDefaultConversationWorkspacePath } from '../main/defaultConversationWorkspace';
 import { parseManagedSessionKey } from '../main/libs/channelSessionKey';
+import { CoworkSessionSource } from '../shared/cowork/constants';
 
 import { PayloadKind, SessionTarget } from './constants';
 import type { ScheduledTask, ScheduledTaskRun } from './types';
@@ -70,7 +71,7 @@ export class PiScheduledTaskExecutor {
       undefined,
       workspace?.id,
       [],
-      'scheduled',
+      CoworkSessionSource.Scheduled,
     );
   }
 
