@@ -1,5 +1,6 @@
 import { Badge } from '@shared/components/ui/badge';
-import { Empty, EmptyHeader, EmptyTitle } from '@shared/components/ui/empty';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@shared/components/ui/empty';
+import { Activity } from 'lucide-react';
 
 import type { WorkbenchRun, WorkbenchRunEvent } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
@@ -14,9 +15,12 @@ interface EventAuditTabProps {
 export function EventAuditTab({ events, runs }: EventAuditTabProps) {
   if (events.length === 0) {
     return (
-      <Empty>
+      <Empty className="py-8 text-foreground/60 dark:text-muted-foreground">
         <EmptyHeader>
-          <EmptyTitle>{i18nService.t('workbenchTaskNoEvents')}</EmptyTitle>
+          <EmptyMedia className="mb-0">
+            <Activity className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle className="font-normal">{i18nService.t('workbenchTaskNoEvents')}</EmptyTitle>
         </EmptyHeader>
       </Empty>
     );

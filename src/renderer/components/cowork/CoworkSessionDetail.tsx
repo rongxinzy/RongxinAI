@@ -4,7 +4,7 @@ import {
   ConversationScrollButton,
 } from '@shared/components/ai-elements/conversation';
 import { Button } from '@shared/components/ui/button';
-import { ChevronDown, ChevronUp, Download, Image as ImageIcon, PanelLeft } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Image as ImageIcon } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -20,8 +20,6 @@ import {
 } from '../../services/artifactParser';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
-import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { RootState } from '../../store';
 import {
   selectCurrentMessagesLength,
@@ -55,7 +53,6 @@ import type {
   CoworkPermissionResult,
 } from '../../types/cowork';
 import { ArtifactPanelFallback } from '../artifacts/ArtifactPanelFallback';
-import WindowTitleBar from '../window/WindowTitleBar';
 import { TurnBlock } from './components/TurnBlock';
 import { UserBubble } from './components/UserBubble';
 import {
@@ -64,10 +61,8 @@ import {
 } from './components/VirtualizedTurnList';
 import { type CoworkOpenShareOptionsEventDetail, CoworkUiEvent } from './constants';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
-import {
-  CoworkConversationLoadingSkeleton,
-  CoworkSessionTitleLoadingSkeleton,
-} from './CoworkSessionLoadingState';
+import { CoworkConversationLoadingSkeleton } from './CoworkSessionLoadingState';
+import { CoworkSessionLayout } from './CoworkSessionLayout';
 import PendingMessageQueue from './PendingMessageQueue';
 import type { CaptureRect } from './helpers/exportUtils';
 import {
@@ -103,7 +98,6 @@ import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
 import { WorkbenchTaskAcceptanceCard } from './WorkbenchTaskAcceptanceCard';
 import CoworkPermissionModal from './CoworkPermissionModal';
-import { WorkbenchTaskStatusBar } from './WorkbenchTaskStatus';
 
 // The artifact panel only mounts when the user opens it, so keep its code
 // (and the whole renderers tree behind it) out of the cowork startup chunk.
@@ -231,7 +225,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     },
     [onResumeTask],
   );
-
 
   // Rail navigation states
   const [currentRailIndex, setCurrentRailIndex] = useState(-1);
@@ -1114,61 +1107,18 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
-      {/* Header — spans full width */}
-      <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border bg-background shrink-0">
-        {/* Left side: Toggle buttons (when collapsed) + Title */}
-        <div className="flex h-full items-center gap-2 min-w-0">
-          {isSidebarCollapsed && (
-            <div className={`non-draggable flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggleSidebar}
-                className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
-              >
-                <PanelLeft className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onNewChat}
-                className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
-              >
-                <SidebarAnimatedMessageCirclePlusIcon />
-              </Button>
-              {updateBadge}
-            </div>
-          )}
-          {isSessionSwitching ? (
-            <CoworkSessionTitleLoadingSkeleton />
-          ) : (
-            <>
-              <h1 className="text-sm leading-none font-medium text-foreground truncate max-w-[400px]">
-                {currentSession.title || i18nService.t('coworkNewSession')}
-              </h1>
-              {sessionId && <WorkbenchTaskStatusBar sessionId={sessionId} />}
-            </>
-          )}
-        </div>
-
-        {/* Right side: Artifact toggle */}
-        <div className="non-draggable flex items-center gap-1">
-          {/* Artifact panel toggle */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => dispatch(togglePanel())}
-            aria-label={i18nService.t('artifactPanelToggle')}
-            disabled={isSessionSwitching}
-          >
-            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isPanelOpen} />
-          </Button>
-
-          <WindowTitleBar inline className="ml-1" />
-        </div>
-      </div>
-
+    <CoworkSessionLayout
+      title={currentSession.title || i18nService.t('coworkNewSession')}
+      sessionId={sessionId}
+      isSessionSwitching={isSessionSwitching}
+      isSidebarCollapsed={isSidebarCollapsed}
+      isMac={isMac}
+      isArtifactPanelOpen={isPanelOpen}
+      onToggleSidebar={onToggleSidebar}
+      onNewChat={onNewChat}
+      onToggleArtifactPanel={() => dispatch(togglePanel())}
+      updateBadge={updateBadge}
+    >
       {/* Export Options Modal */}
       {!isSessionSwitching && showExportOptions && (
         <div
@@ -1625,7 +1575,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           </ArtifactPanelErrorBoundary>
         )}
       </div>
-    </div>
+    </CoworkSessionLayout>
   );
 };
 
