@@ -15,7 +15,11 @@ import {
   ChatExecution,
   resolveChatExecution,
 } from '../../services/chatExecutionRouter';
-import { resolveSkillPlaceholderKey } from '../chat/constants';
+import {
+  isChatSkillShortcutSelection,
+  resolveChatSkillShortcutPermissionMode,
+  resolveSkillPlaceholderKey,
+} from '../chat/constants';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
@@ -829,6 +833,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       const sessionModelOverride = currentAgentSelectedModel
         ? toAgentModelRef(currentAgentSelectedModel)
         : '';
+      const shouldAutoAllowChatSkill =
+        workMode === WorkMode.Chat &&
+        isChatAgentExecution &&
+        isChatSkillShortcutSelection(sessionSkillIds);
+      const sessionPermissionMode =
+        shouldAutoAllowChatSkill
+          ? resolveChatSkillShortcutPermissionMode(sessionSkillIds, config.permissionMode)
+          : config.permissionMode;
       console.log('[CoworkView] creating session:', {
         modelId: currentAgentSelectedModel?.id,
         providerKey: currentAgentSelectedModel?.providerKey,
@@ -854,7 +866,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         expertIds,
         goalMode,
         modelOverride: sessionModelOverride,
-        permissionMode: config.permissionMode,
+        permissionMode: sessionPermissionMode,
         imageAttachments,
         fileAttachments,
       });
@@ -879,6 +891,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       }
 
       if (startedSession) {
+        if (shouldAutoAllowChatSkill) {
+          await coworkService.updateConfig({
+            permissionModeBySession: {
+              ...(store.getState().cowork.config.permissionModeBySession ?? {}),
+              [startedSession.id]: CoworkPermissionMode.AllowAll,
+            },
+          });
+        }
         clearUnmanagedWorkingDirectory();
         // coworkService.startSession already selected the real session.
         // Remove only the temporary list entry after that replacement.

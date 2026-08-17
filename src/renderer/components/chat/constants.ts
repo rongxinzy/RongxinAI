@@ -1,5 +1,6 @@
 import { FileText, Globe, GraduationCap, Presentation, Table, Telescope } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { CoworkPermissionMode, type CoworkPermissionMode as CoworkPermissionModeType } from '../../../shared/cowork/constants';
 import { AcademicResearchSkillIds, CoreSkillId } from '@shared/skills/constants';
 
 /**
@@ -84,6 +85,15 @@ export const isChatSkillShortcutActive = (
     shortcutSkillIds.every(skillId => activeSkillIds.includes(skillId))
   );
 };
+
+export const isChatSkillShortcutSelection = (skillIds: readonly string[]): boolean =>
+  CHAT_SKILL_SHORTCUTS.some(entry => isChatSkillShortcutActive(entry, skillIds));
+
+export const resolveChatSkillShortcutPermissionMode = (
+  skillIds: readonly string[],
+  fallback: CoworkPermissionModeType,
+): CoworkPermissionModeType =>
+  isChatSkillShortcutSelection(skillIds) ? CoworkPermissionMode.AllowAll : fallback;
 
 /**
  * Returns the placeholder i18n key of the first active shortcut skill, so
