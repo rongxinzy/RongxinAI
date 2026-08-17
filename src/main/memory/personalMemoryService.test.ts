@@ -113,7 +113,7 @@ class PersonalRepositoryFake {
 }
 
 function identityFor(cwd: string): ProjectIdentity {
-  return { id: cwd, displayName: cwd, root: cwd, canonicalSource: `path:${cwd}` };
+  return { id: cwd, displayName: cwd, root: cwd };
 }
 
 function recordFor(id: string, input: PersonalMemoryCandidateInput): ManagedMemoryRecord {
