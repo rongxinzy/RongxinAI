@@ -14,10 +14,10 @@ export function buildPiProjectMemoryTool(input: {
     name: 'memory',
     label: 'Memory',
     description:
-      'Recall project and confirmed personal memory, explicitly save durable project memory, ' +
-      'list controlled active memory, propose personal memory for user review, or save a short-lived session summary.',
+      'Recall workspace, current-session, and confirmed personal memory; explicitly save durable workspace memory; ' +
+      'list controlled active memory; propose personal memory for user review; or save a short-lived session summary.',
     promptSnippet:
-      'Use memory to recall prior project decisions or save durable facts only when they are useful later.',
+      'Use memory to recall prior workspace decisions or save durable facts only when they are useful later.',
     parameters: {
       type: 'object',
       properties: {
@@ -28,12 +28,17 @@ export function buildPiProjectMemoryTool(input: {
         },
         query: { type: 'string', description: 'Search query for recall.' },
         limit: { type: 'number', description: 'Maximum number of memories to list.' },
-        title: { type: 'string', description: 'Short title for a saved project memory.' },
+        title: { type: 'string', description: 'Short title for a saved workspace memory.' },
         content: { type: 'string', description: 'Atomic memory content or session summary.' },
-        topicKey: { type: 'string', description: 'Stable topic key for project memory upsert.' },
+        topicKey: { type: 'string', description: 'Stable topic key for workspace memory upsert.' },
         supersedesMemoryId: {
           type: 'number',
-          description: 'Observation ID replaced by a proposed personal memory.',
+          description: 'Active Personal observation ID replaced by the proposed Personal memory.',
+        },
+        promotesMemoryId: {
+          type: 'number',
+          description:
+            'Active Project observation from this workspace, or Session observation from this session, promoted into Personal memory without replacing the source.',
         },
         kind: {
           type: 'string',
@@ -49,21 +54,27 @@ export function buildPiProjectMemoryTool(input: {
         const action = typeof params.action === 'string' ? params.action : '';
         if (action === PiMemoryAction.Recall) {
           const query = requiredString(params.query, 'query');
-          const [project, personal] = await Promise.all([
+          const [workspace, personal, session] = await Promise.all([
             input.service.recallProject({ workingDirectory: input.workingDirectory, query }),
             input.service.recallPersonal({ query }),
+            input.service.recallSession({
+              workingDirectory: input.workingDirectory,
+              sessionId: input.sessionId,
+              query,
+            }),
           ]);
-          const observations = [...project, ...personal];
+          const observations = [...workspace, ...personal, ...session];
           const text = observations.length
             ? observations
                 .map(item => `[memory:${item.id}] ${item.title}: ${item.content}`)
                 .join('\n')
-            : 'No relevant project memory found.';
+            : 'No relevant workspace, session, or personal memory found.';
           return toolResult(text, { count: observations.length });
         }
         if (action === PiMemoryAction.List) {
           const memories = input.service.listRecallableMemories({
             workingDirectory: input.workingDirectory,
+            sessionId: input.sessionId,
             query: typeof params.query === 'string' ? params.query.trim() || undefined : undefined,
             limit: typeof params.limit === 'number' ? params.limit : undefined,
           });
@@ -74,18 +85,21 @@ export function buildPiProjectMemoryTool(input: {
                     `[memory:${memory.memoryId ?? memory.id}] [${memory.scope}] ${memory.title}: ${memory.content}`,
                 )
                 .join('\n')
-            : 'No active project or confirmed personal memory found.';
+            : 'No active workspace, current-session, or confirmed personal memory found.';
           return toolResult(text, { count: memories.length });
         }
         if (action === PiMemoryAction.ProposePersonal) {
           const candidateId = input.service.proposePersonalMemory({
             sessionId: input.sessionId,
+            workingDirectory: input.workingDirectory,
             type: normalizeKind(params.kind),
             title: requiredString(params.title, 'title'),
             content: requiredString(params.content, 'content'),
             topicKey: typeof params.topicKey === 'string' ? params.topicKey.trim() : undefined,
             supersedesMemoryId:
               typeof params.supersedesMemoryId === 'number' ? params.supersedesMemoryId : undefined,
+            promotesMemoryId:
+              typeof params.promotesMemoryId === 'number' ? params.promotesMemoryId : undefined,
           });
           return toolResult('Personal memory was proposed and requires user confirmation.', {
             candidateId,
@@ -108,7 +122,7 @@ export function buildPiProjectMemoryTool(input: {
             ? toolResult('Project memory was queued and will retry when memory is available.', {
                 queued: true,
               })
-            : toolResult(`Saved project memory ${memoryId}.`, { memoryId });
+            : toolResult(`Saved workspace memory ${memoryId}.`, { memoryId });
         }
         if (action === PiMemoryAction.SessionSummary) {
           const summary = requiredString(params.content, 'content');

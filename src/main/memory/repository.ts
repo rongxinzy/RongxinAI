@@ -33,6 +33,9 @@ export interface MemoryLinkInput extends MemoryProjectionInput {
   runId?: string;
   artifactId?: string;
   approvalId?: string;
+  promotedFromLinkId?: string;
+  promotionSourceProjectId?: string;
+  promotionSourceSessionId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -48,6 +51,9 @@ export interface PersonalMemoryCandidateInput extends MemoryProjectionInput {
   artifactId?: string;
   approvalId?: string;
   supersedesLinkId?: string;
+  promotedFromLinkId?: string;
+  promotionSourceProjectId?: string;
+  promotionSourceSessionId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -99,8 +105,10 @@ export class MemoryRepository {
         `INSERT INTO memory_links (
           id, memory_id, project_id, scope, session_id, source_kind,
           task_id, run_id, artifact_id, approval_id, status, title, content,
-          kind, topic_key, importance, confidence, sensitivity, expires_at, metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          kind, topic_key, importance, confidence, sensitivity, expires_at,
+          promoted_from_link_id, promotion_source_project_id,
+          promotion_source_session_id, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
           memory_id = excluded.memory_id,
           status = excluded.status,
@@ -112,6 +120,10 @@ export class MemoryRepository {
           confidence = excluded.confidence,
           sensitivity = excluded.sensitivity,
           expires_at = excluded.expires_at,
+          promoted_from_link_id = excluded.promoted_from_link_id,
+          promotion_source_project_id = excluded.promotion_source_project_id,
+          promotion_source_session_id = excluded.promotion_source_session_id,
+          metadata_json = excluded.metadata_json,
           updated_at = datetime('now')`,
       )
       .run(
@@ -134,6 +146,9 @@ export class MemoryRepository {
         clampScore(input.confidence),
         input.sensitivity ?? MemorySensitivity.Normal,
         input.expiresAt ?? null,
+        input.promotedFromLinkId ?? null,
+        input.promotionSourceProjectId ?? null,
+        input.promotionSourceSessionId ?? null,
         JSON.stringify(input.metadata ?? {}),
       );
     return id;
@@ -147,8 +162,9 @@ export class MemoryRepository {
           id, project_id, project_root, scope, session_id, source_kind,
           task_id, run_id, artifact_id, approval_id,
           status, title, content, kind, topic_key, importance, confidence,
-          sensitivity, expires_at, supersedes_link_id, metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          sensitivity, expires_at, supersedes_link_id, promoted_from_link_id,
+          promotion_source_project_id, promotion_source_session_id, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -171,6 +187,9 @@ export class MemoryRepository {
         input.sensitivity ?? MemorySensitivity.Normal,
         input.expiresAt ?? null,
         input.supersedesLinkId ?? null,
+        input.promotedFromLinkId ?? null,
+        input.promotionSourceProjectId ?? null,
+        input.promotionSourceSessionId ?? null,
         JSON.stringify(input.metadata ?? {}),
       );
     return id;
@@ -185,19 +204,34 @@ export class MemoryRepository {
 
   getCandidateDetails(id: string): {
     supersedesLinkId: string | null;
+    promotedFromLinkId: string | null;
+    promotionSourceProjectId: string | null;
+    promotionSourceSessionId: string | null;
     projectRoot: string;
     metadata: Record<string, unknown>;
   } | null {
     const row = this.db
       .prepare(
-        'SELECT supersedes_link_id, project_root, metadata_json FROM memory_candidates WHERE id = ?',
+        `SELECT supersedes_link_id, promoted_from_link_id, promotion_source_project_id,
+                promotion_source_session_id, project_root, metadata_json
+         FROM memory_candidates WHERE id = ?`,
       )
       .get(id) as
-      | { supersedes_link_id: string | null; project_root: string; metadata_json: string }
+      | {
+          supersedes_link_id: string | null;
+          promoted_from_link_id: string | null;
+          promotion_source_project_id: string | null;
+          promotion_source_session_id: string | null;
+          project_root: string;
+          metadata_json: string;
+        }
       | undefined;
     return row
       ? {
           supersedesLinkId: row.supersedes_link_id,
+          promotedFromLinkId: row.promoted_from_link_id,
+          promotionSourceProjectId: row.promotion_source_project_id,
+          promotionSourceSessionId: row.promotion_source_session_id,
           projectRoot: row.project_root,
           metadata: JSON.parse(row.metadata_json) as Record<string, unknown>,
         }
@@ -475,6 +509,9 @@ export class MemoryRepository {
         sensitivity TEXT NOT NULL DEFAULT 'normal',
         expires_at TEXT,
         superseded_by TEXT,
+        promoted_from_link_id TEXT,
+        promotion_source_project_id TEXT,
+        promotion_source_session_id TEXT,
         metadata_json TEXT NOT NULL DEFAULT '{}',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -506,6 +543,9 @@ export class MemoryRepository {
         sensitivity TEXT NOT NULL DEFAULT 'normal',
         expires_at TEXT,
         supersedes_link_id TEXT,
+        promoted_from_link_id TEXT,
+        promotion_source_project_id TEXT,
+        promotion_source_session_id TEXT,
         metadata_json TEXT NOT NULL DEFAULT '{}',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
@@ -542,6 +582,9 @@ export class MemoryRepository {
       sensitivity: "TEXT NOT NULL DEFAULT 'normal'",
       expires_at: 'TEXT',
       superseded_by: 'TEXT',
+      promoted_from_link_id: 'TEXT',
+      promotion_source_project_id: 'TEXT',
+      promotion_source_session_id: 'TEXT',
     };
     const columns = this.db.prepare('PRAGMA table_info(memory_links)').all() as Array<{
       name: string;
@@ -561,6 +604,9 @@ export class MemoryRepository {
       project_id: "TEXT NOT NULL DEFAULT 'personal://zhiyuan-agent/user'",
       project_root: "TEXT NOT NULL DEFAULT ''",
       scope: "TEXT NOT NULL DEFAULT 'personal'",
+      promoted_from_link_id: 'TEXT',
+      promotion_source_project_id: 'TEXT',
+      promotion_source_session_id: 'TEXT',
     };
     const candidateColumns = this.db
       .prepare('PRAGMA table_info(memory_candidates)')
@@ -631,6 +677,9 @@ function mapRecord(
     sensitivity: String(row.sensitivity) as ManagedMemoryRecord['sensitivity'],
     expiresAt: nullableString(row.expires_at),
     supersededBy: nullableString(row.superseded_by),
+    promotedFromLinkId: nullableString(row.promoted_from_link_id),
+    promotionSourceProjectId: nullableString(row.promotion_source_project_id),
+    promotionSourceSessionId: nullableString(row.promotion_source_session_id),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     deliveryStatus: delivery ? (delivery.status as ManagedMemoryRecord['deliveryStatus']) : null,

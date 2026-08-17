@@ -349,6 +349,14 @@ function statusVariant(status: ManagedMemoryRecord['status']): 'default' | 'seco
 }
 
 function sourceLabel(record: ManagedMemoryRecord): string {
+  if (record.promotedFromLinkId) {
+    if (record.promotionSourceSessionId) {
+      return i18nService
+        .t('managedMemoryPromotedFromSession')
+        .replace('{id}', record.promotionSourceSessionId);
+    }
+    return i18nService.t('managedMemoryPromotedFromWorkspace');
+  }
   const id = record.taskId ?? record.runId ?? record.sessionId;
   return i18nService.t('managedMemorySource').replace('{id}', id);
 }
