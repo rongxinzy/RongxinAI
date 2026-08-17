@@ -47,3 +47,13 @@ test('renders an event with its owning run attempt', () => {
     ),
   ).toBeTruthy();
 });
+
+test('renders the empty state with an icon and the inactive tab text color', () => {
+  const { container } = render(<EventAuditTab events={[]} runs={[]} />);
+
+  const emptyState = container.querySelector<HTMLElement>('[data-slot="empty"]');
+  expect(emptyState).toBeTruthy();
+  expect(emptyState?.querySelector('svg')).toBeTruthy();
+  expect(emptyState).toHaveClass('text-foreground/60', 'dark:text-muted-foreground');
+  expect(screen.getByText(i18nService.t('workbenchTaskNoEvents'))).toBeTruthy();
+});

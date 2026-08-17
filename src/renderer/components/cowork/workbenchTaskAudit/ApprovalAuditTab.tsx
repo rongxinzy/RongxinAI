@@ -12,10 +12,10 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@shared/components/ui/collapsible';
-import { Empty, EmptyHeader, EmptyTitle } from '@shared/components/ui/empty';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@shared/components/ui/empty';
 import { Label } from '@shared/components/ui/label';
 import { Textarea } from '@shared/components/ui/textarea';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -55,9 +55,14 @@ export function ApprovalAuditTab({ approvals, runs, busy, onRespond }: ApprovalA
 
   if (approvals.length === 0) {
     return (
-      <Empty>
+      <Empty className="py-8 text-foreground/60 dark:text-muted-foreground">
         <EmptyHeader>
-          <EmptyTitle>{i18nService.t('workbenchTaskNoApprovals')}</EmptyTitle>
+          <EmptyMedia className="mb-0">
+            <ShieldCheck className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle className="font-normal">
+            {i18nService.t('workbenchTaskNoApprovals')}
+          </EmptyTitle>
         </EmptyHeader>
       </Empty>
     );

@@ -5,8 +5,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@shared/components/ui/collapsible';
-import { Empty, EmptyHeader, EmptyTitle } from '@shared/components/ui/empty';
-import { ChevronRight } from 'lucide-react';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@shared/components/ui/empty';
+import { ChevronRight, ListChecks } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -33,9 +33,12 @@ interface RunAuditTabProps {
 export function RunAuditTab({ runs, activeRunId }: RunAuditTabProps) {
   if (runs.length === 0) {
     return (
-      <Empty>
+      <Empty className="py-8 text-foreground/60 dark:text-muted-foreground">
         <EmptyHeader>
-          <EmptyTitle>{i18nService.t('workbenchTaskNoRuns')}</EmptyTitle>
+          <EmptyMedia className="mb-0">
+            <ListChecks className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle className="font-normal">{i18nService.t('workbenchTaskNoRuns')}</EmptyTitle>
         </EmptyHeader>
       </Empty>
     );
@@ -83,7 +86,7 @@ function RunAuditItem({ run, defaultOpen }: { run: WorkbenchRun; defaultOpen: bo
           </span>
         </span>
       </CollapsibleTrigger>
-      <CollapsibleContent className="border-t border-border px-3 py-3">
+      <CollapsibleContent className="px-3 py-3">
         <div className="flex flex-col gap-3">
           {verification ? (
             <>

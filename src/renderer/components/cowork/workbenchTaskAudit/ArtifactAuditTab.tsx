@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { Empty, EmptyHeader, EmptyTitle } from '@shared/components/ui/empty';
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@shared/components/ui/empty';
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@shared/components/ui/tooltip';
-import { Copy, ExternalLink, FolderOpen } from 'lucide-react';
+import { Copy, ExternalLink, FolderOpen, PackageOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { WorkbenchArtifact, WorkbenchRun } from '../../../../shared/workbenchTask';
@@ -35,9 +35,14 @@ interface ArtifactAuditTabProps {
 export function ArtifactAuditTab({ artifacts, runs }: ArtifactAuditTabProps) {
   if (artifacts.length === 0) {
     return (
-      <Empty>
+      <Empty className="py-8 text-foreground/60 dark:text-muted-foreground">
         <EmptyHeader>
-          <EmptyTitle>{i18nService.t('workbenchTaskNoArtifacts')}</EmptyTitle>
+          <EmptyMedia className="mb-0">
+            <PackageOpen className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle className="font-normal">
+            {i18nService.t('workbenchTaskNoArtifacts')}
+          </EmptyTitle>
         </EmptyHeader>
       </Empty>
     );

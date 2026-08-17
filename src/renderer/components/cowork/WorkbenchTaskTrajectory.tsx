@@ -1,13 +1,21 @@
-import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from '@shared/components/ui/empty';
+import { Skeleton } from '@shared/components/ui/skeleton';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@shared/components/ui/tooltip';
-import { Check, ClipboardCheck, Play, RefreshCw, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Activity, Check, Play, RefreshCw, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { toast } from 'sonner';
 
@@ -15,18 +23,21 @@ import {
   WorkbenchTaskStatus,
   WorkbenchVerificationOutcome,
   type WorkbenchApprovalResponseInput,
+  type WorkbenchTask,
   type WorkbenchTaskActionResult,
   type WorkbenchTaskDetail,
-  type WorkbenchTask,
 } from '../../../shared/workbenchTask';
 import { i18nService } from '../../services/i18n';
 import type { AppDispatch } from '../../store';
 import { setActiveArtifactProjection } from '../../store/slices/artifactSlice';
-import { WorkbenchTaskAuditSheet } from './workbenchTaskAudit/WorkbenchTaskAuditSheet';
-import { getProjectedRun, statusBadgeVariant, statusLabel } from './workbenchTaskAudit/utils';
+import { WorkbenchTaskAuditView } from './workbenchTaskAudit/WorkbenchTaskAuditView';
+import { getProjectedRun } from './workbenchTaskAudit/utils';
 
-interface WorkbenchTaskStatusProps {
-  sessionId: string;
+interface WorkbenchTaskTrajectoryProps {
+  sessionId?: string;
+  active: boolean;
+  loadingOverride?: boolean;
+  onBackToConversation: () => void;
 }
 
 interface WorkbenchTaskActionButtonProps {
@@ -62,14 +73,25 @@ function WorkbenchTaskActionButton({
   );
 }
 
-export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) {
+export function WorkbenchTaskTrajectory({
+  sessionId,
+  active,
+  loadingOverride = false,
+  onBackToConversation,
+}: WorkbenchTaskTrajectoryProps) {
   const dispatch = useDispatch<AppDispatch>();
   const [detail, setDetail] = useState<WorkbenchTaskDetail | null>(null);
   const [auditDetail, setAuditDetail] = useState<WorkbenchTaskDetail | null>(null);
   const [taskHistory, setTaskHistory] = useState<WorkbenchTask[]>([]);
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(Boolean(sessionId));
   const [auditLoading, setAuditLoading] = useState(false);
+  const activeRef = useRef(active);
+  const wasActiveRef = useRef(active);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   const applyDetail = useCallback(
     (nextDetail: WorkbenchTaskDetail | null) => {
@@ -78,6 +100,7 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
         if (!nextDetail) return null;
         return !current || current.task.id === nextDetail.task.id ? nextDetail : current;
       });
+      if (!sessionId) return;
       const projectedRun = getProjectedRun(nextDetail);
       dispatch(
         setActiveArtifactProjection({
@@ -90,7 +113,8 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
     [dispatch, sessionId],
   );
 
-  const load = useCallback(async () => {
+  const loadCurrent = useCallback(async () => {
+    if (!sessionId) return;
     try {
       const result = await window.electron.workbenchTask.getCurrent(sessionId);
       if (!result.success) throw new Error(result.error);
@@ -102,6 +126,7 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
   }, [applyDetail, sessionId]);
 
   const loadTaskHistory = useCallback(async () => {
+    if (!sessionId) return;
     setAuditLoading(true);
     try {
       const result = await window.electron.workbenchTask.listForSession(sessionId);
@@ -129,26 +154,38 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
     }
   }, []);
 
-  const handleOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      setOpen(nextOpen);
-      if (!nextOpen) return;
-      setAuditDetail(detail);
-      void loadTaskHistory();
-    },
-    [detail, loadTaskHistory],
-  );
-
   useEffect(() => {
     applyDetail(null);
     setTaskHistory([]);
-    void load();
-    return window.electron.workbenchTask.onChanged(event => {
-      if (event.sessionId !== sessionId) return;
-      void load();
-      void loadTaskHistory();
+    if (!sessionId) {
+      setInitialLoading(false);
+      return;
+    }
+
+    setInitialLoading(true);
+    let disposed = false;
+    void loadCurrent().finally(() => {
+      if (!disposed) setInitialLoading(false);
     });
-  }, [applyDetail, load, loadTaskHistory, sessionId]);
+    const unsubscribe = window.electron.workbenchTask.onChanged(event => {
+      if (event.sessionId !== sessionId) return;
+      void loadCurrent();
+      if (activeRef.current) void loadTaskHistory();
+    });
+    return () => {
+      disposed = true;
+      unsubscribe();
+    };
+  }, [applyDetail, loadCurrent, loadTaskHistory, sessionId]);
+
+  useEffect(() => {
+    if (active) void loadTaskHistory();
+  }, [active, loadTaskHistory]);
+
+  useEffect(() => {
+    if (active && !wasActiveRef.current) setAuditDetail(detail);
+    wasActiveRef.current = active;
+  }, [active, detail]);
 
   const activeRun = useMemo(() => getProjectedRun(detail), [detail]);
   const canAccept =
@@ -187,75 +224,90 @@ export function WorkbenchTaskStatusBar({ sessionId }: WorkbenchTaskStatusProps) 
     [runAction],
   );
 
-  if (!detail || !auditDetail) return null;
+  if (loadingOverride || initialLoading) return <WorkbenchTaskTrajectorySkeleton />;
+
+  if (!detail || !auditDetail) {
+    return (
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Activity />
+          </EmptyMedia>
+          <EmptyTitle>{i18nService.t('coworkTraceEmptyTitle')}</EmptyTitle>
+          <EmptyDescription>{i18nService.t('coworkTraceEmptyDescription')}</EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button variant="outline" onClick={onBackToConversation}>
+            {i18nService.t('coworkBackToConversation')}
+          </Button>
+        </EmptyContent>
+      </Empty>
+    );
+  }
 
   return (
-    <>
-      <TooltipProvider>
-        <div className="non-draggable flex min-w-0 shrink-0 items-center gap-1">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label={i18nService.t('workbenchTaskDetails')}
-                  onClick={() => handleOpenChange(true)}
-                >
-                  <ClipboardCheck data-icon="inline-start" />
-                  <Badge variant={statusBadgeVariant(detail.task.status)}>
-                    {statusLabel(detail.task.status)}
-                  </Badge>
-                </Button>
-              }
-            />
-            <TooltipContent>{i18nService.t('workbenchTaskDetails')}</TooltipContent>
-          </Tooltip>
-          {canResume && (
-            <WorkbenchTaskActionButton
-              icon={Play}
-              label={i18nService.t('workbenchTaskResume')}
-              disabled={busy}
-              onClick={() =>
-                void runAction(() =>
-                  window.electron.workbenchTask.resume({ taskId: detail.task.id }),
-                )
-              }
-            />
-          )}
-          {canAccept && (
-            <WorkbenchTaskActionButton
-              icon={Check}
-              label={i18nService.t('workbenchTaskAccept')}
-              disabled={busy}
-              onClick={() =>
-                void runAction(() => window.electron.workbenchTask.accept(detail.task.id))
-              }
-            />
-          )}
-          {canRetry && !canAccept && (
-            <WorkbenchTaskActionButton
-              icon={RefreshCw}
-              label={i18nService.t('workbenchTaskRetry')}
-              disabled={busy}
-              onClick={() =>
-                void runAction(() => window.electron.workbenchTask.retry(detail.task.id))
-              }
-            />
-          )}
-        </div>
-      </TooltipProvider>
+    <WorkbenchTaskAuditView
+      detail={auditDetail}
+      tasks={taskHistory}
+      busy={busy}
+      loading={auditLoading}
+      onSelectTask={taskId => void selectAuditTask(taskId)}
+      onRespondToApproval={respondToApproval}
+      toolbarActions={
+        <TooltipProvider>
+          <div className="flex items-center gap-1">
+            {canResume && (
+              <WorkbenchTaskActionButton
+                icon={Play}
+                label={i18nService.t('workbenchTaskResume')}
+                disabled={busy}
+                onClick={() =>
+                  void runAction(() =>
+                    window.electron.workbenchTask.resume({ taskId: detail.task.id }),
+                  )
+                }
+              />
+            )}
+            {canAccept && (
+              <WorkbenchTaskActionButton
+                icon={Check}
+                label={i18nService.t('workbenchTaskAccept')}
+                disabled={busy}
+                onClick={() =>
+                  void runAction(() => window.electron.workbenchTask.accept(detail.task.id))
+                }
+              />
+            )}
+            {canRetry && !canAccept && (
+              <WorkbenchTaskActionButton
+                icon={RefreshCw}
+                label={i18nService.t('workbenchTaskRetry')}
+                disabled={busy}
+                onClick={() =>
+                  void runAction(() => window.electron.workbenchTask.retry(detail.task.id))
+                }
+              />
+            )}
+          </div>
+        </TooltipProvider>
+      }
+    />
+  );
+}
 
-      <WorkbenchTaskAuditSheet
-        detail={auditDetail}
-        tasks={taskHistory}
-        open={open}
-        busy={busy}
-        loading={auditLoading}
-        onOpenChange={handleOpenChange}
-        onSelectTask={taskId => void selectAuditTask(taskId)}
-        onRespondToApproval={respondToApproval}
-      />
-    </>
+function WorkbenchTaskTrajectorySkeleton() {
+  return (
+    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-8 w-24" />
+      </div>
+      <Skeleton className="h-24 w-full" />
+      <Skeleton className="h-8 w-80" />
+      <Skeleton className="min-h-0 flex-1 w-full" />
+    </div>
   );
 }
