@@ -819,7 +819,14 @@ const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!workbenchTaskService) {
     workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
       onVerifiedRun: event => {
-        promoteVerifiedWorkbenchRun(getProjectMemoryService(), event);
+        const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
+        if (!complete) {
+          console.warn('[Memory] Skipped verified run extraction because the session model is unavailable.');
+          return;
+        }
+        void promoteVerifiedWorkbenchRun(getProjectMemoryService(), event, complete).catch(error => {
+          console.warn('[Memory] Failed to extract verified run memory:', error);
+        });
       },
     });
   }

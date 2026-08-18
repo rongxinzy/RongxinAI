@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
+import { MemoryLifecycleStatus, MemoryScope } from '../../shared/memory';
 import {
   EngramMemoryScope,
   EngramObservationType,
@@ -100,6 +101,36 @@ test('always recalls with the current project identity', async () => {
   expect(recall.mock.calls[1][0]).toMatchObject({ project: 'project-beta' });
 });
 
+test('returns referenced memory only when it is recallable in the current boundary', () => {
+  const findLinkByMemoryId = vi.fn((memoryId: number) => ({
+    memoryId,
+    status: MemoryLifecycleStatus.Active,
+    scope: MemoryScope.Project,
+    projectId: memoryId === 1 ? 'project-alpha' : 'project-beta',
+    sessionId: 'session-1',
+  }));
+  const service = new ProjectMemoryService(
+    { findLinkByMemoryId } as never,
+    {} as never,
+    identityFor,
+  );
+
+  expect(
+    service.getRecallableMemoryById({
+      workingDirectory: 'alpha',
+      sessionId: 'session-1',
+      memoryId: 1,
+    }),
+  ).toMatchObject({ memoryId: 1, projectId: 'project-alpha' });
+  expect(
+    service.getRecallableMemoryById({
+      workingDirectory: 'alpha',
+      sessionId: 'session-1',
+      memoryId: 2,
+    }),
+  ).toBeNull();
+});
+
 test('persists the outbox before confirming and linking a project memory', async () => {
   const repository = new FakeRepository();
   const adapter = {
@@ -116,6 +147,9 @@ test('persists the outbox before confirming and linking a project memory', async
       type: EngramObservationType.Decision,
       title: 'Database',
       content: 'Use SQLite.',
+      importance: 0.8,
+      confidence: 0.95,
+      metadata: { extractorVersion: 1, sourceIds: ['message-1'] },
     }),
   ).resolves.toBe(42);
 
@@ -124,6 +158,9 @@ test('persists the outbox before confirming and linking a project memory', async
     memoryId: 42,
     projectId: 'project-alpha',
     sessionId: 'session-1',
+    importance: 0.8,
+    confidence: 0.95,
+    metadata: { extractorVersion: 1, sourceIds: ['message-1'] },
   });
 });
 

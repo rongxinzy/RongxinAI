@@ -227,6 +227,7 @@ import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAge
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import type { CoworkStore } from '../../coworkStore';
+import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -310,6 +311,33 @@ describe('PiRuntimeAdapter', () => {
           ],
         },
       );
+    });
+
+    it('serializes background memory completions for the same session', async () => {
+      let releaseFirst: (() => void) | undefined;
+      hoisted.mockCompleteSimple
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              releaseFirst = () => resolve({ content: [{ text: 'First memory' }] });
+            }),
+        )
+        .mockResolvedValueOnce({ content: [{ text: 'Second memory' }] });
+      await adapter.startSession('memory-queue', 'Remember this');
+      const complete = adapter.getSessionMemoryCompletion('memory-queue');
+      expect(complete).not.toBeNull();
+      const messages = [{ role: SessionMemoryCompletionRole.System, content: 'Extract memory.' }];
+
+      const first = complete!(messages);
+      const second = complete!(messages);
+      await vi.waitFor(() => expect(hoisted.mockCompleteSimple).toHaveBeenCalledTimes(1));
+      releaseFirst?.();
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        'First memory',
+        'Second memory',
+      ]);
+      expect(hoisted.mockCompleteSimple).toHaveBeenCalledTimes(2);
     });
 
     it('registers raw conversation search as a separate tool', async () => {

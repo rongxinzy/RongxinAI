@@ -511,6 +511,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private sessionSummaryService: SessionSummaryService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
+  private readonly pendingMemoryCompletions = new Map<string, Promise<string>>();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
 
@@ -786,6 +787,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             service: this.projectMemoryService,
             sessionId,
             workingDirectory: workspaceRoot,
+            getMessages: () => this.store?.getSession(sessionId, 32)?.messages ?? [],
+            complete: async messages => {
+              const complete = this.getSessionMemoryCompletion(sessionId);
+              if (!complete) throw new Error('The session model is unavailable for memory extraction.');
+              return await complete(messages);
+            },
           }),
         );
       }
@@ -2040,11 +2047,30 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
 
   private createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion {
+    const sessionId = active.sessionId;
     const model = active.model;
     const modelRuntime = active.modelRuntime;
     const modelRequestOptions = active.modelRequestOptions;
-    return async messages =>
-      await this.completeSessionMemory(model, modelRuntime, modelRequestOptions, messages);
+    return messages => {
+      const previous = this.pendingMemoryCompletions.get(sessionId) ?? Promise.resolve('');
+      const current = previous
+        .catch(() => '')
+        .then(() =>
+          this.completeSessionMemory(model, modelRuntime, modelRequestOptions, messages),
+        )
+        .finally(() => {
+          if (this.pendingMemoryCompletions.get(sessionId) === current) {
+            this.pendingMemoryCompletions.delete(sessionId);
+          }
+        });
+      this.pendingMemoryCompletions.set(sessionId, current);
+      return current;
+    };
+  }
+
+  getSessionMemoryCompletion(sessionId: string): SessionMemoryCompletion | null {
+    const active = this.activeSessions.get(sessionId);
+    return active ? this.createSessionMemoryCompletion(active) : null;
   }
 
   private async completeSessionMemory(
