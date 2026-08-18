@@ -194,6 +194,48 @@ const SKILL_PROTOCOL_SEMANTICS = [
   { label: '按依赖顺序加载后续技能', pattern: /依赖顺序/ },
 ];
 
+/** Extract the body of a `## <keyword>` section (until the next ## heading). */
+function extractSection(body, headingKeyword) {
+  const lines = body.split('\n');
+  const result = [];
+  let inside = false;
+  for (const line of lines) {
+    const heading = line.match(/^##\s+(.+)$/);
+    if (heading) {
+      if (heading[1].includes(headingKeyword)) {
+        inside = true;
+        continue;
+      }
+      if (inside) break;
+      continue;
+    }
+    if (inside) result.push(line);
+  }
+  return result.join('\n');
+}
+
+/**
+ * Headings (##-level) under which checkbox lines appear. Only headings that
+ * denote progress ownership (进度/SOP/清单) count; delivery templates and
+ * domain QA checklists are output content and remain allowed.
+ */
+function findChecklistSections(body) {
+  const lines = body.split('\n');
+  const offenders = [];
+  let currentHeading = '';
+  for (const line of lines) {
+    const heading = line.match(/^##{1,3}\s+(.+)$/);
+    if (heading) {
+      currentHeading = heading[1].trim();
+      continue;
+    }
+    if (/^\s*-\s+\[[ xX]\]\s+/.test(line) && /进度|SOP|清单/.test(currentHeading)) {
+      if (!offenders.includes(currentHeading)) offenders.push(currentHeading);
+    }
+  }
+  return offenders;
+}
+
 function validatePluginJson(pluginJson, expertDir, result) {
   for (const field of ['name', 'version', 'description']) {
     if (!pluginJson[field] || hasTodo(pluginJson[field])) {
@@ -366,8 +408,11 @@ function validateAgentMd(mdPath, result, options = {}) {
   }
 
   if (requireSkillProtocol) {
+    // Only inspect the Skill usage protocol section itself, so stray keyword
+    // matches elsewhere in the prompt cannot satisfy the requirement.
+    const protocolSection = extractSection(body, 'Skill 使用协议');
     const missingSemantics = SKILL_PROTOCOL_SEMANTICS.filter(
-      semantic => !semantic.pattern.test(body),
+      semantic => !semantic.pattern.test(protocolSection),
     ).map(semantic => semantic.label);
     if (missingSemantics.length > 0) {
       result.error(
@@ -377,9 +422,13 @@ function validateAgentMd(mdPath, result, options = {}) {
   }
 
   // Hard architectural gates: progress ownership belongs to the runtime.
-  if (/^\s*-\s+\[[ xX]\]\s+/m.test(body)) {
+  // Only checklists inside progress-ownership headings (进度/SOP/清单) are
+  // rejected; checkboxes in delivery templates or domain QA sections are
+  // output content, not a second task state machine.
+  const progressSections = findChecklistSections(body);
+  if (progressSections.length > 0) {
     result.error(
-      `${basename}: Markdown progress checklists conflict with runtime-owned production progress`,
+      `${basename}: Markdown progress checklists conflict with runtime-owned production progress (${progressSections.join('、')})`,
     );
   }
 
@@ -401,7 +450,8 @@ function validateAgentMd(mdPath, result, options = {}) {
   // Formatting: full-width dash is the canonical routing heading separator.
   // Bundled presets must pass strict validation; third-party packages only
   // get a warning so a cosmetic difference never blocks registration.
-  if (/CRITICAL\s+-\s/.test(body)) {
+  // Match any half-width hyphen variant (with or without surrounding spaces).
+  if (/CRITICAL\s*-/.test(body)) {
     const message = `${basename}: 工作流路由标题使用半角破折号，应为全角（CRITICAL — 收到请求时首先判断）`;
     if (strict) result.error(message);
     else result.warn(message);
