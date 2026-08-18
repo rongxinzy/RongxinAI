@@ -83,7 +83,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
       {showMenu ? (
         <div
           role="menu"
-          className="absolute bottom-full left-0 z-50 mb-2 w-60 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-popover"
+          className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-popover"
         >
           {user ? (
             <>
