@@ -4,6 +4,7 @@ import {
   Atom,
   Calculator,
   ChartColumn,
+  ClipboardCheck,
   Feather,
   Megaphone,
   MoonStar,
@@ -30,7 +31,7 @@ const tile = (gradient: string) => `${TILE_SHEEN}, ${gradient}`;
  * Avatar art for the built-in preset experts, keyed by the preset name
  * (the machine id in zhiyuan-expert-manager/presets/{preset}/plugin.json).
  *
- * Each preset gets a distinct hue + profession icon so the eight cards on the
+ * Each preset gets a distinct hue + profession icon so the expert cards on the
  * Experts page are recognizable at a glance. Unknown presets fall back to the
  * initial-letter avatar rendered by {@link ExpertAvatar}.
  */
@@ -44,6 +45,11 @@ export const PRESET_EXPERT_AVATARS: Record<string, PresetExpertAvatarStyle> = {
   'data-analyst': {
     icon: ChartColumn,
     background: tile('linear-gradient(135deg, oklch(0.67 0.16 252), oklch(0.56 0.2 262))'),
+  },
+  // 日报专家 — checklist on teal
+  'daily-report-expert': {
+    icon: ClipboardCheck,
+    background: tile('linear-gradient(135deg, oklch(0.7 0.13 190), oklch(0.56 0.14 205))'),
   },
   // 股票研究专家 — trend line on emerald
   'equity-research': {
