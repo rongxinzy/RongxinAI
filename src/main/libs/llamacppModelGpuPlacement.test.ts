@@ -15,12 +15,15 @@ import {
 import { LlamaCppModelLoadFailureReason } from './llamacppModelLoadErrors';
 
 describe('llamacppModelGpuPlacement', () => {
-  test('lets llama.cpp automatically select GPU layers even when the complete model exceeds VRAM', () => {
+  test('writes llama.cpp device IDs for automatically selected GPUs', () => {
     const result = planLlamaCppModelGpuPlacement({
       launchInput: modelLaunchInput({ options: { ctxSize: 8192 } }),
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
       runtimeCapabilities: gpuCapabilities(),
-      nvidiaSnapshot: availableSnapshot(8_000),
+      nvidiaSnapshot: availableSnapshot([
+        { index: 0, memoryFreeMiB: 8_000 },
+        { index: 1, memoryFreeMiB: 8_000 },
+      ]),
       modelSizeBytes: gib(14),
     });
 
@@ -29,7 +32,7 @@ describe('llamacppModelGpuPlacement', () => {
       mode: LlamaCppModelGpuPlacementMode.Auto,
     });
     expect(result.success && result.input.options?.gpuLayers).toBe('auto');
-    expect(result.success && result.input.options?.device).toBe('0');
+    expect(result.success && result.input.options?.device).toBe('CUDA0,CUDA1');
   });
 
   test('keeps a CPU runtime launch input unchanged', () => {
@@ -66,7 +69,7 @@ describe('llamacppModelGpuPlacement', () => {
       memoryPolicy: LlamaCppMemoryPolicy.Manual,
       memoryBudgetPercent: 50,
       systemMemorySnapshot: systemMemorySnapshot({ totalMemoryMiB: 64_000, freeMemoryMiB: 40_000 }),
-      nvidiaSnapshot: availableSnapshot(8_000),
+      nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 8_000 }]),
       modelSizeBytes: gib(32),
     });
 
@@ -80,7 +83,7 @@ describe('llamacppModelGpuPlacement', () => {
       memoryPolicy: LlamaCppMemoryPolicy.Manual,
       memoryBudgetPercent: 50,
       systemMemorySnapshot: systemMemorySnapshot({ totalMemoryMiB: 64_000, freeMemoryMiB: 40_000 }),
-      nvidiaSnapshot: availableSnapshot(8_000),
+      nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 8_000 }]),
       modelSizeBytes: gib(40),
     });
 
@@ -118,15 +121,31 @@ function modelLaunchInput(input: Partial<LlamaCppModelLaunchInput> = {}): LlamaC
 }
 
 function gpuCapabilities() {
-  return { success: true, deviceProbeSucceeded: true, gpuDeviceCount: 1, backendKinds: ['cuda'] };
+  return {
+    success: true,
+    deviceProbeSucceeded: true,
+    devices: [
+      { id: 'CUDA0', name: 'GPU 0', backend: 'cuda' },
+      { id: 'CUDA1', name: 'GPU 1', backend: 'cuda' },
+    ],
+    gpuDeviceCount: 2,
+    backendKinds: ['cuda'],
+  };
 }
 
-function availableSnapshot(memoryFreeMiB: number): NvidiaSmiSnapshot {
+function availableSnapshot(
+  gpus: Array<{ index: number; memoryFreeMiB: number }>,
+): NvidiaSmiSnapshot {
   return {
     source: 'nvidia-smi',
     available: true,
     checkedAt: '2026-08-13T00:00:00.000Z',
-    gpus: [{ index: 0, name: 'GPU 0', memoryTotalMiB: memoryFreeMiB, memoryFreeMiB }],
+    gpus: gpus.map(gpu => ({
+      index: gpu.index,
+      name: `GPU ${gpu.index}`,
+      memoryTotalMiB: gpu.memoryFreeMiB,
+      memoryFreeMiB: gpu.memoryFreeMiB,
+    })),
   };
 }
 

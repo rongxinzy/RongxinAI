@@ -33,12 +33,9 @@ import {
   MARKETPLACE_PAGE_SIZE,
   MARKETPLACE_GRID_COLUMN_COUNT,
 } from '../constants';
-import type { InstallProgressState } from '../types';
 import {
   getInstallableMarketplaceModels,
-  getMarketplaceInstallProgress,
 } from '../utils/marketplace';
-import { isPullInProgress } from '../utils/progress';
 
 export function MarketplacePanel({
   loading,
@@ -50,12 +47,12 @@ export function MarketplacePanel({
   hasNextPage,
   query,
   installedModelPathMap,
-  installProgress,
   hardwareSummary,
-  onOpenInstalled,
+  activeDownloadModelId,
   onQueryChange,
   onSearch,
   onInstall,
+  onOpenDownloadPanel,
   hardwareSummaryReady,
 }: {
   loading: boolean;
@@ -67,15 +64,14 @@ export function MarketplacePanel({
   hasNextPage: boolean;
   query: string;
   installedModelPathMap: Map<string, string>;
-  installProgress: InstallProgressState;
-  onOpenInstalled: (model: MarketplaceModel) => void;
   onQueryChange: (v: string) => void;
   onSearch: (params?: MarketplaceSearchParams) => void;
   hardwareSummary?: MarketplaceHardwareProfile;
   hardwareSummaryReady: boolean;
   onInstall: (model: MarketplaceModel) => Promise<void>;
+  activeDownloadModelId?: string;
+  onOpenDownloadPanel: () => void;
 }) {
-  const [installingModelIds, setInstallingModelIds] = useState<Set<string>>(new Set());
   const [taskFilter, setTaskFilter] = useState<MarketplaceTaskFilter>('all');
   const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('all');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -94,11 +90,6 @@ export function MarketplacePanel({
     () => getInstallableMarketplaceModels(models, installedModelPathMap),
     [installedModelPathMap, models],
   );
-  const installedModels = useMemo(
-    () => models.filter(model => model.installed),
-    [models],
-  );
-
 
   const showAllModels = fitFilter === 'all';
   const pageCount = Math.max(
@@ -128,16 +119,7 @@ export function MarketplacePanel({
   }, [page, pageCount]);
 
   const handleInstall = async (model: MarketplaceModel) => {
-    setInstallingModelIds(prev => new Set(prev).add(model.id));
-    try {
-      await onInstall(model);
-    } finally {
-      setInstallingModelIds(prev => {
-        const next = new Set(prev);
-        next.delete(model.id);
-        return next;
-      });
-    }
+    await onInstall(model);
   };
 
   const fitFilterLabel = {
@@ -222,18 +204,6 @@ export function MarketplacePanel({
       featuredOnly: false,
     });
   }, [onQueryChange, onSearch]);
-
-  const installedModelActions = installedModels.length > 0 ? (
-    <div className="mx-auto mb-4 flex w-full max-w-6xl flex-wrap items-center gap-2 rounded-xl border border-success/20 bg-success/5 px-3 py-2">
-      <span className="mr-1 text-xs font-medium text-foreground">{i18nService.t('marketplaceInstalledNext')}</span>
-      {installedModels.slice(0, 4).map(model => (
-        <Button key={model.repoId} type="button" size="xs" variant="secondary" onClick={() => onOpenInstalled(model)}>
-          {model.name || model.repoId}
-          <span className="ml-1 text-[10px] text-muted-foreground">{i18nService.t('marketplaceRun')}</span>
-        </Button>
-      ))}
-    </div>
-  ) : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">
@@ -340,7 +310,7 @@ export function MarketplacePanel({
         </div>
       </div>
 
-      {marketplaceError ? (
+      {marketplaceError && models.length > 0 ? (
         <Alert>
           <AlertTitle>
             {marketplaceError.startsWith('CATALOG_ERROR:')
@@ -357,43 +327,38 @@ export function MarketplacePanel({
         </div>
       ) : !hasSearched ? null : visibleModels.length === 0 ? (
         <div className="mx-auto flex min-h-[620px] w-full max-w-6xl flex-col gap-4 rounded-lg bg-surface p-1">
-          {installedModelActions ?? (
-            <EmptyState
-              title={i18nService.t('marketplaceNoModels')}
-              action={
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  {fitFilter !== 'all' ? (
-                    <Button type="button" size="sm" onClick={() => setFitFilter('all')}>
-                      {i18nService.t('marketplaceEmptyShowAll')}
-                    </Button>
-                  ) : null}
-                  <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
-                    {i18nService.t('marketplaceFilterClear')}
+          <EmptyState
+            title={i18nService.t('marketplaceNoModels')}
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {fitFilter !== 'all' ? (
+                  <Button type="button" size="sm" onClick={() => setFitFilter('all')}>
+                    {i18nService.t('marketplaceEmptyShowAll')}
                   </Button>
-                </div>
-              }
-            />
-          )}
+                ) : null}
+                <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
+                  {i18nService.t('marketplaceFilterClear')}
+                </Button>
+              </div>
+            }
+          />
         </div>
       ) : (
         <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col rounded-lg bg-surface p-1">
-          {installedModelActions}
           <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface px-4 py-1">
             <div
               className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
               style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
             >
               {visibleModels.map(model => {
-                const progress = getMarketplaceInstallProgress(installProgress, model);
-                const installing = installingModelIds.has(model.id) || isPullInProgress(progress);
                 return (
                   <MarketplaceModelCard
                     key={model.repoId || model.id}
                     model={model}
                     loading={loading}
-                    installing={installing}
-                    installProgress={installProgress}
+                    isDownloadActive={model.repoId === activeDownloadModelId}
                     onInstall={handleInstall}
+                    onOpenDownload={onOpenDownloadPanel}
                   />
                 );
               })}

@@ -46,6 +46,7 @@ import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceA
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
 import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
+import { MarketplaceDownloadSidebar } from './components/MarketplaceDownloadSidebar';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
 import { ModelLaunchLogSidebar } from './components/ModelLaunchLogSidebar';
 import { RuntimeInstallCard } from './components/RuntimeInstallCard';
@@ -84,6 +85,7 @@ import {
 import {
   isInstallTerminalPhase,
   isPullInProgress,
+  isSuccessfulMarketplaceInstallProgress,
   normalizeInstallProgress,
 } from './utils/progress';
 import {
@@ -193,10 +195,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [activePullName, setActivePullName] = useState<string | null>(null);
+  const [isMarketplaceInstallPending, setIsMarketplaceInstallPending] = useState(false);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
+  const [marketplaceDownloadModel, setMarketplaceDownloadModel] = useState<MarketplaceModel | null>(null);
+  const [marketplaceDownloadPanelProgress, setMarketplaceDownloadPanelProgress] =
+    useState<LlamaCppInstallProgress>();
+  const [marketplaceDownloadPanelVisible, setMarketplaceDownloadPanelVisible] = useState(false);
   const isRunning = status?.status === 'running';
   const activePullProgress = activePullName ? pullProgress[activePullName] : undefined;
-  const pulling = isPullInProgress(activePullProgress);
+  const pulling = isMarketplaceInstallPending || isPullInProgress(activePullProgress);
   const [marketplaceModels, setMarketplaceModels] = useState<MarketplaceModel[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
@@ -295,6 +302,15 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     },
     [],
   );
+
+  const openMarketplaceDownloadPanel = useCallback(() => {
+    launchLogs.closePanel();
+    setMarketplaceDownloadPanelVisible(true);
+  }, [launchLogs]);
+
+  useEffect(() => {
+    if (activePullProgress) setMarketplaceDownloadPanelProgress(activePullProgress);
+  }, [activePullProgress]);
 
   const clearInstallProgressDismissTimer = useCallback((name: string) => {
     const timer = installProgressDismissTimersRef.current[name];
@@ -561,6 +577,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const handleMarketplaceInstall = useCallback(
     async (model: MarketplaceModel) => {
       if (pulling) {
+        openMarketplaceDownloadPanel();
         showToast(
           i18nService.t('marketplaceInstallAlreadyInProgress'),
           LocalInferenceToastKind.Info,
@@ -568,12 +585,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         return;
       }
       const name = model.repoId;
+      setMarketplaceDownloadModel(model);
+      setMarketplaceDownloadPanelProgress(undefined);
+      openMarketplaceDownloadPanel();
       clearInstallProgressDismissTimer(name);
       setActivePullName(name);
-      setPullProgress(current => ({
-        ...current,
-        [name]: { phase: 'starting', modelId: model.repoId, modelName: model.repoId },
-      }));
+      setIsMarketplaceInstallPending(true);
       dismissToast();
       try {
         const selectedFile =
@@ -623,9 +640,18 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           getLocalInferenceUserFacingErrorMessage(installError),
           LocalInferenceToastKind.Error,
         );
+      } finally {
+        setIsMarketplaceInstallPending(false);
       }
     },
-    [clearInstallProgressDismissTimer, dismissToast, pulling, refreshLocalModels, showToast],
+    [
+      clearInstallProgressDismissTimer,
+      dismissToast,
+      openMarketplaceDownloadPanel,
+      pulling,
+      refreshLocalModels,
+      showToast,
+    ],
   );
 
   const runAction = useCallback(
@@ -780,16 +806,30 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setPullProgress(current => ({ ...current, [name]: progress }));
         if (isInstallTerminalPhase(progress.phase)) {
           scheduleInstallProgressDismiss(name, progress.phase);
-          void refreshLocalModels().catch(() => undefined);
-          if (progress.phase === 'done') {
-            const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
-            if (marketplaceHasSearchedRef.current && params) {
-              void searchMarketplace(params).catch(() => undefined);
-            }
-            setMarketplaceModels(prev =>
-              prev.map(m => (m.repoId === name ? { ...m, installed: true } : m)),
-            );
-          }
+          void refreshLocalModels()
+            .then(localModels => {
+              if (progress.phase === 'done' && !isSuccessfulMarketplaceInstallProgress(progress, localModels)) {
+                setPullProgress(current => ({
+                  ...current,
+                  [name]: {
+                    ...progress,
+                    phase: 'failed',
+                    error: i18nService.t('marketplaceInstallFailed'),
+                  },
+                }));
+                return;
+              }
+              if (progress.phase === 'done') {
+                const params = buildMarketplaceSearchParams({ query: marketplaceQueryRef.current });
+                if (marketplaceHasSearchedRef.current && params) {
+                  void searchMarketplace(params).catch(() => undefined);
+                }
+                setMarketplaceModels(prev =>
+                  prev.map(m => (m.repoId === name ? { ...m, installed: true } : m)),
+                );
+              }
+            })
+            .catch(() => undefined);
         }
       }),
     ];
@@ -868,25 +908,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       }
     });
   }, [cancellingModelLoad, runAction]);
-
-  const handleMarketplaceOpenInstalled = useCallback(
-    (model: MarketplaceModel) => {
-      const target = localModels.find(candidate => {
-        if (!candidate.path) return false;
-        if (model.installedPath && candidate.path === model.installedPath) return true;
-        const normalizedPath = candidate.path.toLowerCase();
-        const repoId = model.repoId.toLowerCase();
-        return normalizedPath.includes(repoId) || normalizedPath.includes(repoId.replace('/', '\\'));
-      });
-      if (target) {
-        setActiveTab('models');
-        handleLoadModel(target);
-        return;
-      }
-      showToast(i18nService.t('marketplaceInstalledNotIndexed'), LocalInferenceToastKind.Info);
-    },
-    [handleLoadModel, localModels, showToast],
-  );
 
   const handleUnload = (modelName: string) => {
     if (shouldBlockModelAction({ modelName, unloadingModelName })) return;
@@ -1191,23 +1212,33 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   hasNextPage={marketplaceHasNextPage}
                   query={marketplaceQuery}
                   installedModelPathMap={installedModelPathMap}
-                  installProgress={pullProgress}
                   hardwareSummary={marketplaceHardware}
                   hardwareSummaryReady={marketplaceHardwareChecked}
-                  onOpenInstalled={handleMarketplaceOpenInstalled}
+                  activeDownloadModelId={pulling ? activePullName ?? undefined : undefined}
                   onQueryChange={setMarketplaceQuery}
                   onSearch={handleMarketplaceSearch}
                   onInstall={handleMarketplaceInstall}
+                  onOpenDownloadPanel={openMarketplaceDownloadPanel}
                 />
               </LayeredTabsContent>
             </div>
           </div>
-          <ModelLaunchLogSidebar
-            state={launchLogs.state}
-            isFullscreen={launchLogFullscreen}
-            onFullscreenChange={setLaunchLogFullscreen}
-            onClose={launchLogs.closePanel}
-          />
+          {activeTab === 'marketplace' ? (
+            <MarketplaceDownloadSidebar
+              visible={marketplaceDownloadPanelVisible && marketplaceDownloadModel !== null}
+              model={marketplaceDownloadModel}
+              progress={marketplaceDownloadPanelProgress}
+              onClose={() => setMarketplaceDownloadPanelVisible(false)}
+              onCancel={modelId => void window.electron.llamacpp.cancelInstall(modelId)}
+            />
+          ) : (
+            <ModelLaunchLogSidebar
+              state={launchLogs.state}
+              isFullscreen={launchLogFullscreen}
+              onFullscreenChange={setLaunchLogFullscreen}
+              onClose={launchLogs.closePanel}
+            />
+          )}
         </div>
       </Tabs>
 

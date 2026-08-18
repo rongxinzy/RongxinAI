@@ -271,14 +271,16 @@ function isGenerativeLanguageModel(model: MarketplaceModel): boolean {
 function matchesQuery(model: MarketplaceModel, query?: string): boolean {
   if (!query?.trim()) return true;
   const normalized = query.trim().toLowerCase();
-  return [
+  const haystacks = [
     model.repoId,
+    model.id,
     model.name,
     model.description,
     model.tags.join(' '),
     model.sizes.join(' '),
     model.recommendedTag,
-  ].some(value => value.toLowerCase().includes(normalized));
+  ].filter((value): value is string => typeof value === 'string');
+  return haystacks.some(value => value.toLowerCase().includes(normalized));
 }
 
 function matchesTags(model: MarketplaceModel, required: Set<string>): boolean {

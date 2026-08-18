@@ -9,6 +9,7 @@ import {
   LlamaCppModelLoadFailureReason,
   type LlamaCppModelLoadFailureReason as LlamaCppModelLoadFailureReasonType,
 } from './llamacppModelLoadErrors';
+import { resolveLlamaCppDeviceSelection } from './llamacppServe';
 
 export const LlamaCppModelGpuPlacementMode = {
   Cpu: 'cpu',
@@ -29,7 +30,7 @@ export type LlamaCppModelGpuPlacementInput = {
   runtimeBackend?: LlamaCppRuntimeBackend;
   runtimeCapabilities?: Pick<
     LlamaCppRuntimeCapabilities,
-    'success' | 'deviceProbeSucceeded' | 'gpuDeviceCount' | 'backendKinds'
+    'success' | 'deviceProbeSucceeded' | 'devices' | 'gpuDeviceCount' | 'backendKinds'
   > | null;
   nvidiaSnapshot?: NvidiaSmiSnapshot | null;
   systemMemorySnapshot?: SystemMemorySnapshot | null;
@@ -89,7 +90,11 @@ export function planLlamaCppModelGpuPlacement(
   return {
     success: true,
     mode: LlamaCppModelGpuPlacementMode.Auto,
-    input: withLlamaCppAutoGpuLayers(input.launchInput, selectedGpuIndexes),
+    input: withLlamaCppAutoGpuLayers(
+      input.launchInput,
+      selectedGpuIndexes,
+      input.runtimeCapabilities?.devices ?? [],
+    ),
   };
 }
 
@@ -229,12 +234,14 @@ function selectGpuIndexes(input: LlamaCppModelGpuPlacementInput): number[] {
 function withLlamaCppAutoGpuLayers(
   input: LlamaCppModelLaunchInput,
   selectedGpuIndexes: number[],
+  runtimeDevices: LlamaCppRuntimeCapabilities['devices'],
 ): LlamaCppModelLaunchInput {
+  const device = resolveLlamaCppDeviceSelection(selectedGpuIndexes.join(','), runtimeDevices);
   return {
     ...input,
     options: {
       ...input.options,
-      device: selectedGpuIndexes.join(','),
+      ...(device ? { device } : {}),
       gpuLayers: input.options?.gpuLayers ?? LlamaCppModelGpuLayerSelection.Auto,
     },
   };
