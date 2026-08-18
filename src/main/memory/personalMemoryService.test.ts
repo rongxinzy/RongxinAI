@@ -173,6 +173,7 @@ test('keeps personal proposals local until the user confirms them', async () => 
     type: MemoryKind.Preference,
     title: 'Editor',
     content: 'Prefer compact diffs.',
+    metadata: { extractorVersion: 1, sourceIds: ['message-1'] },
   });
 
   expect(adapter.saveCandidate).not.toHaveBeenCalled();
@@ -181,6 +182,9 @@ test('keeps personal proposals local until the user confirms them', async () => 
     expect.objectContaining({ project: PERSONAL_MEMORY_PROJECT_ID, scope: MemoryScope.Personal }),
   );
   expect(repository.links.get(id)).toMatchObject({ memoryId: 91 });
+  expect(repository.items[0].payload).toMatchObject({
+    metadata: { extractorVersion: 1, sourceIds: ['message-1'] },
+  });
 });
 
 function createMemoryServiceFixture() {

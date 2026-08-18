@@ -51,6 +51,7 @@ const hoisted = vi.hoisted(() => {
     applyOverrides: vi.fn(),
     getShellPath: vi.fn(),
   }));
+  const mockCompleteSimple = vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] });
 
   return {
     mockSession,
@@ -62,7 +63,7 @@ const hoisted = vi.hoisted(() => {
     }),
     mockGetAgentDir: vi.fn(() => '/tmp/pi-agent'),
     mockApplyApplicationRuntimeEnv: vi.fn(),
-    mockCompleteSimple: vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] }),
+    mockCompleteSimple,
     mockGetModel: vi.fn((provider: string, modelId: string) => ({
       provider,
       id: modelId,
@@ -77,6 +78,7 @@ const hoisted = vi.hoisted(() => {
       registerProvider: vi.fn(),
       setRuntimeApiKey: vi.fn().mockResolvedValue(undefined),
       getModel: vi.fn(),
+      completeSimple: mockCompleteSimple,
     },
     mockModelRuntimeCreate: vi.fn(),
     mockRegisterPiOpenAICompatUpstream: vi.fn(
@@ -225,6 +227,7 @@ import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAge
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
 import { CONVERSATION_HISTORY_TOOL_NAME } from '../../conversationHistory/constants';
 import type { CoworkStore } from '../../coworkStore';
+import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { WorkbenchTaskService } from '../../workbenchTask/taskService';
 import { WorkbenchTaskService as RealWorkbenchTaskService } from '../../workbenchTask/taskService';
 import { initializeWorkbenchTaskSchema } from '../../workbenchTask/schema';
@@ -277,15 +280,64 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('summary-session', 'Remember this', {
         workspaceRoot: '/workspace/project',
       });
+      await adapter.patchSession('summary-session', { model: 'openai/gpt-5' });
       const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
         type: string;
       }) => void;
       listener({ type: 'agent_end' });
 
-      expect(rollup).toHaveBeenCalledWith({
-        sessionId: 'summary-session',
-        workingDirectory: '/workspace/project',
-      });
+      expect(rollup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: 'summary-session',
+          workingDirectory: '/workspace/project',
+          complete: expect.any(Function),
+        }),
+      );
+      const complete = rollup.mock.calls[0][0].complete as (
+        messages: Array<{ role: string; content: string }>,
+      ) => Promise<string>;
+      await expect(
+        complete([
+          { role: 'system', content: 'Extract memory.' },
+          { role: 'user', content: 'Conversation payload.' },
+        ]),
+      ).resolves.toBe('Hello from Pi');
+      expect(hoisted.mockCompleteSimple).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'gpt-5', provider: 'openai' }),
+        {
+          messages: [
+            { role: 'system', content: 'Extract memory.' },
+            { role: 'user', content: 'Conversation payload.' },
+          ],
+        },
+      );
+    });
+
+    it('serializes background memory completions for the same session', async () => {
+      let releaseFirst: (() => void) | undefined;
+      hoisted.mockCompleteSimple
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              releaseFirst = () => resolve({ content: [{ text: 'First memory' }] });
+            }),
+        )
+        .mockResolvedValueOnce({ content: [{ text: 'Second memory' }] });
+      await adapter.startSession('memory-queue', 'Remember this');
+      const complete = adapter.getSessionMemoryCompletion('memory-queue');
+      expect(complete).not.toBeNull();
+      const messages = [{ role: SessionMemoryCompletionRole.System, content: 'Extract memory.' }];
+
+      const first = complete!(messages);
+      const second = complete!(messages);
+      await vi.waitFor(() => expect(hoisted.mockCompleteSimple).toHaveBeenCalledTimes(1));
+      releaseFirst?.();
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        'First memory',
+        'Second memory',
+      ]);
+      expect(hoisted.mockCompleteSimple).toHaveBeenCalledTimes(2);
     });
 
     it('registers raw conversation search as a separate tool', async () => {

@@ -61,11 +61,16 @@ import type { CoworkStore } from '../../coworkStore';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
+import type { LegacyMemoryMigrationService } from '../../memory/legacyMemoryMigrationService';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import {
   buildProjectMemoryContextSafe,
   type ProjectMemoryService,
 } from '../../memory/projectMemoryService';
+import type {
+  SessionMemoryCompletion,
+  SessionMemoryCompletionMessage,
+} from '../../memory/sessionMemoryExtractor';
 import type { SessionSummaryService } from '../../memory/sessionSummaryService';
 import type {
   WorkbenchApprovalRequestedEvent,
@@ -216,7 +221,9 @@ interface ActivePiSession {
   sessionId: string;
   piSession: PiSession;
   abortController: AbortController;
+  model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
+  modelRequestOptions?: { apiKey?: string };
   capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
@@ -503,8 +510,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
+  private legacyMemoryMigrationService: LegacyMemoryMigrationService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
+  private readonly pendingMemoryCompletions = new Map<string, Promise<string>>();
   private workbenchApprovalListener: ((event: WorkbenchApprovalRequestedEvent) => void) | null =
     null;
 
@@ -516,6 +525,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setSessionSummaryService(service: SessionSummaryService): void {
     this.sessionSummaryService = service;
+  }
+  setLegacyMemoryMigrationService(service: LegacyMemoryMigrationService): void {
+    this.legacyMemoryMigrationService = service;
   }
   setConversationHistoryService(service: ConversationHistoryService): void {
     this.conversationHistoryService = service;
@@ -780,6 +792,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             service: this.projectMemoryService,
             sessionId,
             workingDirectory: workspaceRoot,
+            getMessages: () => this.store?.getSession(sessionId, 32)?.messages ?? [],
+            complete: async messages => {
+              const complete = this.getSessionMemoryCompletion(sessionId);
+              if (!complete) throw new Error('The session model is unavailable for memory extraction.');
+              return await complete(messages);
+            },
           }),
         );
       }
@@ -977,7 +995,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionId,
         piSession: session,
         abortController,
+        model: resolvedModel.model,
         modelRuntime: resolvedModel.modelRuntime,
+        modelRequestOptions: resolvedModel.requestOptions,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1414,7 +1434,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const resolvedModel = await resolvePiModel(pi, patch.model, active.modelRuntime);
       const model = resolvedModel.model;
       await active.piSession.setModel(model);
+      active.model = model;
       active.modelRuntime = resolvedModel.modelRuntime;
+      active.modelRequestOptions = resolvedModel.requestOptions;
       active.capabilities = {
         ...active.capabilities,
         ...resolvedModel.capabilities,
@@ -2026,10 +2048,73 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           { messages: [{ role: 'user', content: prompt }] },
           resolvedModel.requestOptions,
         );
-    return result.content
-      .filter((c): c is { text: string } => 'text' in c)
-      .map(c => c.text)
-      .join('');
+    return extractPiCompletionText(result);
+  }
+
+  private createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion {
+    const sessionId = active.sessionId;
+    const model = active.model;
+    const modelRuntime = active.modelRuntime;
+    const modelRequestOptions = active.modelRequestOptions;
+    return messages => {
+      const previous = this.pendingMemoryCompletions.get(sessionId) ?? Promise.resolve('');
+      const current = previous
+        .catch(() => '')
+        .then(() =>
+          this.completeSessionMemory(model, modelRuntime, modelRequestOptions, messages),
+        )
+        .finally(() => {
+          if (this.pendingMemoryCompletions.get(sessionId) === current) {
+            this.pendingMemoryCompletions.delete(sessionId);
+          }
+        });
+      this.pendingMemoryCompletions.set(sessionId, current);
+      return current;
+    };
+  }
+
+  getSessionMemoryCompletion(sessionId: string): SessionMemoryCompletion | null {
+    const active = this.activeSessions.get(sessionId);
+    return active ? this.createSessionMemoryCompletion(active) : null;
+  }
+
+  private async runPostTurnMemoryMaintenance(
+    sessionId: string,
+    workingDirectory: string,
+    complete: SessionMemoryCompletion,
+  ): Promise<void> {
+    if (this.legacyMemoryMigrationService) {
+      try {
+        await this.legacyMemoryMigrationService.migrateSession({
+          sessionId,
+          workingDirectory,
+          complete,
+        });
+      } catch (error) {
+        console.warn(`[MemoryMigration] Failed to migrate session ${sessionId}:`, error);
+      }
+    }
+    if (this.sessionSummaryService) {
+      try {
+        await this.sessionSummaryService.rollup({ sessionId, workingDirectory, complete });
+      } catch (error) {
+        console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
+      }
+    }
+  }
+
+  private async completeSessionMemory(
+    model: Record<string, unknown>,
+    modelRuntime: PiModelRuntime | null,
+    modelRequestOptions: { apiKey?: string } | undefined,
+    messages: readonly SessionMemoryCompletionMessage[],
+  ): Promise<string> {
+    const pi = await getPiModules();
+    const context = { messages: messages.map(message => ({ ...message })) };
+    const result = modelRuntime?.completeSimple
+      ? await modelRuntime.completeSimple(model, context)
+      : await pi.completeSimple(model, context, modelRequestOptions);
+    return extractPiCompletionText(result);
   }
 
   // ── Private: event mapping ──
@@ -2402,13 +2487,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             workflowSnapshot,
           });
         }
-        if (this.sessionSummaryService) {
-          void this.sessionSummaryService
-            .rollup({ sessionId, workingDirectory: active.workspaceRoot })
-            .catch(error => {
-              console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
-            });
-        }
+        void this.runPostTurnMemoryMaintenance(
+          sessionId,
+          active.workspaceRoot,
+          this.createSessionMemoryCompletion(active),
+        );
         this.emit('complete', sessionId, null);
         break;
       }
@@ -3140,6 +3223,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       },
     };
   }
+}
+
+function extractPiCompletionText(result: { content: unknown[] }): string {
+  return result.content
+    .filter(
+      (content): content is { text: string } =>
+        typeof content === 'object' &&
+        content !== null &&
+        'text' in content &&
+        typeof content.text === 'string',
+    )
+    .map(content => content.text)
+    .join('');
 }
 
 // ── Provider resolution ──

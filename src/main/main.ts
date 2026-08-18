@@ -94,6 +94,7 @@ import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
 import { ConversationHistoryService } from './conversationHistory/service';
 import { EngramManager } from './memory/engramManager';
+import { LegacyMemoryMigrationService } from './memory/legacyMemoryMigrationService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
@@ -819,7 +820,14 @@ const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!workbenchTaskService) {
     workbenchTaskService = new WorkbenchTaskService(getStore().getDatabase(), {
       onVerifiedRun: event => {
-        promoteVerifiedWorkbenchRun(getProjectMemoryService(), event);
+        const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
+        if (!complete) {
+          console.warn('[Memory] Skipped verified run extraction because the session model is unavailable.');
+          return;
+        }
+        void promoteVerifiedWorkbenchRun(getProjectMemoryService(), event, complete).catch(error => {
+          console.warn('[Memory] Failed to extract verified run memory:', error);
+        });
       },
     });
   }
@@ -878,6 +886,13 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
     piRuntimeAdapter.setSessionSummaryService(
       new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
+    );
+    piRuntimeAdapter.setLegacyMemoryMigrationService(
+      new LegacyMemoryMigrationService(
+        getProjectMemoryService(),
+        getCoworkStore(),
+        getWorkbenchTaskService(),
+      ),
     );
     piRuntimeAdapter.setConversationHistoryService(
       new ConversationHistoryService(getStore().getDatabase()),
