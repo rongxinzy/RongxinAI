@@ -62,6 +62,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
     patchTaskPreview,
     removeTaskPreview,
     retryLoadTasks,
+    retryLoadScheduledTasks,
     loadMoreTasks,
     loadMoreScheduledTasks,
     collapseTasks,
@@ -123,8 +124,9 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
   const prefersReducedMotion = useReducedMotion();
   const [workspacePendingRemoval, setWorkspacePendingRemoval] =
     useState<WorkspaceSidebarNode | null>(null);
-  const [workspacePendingRename, setWorkspacePendingRename] =
-    useState<WorkspaceSidebarNode | null>(null);
+  const [workspacePendingRename, setWorkspacePendingRename] = useState<WorkspaceSidebarNode | null>(
+    null,
+  );
   const [workspaceRenameValue, setWorkspaceRenameValue] = useState('');
 
   const handleConfirmRemoveWorkspace = async () => {
@@ -325,7 +327,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
                   onRemoveWorkspace={selectedWorkspace =>
                     setWorkspacePendingRemoval(selectedWorkspace)
                   }
-                  onRetryLoadTasks={workspaceId => void retryLoadTasks(workspaceId)}
+                  onRetryLoadTasks={workspaceId => void retryLoadScheduledTasks(workspaceId)}
                   onLoadMoreTasks={workspaceId => void loadMoreScheduledTasks(workspaceId)}
                   onCollapseTasks={collapseScheduledTasks}
                   onSelectTask={task => void handleSelectTask(task)}

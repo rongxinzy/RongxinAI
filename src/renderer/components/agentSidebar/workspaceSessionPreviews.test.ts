@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkSessionMode, CoworkSessionSource } from '../../../shared/cowork/constants';
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import {
   isSessionOwnedByWorkspace,
@@ -14,6 +14,7 @@ const makeSession = (id: string, workspaceId: string): CoworkSessionSummary => (
   status: CoworkSessionStatusValue.Completed,
   mode: CoworkSessionMode.Work,
   pinned: false,
+  source: CoworkSessionSource.Manual,
   createdAt: 1,
   updatedAt: 1,
 });

@@ -5,7 +5,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { buildSessionTitleFromInput } from '../../../common/sessionTitle';
-import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import {
+  CoworkPermissionMode,
+  CoworkSessionMode,
+  CoworkSessionSource,
+} from '../../../shared/cowork/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
@@ -151,12 +155,15 @@ const isDirectChatSessionMetrics = (value: unknown): value is DirectChatSessionM
   const start = data.requestStartedAt;
   const first = data.firstVisibleTextAt;
   const end = data.completedAt;
-  return typeof start === 'number'
-    && typeof end === 'number'
-    && Number.isFinite(start)
-    && Number.isFinite(end)
-    && end >= start
-    && (first === undefined || (typeof first === 'number' && Number.isFinite(first) && first >= start && first <= end));
+  return (
+    typeof start === 'number' &&
+    typeof end === 'number' &&
+    Number.isFinite(start) &&
+    Number.isFinite(end) &&
+    end >= start &&
+    (first === undefined ||
+      (typeof first === 'number' && Number.isFinite(first) && first >= start && first <= end))
+  );
 };
 
 const CoworkView: React.FC<CoworkViewProps> = ({
@@ -423,13 +430,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({
         updatedAt: now,
         cwd: currentWorkspacePath,
         systemPrompt: '',
-        modelOverride: currentAgentSelectedModel
-          ? toAgentModelRef(currentAgentSelectedModel)
-          : '',
+        modelOverride: currentAgentSelectedModel ? toAgentModelRef(currentAgentSelectedModel) : '',
         executionMode: config.executionMode || 'local',
         activeSkillIds: sessionSkillIds,
         workspaceId: currentWorkspaceId || '',
         agentId: currentAgentId,
+        source: CoworkSessionSource.Manual,
         messages: [
           {
             id: `msg-${now}`,

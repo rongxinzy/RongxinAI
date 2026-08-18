@@ -7,6 +7,7 @@ import { EventEmitter } from 'events';
 
 import { type CoworkError, CoworkErrorKind } from '../../common/coworkError';
 import { buildScheduledTaskEnginePrompt } from '../../scheduledTask/enginePrompt';
+import { CoworkSessionSource } from '../../shared/cowork/constants';
 import { ActivitySource, ActivityStatus } from '../../shared/activity/constants';
 import type { CoworkMessage, CoworkStore } from '../coworkStore';
 import type { ActivityService } from '../activity/activityService';
@@ -418,6 +419,8 @@ export class IMCoworkHandler extends EventEmitter {
       'work',
       undefined,
       workspace.id,
+      undefined,
+      CoworkSessionSource.Im,
     );
 
     // Save mapping

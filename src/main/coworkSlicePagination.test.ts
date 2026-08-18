@@ -16,6 +16,7 @@ import coworkReducer, {
   setSessions,
 } from '../renderer/store/slices/coworkSlice';
 import type { CoworkMessage, CoworkSession, CoworkSessionSummary } from '../renderer/types/cowork';
+import { CoworkSessionSource } from '../shared/cowork/constants';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -27,6 +28,7 @@ function makeSession(id: string, updatedAt = Date.now()): CoworkSessionSummary {
     title: `Session ${id}`,
     status: 'idle',
     pinned: false,
+    source: CoworkSessionSource.Manual,
     createdAt: updatedAt,
     updatedAt,
   };
@@ -44,6 +46,7 @@ function makeFullSession(
     claudeSessionId: null,
     status: 'idle',
     pinned: false,
+    source: CoworkSessionSource.Manual,
     cwd: '/tmp',
     systemPrompt: '',
     executionMode: 'local',

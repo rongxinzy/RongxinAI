@@ -6,6 +6,7 @@ import type {
   CoworkPermissionMode,
   CoworkPermissionOrigin,
   CoworkSessionMode,
+  CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
@@ -99,6 +100,7 @@ interface CoworkSession {
   activeSkillIds: string[];
   workspaceId: string;
   agentId: string;
+  source: CoworkSessionSource;
   messages: CoworkMessage[];
   messagesOffset: number;
   totalMessages: number;
@@ -122,6 +124,7 @@ interface CoworkSessionSummary {
   pinOrder?: number | null;
   workspaceId?: string;
   agentId?: string;
+  source: CoworkSessionSource;
   createdAt: number;
   updatedAt: number;
 }
@@ -791,6 +794,7 @@ interface IElectronAPI {
       agentId?: string;
       workspaceId?: string;
       mode?: CoworkSessionMode;
+      sources?: CoworkSessionSource[];
     }) => Promise<{
       success: boolean;
       sessions?: CoworkSessionSummary[];
