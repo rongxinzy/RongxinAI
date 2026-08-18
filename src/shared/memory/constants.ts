@@ -64,6 +64,7 @@ export type MemorySourceKind = (typeof MemorySourceKind)[keyof typeof MemorySour
 
 export const MemoryIpcChannel = {
   List: 'memory:list',
+  ResolveSessionTitles: 'memory:resolveSessionTitles',
   CreateManual: 'memory:createManual',
   UpdateManual: 'memory:updateManual',
   ConfirmCandidate: 'memory:confirmCandidate',
