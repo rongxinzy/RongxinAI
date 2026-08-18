@@ -2,6 +2,8 @@ import { ipcMain } from 'electron';
 
 import {
   MemoryIpcChannel,
+  type ManualMemoryCreateInput,
+  type ManualMemoryUpdateInput,
   type ManagedMemoryListInput,
   type MemoryIpcResult,
 } from '../../shared/memory';
@@ -20,6 +22,12 @@ export function registerMemoryIpcHandlers(options: {
 
   ipcMain.handle(MemoryIpcChannel.List, (_event, input?: ManagedMemoryListInput) =>
     handle(() => options.getService().listManagedMemories(input)),
+  );
+  ipcMain.handle(MemoryIpcChannel.CreateManual, (_event, input: ManualMemoryCreateInput) =>
+    handle(() => options.getService().createManualMemory(input)),
+  );
+  ipcMain.handle(MemoryIpcChannel.UpdateManual, (_event, input: ManualMemoryUpdateInput) =>
+    handle(() => options.getService().updateManualMemory(input)),
   );
   ipcMain.handle(MemoryIpcChannel.ConfirmCandidate, (_event, id: string) =>
     handle(() => options.getService().confirmPersonalCandidate(id)),

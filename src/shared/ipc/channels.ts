@@ -160,16 +160,6 @@ export const CoworkConfigIpc = {
 } as const;
 export type CoworkConfigIpc = (typeof CoworkConfigIpc)[keyof typeof CoworkConfigIpc];
 
-// ─── Cowork Memory ──────────────────────────────────────────────────────────
-export const CoworkMemoryIpc = {
-  ListEntries: 'cowork:memory:listEntries',
-  CreateEntry: 'cowork:memory:createEntry',
-  UpdateEntry: 'cowork:memory:updateEntry',
-  DeleteEntry: 'cowork:memory:deleteEntry',
-  GetStats: 'cowork:memory:getStats',
-} as const;
-export type CoworkMemoryIpc = (typeof CoworkMemoryIpc)[keyof typeof CoworkMemoryIpc];
-
 // ─── Cowork Bootstrap ───────────────────────────────────────────────────────
 export const CoworkBootstrapIpc = {
   Read: 'cowork:bootstrap:read',

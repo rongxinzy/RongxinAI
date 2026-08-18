@@ -133,11 +133,6 @@ interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: 'auto' | 'local' | 'sandbox';
-  memoryEnabled: boolean;
-  memoryImplicitUpdateEnabled: boolean;
-  memoryLlmJudgeEnabled: boolean;
-  memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
-  memoryUserMemoriesMaxItems: number;
   permissionMode: CoworkPermissionMode;
   embeddingEnabled: boolean;
   embeddingProvider: string;
@@ -153,11 +148,6 @@ type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
-    | 'memoryEnabled'
-    | 'memoryImplicitUpdateEnabled'
-    | 'memoryLlmJudgeEnabled'
-    | 'memoryGuardLevel'
-    | 'memoryUserMemoriesMaxItems'
     | 'permissionMode'
     | 'embeddingEnabled'
     | 'embeddingProvider'
@@ -168,27 +158,6 @@ type CoworkConfigUpdate = Partial<
     | 'embeddingRemoteApiKey'
   >
 >;
-
-interface MemorySource {
-  sessionId: string | null;
-  role: 'user' | 'assistant' | 'tool' | 'system' | 'im';
-  date: string;
-}
-
-interface CoworkUserMemoryEntry {
-  id: string;
-  text: string;
-  source?: MemorySource | null;
-}
-
-interface CoworkMemoryStats {
-  total: number;
-  created: number;
-  stale: number;
-  deleted: number;
-  explicit: number;
-  implicit: number;
-}
 
 interface CoworkPermissionRequest {
   origin: CoworkPermissionOrigin;
@@ -659,15 +628,29 @@ interface IElectronAPI {
     showSystemMenu: (position: { x: number; y: number }) => void;
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
-  memory: {
+    memory: {
     list: (
       input?: import('../../shared/memory').ManagedMemoryListInput,
     ) => Promise<
       import('../../shared/memory').MemoryIpcResult<
         import('../../shared/memory').ManagedMemoryRecord[]
       >
-    >;
-    confirmCandidate: (
+      >;
+      createManual: (
+        input: import('../../shared/memory').ManualMemoryCreateInput,
+      ) => Promise<
+        import('../../shared/memory').MemoryIpcResult<
+          import('../../shared/memory').ManagedMemoryRecord
+        >
+      >;
+      updateManual: (
+        input: import('../../shared/memory').ManualMemoryUpdateInput,
+      ) => Promise<
+        import('../../shared/memory').MemoryIpcResult<
+          import('../../shared/memory').ManagedMemoryRecord
+        >
+      >;
+      confirmCandidate: (
       id: string,
     ) => Promise<import('../../shared/memory').MemoryIpcResult<number | null>>;
     archive: (id: string) => Promise<import('../../shared/memory').MemoryIpcResult<void>>;
@@ -840,21 +823,6 @@ interface IElectronAPI {
     }) => Promise<{ success: boolean; error?: string }>;
     getConfig: () => Promise<{ success: boolean; config?: CoworkConfig; error?: string }>;
     setConfig: (config: CoworkConfigUpdate) => Promise<{ success: boolean; error?: string }>;
-    listMemoryEntries: (input: {
-      query?: string;
-      limit?: number;
-      offset?: number;
-    }) => Promise<{ success: boolean; entries?: CoworkUserMemoryEntry[]; error?: string }>;
-    createMemoryEntry: (input: {
-      text: string;
-      source?: { sessionId?: string | null; role?: string; date?: string };
-    }) => Promise<{ success: boolean; entry?: CoworkUserMemoryEntry; error?: string }>;
-    updateMemoryEntry: (input: {
-      id: string;
-      text: string;
-    }) => Promise<{ success: boolean; entry?: CoworkUserMemoryEntry; error?: string }>;
-    deleteMemoryEntry: (input: { id: string }) => Promise<{ success: boolean; error?: string }>;
-    getMemoryStats: () => Promise<{ success: boolean; stats?: CoworkMemoryStats; error?: string }>;
     readBootstrapFile: (
       filename: string,
     ) => Promise<{ success: boolean; content: string; error?: string }>;

@@ -219,6 +219,27 @@ export class MemoryRepository {
     return row ? mapCandidate(row, this.getDelivery(id)) : null;
   }
 
+  updateCandidate(
+    id: string,
+    input: Pick<MemoryProjectionInput, 'title' | 'content' | 'kind' | 'sensitivity'>,
+  ): ManagedMemoryRecord | null {
+    const result = this.db
+      .prepare(
+        `UPDATE memory_candidates
+         SET title = ?, content = ?, kind = ?, sensitivity = ?, updated_at = datetime('now')
+         WHERE id = ? AND status = ?`,
+      )
+      .run(
+        input.title,
+        input.content,
+        input.kind,
+        input.sensitivity ?? MemorySensitivity.Normal,
+        id,
+        MemoryLifecycleStatus.NeedsReview,
+      );
+    return result.changes > 0 ? this.getCandidate(id) : null;
+  }
+
   getCandidateDetails(id: string): {
     supersedesLinkId: string | null;
     promotedFromLinkId: string | null;
@@ -293,7 +314,44 @@ export class MemoryRepository {
   }
 
   deleteCandidate(id: string): void {
-    this.db.prepare('DELETE FROM memory_candidates WHERE id = ?').run(id);
+    this.db.transaction(() => {
+      this.db
+        .prepare('DELETE FROM memory_outbox WHERE link_id = ? AND status = ?')
+        .run(id, MemoryOutboxStatus.Pending);
+      this.db.prepare('DELETE FROM memory_candidates WHERE id = ?').run(id);
+    })();
+  }
+
+  rejectCandidate(id: string): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare('DELETE FROM memory_outbox WHERE link_id = ? AND status = ?')
+        .run(id, MemoryOutboxStatus.Pending);
+      this.db
+        .prepare(
+          `INSERT INTO memory_import_rejections (id, rejected_at)
+           VALUES (?, datetime('now'))
+           ON CONFLICT(id) DO UPDATE SET rejected_at = excluded.rejected_at`,
+        )
+        .run(id);
+      this.db.prepare('DELETE FROM memory_candidates WHERE id = ?').run(id);
+    })();
+  }
+
+  recordImportRejection(id: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO memory_import_rejections (id, rejected_at)
+         VALUES (?, datetime('now'))
+         ON CONFLICT(id) DO UPDATE SET rejected_at = excluded.rejected_at`,
+      )
+      .run(id);
+  }
+
+  hasImportRejection(id: string): boolean {
+    return Boolean(
+      this.db.prepare('SELECT 1 FROM memory_import_rejections WHERE id = ?').get(id),
+    );
   }
 
   enqueue(
@@ -665,6 +723,11 @@ export class MemoryRepository {
 
       CREATE INDEX IF NOT EXISTS idx_memory_outbox_pending
         ON memory_outbox(status, available_at, created_at);
+
+      CREATE TABLE IF NOT EXISTS memory_import_rejections (
+        id TEXT PRIMARY KEY,
+        rejected_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
     `);
     this.ensureAddedColumns();
   }
