@@ -19,7 +19,8 @@ function getDefaultExpertPackagesDir() {
   const platform = process.platform;
   let base;
   if (platform === 'win32') {
-    base = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'));
+    // The app stores user data under %APPDATA%\ZhiYuanAgent (Roaming), not Local.
+    base = path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'));
   } else if (platform === 'darwin') {
     base = path.join(os.homedir(), 'Library', 'Application Support');
   } else {
@@ -56,6 +57,9 @@ const AGENT_PLUGIN_JSON_TEMPLATE = `{
   "agentName": "%(agent_name)s",
 
   "agents": ["./agents/%(agent_name)s.md"],
+
+  "skills": [],
+  "skillIds": [],
 
   "displayName": {
     "en": "[TODO: English display name]",
@@ -108,6 +112,9 @@ const TEAM_PLUGIN_JSON_TEMPLATE = `{
     "./agents/%(team)s-team-lead.md",
     "./agents/[TODO: member-a].md"
   ],
+
+  "skills": [],
+  "skillIds": [],
 
   "displayName": {
     "en": "[TODO: English team name]",
@@ -166,9 +173,9 @@ profession:
 maxTurns: 50
 ---
 
-# [TODO: 角色名称] - [TODO: 人名]
+# [TODO: 角色名称]
 
-你是**[TODO: 人名]**，一位[TODO: 职业定位]。你必须遵循标准工作流完成所有任务。
+你是**[TODO: 职业定位]**，[TODO: 一句话职责描述]。你必须遵循标准工作流完成所有任务。
 
 ## 工作流路由（CRITICAL — 收到请求时首先判断）
 
@@ -179,41 +186,34 @@ maxTurns: 50
 
 ---
 
+## Skill 使用协议（CRITICAL）
+
+1. 从系统提示的 \`<available_skills>\` 中选择与请求最匹配的一个 Skill。
+2. 使用 \`read\` 完整读取该 Skill 的 \`<location>\`，将其所在目录作为 Skill 根目录。
+3. 严格按 \`SKILL.md\` 的输入、工作流与输出规范执行；相对路径一律相对 Skill 根目录解析。
+4. 仅当首个 Skill 明确引用另一个 Skill 时才继续读取，禁止一次性加载全部 Skill。
+5. 若请求跨多个独立工作流，先完成主工作流，再按依赖顺序加载后续 Skill。
+
+---
+
 ## [TODO: 模式1名称]
-
-### 执行规范（CRITICAL）
-
-开始此模式后，**立即输出以下进度清单并严格按顺序执行**。每完成一个 Phase，**必须将对应 \`- [ ]\` 更新为 \`- [x]\`**：
-
-\`\`\`markdown
-## 任务进度
-- [ ] Phase 1：[TODO: 阶段名]
-- [ ] Phase 2：[TODO: 阶段名]
-- [ ] Phase N：[TODO: 最终阶段名]
-\`\`\`
 
 ### Phase 1：[TODO: 阶段名]
 - [TODO: 输入/输出说明]
-- 完成后更新进度清单
 
 ### Phase 2：[TODO: 阶段名]
 - [TODO: 输入/输出说明]
-- 完成后更新进度清单
 
 ### Phase N：最终交付
 - [TODO: 交付物说明]
-- 完成后更新进度清单，全部 \`[x]\` 表示任务完成
 
 ---
 
 ## [TODO: 其他模式名称]（如有）
 
-\`\`\`markdown
-## 任务进度
-- [ ] [TODO: 步骤1]
-- [ ] [TODO: 步骤2]
-- [ ] [TODO: 步骤3]
-\`\`\`
+- [TODO: 步骤1]
+- [TODO: 步骤2]
+- [TODO: 步骤3]
 
 ---
 
@@ -221,7 +221,6 @@ maxTurns: 50
 
 - ❌ [TODO: 禁止行为1]
 - ❌ [TODO: 禁止行为2]
-- ❌ **禁止忘记更新进度清单** — 每个 Phase 完成后必须把对应 \`- [ ]\` 改为 \`- [x]\`
 
 ## 输出规范
 
@@ -231,9 +230,9 @@ maxTurns: 50
 
 ## 当你收到请求时
 
-1. 判断使用哪个模式，**立即输出对应的进度清单**
-2. 按 Phase 顺序执行，**每完成一步更新清单**
-3. 最终交付时提供汇总和建议，清单应全部为 \`[x]\`
+1. 判断使用哪个模式，说明将采用的工作流
+2. 按 Phase 顺序执行
+3. 最终交付时提供汇总和建议
 
 请用"[TODO: 问候语]"开始对话。
 `;
@@ -251,16 +250,16 @@ maxTurns: 150
 ---
 
 # [TODO: 团队名称] - 主理人
-## [TODO: 花名] · [TODO: 职业定位]
+## [TODO: 团队定位]
 
-你是**[TODO: 花名]**，团队的**主理人**。你的角色是协调整个工作流，将任务分派给合适的团队成员，并确保顺畅协作。**你是协调者，而非执行者。**
+你是**[TODO: 团队定位]**的**主理人**。你的角色是协调整个工作流，将任务分派给合适的团队成员，并确保顺畅协作。**你是协调者，而非执行者。**
 
 ## 团队成员
 
 | Agent ID | 姓名 | 职责 |
 |----------|------|------|
-| %(team)s-team-lead | [TODO: 花名] · [TODO: 头衔] | 编排调度 |
-| [TODO: member-a] | [TODO: 花名] · [TODO: 头衔] | [TODO: 职责] |
+| %(team)s-team-lead | [TODO: 团队定位] · [TODO: 头衔] | 编排调度 |
+| [TODO: member-a] | [TODO: 定位] · [TODO: 头衔] | [TODO: 职责] |
 
 ## 工作流路由（CRITICAL — 收到请求时首先判断）
 
@@ -268,6 +267,16 @@ maxTurns: 150
 |------|---------|-----------|
 | [TODO: 场景1] | [TODO: 判定条件] | ⚡ 快速模式 |
 | [TODO: 场景2] | [TODO: 判定条件] | 🏗️ 标准 SOP |
+
+---
+
+## Skill 使用协议（CRITICAL）
+
+1. 从系统提示的 \`<available_skills>\` 中选择与请求最匹配的一个 Skill。
+2. 使用 \`read\` 完整读取该 Skill 的 \`<location>\`，将其所在目录作为 Skill 根目录。
+3. 严格按 \`SKILL.md\` 的输入、工作流与输出规范执行；相对路径一律相对 Skill 根目录解析。
+4. 仅当首个 Skill 明确引用另一个 Skill 时才继续读取，禁止一次性加载全部 Skill。
+5. 若请求跨多个独立工作流，先完成主工作流，再按依赖顺序加载后续 Skill。
 
 ---
 
@@ -285,32 +294,18 @@ maxTurns: 150
 
 ## 🏗️ 标准 SOP 工作流（复杂需求）
 
-### 执行规范（CRITICAL）
-
-开始标准 SOP 后，**立即输出以下进度清单并严格按顺序执行**。每完成一个 Phase，**必须将对应 \`- [ ]\` 更新为 \`- [x]\`**：
-
-\`\`\`markdown
-## SOP 进度
-- [ ] Phase 1：[TODO: 阶段名] → [TODO: member-a]
-- [ ] Phase 2：[TODO: 阶段名] → [TODO: member-b]
-- [ ] Phase N：最终交付 → 主理人汇编
-\`\`\`
-
 ### Phase 1: [TODO: 阶段名]
 - 调用成员：[TODO: member-a]
 - 输入：[TODO: 用户需求/原始资料]
 - 输出：[TODO: 交付物]
-- 完成后更新进度清单
 
 ### Phase 2: [TODO: 阶段名]
 - 调用成员：[TODO: member-b]
 - 输入：Phase 1 完整产出
 - 输出：[TODO: 交付物]
-- 完成后更新进度清单
 
 ### Phase N: 最终交付
 综合所有产出，生成最终报告返回用户。
-完成后更新进度清单，全部 \`[x]\` 表示任务完成
 
 ---
 
@@ -328,7 +323,6 @@ maxTurns: 150
 - ❌ 禁止未完成前序阶段就跳到后续阶段
 - ❌ 禁止让成员互相直连通信，所有跨成员信息流必须经主理人中转
 - ❌ 禁止 spawn 主理人自己
-- ❌ **禁止忘记更新 SOP 进度清单** — 每个 Phase 完成后必须把对应 \`- [ ]\` 改为 \`- [x]\`
 
 ### 调度方式
 调用 \`subagent\` 工具时，使用以下参数：
@@ -342,11 +336,10 @@ maxTurns: 150
 ## 当你收到请求时
 
 1. **首先判断工作流类型**（快速模式 / 标准 SOP）
-2. **立即输出对应的 SOP 进度清单**（markdown checkbox 格式）
-3. 向用户简要说明你的计划（涉及哪些成员、以什么顺序）
-4. 通过分派给第一个成员来启动工作流
-5. 将每个成员的输出传递给下一个成员，**每完成一个 Phase 更新清单**
-6. 向用户汇总最终交付成果，清单应全部为 \`[x]\`
+2. 向用户简要说明你的计划（涉及哪些成员、以什么顺序）
+3. 通过分派给第一个成员来启动工作流
+4. 将每个成员的输出传递给下一个成员
+5. 向用户汇总最终交付成果
 `;
 
 const TEAM_MEMBER_MD_TEMPLATE = `---
@@ -361,9 +354,9 @@ profession:
 maxTurns: 50
 ---
 
-# [TODO: 角色名称] - [TODO: 人名]
+# [TODO: 角色名称]
 
-你是**[TODO: 人名]**，团队的**[TODO: 角色]**。你必须基于自身专业判断独立完成任务。
+你是团队的**[TODO: 角色]**。你必须基于自身专业判断独立完成任务。
 
 ## 核心能力
 1. **[TODO: 能力1]**：[TODO: 描述]

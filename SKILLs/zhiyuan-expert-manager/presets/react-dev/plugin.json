@@ -21,7 +21,7 @@
   },
   "displayDescription": {
     "en": "Builds reviewable React components with interface-first design, evidence-based defect diagnosis, and checklists for a11y, performance, and design-system compliance.",
-    "zh": "接口先于实现、证据先于猜测地交付 React 组件：标准组件蓝图、缺陷定位与重构审查，覆盖 a11y、性能与设计规范自检。"
+    "zh": "接口先于实现、证据先于猜测地交付 React 组件：标准蓝图、缺陷定位与重构，含 a11y 自检。"
   },
   "categoryId": "02-Engineering",
   "defaultInitPrompt": {

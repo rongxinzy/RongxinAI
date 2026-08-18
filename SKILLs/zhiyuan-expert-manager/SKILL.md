@@ -51,7 +51,7 @@ ZhiYuan Agent 使用 **pi** 作为 Work、Chat、Channel 与 Cron 的唯一执�
 
 ### 场景 A：交互模式
 
-**专家目录（固定）**：`%LOCALAPPDATA%/ZhiYuan Agent/expert-packages/`（Windows）或对应平台的用户数据目录。禁止生成到其他目录。
+**专家目录（固定）**：`%APPDATA%/ZhiYuanAgent/expert-packages/`（Windows）或对应平台的用户数据目录。禁止生成到其他目录。
 
 **必须明确的信息：**
 
@@ -118,7 +118,7 @@ node scripts/init_expert.js <expert-name> --type agent|team
 
 > **⚠️ 关键：命令式 > 描述式。** Agent MD 正文必须写成**行动指令**（other applications 风格），不能写成简历（CV 风格）。
 >
-> - ✅ "你是**林墨**，你必须遵循标准工作流完成所有任务。"
+> - ✅ "你是**文案创作专家**，你必须遵循标准工作流完成所有任务。"
 > - ✅ "## 工作流路由（CRITICAL — 收到请求时首先判断）"
 > - ✅ "## 严禁行为" + ❌ 标记
 > - ✅ "## 当你收到请求时" → 1、2、3 具体行动步骤
@@ -140,8 +140,20 @@ node scripts/register_expert.js <path/to/expert-dir>
 
 1. 再次校验关键字段
 2. 将专家写入 SQLite `agents` 表
-3. 把 `plugin.skills` 复制到 `%LOCALAPPDATA%/ZhiYuan Agent/SKILLs/`
+3. 把 `plugin.skills` 复制到 `%APPDATA%/ZhiYuanAgent/SKILLs/`
 4. 写入 `expert-packages/registry.json`
+
+### 内置预设与用户包：两条生命线
+
+- **内置预设**（仓库内 `SKILLs/zhiyuan-expert-manager/presets/`）：与普通技能一样**文件即真源**——直接修改预设文件即可生效，无需注册；下次会话读取磁盘快照。CI 会以 strict 模式校验全部内置预设。
+- **用户导入包**：走本节的 init → validate → register 流程，写入 `agents` 表与 `registry.json`。
+
+### 校验硬门禁（validate_expert.js）
+
+- `displayDescription.zh` 长度必须为 40-50 字
+- 主文件（单 Agent 主文件、拥有 Skill 的 Team 主理人）必须包含完整「Skill 使用协议（CRITICAL）」段（五项语义）；Team 普通成员豁免
+- 禁止引用 `production_loop` / `commit_plan` / `update_plan_item` / `skip_workflow`，禁止 Markdown 进度清单（进度所有权归运行时）
+- 半角破折号（`CRITICAL - `）为格式问题：内置预设 strict 模式报错，用户包仅警告
 
 ## 六、行业分类（categoryId）
 
