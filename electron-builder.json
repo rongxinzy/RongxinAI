@@ -203,6 +203,11 @@
       }
     ]
   },
+  "deb": {
+    "fpm": [
+      "--before-install=scripts/linux-before-install.sh"
+    ]
+  },
   "linux": {
     "target": ["AppImage", "deb"],
     "publish": [
