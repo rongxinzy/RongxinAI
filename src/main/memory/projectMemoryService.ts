@@ -141,6 +141,28 @@ export class ProjectMemoryService {
       .slice(0, limit);
   }
 
+  getRecallableMemoryById(input: {
+    workingDirectory: string;
+    sessionId: string;
+    memoryId: number;
+  }): ManagedMemoryRecord | null {
+    const project = this.resolveIdentity(input.workingDirectory);
+    const memory = this.repository.findLinkByMemoryId(input.memoryId);
+    if (!memory || memory.status !== MemoryLifecycleStatus.Active) return null;
+    if (memory.scope === MemoryScope.Project && memory.projectId === project.id) return memory;
+    if (memory.scope === MemoryScope.Personal && memory.projectId === PERSONAL_MEMORY_PROJECT_ID) {
+      return memory;
+    }
+    if (
+      memory.scope === MemoryScope.Session &&
+      memory.projectId === project.id &&
+      memory.sessionId === input.sessionId
+    ) {
+      return memory;
+    }
+    return null;
+  }
+
   async buildProjectContext(input: {
     workingDirectory: string;
     sessionId: string;
@@ -177,6 +199,10 @@ export class ProjectMemoryService {
     content: string;
     topicKey?: string;
     sourceKind?: MemorySourceKindValue;
+    importance?: number;
+    confidence?: number;
+    sensitivity?: MemorySensitivityValue;
+    metadata?: Record<string, unknown>;
   }): Promise<number | null> {
     const project = this.resolveIdentity(input.workingDirectory);
     const linkId = randomUUID();
@@ -193,6 +219,10 @@ export class ProjectMemoryService {
         sourceKind: input.sourceKind ?? MemorySourceKind.Explicit,
         scope: MemoryScope.Project,
         linkId,
+        importance: input.importance,
+        confidence: input.confidence,
+        sensitivity: input.sensitivity,
+        metadata: input.metadata,
       },
       linkId,
     );
@@ -218,6 +248,7 @@ export class ProjectMemoryService {
     supersedesLinkId?: string;
     supersedesMemoryId?: number;
     promotesMemoryId?: number;
+    metadata?: Record<string, unknown>;
   }): string {
     const workspace = this.resolveIdentity(input.workingDirectory);
     const candidateIdentity: MemoryRelationshipIdentity = {
