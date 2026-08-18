@@ -6,11 +6,14 @@ import {
   type ManualMemoryUpdateInput,
   type ManagedMemoryListInput,
   type MemoryIpcResult,
+  type MemorySessionTitle,
+  type MemorySessionTitleResolveInput,
 } from '../../shared/memory';
 import type { ProjectMemoryService } from './projectMemoryService';
 
 export function registerMemoryIpcHandlers(options: {
   getService: () => ProjectMemoryService;
+  resolveSessionTitles: (sessionIds: readonly string[]) => MemorySessionTitle[];
 }): void {
   const handle = async <T>(operation: () => T | Promise<T>): Promise<MemoryIpcResult<T>> => {
     try {
@@ -22,6 +25,19 @@ export function registerMemoryIpcHandlers(options: {
 
   ipcMain.handle(MemoryIpcChannel.List, (_event, input?: ManagedMemoryListInput) =>
     handle(() => options.getService().listManagedMemories(input)),
+  );
+  ipcMain.handle(
+    MemoryIpcChannel.ResolveSessionTitles,
+    (_event, input?: MemorySessionTitleResolveInput) =>
+      handle(() =>
+        options.resolveSessionTitles(
+          Array.isArray(input?.sessionIds)
+            ? input.sessionIds.filter(
+                (sessionId): sessionId is string => typeof sessionId === 'string',
+              )
+            : [],
+        ),
+      ),
   );
   ipcMain.handle(MemoryIpcChannel.CreateManual, (_event, input: ManualMemoryCreateInput) =>
     handle(() => options.getService().createManualMemory(input)),

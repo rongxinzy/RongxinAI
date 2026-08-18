@@ -628,29 +628,36 @@ interface IElectronAPI {
     showSystemMenu: (position: { x: number; y: number }) => void;
     onStateChanged: (callback: (state: WindowState) => void) => () => void;
   };
-    memory: {
+  memory: {
     list: (
       input?: import('../../shared/memory').ManagedMemoryListInput,
     ) => Promise<
       import('../../shared/memory').MemoryIpcResult<
         import('../../shared/memory').ManagedMemoryRecord[]
       >
-      >;
-      createManual: (
-        input: import('../../shared/memory').ManualMemoryCreateInput,
-      ) => Promise<
-        import('../../shared/memory').MemoryIpcResult<
-          import('../../shared/memory').ManagedMemoryRecord
-        >
-      >;
-      updateManual: (
-        input: import('../../shared/memory').ManualMemoryUpdateInput,
-      ) => Promise<
-        import('../../shared/memory').MemoryIpcResult<
-          import('../../shared/memory').ManagedMemoryRecord
-        >
-      >;
-      confirmCandidate: (
+    >;
+    resolveSessionTitles: (
+      input: import('../../shared/memory').MemorySessionTitleResolveInput,
+    ) => Promise<
+      import('../../shared/memory').MemoryIpcResult<
+        import('../../shared/memory').MemorySessionTitle[]
+      >
+    >;
+    createManual: (
+      input: import('../../shared/memory').ManualMemoryCreateInput,
+    ) => Promise<
+      import('../../shared/memory').MemoryIpcResult<
+        import('../../shared/memory').ManagedMemoryRecord
+      >
+    >;
+    updateManual: (
+      input: import('../../shared/memory').ManualMemoryUpdateInput,
+    ) => Promise<
+      import('../../shared/memory').MemoryIpcResult<
+        import('../../shared/memory').ManagedMemoryRecord
+      >
+    >;
+    confirmCandidate: (
       id: string,
     ) => Promise<import('../../shared/memory').MemoryIpcResult<number | null>>;
     archive: (id: string) => Promise<import('../../shared/memory').MemoryIpcResult<void>>;

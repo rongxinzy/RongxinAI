@@ -104,6 +104,7 @@ import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { registerMemoryIpcHandlers } from './memory/ipc';
+import { resolveMemorySessionTitles } from './memory/sessionTitleResolver';
 import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
 import {
@@ -6593,7 +6594,11 @@ if (!gotTheLock) {
         });
       },
     });
-    registerMemoryIpcHandlers({ getService: getProjectMemoryService });
+    registerMemoryIpcHandlers({
+      getService: getProjectMemoryService,
+      resolveSessionTitles: sessionIds =>
+        resolveMemorySessionTitles(getStore().getDatabase(), sessionIds),
+    });
     // Inject store getter into claudeSettings
     setStoreGetter(() => store);
     piModelCatalogRefreshCoordinator = new PiModelCatalogRefreshCoordinator({
