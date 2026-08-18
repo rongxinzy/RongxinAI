@@ -25,9 +25,7 @@ import {
   Info,
   Star,
   ThumbsUp,
-  X,
 } from 'lucide-react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { ComponentType } from 'react';
 import { useMemo, useState } from 'react';
 
@@ -50,12 +48,10 @@ import {
   ZhipuIcon,
 } from '../../icons/providers';
 import { localInferenceMutedTextClass } from '../constants';
-import type { InstallProgressState } from '../types';
 import {
   capabilityLabel,
   getMarketplaceCapabilityTags,
   getMarketplaceDisplayName,
-  getMarketplaceInstallProgress,
   getMarketplacePublisher,
   getMarketplaceRecommendedQuantization,
   formatDownloadCount,
@@ -66,8 +62,7 @@ import {
   openExternalUrl,
 } from '../utils/marketplace';
 import { resolveModelProviderName, type LocalModelProvider } from '../utils/modelProvider';
-import { formatBytes, formatPullProgress } from '../utils/progress';
-import { InstallProgressBar } from './Common';
+import { formatBytes } from '../utils/progress';
 
 const marketplaceCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal shadow-none';
 const marketplaceModelIcons = {
@@ -88,21 +83,16 @@ const marketplaceModelIcons = {
 export function MarketplaceModelCard({
   model,
   loading,
-  installing,
-  installProgress,
+  isDownloadActive,
   onInstall,
+  onOpenDownload,
 }: {
   model: MarketplaceModel;
   loading: boolean;
-  installing: boolean;
-  installProgress: InstallProgressState;
+  isDownloadActive: boolean;
   onInstall: (model: MarketplaceModel) => Promise<void>;
+  onOpenDownload: () => void;
 }) {
-  const progress = getMarketplaceInstallProgress(installProgress, model);
-  const reduceMotion = useReducedMotion();
-  const motionTransition = reduceMotion
-    ? { duration: 0 }
-    : { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
   const capabilities = getMarketplaceCapabilityTags(model);
   const publisher = getMarketplacePublisher(model.repoId);
   const displayName = getMarketplaceDisplayName(model.repoId);
@@ -150,7 +140,7 @@ export function MarketplaceModelCard({
         size="sm"
         className="relative z-10 h-full w-full gap-0 overflow-visible rounded-xl bg-transparent p-0 ring-0"
       >
-        <motion.div animate={{ opacity: progress ? 0.35 : 1 }} transition={motionTransition}>
+        <div>
           <CardHeader className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 px-5 pt-3 pb-0">
             <span
               aria-hidden="true"
@@ -268,7 +258,7 @@ export function MarketplaceModelCard({
 
           </CardContent>
 
-        </motion.div>
+        </div>
 
           <div className="flex min-w-0 items-center gap-3 px-5 pb-3">
             <div className="min-w-0 flex-1">
@@ -310,10 +300,16 @@ export function MarketplaceModelCard({
             </div>
 
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              {installing ? (
-                <Button21st type="button" variant="danger" size="sm" className="h-8 min-w-16 border-destructive/40 bg-destructive/10 px-3 font-semibold hover:border-destructive/60 hover:bg-destructive/15" onClick={() => void window.electron.llamacpp.cancelInstall(model.repoId)}>
-                  <X data-icon="inline-start" />
-                  {i18nService.t('marketplaceCancelInstall')}
+              {isDownloadActive ? (
+                <Button21st
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 min-w-16 px-3"
+                  onClick={onOpenDownload}
+                >
+                  <Download data-icon="inline-start" />
+                  {i18nService.t('marketplaceDownloadInProgress')}
                 </Button21st>
               ) : (
                 <Button21st
@@ -331,25 +327,6 @@ export function MarketplaceModelCard({
             </div>
           </div>
 
-        <AnimatePresence initial={false}>
-          {progress ? (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={motionTransition}
-              className="pointer-events-none absolute inset-x-4 top-1/2 z-10 -translate-y-1/2"
-            >
-              <div className="w-full">
-                <div className={cn('mb-1.5 flex items-center justify-between gap-2 text-[11px]', localInferenceMutedTextClass)}>
-                  <span className="min-w-0 truncate">{formatPullProgress(progress)}</span>
-                  {typeof progress.percent === 'number' ? <span>{progress.percent}%</span> : null}
-                </div>
-                <InstallProgressBar progress={progress} />
-              </div>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
       </Card>
     </div>
   );

@@ -4,12 +4,14 @@ import path from 'path';
 import type { LlamaCppModel } from '../../shared/llamacpp';
 import { ggufSupportsThinkingToggle } from './ggufMetadata';
 
+const MMPROJ_FILE_PATTERN = /(?:^|[._-])mmproj(?:[._-]|$)/i;
+
 export function scanLocalGgufModels(modelsDir: string): LlamaCppModel[] {
   const root = path.resolve(modelsDir);
   if (!fs.existsSync(root)) return [];
   const files = walkGgufFiles(root).filter(filePath => {
     const baseName = path.basename(filePath);
-    if (/^mmproj/i.test(baseName)) return false;
+    if (MMPROJ_FILE_PATTERN.test(baseName)) return false;
     // Split-GGUF models are registered once, under their first part; later
     // parts would otherwise show up as duplicate standalone models.
     const shard = baseName.match(/-(\d{5})-of-\d{5}\.gguf$/i);

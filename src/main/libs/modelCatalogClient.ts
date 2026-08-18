@@ -72,6 +72,12 @@ function normalizeCursor(value: string | null | undefined): string | undefined {
   return cursor || undefined;
 }
 
+function matchesCatalogLookup(model: MarketplaceModel, lookup: string): boolean {
+  return [model.repoId, model.id, model.name].some(value =>
+    typeof value === 'string' && value.toLowerCase() === lookup,
+  );
+}
+
 export class ModelCatalogClient {
   readonly baseUrl: string;
   private readonly fetchImpl: CatalogFetchLike;
@@ -120,9 +126,8 @@ export class ModelCatalogClient {
       limit: 8,
       fit: 'all',
     });
-    const model = result.models.find(candidate =>
-      candidate.repoId === normalizedRepoId || candidate.id === normalizedRepoId,
-    );
+    const lookup = normalizedRepoId.toLowerCase();
+    const model = result.models.find(candidate => matchesCatalogLookup(candidate, lookup));
     return model && isGenerativeLanguageModel(model) && isVerifiedGgufCatalogModel(model)
       ? model
       : null;
