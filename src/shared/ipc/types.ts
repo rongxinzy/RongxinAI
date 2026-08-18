@@ -9,10 +9,6 @@ import type { z } from 'zod';
 
 import type {
   CoworkConfigSetSchema,
-  CoworkMemoryCreateEntrySchema,
-  CoworkMemoryDeleteEntrySchema,
-  CoworkMemoryListEntriesSchema,
-  CoworkMemoryUpdateEntrySchema,
   CoworkPermissionRespondSchema,
   CoworkSessionCaptureImageChunkSchema,
   CoworkSessionContinueSchema,
@@ -46,10 +42,6 @@ export type CoworkSessionSaveResultImageInput = z.infer<
 export type CoworkSessionExportTextInput = z.infer<typeof CoworkSessionExportTextSchema.input>;
 export type CoworkPermissionRespondInput = z.infer<typeof CoworkPermissionRespondSchema.input>;
 export type CoworkConfigSetInput = z.infer<typeof CoworkConfigSetSchema.input>;
-export type CoworkMemoryListEntriesInput = z.infer<typeof CoworkMemoryListEntriesSchema.input>;
-export type CoworkMemoryCreateEntryInput = z.infer<typeof CoworkMemoryCreateEntrySchema.input>;
-export type CoworkMemoryUpdateEntryInput = z.infer<typeof CoworkMemoryUpdateEntrySchema.input>;
-export type CoworkMemoryDeleteEntryInput = z.infer<typeof CoworkMemoryDeleteEntrySchema.input>;
 
 /** IPC success envelope with optional data fields. */
 export type IpcSuccessPayload<T extends Record<string, unknown> = Record<string, never>> = {
