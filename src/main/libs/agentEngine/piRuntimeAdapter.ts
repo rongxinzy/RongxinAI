@@ -58,6 +58,7 @@ import {
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkStore } from '../../coworkStore';
+import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
@@ -886,6 +887,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const subagentTool = buildPiSubagentTool({
         getPiAgentsDir: () => this.getPiAgentsDir(),
         presetId: subagentPresetId,
+        loadBundledMembers: subagentPresetId
+          ? presetId =>
+              this.resolveBundledMemberProfiles(presetId)?.map(member => ({
+                ...member,
+                source: 'member' as const,
+              })) ?? null
+          : undefined,
         resolvedModel,
         workspaceRoot,
         webSearchSkillPath:
@@ -3110,6 +3118,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return path.join(configDir, 'agents');
   }
 
+  /**
+   * Live team member definitions for bundled presets. Returns null when the
+   * preset is not bundled, so the subagent tool falls back to the synced pi
+   * agents files (user-imported packages).
+   */
+  private resolveBundledMemberProfiles(
+    presetId: string,
+  ): Array<{ id: string; description: string; systemPrompt: string }> | null {
+    return resolveBundledPresetMembers(getSkillsRoot(), presetId);
+  }
   private createWorkbenchContract(
     sessionMode: PiStartOptions['sessionMode'],
     skillIds: string[] | undefined,
