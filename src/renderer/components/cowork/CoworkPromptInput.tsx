@@ -1287,7 +1287,6 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               </div>
             )}
             <PromptInputSubmit
-              className={isStreaming ? 'relative z-20' : undefined}
               disabled={sessionContextPending}
               status={isStreaming ? 'streaming' : 'ready'}
               onStop={isStreaming ? onStop : undefined}
