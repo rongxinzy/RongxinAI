@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
-import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import { MarketplaceModelCard } from './MarketplaceModelCard';
 
 function makeModel(overrides: Partial<MarketplaceModel> = {}): MarketplaceModel {
@@ -69,9 +68,9 @@ function renderCard(
   const props = {
     model,
     loading: false,
-    installing: false,
-    installProgress: {},
+    isDownloadActive: false,
     onInstall: vi.fn(),
+    onOpenDownload: vi.fn(),
     ...overrides,
   };
   return { ...render(<MarketplaceModelCard {...props} />), props };
@@ -145,33 +144,15 @@ describe('MarketplaceModelCard', () => {
     await user.click(verifyButton);
     expect(onInstall).toHaveBeenCalledWith(expect.objectContaining({ repoId: model.repoId }));
   });
-  test('offers cancel while installing and calls the main-process canceller', async () => {
+  test('opens the download sidebar from an active download card', async () => {
     const user = userEvent.setup();
-    renderCard(makeModel(), {
-      installing: true,
-      installProgress: {
-        'acme/alpha-GGUF': { phase: 'downloading', percent: 42 } as LlamaCppInstallProgress,
-      },
-    });
+    const onOpenDownload = vi.fn();
+    renderCard(makeModel(), { isDownloadActive: true, onOpenDownload });
 
-    await user.click(screen.getByRole('button', { name: /取消安装/ }));
+    await user.click(screen.getByRole('button', { name: /下载中|Downloading/ }));
 
-    expect(
-      (window as unknown as { electron: { llamacpp: { cancelInstall: ReturnType<typeof vi.fn> } } })
-        .electron.llamacpp.cancelInstall,
-    ).toHaveBeenCalledWith('acme/alpha-GGUF');
-  });
-
-  test('shows the pull progress overlay while downloading', () => {
-    renderCard(makeModel(), {
-      installing: true,
-      installProgress: {
-        'acme/alpha-GGUF': { phase: 'downloading', percent: 42 } as LlamaCppInstallProgress,
-      },
-    });
-
-    expect(screen.getByText('42%')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /取消安装/ })).toBeInTheDocument();
+    expect(onOpenDownload).toHaveBeenCalledOnce();
+    expect(screen.queryByText('42%')).not.toBeInTheDocument();
   });
 
   test('offers a quantization selector when a repo ships multiple GGUF files', async () => {

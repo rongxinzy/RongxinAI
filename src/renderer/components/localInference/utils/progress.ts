@@ -83,6 +83,67 @@ export function isInstallTerminalPhase(phase: LlamaCppInstallProgress['phase']):
   return ['done', 'failed', 'cancelled', 'needs-manual'].includes(phase);
 }
 
+export function isSuccessfulMarketplaceInstallProgress(
+  progress: Pick<LlamaCppInstallProgress, 'phase' | 'modelId' | 'modelName' | 'targetPath'> | Record<string, unknown>,
+  localModels: Array<{
+    name?: string;
+    id?: string;
+    model?: string;
+    path?: string;
+    repoId?: string;
+  }> = [],
+): boolean {
+  const phase = typeof progress.phase === 'string' ? progress.phase : readProgressStatus(progress);
+  if (phase !== 'done') return false;
+
+  const normalizedTargetPath = typeof progress.targetPath === 'string' ? progress.targetPath.trim() : '';
+  const targetFileName = normalizedTargetPath
+    ? normalizedTargetPath.split(/[\\/]+/).pop()?.toLowerCase() ?? ''
+    : '';
+
+  const progressNames = [
+    typeof progress.modelId === 'string' ? progress.modelId.trim() : '',
+    typeof progress.modelName === 'string' ? progress.modelName.trim() : '',
+  ].filter(Boolean).map(value => value.toLowerCase());
+
+  return localModels.some(model => {
+    const candidateNames = [model.name, model.id, model.model, model.repoId]
+      .filter((value): value is string => Boolean(value && value.trim()))
+      .map(value => value.trim().toLowerCase());
+    const candidatePath = model.path?.trim().toLowerCase() ?? '';
+
+    if (normalizedTargetPath) {
+      const samePath = candidatePath === normalizedTargetPath.toLowerCase();
+      const sameFileName = targetFileName
+        ? candidatePath.endsWith(`/${targetFileName}`) || candidatePath.endsWith(`\\${targetFileName}`)
+        : false;
+      if (samePath || sameFileName) return true;
+    }
+
+    return progressNames.some(progressName => {
+      const normalizedProgressName = progressName.trim().toLowerCase();
+      const progressVariants = new Set([
+        normalizedProgressName,
+        normalizedProgressName.split('/').at(-1) ?? '',
+        ...candidateNames,
+      ]);
+      return candidateNames.some(candidate => {
+        const candidateVariants = new Set([
+          candidate,
+          candidate.split('/').at(-1) ?? '',
+          ...Array.from(progressVariants),
+        ]);
+        return Array.from(candidateVariants).some(value => value && (
+          value === normalizedProgressName ||
+          value === normalizedProgressName.split('/').at(-1) ||
+          normalizedProgressName.endsWith(`/${value}`) ||
+          normalizedProgressName.includes(`/${value}`)
+        ));
+      });
+    });
+  });
+}
+
 export function humanizeInstallPhase(phase: string): string {
   switch (phase) {
     case 'starting':
