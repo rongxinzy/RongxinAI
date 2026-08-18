@@ -91,6 +91,128 @@ test('blocks premature finalization and returns a recovery prompt', () => {
   expect(controller.onAgentEnd({ next: false })).toMatchObject({ shouldFinish: false });
 });
 
+test('defers persistent state until the model records a start or skip decision', () => {
+  const workbench = new WorkbenchTaskRepository(db);
+  const task = workbench.createTask('session', 'Answer or build', {
+    kind: WorkbenchContractKind.GenericWork,
+    requiresUserAcceptance: true,
+  });
+  const run = workbench.createRun(task.id, WorkbenchRunTrigger.Message);
+  const service = new ProductionLoopService(
+    new ProductionLoopRepository(db),
+    new HarnessMeasurementService(workbench),
+  );
+  const controller = new ProductionLoopController(service, {
+    taskId: task.id,
+    runId: run.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: task.goal,
+    prototypeRequired: false,
+    deferDecision: true,
+  });
+
+  expect(controller.getModelState()).toMatchObject({ decision: 'undecided' });
+  expect(service.repository.get(run.id)).toBeNull();
+  expect(controller.buildInitialPrompt()).toContain('Before any other tool call');
+  expect(controller.onAgentEnd({ next: false })).toMatchObject({ shouldFinish: false });
+  expect(service.repository.get(run.id)).toBeNull();
+
+  controller.skipWorkflow('Direct answer requiring no tools or deliverable');
+  expect(service.repository.get(run.id)).toMatchObject({
+    status: ProductionLoopStatus.Completed,
+    skip: { reason: 'Direct answer requiring no tools or deliverable' },
+  });
+});
+
+test('exposes record_prototype as the first action for deferred prototype workflows', () => {
+  const workbench = new WorkbenchTaskRepository(db);
+  const task = workbench.createTask('session', 'Create a presentation', {
+    kind: WorkbenchContractKind.GenericWork,
+    requiresUserAcceptance: true,
+  });
+  const run = workbench.createRun(task.id, WorkbenchRunTrigger.Message);
+  const service = new ProductionLoopService(
+    new ProductionLoopRepository(db),
+    new HarnessMeasurementService(workbench),
+  );
+  const controller = new ProductionLoopController(service, {
+    taskId: task.id,
+    runId: run.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: task.goal,
+    prototypeRequired: true,
+    deferDecision: true,
+  });
+
+  expect(controller.getModelState()).toMatchObject({
+    decision: 'undecided',
+    prototypeRequired: true,
+    availableActions: ['record_prototype', 'skip_workflow'],
+  });
+  expect(controller.buildInitialPrompt()).toContain(
+    'start with production_loop record_prototype',
+  );
+});
+
+test('starts deferred production state when the model commits a plan', () => {
+  const workbench = new WorkbenchTaskRepository(db);
+  const task = workbench.createTask('session', 'Research a company', {
+    kind: WorkbenchContractKind.GenericWork,
+    requiresUserAcceptance: true,
+  });
+  const run = workbench.createRun(task.id, WorkbenchRunTrigger.Message);
+  const service = new ProductionLoopService(
+    new ProductionLoopRepository(db),
+    new HarnessMeasurementService(workbench),
+  );
+  const controller = new ProductionLoopController(service, {
+    taskId: task.id,
+    runId: run.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: task.goal,
+    prototypeRequired: false,
+    deferDecision: true,
+  });
+
+  controller.commitPlan({
+    items: [{ title: 'Collect evidence' }],
+    constraints: [],
+    acceptanceCriteria: ['Claims cite evidence'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'evidence_check', deterministic: true }],
+  });
+
+  expect(service.repository.get(run.id)).toMatchObject({
+    phase: ProductionLoopPhase.Execute,
+    status: ProductionLoopStatus.Active,
+  });
+});
+
+test('does not allow Goal mode to skip the production workflow', () => {
+  const workbench = new WorkbenchTaskRepository(db);
+  const task = workbench.createTask('session', 'Complete the goal', {
+    kind: WorkbenchContractKind.GenericWork,
+    requiresUserAcceptance: true,
+  });
+  const run = workbench.createRun(task.id, WorkbenchRunTrigger.Message);
+  const service = new ProductionLoopService(
+    new ProductionLoopRepository(db),
+    new HarnessMeasurementService(workbench),
+  );
+  const controller = new ProductionLoopController(service, {
+    taskId: task.id,
+    runId: run.id,
+    workflowKind: WorkbenchContractKind.GenericWork,
+    goal: task.goal,
+    prototypeRequired: false,
+    deferDecision: true,
+    skipAllowed: false,
+  });
+
+  expect(() => controller.skipWorkflow('Looks simple')).toThrow('cannot be skipped');
+  expect(service.repository.get(run.id)).toBeNull();
+});
+
 test('a normal agent_loop next continues without recording a recovery', () => {
   const { controller } = createController();
   const before = controller.getState().recoveries.length;

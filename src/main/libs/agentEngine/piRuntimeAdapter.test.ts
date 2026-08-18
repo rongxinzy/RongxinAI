@@ -493,7 +493,7 @@ describe('PiRuntimeAdapter', () => {
       expect(onComplete).toHaveBeenCalledOnce();
     });
 
-    it('registers the production workflow only for nontrivial Work turns', async () => {
+    it('offers a lazy production decision for every Work turn', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -532,34 +532,27 @@ describe('PiRuntimeAdapter', () => {
           customTools?: Array<{ name: string }>;
         };
         expect(workOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(simpleOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
-        expect(lightOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
-        expect(lightOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'workflow_state',
-        );
+        expect(simpleOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(lightOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
         expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
           'production_loop',
         );
         expect(
           db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
-        ).toEqual({ count: 1 });
+        ).toEqual({ count: 0 });
         expect(
           service.getCurrent('production-work')?.task.contract.metadata?.productionWorkflowEnabled,
         ).toBe(true);
         expect(
           service.getCurrent('production-simple')?.task.contract.metadata
             ?.productionWorkflowEnabled,
-        ).toBe(false);
+        ).toBe(true);
       } finally {
         db.close();
       }
     });
 
-    it('coordinates expert methods only inside an active production workflow', async () => {
+    it('lets the model coordinate or skip expert methods through the outer decision', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -586,13 +579,12 @@ describe('PiRuntimeAdapter', () => {
 
         expect(productionPrompt).toContain(ExpertProductionWorkflowHeading);
         expect(productionPrompt).toContain('expert workflow only as the domain method');
-        expect(directPrompt).not.toContain(ExpertProductionWorkflowHeading);
-        expect(directOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
+        expect(directPrompt).toContain(ExpertProductionWorkflowHeading);
+        expect(directPrompt).toContain('may skip production with a concrete reason');
+        expect(directOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
         expect(
           service.getCurrent('expert-direct')?.task.contract.metadata?.productionWorkflowEnabled,
-        ).toBe(false);
+        ).toBe(true);
       } finally {
         db.close();
       }
@@ -710,7 +702,7 @@ describe('PiRuntimeAdapter', () => {
           expect.stringContaining('## Production workflow'),
         );
         expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Persistent phase: plan'),
+          expect.stringContaining('## Production workflow decision'),
         );
       } finally {
         db.close();
@@ -783,7 +775,7 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('rebuilds the production workflow topology when follow-up complexity changes', async () => {
+    it('keeps a stable production tool topology across Work follow-ups', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -804,20 +796,13 @@ describe('PiRuntimeAdapter', () => {
         const simpleStart = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
-        const complexFollowUp = mockCreateAgentSession.mock.calls[1]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        const simpleFollowUp = mockCreateAgentSession.mock.calls[2]?.[0] as {
-          customTools?: Array<{ name: string }>;
-        };
-        expect(simpleStart.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
+        expect(simpleStart.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+        expect(mockSession.abort).not.toHaveBeenCalled();
+        expect(mockSession.prompt).toHaveBeenCalledTimes(3);
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('## Production workflow decision'),
         );
-        expect(complexFollowUp.customTools?.map(tool => tool.name)).toContain('production_loop');
-        expect(simpleFollowUp.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
-        expect(mockSession.abort).toHaveBeenCalledTimes(2);
       } finally {
         db.close();
       }
@@ -1481,7 +1466,7 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('keeps a lightweight turn outside the durable loop when a skill is added', async () => {
+    it('keeps skill execution controls when a skill is added to Work', async () => {
       const workspaceRoot = createTemporaryWorkspace();
       await adapter.startSession('dynamic-skill', 'First', { sessionMode: 'work', workspaceRoot });
 
@@ -1492,16 +1477,16 @@ describe('PiRuntimeAdapter', () => {
       });
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
       expect(mockSession.abort).toHaveBeenCalledOnce();
-      expect(mockSession.prompt).toHaveBeenLastCalledWith('Read package.json');
+      expect(mockSession.prompt).toHaveBeenLastCalledWith(
+        expect.stringContaining('## Persistent Work execution'),
+      );
       const recreatedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
         customTools?: Array<{ name: string }>;
       };
-      expect(recreatedOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-        'work_acceptance',
-      );
+      expect(recreatedOptions.customTools?.map(tool => tool.name)).toContain('work_acceptance');
     });
 
-    it('removes completed production controllers before a greeting in the same session', async () => {
+    it('keeps a stable workflow topology before the model skips a greeting', async () => {
       const workspaceRoot = createTemporaryWorkspace();
       await adapter.startSession('production-to-greeting', 'Create a 10-page PPT', {
         skillIds: ['presentation-studio'],
@@ -1521,20 +1506,18 @@ describe('PiRuntimeAdapter', () => {
         workspaceRoot,
       });
 
-      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
-      expect(mockSession.abort).toHaveBeenCalledOnce();
-      const greetingOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+      expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+      expect(mockSession.abort).not.toHaveBeenCalled();
+      const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
         customTools?: Array<{ name: string }>;
       };
-      expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-        'production_loop',
-      );
-      expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-        'workflow_state',
+      expect(greetingOptions.customTools?.map(tool => tool.name)).toContain('workflow_state');
+      expect(mockSession.prompt).toHaveBeenLastCalledWith(
+        expect.stringContaining('## Controlled PPT presentation workflow'),
       );
     });
 
-    it('starts a fresh generic task after a shortcut approval is denied', async () => {
+    it('starts a fresh model-decided task after a shortcut approval is denied', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -1569,14 +1552,13 @@ describe('PiRuntimeAdapter', () => {
 
         const current = service.getCurrent('denied-shortcut')!;
         expect(current.task.id).not.toBe(first.task.id);
-        expect(current.task.contract.kind).toBe(WorkbenchContractKind.GenericWork);
+        expect(current.task.contract.kind).toBe(WorkbenchContractKind.Shortcut);
         expect(service.getDetail(first.task.id)?.task.status).toBe(WorkbenchTaskStatus.Cancelled);
-        const greetingOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
+        const greetingOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools?: Array<{ name: string }>;
         };
-        expect(greetingOptions.customTools?.map(tool => tool.name) || []).not.toContain(
-          'production_loop',
-        );
+        expect(greetingOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
       } finally {
         db.close();
       }

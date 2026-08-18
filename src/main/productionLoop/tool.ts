@@ -70,7 +70,8 @@ export function buildProductionLoopTool(
   controller: ProductionLoopController,
 ): Record<string, unknown> {
   const stateForModel = (): string => {
-    const state = controller.getState();
+    const state = controller.getModelState();
+    if (state.decision === 'undecided') return JSON.stringify(state);
     return JSON.stringify({
       phase: state.phase,
       status: state.status,
@@ -85,14 +86,14 @@ export function buildProductionLoopTool(
   };
   const result = (text: string): ProductionLoopToolResult => ({
     content: [{ type: 'text', text }],
-    details: controller.getState() as unknown as Record<string, unknown>,
+    details: controller.getModelState(),
   });
 
   return {
     name: ProductionLoopToolName,
     label: 'Production Workflow',
     description:
-      'Persist and advance the production workflow. Commit a plan before execution, inspect the result, request a read-only critic, revise findings, and deliver only after all gates pass.',
+      'Decide and control the Work production workflow. Start substantive work with the first action named by get_state (record_prototype when exploration is required, otherwise commit_plan), or use skip_workflow only for a direct answer requiring no tools or deliverable. Active workflows must be inspected, independently reviewed, revised when needed, and delivered only after all gates pass.',
     parameters: {
       type: 'object',
       properties: {
