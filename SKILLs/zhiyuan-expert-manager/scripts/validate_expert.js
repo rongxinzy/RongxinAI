@@ -152,6 +152,48 @@ function parseMdFrontmatter(mdPath) {
   return { fm, content, error: null };
 }
 
+/**
+ * Determine which agent files are primary (own the conversation) and thus
+ * require the Skill usage protocol section:
+ * - single-agent experts: every agent file (normally exactly one)
+ * - team experts: the lead agent file, but only when the team owns skills
+ * Team members never own skills themselves and are exempt.
+ *
+ * Returns a Map<absolute md path, boolean isPrimary>.
+ */
+function resolvePrimaryAgents(pluginJson, expertDir) {
+  const primary = new Map();
+  const agents = Array.isArray(pluginJson.agents) ? pluginJson.agents : [];
+  if (pluginJson.expertType === 'team') {
+    const leadAgent = pluginJson.teamInfo?.leadAgent;
+    const ownsSkills =
+      (Array.isArray(pluginJson.skills) && pluginJson.skills.length > 0) ||
+      (Array.isArray(pluginJson.skillIds) && pluginJson.skillIds.length > 0);
+    if (ownsSkills) {
+      for (const agentPath of agents) {
+        const agentId = path.basename(agentPath).replace(/\.md$/, '');
+        if (agentId === leadAgent) {
+          primary.set(path.resolve(expertDir, agentPath), true);
+        }
+      }
+    }
+    return primary;
+  }
+  for (const agentPath of agents) {
+    primary.set(path.resolve(expertDir, agentPath), true);
+  }
+  return primary;
+}
+
+/** Semantic keywords the Skill usage protocol section must contain. */
+const SKILL_PROTOCOL_SEMANTICS = [
+  { label: '从 <available_skills> 中选择', pattern: /<available_skills>/ },
+  { label: '使用 read 读取 <location>', pattern: /<location>/ },
+  { label: '严格按 SKILL.md 执行', pattern: /SKILL\.md/ },
+  { label: '禁止一次性加载全部技能', pattern: /禁止一次性加载|一次只加载/ },
+  { label: '按依赖顺序加载后续技能', pattern: /依赖顺序/ },
+];
+
 function validatePluginJson(pluginJson, expertDir, result) {
   for (const field of ['name', 'version', 'description']) {
     if (!pluginJson[field] || hasTodo(pluginJson[field])) {
@@ -200,6 +242,16 @@ function validatePluginJson(pluginJson, expertDir, result) {
           `plugin.json: 'quickPrompts[0].${lang}' should match 'defaultInitPrompt.${lang}'`,
         );
       }
+    }
+  }
+
+  const displayDescriptionZh = pluginJson.displayDescription?.zh;
+  if (typeof displayDescriptionZh === 'string' && !hasTodo(displayDescriptionZh)) {
+    const length = [...displayDescriptionZh].length;
+    if (length < 40 || length > 50) {
+      result.error(
+        `plugin.json: 'displayDescription.zh' 长度应为 40-50 字，当前 ${length} 字`,
+      );
     }
   }
 
@@ -264,7 +316,8 @@ function validatePluginJson(pluginJson, expertDir, result) {
   }
 }
 
-function validateAgentMd(mdPath, result) {
+function validateAgentMd(mdPath, result, options = {}) {
+  const { requireSkillProtocol = false, strict = false } = options;
   const { fm, content, error } = parseMdFrontmatter(mdPath);
   if (error) {
     result.error(error);
@@ -306,16 +359,27 @@ function validateAgentMd(mdPath, result) {
   }
 
   const body = content.replace(/^---.*?---/s, '');
+  const basename = path.basename(mdPath);
   const todoCount = (body.match(/\[TODO/g) || []).length;
   if (todoCount > 5) {
-    result.warn(
-      `${path.basename(mdPath)}: body still contains many [TODO] placeholders (${todoCount})`,
-    );
+    result.warn(`${basename}: body still contains many [TODO] placeholders (${todoCount})`);
   }
 
+  if (requireSkillProtocol) {
+    const missingSemantics = SKILL_PROTOCOL_SEMANTICS.filter(
+      semantic => !semantic.pattern.test(body),
+    ).map(semantic => semantic.label);
+    if (missingSemantics.length > 0) {
+      result.error(
+        `${basename}: primary agent requires a Skill usage protocol section (## Skill 使用协议) with all five semantics; missing: ${missingSemantics.join('、')}`,
+      );
+    }
+  }
+
+  // Hard architectural gates: progress ownership belongs to the runtime.
   if (/^\s*-\s+\[[ xX]\]\s+/m.test(body)) {
-    result.warn(
-      `${path.basename(mdPath)}: Markdown progress checklists conflict with runtime-owned production progress`,
+    result.error(
+      `${basename}: Markdown progress checklists conflict with runtime-owned production progress`,
     );
   }
 
@@ -329,13 +393,31 @@ function validateAgentMd(mdPath, result) {
     new RegExp(`\\b${toolName}\\b`).test(body),
   );
   if (referencedProductionTools.length > 0) {
-    result.warn(
-      `${path.basename(mdPath)}: production workflow tools are runtime-owned (${referencedProductionTools.join(', ')})`,
+    result.error(
+      `${basename}: production workflow tools are runtime-owned (${referencedProductionTools.join(', ')})`,
     );
+  }
+
+  // Formatting: full-width dash is the canonical routing heading separator.
+  // Bundled presets must pass strict validation; third-party packages only
+  // get a warning so a cosmetic difference never blocks registration.
+  if (/CRITICAL\s+-\s/.test(body)) {
+    const message = `${basename}: 工作流路由标题使用半角破折号，应为全角（CRITICAL — 收到请求时首先判断）`;
+    if (strict) result.error(message);
+    else result.warn(message);
   }
 }
 
-function validateExpert(expertPath) {
+/**
+ * Validate an expert package directory.
+ *
+ * @param {string} expertPath absolute path to the expert package
+ * @param {{ strict?: boolean }} [options] strict mode upgrades cosmetic
+ *   formatting checks to errors; used by CI for bundled presets while
+ *   third-party imports keep them as warnings.
+ */
+function validateExpert(expertPath, options = {}) {
+  const strict = options.strict === true;
   const result = new ValidationResult();
 
   if (!fs.existsSync(expertPath)) {
@@ -364,6 +446,7 @@ function validateExpert(expertPath) {
   }
 
   validatePluginJson(pluginJson, expertPath, result);
+  const primaryAgents = resolvePrimaryAgents(pluginJson, expertPath);
 
   const agentsDir = path.join(expertPath, 'agents');
   if (!fs.existsSync(agentsDir)) {
@@ -377,7 +460,10 @@ function validateExpert(expertPath) {
       result.error('No .md files found in agents/ directory');
     } else {
       for (const mdFile of mdFiles) {
-        validateAgentMd(mdFile, result);
+        validateAgentMd(mdFile, result, {
+          requireSkillProtocol: primaryAgents.get(mdFile) === true,
+          strict,
+        });
       }
     }
   }
