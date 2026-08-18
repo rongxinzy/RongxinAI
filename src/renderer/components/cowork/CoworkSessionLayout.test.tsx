@@ -2,11 +2,18 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { useState } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import { i18nService } from '../../services/i18n';
 import { CoworkSessionLayout } from './CoworkSessionLayout';
+
+const taskAuditSource = readFileSync(
+  resolve('src/renderer/components/cowork/workbenchTaskAudit/WorkbenchTaskAuditView.tsx'),
+  'utf8',
+);
 
 vi.mock('../icons/ArtifactPanelAnimatedToggleIcon', () => ({
   ArtifactPanelAnimatedToggleIcon: () => <span data-testid="artifact-toggle-icon" />,
@@ -75,4 +82,15 @@ test('renders the title above tabs and preserves conversation state across tab s
 
   await user.click(conversationTab);
   expect(screen.getByRole('textbox', { name: 'conversation draft' })).toHaveValue('保留草稿');
+});
+
+test('renders every task audit module in one natural-height full-width view', () => {
+  expect(taskAuditSource).not.toContain('max-w-5xl');
+  expect(taskAuditSource).not.toContain('<Tabs');
+  expect(taskAuditSource).toContain('md:grid-cols-2');
+  expect(taskAuditSource).toContain('gap-4 p-4');
+  expect(taskAuditSource).toContain('rounded-lg border border-border');
+  expect(taskAuditSource.match(/<WorkbenchTaskAuditSection/g)).toHaveLength(4);
+  expect(taskAuditSource).toContain('max-h-80');
+  expect(taskAuditSource).not.toContain('grid-rows-2');
 });

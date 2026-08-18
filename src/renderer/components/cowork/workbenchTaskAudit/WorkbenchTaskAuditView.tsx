@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { Download } from 'lucide-react';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -23,7 +22,7 @@ import { i18nService } from '../../../services/i18n';
 import { ApprovalAuditTab } from './ApprovalAuditTab';
 import { ArtifactAuditTab } from './ArtifactAuditTab';
 import { AuditJsonDisclosure } from './AuditJsonDisclosure';
-import { WorkbenchTaskAuditTab, WorkbenchTaskRunFilter } from './constants';
+import { WorkbenchTaskRunFilter } from './constants';
 import { EventAuditTab } from './EventAuditTab';
 import { RunAuditTab } from './RunAuditTab';
 import {
@@ -92,7 +91,7 @@ export function WorkbenchTaskAuditView({
 
   return (
     <ScrollArea className="h-full">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-4">
+      <div className="flex w-full flex-col gap-4 p-4">
         <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold text-foreground">
@@ -118,7 +117,7 @@ export function WorkbenchTaskAuditView({
         </header>
 
         <section
-          className="flex shrink-0 flex-col gap-3"
+          className="flex shrink-0 flex-col gap-3 rounded-lg border border-border bg-muted p-4"
           aria-label={i18nService.t('workbenchTaskSummary')}
         >
           {tasks.length > 1 && (
@@ -190,74 +189,92 @@ export function WorkbenchTaskAuditView({
           )}
         </section>
 
-        <Tabs defaultValue={WorkbenchTaskAuditTab.Runs} className="gap-0">
-          <div className="shrink-0 border-b border-border">
-            <TabsList
-              variant="line"
-              className="w-full justify-start overflow-x-auto overflow-y-hidden"
-            >
-              <TabsTrigger value={WorkbenchTaskAuditTab.Runs} className="after:bottom-[-1px]">
-                {tabLabel('workbenchTaskRuns', filteredDetail.runs.length)}
-              </TabsTrigger>
-              <TabsTrigger value={WorkbenchTaskAuditTab.Events} className="after:bottom-[-1px]">
-                {tabLabel('workbenchTaskEvents', filteredDetail.events.length)}
-              </TabsTrigger>
-              <TabsTrigger value={WorkbenchTaskAuditTab.Artifacts} className="after:bottom-[-1px]">
-                {tabLabel('workbenchTaskArtifacts', filteredDetail.artifacts.length)}
-              </TabsTrigger>
-              <TabsTrigger value={WorkbenchTaskAuditTab.Approvals} className="after:bottom-[-1px]">
-                {tabLabel('workbenchTaskApprovals', filteredDetail.approvals.length)}
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          {detail.runs.length > 1 && (
-            <div className="flex items-center gap-2 pt-3">
-              <span className="text-xs text-muted-foreground">
-                {i18nService.t('workbenchTaskRunFilter')}
-              </span>
-              <Select value={runFilter} onValueChange={value => value && setRunFilter(value)}>
-                <SelectTrigger size="sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="start">
-                  <SelectGroup>
-                    <SelectItem value={WorkbenchTaskRunFilter.All}>
-                      {i18nService.t('workbenchTaskAllRuns')}
+        {detail.runs.length > 1 && (
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-xs text-muted-foreground">
+              {i18nService.t('workbenchTaskRunFilter')}
+            </span>
+            <Select value={runFilter} onValueChange={value => value && setRunFilter(value)}>
+              <SelectTrigger size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent align="start">
+                <SelectGroup>
+                  <SelectItem value={WorkbenchTaskRunFilter.All}>
+                    {i18nService.t('workbenchTaskAllRuns')}
+                  </SelectItem>
+                  {detail.runs.map(run => (
+                    <SelectItem key={run.id} value={run.id}>
+                      {i18nService
+                        .t('workbenchTaskRunAttempt')
+                        .replace('{attempt}', String(run.attempt))}
                     </SelectItem>
-                    {detail.runs.map(run => (
-                      <SelectItem key={run.id} value={run.id}>
-                        {i18nService
-                          .t('workbenchTaskRunAttempt')
-                          .replace('{attempt}', String(run.attempt))}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
-          <TabsContent value={WorkbenchTaskAuditTab.Runs} className="flex-none pt-3">
+        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+          <WorkbenchTaskAuditSection
+            title={i18nService.t('workbenchTaskRuns')}
+            count={filteredDetail.runs.length}
+          >
             <RunAuditTab runs={filteredDetail.runs} activeRunId={task.activeRunId} />
-          </TabsContent>
-          <TabsContent value={WorkbenchTaskAuditTab.Events} className="flex-none pt-3">
+          </WorkbenchTaskAuditSection>
+          <WorkbenchTaskAuditSection
+            title={i18nService.t('workbenchTaskEvents')}
+            count={filteredDetail.events.length}
+          >
             <EventAuditTab events={filteredDetail.events} runs={detail.runs} />
-          </TabsContent>
-          <TabsContent value={WorkbenchTaskAuditTab.Artifacts} className="flex-none pt-3">
+          </WorkbenchTaskAuditSection>
+          <WorkbenchTaskAuditSection
+            title={i18nService.t('workbenchTaskArtifacts')}
+            count={filteredDetail.artifacts.length}
+          >
             <ArtifactAuditTab artifacts={filteredDetail.artifacts} runs={detail.runs} />
-          </TabsContent>
-          <TabsContent value={WorkbenchTaskAuditTab.Approvals} className="flex-none pt-3">
+          </WorkbenchTaskAuditSection>
+          <WorkbenchTaskAuditSection
+            title={i18nService.t('workbenchTaskApprovals')}
+            count={filteredDetail.approvals.length}
+          >
             <ApprovalAuditTab
               approvals={filteredDetail.approvals}
               runs={detail.runs}
               busy={busy}
               onRespond={onRespondToApproval}
             />
-          </TabsContent>
-        </Tabs>
+          </WorkbenchTaskAuditSection>
+        </div>
       </div>
     </ScrollArea>
+  );
+}
+
+function WorkbenchTaskAuditSection({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count: number;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      className="min-w-0 overflow-hidden rounded-lg border border-border bg-background"
+      aria-label={`${title} (${count})`}
+    >
+      <div className="flex h-10 items-center border-b border-border bg-muted px-4">
+        <h3 className="text-sm font-semibold text-foreground">
+          {title} <span className="font-normal text-muted-foreground">({count})</span>
+        </h3>
+      </div>
+      <ScrollArea className="max-h-80 [&_[data-slot=scroll-area-viewport]]:max-h-80">
+        <div className="p-3">{children}</div>
+      </ScrollArea>
+    </section>
   );
 }
 
@@ -268,8 +285,4 @@ function TaskMetadata({ label, value }: { label: string; value: string }) {
       <dd className="break-words text-foreground">{value}</dd>
     </div>
   );
-}
-
-function tabLabel(key: string, count: number): string {
-  return `${i18nService.t(key)} (${count})`;
 }
