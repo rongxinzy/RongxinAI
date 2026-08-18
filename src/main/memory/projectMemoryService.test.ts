@@ -54,6 +54,10 @@ class FakeRepository {
     return {};
   }
 
+  isCurrentSemanticMemoryLink() {
+    return true;
+  }
+
   supersedeActiveTopic() {}
 
   createLink(input: Record<string, unknown>) {
@@ -110,7 +114,7 @@ test('returns referenced memory only when it is recallable in the current bounda
     sessionId: 'session-1',
   }));
   const service = new ProjectMemoryService(
-    { findLinkByMemoryId } as never,
+    { findLinkByMemoryId, isCurrentSemanticMemoryLink: vi.fn(() => true) } as never,
     {} as never,
     identityFor,
   );
@@ -162,6 +166,76 @@ test('persists the outbox before confirming and linking a project memory', async
     confidence: 0.95,
     metadata: { extractorVersion: 1, sourceIds: ['message-1'] },
   });
+});
+
+test('supersedes a legacy Project link through the durable outbox', async () => {
+  const target = {
+    id: 'legacy-project-link',
+    memoryId: 41,
+    projectId: 'project-alpha',
+    scope: MemoryScope.Project,
+    sessionId: 'session-old',
+    status: MemoryLifecycleStatus.Active,
+  };
+  let pending: MemoryOutboxItem | null = null;
+  const repository = {
+    getLink: vi.fn(() => target),
+    findLinkByMemoryId: vi.fn(() => target),
+    enqueue: vi.fn((operation, payload, linkId) => {
+      pending = {
+        id: 'outbox-supersede',
+        linkId,
+        operation,
+        payload,
+        status: MemoryOutboxStatus.Pending,
+        attempts: 0,
+        availableAt: new Date(0).toISOString(),
+        lastError: null,
+      };
+      return pending.id;
+    }),
+    listPending: vi.fn(() => (pending ? [pending] : [])),
+    createLink: vi.fn(),
+    setLinkStatus: vi.fn(),
+    supersedeActiveTopic: vi.fn(),
+    markCompleted: vi.fn(),
+    markRetry: vi.fn(),
+  };
+  const adapter = {
+    saveCandidate: vi.fn(input => ({ id: 'replacement-candidate', ...input })),
+    supersede: vi.fn(async () => 42),
+    discardCandidate: vi.fn(),
+  };
+  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+
+  const memoryId = await service.saveProjectMemory({
+    sessionId: 'session-new',
+    workingDirectory: 'alpha',
+    type: EngramObservationType.Decision,
+    title: 'Project store',
+    content: 'Use SQLite.',
+    supersedesLinkId: target.id,
+  });
+
+  expect(repository.markRetry).not.toHaveBeenCalled();
+  expect(memoryId).toBe(42);
+
+  expect(repository.enqueue).toHaveBeenCalledWith(
+    MemoryOutboxOperation.Supersede,
+    expect.objectContaining({
+      supersedesLinkId: target.id,
+      supersededObservationId: target.memoryId,
+    }),
+    expect.any(String),
+  );
+  expect(adapter.supersede).toHaveBeenCalledWith(
+    expect.objectContaining({ observationId: target.memoryId }),
+  );
+  expect(repository.setLinkStatus).toHaveBeenCalledWith(
+    target.id,
+    MemoryLifecycleStatus.Superseded,
+    expect.any(String),
+  );
 });
 
 test('keeps an unavailable write pending for a later outbox drain', async () => {
@@ -294,7 +368,10 @@ test('lists the current workspace, confirmed personal, and current-session memor
     },
   ];
   const service = new ProjectMemoryService(
-    { listManaged: vi.fn(() => memories) } as never,
+    {
+      listManaged: vi.fn(() => memories),
+      isCurrentSemanticMemoryLink: vi.fn(() => true),
+    } as never,
     {} as never,
     identityFor,
   );
@@ -307,6 +384,28 @@ test('lists the current workspace, confirmed personal, and current-session memor
       .listRecallableMemories({ workingDirectory: 'alpha', sessionId: 'session-a' })
       .map(memory => memory.id),
   ).toEqual(['project-current', 'personal', 'session-current']);
+});
+
+test('does not expose legacy copy-style Session summaries through controlled listing', () => {
+  const service = new ProjectMemoryService(
+    {
+      listManaged: vi.fn(() => [
+        {
+          id: 'legacy-session',
+          projectId: 'project-alpha',
+          scope: EngramMemoryScope.Session,
+          sessionId: 'session-a',
+        },
+      ]),
+      isCurrentSemanticMemoryLink: vi.fn(() => false),
+    } as never,
+    {} as never,
+    identityFor,
+  );
+
+  expect(
+    service.listRecallableMemories({ workingDirectory: 'alpha', sessionId: 'session-a' }),
+  ).toEqual([]);
 });
 
 test('stores rolling session summaries with a 30 day expiration', async () => {

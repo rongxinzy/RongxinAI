@@ -94,6 +94,7 @@ import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
 import { ConversationHistoryService } from './conversationHistory/service';
 import { EngramManager } from './memory/engramManager';
+import { LegacyMemoryMigrationService } from './memory/legacyMemoryMigrationService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
@@ -885,6 +886,13 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
     piRuntimeAdapter.setSessionSummaryService(
       new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
+    );
+    piRuntimeAdapter.setLegacyMemoryMigrationService(
+      new LegacyMemoryMigrationService(
+        getProjectMemoryService(),
+        getCoworkStore(),
+        getWorkbenchTaskService(),
+      ),
     );
     piRuntimeAdapter.setConversationHistoryService(
       new ConversationHistoryService(getStore().getDatabase()),
