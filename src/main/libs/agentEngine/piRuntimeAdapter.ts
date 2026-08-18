@@ -975,6 +975,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 workflowKind: workbenchContract.kind,
                 goal: workbenchTaskGoal,
                 prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
+                deferDecision:
+                  options.goalMode !== true && options._productionWorkflowEnabled === undefined,
+                skipAllowed: options.goalMode !== true,
               },
               completionWorkflow || undefined,
             )
@@ -1316,6 +1319,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           workflowKind: workbenchContract.kind,
           goal: workbench.task.goal,
           prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
+          deferDecision: nextGoalMode !== true && options._productionWorkflowEnabled === undefined,
+          skipAllowed: nextGoalMode !== true,
         });
       }
     }
@@ -2431,7 +2436,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (loopDecision.shouldContinue && loopDecision.nextPrompt) {
           if (
             active.productionLoop &&
-            active.productionLoop.getState().staleCount >= MAX_STALE_PRODUCTION_ITERATIONS
+            active.productionLoop.getStaleCount() >= MAX_STALE_PRODUCTION_ITERATIONS
           ) {
             this.stopActiveSession(
               sessionId,
