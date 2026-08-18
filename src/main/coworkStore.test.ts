@@ -26,7 +26,11 @@ import {
   DefaultAgentAvatarIcon,
   encodeAgentAvatarIcon,
 } from '../shared/agent/avatar';
-import { COWORK_MESSAGE_PAGE_SIZE, CoworkSessionMode } from '../shared/cowork/constants';
+import {
+  COWORK_MESSAGE_PAGE_SIZE,
+  CoworkSessionMode,
+  CoworkSessionSource,
+} from '../shared/cowork/constants';
 import { CoworkSessionExpertSource } from '../shared/cowork/sessionExperts';
 import { initializeCoworkArtifactIndexSchema } from './coworkArtifactIndex';
 import { CoworkStore } from './coworkStore';
@@ -58,6 +62,7 @@ function setupDb(): void {
       active_skill_ids TEXT,
       workspace_id TEXT,
       agent_id TEXT NOT NULL DEFAULT 'main',
+      source TEXT NOT NULL DEFAULT '${CoworkSessionSource.Manual}',
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -285,6 +290,44 @@ test('sessions are grouped by workspace independently of their agent snapshot', 
   expect(
     store.listSessions(10, 0, undefined, first.workspaceId).map(session => session.id),
   ).toEqual(expect.arrayContaining([first.id, second.id]));
+});
+
+test('listSessions paginates independently by session source', () => {
+  const workspace = store.ensureWorkspace('/tmp/workspace-source');
+  const scheduled = store.createSession(
+    'scheduled',
+    workspace.path,
+    '',
+    'local',
+    [],
+    'main',
+    '',
+    CoworkSessionMode.Work,
+    undefined,
+    workspace.id,
+    [],
+    CoworkSessionSource.Scheduled,
+  );
+  db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(1, scheduled.id);
+  for (let index = 0; index < 8; index += 1) {
+    const manual = store.createSession(`manual-${index}`, workspace.path);
+    db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(index + 2, manual.id);
+  }
+
+  const scheduledSources = [CoworkSessionSource.Scheduled];
+  const regularSources = [CoworkSessionSource.Manual, CoworkSessionSource.Im];
+
+  expect(
+    store
+      .listSessions(6, 0, undefined, workspace.id, CoworkSessionMode.Work, scheduledSources)
+      .map(session => session.id),
+  ).toEqual([scheduled.id]);
+  expect(
+    store.countSessions(undefined, workspace.id, CoworkSessionMode.Work, scheduledSources),
+  ).toBe(1);
+  expect(store.countSessions(undefined, workspace.id, CoworkSessionMode.Work, regularSources)).toBe(
+    8,
+  );
 });
 
 test('workspace order changes only when the workspace is explicitly touched', () => {
@@ -547,11 +590,7 @@ test('updateSession can patch model override without refreshing the session upda
   insertSession(sid);
   db.prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?').run(1000, sid);
 
-  store.updateSession(
-    sid,
-    { modelOverride: 'deepseek/qwen3.6-plus' },
-    { touchUpdatedAt: false },
-  );
+  store.updateSession(sid, { modelOverride: 'deepseek/qwen3.6-plus' }, { touchUpdatedAt: false });
 
   const session = store.getSession(sid);
   expect(session?.modelOverride).toBe('deepseek/qwen3.6-plus');

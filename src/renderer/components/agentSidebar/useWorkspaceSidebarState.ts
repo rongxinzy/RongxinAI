@@ -1,7 +1,7 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import { CoworkSessionMode } from '../../../shared/cowork/constants';
+import { CoworkSessionMode, CoworkSessionSource } from '../../../shared/cowork/constants';
 import { coworkService } from '../../services/cowork';
 import { i18nService } from '../../services/i18n';
 import { localStore } from '../../services/store';
@@ -16,7 +16,7 @@ import { WorkMode, type WorkMode as WorkModeType } from '../../store/workMode/co
 import type { CoworkSessionSummary } from '../../types/cowork';
 import { CoworkSessionStatusValue } from '../../types/cowork';
 import { isScratchWorkspacePath } from '../../utils/path';
-import { AgentSidebarIndicator, AgentSidebarPageSize, isScheduledSessionTitle } from './constants';
+import { AgentSidebarIndicator, AgentSidebarPageSize } from './constants';
 import type {
   AgentSidebarTaskNode,
   WorkspaceSidebarNode,
@@ -34,6 +34,17 @@ const modeMatches = (session: CoworkSessionSummary, workMode: WorkModeType) =>
   workMode === WorkMode.Chat
     ? session.mode === CoworkSessionMode.Chat
     : session.mode !== CoworkSessionMode.Chat;
+
+const isScheduledSession = (session: CoworkSessionSummary): boolean =>
+  session.source === CoworkSessionSource.Scheduled;
+
+const sourcesForGroup = (scheduled: boolean) =>
+  scheduled
+    ? [CoworkSessionSource.Scheduled]
+    : [CoworkSessionSource.Manual, CoworkSessionSource.Im];
+
+const workspaceGroupKey = (workspaceId: string, scheduled: boolean): string =>
+  `${workspaceId}:${scheduled ? CoworkSessionSource.Scheduled : CoworkSessionSource.Manual}`;
 
 const toTaskNode = (
   session: CoworkSessionSummary,
@@ -81,10 +92,7 @@ export const useWorkspaceSidebarState = (
   const streamingSessionIds = useSelector(selectStreamingSessionIds);
   const unreadSessionIds = useDeferredValue(useSelector(selectUnreadSessionIds));
   const unreadSet = useMemo(() => new Set(unreadSessionIds), [unreadSessionIds]);
-  const streamingSessionIdSet = useMemo(
-    () => new Set(streamingSessionIds),
-    [streamingSessionIds],
-  );
+  const streamingSessionIdSet = useMemo(() => new Set(streamingSessionIds), [streamingSessionIds]);
   const [expandedIds, setExpandedIds] = useState<string[]>([]);
   const [expandedTaskIds, setExpandedTaskIds] = useState<string[]>([]);
   const [scheduledExpandedIds, setScheduledExpandedIds] = useState<string[]>([]);
@@ -92,18 +100,19 @@ export const useWorkspaceSidebarState = (
   const [preferencesHydrated, setPreferencesHydrated] = useState(false);
   const [previews, setPreviews] = useState<Record<string, CoworkSessionSummary[]>>({});
   const [hasMore, setHasMore] = useState<Record<string, boolean>>({});
-  const [loadingIds, setLoadingIds] = useState<string[]>([]);
-  const [failedIds, setFailedIds] = useState<string[]>([]);
+  const [loadingKeys, setLoadingKeys] = useState<string[]>([]);
+  const [failedKeys, setFailedKeys] = useState<string[]>([]);
   const loadingKeysRef = useRef(new Set<string>());
+  const loadedGroupsRef = useRef(new Set<string>());
   const hasStoredPreferenceRef = useRef(false);
 
-  const setLoading = useCallback((id: string, loading: boolean) => {
-    setLoadingIds(current =>
+  const setLoading = useCallback((key: string, loading: boolean) => {
+    setLoadingKeys(current =>
       loading
-        ? current.includes(id)
+        ? current.includes(key)
           ? current
-          : [...current, id]
-        : current.filter(value => value !== id),
+          : [...current, key]
+        : current.filter(value => value !== key),
     );
   }, []);
 
@@ -163,34 +172,39 @@ export const useWorkspaceSidebarState = (
   ]);
 
   const loadWorkspaceTasks = useCallback(
-    async (workspaceId: string, offset = 0, replace = offset === 0) => {
-      const key = `${workspaceId}:${offset}`;
-      if (loadingKeysRef.current.has(key)) return;
-      loadingKeysRef.current.add(key);
-      setLoading(workspaceId, true);
-      setFailedIds(current => current.filter(id => id !== workspaceId));
+    async (workspaceId: string, scheduled: boolean, offset = 0, replace = offset === 0) => {
+      const groupKey = workspaceGroupKey(workspaceId, scheduled);
+      const requestKey = `${groupKey}:${offset}`;
+      if (loadingKeysRef.current.has(requestKey)) return;
+      loadingKeysRef.current.add(requestKey);
+      setLoading(groupKey, true);
+      setFailedKeys(current => current.filter(key => key !== groupKey));
       try {
         const result = await coworkService.listSessionsForWorkspacePreview(
           workspaceId,
           AgentSidebarPageSize.Preview,
           offset,
+          sourcesForGroup(scheduled),
         );
         if (!result.success) {
-          setFailedIds(current =>
-            current.includes(workspaceId) ? current : [...current, workspaceId],
-          );
+          setFailedKeys(current => (current.includes(groupKey) ? current : [...current, groupKey]));
           return;
         }
         setPreviews(current => ({
           ...current,
           [workspaceId]: replace
-            ? (result.sessions ?? [])
+            ? [
+                ...(current[workspaceId] ?? []).filter(
+                  session => isScheduledSession(session) !== scheduled,
+                ),
+                ...(result.sessions ?? []),
+              ]
             : mergeSessionSummaries(current[workspaceId] ?? [], result.sessions ?? []),
         }));
-        setHasMore(current => ({ ...current, [workspaceId]: result.hasMore ?? false }));
+        setHasMore(current => ({ ...current, [groupKey]: result.hasMore ?? false }));
       } finally {
-        loadingKeysRef.current.delete(key);
-        setLoading(workspaceId, false);
+        loadingKeysRef.current.delete(requestKey);
+        setLoading(groupKey, false);
       }
     },
     [setLoading],
@@ -198,9 +212,14 @@ export const useWorkspaceSidebarState = (
 
   useEffect(() => {
     workspaces.forEach(workspace => {
-      if (!previews[workspace.id]) void loadWorkspaceTasks(workspace.id);
+      for (const scheduled of [false, true]) {
+        const groupKey = workspaceGroupKey(workspace.id, scheduled);
+        if (loadedGroupsRef.current.has(groupKey)) continue;
+        loadedGroupsRef.current.add(groupKey);
+        void loadWorkspaceTasks(workspace.id, scheduled);
+      }
     });
-  }, [loadWorkspaceTasks, previews, workspaces]);
+  }, [loadWorkspaceTasks, workspaces]);
 
   useEffect(() => {
     setPreviews(current =>
@@ -228,9 +247,12 @@ export const useWorkspaceSidebarState = (
       setExpandedTaskIds(current =>
         current.includes(workspaceId) ? current : [...current, workspaceId],
       );
-      const current = previews[workspaceId] ?? [];
-      if (!hasMore[workspaceId]) return;
-      await loadWorkspaceTasks(workspaceId, current.length, false);
+      const groupKey = workspaceGroupKey(workspaceId, false);
+      const offset = (previews[workspaceId] ?? []).filter(
+        session => !isScheduledSession(session),
+      ).length;
+      if (!hasMore[groupKey]) return;
+      await loadWorkspaceTasks(workspaceId, false, offset, false);
     },
     [hasMore, loadWorkspaceTasks, previews],
   );
@@ -239,14 +261,19 @@ export const useWorkspaceSidebarState = (
       setScheduledExpandedTaskIds(current =>
         current.includes(workspaceId) ? current : [...current, workspaceId],
       );
-      const current = previews[workspaceId] ?? [];
-      if (!hasMore[workspaceId]) return;
-      await loadWorkspaceTasks(workspaceId, current.length, false);
+      const groupKey = workspaceGroupKey(workspaceId, true);
+      const offset = (previews[workspaceId] ?? []).filter(isScheduledSession).length;
+      if (!hasMore[groupKey]) return;
+      await loadWorkspaceTasks(workspaceId, true, offset, false);
     },
     [hasMore, loadWorkspaceTasks, previews],
   );
   const retryLoadTasks = useCallback(
-    (workspaceId: string) => loadWorkspaceTasks(workspaceId, 0, true),
+    (workspaceId: string) => loadWorkspaceTasks(workspaceId, false, 0, true),
+    [loadWorkspaceTasks],
+  );
+  const retryLoadScheduledTasks = useCallback(
+    (workspaceId: string) => loadWorkspaceTasks(workspaceId, true, 0, true),
     [loadWorkspaceTasks],
   );
   const patchTaskPreview = useCallback(
@@ -280,45 +307,48 @@ export const useWorkspaceSidebarState = (
 
   const buildWorkspaceNodes = useCallback(
     (scheduled: boolean, expandedWorkspaceIds: string[], expandedTaskListIds: string[]) =>
-      workspaces.filter(workspace => !workspace.isHidden).map(workspace => {
-        const filtered = sortTasks(
-          (previews[workspace.id] ?? []).filter(
-            session =>
-              isSessionOwnedByWorkspace(session, workspace.id) &&
-              modeMatches(session, workMode) &&
-              isScheduledSessionTitle(session.title) === scheduled,
-          ),
-        );
-        const expanded = expandedWorkspaceIds.includes(workspace.id);
-        const taskExpanded = expandedTaskListIds.includes(workspace.id);
-        const visible = taskExpanded ? filtered : filtered.slice(0, AgentSidebarPageSize.Preview);
-        return {
-          id: workspace.id,
-          // The scratch workspace (「不使用文件夹」) displays as 默认对话 instead
-          // of its folder basename.
-          name: isScratchWorkspacePath(workspace.path)
-            ? i18nService.t('defaultConversation')
-            : workspace.name,
-          path: workspace.path,
-          pinned: workspace.pinned,
-          isExpanded: expanded,
-          isTaskListExpanded: taskExpanded,
-          canExpandTasks:
-            !taskExpanded &&
-            ((hasMore[workspace.id] ?? false) || filtered.length > AgentSidebarPageSize.Preview),
-          canCollapseTasks: taskExpanded && filtered.length > AgentSidebarPageSize.Preview,
-          isLoadingTasks: loadingIds.includes(workspace.id),
-          hasLoadError: failedIds.includes(workspace.id),
-          tasks: visible.map(session =>
-            toTaskNode(session, currentSessionId, unreadSet, streamingSessionIdSet),
-          ),
-        } satisfies WorkspaceSidebarNode;
-      }),
+      workspaces
+        .filter(workspace => !workspace.isHidden)
+        .map(workspace => {
+          const groupKey = workspaceGroupKey(workspace.id, scheduled);
+          const filtered = sortTasks(
+            (previews[workspace.id] ?? []).filter(
+              session =>
+                isSessionOwnedByWorkspace(session, workspace.id) &&
+                modeMatches(session, workMode) &&
+                isScheduledSession(session) === scheduled,
+            ),
+          );
+          const expanded = expandedWorkspaceIds.includes(workspace.id);
+          const taskExpanded = expandedTaskListIds.includes(workspace.id);
+          const visible = taskExpanded ? filtered : filtered.slice(0, AgentSidebarPageSize.Preview);
+          return {
+            id: workspace.id,
+            // The scratch workspace (「不使用文件夹」) displays as 默认对话 instead
+            // of its folder basename.
+            name: isScratchWorkspacePath(workspace.path)
+              ? i18nService.t('defaultConversation')
+              : workspace.name,
+            path: workspace.path,
+            pinned: workspace.pinned,
+            isExpanded: expanded,
+            isTaskListExpanded: taskExpanded,
+            canExpandTasks:
+              !taskExpanded &&
+              ((hasMore[groupKey] ?? false) || filtered.length > AgentSidebarPageSize.Preview),
+            canCollapseTasks: taskExpanded && filtered.length > AgentSidebarPageSize.Preview,
+            isLoadingTasks: loadingKeys.includes(groupKey),
+            hasLoadError: failedKeys.includes(groupKey),
+            tasks: visible.map(session =>
+              toTaskNode(session, currentSessionId, unreadSet, streamingSessionIdSet),
+            ),
+          } satisfies WorkspaceSidebarNode;
+        }),
     [
       currentSessionId,
-      failedIds,
+      failedKeys,
       hasMore,
-      loadingIds,
+      loadingKeys,
       previews,
       streamingSessionIdSet,
       unreadSet,
@@ -362,7 +392,7 @@ export const useWorkspaceSidebarState = (
         const tasks = sortTasks(
           (searchSource[node.id] ?? []).filter(
             session =>
-              isScheduledSessionTitle(session.title) === scheduled &&
+              isScheduledSession(session) === scheduled &&
               session.title.toLowerCase().includes(query),
           ),
         );
@@ -412,6 +442,7 @@ export const useWorkspaceSidebarState = (
     patchTaskPreview,
     removeTaskPreview,
     retryLoadTasks,
+    retryLoadScheduledTasks,
     loadMoreTasks,
     loadMoreScheduledTasks,
     collapseTasks,

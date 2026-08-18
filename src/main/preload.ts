@@ -39,7 +39,11 @@ import {
   WindowIpc,
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
-import type { CoworkPermissionMode, CoworkSessionMode } from '../shared/cowork/constants';
+import type {
+  CoworkPermissionMode,
+  CoworkSessionMode,
+  CoworkSessionSource,
+} from '../shared/cowork/constants';
 import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
 import type { CoworkPendingMessage } from '../shared/cowork/pendingMessageQueue';
 import { LlamaCppIpcChannel } from '../shared/llamacpp/constants';
@@ -472,6 +476,7 @@ contextBridge.exposeInMainWorld('electron', {
       agentId?: string;
       workspaceId?: string;
       mode?: CoworkSessionMode;
+      sources?: CoworkSessionSource[];
     }) => ipcRenderer.invoke(CoworkSessionIpc.List, options),
     getSessionMessages: (options: { sessionId: string; limit?: number; offset?: number }) =>
       ipcRenderer.invoke(CoworkSessionIpc.GetMessages, options),

@@ -1,6 +1,6 @@
 import { test, expect } from 'vitest';
 
-import { CoworkSessionMode } from '../shared/cowork/constants';
+import { CoworkSessionMode, CoworkSessionSource } from '../shared/cowork/constants';
 import type { CoworkSessionSummary } from './coworkStore';
 import { reconcileWorkSessionRuntimeState } from './coworkSessionRuntimeState';
 
@@ -13,6 +13,7 @@ const makeSession = (overrides: Partial<CoworkSessionSummary> = {}): CoworkSessi
   pinOrder: null,
   workspaceId: 'workspace-1',
   agentId: 'main',
+  source: CoworkSessionSource.Manual,
   createdAt: 1,
   updatedAt: 1,
   ...overrides,

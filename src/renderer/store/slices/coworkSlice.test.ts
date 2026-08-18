@@ -1,6 +1,10 @@
 import { expect, test } from 'vitest';
 
-import { CoworkPermissionMode, CoworkPermissionOrigin } from '../../../shared/cowork/constants';
+import {
+  CoworkPermissionMode,
+  CoworkPermissionOrigin,
+  CoworkSessionSource,
+} from '../../../shared/cowork/constants';
 import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
@@ -39,6 +43,7 @@ const makeSession = (overrides: Partial<Parameters<typeof addSession>[0]> = {}) 
   activeSkillIds: [],
   workspaceId: 'workspace-test',
   agentId: 'main',
+  source: CoworkSessionSource.Manual,
   messages: [],
   messagesOffset: 0,
   totalMessages: 0,
@@ -178,6 +183,15 @@ test('addSession preserves the agent id in session summaries', () => {
   expect(state.sessions[0].agentId).toBe('agent-2');
 });
 
+test('addSession preserves the source in session summaries', () => {
+  const state = coworkReducer(
+    undefined,
+    addSession(makeSession({ source: CoworkSessionSource.Scheduled })),
+  );
+
+  expect(state.sessions[0].source).toBe(CoworkSessionSource.Scheduled);
+});
+
 test('chat sessions use the chat cache without invalidating work sessions', () => {
   const chatState = coworkReducer(
     undefined,
@@ -267,6 +281,7 @@ test('updateSessionStatus marks completed inactive sessions unread', () => {
         status: CoworkSessionStatusValue.Running,
         pinned: false,
         agentId: 'main',
+        source: CoworkSessionSource.Manual,
         createdAt: 1,
         updatedAt: 1,
       },
@@ -295,6 +310,7 @@ test('updateSessionStatus does not mark the active completed session unread', ()
           status: CoworkSessionStatusValue.Running,
           pinned: false,
           agentId: 'main',
+          source: CoworkSessionSource.Manual,
           createdAt: 1,
           updatedAt: 1,
         },
