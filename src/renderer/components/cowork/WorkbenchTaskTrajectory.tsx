@@ -297,7 +297,7 @@ export function WorkbenchTaskTrajectory({
 
 function WorkbenchTaskTrajectorySkeleton() {
   return (
-    <div className="mx-auto flex h-full w-full max-w-5xl flex-col gap-4 p-4">
+    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto p-4">
       <div className="flex items-center justify-between gap-4">
         <div className="flex flex-col gap-2">
           <Skeleton className="h-5 w-40" />
@@ -305,9 +305,17 @@ function WorkbenchTaskTrajectorySkeleton() {
         </div>
         <Skeleton className="h-8 w-24" />
       </div>
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-8 w-80" />
-      <Skeleton className="min-h-0 flex-1 w-full" />
+      <div className="rounded-lg border border-border bg-muted p-4">
+        <Skeleton className="h-20 w-full" />
+      </div>
+      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
+        {[0, 1, 2, 3].map(index => (
+          <div key={index} className="rounded-lg border border-border p-3">
+            <Skeleton className="mb-3 h-5 w-24" />
+            <Skeleton className="h-48 w-full" />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
