@@ -730,6 +730,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   memory: {
     list: (input?: unknown) => ipcRenderer.invoke(MemoryIpcChannel.List, input),
+    resolveSessionTitles: (input: unknown) =>
+      ipcRenderer.invoke(MemoryIpcChannel.ResolveSessionTitles, input),
     createManual: (input: unknown) => ipcRenderer.invoke(MemoryIpcChannel.CreateManual, input),
     updateManual: (input: unknown) => ipcRenderer.invoke(MemoryIpcChannel.UpdateManual, input),
     confirmCandidate: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.ConfirmCandidate, id),

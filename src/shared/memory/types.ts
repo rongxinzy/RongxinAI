@@ -43,6 +43,15 @@ export interface ManagedMemoryListInput {
   query?: string;
 }
 
+export interface MemorySessionTitleResolveInput {
+  sessionIds: string[];
+}
+
+export interface MemorySessionTitle {
+  sessionId: string;
+  title: string;
+}
+
 export type ManualMemoryScope = typeof MemoryScope.Project | typeof MemoryScope.Personal;
 
 export interface ManualMemoryCreateInput {

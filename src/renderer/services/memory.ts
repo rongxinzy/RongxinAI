@@ -4,6 +4,7 @@ import type {
   ManagedMemoryListInput,
   ManagedMemoryRecord,
   MemoryIpcResult,
+  MemorySessionTitle,
 } from '../../shared/memory';
 
 function unwrap<T>(result: MemoryIpcResult<T>): T {
@@ -14,6 +15,9 @@ function unwrap<T>(result: MemoryIpcResult<T>): T {
 export const memoryService = {
   async list(input: ManagedMemoryListInput = {}): Promise<ManagedMemoryRecord[]> {
     return unwrap(await window.electron.memory.list(input));
+  },
+  async resolveSessionTitles(sessionIds: string[]): Promise<MemorySessionTitle[]> {
+    return unwrap(await window.electron.memory.resolveSessionTitles({ sessionIds }));
   },
   async createManual(input: ManualMemoryCreateInput): Promise<ManagedMemoryRecord> {
     return unwrap(await window.electron.memory.createManual(input));
