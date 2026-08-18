@@ -30,7 +30,7 @@ const availableVerifierEvidence = [
 
 const createTool = () => {
   const controller = {
-    getState: vi.fn(() => state),
+    getModelState: vi.fn(() => state),
     getAvailableVerifierEvidence: vi.fn(() => availableVerifierEvidence),
     commitPlan: vi.fn(),
     startInspection: vi.fn(),
