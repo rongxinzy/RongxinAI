@@ -1,3 +1,4 @@
+import { MemoryScope } from '../../shared/memory';
 import {
   WorkbenchApprovalEffectStatus,
   WorkbenchArtifactVerificationStatus,
@@ -9,10 +10,10 @@ import {
   type WorkbenchTask,
   type WorkbenchVerificationResult,
 } from '../../shared/workbenchTask';
-import { MemoryKind, MemorySensitivity } from '../../shared/memory';
+import { AtomicMemoryExtractor } from './atomicMemoryExtractor';
+import { AtomicMemorySourceKind } from './constants';
 import type { ProjectMemoryService } from './projectMemoryService';
-
-const MAX_VERIFIED_RESULT_LENGTH = 1_600;
+import type { SessionMemoryCompletion } from './sessionMemoryExtractor';
 
 export interface VerifiedWorkbenchRunMemorySource {
   task: WorkbenchTask;
@@ -24,14 +25,15 @@ export interface VerifiedWorkbenchRunMemorySource {
   finalAnswer: string;
 }
 
-export function promoteVerifiedWorkbenchRun(
+export async function promoteVerifiedWorkbenchRun(
   service: ProjectMemoryService,
   source: VerifiedWorkbenchRunMemorySource,
-): string | null {
-  if (source.verificationResult.outcome !== WorkbenchVerificationOutcome.Passed) return null;
-  if (source.task.contract.kind === WorkbenchContractKind.Chat) return null;
-  const content = compactVerifiedResult(source.finalAnswer);
-  if (content.length < 32) return null;
+  complete: SessionMemoryCompletion,
+  extractor = new AtomicMemoryExtractor(),
+): Promise<string[]> {
+  if (source.verificationResult.outcome !== WorkbenchVerificationOutcome.Passed) return [];
+  if (source.task.contract.kind === WorkbenchContractKind.Chat) return [];
+  if (!source.finalAnswer.trim()) return [];
   const artifacts = source.artifacts.filter(
     artifact =>
       artifact.runId === source.run.id &&
@@ -42,30 +44,79 @@ export function promoteVerifiedWorkbenchRun(
       approval.runId === source.run.id &&
       approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded,
   );
-  return service.proposeProjectMemoryCandidate({
-    sessionId: source.task.sessionId,
-    workingDirectory: source.workspaceRoot,
-    type: MemoryKind.Decision,
-    title: source.task.goal.slice(0, 120),
-    content,
-    topicKey: `task/${source.task.id}`,
-    importance: artifacts.length > 0 ? 0.8 : 0.65,
-    confidence: 1,
-    sensitivity: MemorySensitivity.Normal,
-    taskId: source.task.id,
-    runId: source.run.id,
-    artifactId: artifacts[0]?.id,
-    approvalId: approvals[0]?.id,
-    metadata: {
-      artifactIds: artifacts.map(artifact => artifact.id),
-      approvalIds: approvals.map(approval => approval.id),
-      verificationSummary: source.verificationResult.summary,
-    },
+  const extracted = await extractor.extract({
+    scope: MemoryScope.Project,
+    maxItems: 5,
+    complete,
+    sources: [
+      {
+        id: `task:${source.task.id}:goal`,
+        kind: AtomicMemorySourceKind.TaskGoal,
+        content: source.task.goal,
+      },
+      {
+        id: `run:${source.run.id}:final-answer`,
+        kind: AtomicMemorySourceKind.FinalAnswer,
+        content: source.finalAnswer,
+      },
+      {
+        id: `run:${source.run.id}:verification`,
+        kind: AtomicMemorySourceKind.Verification,
+        content: JSON.stringify({
+          summary: source.verificationResult.summary,
+          checks: source.verificationResult.checks,
+          evidence: source.verificationResult.evidence,
+        }),
+      },
+      ...artifacts.map(artifact => ({
+        id: `artifact:${artifact.id}`,
+        kind: AtomicMemorySourceKind.Artifact,
+        content: JSON.stringify({
+          reference: artifact.reference,
+          contentHash: artifact.contentHash,
+          provenance: artifact.provenance,
+          metadata: artifact.metadata,
+        }),
+      })),
+      ...approvals.map(approval => ({
+        id: `approval:${approval.id}`,
+        kind: AtomicMemorySourceKind.Approval,
+        content: JSON.stringify({
+          toolName: approval.toolName,
+          decision: approval.decision,
+          effectStatus: approval.effectStatus,
+        }),
+      })),
+    ],
   });
-}
-
-function compactVerifiedResult(value: string): string {
-  const compact = value.trim().replace(/\n{3,}/g, '\n\n');
-  if (compact.length <= MAX_VERIFIED_RESULT_LENGTH) return compact;
-  return `${compact.slice(0, MAX_VERIFIED_RESULT_LENGTH - 3).trimEnd()}...`;
+  if (!extracted) return [];
+  return extracted.memories.map((memory, index) => {
+    const artifact = artifacts.find(item =>
+      memory.evidenceSourceIds.includes(`artifact:${item.id}`),
+    );
+    const approval = approvals.find(item =>
+      memory.evidenceSourceIds.includes(`approval:${item.id}`),
+    );
+    return service.proposeProjectMemoryCandidate({
+      sessionId: source.task.sessionId,
+      workingDirectory: source.workspaceRoot,
+      type: memory.kind,
+      title: memory.title,
+      content: memory.content,
+      topicKey: `task/${source.task.id}/${index + 1}`,
+      importance: memory.importance,
+      confidence: memory.confidence,
+      sensitivity: memory.sensitivity,
+      taskId: source.task.id,
+      runId: source.run.id,
+      artifactId: artifact?.id,
+      approvalId: approval?.id,
+      metadata: {
+        artifactIds: artifacts.map(item => item.id),
+        approvalIds: approvals.map(item => item.id),
+        verificationSummary: source.verificationResult.summary,
+        extraction: extracted.metadataFor(memory),
+      },
+    });
+  });
 }

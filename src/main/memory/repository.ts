@@ -9,7 +9,16 @@ import {
   PERSONAL_MEMORY_PROJECT_ID,
   type MemoryKind,
 } from '../../shared/memory';
-import { MemoryOutboxStatus, type MemoryOutboxOperation, type MemorySourceKind } from './constants';
+import {
+  ATOMIC_MEMORY_EXTRACTOR_VERSION,
+  MemoryExtractorKind,
+  MemoryOutboxStatus,
+  MemoryRecordStorageKind,
+  SESSION_MEMORY_EXTRACTOR_VERSION,
+  type MemoryOutboxOperation,
+  type MemoryRecordStorageKind as MemoryRecordStorageKindValue,
+  type MemorySourceKind,
+} from './constants';
 
 export interface MemoryProjectionInput {
   title: string;
@@ -71,6 +80,14 @@ export interface MemoryOutboxItem {
 export interface MemoryRecallMetadata {
   importance: number;
   updatedAt: string;
+}
+
+export interface MemoryMigrationRecord {
+  memory: ManagedMemoryRecord;
+  storageKind: MemoryRecordStorageKindValue;
+  metadata: Record<string, unknown>;
+  supersedesLinkId: string | null;
+  promotedFromLinkId: string | null;
 }
 
 export interface RecallableMemoryFilter {
@@ -245,6 +262,13 @@ export class MemoryRepository {
     return row ? mapLink(row, this.getDelivery(id)) : null;
   }
 
+  getLinkMetadata(id: string): Record<string, unknown> {
+    const row = this.db.prepare('SELECT metadata_json FROM memory_links WHERE id = ?').get(id) as
+      | { metadata_json: string }
+      | undefined;
+    return row ? (JSON.parse(row.metadata_json) as Record<string, unknown>) : {};
+  }
+
   findActiveTopic(
     projectId: string,
     scope: MemoryScope,
@@ -359,6 +383,72 @@ export class MemoryRepository {
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
   }
 
+  listMigrationRecordsForContext(projectId: string): MemoryMigrationRecord[] {
+    const links = this.db
+      .prepare(
+        `SELECT * FROM memory_links
+         WHERE status = ?
+           AND ((scope = ? AND project_id = ?) OR (scope = ? AND project_id = ?))
+         ORDER BY created_at`,
+      )
+      .all(
+        MemoryLifecycleStatus.Active,
+        MemoryScope.Project,
+        projectId,
+        MemoryScope.Personal,
+        PERSONAL_MEMORY_PROJECT_ID,
+      ) as SqlRow[];
+    const candidates = this.db
+      .prepare(
+        `SELECT * FROM memory_candidates
+         WHERE status = ?
+           AND ((scope = ? AND project_id = ?) OR (scope = ? AND project_id = ?))
+         ORDER BY created_at`,
+      )
+      .all(
+        MemoryLifecycleStatus.NeedsReview,
+        MemoryScope.Project,
+        projectId,
+        MemoryScope.Personal,
+        PERSONAL_MEMORY_PROJECT_ID,
+      ) as SqlRow[];
+    return [
+      ...links.map<MemoryMigrationRecord>(row => ({
+        memory: mapLink(row, this.getDelivery(String(row.id))),
+        storageKind: MemoryRecordStorageKind.Link,
+        metadata: parseMetadata(row.metadata_json),
+        supersedesLinkId: null,
+        promotedFromLinkId: nullableString(row.promoted_from_link_id),
+      })),
+      ...candidates.map<MemoryMigrationRecord>(row => ({
+        memory: mapCandidate(row, this.getDelivery(String(row.id))),
+        storageKind: MemoryRecordStorageKind.Candidate,
+        metadata: parseMetadata(row.metadata_json),
+        supersedesLinkId: nullableString(row.supersedes_link_id),
+        promotedFromLinkId: nullableString(row.promoted_from_link_id),
+      })),
+    ];
+  }
+
+  updateMigrationRecordMetadata(
+    id: string,
+    storageKind: MemoryRecordStorageKindValue,
+    metadata: Record<string, unknown>,
+  ): void {
+    const table =
+      storageKind === MemoryRecordStorageKind.Link ? 'memory_links' : 'memory_candidates';
+    this.db
+      .prepare(`UPDATE ${table} SET metadata_json = ?, updated_at = ? WHERE id = ?`)
+      .run(JSON.stringify(metadata), new Date().toISOString(), id);
+  }
+
+  isCurrentSemanticMemoryLink(id: string, scope: MemoryScope): boolean {
+    const metadata = this.getLinkMetadata(id);
+    return scope === MemoryScope.Session
+      ? isCurrentSemanticSessionMetadata(metadata)
+      : isCurrentAtomicMetadata(metadata);
+  }
+
   filterRecallableMemoryIds(input: RecallableMemoryFilter): Set<number> {
     if (input.memoryIds.length === 0) return new Set();
     this.expireDue();
@@ -374,12 +464,21 @@ export class MemoryRepository {
     ];
     const rows = this.db
       .prepare(
-        `SELECT memory_id FROM memory_links
+        `SELECT memory_id, metadata_json FROM memory_links
          WHERE project_id = ? AND status = ? AND scope = ?
            AND memory_id IN (${placeholders})${sessionClause}`,
       )
-      .all(...parameters) as Array<{ memory_id: number }>;
-    return new Set(rows.map(row => row.memory_id));
+      .all(...parameters) as Array<{ memory_id: number; metadata_json: string }>;
+    return new Set(
+      rows
+        .filter(
+          row =>
+            input.scope === MemoryScope.Session
+              ? isCurrentSemanticSessionMetadata(parseMetadata(row.metadata_json))
+              : isCurrentAtomicMetadata(parseMetadata(row.metadata_json)),
+        )
+        .map(row => row.memory_id),
+    );
   }
 
   getRecallMetadata(projectId: string, memoryIds: number[]): Map<number, MemoryRecallMetadata> {
@@ -685,6 +784,47 @@ function mapRecord(
     deliveryStatus: delivery ? (delivery.status as ManagedMemoryRecord['deliveryStatus']) : null,
     deliveryError: delivery?.error ?? null,
   };
+}
+
+function parseMetadata(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'string') return {};
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function isCurrentSemanticSessionMetadata(metadata: Record<string, unknown>): boolean {
+  const digest = metadata.digest as Record<string, unknown> | null;
+  return (
+    metadata.extractorVersion === SESSION_MEMORY_EXTRACTOR_VERSION &&
+    Array.isArray(metadata.sourceMessageIds) &&
+    digest !== null &&
+    typeof digest === 'object' &&
+    !Array.isArray(digest) &&
+    digest.shouldSave === true &&
+    digest.goal !== null &&
+    typeof digest.goal === 'object' &&
+    digest.currentState !== null &&
+    typeof digest.currentState === 'object'
+  );
+}
+
+function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
+  const candidate =
+    metadata.extractorKind === MemoryExtractorKind.Atomic ? metadata : metadata.extraction;
+  return Boolean(
+    candidate &&
+      typeof candidate === 'object' &&
+      !Array.isArray(candidate) &&
+      (candidate as Record<string, unknown>).extractorKind === MemoryExtractorKind.Atomic &&
+      (candidate as Record<string, unknown>).extractorVersion ===
+        ATOMIC_MEMORY_EXTRACTOR_VERSION,
+  );
 }
 
 function nullableString(value: unknown): string | null {

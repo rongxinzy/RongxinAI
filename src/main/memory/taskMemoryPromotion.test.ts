@@ -1,5 +1,6 @@
 import { expect, test, vi } from 'vitest';
 
+import { MemoryKind, MemorySensitivity } from '../../shared/memory';
 import {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalDecision,
@@ -99,24 +100,59 @@ function source(overrides: Partial<VerifiedWorkbenchRunMemorySource> = {}) {
   } satisfies VerifiedWorkbenchRunMemorySource;
 }
 
-test('creates a review candidate with Task, Run, Artifact, and Approval provenance', () => {
+test('creates an atomic review candidate with Task, Run, Artifact, and Approval provenance', async () => {
   const proposeProjectMemoryCandidate = vi.fn(() => 'candidate-1');
-  const result = promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, source());
+  const memory = {
+    title: 'Project store',
+    content: 'Use SQLite as the durable project store.',
+    kind: MemoryKind.Decision,
+    importance: 0.8,
+    confidence: 0.95,
+    sensitivity: MemorySensitivity.Normal,
+    evidenceSourceIds: ['run:run-1:final-answer', 'artifact:artifact-1', 'approval:approval-1'],
+  };
+  const extractor = {
+    extract: vi.fn(async () => ({
+      memories: [memory],
+      metadataFor: vi.fn(() => ({ extractorVersion: 1, sourceIds: memory.evidenceSourceIds })),
+    })),
+  };
+  const result = await promoteVerifiedWorkbenchRun(
+    { proposeProjectMemoryCandidate } as never,
+    source(),
+    vi.fn(),
+    extractor as never,
+  );
 
-  expect(result).toBe('candidate-1');
+  expect(result).toEqual(['candidate-1']);
+  expect(extractor.extract).toHaveBeenCalledWith(
+    expect.objectContaining({
+      maxItems: 5,
+      sources: expect.arrayContaining([
+        expect.objectContaining({ id: 'run:run-1:final-answer' }),
+        expect.objectContaining({ id: 'artifact:artifact-1' }),
+        expect.objectContaining({ id: 'approval:approval-1' }),
+      ]),
+    }),
+  );
   expect(proposeProjectMemoryCandidate).toHaveBeenCalledWith(
     expect.objectContaining({
       taskId: 'task-1',
       runId: 'run-1',
       artifactId: 'artifact-1',
       approvalId: 'approval-1',
-      topicKey: 'task/task-1',
-      confidence: 1,
+      topicKey: 'task/task-1/1',
+      title: memory.title,
+      content: memory.content,
+      confidence: memory.confidence,
+      metadata: expect.objectContaining({
+        extraction: { extractorVersion: 1, sourceIds: memory.evidenceSourceIds },
+      }),
     }),
   );
 });
 
-test('does not promote failed verification or ordinary chat completion', () => {
+test('does not promote failed verification or ordinary chat completion', async () => {
   const proposeProjectMemoryCandidate = vi.fn();
   const failed = source({
     verificationResult: {
@@ -131,9 +167,11 @@ test('does not promote failed verification or ordinary chat completion', () => {
     },
   });
 
-  expect(
-    promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, failed),
-  ).toBeNull();
-  expect(promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, chat)).toBeNull();
+  await expect(
+    promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, failed, vi.fn()),
+  ).resolves.toEqual([]);
+  await expect(
+    promoteVerifiedWorkbenchRun({ proposeProjectMemoryCandidate } as never, chat, vi.fn()),
+  ).resolves.toEqual([]);
   expect(proposeProjectMemoryCandidate).not.toHaveBeenCalled();
 });

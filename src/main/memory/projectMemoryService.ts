@@ -16,12 +16,13 @@ import {
 import {
   EngramSearchMatchMode,
   MemoryOutboxOperation,
+  PERSONAL_MEMORY_SESSION_PREFIX,
   SESSION_SUMMARY_TTL_DAYS,
 } from './constants';
 import type { ProjectIdentity } from './projectIdentity';
 import { resolveProjectIdentity } from './projectIdentity';
 import { planRecallQuery, rankRecallResults } from './recallQueryPlanner';
-import type { MemoryOutboxItem } from './repository';
+import type { MemoryMigrationRecord, MemoryOutboxItem } from './repository';
 import { MemoryRepository } from './repository';
 import type { ZhiYuanEngramAdapter } from './zhiyuanEngramAdapter';
 import { redactPrivateBlocks } from './zhiyuanEngramAdapter';
@@ -64,6 +65,11 @@ interface ForgetPayload {
   linkId: string;
   observationId: number;
   hardDelete: boolean;
+}
+
+export interface ActiveSessionSummary {
+  content: string;
+  metadata: Record<string, unknown>;
 }
 
 export class ProjectMemoryService {
@@ -125,15 +131,52 @@ export class ProjectMemoryService {
       .listManaged({ status: MemoryLifecycleStatus.Active, query: input.query })
       .filter(
         memory =>
-          (memory.scope === MemoryScope.Project && memory.projectId === project.id) ||
+          (memory.scope === MemoryScope.Project &&
+            memory.projectId === project.id &&
+            this.repository.isCurrentSemanticMemoryLink(memory.id, memory.scope)) ||
           (memory.scope === MemoryScope.Personal &&
-            memory.projectId === PERSONAL_MEMORY_PROJECT_ID) ||
+            memory.projectId === PERSONAL_MEMORY_PROJECT_ID &&
+            this.repository.isCurrentSemanticMemoryLink(memory.id, memory.scope)) ||
           (memory.scope === MemoryScope.Session &&
             memory.projectId === project.id &&
             Boolean(input.sessionId) &&
-            memory.sessionId === input.sessionId),
+            memory.sessionId === input.sessionId &&
+            this.repository.isCurrentSemanticMemoryLink(memory.id, memory.scope)),
       )
       .slice(0, limit);
+  }
+
+  getRecallableMemoryById(input: {
+    workingDirectory: string;
+    sessionId: string;
+    memoryId: number;
+  }): ManagedMemoryRecord | null {
+    const project = this.resolveIdentity(input.workingDirectory);
+    const memory = this.repository.findLinkByMemoryId(input.memoryId);
+    if (!memory || memory.status !== MemoryLifecycleStatus.Active) return null;
+    if (
+      memory.scope === MemoryScope.Project &&
+      memory.projectId === project.id &&
+      this.repository.isCurrentSemanticMemoryLink(memory.id, memory.scope)
+    ) {
+      return memory;
+    }
+    if (
+      memory.scope === MemoryScope.Personal &&
+      memory.projectId === PERSONAL_MEMORY_PROJECT_ID &&
+      this.repository.isCurrentSemanticMemoryLink(memory.id, memory.scope)
+    ) {
+      return memory;
+    }
+    if (
+      memory.scope === MemoryScope.Session &&
+      memory.projectId === project.id &&
+      memory.sessionId === input.sessionId &&
+      this.repository.isCurrentSemanticMemoryLink(memory.id, memory.scope)
+    ) {
+      return memory;
+    }
+    return null;
   }
 
   async buildProjectContext(input: {
@@ -172,11 +215,25 @@ export class ProjectMemoryService {
     content: string;
     topicKey?: string;
     sourceKind?: MemorySourceKindValue;
+    importance?: number;
+    confidence?: number;
+    sensitivity?: MemorySensitivityValue;
+    metadata?: Record<string, unknown>;
+    supersedesLinkId?: string;
   }): Promise<number | null> {
     const project = this.resolveIdentity(input.workingDirectory);
+    const superseded = input.supersedesLinkId
+      ? this.resolveReferencedLink('Superseded memory', input.supersedesLinkId, undefined)
+      : null;
+    if (superseded) {
+      assertCanSupersede(
+        { scope: MemoryScope.Project, projectId: project.id, sessionId: input.sessionId },
+        superseded,
+      );
+    }
     const linkId = randomUUID();
     const outboxId = this.repository.enqueue(
-      MemoryOutboxOperation.Confirm,
+      superseded ? MemoryOutboxOperation.Supersede : MemoryOutboxOperation.Confirm,
       {
         sessionId: input.sessionId,
         projectId: project.id,
@@ -188,6 +245,12 @@ export class ProjectMemoryService {
         sourceKind: input.sourceKind ?? MemorySourceKind.Explicit,
         scope: MemoryScope.Project,
         linkId,
+        importance: input.importance,
+        confidence: input.confidence,
+        sensitivity: input.sensitivity,
+        metadata: input.metadata,
+        supersedesLinkId: superseded?.id,
+        supersededObservationId: superseded?.memoryId ?? undefined,
       },
       linkId,
     );
@@ -212,7 +275,9 @@ export class ProjectMemoryService {
     approvalId?: string;
     supersedesLinkId?: string;
     supersedesMemoryId?: number;
+    promotesLinkId?: string;
     promotesMemoryId?: number;
+    metadata?: Record<string, unknown>;
   }): string {
     const workspace = this.resolveIdentity(input.workingDirectory);
     const candidateIdentity: MemoryRelationshipIdentity = {
@@ -227,9 +292,13 @@ export class ProjectMemoryService {
     );
     if (superseded) assertCanSupersede(candidateIdentity, superseded);
     const promotedFrom =
-      input.promotesMemoryId === undefined
+      !input.promotesLinkId && input.promotesMemoryId === undefined
         ? null
-        : this.resolveReferencedLink('Promotion source', undefined, input.promotesMemoryId);
+        : this.resolveReferencedLink(
+            'Promotion source',
+            input.promotesLinkId,
+            input.promotesMemoryId,
+          );
     if (promotedFrom) assertCanPromote(candidateIdentity, promotedFrom, workspace.id);
     return this.repository.createPersonalCandidate({
       ...input,
@@ -299,7 +368,7 @@ export class ProjectMemoryService {
       {
         sessionId:
           candidate.scope === MemoryScope.Personal
-            ? `personal:${candidate.sessionId}`
+            ? `${PERSONAL_MEMORY_SESSION_PREFIX}${candidate.sessionId}`
             : candidate.sessionId,
         projectId: candidate.projectId,
         projectRoot: rawCandidate?.projectRoot || this.personalDirectory,
@@ -336,6 +405,7 @@ export class ProjectMemoryService {
     sessionId: string;
     workingDirectory: string;
     summary: string;
+    metadata?: Record<string, unknown>;
   }): Promise<number | null> {
     const project = this.resolveIdentity(input.workingDirectory);
     const topicKey = `session/${input.sessionId}`;
@@ -355,6 +425,7 @@ export class ProjectMemoryService {
         sourceKind: MemorySourceKind.SessionSummary,
         scope: MemoryScope.Session,
         linkId,
+        metadata: input.metadata,
         expiresAt: new Date(
           Date.now() + SESSION_SUMMARY_TTL_DAYS * 24 * 60 * 60 * 1_000,
         ).toISOString(),
@@ -362,6 +433,41 @@ export class ProjectMemoryService {
       linkId,
     );
     return await this.processOutboxItem(this.findPending(outboxId));
+  }
+
+  getActiveSessionSummary(input: {
+    sessionId: string;
+    workingDirectory: string;
+  }): ActiveSessionSummary | null {
+    const project = this.resolveIdentity(input.workingDirectory);
+    const active = this.repository.findActiveTopic(
+      project.id,
+      MemoryScope.Session,
+      `session/${input.sessionId}`,
+    );
+    return active
+      ? { content: active.content, metadata: this.repository.getLinkMetadata(active.id) }
+      : null;
+  }
+
+  listMigrationRecordsForContext(workingDirectory: string): MemoryMigrationRecord[] {
+    const project = this.resolveIdentity(workingDirectory);
+    return this.repository.listMigrationRecordsForContext(project.id);
+  }
+
+  updateMigrationRecordMetadata(
+    record: Pick<MemoryMigrationRecord, 'storageKind'> & { memory: { id: string } },
+    metadata: Record<string, unknown>,
+  ): void {
+    this.repository.updateMigrationRecordMetadata(
+      record.memory.id,
+      record.storageKind,
+      metadata,
+    );
+  }
+
+  deleteMigrationCandidate(id: string): void {
+    this.repository.deleteCandidate(id);
   }
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {

@@ -58,10 +58,51 @@ export const PiMemoryAction = {
   List: 'list',
   Save: 'save',
   ProposePersonal: 'propose_personal',
-  SessionSummary: 'session_summary',
 } as const;
 
 export type PiMemoryAction = (typeof PiMemoryAction)[keyof typeof PiMemoryAction];
+
+export const AtomicMemorySourceKind = {
+  Conversation: 'conversation',
+  TaskGoal: 'task_goal',
+  FinalAnswer: 'final_answer',
+  Verification: 'verification',
+  Artifact: 'artifact',
+  Approval: 'approval',
+  ExistingMemory: 'existing_memory',
+} as const;
+
+export type AtomicMemorySourceKind =
+  (typeof AtomicMemorySourceKind)[keyof typeof AtomicMemorySourceKind];
+
+export const ATOMIC_MEMORY_EXTRACTOR_VERSION = 1;
+export const SESSION_MEMORY_EXTRACTOR_VERSION = 1;
+export const SEMANTIC_MEMORY_MIGRATION_VERSION = 1;
+export const PERSONAL_MEMORY_SESSION_PREFIX = 'personal:';
+
+export const MemoryExtractorKind = {
+  Atomic: 'atomic_memory',
+} as const;
+
+export type MemoryExtractorKind = (typeof MemoryExtractorKind)[keyof typeof MemoryExtractorKind];
+
+export const MemoryRecordStorageKind = {
+  Link: 'link',
+  Candidate: 'candidate',
+} as const;
+
+export type MemoryRecordStorageKind =
+  (typeof MemoryRecordStorageKind)[keyof typeof MemoryRecordStorageKind];
+
+export const SemanticMemoryMigrationStatus = {
+  DeliveryPending: 'delivery_pending',
+  PendingReview: 'pending_review',
+  RetainedNoReplacement: 'retained_no_replacement',
+  EvidenceUnavailable: 'evidence_unavailable',
+} as const;
+
+export type SemanticMemoryMigrationStatus =
+  (typeof SemanticMemoryMigrationStatus)[keyof typeof SemanticMemoryMigrationStatus];
 
 export const EngramSearchMatchMode = {
   All: 'all',
