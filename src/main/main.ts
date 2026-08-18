@@ -1349,6 +1349,22 @@ const getAgentManager = () => {
   return agentManager;
 };
 
+/** True when `candidate` resolves inside `root` (real paths, symlink-safe). */
+const isPathWithin = (root: string, candidate: string): boolean => {
+  let realRoot = path.resolve(root);
+  let realCandidate = path.resolve(candidate);
+  try {
+    realRoot = fs.realpathSync(realRoot);
+    realCandidate = fs.realpathSync(realCandidate);
+  } catch {
+    // Fall back to lexical resolution when a path does not exist yet.
+  }
+  if (realCandidate === realRoot) return true;
+  return realCandidate.startsWith(
+    realRoot.endsWith(path.sep) ? realRoot : `${realRoot}${path.sep}`,
+  );
+};
+
 const resolveSessionWorkingDirectory = (options: { cwd?: string }): string => {
   const explicitWorkingDirectory = options.cwd?.trim();
   if (explicitWorkingDirectory) return explicitWorkingDirectory;
@@ -4191,30 +4207,38 @@ if (!gotTheLock) {
         }
       }
 
-      // Write to expert-packages/registry.json in userData
-      const packagesDir = path.join(app.getPath('userData'), 'expert-packages');
-      fs.mkdirSync(packagesDir, { recursive: true });
-      const registryPath = path.join(packagesDir, 'registry.json');
-      let registry: { packages: Array<Record<string, unknown>> } = { packages: [] };
-      if (fs.existsSync(registryPath)) {
-        try {
-          registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
-          if (!Array.isArray(registry.packages)) registry.packages = [];
-        } catch {
-          registry = { packages: [] };
+      // Bundled presets are file-sourced (方案A): they never enter the
+      // registry. Only user-imported packages are recorded, so the registry
+      // is an audit trail of user installs — not a mirror of built-ins whose
+      // "version" would drift from the live preset files. Bundled detection
+      // is server-side (directory containment), not a frontend flag.
+      const isBundledPreset = isPathWithin(bundledSkillsRoot, expertDir);
+      if (!isBundledPreset) {
+        // Write to expert-packages/registry.json in userData
+        const packagesDir = path.join(app.getPath('userData'), 'expert-packages');
+        fs.mkdirSync(packagesDir, { recursive: true });
+        const registryPath = path.join(packagesDir, 'registry.json');
+        let registry: { packages: Array<Record<string, unknown>> } = { packages: [] };
+        if (fs.existsSync(registryPath)) {
+          try {
+            registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+            if (!Array.isArray(registry.packages)) registry.packages = [];
+          } catch {
+            registry = { packages: [] };
+          }
         }
+        registry.packages = registry.packages.filter(p => p.name !== pluginJson.name);
+        registry.packages.push({
+          name: pluginJson.name,
+          version: pluginJson.version,
+          expertType: pluginJson.expertType,
+          path: expertDir,
+          agentIds,
+          piSyncedFiles: piSyncedFiles || [],
+          createdAt: new Date().toISOString(),
+        });
+        fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf-8');
       }
-      registry.packages = registry.packages.filter(p => p.name !== pluginJson.name);
-      registry.packages.push({
-        name: pluginJson.name,
-        version: pluginJson.version,
-        expertType: pluginJson.expertType,
-        path: expertDir,
-        agentIds,
-        piSyncedFiles: piSyncedFiles || [],
-        createdAt: new Date().toISOString(),
-      });
-      fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf-8');
 
       return { success: true, agentIds, expertType: pluginJson.expertType, name: pluginJson.name };
     } catch (error) {
