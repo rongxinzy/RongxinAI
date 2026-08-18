@@ -48,3 +48,35 @@ test('uses the search endpoint without sending the legacy featured query', async
   expect(url.searchParams.get('device')).toBe(MarketplaceDeviceProfile.Pro);
   expect(url.searchParams.has('featured')).toBe(false);
 });
+
+test('resolveModel matches repo ids case-insensitively and aliases by model id', async () => {
+  const fetchMock = vi.fn(async () => Response.json({
+    models: [
+      {
+        id: 'qwen3-8b-gguf',
+        repoId: 'Qwen/Qwen3-8B-GGUF',
+        name: 'Qwen3 8B GGUF',
+        files: [
+          {
+            path: 'Qwen3-8B-Q4_K_M.gguf',
+            isRecommended: true,
+            sizeBytes: 100,
+            sha256: VERIFIED_SHA,
+          },
+        ],
+        metadataStatus: 'verified',
+        runtime: { format: 'gguf', ggufFilesVerified: true },
+      },
+    ],
+    totalCount: 1,
+  }));
+
+  const client = new ModelCatalogClient('https://catalog.example.test', fetchMock);
+
+  await expect(client.resolveModel('qwen/qwen3-8b-gguf')).resolves.toMatchObject({
+    repoId: 'Qwen/Qwen3-8B-GGUF',
+  });
+  await expect(client.resolveModel('qwen3-8b-gguf')).resolves.toMatchObject({
+    id: 'qwen3-8b-gguf',
+  });
+});

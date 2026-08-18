@@ -22,7 +22,9 @@ describe('llamacppModelLoadPipeline', () => {
     const result = await loadLlamaCppModelThroughPipeline({
       launchInput: { model: 'qwen.gguf', options: { ctxSize: 4096 } },
       runtimeBackend: LlamaCppRuntimeBackend.Cuda,
-      runtimeCapabilities: gpuCapabilities(1),
+      runtimeCapabilities: gpuCapabilities(1, ['cuda'], [
+        { id: 'CUDA0', name: 'GPU 0', backend: 'cuda' },
+      ]),
       nvidiaSnapshot: availableSnapshot([{ index: 0, memoryFreeMiB: 24_000 }]),
       modelSizeBytes: gib(7),
       loadModel,
@@ -34,12 +36,12 @@ describe('llamacppModelLoadPipeline', () => {
     expect(loadModel).toHaveBeenCalledWith(
       expect.objectContaining({
         options: expect.objectContaining({
-          device: '0',
+          device: 'CUDA0',
           gpuLayers: 'auto',
         }),
       }),
     );
-    expect(result.finalInput.options?.device).toBe('0');
+    expect(result.finalInput.options?.device).toBe('CUDA0');
     expect(result.runningModels).toHaveLength(1);
   });
 
@@ -140,12 +142,13 @@ describe('llamacppModelLoadPipeline', () => {
 function gpuCapabilities(
   gpuDeviceCount: number,
   backendKinds: string[] = ['cuda'],
+  devices: LlamaCppRuntimeCapabilities['devices'] = [],
 ): LlamaCppRuntimeCapabilities {
   return {
     success: true,
     flags: [],
     deviceProbeSucceeded: true,
-    devices: [],
+    devices,
     backendKinds,
     gpuDeviceCount,
     supports: {},

@@ -79,13 +79,12 @@ function renderPanel(overrides: Partial<Parameters<typeof MarketplacePanel>[0]> 
     hasNextPage: false,
     query: '',
     installedModelPathMap: new Map(),
-    installProgress: {},
     hardwareSummary: undefined,
     hardwareSummaryReady: false,
-    onOpenInstalled: vi.fn(),
     onQueryChange: vi.fn(),
     onSearch: vi.fn(),
     onInstall: vi.fn(),
+    onOpenDownloadPanel: vi.fn(),
     ...overrides,
   };
   return { ...render(<MarketplacePanel {...props} />), props };
@@ -165,7 +164,19 @@ describe('MarketplacePanel result grid', () => {
     renderPanel({ hasSearched: true, models: []});
 
     expect(screen.queryByText(/共 7 个模型/)).not.toBeInTheDocument();
-    expect(screen.getByText('没有找到匹配的模型')).toBeInTheDocument();
+    expect(screen.getByText(i18nService.t('marketplaceNoModels'))).toBeInTheDocument();
+  });
+
+  test('empty search results hide upstream 503 warnings and show the no-model state', () => {
+    renderPanel({
+      hasSearched: true,
+      models: [],
+      marketplaceError: 'Model catalog failed: HTTP 503',
+    });
+
+    expect(screen.getByText(i18nService.t('marketplaceNoModels'))).toBeInTheDocument();
+    expect(screen.queryByText('搜索受限')).not.toBeInTheDocument();
+    expect(screen.queryByText(/503/)).not.toBeInTheDocument();
   });
 
   test('fit=all keeps installed models in the grid', () => {
@@ -176,6 +187,16 @@ describe('MarketplacePanel result grid', () => {
     renderPanel({ hasSearched: true, models });
 
     expect(screen.getAllByText('安装')).toHaveLength(2);
+  });
+
+  test('does not render persistent next-step actions for installed models', () => {
+    renderPanel({
+      hasSearched: true,
+      models: [makeModel('beta', { installed: true, installedPath: '/models/beta.gguf' })],
+    });
+
+    expect(screen.queryByText('已安装，下一步')).not.toBeInTheDocument();
+    expect(screen.queryByText('立即运行')).not.toBeInTheDocument();
   });
 
   test('renders a card grid skeleton while loading, not a centered spinner', () => {
@@ -246,12 +267,11 @@ describe('MarketplacePanel search and filters', () => {
           hasNextPage={false}
           query={query}
           installedModelPathMap={new Map()}
-          installProgress={{}}
           hardwareSummaryReady={false}
-          onOpenInstalled={vi.fn()}
           onQueryChange={setQuery}
           onSearch={onSearch}
           onInstall={vi.fn()}
+          onOpenDownloadPanel={vi.fn()}
         />
       );
     };

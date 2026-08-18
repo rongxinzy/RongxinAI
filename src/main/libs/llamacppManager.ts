@@ -1148,7 +1148,6 @@ export class LlamaCppManager extends EventEmitter {
   ): Promise<LlamaCppModel> {
     const modelId = input.modelId.trim();
     if (!modelId) throw new Error('Model ID is required');
-    onProgress?.({ phase: 'starting', modelId, modelName: input.displayName ?? modelId });
     const safeModelDir = resolveManagedModelInstallDir(this.getModelsDir(), modelId);
     fs.mkdirSync(safeModelDir, { recursive: true });
     let request = await prefillInstallInputFromMarketplace(input, this.marketplaceService);

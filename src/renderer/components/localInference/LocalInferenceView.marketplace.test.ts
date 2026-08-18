@@ -9,7 +9,34 @@ import {
   getMarketplacePageSize,
 } from './utils/marketplace';
 import { LOCAL_INFERENCE_PROGRESS_DISMISS_MS, LOCAL_INFERENCE_TOAST_AUTO_DISMISS_MS, MARKETPLACE_MAX_PAGE_ROWS, MARKETPLACE_PAGE_SIZE } from './constants';
-import { formatInstallProgressSummary, isInstallTerminalPhase } from './utils/progress';
+import {
+  formatInstallProgressSummary,
+  isInstallTerminalPhase,
+  isSuccessfulMarketplaceInstallProgress,
+} from './utils/progress';
+
+test('done progress is only considered a successful install when the model actually exists locally', () => {
+  expect(
+    isSuccessfulMarketplaceInstallProgress(
+      { phase: 'done', modelId: 'QuantFactory/Phi-3-mini-4k-instruct-GGUF-imatrix' },
+      [],
+    ),
+  ).toBe(false);
+
+  expect(
+    isSuccessfulMarketplaceInstallProgress(
+      { phase: 'done', modelId: 'QuantFactory/Phi-3-mini-4k-instruct-GGUF-imatrix' },
+      [{ name: 'Phi-3-mini-4k-instruct-GGUF-imatrix', id: 'Phi-3-mini-4k-instruct-GGUF-imatrix', model: 'Phi-3-mini-4k-instruct-GGUF-imatrix', path: '/models/Phi-3-mini-4k-instruct-GGUF-imatrix.gguf' }],
+    ),
+  ).toBe(true);
+
+  expect(
+    isSuccessfulMarketplaceInstallProgress(
+      { phase: 'done', targetPath: '/models/Phi-3-mini-4k-instruct-GGUF-imatrix.gguf' },
+      [{ path: '/models/other.gguf' }],
+    ),
+  ).toBe(false);
+});
 
 test('marketplace page size uses the actual grid height', () => {
   expect(
