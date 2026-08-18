@@ -350,9 +350,35 @@ function copyDirRecursive(src, dest) {
   }
 }
 
-function writeRegistry(expertDir, pluginJson, agentIds, piSyncedFiles) {
-  const packagesDir = path.dirname(expertDir);
-  const registryPath = path.join(packagesDir, 'registry.json');
+/**
+ * True when `candidate` resolves inside `root` (real paths, symlink-safe).
+ * Falls back to lexical comparison when a path does not exist yet.
+ */
+function isPathWithin(root, candidate) {
+  let realRoot = path.resolve(root);
+  let realCandidate = path.resolve(candidate);
+  try {
+    realRoot = fs.realpathSync(realRoot);
+    realCandidate = fs.realpathSync(realCandidate);
+  } catch {
+    // Fall back to lexical resolution when a path does not exist yet.
+  }
+  if (realCandidate === realRoot) return true;
+  const separator = realRoot.endsWith(path.sep) ? '' : path.sep;
+  return realCandidate.startsWith(`${realRoot}${separator}`);
+}
+
+/**
+ * Upsert one expert package into a registry file (唯一 registry 服务).
+ *
+ * - entries whose path lies inside any `skipIfWithin` root are dropped
+ *   (idempotent cleanup of pre-fix bundled records) and never rewritten
+ * - the incoming entry itself is skipped when it resides in a skipped root
+ */
+function upsertExpertRegistry({ registryPath, entry, skipIfWithin = [] }) {
+  const insideSkipped = candidate =>
+    skipIfWithin.some(root => isPathWithin(root, String(candidate || '')));
+
   let registry = { packages: [] };
   if (fs.existsSync(registryPath)) {
     try {
@@ -363,18 +389,43 @@ function writeRegistry(expertDir, pluginJson, agentIds, piSyncedFiles) {
     }
   }
 
-  registry.packages = registry.packages.filter(p => p.name !== pluginJson.name);
-  registry.packages.push({
-    name: pluginJson.name,
-    version: pluginJson.version,
-    expertType: pluginJson.expertType,
-    path: expertDir,
-    agentIds,
-    piSyncedFiles: piSyncedFiles || [],
-    createdAt: new Date().toISOString(),
+  // Drop stale bundled records (idempotent cleanup) and the entry being
+  // replaced (same name, not inside a skipped root). Same-name entries inside
+  // a skipped root are bundled mirrors and never count as the replacement
+  // target — they are removed by the containment filter alone.
+  registry.packages = registry.packages.filter(p => {
+    const skipped = insideSkipped(p.path);
+    return !skipped && p.name !== entry.name;
   });
-
+  if (!insideSkipped(entry.path)) {
+    registry.packages.push(entry);
+  }
   fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf-8');
+}
+
+function writeRegistry(expertDir, pluginJson, agentIds, piSyncedFiles, skipIfWithin = []) {
+  return upsertExpertRegistry({
+    registryPath: path.join(path.dirname(expertDir), 'registry.json'),
+    entry: {
+      name: pluginJson.name,
+      version: pluginJson.version,
+      expertType: pluginJson.expertType,
+      path: expertDir,
+      agentIds,
+      piSyncedFiles: piSyncedFiles || [],
+      createdAt: new Date().toISOString(),
+    },
+    skipIfWithin,
+  });
+}
+
+/**
+ * Bundled preset roots: this script ships inside SKILLs/zhiyuan-expert-manager,
+ * so the SKILLs root is three levels up. Bundled presets are file-sourced and
+ * must never appear in the registry (its semantic is user-installed packages).
+ */
+function getBundledSkillRoots() {
+  return [path.resolve(__dirname, '..', '..', '..')];
 }
 
 function registerAgentExpert(db, pluginJson, expertDir, options) {
@@ -713,7 +764,7 @@ function registerExpert(expertDir, options = {}) {
       agentIds.push(agentId);
     }
 
-    writeRegistry(expertPath, pluginJson, agentIds, piSyncedFiles);
+    writeRegistry(expertPath, pluginJson, agentIds, piSyncedFiles, getBundledSkillRoots());
 
     if (options.sessionId) {
       fs.writeFileSync(path.join(expertPath, '.created-by-session'), options.sessionId, 'utf-8');
@@ -788,6 +839,7 @@ module.exports = {
   getDefaultExpertPackagesDir,
   getPiAgentsDir,
   syncAgentsToPiDir,
+  upsertExpertRegistry,
   AGENT_SOURCE_EXPERT_PACKAGE,
   AGENT_SOURCE_EXPERT_PACKAGE_MEMBER,
 };
