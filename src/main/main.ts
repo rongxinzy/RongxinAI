@@ -2207,6 +2207,18 @@ const scheduleReload = (reason: string, webContents?: WebContents) => {
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
+  // Linux 覆盖安装(AppImage 替换/deb 升级)时旧实例可能仍在运行并持有
+  // 单实例锁;这里不静默退出,给用户明确提示(deb 的 preinst 已先杀旧进程,
+  // 此分支主要兜底 AppImage 替换与手动多开场景)。
+  console.warn('[Main] Another ZhiYuanAgent instance is already running; exiting.');
+  try {
+    dialog.showErrorBox(
+      '知远已在运行',
+      '检测到知远已在运行,请先关闭现有实例后再启动。',
+    );
+  } catch {
+    // 无显示环境(如无头 CI)时跳过弹窗,仍以退出码 0 结束。
+  }
   app.quit();
 } else {
   // In development Electron needs the app entry point before the callback URL;

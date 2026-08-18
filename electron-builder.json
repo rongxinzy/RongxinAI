@@ -211,6 +211,9 @@
         "url": "https://updates.rongxzyai.com/v2/electron/stable/linux/x64/appimage"
       }
     ],
+    "deb": {
+      "fpm": ["--before-install=scripts/linux-before-install.sh"]
+    },
     "icon": "build/icons/png",
     "category": "Utility",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
