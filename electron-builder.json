@@ -14,12 +14,18 @@
     {
       "from": "dist",
       "to": "dist",
-      "filter": ["**/*", "!**/*.map"]
+      "filter": [
+        "**/*",
+        "!**/*.map"
+      ]
     },
     {
       "from": "dist-electron",
       "to": "dist-electron",
-      "filter": ["**/*", "!**/*.map"]
+      "filter": [
+        "**/*",
+        "!**/*.map"
+      ]
     },
     "!**/*.map",
     "!**/*.d.ts",
@@ -60,7 +66,9 @@
     {
       "from": "resources/tray",
       "to": "tray",
-      "filter": ["**/*"]
+      "filter": [
+        "**/*"
+      ]
     },
     {
       "from": "resources/modelscope.tokens.local.json",
@@ -69,17 +77,27 @@
     {
       "from": "vendor/engram-runtime/current",
       "to": "memory",
-      "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]
+      "filter": [
+        "engram",
+        "engram.exe",
+        "runtime-build-info.json",
+        "LICENSE"
+      ]
     }
   ],
   "protocols": [
     {
       "name": "知远",
-      "schemes": ["zhiyuan"]
+      "schemes": [
+        "zhiyuan"
+      ]
     }
   ],
   "mac": {
-    "target": ["dmg", "zip"],
+    "target": [
+      "dmg",
+      "zip"
+    ],
     "publish": [
       {
         "provider": "generic",
@@ -102,7 +120,9 @@
       {
         "from": "MCPs",
         "to": "MCPs",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "SKILLs",
@@ -140,17 +160,23 @@
       {
         "from": "resources/uv-mac",
         "to": "uv-mac",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/python-mac",
         "to": "python-mac",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/skill-python",
         "to": "skill-python",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "vendor/channel-runtime/current",
@@ -187,7 +213,9 @@
     "sign": false
   },
   "win": {
-    "target": ["nsis"],
+    "target": [
+      "nsis"
+    ],
     "publish": [
       {
         "provider": "generic",
@@ -204,16 +232,16 @@
     ]
   },
   "linux": {
-    "target": ["AppImage", "deb"],
+    "target": [
+      "AppImage",
+      "deb"
+    ],
     "publish": [
       {
         "provider": "generic",
         "url": "https://updates.rongxzyai.com/v2/electron/stable/linux/x64/appimage"
       }
     ],
-    "deb": {
-      "fpm": ["--before-install=scripts/linux-before-install.sh"]
-    },
     "icon": "build/icons/png",
     "category": "Utility",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
@@ -221,22 +249,30 @@
       {
         "from": "MCPs",
         "to": "MCPs",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/uv-linux",
         "to": "uv-linux",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/python-linux",
         "to": "python-linux",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "resources/skill-python",
         "to": "skill-python",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "SKILLs",
@@ -314,7 +350,16 @@
     "artifactName": "${productName}-Setup-${version}.${ext}"
   },
   "electronVersion": "40.2.1",
-  "electronLanguages": ["en-US", "zh-CN", "zh-TW", "ja", "ko", "fr", "es", "es-419"],
+  "electronLanguages": [
+    "en-US",
+    "zh-CN",
+    "zh-TW",
+    "ja",
+    "ko",
+    "fr",
+    "es",
+    "es-419"
+  ],
   "electronUpdaterCompatibility": ">=6.0.0",
   "detectUpdateChannel": false,
   "generateUpdatesFilesForAllChannels": false,
@@ -324,5 +369,10 @@
     "node_modules/better-sqlite3/**",
     "node_modules/npm/**"
   ],
-  "asar": true
+  "asar": true,
+  "deb": {
+    "fpm": [
+      "--before-install=scripts/linux-before-install.sh"
+    ]
+  }
 }
