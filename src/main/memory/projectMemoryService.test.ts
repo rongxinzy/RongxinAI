@@ -49,6 +49,10 @@ class FakeRepository {
     return null;
   }
 
+  getLinkMetadata() {
+    return {};
+  }
+
   supersedeActiveTopic() {}
 
   createLink(input: Record<string, unknown>) {
@@ -283,7 +287,12 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
     service.saveSessionSummary({
       sessionId: 'session-1',
       workingDirectory: 'alpha',
-      summary: 'Session objective: fix recall',
+      summary: 'Semantic session memory (v1)\nGoal: Fix recall\nCurrent state: Verified',
+      metadata: {
+        extractorVersion: 1,
+        sourceMessageIds: ['message-1'],
+        digest: { shouldSave: true },
+      },
     }),
   ).resolves.toBe(21);
 
@@ -291,6 +300,18 @@ test('stores rolling session summaries with a 30 day expiration', async () => {
     scope: EngramMemoryScope.Session,
     topicKey: 'session/session-1',
     expiresAt: '2026-09-10T00:00:00.000Z',
+    metadata: {
+      extractorVersion: 1,
+      sourceMessageIds: ['message-1'],
+      digest: { shouldSave: true },
+    },
+  });
+  expect(repository.links[0]).toMatchObject({
+    metadata: {
+      extractorVersion: 1,
+      sourceMessageIds: ['message-1'],
+      digest: { shouldSave: true },
+    },
   });
   vi.useRealTimers();
 });
