@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { upsertExpertRegistry } = require(
+const { upsertExpertRegistry, getBundledSkillRoots } = require(
   '../SKILLs/zhiyuan-expert-manager/scripts/register_expert.js',
 ) as {
   upsertExpertRegistry: (options: {
@@ -13,6 +13,7 @@ const { upsertExpertRegistry } = require(
     entry: Record<string, unknown>;
     skipIfWithin?: string[];
   }) => void;
+  getBundledSkillRoots: () => string[];
 };
 
 const temporaryDirectories: string[] = [];
@@ -117,4 +118,39 @@ test('rejects only real containment, not prefix look-alikes', () => {
 
   const packages = readRegistry(registryPath);
   expect(packages.map(p => p.name)).toEqual(['look-alike']);
+});
+
+test('CLI bundled root points exactly at the presets directory', () => {
+  // Script lives at SKILLs/zhiyuan-expert-manager/scripts; the presets
+  // directory is one level up — never the repository root, otherwise any
+  // user package inside the repo would be mistaken for bundled.
+  const [bundledRoot] = getBundledSkillRoots();
+  expect(path.basename(bundledRoot)).toBe('presets');
+  expect(path.basename(path.dirname(bundledRoot))).toBe('zhiyuan-expert-manager');
+  expect(fs.existsSync(bundledRoot)).toBe(true);
+});
+
+test('CLI skips only presets; a repo-local user package is still recorded', () => {
+  const root = makeDir();
+  const registryPath = path.join(root, 'registry.json');
+
+  // A bundled preset path (real presets dir) must never be written.
+  const bundledPreset = path.join(getBundledSkillRoots()[0], 'data-analyst');
+  upsertExpertRegistry({
+    registryPath,
+    entry: entry('data-analyst', bundledPreset),
+    skipIfWithin: getBundledSkillRoots(),
+  });
+  expect(readRegistry(registryPath)).toHaveLength(0);
+
+  // A user package elsewhere — including inside the repository but outside
+  // the presets dir — is recorded normally.
+  const repoLocalPackage = path.join(root, 'SKILLs', 'user-experts', 'my-expert');
+  upsertExpertRegistry({
+    registryPath,
+    entry: entry('my-expert', repoLocalPackage),
+    skipIfWithin: getBundledSkillRoots(),
+  });
+  const packages = readRegistry(registryPath);
+  expect(packages.map(p => p.name)).toEqual(['my-expert']);
 });

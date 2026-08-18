@@ -420,12 +420,14 @@ function writeRegistry(expertDir, pluginJson, agentIds, piSyncedFiles, skipIfWit
 }
 
 /**
- * Bundled preset roots: this script ships inside SKILLs/zhiyuan-expert-manager,
- * so the SKILLs root is three levels up. Bundled presets are file-sourced and
- * must never appear in the registry (its semantic is user-installed packages).
+ * Bundled preset root: this script ships inside SKILLs/zhiyuan-expert-manager,
+ * so the presets directory is one level up. Bundled presets are file-sourced
+ * and must never appear in the registry (its semantic is user-installed
+ * packages). User packages anywhere else — including elsewhere inside the
+ * repository — are recorded normally.
  */
 function getBundledSkillRoots() {
-  return [path.resolve(__dirname, '..', '..', '..')];
+  return [path.resolve(__dirname, '..', 'presets')];
 }
 
 function registerAgentExpert(db, pluginJson, expertDir, options) {
@@ -840,6 +842,7 @@ module.exports = {
   getPiAgentsDir,
   syncAgentsToPiDir,
   upsertExpertRegistry,
+  getBundledSkillRoots,
   AGENT_SOURCE_EXPERT_PACKAGE,
   AGENT_SOURCE_EXPERT_PACKAGE_MEMBER,
 };
