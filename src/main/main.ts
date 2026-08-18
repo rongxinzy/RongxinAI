@@ -1965,7 +1965,13 @@ const resolveSessionExpertSnapshots = (expertIds: string[]): CoworkSessionExpert
     // when the preset directory is missing or unreadable.
     if (expert.presetId.trim()) {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
-      const liveSnapshot = resolveBundledPresetExpertSnapshot(bundledSkillsRoot, packageId);
+      // The main session loads only the selected agent's file: the lead for
+      // teams, the single file for standalone agents.
+      const liveSnapshot = resolveBundledPresetExpertSnapshot(
+        bundledSkillsRoot,
+        packageId,
+        expert.id,
+      );
       if (liveSnapshot) {
         promptSnapshot = liveSnapshot.promptSnapshot;
         skillIds = liveSnapshot.skillIds;

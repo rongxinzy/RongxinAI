@@ -264,6 +264,39 @@ describe('buildPiSubagentTool', () => {
       }
     });
 
+    it('prefers live bundled member definitions over synced pi agents files', async () => {
+      const agentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-subagent-test-'));
+      try {
+        // Stale synced copy: would be used if the bundled source were absent.
+        fs.writeFileSync(
+          path.join(agentsDir, 'team1--custom-member.md'),
+          '---\ndescription: Stale member\n---\nYou are the stale member definition.\n',
+        );
+
+        const { tool, deps } = buildTool({
+          getPiAgentsDir: () => agentsDir,
+          presetId: 'team1',
+          loadBundledMembers: () => [
+            {
+              id: 'custom-member',
+              description: 'Live member',
+              systemPrompt: 'You are the live bundled member definition.',
+            },
+          ],
+        });
+
+        expect(tool.description).toContain('Live member');
+        await tool.execute('call-1', { agent: 'custom-member', task: 'help out' });
+        expect(deps.createPiResourceLoader).toHaveBeenCalledWith(
+          '/tmp/workspace',
+          'You are the live bundled member definition.',
+          4096,
+        );
+      } finally {
+        fs.rmSync(agentsDir, { recursive: true, force: true });
+      }
+    });
+
     it('does not let a team member override the production reviewer', async () => {
       const agentsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-subagent-test-'));
       try {
