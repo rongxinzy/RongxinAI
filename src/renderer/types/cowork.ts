@@ -137,11 +137,6 @@ export interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: CoworkExecutionMode;
-  memoryEnabled: boolean;
-  memoryImplicitUpdateEnabled: boolean;
-  memoryLlmJudgeEnabled: boolean;
-  memoryGuardLevel: 'strict' | 'standard' | 'relaxed';
-  memoryUserMemoriesMaxItems: number;
   permissionMode: CoworkPermissionMode;
   permissionModeBySession?: Record<string, CoworkPermissionMode>;
   embeddingEnabled: boolean;
@@ -158,11 +153,6 @@ export type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
-    | 'memoryEnabled'
-    | 'memoryImplicitUpdateEnabled'
-    | 'memoryLlmJudgeEnabled'
-    | 'memoryGuardLevel'
-    | 'memoryUserMemoriesMaxItems'
     | 'permissionMode'
     | 'permissionModeBySession'
     | 'embeddingEnabled'
@@ -180,20 +170,6 @@ export interface CoworkApiConfig {
   baseURL: string;
   model: string;
   apiType?: 'anthropic' | 'openai';
-}
-
-export interface CoworkUserMemoryEntry {
-  id: string;
-  text: string;
-}
-
-export interface CoworkMemoryStats {
-  total: number;
-  created: number;
-  stale: number;
-  deleted: number;
-  explicit: number;
-  implicit: number;
 }
 
 // Cowork pending permission request

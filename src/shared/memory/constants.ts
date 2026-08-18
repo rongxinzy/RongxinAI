@@ -56,12 +56,16 @@ export const MemorySourceKind = {
   SessionSummary: 'session_summary',
   TaskVerifier: 'task_verifier',
   ModelProposal: 'model_proposal',
+  LegacyFileImport: 'legacy_file_import',
+  LegacySqliteImport: 'legacy_sqlite_import',
 } as const;
 
 export type MemorySourceKind = (typeof MemorySourceKind)[keyof typeof MemorySourceKind];
 
 export const MemoryIpcChannel = {
   List: 'memory:list',
+  CreateManual: 'memory:createManual',
+  UpdateManual: 'memory:updateManual',
   ConfirmCandidate: 'memory:confirmCandidate',
   Archive: 'memory:archive',
   Restore: 'memory:restore',

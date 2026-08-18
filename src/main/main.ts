@@ -95,6 +95,10 @@ import { AgentManager } from './agentManager';
 import { ConversationHistoryService } from './conversationHistory/service';
 import { EngramManager } from './memory/engramManager';
 import { LegacyMemoryMigrationService } from './memory/legacyMemoryMigrationService';
+import {
+  importLegacyMemoryFileCandidates,
+  importLegacySqliteMemoryCandidates,
+} from './memory/legacyMemoryFileImportService';
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
@@ -212,14 +216,7 @@ import { OllamaManager } from './libs/ollamaManager';
 import { resolveQualifiedAgentModelRef } from './libs/agentModels';
 import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenceInstall';
 import {
-  addMemoryEntry,
-  deleteMemoryEntry,
-  type MemorySource,
   readBootstrapFile,
-  readMemoryEntries,
-  resolveMemoryFilePath,
-  searchMemoryEntries,
-  updateMemoryEntry,
   writeBootstrapFile,
 } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
@@ -262,8 +259,6 @@ app.name = APP_NAME;
 app.setName(APP_NAME);
 
 const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
-const MIN_MEMORY_USER_MEMORIES_MAX_ITEMS = 1;
-const MAX_MEMORY_USER_MEMORIES_MAX_ITEMS = 60;
 const IPC_MESSAGE_CONTENT_MAX_CHARS = 120_000;
 const IPC_UPDATE_CONTENT_MAX_CHARS = 120_000;
 const IPC_STRING_MAX_CHARS = 4_000;
@@ -4443,145 +4438,6 @@ if (!gotTheLock) {
     }
   });
 
-  ipcMain.handle(
-    'cowork:memory:listEntries',
-    async (
-      _event,
-      input: {
-        query?: string;
-        status?: 'created' | 'stale' | 'deleted' | 'all';
-        includeDeleted?: boolean;
-        limit?: number;
-        offset?: number;
-      },
-    ) => {
-      try {
-        const filePath = resolveMemoryFilePath(getMainAgentWorkspace());
-
-        // Read the canonical memory file in the application-owned agent workspace.
-
-        const query = input?.query?.trim() || '';
-        const entries = query ? searchMemoryEntries(filePath, query) : readMemoryEntries(filePath);
-        return { success: true, entries };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to list memory entries',
-        };
-      }
-    },
-  );
-  ipcMain.handle(
-    'cowork:memory:createEntry',
-    async (
-      _event,
-      input: {
-        text: string;
-        confidence?: number;
-        isExplicit?: boolean;
-        source?: MemorySource;
-      },
-    ) => {
-      try {
-        const filePath = resolveMemoryFilePath(getMainAgentWorkspace());
-        const source =
-          input.source && typeof input.source === 'object'
-            ? ({
-                sessionId:
-                  typeof input.source.sessionId === 'string' ? input.source.sessionId : null,
-                role: (['user', 'assistant', 'tool', 'system', 'im'] as const).includes(
-                  input.source.role as MemorySource['role'],
-                )
-                  ? input.source.role
-                  : 'system',
-                date:
-                  typeof input.source.date === 'string'
-                    ? input.source.date
-                    : new Date().toISOString().slice(0, 10),
-              } as MemorySource)
-            : undefined;
-        const entry = addMemoryEntry(filePath, input.text, source);
-        return { success: true, entry };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to create memory entry',
-        };
-      }
-    },
-  );
-  ipcMain.handle(
-    'cowork:memory:updateEntry',
-    async (
-      _event,
-      input: {
-        id: string;
-        text?: string;
-        confidence?: number;
-        status?: 'created' | 'stale' | 'deleted';
-        isExplicit?: boolean;
-      },
-    ) => {
-      try {
-        const filePath = resolveMemoryFilePath(getMainAgentWorkspace());
-        if (!input.text) {
-          return { success: false, error: 'Memory text is required' };
-        }
-        const entry = updateMemoryEntry(filePath, input.id, input.text);
-        if (!entry) {
-          return { success: false, error: 'Memory entry not found' };
-        }
-        return { success: true, entry };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to update memory entry',
-        };
-      }
-    },
-  );
-  ipcMain.handle(
-    'cowork:memory:deleteEntry',
-    async (
-      _event,
-      input: {
-        id: string;
-      },
-    ) => {
-      try {
-        const filePath = resolveMemoryFilePath(getMainAgentWorkspace());
-        const success = deleteMemoryEntry(filePath, input.id);
-        return success ? { success: true } : { success: false, error: 'Memory entry not found' };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to delete memory entry',
-        };
-      }
-    },
-  );
-  ipcMain.handle('cowork:memory:getStats', async () => {
-    try {
-      const filePath = resolveMemoryFilePath(getMainAgentWorkspace());
-      const entries = readMemoryEntries(filePath);
-      return {
-        success: true,
-        stats: {
-          total: entries.length,
-          created: entries.length,
-          stale: 0,
-          deleted: 0,
-          explicit: entries.length,
-          implicit: 0,
-        },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get memory stats',
-      };
-    }
-  });
   ipcMain.handle('cowork:bootstrap:read', async (_event, filename: string) => {
     try {
       const mainWorkspace = getMainAgentWorkspace();
@@ -4663,11 +4519,6 @@ if (!gotTheLock) {
       config: {
         workingDirectory?: string;
         executionMode?: 'auto' | 'local' | 'sandbox';
-        memoryEnabled?: boolean;
-        memoryImplicitUpdateEnabled?: boolean;
-        memoryLlmJudgeEnabled?: boolean;
-        memoryGuardLevel?: 'strict' | 'standard' | 'relaxed';
-        memoryUserMemoriesMaxItems?: number;
         permissionMode?: CoworkPermissionMode;
         permissionModeBySession?: Record<string, CoworkPermissionMode>;
         embeddingEnabled?: boolean;
@@ -4684,33 +4535,6 @@ if (!gotTheLock) {
           config.executionMode && String(config.executionMode) === 'container'
             ? 'local'
             : config.executionMode;
-        const normalizedMemoryEnabled =
-          typeof config.memoryEnabled === 'boolean' ? config.memoryEnabled : undefined;
-        const normalizedMemoryImplicitUpdateEnabled =
-          typeof config.memoryImplicitUpdateEnabled === 'boolean'
-            ? config.memoryImplicitUpdateEnabled
-            : undefined;
-        const normalizedMemoryLlmJudgeEnabled =
-          typeof config.memoryLlmJudgeEnabled === 'boolean'
-            ? config.memoryLlmJudgeEnabled
-            : undefined;
-        const normalizedMemoryGuardLevel =
-          config.memoryGuardLevel === 'strict' ||
-          config.memoryGuardLevel === 'standard' ||
-          config.memoryGuardLevel === 'relaxed'
-            ? config.memoryGuardLevel
-            : undefined;
-        const normalizedMemoryUserMemoriesMaxItems =
-          typeof config.memoryUserMemoriesMaxItems === 'number' &&
-          Number.isFinite(config.memoryUserMemoriesMaxItems)
-            ? Math.max(
-                MIN_MEMORY_USER_MEMORIES_MAX_ITEMS,
-                Math.min(
-                  MAX_MEMORY_USER_MEMORIES_MAX_ITEMS,
-                  Math.floor(config.memoryUserMemoriesMaxItems),
-                ),
-              )
-            : undefined;
         const normalizedPermissionMode =
           config.permissionMode === CoworkPermissionMode.Ask ||
           config.permissionMode === CoworkPermissionMode.AllowAll
@@ -4729,11 +4553,6 @@ if (!gotTheLock) {
         const normalizedConfig: Parameters<CoworkStore['setConfig']>[0] = {
           ...config,
           executionMode: normalizedExecutionMode,
-          memoryEnabled: normalizedMemoryEnabled,
-          memoryImplicitUpdateEnabled: normalizedMemoryImplicitUpdateEnabled,
-          memoryLlmJudgeEnabled: normalizedMemoryLlmJudgeEnabled,
-          memoryGuardLevel: normalizedMemoryGuardLevel,
-          memoryUserMemoriesMaxItems: normalizedMemoryUserMemoriesMaxItems,
           permissionMode: normalizedPermissionMode,
           permissionModeBySession: normalizedPermissionModeBySession,
           ...normalizedEmbedding,
@@ -6666,6 +6485,25 @@ if (!gotTheLock) {
     store = await initStore();
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
+    try {
+      const legacyMemoryImport = importLegacyMemoryFileCandidates({
+        agentWorkspace: getMainAgentWorkspace(),
+        service: getProjectMemoryService(),
+      });
+      const legacySqliteMemoryImport = importLegacySqliteMemoryCandidates({
+        store: getCoworkStore(),
+        service: getProjectMemoryService(),
+      });
+      const importedLegacyMemories =
+        legacyMemoryImport.imported + legacySqliteMemoryImport.imported;
+      if (importedLegacyMemories > 0) {
+        console.log(
+          `[MemoryMigration] imported ${importedLegacyMemories} legacy entries for review`,
+        );
+      }
+    } catch (error) {
+      console.warn('[MemoryMigration] Failed to import legacy memory sources:', error);
+    }
     refreshEndpointsTestMode(store);
     sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
     await startCcConnectBridge().catch(error =>

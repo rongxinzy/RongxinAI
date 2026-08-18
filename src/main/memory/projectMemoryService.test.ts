@@ -1,6 +1,13 @@
 import { expect, test, vi } from 'vitest';
 
-import { MemoryLifecycleStatus, MemoryScope } from '../../shared/memory';
+import {
+  MemoryKind,
+  MemoryLifecycleStatus,
+  MemoryScope,
+  MemorySensitivity,
+  MemorySourceKind,
+  PERSONAL_MEMORY_PROJECT_ID,
+} from '../../shared/memory';
 import {
   EngramMemoryScope,
   EngramObservationType,
@@ -166,6 +173,163 @@ test('persists the outbox before confirming and linking a project memory', async
     confidence: 0.95,
     metadata: { extractorVersion: 1, sourceIds: ['message-1'] },
   });
+});
+
+test('creates manual memory as a controlled candidate before confirmation', async () => {
+  const active = {
+    id: 'manual-candidate',
+    memoryId: 52,
+    projectId: PERSONAL_MEMORY_PROJECT_ID,
+    scope: MemoryScope.Personal,
+    status: MemoryLifecycleStatus.Active,
+  };
+  const repository = {
+    createPersonalCandidate: vi.fn(() => active.id),
+    getLink: vi.fn(() => active),
+    getCandidate: vi.fn(() => null),
+  };
+  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+  const confirm = vi.spyOn(service, 'confirmMemoryCandidate').mockResolvedValue(active.memoryId);
+
+  await expect(
+    service.createManualMemory({
+      workingDirectory: 'alpha',
+      scope: MemoryScope.Personal,
+      title: 'Editor preference',
+      content: 'Use compact tables.',
+      kind: MemoryKind.Preference,
+      sensitivity: MemorySensitivity.Normal,
+    }),
+  ).resolves.toBe(active);
+
+  expect(repository.createPersonalCandidate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      scope: MemoryScope.Personal,
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Editor preference',
+      content: 'Use compact tables.',
+    }),
+  );
+  expect(confirm).toHaveBeenCalledWith(active.id);
+});
+
+test('records a rejected legacy candidate without retaining its content', async () => {
+  const candidate = {
+    id: 'legacy-memory:abc',
+    memoryId: null,
+    projectId: PERSONAL_MEMORY_PROJECT_ID,
+    scope: MemoryScope.Personal,
+    sourceKind: MemorySourceKind.LegacySqliteImport,
+    status: MemoryLifecycleStatus.NeedsReview,
+  };
+  const repository = {
+    getCandidate: vi.fn(() => candidate),
+    rejectCandidate: vi.fn(),
+    deleteCandidate: vi.fn(),
+  };
+  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+
+  await expect(service.forgetMemory(candidate.id, false)).resolves.toBe(true);
+
+  expect(repository.rejectCandidate).toHaveBeenCalledWith(candidate.id);
+  expect(repository.deleteCandidate).not.toHaveBeenCalled();
+});
+
+test('records an import rejection before permanently forgetting a confirmed legacy memory', async () => {
+  const link = {
+    id: 'legacy-memory:confirmed',
+    memoryId: 81,
+    projectId: PERSONAL_MEMORY_PROJECT_ID,
+    scope: MemoryScope.Personal,
+    sourceKind: MemorySourceKind.LegacyFileImport,
+    status: MemoryLifecycleStatus.Active,
+  };
+  const pending = {
+    id: 'outbox-forget',
+    operation: MemoryOutboxOperation.Forget,
+    payload: { linkId: link.id, observationId: link.memoryId, hardDelete: true },
+    status: MemoryOutboxStatus.Pending,
+    attempts: 0,
+    availableAt: new Date(0).toISOString(),
+    lastError: null,
+  };
+  const repository = {
+    getCandidate: vi.fn(() => null),
+    getLink: vi.fn(() => link),
+    recordImportRejection: vi.fn(),
+    setLinkStatus: vi.fn(),
+    enqueue: vi.fn(() => pending.id),
+    listPending: vi.fn(() => [pending]),
+    markCompleted: vi.fn(),
+    deleteLink: vi.fn(),
+  };
+  const adapter = { forget: vi.fn(async () => true) };
+  const service = new ProjectMemoryService(repository as never, adapter as never, identityFor);
+
+  await expect(service.forgetMemory(link.id, true)).resolves.toBe(true);
+
+  expect(repository.recordImportRejection).toHaveBeenCalledWith(link.id);
+  expect(repository.deleteLink).toHaveBeenCalledWith(link.id);
+});
+
+test('does not reimport a legacy entry with a rejection receipt', () => {
+  const repository = {
+    hasImportRejection: vi.fn(() => true),
+    getCandidate: vi.fn(),
+    getLink: vi.fn(),
+    createPersonalCandidate: vi.fn(),
+  };
+  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+
+  expect(
+    service.importLegacyPersonalMemoryCandidate({
+      id: 'legacy-memory:rejected',
+      title: 'Rejected memory',
+      content: 'Do not import this again.',
+      sourceKind: MemorySourceKind.LegacySqliteImport,
+      metadata: {},
+    }),
+  ).toBe(false);
+  expect(repository.createPersonalCandidate).not.toHaveBeenCalled();
+});
+
+test('edits active manual memory by confirming a superseding candidate', async () => {
+  const current = {
+    id: 'current-link',
+    memoryId: 51,
+    projectId: 'project-alpha',
+    scope: MemoryScope.Project,
+    status: MemoryLifecycleStatus.Active,
+  };
+  const replacement = { ...current, id: 'replacement-link', memoryId: 52 };
+  const repository = {
+    getCandidate: vi.fn(() => null),
+    getLink: vi.fn((id: string) => (id === current.id ? current : replacement)),
+    createPersonalCandidate: vi.fn(() => replacement.id),
+  };
+  const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
+  const confirm = vi.spyOn(service, 'confirmMemoryCandidate').mockResolvedValue(replacement.memoryId);
+
+  await expect(
+    service.updateManualMemory({
+      id: current.id,
+      workingDirectory: 'alpha',
+      title: 'Database choice',
+      content: 'Use SQLite with WAL.',
+      kind: MemoryKind.Decision,
+      sensitivity: MemorySensitivity.Normal,
+    }),
+  ).resolves.toBe(replacement);
+
+  expect(repository.createPersonalCandidate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      projectId: 'project-alpha',
+      scope: MemoryScope.Project,
+      supersedesLinkId: current.id,
+      sourceKind: MemorySourceKind.Explicit,
+    }),
+  );
+  expect(confirm).toHaveBeenCalledWith(replacement.id);
 });
 
 test('supersedes a legacy Project link through the durable outbox', async () => {

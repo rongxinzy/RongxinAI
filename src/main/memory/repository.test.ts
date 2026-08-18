@@ -9,6 +9,7 @@ import {
 } from '../../shared/memory';
 import {
   MemoryExtractorKind,
+  MemoryOutboxOperation,
   MemoryRecordStorageKind,
   PERSONAL_MEMORY_SESSION_PREFIX,
 } from './constants';
@@ -23,6 +24,7 @@ test('creates the link and outbox schema without importing the memory kernel dat
   expect(schema).toContain('CREATE TABLE IF NOT EXISTS memory_links');
   expect(schema).toContain('CREATE TABLE IF NOT EXISTS memory_outbox');
   expect(schema).toContain('CREATE TABLE IF NOT EXISTS memory_candidates');
+  expect(schema).toContain('CREATE TABLE IF NOT EXISTS memory_import_rejections');
   expect(schema).toContain('project_root TEXT');
   expect(schema).toContain("scope TEXT NOT NULL DEFAULT 'personal'");
   expect(schema).toContain('superseded_by TEXT');
@@ -153,6 +155,60 @@ test('reads local metadata for a confirmed memory link', () => {
       extractorVersion: 1,
       sourceMessageIds: ['message-a'],
     });
+  } finally {
+    db.close();
+  }
+});
+
+test('deleting a candidate also cancels its pending outbox delivery', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    const candidateId = repository.createPersonalCandidate({
+      id: 'pending-candidate',
+      sessionId: 'settings-memory',
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Editor preference',
+      content: 'Use compact tables.',
+      kind: MemoryKind.Preference,
+    });
+    repository.enqueue(
+      MemoryOutboxOperation.Confirm,
+      { linkId: candidateId },
+      candidateId,
+    );
+
+    expect(repository.listPending()).toHaveLength(1);
+    repository.deleteCandidate(candidateId);
+
+    expect(repository.getCandidate(candidateId)).toBeNull();
+    expect(repository.listPending()).toHaveLength(0);
+  } finally {
+    db.close();
+  }
+});
+
+test('rejecting an imported candidate leaves a content-free durable receipt', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    const candidateId = repository.createPersonalCandidate({
+      id: 'legacy-memory:rejected',
+      sessionId: 'legacy-memory-file',
+      sourceKind: MemorySourceKind.LegacyFileImport,
+      title: 'Legacy preference',
+      content: 'Prefer concise answers.',
+      kind: MemoryKind.Preference,
+    });
+    repository.enqueue(MemoryOutboxOperation.Confirm, { linkId: candidateId }, candidateId);
+
+    repository.rejectCandidate(candidateId);
+
+    expect(repository.getCandidate(candidateId)).toBeNull();
+    expect(repository.hasImportRejection(candidateId)).toBe(true);
+    expect(repository.listPending()).toHaveLength(0);
   } finally {
     db.close();
   }

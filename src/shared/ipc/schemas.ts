@@ -364,11 +364,6 @@ export const CoworkConfigSetSchema = {
   input: z.object({
     workingDirectory: z.string().optional(),
     executionMode: z.enum(['auto', 'local', 'sandbox']).optional(),
-    memoryEnabled: z.boolean().optional(),
-    memoryImplicitUpdateEnabled: z.boolean().optional(),
-    memoryLlmJudgeEnabled: z.boolean().optional(),
-    memoryGuardLevel: z.enum(['strict', 'standard', 'relaxed']).optional(),
-    memoryUserMemoriesMaxItems: z.number().int().min(1).max(60).optional(),
     embeddingEnabled: z.boolean().optional(),
     embeddingProvider: z.string().optional(),
     embeddingModel: z.string().optional(),
@@ -377,46 +372,6 @@ export const CoworkConfigSetSchema = {
     embeddingRemoteBaseUrl: z.string().optional(),
     embeddingRemoteApiKey: z.string().optional(),
   }),
-  output: IpcResult({}),
-};
-
-// ─── Cowork Memory ──────────────────────────────────────────────────────────
-
-export const CoworkMemoryListEntriesSchema = {
-  input: z.object({
-    query: z.string().optional(),
-    status: z.enum(['created', 'stale', 'deleted', 'all']).optional(),
-    includeDeleted: z.boolean().optional(),
-    limit: z.number().int().positive().optional(),
-    offset: z.number().int().min(0).optional(),
-  }),
-  output: IpcResult({
-    entries: z.array(z.object({}).passthrough()),
-  }),
-};
-
-export const CoworkMemoryCreateEntrySchema = {
-  input: z.object({
-    text: z.string().min(1),
-    confidence: z.number().min(0).max(1).optional(),
-    isExplicit: z.boolean().optional(),
-  }),
-  output: IpcResult({ entry: z.object({}).passthrough() }),
-};
-
-export const CoworkMemoryUpdateEntrySchema = {
-  input: z.object({
-    id: z.string().min(1),
-    text: z.string().optional(),
-    confidence: z.number().min(0).max(1).optional(),
-    status: z.enum(['created', 'stale', 'deleted']).optional(),
-    isExplicit: z.boolean().optional(),
-  }),
-  output: IpcResult({ entry: z.object({}).passthrough() }),
-};
-
-export const CoworkMemoryDeleteEntrySchema = {
-  input: z.object({ id: z.string().min(1) }),
   output: IpcResult({}),
 };
 
