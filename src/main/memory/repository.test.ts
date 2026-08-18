@@ -126,6 +126,33 @@ test('persists promotion provenance on candidates and confirmed links', () => {
   }
 });
 
+test('reads local metadata for a confirmed memory link', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    repository.createLink({
+      id: 'session-summary',
+      memoryId: 7,
+      projectId: 'project-a',
+      scope: MemoryScope.Session,
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.SessionSummary,
+      title: 'Session summary',
+      content: 'Semantic session memory (v1)',
+      kind: MemoryKind.SessionSummary,
+      metadata: { extractorVersion: 1, sourceMessageIds: ['message-a'] },
+    });
+
+    expect(repository.getLinkMetadata('session-summary')).toEqual({
+      extractorVersion: 1,
+      sourceMessageIds: ['message-a'],
+    });
+  } finally {
+    db.close();
+  }
+});
+
 test('authorizes recall against projected scope, session, and lifecycle state', () => {
   const db = new Database(':memory:');
   const repository = new MemoryRepository(db);

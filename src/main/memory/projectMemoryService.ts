@@ -66,6 +66,11 @@ interface ForgetPayload {
   hardDelete: boolean;
 }
 
+export interface ActiveSessionSummary {
+  content: string;
+  metadata: Record<string, unknown>;
+}
+
 export class ProjectMemoryService {
   constructor(
     readonly repository: MemoryRepository,
@@ -336,6 +341,7 @@ export class ProjectMemoryService {
     sessionId: string;
     workingDirectory: string;
     summary: string;
+    metadata?: Record<string, unknown>;
   }): Promise<number | null> {
     const project = this.resolveIdentity(input.workingDirectory);
     const topicKey = `session/${input.sessionId}`;
@@ -355,6 +361,7 @@ export class ProjectMemoryService {
         sourceKind: MemorySourceKind.SessionSummary,
         scope: MemoryScope.Session,
         linkId,
+        metadata: input.metadata,
         expiresAt: new Date(
           Date.now() + SESSION_SUMMARY_TTL_DAYS * 24 * 60 * 60 * 1_000,
         ).toISOString(),
@@ -362,6 +369,21 @@ export class ProjectMemoryService {
       linkId,
     );
     return await this.processOutboxItem(this.findPending(outboxId));
+  }
+
+  getActiveSessionSummary(input: {
+    sessionId: string;
+    workingDirectory: string;
+  }): ActiveSessionSummary | null {
+    const project = this.resolveIdentity(input.workingDirectory);
+    const active = this.repository.findActiveTopic(
+      project.id,
+      MemoryScope.Session,
+      `session/${input.sessionId}`,
+    );
+    return active
+      ? { content: active.content, metadata: this.repository.getLinkMetadata(active.id) }
+      : null;
   }
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {

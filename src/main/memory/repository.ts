@@ -245,6 +245,13 @@ export class MemoryRepository {
     return row ? mapLink(row, this.getDelivery(id)) : null;
   }
 
+  getLinkMetadata(id: string): Record<string, unknown> {
+    const row = this.db.prepare('SELECT metadata_json FROM memory_links WHERE id = ?').get(id) as
+      | { metadata_json: string }
+      | undefined;
+    return row ? (JSON.parse(row.metadata_json) as Record<string, unknown>) : {};
+  }
+
   findActiveTopic(
     projectId: string,
     scope: MemoryScope,
