@@ -51,7 +51,11 @@ test('extracts atomic project memory with evidence metadata', async () => {
     digest: result.memories[0],
   });
   const payload = JSON.parse(complete.mock.calls[0][0][1].content);
-  expect(payload).toMatchObject({ targetScope: MemoryScope.Project, maxItems: 1 });
+  expect(payload).toMatchObject({
+    targetScope: MemoryScope.Project,
+    maxItems: 1,
+    selectionHint: expect.objectContaining({ title: 'Database discussion' }),
+  });
 });
 
 test('redacts private blocks and treats all sources as untrusted evidence', async () => {

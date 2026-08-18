@@ -61,6 +61,7 @@ import type { CoworkStore } from '../../coworkStore';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
 import type { ConversationHistoryService } from '../../conversationHistory/service';
 import { t } from '../../i18n';
+import type { LegacyMemoryMigrationService } from '../../memory/legacyMemoryMigrationService';
 import { buildPiProjectMemoryTool } from '../../memory/piMemoryTool';
 import {
   buildProjectMemoryContextSafe,
@@ -509,6 +510,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
+  private legacyMemoryMigrationService: LegacyMemoryMigrationService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
   private readonly pendingMemoryCompletions = new Map<string, Promise<string>>();
@@ -523,6 +525,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setSessionSummaryService(service: SessionSummaryService): void {
     this.sessionSummaryService = service;
+  }
+  setLegacyMemoryMigrationService(service: LegacyMemoryMigrationService): void {
+    this.legacyMemoryMigrationService = service;
   }
   setConversationHistoryService(service: ConversationHistoryService): void {
     this.conversationHistoryService = service;
@@ -2073,6 +2078,31 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return active ? this.createSessionMemoryCompletion(active) : null;
   }
 
+  private async runPostTurnMemoryMaintenance(
+    sessionId: string,
+    workingDirectory: string,
+    complete: SessionMemoryCompletion,
+  ): Promise<void> {
+    if (this.legacyMemoryMigrationService) {
+      try {
+        await this.legacyMemoryMigrationService.migrateSession({
+          sessionId,
+          workingDirectory,
+          complete,
+        });
+      } catch (error) {
+        console.warn(`[MemoryMigration] Failed to migrate session ${sessionId}:`, error);
+      }
+    }
+    if (this.sessionSummaryService) {
+      try {
+        await this.sessionSummaryService.rollup({ sessionId, workingDirectory, complete });
+      } catch (error) {
+        console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
+      }
+    }
+  }
+
   private async completeSessionMemory(
     model: Record<string, unknown>,
     modelRuntime: PiModelRuntime | null,
@@ -2457,17 +2487,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             workflowSnapshot,
           });
         }
-        if (this.sessionSummaryService) {
-          void this.sessionSummaryService
-            .rollup({
-              sessionId,
-              workingDirectory: active.workspaceRoot,
-              complete: this.createSessionMemoryCompletion(active),
-            })
-            .catch(error => {
-              console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
-            });
-        }
+        void this.runPostTurnMemoryMaintenance(
+          sessionId,
+          active.workspaceRoot,
+          this.createSessionMemoryCompletion(active),
+        );
         this.emit('complete', sessionId, null);
         break;
       }

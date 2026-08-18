@@ -7,6 +7,11 @@ import {
   MemoryScope,
   MemorySourceKind,
 } from '../../shared/memory';
+import {
+  MemoryExtractorKind,
+  MemoryRecordStorageKind,
+  PERSONAL_MEMORY_SESSION_PREFIX,
+} from './constants';
 import { MemoryRepository } from './repository';
 
 test('creates the link and outbox schema without importing the memory kernel database', () => {
@@ -106,7 +111,7 @@ test('persists promotion provenance on candidates and confirmed links', () => {
       memoryId: 42,
       projectId: 'personal://zhiyuan-agent/user',
       scope: MemoryScope.Personal,
-      sessionId: 'personal:session-a',
+      sessionId: `${PERSONAL_MEMORY_SESSION_PREFIX}session-a`,
       sourceKind: MemorySourceKind.ModelProposal,
       title: 'Promoted preference',
       content: 'Use SQLite for local state.',
@@ -153,6 +158,34 @@ test('reads local metadata for a confirmed memory link', () => {
   }
 });
 
+test('finds confirmed Personal memories by their prefixed origin session', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    repository.createLink({
+      id: 'personal-link',
+      memoryId: 8,
+      projectId: 'personal://zhiyuan-agent/user',
+      scope: MemoryScope.Personal,
+      sessionId: 'personal:session-a',
+      sourceKind: MemorySourceKind.ModelProposal,
+      title: 'Editor preference',
+      content: 'Copied conversation text.',
+      kind: MemoryKind.Preference,
+    });
+
+    expect(repository.listMigrationRecordsForContext('project-a')).toEqual([
+      expect.objectContaining({
+        storageKind: MemoryRecordStorageKind.Link,
+        memory: expect.objectContaining({ id: 'personal-link' }),
+      }),
+    ]);
+  } finally {
+    db.close();
+  }
+});
+
 test('authorizes recall against projected scope, session, and lifecycle state', () => {
   const db = new Database(':memory:');
   const repository = new MemoryRepository(db);
@@ -174,6 +207,21 @@ test('authorizes recall against projected scope, session, and lifecycle state', 
       content: `Content ${memoryId}`,
       kind: scope === MemoryScope.Session ? MemoryKind.SessionSummary : MemoryKind.Decision,
       expiresAt,
+      metadata:
+        scope === MemoryScope.Session
+          ? {
+              extractorVersion: 1,
+              sourceMessageIds: ['message-a'],
+              digest: {
+                shouldSave: true,
+                goal: { text: 'Goal', evidenceMessageIds: ['message-a'] },
+                currentState: { text: 'Done', evidenceMessageIds: ['message-a'] },
+              },
+            }
+          : {
+              extractorKind: MemoryExtractorKind.Atomic,
+              extractorVersion: 1,
+            },
     });
 
   try {
@@ -182,8 +230,30 @@ test('authorizes recall against projected scope, session, and lifecycle state', 
     createLink(3, MemoryScope.Session, 'session-b');
     const archivedLinkId = createLink(4, MemoryScope.Project, 'session-origin');
     createLink(5, MemoryScope.Project, 'session-origin', '2000-01-01T00:00:00.000Z');
+    repository.createLink({
+      id: 'legacy-session-summary',
+      memoryId: 6,
+      projectId: 'project-a',
+      scope: MemoryScope.Session,
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.SessionSummary,
+      title: 'Session summary',
+      content: 'Session objective: copied transcript',
+      kind: MemoryKind.SessionSummary,
+    });
+    repository.createLink({
+      id: 'legacy-project-memory',
+      memoryId: 7,
+      projectId: 'project-a',
+      scope: MemoryScope.Project,
+      sessionId: 'session-origin',
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Legacy project memory',
+      content: 'Copied final answer.',
+      kind: MemoryKind.Decision,
+    });
     repository.setLinkStatus(archivedLinkId, MemoryLifecycleStatus.Archived);
-    const memoryIds = [1, 2, 3, 4, 5];
+    const memoryIds = [1, 2, 3, 4, 5, 6, 7];
 
     expect(
       repository.filterRecallableMemoryIds({
