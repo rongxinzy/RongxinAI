@@ -495,6 +495,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   >();
   private store: CoworkStore | null = null;
   private mcpServerManager: McpServerManager | null = null;
+  private bundledSkillsRoot: string | null = null;
   /**
    * Pi custom tools are fixed when a session is created. Bump this whenever
    * MCP discovery changes so the next user turn recreates an outdated session
@@ -511,6 +512,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   setCoworkStore(store: CoworkStore): void {
     this.store = store;
+  }
+  /**
+   * Bundled SKILLs root (resources/SKILLs in production). Injected so the
+   * live member source matches the main-session preset snapshot; getSkillsRoot
+   * alone is wrong in packaged builds, where it resolves to the userData copy
+   * that can drift from the bundled truth.
+   */
+  setBundledSkillsRoot(root: string): void {
+    this.bundledSkillsRoot = root;
   }
   setProjectMemoryService(service: ProjectMemoryService): void {
     this.projectMemoryService = service;
@@ -3126,7 +3136,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private resolveBundledMemberProfiles(
     presetId: string,
   ): Array<{ id: string; description: string; systemPrompt: string }> | null {
-    return resolveBundledPresetMembers(getSkillsRoot(), presetId);
+    return resolveBundledPresetMembers(this.bundledSkillsRoot ?? getSkillsRoot(), presetId);
   }
   private createWorkbenchContract(
     sessionMode: PiStartOptions['sessionMode'],
