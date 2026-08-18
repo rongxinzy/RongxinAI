@@ -216,8 +216,10 @@ function extractSection(body, headingKeyword) {
 
 /**
  * Headings (##-level) under which checkbox lines appear. Only headings that
- * denote progress ownership (进度/SOP/清单) count; delivery templates and
- * domain QA checklists are output content and remain allowed.
+ * denote progress ownership count: 进度/SOP (zh) and Progress/Status (en).
+ * Plain "清单" headings (交付清单/质量检查清单/上线检查清单) are delivery
+ * checklists — output content, not a second task state machine — and stay
+ * allowed.
  */
 function findChecklistSections(body) {
   const lines = body.split('\n');
@@ -229,7 +231,10 @@ function findChecklistSections(body) {
       currentHeading = heading[1].trim();
       continue;
     }
-    if (/^\s*-\s+\[[ xX]\]\s+/.test(line) && /进度|SOP|清单/.test(currentHeading)) {
+    if (
+      /^\s*-\s+\[[ xX]\]\s+/.test(line) &&
+      /进度|SOP|Progress|Status/i.test(currentHeading)
+    ) {
       if (!offenders.includes(currentHeading)) offenders.push(currentHeading);
     }
   }

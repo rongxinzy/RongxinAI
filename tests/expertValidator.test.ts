@@ -80,12 +80,33 @@ test('allows checkboxes inside delivery templates and domain QA sections', () =>
       '## 输出规范',
       '- [x] 已核对数据来源',
       '- [ ] 待用户确认口径',
+      '',
+      '## 交付清单',
+      '- [ ] 已生成报告文件',
+      '',
+      '## 质量检查清单',
+      '- [x] 数据口径一致',
+      '',
+      '## 上线检查清单',
+      '- [ ] 已配置监控告警',
     ].join('\n'),
   );
 
   validateAgentMd(agentPath, result);
 
   expect(result.errors).toEqual([]);
+});
+
+test('rejects progress checklists under English progress headings', () => {
+  for (const heading of ['## Task Progress', '## Execution Status', '## Phase Status']) {
+    const result = new ValidationResult();
+    const agentPath = writeAgent(['# Test expert', '', heading, '- [ ] Track phase'].join('\n'));
+
+    validateAgentMd(agentPath, result);
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('Markdown progress checklists');
+  }
 });
 
 test('primary agents must carry the full Skill usage protocol in its own section', () => {
