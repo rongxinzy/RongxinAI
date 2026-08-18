@@ -27,6 +27,16 @@ maxTurns: 50
 
 ---
 
+## Skill 使用协议（CRITICAL）
+
+1. 从系统提示的 `<available_skills>` 中选择与请求最匹配的一个售前 Skill。
+2. 使用 `read` 完整读取该 Skill 的 `<location>`，将其所在目录作为 Skill 根目录。
+3. 严格按 `SKILL.md` 的输入、工作流与输出规范执行；相对路径一律相对 Skill 根目录解析。
+4. 仅当首个 Skill 明确引用另一个 Skill 时才继续读取，禁止一次性加载全部售前 Skill。
+5. 若请求跨多个独立售前工作流，先完成主工作流，再按依赖顺序加载后续 Skill。
+
+---
+
 ## 标准工作流
 
 ### 执行规范（CRITICAL）

@@ -42,7 +42,7 @@ function writeAgent(body: string): string {
   return agentPath;
 }
 
-test('warns without rejecting imported experts that own workflow progress', () => {
+test('rejects imported experts that own workflow progress', () => {
   const result = new ValidationResult();
   const agentPath = writeAgent(
     ['# Test expert', '', '- [ ] Track phase', '', 'Call production_loop then skip_workflow.'].join(
@@ -52,11 +52,53 @@ test('warns without rejecting imported experts that own workflow progress', () =
 
   validateAgentMd(agentPath, result);
 
-  expect(result.errors).toEqual([]);
-  expect(result.warnings).toEqual([
+  expect(result.warnings).toEqual([]);
+  expect(result.errors).toEqual([
     'test-expert.md: Markdown progress checklists conflict with runtime-owned production progress',
     'test-expert.md: production workflow tools are runtime-owned (production_loop, skip_workflow)',
   ]);
+});
+
+test('primary agents must carry the full Skill usage protocol', () => {
+  const result = new ValidationResult();
+  const agentPath = writeAgent(
+    [
+      '# Test expert',
+      '',
+      '## Skill 使用协议（CRITICAL）',
+      '',
+      '1. 从系统提示的 `<available_skills>` 中选择最匹配的 Skill。',
+      '2. 使用 `read` 完整读取该 Skill 的 `<location>`。',
+      '3. 严格按 `SKILL.md` 执行。',
+    ].join('\n'),
+  );
+
+  validateAgentMd(agentPath, result, { requireSkillProtocol: true });
+
+  expect(result.errors).toHaveLength(1);
+  expect(result.errors[0]).toContain('missing: 禁止一次性加载全部技能、按依赖顺序加载后续技能');
+});
+
+test('members and skill-less leads are exempt from the protocol requirement', () => {
+  const result = new ValidationResult();
+  const agentPath = writeAgent(['# Test member', '', '你是团队的**[TODO: 角色]**。'].join('\n'));
+
+  validateAgentMd(agentPath, result, { requireSkillProtocol: false });
+
+  expect(result.errors).toEqual([]);
+});
+
+test('half-width dash in the routing heading is a strict-only error', () => {
+  const body = '## 工作流路由（CRITICAL - 收到请求时首先判断）';
+  const relaxed = new ValidationResult();
+  validateAgentMd(writeAgent(['# Test expert', '', body].join('\n')), relaxed);
+  expect(relaxed.errors).toEqual([]);
+  expect(relaxed.warnings).toHaveLength(1);
+
+  const strict = new ValidationResult();
+  validateAgentMd(writeAgent(['# Test expert', '', body].join('\n')), strict, { strict: true });
+  expect(strict.warnings).toEqual([]);
+  expect(strict.errors).toHaveLength(1);
 });
 
 test('bundled expert prompts leave production workflow ownership to the runtime', () => {
