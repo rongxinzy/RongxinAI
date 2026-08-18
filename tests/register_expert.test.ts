@@ -29,7 +29,7 @@ function createMinimalExpertPackage(dir: string, overrides: Record<string, unkno
     profession: { en: 'Code Assistant', zh: '代码助手' },
     displayDescription: {
       en: 'A lightweight expert for integration testing.',
-      zh: '一个用于集成测试的轻量专家，专注于回答简单编程问题，验证导入流程。',
+      zh: '一个用于集成测试的轻量专家，专注于回答简单编程问题、验证导入流程与技能打包语义。',
     },
     categoryId: '02-Engineering',
     defaultInitPrompt: {
@@ -56,7 +56,7 @@ function createMinimalExpertPackage(dir: string, overrides: Record<string, unkno
   fs.writeFileSync(path.join(dir, 'plugin.json'), JSON.stringify(plugin, null, 2), 'utf-8');
   fs.writeFileSync(
     path.join(agentDir, 'test-code-assistant.md'),
-    `---\nname: test-code-assistant\ndescription: \"A test code assistant for integration testing.\"\ndisplayName:\n  en: \"Test Code Assistant\"\n  zh: \"测试代码助手\"\nprofession:\n  en: \"Code Assistant\"\n  zh: \"代码助手\"\nmaxTurns: 50\nskills: [hello-skill]\n---\n\n# 测试代码助手\n\n## 角色\n你是一个用于集成测试的代码助手。\n`,
+    `---\nname: test-code-assistant\ndescription: \"A test code assistant for integration testing.\"\ndisplayName:\n  en: \"Test Code Assistant\"\n  zh: \"测试代码助手\"\nprofession:\n  en: \"Code Assistant\"\n  zh: \"代码助手\"\nmaxTurns: 50\nskills: [hello-skill]\n---\n\n# 测试代码助手\n\n## 角色\n你是一个用于集成测试的代码助手。\n\n## 工作流路由（CRITICAL — 收到请求时首先判断）\n\n| 场景 | 判定条件 | 使用模式 |\n|------|---------|---------|\n| 编程问答 | 简单编程问题 | 直接回答 |\n\n## Skill 使用协议（CRITICAL）\n\n1. 从系统提示的 \`<available_skills>\` 中选择与请求最匹配的一个 Skill。\n2. 使用 \`read\` 完整读取该 Skill 的 \`<location>\`，将其所在目录作为 Skill 根目录。\n3. 严格按 \`SKILL.md\` 的输入、工作流与输出规范执行；相对路径一律相对 Skill 根目录解析。\n4. 仅当首个 Skill 明确引用另一个 Skill 时才继续读取，禁止一次性加载全部 Skill。\n5. 若请求跨多个独立工作流，先完成主工作流，再按依赖顺序加载后续 Skill。\n`,
     'utf-8',
   );
   fs.writeFileSync(

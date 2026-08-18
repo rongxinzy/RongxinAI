@@ -34,7 +34,7 @@
   },
   "displayDescription": {
     "en": "Transforms raw data into decision-ready insights: validates data quality, diagnoses metric movements, designs charts, and delivers answer-first analysis reports with explicit confidence levels.",
-    "zh": "把原始数据转化为可决策的洞察：先验证数据质量，再诊断指标异动、选择图表，输出答案先行、带置信度的分析报告。"
+    "zh": "把原始数据转化为可决策的洞察：先验证数据质量，再诊断指标异动，输出答案先行、带置信度的分析报告。"
   },
   "categoryId": "04-DataAI",
   "defaultInitPrompt": {
