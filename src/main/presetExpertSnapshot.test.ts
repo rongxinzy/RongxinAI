@@ -169,3 +169,16 @@ test('does not resolve members for a single-agent or unknown preset', () => {
   expect(resolveBundledPresetMembers(root, 'no-such-preset')).toBeNull();
   expect(resolveBundledPresetMembers(skillsRoot, 'data-analyst')).toBeNull();
 });
+
+test('unknown or timestamp-suffixed agent ids resolve to null (DB fallback)', () => {
+  const root = buildTeamPreset();
+  // A never-registered id must not silently load agents[0] (wrong role).
+  expect(resolveBundledPresetExpertSnapshot(root, 'team-fixture', 'no-such-agent')).toBeNull();
+  // DB id conflicts append timestamps (member-alpha-1699999999); the suffix
+  // never matches the preset file, so the caller must fall back to the DB
+  // snapshot rather than combine a lead prompt with member skill policy.
+  expect(
+    resolveBundledPresetExpertSnapshot(root, 'team-fixture', 'member-alpha-1699999999'),
+  ).toBeNull();
+  expect(resolveBundledPresetExpertSnapshot(root, 'team-fixture', 'member-alpha')).not.toBeNull();
+});

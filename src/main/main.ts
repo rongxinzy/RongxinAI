@@ -882,6 +882,9 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setConversationHistoryService(
       new ConversationHistoryService(getStore().getDatabase()),
     );
+    // Live team member definitions must read the same bundled truth as the
+    // main-session preset snapshot, not the userData skills copy.
+    piRuntimeAdapter.setBundledSkillsRoot(getSkillManager().getBundledSkillsRoot());
     // MCP initialization runs asynchronously, so late injection may still be needed.
     console.log('[PiRuntime] mcpServerManager available at init:', mcpServerManager !== null);
   }

@@ -103,11 +103,14 @@ export function resolveBundledPresetExpertSnapshot(
   try {
     const agentPaths = Array.isArray(pluginJson.agents) ? pluginJson.agents : [];
     // The main session only loads the single selected agent file: the agent
-    // named by `agentId` (lead for teams, the only file for single agents),
-    // falling back to the first entry for compatibility.
+    // named by `agentId` (lead for teams, the only file for single agents).
+    // An unmatched agentId (e.g. a timestamp-suffixed id after a DB id
+    // conflict) resolves to null so the caller falls back to the DB snapshot
+    // instead of silently loading the wrong role's prompt.
     const selected =
-      (agentId ? agentPaths.find(entry => matchesAgentId(String(entry), agentId)) : undefined) ??
-      agentPaths[0];
+      agentId === undefined
+        ? agentPaths[0]
+        : agentPaths.find(entry => matchesAgentId(String(entry), agentId));
     const agentMdPath = selected === undefined ? null : agentFilePath(presetDir, selected);
     if (!agentMdPath) return null;
 
