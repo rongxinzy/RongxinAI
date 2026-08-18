@@ -34,14 +34,6 @@ const getDefaultWorkingDirectory = (): string => {
   return getDefaultConversationWorkspacePath();
 };
 
-const DEFAULT_MEMORY_ENABLED = true;
-const DEFAULT_MEMORY_IMPLICIT_UPDATE_ENABLED = true;
-const DEFAULT_MEMORY_LLM_JUDGE_ENABLED = false;
-export type CoworkMemoryGuardLevel = 'strict' | 'standard' | 'relaxed';
-const DEFAULT_MEMORY_GUARD_LEVEL: CoworkMemoryGuardLevel = 'strict';
-const DEFAULT_MEMORY_USER_MEMORIES_MAX_ITEMS = 12;
-const MIN_MEMORY_USER_MEMORIES_MAX_ITEMS = 1;
-const MAX_MEMORY_USER_MEMORIES_MAX_ITEMS = 60;
 const MEMORY_NEAR_DUPLICATE_MIN_SCORE = 0.82;
 const MEMORY_PROCEDURAL_TEXT_RE =
   /(执行以下命令|run\s+(?:the\s+)?following\s+command|\b(?:cd|npm|pnpm|yarn|node|python|bash|sh|git|curl|wget)\b|\$[A-Z_][A-Z0-9_]*|&&|--[a-z0-9-]+|\/tmp\/|\.sh\b|\.bat\b|\.ps1\b)/i;
@@ -81,11 +73,6 @@ function isQuestionLikeMemoryText(text: string): boolean {
   return false;
 }
 
-function normalizeMemoryGuardLevel(value: string | undefined): CoworkMemoryGuardLevel {
-  if (value === 'strict' || value === 'standard' || value === 'relaxed') return value;
-  return DEFAULT_MEMORY_GUARD_LEVEL;
-}
-
 function parseBooleanConfig(value: string | undefined, fallback: boolean): boolean {
   if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
@@ -99,14 +86,6 @@ function parseBooleanConfig(value: string | undefined, fallback: boolean): boole
 function normalizePermissionMode(value: string | undefined): CoworkPermissionModeType {
   if (value === CoworkPermissionMode.Ask || value === CoworkPermissionMode.AllowAll) return value;
   return CoworkPermissionMode.Ask;
-}
-
-function clampMemoryUserMemoriesMaxItems(value: number): number {
-  if (!Number.isFinite(value)) return DEFAULT_MEMORY_USER_MEMORIES_MAX_ITEMS;
-  return Math.max(
-    MIN_MEMORY_USER_MEMORIES_MAX_ITEMS,
-    Math.min(MAX_MEMORY_USER_MEMORIES_MAX_ITEMS, Math.floor(value)),
-  );
 }
 
 function parseEmbeddingVectorWeight(value: string | undefined): number {
@@ -531,11 +510,6 @@ export interface CoworkConfig {
   workingDirectory: string;
   systemPrompt: string;
   executionMode: CoworkExecutionMode;
-  memoryEnabled: boolean;
-  memoryImplicitUpdateEnabled: boolean;
-  memoryLlmJudgeEnabled: boolean;
-  memoryGuardLevel: CoworkMemoryGuardLevel;
-  memoryUserMemoriesMaxItems: number;
   permissionMode: CoworkPermissionModeType;
   permissionModeBySession: Record<string, CoworkPermissionModeType>;
   embeddingEnabled: boolean;
@@ -552,11 +526,6 @@ export type CoworkConfigUpdate = Partial<
     CoworkConfig,
     | 'workingDirectory'
     | 'executionMode'
-    | 'memoryEnabled'
-    | 'memoryImplicitUpdateEnabled'
-    | 'memoryLlmJudgeEnabled'
-    | 'memoryGuardLevel'
-    | 'memoryUserMemoriesMaxItems'
     | 'permissionMode'
     | 'permissionModeBySession'
     | 'embeddingEnabled'
@@ -1672,11 +1641,6 @@ export class CoworkStore {
     const configKeys = [
       'workingDirectory',
       'executionMode',
-      'memoryEnabled',
-      'memoryImplicitUpdateEnabled',
-      'memoryLlmJudgeEnabled',
-      'memoryGuardLevel',
-      'memoryUserMemoriesMaxItems',
       'permissionMode',
       'permissionModeBySession',
       'embeddingEnabled',
@@ -1697,19 +1661,6 @@ export class CoworkStore {
       workingDirectory: cfg.get('workingDirectory') || getDefaultWorkingDirectory(),
       systemPrompt: getDefaultSystemPrompt(),
       executionMode: 'local' as CoworkExecutionMode,
-      memoryEnabled: parseBooleanConfig(cfg.get('memoryEnabled'), DEFAULT_MEMORY_ENABLED),
-      memoryImplicitUpdateEnabled: parseBooleanConfig(
-        cfg.get('memoryImplicitUpdateEnabled'),
-        DEFAULT_MEMORY_IMPLICIT_UPDATE_ENABLED,
-      ),
-      memoryLlmJudgeEnabled: parseBooleanConfig(
-        cfg.get('memoryLlmJudgeEnabled'),
-        DEFAULT_MEMORY_LLM_JUDGE_ENABLED,
-      ),
-      memoryGuardLevel: normalizeMemoryGuardLevel(cfg.get('memoryGuardLevel')),
-      memoryUserMemoriesMaxItems: clampMemoryUserMemoriesMaxItems(
-        Number(cfg.get('memoryUserMemoriesMaxItems')),
-      ),
       permissionMode: normalizePermissionMode(cfg.get('permissionMode')),
       permissionModeBySession: (() => {
         try {
@@ -1745,33 +1696,6 @@ export class CoworkStore {
     }
     if (config.executionMode !== undefined) {
       this.upsertConfig('executionMode', config.executionMode, now);
-    }
-    if (config.memoryEnabled !== undefined) {
-      this.upsertConfig('memoryEnabled', config.memoryEnabled ? '1' : '0', now);
-    }
-    if (config.memoryImplicitUpdateEnabled !== undefined) {
-      this.upsertConfig(
-        'memoryImplicitUpdateEnabled',
-        config.memoryImplicitUpdateEnabled ? '1' : '0',
-        now,
-      );
-    }
-    if (config.memoryLlmJudgeEnabled !== undefined) {
-      this.upsertConfig('memoryLlmJudgeEnabled', config.memoryLlmJudgeEnabled ? '1' : '0', now);
-    }
-    if (config.memoryGuardLevel !== undefined) {
-      this.upsertConfig(
-        'memoryGuardLevel',
-        normalizeMemoryGuardLevel(config.memoryGuardLevel),
-        now,
-      );
-    }
-    if (config.memoryUserMemoriesMaxItems !== undefined) {
-      this.upsertConfig(
-        'memoryUserMemoriesMaxItems',
-        String(clampMemoryUserMemoriesMaxItems(config.memoryUserMemoriesMaxItems)),
-        now,
-      );
     }
     if (config.permissionMode !== undefined) {
       this.upsertConfig('permissionMode', normalizePermissionMode(config.permissionMode), now);

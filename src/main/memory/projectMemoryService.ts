@@ -7,6 +7,8 @@ import {
   MemorySensitivity,
   MemorySourceKind,
   PERSONAL_MEMORY_PROJECT_ID,
+  type ManualMemoryCreateInput,
+  type ManualMemoryUpdateInput,
   type ManagedMemoryListInput,
   type ManagedMemoryRecord,
   type MemoryKind as MemoryKindValue,
@@ -15,6 +17,9 @@ import {
 } from '../../shared/memory';
 import {
   EngramSearchMatchMode,
+  LEGACY_MEMORY_FILE_SESSION_ID,
+  LEGACY_MEMORY_SQLITE_SESSION_ID,
+  MANUAL_MEMORY_SESSION_ID,
   MemoryOutboxOperation,
   PERSONAL_MEMORY_SESSION_PREFIX,
   SESSION_SUMMARY_TTL_DAYS,
@@ -82,6 +87,94 @@ export class ProjectMemoryService {
 
   getProjectIdentity(workingDirectory: string): ProjectIdentity {
     return this.resolveIdentity(workingDirectory);
+  }
+
+  async createManualMemory(input: ManualMemoryCreateInput): Promise<ManagedMemoryRecord> {
+    const normalized = normalizeManualMemoryInput(input);
+    const project = this.resolveIdentity(input.workingDirectory);
+    const candidateId = this.repository.createPersonalCandidate({
+      projectId:
+        normalized.scope === MemoryScope.Personal ? PERSONAL_MEMORY_PROJECT_ID : project.id,
+      projectRoot:
+        normalized.scope === MemoryScope.Personal ? this.personalDirectory : project.root,
+      scope: normalized.scope,
+      sessionId: MANUAL_MEMORY_SESSION_ID,
+      sourceKind: MemorySourceKind.Explicit,
+      title: normalized.title,
+      content: normalized.content,
+      kind: normalized.kind,
+      sensitivity: normalized.sensitivity,
+      metadata: { manual: true },
+    });
+    await this.confirmMemoryCandidate(candidateId);
+    return this.requireCandidateOrLink(candidateId);
+  }
+
+  async updateManualMemory(input: ManualMemoryUpdateInput): Promise<ManagedMemoryRecord> {
+    const normalized = normalizeManualMemoryInput(input);
+    const candidate = this.repository.getCandidate(input.id);
+    if (candidate) {
+      this.assertManualMemoryBoundary(candidate, input.workingDirectory);
+      const updated = this.repository.updateCandidate(input.id, normalized);
+      if (!updated) throw new Error('Memory candidate is not editable.');
+      return updated;
+    }
+
+    const current = this.repository.getLink(input.id);
+    if (!current || current.status !== MemoryLifecycleStatus.Active) {
+      throw new Error('Active memory not found.');
+    }
+    this.assertManualMemoryBoundary(current, input.workingDirectory);
+    const project = this.resolveIdentity(input.workingDirectory);
+    const replacementId = this.repository.createPersonalCandidate({
+      projectId: current.scope === MemoryScope.Personal ? PERSONAL_MEMORY_PROJECT_ID : project.id,
+      projectRoot:
+        current.scope === MemoryScope.Personal ? this.personalDirectory : project.root,
+      scope: current.scope,
+      sessionId: MANUAL_MEMORY_SESSION_ID,
+      sourceKind: MemorySourceKind.Explicit,
+      title: normalized.title,
+      content: normalized.content,
+      kind: normalized.kind,
+      sensitivity: normalized.sensitivity,
+      supersedesLinkId: current.id,
+      metadata: { manual: true, editedFrom: current.id },
+    });
+    await this.confirmMemoryCandidate(replacementId);
+    return this.requireCandidateOrLink(replacementId);
+  }
+
+  importLegacyPersonalMemoryCandidate(input: {
+    id: string;
+    title: string;
+    content: string;
+    sourceKind: typeof MemorySourceKind.LegacyFileImport | typeof MemorySourceKind.LegacySqliteImport;
+    metadata: Record<string, unknown>;
+  }): boolean {
+    if (
+      this.repository.hasImportRejection(input.id) ||
+      this.repository.getCandidate(input.id) ||
+      this.repository.getLink(input.id)
+    ) {
+      return false;
+    }
+    this.repository.createPersonalCandidate({
+      id: input.id,
+      projectId: PERSONAL_MEMORY_PROJECT_ID,
+      projectRoot: this.personalDirectory,
+      scope: MemoryScope.Personal,
+      sessionId:
+        input.sourceKind === MemorySourceKind.LegacyFileImport
+          ? LEGACY_MEMORY_FILE_SESSION_ID
+          : LEGACY_MEMORY_SQLITE_SESSION_ID,
+      sourceKind: input.sourceKind,
+      title: input.title,
+      content: input.content,
+      kind: MemoryKind.Preference,
+      sensitivity: MemorySensitivity.Normal,
+      metadata: input.metadata,
+    });
+    return true;
   }
 
   async recallProject(input: { workingDirectory: string; query: string; limit?: number }) {
@@ -354,7 +447,7 @@ export class ProjectMemoryService {
   async confirmMemoryCandidate(id: string): Promise<number | null> {
     const candidate = this.repository.getCandidate(id);
     if (!candidate || candidate.status !== MemoryLifecycleStatus.NeedsReview) {
-      throw new Error('Personal memory candidate is not available for review.');
+      throw new Error('Memory candidate is not available for review.');
     }
     const rawCandidate = this.repository.getCandidateDetails(id);
     if (!rawCandidate) throw new Error('Memory candidate details are unavailable.');
@@ -487,11 +580,24 @@ export class ProjectMemoryService {
   async forgetMemory(id: string, hardDelete: boolean): Promise<boolean> {
     const candidate = this.repository.getCandidate(id);
     if (candidate) {
-      this.repository.deleteCandidate(id);
+      if (
+        candidate.sourceKind === MemorySourceKind.LegacyFileImport ||
+        candidate.sourceKind === MemorySourceKind.LegacySqliteImport
+      ) {
+        this.repository.rejectCandidate(id);
+      } else {
+        this.repository.deleteCandidate(id);
+      }
       return true;
     }
     const link = this.repository.getLink(id);
     if (!link?.memoryId) throw new Error('Memory not found.');
+    if (
+      link.sourceKind === MemorySourceKind.LegacyFileImport ||
+      link.sourceKind === MemorySourceKind.LegacySqliteImport
+    ) {
+      this.repository.recordImportRejection(id);
+    }
     this.repository.setLinkStatus(id, MemoryLifecycleStatus.Deleted);
     const outboxId = this.repository.enqueue(
       MemoryOutboxOperation.Forget,
@@ -512,6 +618,27 @@ export class ProjectMemoryService {
   async retryPendingOutbox(limit = 20): Promise<number> {
     this.repository.makePendingAvailable();
     return await this.drainOutbox(limit);
+  }
+
+  private requireCandidateOrLink(id: string): ManagedMemoryRecord {
+    const memory = this.repository.getLink(id) ?? this.repository.getCandidate(id);
+    if (!memory) throw new Error('Memory projection was not created.');
+    return memory;
+  }
+
+  private assertManualMemoryBoundary(
+    memory: ManagedMemoryRecord,
+    workingDirectory: string,
+  ): void {
+    if (memory.scope === MemoryScope.Session) {
+      throw new Error('Session summaries cannot be edited manually.');
+    }
+    if (
+      memory.scope === MemoryScope.Project &&
+      memory.projectId !== this.resolveIdentity(workingDirectory).id
+    ) {
+      throw new Error('Workspace memory belongs to a different workspace.');
+    }
   }
 
   private async recallScope(input: {
@@ -897,6 +1024,29 @@ function estimateMemoryTokens(value: string): number {
     value.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)
       ?.length ?? 0;
   return Math.ceil(cjkCharacters + (value.length - cjkCharacters) / 4);
+}
+
+function normalizeManualMemoryInput(
+  input: ManualMemoryCreateInput | ManualMemoryUpdateInput,
+): Pick<ManualMemoryCreateInput, 'scope' | 'title' | 'content' | 'kind' | 'sensitivity'> {
+  const title = input.title.trim();
+  const content = input.content.trim();
+  if (!title) throw new Error('Memory title is required.');
+  if (!content) throw new Error('Memory content is required.');
+  const scope = 'scope' in input ? input.scope : undefined;
+  return {
+    scope:
+      scope === MemoryScope.Project || scope === MemoryScope.Personal
+        ? scope
+        : MemoryScope.Personal,
+    title,
+    content,
+    kind: input.kind === MemoryKind.Preference ? MemoryKind.Preference : MemoryKind.Decision,
+    sensitivity:
+      input.sensitivity === MemorySensitivity.Sensitive
+        ? MemorySensitivity.Sensitive
+        : MemorySensitivity.Normal,
+  };
 }
 
 export async function buildProjectMemoryContextSafe(

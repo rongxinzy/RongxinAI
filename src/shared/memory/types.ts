@@ -1,10 +1,10 @@
-import type {
-  MemoryDeliveryStatus,
+import {
   MemoryKind,
-  MemoryLifecycleStatus,
   MemoryScope,
-  MemorySensitivity,
-  MemorySourceKind,
+  type MemoryDeliveryStatus,
+  type MemoryLifecycleStatus,
+  type MemorySensitivity,
+  type MemorySourceKind,
 } from './constants';
 
 export interface ManagedMemoryRecord {
@@ -41,6 +41,26 @@ export interface ManagedMemoryListInput {
   scope?: MemoryScope;
   status?: MemoryLifecycleStatus;
   query?: string;
+}
+
+export type ManualMemoryScope = typeof MemoryScope.Project | typeof MemoryScope.Personal;
+
+export interface ManualMemoryCreateInput {
+  workingDirectory: string;
+  scope: ManualMemoryScope;
+  title: string;
+  content: string;
+  kind: typeof MemoryKind.Decision | typeof MemoryKind.Preference;
+  sensitivity: MemorySensitivity;
+}
+
+export interface ManualMemoryUpdateInput {
+  id: string;
+  workingDirectory: string;
+  title: string;
+  content: string;
+  kind: typeof MemoryKind.Decision | typeof MemoryKind.Preference;
+  sensitivity: MemorySensitivity;
 }
 
 export interface MemoryIpcResult<T = undefined> {

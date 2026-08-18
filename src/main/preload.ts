@@ -14,7 +14,6 @@ import {
   CommunityAuthIpc,
   CoworkBootstrapIpc,
   CoworkConfigIpc,
-  CoworkMemoryIpc,
   CoworkPermissionIpc,
   CoworkQueueIpc,
   CoworkSessionIpc,
@@ -502,11 +501,6 @@ contextBridge.exposeInMainWorld('electron', {
     setConfig: (config: {
       workingDirectory?: string;
       executionMode?: 'auto' | 'local' | 'sandbox';
-      memoryEnabled?: boolean;
-      memoryImplicitUpdateEnabled?: boolean;
-      memoryLlmJudgeEnabled?: boolean;
-      memoryGuardLevel?: 'strict' | 'standard' | 'relaxed';
-      memoryUserMemoriesMaxItems?: number;
       permissionMode?: CoworkPermissionMode;
       permissionModeBySession?: Record<string, CoworkPermissionMode>;
       embeddingEnabled?: boolean;
@@ -518,29 +512,6 @@ contextBridge.exposeInMainWorld('electron', {
       embeddingRemoteApiKey?: string;
     }) => ipcRenderer.invoke(CoworkConfigIpc.Set, config),
 
-    listMemoryEntries: (input: {
-      query?: string;
-      status?: 'created' | 'stale' | 'deleted' | 'all';
-      includeDeleted?: boolean;
-      limit?: number;
-      offset?: number;
-    }) => ipcRenderer.invoke(CoworkMemoryIpc.ListEntries, input),
-    createMemoryEntry: (input: {
-      text: string;
-      confidence?: number;
-      isExplicit?: boolean;
-      source?: { sessionId?: string | null; role?: string; date?: string };
-    }) => ipcRenderer.invoke(CoworkMemoryIpc.CreateEntry, input),
-    updateMemoryEntry: (input: {
-      id: string;
-      text?: string;
-      confidence?: number;
-      status?: 'created' | 'stale' | 'deleted';
-      isExplicit?: boolean;
-    }) => ipcRenderer.invoke(CoworkMemoryIpc.UpdateEntry, input),
-    deleteMemoryEntry: (input: { id: string }) =>
-      ipcRenderer.invoke(CoworkMemoryIpc.DeleteEntry, input),
-    getMemoryStats: () => ipcRenderer.invoke(CoworkMemoryIpc.GetStats),
     readBootstrapFile: (filename: string) => ipcRenderer.invoke(CoworkBootstrapIpc.Read, filename),
     writeBootstrapFile: (filename: string, content: string) =>
       ipcRenderer.invoke(CoworkBootstrapIpc.Write, filename, content),
@@ -759,6 +730,8 @@ contextBridge.exposeInMainWorld('electron', {
 
   memory: {
     list: (input?: unknown) => ipcRenderer.invoke(MemoryIpcChannel.List, input),
+    createManual: (input: unknown) => ipcRenderer.invoke(MemoryIpcChannel.CreateManual, input),
+    updateManual: (input: unknown) => ipcRenderer.invoke(MemoryIpcChannel.UpdateManual, input),
     confirmCandidate: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.ConfirmCandidate, id),
     archive: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.Archive, id),
     restore: (id: string) => ipcRenderer.invoke(MemoryIpcChannel.Restore, id),
