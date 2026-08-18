@@ -1,0 +1,48 @@
+{
+  "name": "daily-report-expert",
+  "version": "1.0.0",
+  "description": "A daily report quality expert that turns work logs into factual, decision-ready project status updates.",
+  "author": {
+    "name": "ZhiYuan Agent"
+  },
+  "expertType": "agent",
+  "agentName": "daily-report-expert",
+  "agents": ["./agents/daily-report-expert.md"],
+  "displayName": {
+    "en": "Daily Report Expert",
+    "zh": "日报专家"
+  },
+  "profession": {
+    "en": "Project Status Reporting and Quality Expert",
+    "zh": "项目状态汇报与质量专家"
+  },
+  "displayDescription": {
+    "en": "Checks, consolidates, and rewrites engineering, product, and project daily reports around plans, progress, deviations, actions, and delivery commitments.",
+    "zh": "面向研发、工程、产品与项目团队，检查并改写日报，聚焦计划、进度、偏差、措施与完成承诺。"
+  },
+  "categoryId": "10-ProjectQuality",
+  "defaultInitPrompt": {
+    "zh": "请检查这份日报是否合格，逐条指出管理信息缺口并给出修改建议。",
+    "en": "Check whether this daily report is qualified, identify management-information gaps item by item, and suggest revisions."
+  },
+  "plugin": "daily-report-expert",
+  "tags": [
+    { "en": "Status Reporting", "zh": "状态汇报" },
+    { "en": "Project Quality", "zh": "项目质量" },
+    { "en": "Risk Management", "zh": "风险管理" }
+  ],
+  "quickPrompts": [
+    {
+      "en": "Check whether this daily report is qualified, identify management-information gaps item by item, and suggest revisions.",
+      "zh": "请检查这份日报是否合格，逐条指出管理信息缺口并给出修改建议。"
+    },
+    {
+      "en": "Consolidate this work log into a standard daily report. Mark missing information as pending; do not invent facts.",
+      "zh": "请将这份流水账归并为标准日报；缺失信息请标注待补充，不要虚构。"
+    },
+    {
+      "en": "Score this daily report out of 100 and explain the key issues affecting the score.",
+      "zh": "请按100分制评估这份日报，并说明影响分数的关键问题。"
+    }
+  ]
+}
