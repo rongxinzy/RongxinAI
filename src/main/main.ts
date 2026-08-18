@@ -4171,9 +4171,29 @@ if (!gotTheLock) {
   ipcMain.handle(AgentIpcChannel.ImportExpertPackage, async (_event, expertDir: string) => {
     try {
       const bundledSkillsRoot = getSkillManager().getBundledSkillsRoot();
-      const { parseExpertPackage } = require(
+      const registerExpertModule = require(
         path.join(bundledSkillsRoot, 'zhiyuan-expert-manager', 'scripts', 'register_expert'),
-      );
+      ) as {
+        parseExpertPackage: (...args: unknown[]) => {
+          pluginJson: { name?: unknown; version?: unknown; expertType?: unknown };
+          requests: Array<{
+            id: string;
+            name: string;
+            description: string;
+            systemPrompt: string;
+            identity: string;
+            icon: string;
+            skillIds?: string[];
+          }>;
+          piSyncedFiles?: string[];
+        };
+        upsertExpertRegistry: (options: {
+          registryPath: string;
+          entry: Record<string, unknown>;
+          skipIfWithin?: string[];
+        }) => void;
+      };
+      const { parseExpertPackage, upsertExpertRegistry } = registerExpertModule;
       const dbPath = path.join(app.getPath('userData'), DB_FILENAME);
       const agentManager = getAgentManager();
 
@@ -4182,7 +4202,7 @@ if (!gotTheLock) {
       // preset registry entry is replaced.
       const packageJson = JSON.parse(
         fs.readFileSync(path.join(expertDir, 'plugin.json'), 'utf-8'),
-      ) as { name?: unknown };
+      ) as { name?: unknown; version?: unknown; expertType?: unknown };
       const isUpgrade =
         typeof packageJson.name === 'string' &&
         agentManager.listAgents().some(agent => agent.presetId === packageJson.name);
@@ -4215,30 +4235,25 @@ if (!gotTheLock) {
         }
       }
 
-      // Write to expert-packages/registry.json in userData
+      // Bundled presets are file-sourced (方案A): they never enter the
+      // registry. The single registry service (register_expert.js) enforces
+      // containment server-side, drops stale bundled records idempotently,
+      // and only records user-imported packages.
       const packagesDir = path.join(app.getPath('userData'), 'expert-packages');
       fs.mkdirSync(packagesDir, { recursive: true });
-      const registryPath = path.join(packagesDir, 'registry.json');
-      let registry: { packages: Array<Record<string, unknown>> } = { packages: [] };
-      if (fs.existsSync(registryPath)) {
-        try {
-          registry = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
-          if (!Array.isArray(registry.packages)) registry.packages = [];
-        } catch {
-          registry = { packages: [] };
-        }
-      }
-      registry.packages = registry.packages.filter(p => p.name !== pluginJson.name);
-      registry.packages.push({
-        name: pluginJson.name,
-        version: pluginJson.version,
-        expertType: pluginJson.expertType,
-        path: expertDir,
-        agentIds,
-        piSyncedFiles: piSyncedFiles || [],
-        createdAt: new Date().toISOString(),
+      upsertExpertRegistry({
+        registryPath: path.join(packagesDir, 'registry.json'),
+        entry: {
+          name: pluginJson.name,
+          version: pluginJson.version,
+          expertType: pluginJson.expertType,
+          path: expertDir,
+          agentIds,
+          piSyncedFiles: piSyncedFiles || [],
+          createdAt: new Date().toISOString(),
+        },
+        skipIfWithin: [bundledSkillsRoot],
       });
-      fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2), 'utf-8');
 
       return { success: true, agentIds, expertType: pluginJson.expertType, name: pluginJson.name };
     } catch (error) {
