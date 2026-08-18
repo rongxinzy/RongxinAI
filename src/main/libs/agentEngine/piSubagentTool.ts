@@ -93,6 +93,14 @@ export interface PiSubagentToolDeps {
   getPiAgentsDir(): string;
   /** Team preset id; when set, member agents `<presetId>--<agentId>.md` are exposed. */
   presetId?: string | null;
+  /**
+   * Live bundled member source. When the preset ships inside the app's
+   * bundled SKILLs, member definitions are read from disk per session so
+   * editing a member file takes effect without re-importing; falls back to
+   * the synced pi agents directory when absent or when the preset is a
+   * user-imported package.
+   */
+  loadBundledMembers?: (presetId: string) => SubagentProfile[] | null;
   resolvedModel: PiSubagentResolvedModel;
   workspaceRoot?: string;
   /** Absolute bundled web-search skill directory for researcher subagents. */
@@ -256,7 +264,13 @@ function resolveAgentProfiles(deps: PiSubagentToolDeps): SubagentProfile[] {
     profiles.set(builtin.id, { ...builtin, source: 'builtin' });
   }
   if (deps.presetId) {
-    for (const member of loadMemberProfiles(deps.getPiAgentsDir(), deps.presetId)) {
+    // Bundled presets are file-sourced: prefer the live member definitions
+    // so member edits take effect without re-importing. User-imported
+    // packages keep the synced pi agents files.
+    const bundled =
+      deps.loadBundledMembers?.(deps.presetId) ??
+      loadMemberProfiles(deps.getPiAgentsDir(), deps.presetId);
+    for (const member of bundled) {
       if (member.id === PiSubagentProfileId.ProductionReviewer) continue;
       profiles.set(member.id, member);
     }
