@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
 import electron from 'vite-plugin-electron';
+import { extractExternalDeps } from 'vite-plugin-electron/plugin';
 import renderer from 'vite-plugin-electron-renderer';
 
 import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies.mjs';
@@ -10,6 +11,21 @@ import { ELECTRON_MAIN_EXTERNALS } from './scripts/electron-runtime-dependencies
 // https://vitejs.dev/config/
 const devPort = Number(process.env.VITE_DEV_PORT ?? 5175);
 const katexVersion = process.env.npm_package_dependencies_katex?.replace(/^[~^]/, '') || '0.16.0';
+const packageJson = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, 'package.json'), 'utf8'),
+) as Record<string, unknown>;
+const electronDevelopmentExternalRoots = new Set(extractExternalDeps(packageJson, true));
+const electronReadyPath = path.resolve(__dirname, 'dist-electron/.electron-ready');
+
+function packageRoot(specifier: string): string {
+  return specifier.startsWith('@')
+    ? specifier.split('/').slice(0, 2).join('/')
+    : specifier.split('/')[0];
+}
+
+function isElectronDevelopmentExternal(id: string): boolean {
+  return electronDevelopmentExternalRoots.has(packageRoot(id));
+}
 
 const copyPhotonWasmPlugin = () => ({
   name: 'copy-photon-wasm',
@@ -72,7 +88,10 @@ export default defineConfig(async ({ command }) => {
                     outDir: 'dist-electron',
                     minify: false,
                     rollupOptions: {
-                      external: id => ELECTRON_MAIN_EXTERNALS.includes(id),
+                      external:
+                        command === 'serve'
+                          ? isElectronDevelopmentExternal
+                          : id => ELECTRON_MAIN_EXTERNALS.includes(id),
                       output: {
                         // Keep CJS format (default), but load via ESM loader.mjs
                         inlineDynamicImports: true,
@@ -82,7 +101,7 @@ export default defineConfig(async ({ command }) => {
                 },
                 onstart() {
                   // Signal that the main process bundle is ready for electron to load
-                  fs.writeFileSync('dist-electron/.electron-ready', '');
+                  fs.writeFileSync(electronReadyPath, '');
 
                   // Copy photon-node WASM artifact into dist-electron so pi-coding-agent can load it
                   const wasmSource = path.resolve(
