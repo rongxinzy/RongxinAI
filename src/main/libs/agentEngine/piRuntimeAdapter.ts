@@ -45,6 +45,8 @@ import {
 import { MAX_STALE_PRODUCTION_ITERATIONS } from '../../../shared/productionLoop';
 import {
   WorkbenchContractKind,
+  WorkbenchArtifactCandidateSource,
+  WorkbenchArtifactVerificationStatus,
   WorkbenchRunTrigger,
   WorkbenchTaskStatus,
   type WorkbenchTaskContract,
@@ -806,7 +808,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             getMessages: () => this.store?.getSession(sessionId, 32)?.messages ?? [],
             complete: async messages => {
               const complete = this.getSessionMemoryCompletion(sessionId);
-              if (!complete) throw new Error('The session model is unavailable for memory extraction.');
+              if (!complete)
+                throw new Error('The session model is unavailable for memory extraction.');
               return await complete(messages);
             },
           }),
@@ -822,7 +825,30 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
       if (resourceState.fileToolsEnabled) {
         customTools.push(buildPiDocumentReaderTool({ workspaceRoot }));
-        customTools.push(buildDeclareArtifactTool());
+        customTools.push(
+          buildDeclareArtifactTool({
+            onDeclare: this.workbenchTaskService
+              ? artifact => {
+                  const runId =
+                    this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId;
+                  if (!runId) throw new Error('No active workbench run is available.');
+                  this.workbenchTaskService?.registerArtifact({
+                    sessionId,
+                    runId,
+                    workspaceRoot,
+                    candidate: {
+                      path: artifact.filePath,
+                      source: WorkbenchArtifactCandidateSource.Declaration,
+                      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+                      role: artifact.role,
+                      ...(artifact.title ? { title: artifact.title } : {}),
+                      ...(artifact.kind ? { kind: artifact.kind } : {}),
+                    },
+                  });
+                }
+              : undefined,
+          }),
+        );
       }
 
       // MCP tools: register a single proxy tool (pi-mcp-adapter pattern)
@@ -1192,9 +1218,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? active.requestedSkillIds
         : normalizeSkillIds(options.skillIds);
     const requestedExpertIds =
-      options.expertIds === undefined
-        ? active.requestedExpertIds
-        : explicitExpertIds;
+      options.expertIds === undefined ? active.requestedExpertIds : explicitExpertIds;
     const requestedSessionMode =
       options.sessionMode ??
       (active.workbenchContract.kind === WorkbenchContractKind.Chat
@@ -1935,10 +1959,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
-      additionalSkillPaths: [
-        ...this.resolveZhiyuanSkillDirs(),
-        ...resourceState.expertSkillDirs,
-      ],
+      additionalSkillPaths: [...this.resolveZhiyuanSkillDirs(), ...resourceState.expertSkillDirs],
       skillsOverride: (base: {
         skills: Array<{ name?: string; id?: string }>;
         diagnostics: unknown[];
@@ -2043,13 +2064,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const agent = this.store?.getAgent(expertId);
       const presetId = agent?.presetId?.trim();
       if (!presetId) continue;
-      const dir = path.join(
-        skillsRoot,
-        'zhiyuan-expert-manager',
-        'presets',
-        presetId,
-        'skills',
-      );
+      const dir = path.join(skillsRoot, 'zhiyuan-expert-manager', 'presets', presetId, 'skills');
       if (!dirs.includes(dir) && fs.existsSync(dir)) dirs.push(dir);
     }
     return dirs;
@@ -2083,9 +2098,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const previous = this.pendingMemoryCompletions.get(sessionId) ?? Promise.resolve('');
       const current = previous
         .catch(() => '')
-        .then(() =>
-          this.completeSessionMemory(model, modelRuntime, modelRequestOptions, messages),
-        )
+        .then(() => this.completeSessionMemory(model, modelRuntime, modelRequestOptions, messages))
         .finally(() => {
           if (this.pendingMemoryCompletions.get(sessionId) === current) {
             this.pendingMemoryCompletions.delete(sessionId);
@@ -2390,7 +2403,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             isStreaming: false,
             isFinal: true,
             ...(active.toolStartedAtByCallId.has(event.toolCallId)
-              ? { metrics: { toolDurationMs: Math.max(0, Date.now() - (active.toolStartedAtByCallId.get(event.toolCallId) ?? Date.now())) } }
+              ? {
+                  metrics: {
+                    toolDurationMs: Math.max(
+                      0,
+                      Date.now() -
+                        (active.toolStartedAtByCallId.get(event.toolCallId) ?? Date.now()),
+                    ),
+                  },
+                }
               : {}),
           },
         };
@@ -3247,9 +3268,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // requests) is gated by the baseline checks alone and never needs manual
       // acceptance. The production workflow owns the acceptance gate instead.
       requiresUserAcceptance:
-        sessionMode !== 'chat' &&
-        kind === WorkbenchContractKind.GenericWork &&
-        managedWorkflow,
+        sessionMode !== 'chat' && kind === WorkbenchContractKind.GenericWork && managedWorkflow,
       metadata: {
         productionWorkflowEnabled: managedWorkflow,
         ...(skillIds?.length ? { skillIds } : {}),
