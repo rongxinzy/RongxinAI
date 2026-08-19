@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalEffectStatus,
+  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
@@ -31,6 +32,16 @@ import {
 import { assertRunTransition, assertTaskTransition } from './stateMachine';
 
 const terminalTaskStatuses = new Set<string>(WorkbenchTerminalTaskStatuses);
+
+const artifactSourcePriority: Record<string, number> = {
+  [WorkbenchArtifactCandidateSource.ToolEffect]: 1,
+  [WorkbenchArtifactCandidateSource.DomainWorkflow]: 2,
+  [WorkbenchArtifactCandidateSource.Declaration]: 3,
+  [WorkbenchArtifactCandidateSource.ProductionInspection]: 4,
+};
+
+const getArtifactSourcePriority = (source: unknown): number =>
+  typeof source === 'string' ? (artifactSourcePriority[source] ?? 0) : 0;
 
 const parseJson = <T>(value: string | null, fallback: T): T => {
   if (!value) return fallback;
@@ -351,9 +362,16 @@ export class WorkbenchTaskRepository {
       .get(input.runId, input.reference, input.contentHash) as ArtifactRow | undefined;
     if (existing) {
       const current = this.mapArtifact(existing);
+      const replaceIdentity =
+        getArtifactSourcePriority(input.metadata.source) >=
+        getArtifactSourcePriority(current.metadata.source);
       const replaceEvidence =
         input.verificationStatus !== WorkbenchArtifactVerificationStatus.Pending ||
-        current.verificationStatus === WorkbenchArtifactVerificationStatus.Pending;
+        (current.verificationStatus === WorkbenchArtifactVerificationStatus.Pending &&
+          replaceIdentity);
+      const mergedMetadata = replaceIdentity
+        ? { ...current.metadata, ...input.metadata }
+        : { ...input.metadata, ...current.metadata };
       const updatedAt = Date.now();
       this.db
         .prepare(
@@ -364,7 +382,7 @@ export class WorkbenchTaskRepository {
         .run(
           replaceEvidence ? input.provenance : current.provenance,
           replaceEvidence ? input.verificationStatus : current.verificationStatus,
-          JSON.stringify({ ...current.metadata, ...input.metadata }),
+          JSON.stringify(mergedMetadata),
           updatedAt,
           current.id,
         );

@@ -10,16 +10,24 @@ import {
 } from '../../shared/workbenchTask';
 import { collectWorkbenchArtifacts, resolveWorkspaceFile } from './artifactCollector';
 
-test('accepts relative and absolute workspace files and rejects traversing references', () => {
+test('accepts workspace files while rejecting absolute and relative escapes', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-artifact-outside-'));
   const filePath = path.join(workspace, 'result.md');
+  const dotFilePath = path.join(workspace, '..draft.md');
+  const outsidePath = path.join(outside, 'outside.md');
   fs.writeFileSync(filePath, '# result');
+  fs.writeFileSync(dotFilePath, '# draft');
+  fs.writeFileSync(outsidePath, '# outside');
   try {
     expect(resolveWorkspaceFile(workspace, 'result.md')).toBe(fs.realpathSync(filePath));
     expect(resolveWorkspaceFile(workspace, filePath)).toBe(fs.realpathSync(filePath));
+    expect(resolveWorkspaceFile(workspace, '..draft.md')).toBe(fs.realpathSync(dotFilePath));
+    expect(resolveWorkspaceFile(workspace, outsidePath)).toBeNull();
     expect(resolveWorkspaceFile(workspace, '../outside.md')).toBeNull();
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
   }
 });
 
@@ -89,4 +97,16 @@ test('marks declared files as pending until a workflow verifies them', () => {
   } finally {
     fs.rmSync(workspace, { recursive: true, force: true });
   }
+});
+
+test('uses the final message id in message-block references', () => {
+  const [artifact] = collectWorkbenchArtifacts({
+    taskId: 'task',
+    runId: 'run',
+    workspaceRoot: process.cwd(),
+    finalAnswer: '```artifact:html title="Preview"\n<h1>Hello</h1>\n```',
+    finalMessageId: 'assistant-1',
+  });
+
+  expect(artifact.reference).toBe('message:assistant-1:block:0');
 });
