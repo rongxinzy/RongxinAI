@@ -153,6 +153,7 @@ node scripts/register_expert.js <path/to/expert-dir>
 - `displayDescription.zh` 长度必须为 40-50 字
 - 主文件（单 Agent 主文件、拥有 Skill 的 Team 主理人）必须包含完整「Skill 使用协议（CRITICAL）」段（五项语义）；Team 普通成员豁免
 - 禁止引用 `production_loop` / `commit_plan` / `update_plan_item` / `skip_workflow`，禁止 Markdown 进度清单（进度所有权归运行时）
+- 最终用户验收归 Workbench 所有。专家 Prompt 不得引用 `work_acceptance`，也不得使用模型发起的问题作为最终验收门禁。
 - 半角破折号（`CRITICAL - `）为格式问题：内置预设 strict 模式报错，用户包仅警告
 
 ## 六、行业分类（categoryId）

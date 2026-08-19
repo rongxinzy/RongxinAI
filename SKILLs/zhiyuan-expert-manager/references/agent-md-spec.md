@@ -36,6 +36,7 @@ skills: [{ skill-name }] # 启动时预加载的 Skill（ZhiYuan Agent SKILLs �
 
 - 专家阶段是领域方法，不是第二套任务状态机。生产循环启用时，运行时会要求把适用阶段映射为生产计划项；未启用时，专家直接按需执行。
 - 禁止在专家 Prompt 中直接要求调用 `production_loop`、`commit_plan`、`update_plan_item` 或 `skip_workflow`。
+- 最终用户验收归 Workbench 所有。专家可以定义领域验收标准，但不得引用 `work_acceptance`，也不得通过模型发起的问题请求最终验收。
 - 禁止要求输出或维护 Markdown 勾选清单、TodoQueue、阶段进度表，以及独立的完成或跳过协议。
 - 专家可以规定领域内必须执行的校验与交付标准，但不得覆盖生产循环的规划、复核、修订和交付门禁。
 

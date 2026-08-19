@@ -114,6 +114,7 @@ test('defers persistent state until the model records a start or skip decision',
   expect(controller.getModelState()).toMatchObject({ decision: 'undecided' });
   expect(service.repository.get(run.id)).toBeNull();
   expect(controller.buildInitialPrompt()).toContain('Before any other tool call');
+  expect(controller.buildInitialPrompt()).toContain('Final user acceptance is Workbench-owned');
   expect(controller.onAgentEnd({ next: false })).toMatchObject({ shouldFinish: false });
   expect(service.repository.get(run.id)).toBeNull();
 
@@ -246,6 +247,7 @@ test('describes resumed execution without asking the agent to recommit the plan'
   expect(controller.getState().phase).toBe(ProductionLoopPhase.Execute);
   expect(prompt).toContain('Resume the persisted execution plan');
   expect(prompt).toContain('evidence belongs to this run');
+  expect(prompt).toContain('Final user acceptance is Workbench-owned');
   expect(prompt).not.toContain('Begin by committing an executable plan');
 });
 
