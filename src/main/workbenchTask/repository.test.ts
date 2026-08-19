@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { expect, test } from 'vitest';
 
 import {
+  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactKind,
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
@@ -192,6 +193,54 @@ test('promotes an existing pending artifact when verified evidence arrives', () 
       provenance: WorkbenchArtifactProvenance.Controller,
       verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
       metadata: { role: 'deliverable', verifier: 'production_inspection' },
+    });
+    expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
+  } finally {
+    db.close();
+  }
+});
+
+test('preserves declared identity when pending tool evidence is deduplicated', () => {
+  const { db, repository } = createRepository();
+  try {
+    const task = repository.createTask('session', 'goal', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    const declared = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/markdown',
+      reference: 'result.md',
+      contentHash: 'hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: {
+        source: WorkbenchArtifactCandidateSource.Declaration,
+        role: 'deliverable',
+        title: 'Final report',
+      },
+    });
+
+    const duplicate = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/markdown',
+      reference: 'result.md',
+      contentHash: 'hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: { source: WorkbenchArtifactCandidateSource.ToolEffect },
+    });
+
+    expect(duplicate).toMatchObject({
+      id: declared.id,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: {
+        source: WorkbenchArtifactCandidateSource.Declaration,
+        role: 'deliverable',
+        title: 'Final report',
+      },
     });
     expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
   } finally {

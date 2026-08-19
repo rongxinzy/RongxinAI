@@ -853,3 +853,66 @@ test('startup recovery marks a verifying run for review', () => {
     db.close();
   }
 });
+
+test('keeps declared artifact identity scoped to its run after tool-effect collection', async () => {
+  const { db, service } = createService();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-run-artifact-'));
+  const filePath = path.join(workspace, 'result.md');
+  fs.writeFileSync(filePath, '# result');
+  try {
+    const first = service.beginRun({
+      sessionId: 'session',
+      goal: 'write a report',
+      contract: chatContract,
+    });
+    service.registerArtifact({
+      sessionId: 'session',
+      runId: first.run.id,
+      workspaceRoot: workspace,
+      candidate: {
+        path: filePath,
+        role: 'deliverable',
+        title: 'Final report',
+        source: WorkbenchArtifactCandidateSource.Declaration,
+      },
+    });
+    await service.authorizeToolCall({
+      sessionId: 'session',
+      runId: first.run.id,
+      toolCallId: 'write-call',
+      toolName: 'write',
+      toolInput: { path: filePath, content: '# result' },
+      autoApprove: true,
+    });
+    service.recordToolResult(first.run.id, 'write-call', { path: filePath }, false);
+
+    const completed = service.completeRun({
+      sessionId: 'session',
+      runId: first.run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'done',
+    });
+    expect(completed.artifacts).toHaveLength(1);
+    expect(completed.artifacts[0].metadata).toMatchObject({
+      role: 'deliverable',
+      title: 'Final report',
+      source: WorkbenchArtifactCandidateSource.Declaration,
+    });
+
+    const second = service.beginRun({
+      sessionId: 'session',
+      goal: 'answer without a file',
+      contract: chatContract,
+    });
+    const nextCompleted = service.completeRun({
+      sessionId: 'session',
+      runId: second.run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'done',
+    });
+    expect(nextCompleted.artifacts).toHaveLength(0);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
