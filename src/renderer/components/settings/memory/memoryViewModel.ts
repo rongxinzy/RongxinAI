@@ -2,6 +2,7 @@ import {
   MemoryDeliveryStatus,
   MemoryLifecycleStatus,
   MemoryScope,
+  MemorySummaryFormat,
   type ManagedMemoryRecord,
 } from '../../../../shared/memory';
 import {
@@ -45,6 +46,14 @@ export function collectMemorySourceSessionIds(records: ManagedMemoryRecord[]): s
     }
   }
   return Array.from(sessionIds);
+}
+
+export function isLegacySessionSummaryAwaitingUpgrade(record: ManagedMemoryRecord): boolean {
+  return (
+    record.scope === MemoryScope.Session &&
+    record.status === MemoryLifecycleStatus.Active &&
+    record.summaryFormat === MemorySummaryFormat.Legacy
+  );
 }
 
 export function filterAndSortManagedMemories(

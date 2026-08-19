@@ -74,7 +74,9 @@ import type {
   SessionMemoryCompletion,
   SessionMemoryCompletionMessage,
 } from '../../memory/sessionMemoryExtractor';
+import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { SessionSummaryService } from '../../memory/sessionSummaryService';
+import type { SessionSummaryBackfillService } from '../../memory/sessionSummaryBackfillService';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -100,6 +102,11 @@ import {
   type PiAskUserQuestionResponse,
 } from './piAskUserQuestion';
 import { PiAgentLoopController, PiAgentLoopMode } from './piAgentLoop';
+import {
+  buildPiBackgroundCompletionContext,
+  extractPiBackgroundCompletionText,
+  type PiBackgroundCompletionResult,
+} from './piBackgroundCompletion';
 import { buildPiConversationPrompt } from './piConversationContext';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
@@ -314,9 +321,9 @@ interface PiModules {
   };
   completeSimple: (
     model: unknown,
-    context: { messages: Array<{ role: string; content: string }> },
+    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
     options?: { apiKey?: string },
-  ) => Promise<{ content: Array<{ text: string }> }>;
+  ) => Promise<PiBackgroundCompletionResult>;
 }
 
 interface PiResourceLoader {
@@ -349,8 +356,8 @@ interface PiModelRuntime {
   getModel(provider: string, modelId: string): unknown;
   completeSimple?(
     model: unknown,
-    context: { messages: Array<{ role: string; content: string }> },
-  ): Promise<{ content: Array<{ text: string }> }>;
+    context: ReturnType<typeof buildPiBackgroundCompletionContext>,
+  ): Promise<PiBackgroundCompletionResult>;
 }
 
 interface PiModelRuntimeCreateOptions {
@@ -439,7 +446,7 @@ async function getPiModules(): Promise<PiModules> {
               .SettingsManager as PiModules['SettingsManager'])
           : undefined,
         getAgentDir: codingAgent.getAgentDir as PiModules['getAgentDir'],
-        ModelRuntime: codingAgent.ModelRuntime as PiModules['ModelRuntime'],
+        ModelRuntime: codingAgent.ModelRuntime as unknown as PiModules['ModelRuntime'],
         // getModel is the current API (deprecated but functional); will migrate to createModels() later
         getModel: compat.getModel as unknown as PiModules['getModel'],
         completeSimple: compat.completeSimple as unknown as PiModules['completeSimple'],
@@ -515,6 +522,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
+  private sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
   private legacyMemoryMigrationService: LegacyMemoryMigrationService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
@@ -539,6 +547,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setSessionSummaryService(service: SessionSummaryService): void {
     this.sessionSummaryService = service;
+  }
+  setSessionSummaryBackfillService(service: SessionSummaryBackfillService): void {
+    this.sessionSummaryBackfillService = service;
   }
   setLegacyMemoryMigrationService(service: LegacyMemoryMigrationService): void {
     this.legacyMemoryMigrationService = service;
@@ -2078,16 +2089,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   async chatDirect(prompt: string, modelId?: string): Promise<string> {
     const pi = await getPiModules();
     const resolvedModel = await resolvePiModel(pi, modelId);
+    const context = buildPiBackgroundCompletionContext([
+      { role: SessionMemoryCompletionRole.User, content: prompt },
+    ]);
     const result = resolvedModel.modelRuntime?.completeSimple
-      ? await resolvedModel.modelRuntime.completeSimple(resolvedModel.model, {
-          messages: [{ role: 'user', content: prompt }],
-        })
-      : await pi.completeSimple(
-          resolvedModel.model,
-          { messages: [{ role: 'user', content: prompt }] },
-          resolvedModel.requestOptions,
-        );
-    return extractPiCompletionText(result);
+      ? await resolvedModel.modelRuntime.completeSimple(resolvedModel.model, context)
+      : await pi.completeSimple(resolvedModel.model, context, resolvedModel.requestOptions);
+    return extractPiBackgroundCompletionText(result);
   }
 
   private createSessionMemoryCompletion(active: ActivePiSession): SessionMemoryCompletion {
@@ -2138,6 +2146,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
       }
     }
+    if (this.sessionSummaryBackfillService) {
+      try {
+        await this.sessionSummaryBackfillService.run(complete);
+      } catch (error) {
+        console.warn('[SessionSummaryBackfill] Failed to run semantic backfill:', error);
+      }
+    }
   }
 
   private async completeSessionMemory(
@@ -2147,11 +2162,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     messages: readonly SessionMemoryCompletionMessage[],
   ): Promise<string> {
     const pi = await getPiModules();
-    const context = { messages: messages.map(message => ({ ...message })) };
+    const context = buildPiBackgroundCompletionContext(messages);
     const result = modelRuntime?.completeSimple
       ? await modelRuntime.completeSimple(model, context)
       : await pi.completeSimple(model, context, modelRequestOptions);
-    return extractPiCompletionText(result);
+    return extractPiBackgroundCompletionText(result);
   }
 
   // ── Private: event mapping ──
@@ -3289,19 +3304,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       },
     };
   }
-}
-
-function extractPiCompletionText(result: { content: unknown[] }): string {
-  return result.content
-    .filter(
-      (content): content is { text: string } =>
-        typeof content === 'object' &&
-        content !== null &&
-        'text' in content &&
-        typeof content.text === 'string',
-    )
-    .map(content => content.text)
-    .join('');
 }
 
 // ── Provider resolution ──
