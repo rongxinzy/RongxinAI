@@ -39,6 +39,12 @@ test('all production loop control actions bypass user approval', () => {
   }
 });
 
+test('artifact declarations bypass user approval', () => {
+  expect(
+    classifyWorkbenchToolRisk('declare_artifact', { filePath: 'D:/workspace/report.md' }),
+  ).toBe(WorkbenchApprovalRiskLevel.ReadOnly);
+});
+
 test('only explicitly read-only shell commands qualify for allow-all auto approval', () => {
   expect(isSafeShellCommand('cd "C:/project" && ls -la')).toBe(true);
   expect(isSafeShellCommand("python -c \"open('out.txt', 'w').write('x')\"")).toBe(false);

@@ -10,6 +10,7 @@ const internalControlTools = new Set([
   'work_acceptance',
   'workflow_state',
   'research_state',
+  'declare_artifact',
 ]);
 const reversibleTools = new Set(['write', 'edit']);
 const irreversibleShellPattern =
