@@ -6,6 +6,7 @@ import {
   MemoryLifecycleStatus,
   MemoryScope,
   MemorySourceKind,
+  MemorySummaryFormat,
 } from '../../shared/memory';
 import {
   MemoryExtractorKind,
@@ -14,6 +15,81 @@ import {
   PERSONAL_MEMORY_SESSION_PREFIX,
 } from './constants';
 import { MemoryRepository } from './repository';
+
+test('selects only active legacy session summaries for semantic backfill', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    repository.createLink({
+      id: 'legacy-summary',
+      memoryId: 1,
+      projectId: 'project-a',
+      scope: MemoryScope.Session,
+      sessionId: 'session-a',
+      sourceKind: MemorySourceKind.SessionSummary,
+      title: 'Session summary',
+      content: 'Copied conversation history',
+      kind: MemoryKind.SessionSummary,
+    });
+    repository.createLink({
+      id: 'semantic-summary',
+      memoryId: 2,
+      projectId: 'project-a',
+      scope: MemoryScope.Session,
+      sessionId: 'session-b',
+      sourceKind: MemorySourceKind.SessionSummary,
+      title: 'Session summary',
+      content: 'Semantic session memory (v1)',
+      kind: MemoryKind.SessionSummary,
+      metadata: {
+        extractorVersion: 1,
+        sourceMessageIds: ['message-a'],
+        digest: {
+          shouldSave: true,
+          goal: { text: 'Goal' },
+          currentState: { text: 'Done' },
+        },
+      },
+    });
+
+    expect(repository.listSessionSummaryBackfillRecords()).toEqual([
+      expect.objectContaining({
+        memory: expect.objectContaining({
+          id: 'legacy-summary',
+          summaryFormat: MemorySummaryFormat.Legacy,
+        }),
+      }),
+    ]);
+    expect(repository.getLink('semantic-summary')).toMatchObject({
+      summaryFormat: MemorySummaryFormat.Semantic,
+    });
+  } finally {
+    db.close();
+  }
+});
+
+test('finds a pending operation by stable replacement link id', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    repository.enqueue(
+      MemoryOutboxOperation.SessionSummary,
+      { content: 'Semantic replacement' },
+      'stable-link',
+    );
+
+    expect(
+      repository.findPendingByLinkId('stable-link', MemoryOutboxOperation.SessionSummary),
+    ).toMatchObject({ linkId: 'stable-link', operation: MemoryOutboxOperation.SessionSummary });
+    expect(
+      repository.findPendingByLinkId('missing-link', MemoryOutboxOperation.SessionSummary),
+    ).toBeNull();
+  } finally {
+    db.close();
+  }
+});
 
 test('creates the link and outbox schema without importing the memory kernel database', () => {
   const exec = vi.fn();
@@ -173,11 +249,7 @@ test('deleting a candidate also cancels its pending outbox delivery', () => {
       content: 'Use compact tables.',
       kind: MemoryKind.Preference,
     });
-    repository.enqueue(
-      MemoryOutboxOperation.Confirm,
-      { linkId: candidateId },
-      candidateId,
-    );
+    repository.enqueue(MemoryOutboxOperation.Confirm, { linkId: candidateId }, candidateId);
 
     expect(repository.listPending()).toHaveLength(1);
     repository.deleteCandidate(candidateId);

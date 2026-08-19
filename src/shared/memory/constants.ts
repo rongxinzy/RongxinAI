@@ -14,6 +14,13 @@ export const MemoryKind = {
 
 export type MemoryKind = (typeof MemoryKind)[keyof typeof MemoryKind];
 
+export const MemorySummaryFormat = {
+  Semantic: 'semantic',
+  Legacy: 'legacy',
+} as const;
+
+export type MemorySummaryFormat = (typeof MemorySummaryFormat)[keyof typeof MemorySummaryFormat];
+
 export const MemoryLifecycleStatus = {
   Active: 'active',
   NeedsReview: 'needs_review',

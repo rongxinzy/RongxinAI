@@ -6,6 +6,7 @@ import {
   MemoryLifecycleStatus,
   MemoryScope,
   MemorySensitivity,
+  MemorySummaryFormat,
   MemorySourceKind,
   type ManagedMemoryRecord,
 } from '../../../../shared/memory';
@@ -18,6 +19,7 @@ import {
   collectMemorySourceSessionIds,
   countManagedMemories,
   filterAndSortManagedMemories,
+  isLegacySessionSummaryAwaitingUpgrade,
 } from './memoryViewModel';
 
 function record(id: string, overrides: Partial<ManagedMemoryRecord> = {}): ManagedMemoryRecord {
@@ -85,6 +87,34 @@ test('collects current and promotion source session ids without duplicates', () 
       }),
     ]),
   ).toEqual(['session-a', 'session-b']);
+});
+
+test('marks only active legacy session summaries as awaiting upgrade', () => {
+  expect(
+    isLegacySessionSummaryAwaitingUpgrade(
+      record('legacy', {
+        scope: MemoryScope.Session,
+        summaryFormat: MemorySummaryFormat.Legacy,
+      }),
+    ),
+  ).toBe(true);
+  expect(
+    isLegacySessionSummaryAwaitingUpgrade(
+      record('semantic', {
+        scope: MemoryScope.Session,
+        summaryFormat: MemorySummaryFormat.Semantic,
+      }),
+    ),
+  ).toBe(false);
+  expect(
+    isLegacySessionSummaryAwaitingUpgrade(
+      record('superseded', {
+        scope: MemoryScope.Session,
+        status: MemoryLifecycleStatus.Superseded,
+        summaryFormat: MemorySummaryFormat.Legacy,
+      }),
+    ),
+  ).toBe(false);
 });
 
 test('filters by scope, lifecycle group, and searchable identifiers', () => {

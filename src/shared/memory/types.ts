@@ -4,6 +4,7 @@ import {
   type MemoryDeliveryStatus,
   type MemoryLifecycleStatus,
   type MemorySensitivity,
+  type MemorySummaryFormat,
   type MemorySourceKind,
 } from './constants';
 
@@ -35,6 +36,7 @@ export interface ManagedMemoryRecord {
   updatedAt: string;
   deliveryStatus: MemoryDeliveryStatus | null;
   deliveryError: string | null;
+  summaryFormat?: MemorySummaryFormat | null;
 }
 
 export interface ManagedMemoryListInput {

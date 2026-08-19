@@ -76,6 +76,7 @@ import type {
 } from '../../memory/sessionMemoryExtractor';
 import { SessionMemoryCompletionRole } from '../../memory/sessionMemoryExtractor';
 import type { SessionSummaryService } from '../../memory/sessionSummaryService';
+import type { SessionSummaryBackfillService } from '../../memory/sessionSummaryBackfillService';
 import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
@@ -521,6 +522,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private workbenchTaskService: WorkbenchTaskService | null = null;
   private projectMemoryService: ProjectMemoryService | null = null;
   private sessionSummaryService: SessionSummaryService | null = null;
+  private sessionSummaryBackfillService: SessionSummaryBackfillService | null = null;
   private legacyMemoryMigrationService: LegacyMemoryMigrationService | null = null;
   private conversationHistoryService: ConversationHistoryService | null = null;
   private readonly initializingSessions = new Map<string, InitializingPiSession>();
@@ -545,6 +547,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   }
   setSessionSummaryService(service: SessionSummaryService): void {
     this.sessionSummaryService = service;
+  }
+  setSessionSummaryBackfillService(service: SessionSummaryBackfillService): void {
+    this.sessionSummaryBackfillService = service;
   }
   setLegacyMemoryMigrationService(service: LegacyMemoryMigrationService): void {
     this.legacyMemoryMigrationService = service;
@@ -2139,6 +2144,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         await this.sessionSummaryService.rollup({ sessionId, workingDirectory, complete });
       } catch (error) {
         console.warn(`[SessionSummary] Failed to roll up session ${sessionId}:`, error);
+      }
+    }
+    if (this.sessionSummaryBackfillService) {
+      try {
+        await this.sessionSummaryBackfillService.run(complete);
+      } catch (error) {
+        console.warn('[SessionSummaryBackfill] Failed to run semantic backfill:', error);
       }
     }
   }
