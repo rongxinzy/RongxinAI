@@ -6,6 +6,7 @@ import {
   MemoryLifecycleStatus,
   MemoryScope,
   MemorySensitivity,
+  MemorySummaryFormat,
   PERSONAL_MEMORY_PROJECT_ID,
   type MemoryKind,
 } from '../../shared/memory';
@@ -389,6 +390,19 @@ export class MemoryRepository {
     return rows.map(mapOutbox);
   }
 
+  findPendingByLinkId(linkId: string, operation: MemoryOutboxOperation): MemoryOutboxItem | null {
+    const row = this.db
+      .prepare(
+        `SELECT id, link_id, operation, payload_json, status, attempts, available_at, last_error
+         FROM memory_outbox
+         WHERE link_id = ? AND operation = ? AND status = ?
+         ORDER BY created_at ASC
+         LIMIT 1`,
+      )
+      .get(linkId, operation, MemoryOutboxStatus.Pending) as MemoryOutboxRow | undefined;
+    return row ? mapOutbox(row) : null;
+  }
+
   markCompleted(id: string): void {
     this.db
       .prepare(
@@ -486,6 +500,26 @@ export class MemoryRepository {
         promotedFromLinkId: nullableString(row.promoted_from_link_id),
       })),
     ];
+  }
+
+  listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
+    this.expireDue();
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM memory_links
+         WHERE status = ? AND scope = ?
+         ORDER BY created_at`,
+      )
+      .all(MemoryLifecycleStatus.Active, MemoryScope.Session) as SqlRow[];
+    return rows
+      .filter(row => !isCurrentSemanticSessionMetadata(parseMetadata(row.metadata_json)))
+      .map<MemoryMigrationRecord>(row => ({
+        memory: mapLink(row, this.getDelivery(String(row.id))),
+        storageKind: MemoryRecordStorageKind.Link,
+        metadata: parseMetadata(row.metadata_json),
+        supersedesLinkId: null,
+        promotedFromLinkId: nullableString(row.promoted_from_link_id),
+      }));
   }
 
   updateMigrationRecordMetadata(
@@ -818,6 +852,7 @@ function mapRecord(
   projectId: string,
   scope: string,
 ): ManagedMemoryRecord {
+  const metadata = parseMetadata(row.metadata_json);
   return {
     id: String(row.id),
     memoryId,
@@ -846,6 +881,12 @@ function mapRecord(
     updatedAt: String(row.updated_at),
     deliveryStatus: delivery ? (delivery.status as ManagedMemoryRecord['deliveryStatus']) : null,
     deliveryError: delivery?.error ?? null,
+    summaryFormat:
+      scope === MemoryScope.Session
+        ? isCurrentSemanticSessionMetadata(metadata)
+          ? MemorySummaryFormat.Semantic
+          : MemorySummaryFormat.Legacy
+        : null,
   };
 }
 
