@@ -285,8 +285,17 @@ export class WorkbenchTaskService extends EventEmitter {
       .listApprovalsForRun(run.id)
       .filter(approval => approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded)
       .flatMap(approval => {
+        const resultDetails =
+          approval.result?.details && typeof approval.result.details === 'object'
+            ? (approval.result.details as Record<string, unknown>)
+            : {};
         const pathValue =
-          approval.request.path ?? approval.request.file_path ?? approval.request.filePath;
+          approval.request.path ??
+          approval.request.file_path ??
+          approval.request.filePath ??
+          resultDetails.path ??
+          resultDetails.file_path ??
+          resultDetails.filePath;
         return typeof pathValue === 'string'
           ? [
               {

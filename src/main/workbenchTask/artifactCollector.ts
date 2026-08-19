@@ -35,23 +35,23 @@ const mimeForPath = (filePath: string): string => {
   return mapping[extension] || 'application/octet-stream';
 };
 
+const isOutside = (root: string, target: string): boolean => {
+  const relative = path.relative(root, target);
+  return relative.split(path.sep)[0] === '..' || path.isAbsolute(relative);
+};
+
 const resolveWorkspaceFile = (workspaceRoot: string, reference: string): string | null => {
   if (!reference.trim()) return null;
   const root = path.resolve(workspaceRoot);
   const lexical = path.isAbsolute(reference)
     ? path.normalize(reference)
     : path.resolve(root, reference);
-  const relative = path.relative(root, lexical);
-  if (relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(lexical))
-    return null;
+  if (isOutside(root, lexical) || !fs.existsSync(lexical)) return null;
   try {
     const resolvedRoot = fs.realpathSync(root);
     const resolved = fs.realpathSync(lexical);
-    const realRelative = path.relative(resolvedRoot, resolved);
     const stat = fs.statSync(resolved);
-    return realRelative.startsWith('..') || path.isAbsolute(realRelative) || !stat.isFile()
-      ? null
-      : resolved;
+    return isOutside(resolvedRoot, resolved) || !stat.isFile() ? null : resolved;
   } catch {
     return null;
   }
