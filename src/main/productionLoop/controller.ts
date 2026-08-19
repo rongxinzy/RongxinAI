@@ -2,6 +2,7 @@ import {
   ProductionLoopPhase,
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
+  type ProductionArtifactEvidence,
   type ProductionLoopState,
 } from '../../shared/productionLoop';
 import type { WorkbenchContractKind, WorkbenchJsonObject } from '../../shared/workbenchTask';
@@ -415,6 +416,19 @@ export class ProductionLoopController {
       inspections: this.state.inspections.length,
       revisions: this.state.revisions.length,
     };
+  }
+
+  getReviewedArtifacts(): ProductionArtifactEvidence[] {
+    this.refreshIfStarted();
+    if (
+      !this.state ||
+      this.state.phase !== ProductionLoopPhase.Deliver ||
+      !this.state.critic.passed
+    ) {
+      return [];
+    }
+    const latestInspection = this.state.inspections[this.state.inspections.length - 1];
+    return latestInspection ? structuredClone(latestInspection.artifacts) : [];
   }
 
   private activate(): ProductionLoopState {

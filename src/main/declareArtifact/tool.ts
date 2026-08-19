@@ -13,9 +13,22 @@ type DeclareArtifactToolResult = {
   details: Record<string, unknown>;
 };
 
+export interface DeclaredArtifactInput {
+  filePath: string;
+  title?: string;
+  kind?: string;
+  role: 'intermediate' | 'deliverable';
+}
+
+export interface DeclareArtifactToolOptions {
+  onDeclare?: (artifact: DeclaredArtifactInput) => void | Promise<void>;
+}
+
 const text = (value: unknown): string => (typeof value === 'string' ? value.trim() : '');
 
-export function buildDeclareArtifactTool(): Record<string, unknown> {
+export function buildDeclareArtifactTool(
+  options: DeclareArtifactToolOptions = {},
+): Record<string, unknown> {
   return {
     name: DeclareArtifactToolName,
     label: 'Declare Artifact',
@@ -69,6 +82,20 @@ export function buildDeclareArtifactTool(): Record<string, unknown> {
       const title = text(params.title);
       const kind = text(params.kind);
       const fileName = filePath.split(/[/\\]/).pop() || filePath;
+      try {
+        await options.onDeclare?.({
+          filePath,
+          role,
+          ...(title ? { title } : {}),
+          ...(kind ? { kind } : {}),
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: 'text', text: `Artifact declaration failed: ${message}` }],
+          details: { filePath, role, error: message },
+        };
+      }
       return {
         content: [
           {

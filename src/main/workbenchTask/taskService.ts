@@ -6,6 +6,8 @@ import {
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalRiskLevel,
+  WorkbenchArtifactCandidateSource,
+  WorkbenchArtifactVerificationStatus,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
   WorkbenchRunTrigger,
@@ -13,6 +15,8 @@ import {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
   type WorkbenchApproval,
+  type WorkbenchArtifact,
+  type WorkbenchArtifactCandidate,
   type WorkbenchApprovalResponseInput,
   type WorkbenchJsonObject,
   type WorkbenchRun,
@@ -102,6 +106,43 @@ export class WorkbenchTaskService extends EventEmitter {
 
   listForSession(sessionId: string): WorkbenchTask[] {
     return this.repository.listTasksForSession(sessionId);
+  }
+
+  registerArtifact(input: {
+    sessionId: string;
+    runId: string;
+    workspaceRoot: string;
+    candidate: WorkbenchArtifactCandidate;
+  }): WorkbenchArtifact {
+    const run = this.requireRun(input.runId);
+    const task = this.requireTask(run.taskId);
+    if (task.sessionId !== input.sessionId || task.activeRunId !== run.id) {
+      throw new Error('The artifact does not belong to the active task run.');
+    }
+    if (run.status !== WorkbenchRunStatus.Running) {
+      throw new Error('Artifacts can only be registered while the task run is active.');
+    }
+    const [artifact] = collectWorkbenchArtifacts({
+      taskId: task.id,
+      runId: run.id,
+      workspaceRoot: input.workspaceRoot,
+      finalAnswer: '',
+      artifactCandidates: [input.candidate],
+    });
+    if (!artifact) {
+      throw new Error('The artifact path must resolve to a file inside the workspace.');
+    }
+    const registered = this.repository.transaction(() => {
+      const stored = this.repository.addArtifact(artifact);
+      this.repository.appendRunEvent(run.id, WorkbenchRunEventType.ArtifactRegistered, {
+        artifactId: stored.id,
+        reference: stored.reference,
+        source: input.candidate.source,
+      });
+      return stored;
+    });
+    this.emitChanged(task);
+    return registered;
   }
 
   private withProductionPlan(detail: WorkbenchTaskDetail | null): WorkbenchTaskDetail | null {
@@ -222,6 +263,7 @@ export class WorkbenchTaskService extends EventEmitter {
     finalMessageId?: string | null;
     workflowCompleted?: boolean;
     workflowSnapshot?: Record<string, unknown> | null;
+    artifactCandidates?: WorkbenchArtifactCandidate[];
     streamClosedCleanly?: boolean;
   }): WorkbenchTaskDetail {
     const run = this.requireRun(input.runId);
@@ -239,16 +281,23 @@ export class WorkbenchTaskService extends EventEmitter {
       workflowSnapshot: input.workflowSnapshot,
     };
     const result = verifyWorkbenchRun(verificationContext);
-    const toolArtifacts = this.repository
+    const toolArtifactCandidates: WorkbenchArtifactCandidate[] = this.repository
       .listApprovalsForRun(run.id)
       .filter(approval => approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded)
       .flatMap(approval => {
         const pathValue =
           approval.request.path ?? approval.request.file_path ?? approval.request.filePath;
         return typeof pathValue === 'string'
-          ? [{ path: pathValue, toolName: approval.toolName, toolCallId: approval.toolCallId }]
+          ? [
+              {
+                path: pathValue,
+                source: WorkbenchArtifactCandidateSource.ToolEffect,
+                verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+              },
+            ]
           : [];
       });
+    const artifactCandidates = [...toolArtifactCandidates, ...(input.artifactCandidates ?? [])];
     this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Verifying);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationStarted);
@@ -259,7 +308,7 @@ export class WorkbenchTaskService extends EventEmitter {
         finalAnswer: input.finalAnswer,
         finalMessageId: input.finalMessageId,
         workflowSnapshot: input.workflowSnapshot,
-        toolArtifacts,
+        artifactCandidates,
       })) {
         this.repository.addArtifact(artifact);
       }

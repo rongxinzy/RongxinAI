@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalEffectStatus,
+  WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunStatus,
@@ -15,7 +16,6 @@ import {
   type WorkbenchArtifact,
   type WorkbenchArtifactKind,
   type WorkbenchArtifactProvenance,
-  type WorkbenchArtifactVerificationStatus,
   type WorkbenchJsonObject,
   type WorkbenchRun,
   type WorkbenchRunContext,
@@ -349,7 +349,31 @@ export class WorkbenchTaskRepository {
          WHERE run_id = ? AND reference = ? AND content_hash = ?`,
       )
       .get(input.runId, input.reference, input.contentHash) as ArtifactRow | undefined;
-    if (existing) return this.mapArtifact(existing);
+    if (existing) {
+      const current = this.mapArtifact(existing);
+      const replaceEvidence =
+        input.verificationStatus !== WorkbenchArtifactVerificationStatus.Pending ||
+        current.verificationStatus === WorkbenchArtifactVerificationStatus.Pending;
+      const updatedAt = Date.now();
+      this.db
+        .prepare(
+          `UPDATE workbench_artifacts
+           SET provenance = ?, verification_status = ?, metadata_json = ?, updated_at = ?
+           WHERE id = ?`,
+        )
+        .run(
+          replaceEvidence ? input.provenance : current.provenance,
+          replaceEvidence ? input.verificationStatus : current.verificationStatus,
+          JSON.stringify({ ...current.metadata, ...input.metadata }),
+          updatedAt,
+          current.id,
+        );
+      return this.mapArtifact(
+        this.db
+          .prepare('SELECT * FROM workbench_artifacts WHERE id = ?')
+          .get(current.id) as ArtifactRow,
+      );
+    }
     const now = Date.now();
     const id = randomUUID();
     this.db

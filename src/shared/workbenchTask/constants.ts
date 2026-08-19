@@ -107,6 +107,15 @@ export const WorkbenchArtifactProvenance = {
 export type WorkbenchArtifactProvenance =
   (typeof WorkbenchArtifactProvenance)[keyof typeof WorkbenchArtifactProvenance];
 
+export const WorkbenchArtifactCandidateSource = {
+  Declaration: 'declaration',
+  ToolEffect: 'tool_effect',
+  DomainWorkflow: 'domain_workflow',
+  ProductionInspection: 'production_inspection',
+} as const;
+export type WorkbenchArtifactCandidateSource =
+  (typeof WorkbenchArtifactCandidateSource)[keyof typeof WorkbenchArtifactCandidateSource];
+
 export const WorkbenchArtifactVerificationStatus = {
   Pending: 'pending',
   Verified: 'verified',
@@ -133,6 +142,7 @@ export const WorkbenchRunEventType = {
   HarnessActivation: 'harness_activation',
   HarnessFailure: 'harness_failure',
   HarnessQualityMeasured: 'harness_quality_measured',
+  ArtifactRegistered: 'artifact_registered',
 } as const;
 export type WorkbenchRunEventType =
   (typeof WorkbenchRunEventType)[keyof typeof WorkbenchRunEventType];
