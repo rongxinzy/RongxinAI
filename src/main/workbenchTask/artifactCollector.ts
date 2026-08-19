@@ -3,11 +3,13 @@ import fs from 'fs';
 import path from 'path';
 
 import {
+  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactKind,
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   discoverWorkbenchMessageArtifactBlocks,
   type WorkbenchArtifact,
+  type WorkbenchArtifactCandidate,
 } from '../../shared/workbenchTask';
 
 type ArtifactInput = Omit<WorkbenchArtifact, 'id' | 'createdAt' | 'updatedAt'>;
@@ -34,13 +36,16 @@ const mimeForPath = (filePath: string): string => {
 };
 
 const resolveWorkspaceFile = (workspaceRoot: string, reference: string): string | null => {
-  if (!reference.trim() || path.isAbsolute(reference)) return null;
-  const lexical = path.resolve(workspaceRoot, reference);
-  const relative = path.relative(workspaceRoot, lexical);
+  if (!reference.trim()) return null;
+  const root = path.resolve(workspaceRoot);
+  const lexical = path.isAbsolute(reference)
+    ? path.normalize(reference)
+    : path.resolve(root, reference);
+  const relative = path.relative(root, lexical);
   if (relative.startsWith('..') || path.isAbsolute(relative) || !fs.existsSync(lexical))
     return null;
   try {
-    const resolvedRoot = fs.realpathSync(workspaceRoot);
+    const resolvedRoot = fs.realpathSync(root);
     const resolved = fs.realpathSync(lexical);
     const realRelative = path.relative(resolvedRoot, resolved);
     const stat = fs.statSync(resolved);
@@ -59,7 +64,7 @@ export function collectWorkbenchArtifacts(input: {
   finalAnswer: string;
   finalMessageId?: string | null;
   workflowSnapshot?: Record<string, unknown> | null;
-  toolArtifacts?: Array<Record<string, unknown>>;
+  artifactCandidates?: WorkbenchArtifactCandidate[];
 }): ArtifactInput[] {
   const artifacts: ArtifactInput[] = [];
   for (const block of discoverWorkbenchMessageArtifactBlocks(input.finalAnswer)) {
@@ -78,30 +83,47 @@ export function collectWorkbenchArtifacts(input: {
     });
   }
 
-  const snapshotFiles: Array<{
-    value: unknown;
-    provenance: WorkbenchArtifactProvenance;
-  }> = [
+  const snapshotFiles: WorkbenchArtifactCandidate[] = [
     ...(Array.isArray(input.workflowSnapshot?.files) ? input.workflowSnapshot.files : []).map(
-      value => ({ value, provenance: WorkbenchArtifactProvenance.Controller }),
+      value => ({
+        ...(value && typeof value === 'object' ? (value as Record<string, unknown>) : {}),
+        path:
+          value &&
+          typeof value === 'object' &&
+          typeof (value as Record<string, unknown>).path === 'string'
+            ? String((value as Record<string, unknown>).path)
+            : '',
+        source: WorkbenchArtifactCandidateSource.DomainWorkflow,
+        verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+      }),
     ),
     ...(Array.isArray(input.workflowSnapshot?.artifacts)
       ? input.workflowSnapshot.artifacts
       : []
-    ).map(value => ({ value, provenance: WorkbenchArtifactProvenance.Controller })),
-    ...(input.toolArtifacts ?? []).map(value => ({
-      value,
-      provenance: WorkbenchArtifactProvenance.Workspace,
+    ).map(value => ({
+      ...(value && typeof value === 'object' ? (value as Record<string, unknown>) : {}),
+      path:
+        value &&
+        typeof value === 'object' &&
+        typeof (value as Record<string, unknown>).path === 'string'
+          ? String((value as Record<string, unknown>).path)
+          : '',
+      source: WorkbenchArtifactCandidateSource.DomainWorkflow,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
     })),
+    ...(input.artifactCandidates ?? []),
   ];
-  for (const { value, provenance } of snapshotFiles) {
-    if (!value || typeof value !== 'object') continue;
-    const record = value as Record<string, unknown>;
-    const reference = typeof record.path === 'string' ? record.path : '';
+  for (const candidate of snapshotFiles) {
+    const reference = candidate.path;
     const resolved = resolveWorkspaceFile(input.workspaceRoot, reference);
     if (!resolved) continue;
     const contentHash = createHash('sha256').update(fs.readFileSync(resolved)).digest('hex');
-    const declaredHash = typeof record.sha256 === 'string' ? record.sha256 : null;
+    const declaredHash = candidate.sha256 ?? null;
+    const provenance =
+      candidate.source === WorkbenchArtifactCandidateSource.DomainWorkflow ||
+      candidate.source === WorkbenchArtifactCandidateSource.ProductionInspection
+        ? WorkbenchArtifactProvenance.Controller
+        : WorkbenchArtifactProvenance.Workspace;
     artifacts.push({
       taskId: input.taskId,
       runId: input.runId,
@@ -113,10 +135,12 @@ export function collectWorkbenchArtifacts(input: {
       verificationStatus:
         declaredHash && declaredHash !== contentHash
           ? WorkbenchArtifactVerificationStatus.Failed
-          : WorkbenchArtifactVerificationStatus.Verified,
+          : (candidate.verificationStatus ?? WorkbenchArtifactVerificationStatus.Pending),
       metadata: {
-        ...(typeof record.role === 'string' ? { role: record.role } : {}),
-        ...(typeof record.verifiedAt === 'string' ? { verifiedAt: record.verifiedAt } : {}),
+        source: candidate.source,
+        ...(candidate.role ? { role: candidate.role } : {}),
+        ...(candidate.title ? { title: candidate.title } : {}),
+        ...(candidate.kind ? { declaredKind: candidate.kind } : {}),
         ...(declaredHash ? { declaredHash } : {}),
       },
     });

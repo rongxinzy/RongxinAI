@@ -4,6 +4,7 @@ import type {
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalRiskLevel,
   WorkbenchArtifactKind,
+  WorkbenchArtifactCandidateSource,
   WorkbenchArtifactProvenance,
   WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
@@ -94,6 +95,16 @@ export interface WorkbenchArtifact {
   metadata: WorkbenchJsonObject;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface WorkbenchArtifactCandidate {
+  path: string;
+  source: WorkbenchArtifactCandidateSource;
+  title?: string;
+  kind?: string;
+  role?: string;
+  sha256?: string;
+  verificationStatus?: WorkbenchArtifactVerificationStatus;
 }
 
 export interface WorkbenchApproval {

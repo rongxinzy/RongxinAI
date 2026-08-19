@@ -157,3 +157,44 @@ test('deduplicates identical artifact evidence within a run', () => {
     db.close();
   }
 });
+
+test('promotes an existing pending artifact when verified evidence arrives', () => {
+  const { db, repository } = createRepository();
+  try {
+    const task = repository.createTask('session', 'goal', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    const pending = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/plain',
+      reference: 'result.txt',
+      contentHash: 'hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: { role: 'deliverable' },
+    });
+
+    const verified = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/plain',
+      reference: 'result.txt',
+      contentHash: 'hash',
+      provenance: WorkbenchArtifactProvenance.Controller,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+      metadata: { verifier: 'production_inspection' },
+    });
+
+    expect(verified).toMatchObject({
+      id: pending.id,
+      provenance: WorkbenchArtifactProvenance.Controller,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+      metadata: { role: 'deliverable', verifier: 'production_inspection' },
+    });
+    expect(repository.getDetail(task.id)?.artifacts).toHaveLength(1);
+  } finally {
+    db.close();
+  }
+});

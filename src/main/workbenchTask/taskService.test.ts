@@ -1,4 +1,7 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { expect, test, vi } from 'vitest';
 
 import {
@@ -6,6 +9,9 @@ import {
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalEffectStatus,
   WorkbenchApprovalRiskLevel,
+  WorkbenchArtifactCandidateSource,
+  WorkbenchArtifactProvenance,
+  WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
   WorkbenchRunEventType,
   WorkbenchRunTrigger,
@@ -141,6 +147,99 @@ test('emits a verified run source only after deterministic verification passes',
       }),
     );
   } finally {
+    db.close();
+  }
+});
+
+test('registers a declared artifact before production workflow completion', () => {
+  const { db, service } = createService();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-ledger-'));
+  const filePath = path.join(workspace, 'report.md');
+  fs.writeFileSync(filePath, '# report');
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'create a small report',
+      contract: chatContract,
+    });
+    const artifact = service.registerArtifact({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      candidate: {
+        path: filePath,
+        role: 'deliverable',
+        source: WorkbenchArtifactCandidateSource.Declaration,
+      },
+    });
+
+    expect(artifact).toMatchObject({
+      taskId: task.id,
+      runId: run.id,
+      reference: 'report.md',
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+    });
+    expect(service.getDetail(task.id)?.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: WorkbenchRunEventType.ArtifactRegistered }),
+      ]),
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
+test('promotes a declared artifact when reviewed evidence is projected at completion', () => {
+  const { db, service } = createService();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-reviewed-artifact-'));
+  const filePath = path.join(workspace, 'report.md');
+  fs.writeFileSync(filePath, '# report');
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'create a reviewed report',
+      contract: chatContract,
+    });
+    service.registerArtifact({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      candidate: {
+        path: filePath,
+        role: 'deliverable',
+        source: WorkbenchArtifactCandidateSource.Declaration,
+      },
+    });
+
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'Done',
+      artifactCandidates: [
+        {
+          path: filePath,
+          kind: 'report',
+          role: 'report',
+          source: WorkbenchArtifactCandidateSource.ProductionInspection,
+          verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+        },
+      ],
+    });
+
+    expect(detail.artifacts).toHaveLength(1);
+    expect(detail.artifacts[0]).toMatchObject({
+      taskId: task.id,
+      provenance: WorkbenchArtifactProvenance.Controller,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+      metadata: {
+        source: WorkbenchArtifactCandidateSource.ProductionInspection,
+        declaredKind: 'report',
+      },
+    });
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
     db.close();
   }
 });
