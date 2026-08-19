@@ -1,6 +1,7 @@
 import { ProviderName } from '../../shared/providers';
 
 export type DirectChatRequestOptions = {
+  conversationId?: string;
   modelId?: string;
   modelProviderKey?: string;
   localThinkingEnabled?: boolean;
