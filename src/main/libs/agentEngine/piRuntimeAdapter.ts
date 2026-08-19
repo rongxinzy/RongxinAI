@@ -79,6 +79,7 @@ import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
+import { composeWorkbenchWorkflowSnapshot } from '../../workbenchTask/workflowSnapshot';
 import { ProductionLoopController } from '../../productionLoop/controller';
 import { shouldEnableProductionWorkflow } from '../../productionLoop/entryPolicy';
 import { buildProductionLoopTool } from '../../productionLoop/tool';
@@ -2508,15 +2509,27 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           }
         }
         if (active.workbenchRunId && this.workbenchTaskService) {
-          const workflowSnapshot = active.productionWorkflowEnabled
-            ? active.productionLoop
-              ? active.productionLoop.getSnapshot()
-              : active.researchRun
-                ? active.researchRun.getSnapshot()
-                : active.shortcutWorkflow
-                  ? active.shortcutWorkflow.getSnapshot()
-                  : active.workExecution?.getSnapshot() || null
-            : null;
+          const domainWorkflowSnapshot = active.researchRun
+            ? active.researchRun.getSnapshot()
+            : active.shortcutWorkflow
+              ? active.shortcutWorkflow.getSnapshot()
+              : active.workExecution?.getSnapshot() || null;
+          const workflowSnapshot = composeWorkbenchWorkflowSnapshot({
+            production:
+              active.productionWorkflowEnabled && active.productionLoop
+                ? active.productionLoop.getSnapshot()
+                : null,
+            domain: domainWorkflowSnapshot,
+          });
+          const artifactCandidates = active.productionLoop
+            ?.getReviewedArtifacts()
+            .map(artifact => ({
+              path: artifact.reference,
+              kind: artifact.kind,
+              role: artifact.kind,
+              source: WorkbenchArtifactCandidateSource.ProductionInspection,
+              verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+            }));
           this.workbenchTaskService.completeRun({
             sessionId,
             runId: active.workbenchRunId,
@@ -2529,6 +2542,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 ? undefined
                 : active.agentLoop.getState().done,
             workflowSnapshot,
+            artifactCandidates,
           });
         }
         void this.runPostTurnMemoryMaintenance(
