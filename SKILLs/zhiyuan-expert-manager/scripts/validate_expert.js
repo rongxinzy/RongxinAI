@@ -231,10 +231,7 @@ function findChecklistSections(body) {
       currentHeading = heading[1].trim();
       continue;
     }
-    if (
-      /^\s*-\s+\[[ xX]\]\s+/.test(line) &&
-      /进度|SOP|Progress|Status/i.test(currentHeading)
-    ) {
+    if (/^\s*-\s+\[[ xX]\]\s+/.test(line) && /进度|SOP|Progress|Status/i.test(currentHeading)) {
       if (!offenders.includes(currentHeading)) offenders.push(currentHeading);
     }
   }
@@ -296,9 +293,7 @@ function validatePluginJson(pluginJson, expertDir, result) {
   if (typeof displayDescriptionZh === 'string' && !hasTodo(displayDescriptionZh)) {
     const length = [...displayDescriptionZh].length;
     if (length < 40 || length > 50) {
-      result.error(
-        `plugin.json: 'displayDescription.zh' 长度应为 40-50 字，当前 ${length} 字`,
-      );
+      result.error(`plugin.json: 'displayDescription.zh' 长度应为 40-50 字，当前 ${length} 字`);
     }
   }
 
@@ -363,6 +358,11 @@ function validatePluginJson(pluginJson, expertDir, result) {
   }
 }
 
+function validateWorkbenchAcceptanceOwnership(content, label, result) {
+  if (/\bwork_acceptance\b/.test(content)) {
+    result.error(`${label}: final user acceptance is Workbench-owned (work_acceptance)`);
+  }
+}
 function validateAgentMd(mdPath, result, options = {}) {
   const { requireSkillProtocol = false, strict = false } = options;
   const { fm, content, error } = parseMdFrontmatter(mdPath);
@@ -452,6 +452,8 @@ function validateAgentMd(mdPath, result, options = {}) {
     );
   }
 
+  validateWorkbenchAcceptanceOwnership(body, basename, result);
+
   // Formatting: full-width dash is the canonical routing heading separator.
   // Bundled presets must pass strict validation; third-party packages only
   // get a warning so a cosmetic difference never blocks registration.
@@ -519,6 +521,27 @@ function validateExpert(expertPath, options = {}) {
           requireSkillProtocol: primaryAgents.get(mdFile) === true,
           strict,
         });
+      }
+    }
+  }
+
+  const skillsDir = path.join(expertPath, 'skills');
+  if (fs.existsSync(skillsDir)) {
+    const pendingDirectories = [skillsDir];
+    while (pendingDirectories.length > 0) {
+      const directory = pendingDirectories.pop();
+      for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+        const entryPath = path.join(directory, entry.name);
+        if (entry.isDirectory()) {
+          pendingDirectories.push(entryPath);
+        } else if (entry.isFile() && entry.name === 'SKILL.md') {
+          const content = fs.readFileSync(entryPath, 'utf-8');
+          validateWorkbenchAcceptanceOwnership(
+            content,
+            path.relative(expertPath, entryPath),
+            result,
+          );
+        }
       }
     }
   }

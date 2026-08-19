@@ -132,7 +132,6 @@ import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDoc
 import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
-import { buildPiWorkAcceptanceTool, PiWorkExecutionController } from './piWorkExecution';
 import { createPiWorkLoop } from './piWorkLoop';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import {
@@ -275,8 +274,6 @@ interface ActivePiSession {
   researchRun: PiResearchRunController | null;
   /** Present for every other first-class sidebar shortcut workflow. */
   shortcutWorkflow: PiShortcutWorkflowController | null;
-  /** Present for arbitrary skills loaded in Work mode. */
-  workExecution: PiWorkExecutionController | null;
   productionLoop: ProductionLoopController | null;
   /** Whether the current turn owns durable completion and production gates. */
   productionWorkflowEnabled: boolean;
@@ -912,25 +909,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           }),
         );
       }
-      // Complex Work turns with arbitrary skills use the durable acceptance
-      // loop because they do not share a safe universal semantic validator.
-      const shouldManageSkillExecution =
-        productionWorkflowEnabled &&
-        options.sessionMode === 'work' &&
-        Boolean(resourceState.skillIds?.length) &&
-        !researchRun &&
-        !shortcutWorkflow;
-      const workExecution = shouldManageSkillExecution
-        ? new PiWorkExecutionController({ sessionId, workspaceRoot, task: prompt })
-        : null;
-      if (workExecution) {
-        workExecution.start(prompt);
-        customTools.push(
-          buildPiWorkAcceptanceTool(workExecution, (toolCallId, input, signal) =>
-            this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
-          ),
-        );
-      }
 
       // Subagent tool: registered for every cowork session. When the session
       // agent is a Team Lead from a package, its presetId additionally exposes
@@ -999,7 +977,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       // Agent loop tool: lets the LLM drive multi-iteration long-horizon
       // loops; the controller continues the session on agent_end.
-      const completionWorkflow = researchRun || shortcutWorkflow || workExecution;
+      const completionWorkflow = researchRun || shortcutWorkflow;
       const productionLoop =
         productionWorkflowEnabled &&
         workbenchTaskId &&
@@ -1030,7 +1008,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         start: Boolean(productionLoop || completionWorkflow || shouldRunGoalLoop),
       });
       const agentLoop = workLoop.controller;
-      const workLoopPrompt = workExecution || shouldRunGoalLoop ? workLoop.initialPrompt : '';
+      const workLoopPrompt = shouldRunGoalLoop ? workLoop.initialPrompt : '';
       customTools.push(workLoop.tool);
 
       if (customTools.length > 0) {
@@ -1097,7 +1075,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         agentLoop,
         researchRun,
         shortcutWorkflow,
-        workExecution,
         productionLoop,
         productionWorkflowEnabled,
         goalMode: options.goalMode === true,
@@ -1136,10 +1113,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? researchRun.buildInitialPrompt(options._piPromptOverride || prompt)
         : shortcutWorkflow
           ? shortcutWorkflow.buildInitialPrompt(options._piPromptOverride || prompt)
-          : workExecution
-            ? workExecution.buildInitialPrompt(options._piPromptOverride || prompt)
-            : options._piPromptOverride || prompt;
-      if (workExecution || shouldRunGoalLoop) {
+          : options._piPromptOverride || prompt;
+      if (shouldRunGoalLoop) {
         initialPrompt = `${workLoopPrompt}\n\n${initialPrompt}`;
       }
       if (productionLoop) {
@@ -1417,7 +1392,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
     let nextPrompt = prompt;
     const domainCompletionWorkflow = active.productionWorkflowEnabled
-      ? active.researchRun || active.shortcutWorkflow || active.workExecution
+      ? active.researchRun || active.shortcutWorkflow
       : null;
     const completionWorkflow = active.productionWorkflowEnabled
       ? active.productionLoop || domainCompletionWorkflow
@@ -1442,9 +1417,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? active.researchRun.buildInitialPrompt(prompt)
         : active.shortcutWorkflow
           ? active.shortcutWorkflow.buildInitialPrompt(prompt)
-          : active.workExecution
-            ? active.workExecution.buildInitialPrompt(prompt)
-            : prompt;
+          : prompt;
       if (!completionWorkflow) {
         nextPrompt = `${loopPrompt}\n\n${nextPrompt}`;
       }
@@ -2528,7 +2501,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             ? active.researchRun.getSnapshot()
             : active.shortcutWorkflow
               ? active.shortcutWorkflow.getSnapshot()
-              : active.workExecution?.getSnapshot() || null;
+              : null;
           const workflowSnapshot = composeWorkbenchWorkflowSnapshot({
             production:
               active.productionWorkflowEnabled && active.productionLoop
@@ -2551,11 +2524,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             workspaceRoot: active.workspaceRoot,
             finalAnswer: active.lastCompletedAnswerText,
             finalMessageId: active.lastCompletedAnswerMessageId,
-            workflowCompleted:
-              !active.productionWorkflowEnabled ||
-              (!active.researchRun && !active.shortcutWorkflow && !active.workExecution)
-                ? undefined
-                : active.agentLoop.getState().done,
+            workflowCompleted: active.productionWorkflowEnabled
+              ? active.agentLoop.getState().done
+              : undefined,
             workflowSnapshot,
             artifactCandidates,
           });

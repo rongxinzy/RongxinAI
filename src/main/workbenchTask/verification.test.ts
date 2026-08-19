@@ -51,6 +51,19 @@ test('generic work falls back to explicit acceptance', () => {
   expect(result.outcome).toBe(WorkbenchVerificationOutcome.AcceptanceRequired);
 });
 
+test('generic workflow snapshots cannot bypass Workbench acceptance', () => {
+  const result = verifyWorkbenchRun({
+    contract: {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    },
+    finalAnswer: 'Implementation finished',
+    streamClosedCleanly: true,
+    workflowCompleted: true,
+    workflowSnapshot: { accepted: true, status: 'ready_to_deliver' },
+  });
+  expect(result.outcome).toBe(WorkbenchVerificationOutcome.AcceptanceRequired);
+});
 test('generic work without user acceptance passes on baseline checks alone', () => {
   const result = verifyWorkbenchRun({
     contract: {
