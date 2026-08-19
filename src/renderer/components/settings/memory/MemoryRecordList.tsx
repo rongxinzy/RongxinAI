@@ -69,7 +69,11 @@ import {
   type ManagedMemoryStatusFilter as ManagedMemoryStatusFilterValue,
   type ManagedMemoryView as ManagedMemoryViewValue,
 } from './constants';
-import { countManagedMemories, filterAndSortManagedMemories } from './memoryViewModel';
+import {
+  countManagedMemories,
+  filterAndSortManagedMemories,
+  isLegacySessionSummaryAwaitingUpgrade,
+} from './memoryViewModel';
 
 interface MemoryRecordListProps {
   records: ManagedMemoryRecord[];
@@ -360,6 +364,11 @@ function MemoryRows(props: {
                     {displayTitle(record)}
                   </span>
                   <StatusBadge record={record} />
+                  {isLegacySessionSummaryAwaitingUpgrade(record) && (
+                    <Badge variant="outline">
+                      {i18nService.t('managedMemoryLegacySummaryPendingUpgrade')}
+                    </Badge>
+                  )}
                 </div>
                 <p className="line-clamp-2 whitespace-normal wrap-break-word text-sm text-muted-foreground">
                   {record.content}
@@ -525,6 +534,11 @@ function MemoryDetailsDialog(props: {
             <div className="flex flex-col gap-5 pr-3">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge record={record} />
+                {isLegacySessionSummaryAwaitingUpgrade(record) && (
+                  <Badge variant="outline">
+                    {i18nService.t('managedMemoryLegacySummaryPendingUpgrade')}
+                  </Badge>
+                )}
                 <Badge variant="outline">{scopeLabel(record.scope)}</Badge>
                 <Badge variant="outline">{kindLabel(record.kind)}</Badge>
                 {record.sensitivity === MemorySensitivity.Sensitive && (

@@ -499,12 +499,19 @@ export class ProjectMemoryService {
     workingDirectory: string;
     summary: string;
     metadata?: Record<string, unknown>;
+    linkId?: string;
   }): Promise<number | null> {
     const project = this.resolveIdentity(input.workingDirectory);
     const topicKey = `session/${input.sessionId}`;
     const active = this.repository.findActiveTopic(project.id, MemoryScope.Session, topicKey);
     if (active?.content === input.summary) return active.memoryId;
-    const linkId = randomUUID();
+    const linkId = input.linkId ?? randomUUID();
+    const existing = input.linkId ? this.repository.getLink(input.linkId) : null;
+    if (existing) return existing.memoryId;
+    const pending = input.linkId
+      ? this.repository.findPendingByLinkId(input.linkId, MemoryOutboxOperation.SessionSummary)
+      : null;
+    if (pending) return await this.processOutboxItem(pending);
     const outboxId = this.repository.enqueue(
       MemoryOutboxOperation.SessionSummary,
       {
@@ -546,6 +553,10 @@ export class ProjectMemoryService {
   listMigrationRecordsForContext(workingDirectory: string): MemoryMigrationRecord[] {
     const project = this.resolveIdentity(workingDirectory);
     return this.repository.listMigrationRecordsForContext(project.id);
+  }
+
+  listSessionSummaryBackfillRecords(): MemoryMigrationRecord[] {
+    return this.repository.listSessionSummaryBackfillRecords();
   }
 
   updateMigrationRecordMetadata(

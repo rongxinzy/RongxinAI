@@ -102,6 +102,7 @@ import {
 import { ProjectMemoryService } from './memory/projectMemoryService';
 import { MemoryRepository } from './memory/repository';
 import { SessionSummaryService } from './memory/sessionSummaryService';
+import { SessionSummaryBackfillService } from './memory/sessionSummaryBackfillService';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { registerMemoryIpcHandlers } from './memory/ipc';
 import { resolveMemorySessionTitles } from './memory/sessionTitleResolver';
@@ -882,6 +883,9 @@ const getPiRuntimeAdapter = (): PiRuntimeAdapter => {
     piRuntimeAdapter.setProjectMemoryService(getProjectMemoryService());
     piRuntimeAdapter.setSessionSummaryService(
       new SessionSummaryService(getProjectMemoryService(), getCoworkStore()),
+    );
+    piRuntimeAdapter.setSessionSummaryBackfillService(
+      new SessionSummaryBackfillService(getProjectMemoryService(), getCoworkStore()),
     );
     piRuntimeAdapter.setLegacyMemoryMigrationService(
       new LegacyMemoryMigrationService(
