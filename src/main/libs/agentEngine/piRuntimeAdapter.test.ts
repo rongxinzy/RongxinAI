@@ -51,7 +51,10 @@ const hoisted = vi.hoisted(() => {
     applyOverrides: vi.fn(),
     getShellPath: vi.fn(),
   }));
-  const mockCompleteSimple = vi.fn().mockResolvedValue({ content: [{ text: 'Hello from Pi' }] });
+  const mockCompleteSimple = vi.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'Hello from Pi' }],
+    stopReason: 'stop',
+  });
 
   return {
     mockSession,
@@ -305,9 +308,13 @@ describe('PiRuntimeAdapter', () => {
       expect(hoisted.mockCompleteSimple).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'gpt-5', provider: 'openai' }),
         {
+          systemPrompt: 'Extract memory.',
           messages: [
-            { role: 'system', content: 'Extract memory.' },
-            { role: 'user', content: 'Conversation payload.' },
+            expect.objectContaining({
+              role: SessionMemoryCompletionRole.User,
+              content: 'Conversation payload.',
+              timestamp: expect.any(Number),
+            }),
           ],
         },
       );
@@ -319,14 +326,24 @@ describe('PiRuntimeAdapter', () => {
         .mockImplementationOnce(
           () =>
             new Promise(resolve => {
-              releaseFirst = () => resolve({ content: [{ text: 'First memory' }] });
+              releaseFirst = () =>
+                resolve({
+                  content: [{ type: 'text', text: 'First memory' }],
+                  stopReason: 'stop',
+                });
             }),
         )
-        .mockResolvedValueOnce({ content: [{ text: 'Second memory' }] });
+        .mockResolvedValueOnce({
+          content: [{ type: 'text', text: 'Second memory' }],
+          stopReason: 'stop',
+        });
       await adapter.startSession('memory-queue', 'Remember this');
       const complete = adapter.getSessionMemoryCompletion('memory-queue');
       expect(complete).not.toBeNull();
-      const messages = [{ role: SessionMemoryCompletionRole.System, content: 'Extract memory.' }];
+      const messages = [
+        { role: SessionMemoryCompletionRole.System, content: 'Extract memory.' },
+        { role: SessionMemoryCompletionRole.User, content: 'Conversation payload.' },
+      ];
 
       const first = complete!(messages);
       const second = complete!(messages);
