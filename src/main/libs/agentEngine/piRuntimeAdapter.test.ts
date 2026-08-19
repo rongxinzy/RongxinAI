@@ -433,83 +433,65 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
-    it('runs an explicit production request through a durable acceptance loop', async () => {
+    it('keeps final acceptance out of model tools for production work', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
       const onPermissionRequest = vi.fn();
       const onComplete = vi.fn();
       adapter.on('permissionRequest', onPermissionRequest);
       adapter.on('complete', onComplete);
 
-      await adapter.startSession(
-        'generic-work-skill',
-        'Analyze this codebase, write a review report, and verify the findings',
-        {
-          skillIds: ['code-review'],
-          sessionMode: 'work',
-          workspaceRoot: createTemporaryWorkspace(),
-        },
-      );
+      try {
+        await adapter.startSession(
+          'generic-work-skill',
+          'Analyze this codebase, write a review report, and verify the findings',
+          {
+            skillIds: ['code-review'],
+            sessionMode: 'work',
+            workspaceRoot: createTemporaryWorkspace(),
+          },
+        );
 
-      expect(mockSession.prompt).toHaveBeenCalledWith(
-        expect.stringContaining('Loop started. Iteration 1. Goal:'),
-      );
+        expect(mockSession.prompt).toHaveBeenCalledWith(
+          expect.stringContaining('## Production workflow decision'),
+        );
 
-      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
-        customTools: Array<{
-          name: string;
-          execute(
-            toolCallId: string,
-            params: Record<string, unknown>,
-          ): Promise<{ content: Array<{ text: string }> }>;
-        }>;
-      };
-      const loopTool = sessionOptions.customTools.find(tool => tool.name === 'agent_loop');
-      const acceptanceTool = sessionOptions.customTools.find(
-        tool => tool.name === 'work_acceptance',
-      );
-      const skillScriptTool = sessionOptions.customTools.find(
-        tool => tool.name === 'run_skill_script',
-      );
-      expect(loopTool).toBeDefined();
-      expect(acceptanceTool).toBeDefined();
-      expect(skillScriptTool).toBeDefined();
+        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools: Array<{
+            name: string;
+            execute(
+              toolCallId: string,
+              params: Record<string, unknown>,
+            ): Promise<{ content: Array<{ text: string }> }>;
+          }>;
+        };
+        const toolNames = sessionOptions.customTools.map(tool => tool.name);
+        const loopTool = sessionOptions.customTools.find(tool => tool.name === 'agent_loop');
+        expect(toolNames).toContain('production_loop');
+        expect(toolNames).toContain('run_skill_script');
+        expect(toolNames).not.toContain('work_acceptance');
 
-      const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-        type: string;
-      }) => void;
-      await loopTool!.execute('done-too-early', {
-        action: 'done',
-        reason: 'I think it is complete',
-      });
-      listener({ type: 'agent_end' });
-      await Promise.resolve();
-      expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('has not received explicit user acceptance'),
-        { streamingBehavior: 'followUp' },
-      );
-      expect(onComplete).not.toHaveBeenCalled();
-
-      const acceptance = acceptanceTool!.execute('acceptance-call', {
-        summary: 'Implementation and tests are complete.',
-      });
-      await vi.waitFor(() => expect(onPermissionRequest).toHaveBeenCalledTimes(1));
-      const [, acceptanceRequest] = onPermissionRequest.mock.calls[0] as [
-        string,
-        { requestId: string; toolInput: { questions: Array<{ question: string }> } },
-      ];
-      const acceptanceQuestion = acceptanceRequest.toolInput.questions[0].question;
-      adapter.respondToPermission(acceptanceRequest.requestId, {
-        behavior: 'allow',
-        updatedInput: { answers: { [acceptanceQuestion]: '验收通过' } },
-      });
-      await acceptance;
-      await loopTool!.execute('done-after-acceptance', {
-        action: 'done',
-        reason: 'The user accepted the result',
-      });
-      listener({ type: 'agent_end' });
-      expect(onComplete).toHaveBeenCalledOnce();
+        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+          type: string;
+        }) => void;
+        await loopTool!.execute('done-too-early', {
+          action: 'done',
+          reason: 'I think it is complete',
+        });
+        listener({ type: 'agent_end' });
+        await Promise.resolve();
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.stringContaining('Production workflow decision required'),
+          { streamingBehavior: 'followUp' },
+        );
+        expect(onPermissionRequest).not.toHaveBeenCalled();
+        expect(onComplete).not.toHaveBeenCalled();
+      } finally {
+        db.close();
+      }
     });
-
     it('offers a lazy production decision for every Work turn', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
@@ -1494,13 +1476,13 @@ describe('PiRuntimeAdapter', () => {
       });
       expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
       expect(mockSession.abort).toHaveBeenCalledOnce();
-      expect(mockSession.prompt).toHaveBeenLastCalledWith(
-        expect.stringContaining('## Persistent Work execution'),
-      );
+      expect(mockSession.prompt).toHaveBeenLastCalledWith('Read package.json');
       const recreatedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
         customTools?: Array<{ name: string }>;
       };
-      expect(recreatedOptions.customTools?.map(tool => tool.name)).toContain('work_acceptance');
+      const toolNames = recreatedOptions.customTools?.map(tool => tool.name);
+      expect(toolNames).toContain('run_skill_script');
+      expect(toolNames).not.toContain('work_acceptance');
     });
 
     it('keeps a stable workflow topology before the model skips a greeting', async () => {

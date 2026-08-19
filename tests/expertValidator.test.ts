@@ -5,16 +5,19 @@ import path from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { validateAgentMd, ValidationResult } = require(
-  '../SKILLs/zhiyuan-expert-manager/scripts/validate_expert.js',
-) as {
-  validateAgentMd: (
-    mdPath: string,
-    result: { errors: string[]; warnings: string[] },
-    options?: { requireSkillProtocol?: boolean; strict?: boolean },
-  ) => void;
-  ValidationResult: new () => { errors: string[]; warnings: string[] };
-};
+const { validateAgentMd, validateExpert, ValidationResult } =
+  require('../SKILLs/zhiyuan-expert-manager/scripts/validate_expert.js') as {
+    validateAgentMd: (
+      mdPath: string,
+      result: { errors: string[]; warnings: string[] },
+      options?: { requireSkillProtocol?: boolean; strict?: boolean },
+    ) => void;
+    validateExpert: (
+      expertPath: string,
+      options?: { strict?: boolean },
+    ) => { errors: string[]; warnings: string[] };
+    ValidationResult: new () => { errors: string[]; warnings: string[] };
+  };
 
 const temporaryDirectories: string[] = [];
 
@@ -71,6 +74,39 @@ test('rejects imported experts that own workflow progress', () => {
   ]);
 });
 
+test('rejects expert-controlled final acceptance', () => {
+  const result = new ValidationResult();
+  const agentPath = writeAgent(
+    [
+      '# Test expert',
+      '',
+      'After delivery, call work_acceptance and wait for the user decision.',
+    ].join('\n'),
+  );
+
+  validateAgentMd(agentPath, result);
+
+  expect(result.warnings).toEqual([]);
+  expect(result.errors).toEqual([
+    'test-expert.md: final user acceptance is Workbench-owned (work_acceptance)',
+  ]);
+});
+
+test('rejects work_acceptance instructions from packaged skills', () => {
+  const source = path.resolve('SKILLs/zhiyuan-expert-manager/presets/data-analyst');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zhiyuan-expert-skill-validator-'));
+  temporaryDirectories.push(directory);
+  const expertPath = path.join(directory, 'data-analyst');
+  fs.cpSync(source, expertPath, { recursive: true });
+  const skillPath = path.join(expertPath, 'skills', 'analytics-report', 'SKILL.md');
+  fs.appendFileSync(skillPath, '\nCall work_acceptance for final approval.\n', 'utf8');
+
+  const result = validateExpert(expertPath, { strict: true });
+
+  expect(result.errors).toContain(
+    `${path.join('skills', 'analytics-report', 'SKILL.md')}: final user acceptance is Workbench-owned (work_acceptance)`,
+  );
+});
 test('allows checkboxes inside delivery templates and domain QA sections', () => {
   const result = new ValidationResult();
   const agentPath = writeAgent(
@@ -148,7 +184,9 @@ test('keywords outside the protocol section cannot satisfy the requirement', () 
   validateAgentMd(agentPath, result, { requireSkillProtocol: true });
 
   expect(result.errors).toHaveLength(1);
-  expect(result.errors[0]).toContain('missing: 从 <available_skills> 中选择、使用 read 读取 <location>');
+  expect(result.errors[0]).toContain(
+    'missing: 从 <available_skills> 中选择、使用 read 读取 <location>',
+  );
 });
 
 test('members and skill-less leads are exempt from the protocol requirement', () => {

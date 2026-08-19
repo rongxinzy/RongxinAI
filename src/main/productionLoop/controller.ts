@@ -135,6 +135,7 @@ export class ProductionLoopController {
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',
       'Call agent_loop done only after the production loop reports ready_to_deliver.',
+      'Final user acceptance is Workbench-owned. Never use AskUserQuestion or another model-initiated question as a final acceptance gate.',
     ].join('\n');
   }
 
@@ -152,6 +153,7 @@ export class ProductionLoopController {
         ? 'This run requires the production workflow. Commit the plan; skip_workflow is not allowed.'
         : 'Only direct conversation or a simple answer requiring no tools or deliverable may call production_loop skip_workflow with a concrete reason, then answer directly.',
       'Do not answer the user until this decision has been recorded.',
+      'Final user acceptance is Workbench-owned. Never use AskUserQuestion or another model-initiated question as a final acceptance gate.',
     ].join('\n');
   }
 

@@ -88,21 +88,6 @@ export function verifyWorkbenchRun(
     };
   }
 
-  const accepted = context.workflowSnapshot?.accepted === true;
-  if (accepted && context.workflowCompleted) {
-    return {
-      outcome: WorkbenchVerificationOutcome.Passed,
-      checks: [
-        {
-          name: 'explicit_acceptance',
-          status: WorkbenchVerificationCheckStatus.Passed,
-        },
-      ],
-      evidence: context.workflowSnapshot ? [context.workflowSnapshot] : [],
-      summary: 'The work result was explicitly accepted.',
-    };
-  }
-
   // The production workflow was declared unnecessary (skip_workflow): the
   // baseline checks already passed, so there is nothing left to accept.
   if (context.workflowSnapshot?.skipped === true) {

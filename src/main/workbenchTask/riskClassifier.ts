@@ -7,7 +7,6 @@ const readOnlyTools = new Set(['read', 'grep', 'find', 'ls', 'skill_runtime_capa
 const internalControlTools = new Set([
   'askuserquestion',
   'agent_loop',
-  'work_acceptance',
   'workflow_state',
   'research_state',
   'declare_artifact',
