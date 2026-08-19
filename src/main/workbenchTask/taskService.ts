@@ -263,6 +263,7 @@ export class WorkbenchTaskService extends EventEmitter {
     finalMessageId?: string | null;
     workflowCompleted?: boolean;
     workflowSnapshot?: Record<string, unknown> | null;
+    artifactCandidates?: WorkbenchArtifactCandidate[];
     streamClosedCleanly?: boolean;
   }): WorkbenchTaskDetail {
     const run = this.requireRun(input.runId);
@@ -280,7 +281,7 @@ export class WorkbenchTaskService extends EventEmitter {
       workflowSnapshot: input.workflowSnapshot,
     };
     const result = verifyWorkbenchRun(verificationContext);
-    const artifactCandidates: WorkbenchArtifactCandidate[] = this.repository
+    const toolArtifactCandidates: WorkbenchArtifactCandidate[] = this.repository
       .listApprovalsForRun(run.id)
       .filter(approval => approval.effectStatus === WorkbenchApprovalEffectStatus.Succeeded)
       .flatMap(approval => {
@@ -296,6 +297,7 @@ export class WorkbenchTaskService extends EventEmitter {
             ]
           : [];
       });
+    const artifactCandidates = [...toolArtifactCandidates, ...(input.artifactCandidates ?? [])];
     this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Verifying);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationStarted);

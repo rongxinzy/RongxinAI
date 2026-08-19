@@ -149,9 +149,7 @@ test('exposes record_prototype as the first action for deferred prototype workfl
     prototypeRequired: true,
     availableActions: ['record_prototype', 'skip_workflow'],
   });
-  expect(controller.buildInitialPrompt()).toContain(
-    'start with production_loop record_prototype',
-  );
+  expect(controller.buildInitialPrompt()).toContain('start with production_loop record_prototype');
 });
 
 test('starts deferred production state when the model commits a plan', () => {
@@ -476,4 +474,38 @@ test('getSnapshot exposes the skip flag for the verification chain', () => {
     phase: ProductionLoopPhase.Plan,
     status: ProductionLoopStatus.Completed,
   });
+});
+
+test('exposes artifacts only after the latest inspection passes critique', () => {
+  const { controller, service } = createController();
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Report passes'],
+    expectedArtifacts: [{ kind: 'report', description: 'Final report', required: true }],
+    expectedVerifiers: [{ name: 'report_check', deterministic: true }],
+  });
+  controller.updatePlanItem(planned.planItems[0].id, 'completed');
+  controller.recordToolResult('report-check', 'bash', 'Report check passed.', false);
+  const evidenceRef = controller.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
+  controller.startInspection({
+    artifacts: [{ kind: 'report', reference: 'output/report.md' }],
+    verifiers: [{ name: 'report_check', evidenceRef }],
+  });
+  controller.requestCritique();
+
+  expect(controller.getReviewedArtifacts()).toEqual([]);
+
+  const runId = controller.getState().runId;
+  service.recordCriticStart(runId, 'critic-call');
+  service.recordCriticResult(
+    runId,
+    'critic-call',
+    JSON.stringify({ verdict: 'pass', findings: [] }),
+    false,
+  );
+
+  expect(controller.getReviewedArtifacts()).toEqual([
+    { kind: 'report', reference: 'output/report.md' },
+  ]);
 });
