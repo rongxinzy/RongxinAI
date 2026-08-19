@@ -70,3 +70,29 @@ test('supports normal flow for virtualized conversation content', () => {
   expect(content).toHaveClass('flex-col');
   expect(content).not.toHaveClass('flex-col-reverse');
 });
+
+test('keeps horizontal overflow inside message content', () => {
+  const view = render(
+    React.createElement(
+      Conversation,
+      null,
+      React.createElement(
+        TestConversationContent,
+        {
+          observeContentResize: false,
+          scrollClassName: 'cowork-conversation-scroll',
+        },
+        'message',
+      ),
+    ),
+  );
+
+  const content = view.getByText('message');
+  expect(content).toHaveClass('min-w-0');
+  expect(content.parentElement).toHaveClass(
+    'cowork-conversation-scroll',
+    'min-w-0',
+    'overflow-x-hidden',
+    'overflow-y-auto',
+  );
+});
