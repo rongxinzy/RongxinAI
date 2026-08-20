@@ -23,6 +23,7 @@ describe('CoworkInlineAttachments', () => {
 
     const attachment = screen.getByText('metrics.csv').closest('.group');
     expect(attachment).toHaveClass('h-8');
+    expect(attachment).not.toHaveAttribute('title');
     fireEvent.focus(attachment!);
 
     await waitFor(() => {

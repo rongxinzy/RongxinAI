@@ -168,7 +168,6 @@ const CoworkInlineAttachmentItem = ({
             onRemove={onRemove ? () => onRemove(attachment.path) : undefined}
             role={canOpenImage ? 'button' : undefined}
             tabIndex={canOpenImage ? 0 : undefined}
-            title={attachment.path}
           >
             <div className="relative size-5 shrink-0">
               <div
