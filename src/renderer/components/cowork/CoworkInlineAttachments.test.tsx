@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { i18nService } from '../../services/i18n';
@@ -22,6 +22,36 @@ describe('CoworkInlineAttachments', () => {
 
     fireEvent.click(screen.getByLabelText(i18nService.t('coworkAttachmentRemove')));
     expect(onRemove).toHaveBeenCalledWith('C:\\reports\\metrics.csv');
+  });
+
+  test('shows hover metadata and uses the inline remove transition', async () => {
+    render(
+      <CoworkInlineAttachments
+        attachments={[
+          {
+            path: 'C:\\reports\\brief.pdf',
+            name: 'brief.pdf',
+            mediaType: 'application/pdf',
+          },
+        ]}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    const attachment = screen.getByText('brief.pdf').closest('[data-slot="hover-card-trigger"]');
+    expect(attachment).toHaveClass('h-8');
+
+    const removeButton = screen.getByLabelText(i18nService.t('coworkAttachmentRemove'));
+    expect(removeButton).toHaveClass('group-hover:opacity-100');
+    expect(attachment?.firstElementChild?.firstElementChild).toHaveClass(
+      'group-hover:opacity-0',
+    );
+
+    fireEvent.focus(attachment!);
+
+    await waitFor(() => {
+      expect(screen.getByText('application/pdf')).toBeInTheDocument();
+    });
   });
 
   test('loads local image previews and supports keyboard opening', async () => {
