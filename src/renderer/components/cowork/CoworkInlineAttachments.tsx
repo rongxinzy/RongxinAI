@@ -1,11 +1,17 @@
 import {
   Attachment,
+  AttachmentHoverCard,
+  AttachmentHoverCardContent,
+  AttachmentHoverCardTrigger,
   AttachmentInfo,
   AttachmentPreview,
   AttachmentRemove,
   Attachments,
+  getAttachmentLabel,
+  getMediaCategory,
   type AttachmentData,
 } from '@shared/components/ai-elements/attachments';
+import { cn } from '@shared/lib/utils';
 import type { KeyboardEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -78,6 +84,8 @@ const CoworkInlineAttachmentItem = ({
     }),
     [attachment, resolvedDataUrl],
   );
+  const mediaCategory = getMediaCategory(data);
+  const label = getAttachmentLabel(data);
   const canOpenImage = Boolean(attachment.isImage && resolvedDataUrl && onOpenImage);
   const openImage = () => {
     if (!canOpenImage || !resolvedDataUrl) return;
@@ -90,19 +98,60 @@ const CoworkInlineAttachmentItem = ({
   };
 
   return (
-    <Attachment
-      data={data}
-      onClick={canOpenImage ? openImage : undefined}
-      onKeyDown={canOpenImage ? handleKeyDown : undefined}
-      onRemove={onRemove ? () => onRemove(attachment.path) : undefined}
-      role={canOpenImage ? 'button' : undefined}
-      tabIndex={canOpenImage ? 0 : undefined}
-      title={attachment.path}
-    >
-      <AttachmentPreview />
-      <AttachmentInfo />
-      <AttachmentRemove label={i18nService.t('coworkAttachmentRemove')} />
-    </Attachment>
+    <AttachmentHoverCard>
+      <AttachmentHoverCardTrigger
+        closeDelay={100}
+        delay={200}
+        render={
+          <Attachment
+            data={data}
+            onClick={canOpenImage ? openImage : undefined}
+            onKeyDown={canOpenImage ? handleKeyDown : undefined}
+            onRemove={onRemove ? () => onRemove(attachment.path) : undefined}
+            role={canOpenImage ? 'button' : undefined}
+            tabIndex={canOpenImage ? 0 : undefined}
+            title={attachment.path}
+          >
+            <div className="relative size-5 shrink-0">
+              <div
+                className={cn(
+                  'absolute inset-0',
+                  onRemove && 'transition-opacity duration-150 group-hover:opacity-0',
+                )}
+              >
+                <AttachmentPreview />
+              </div>
+              <AttachmentRemove
+                className="absolute inset-0 duration-150"
+                label={i18nService.t('coworkAttachmentRemove')}
+              />
+            </div>
+            <AttachmentInfo />
+          </Attachment>
+        }
+      />
+      <AttachmentHoverCardContent align="start">
+        <div className="flex max-w-80 flex-col gap-3">
+          {mediaCategory === 'image' && data.type === 'file' && data.url && (
+            <div className="flex max-h-96 w-80 items-center justify-center overflow-hidden rounded-md border border-border">
+              <img
+                alt={label}
+                className="max-h-96 max-w-full object-contain"
+                height={384}
+                src={data.url}
+                width={320}
+              />
+            </div>
+          )}
+          <div className="flex min-w-0 flex-col gap-1 px-0.5">
+            <h4 className="truncate text-sm font-semibold leading-none">{label}</h4>
+            {data.mediaType && (
+              <p className="truncate font-mono text-xs text-muted-foreground">{data.mediaType}</p>
+            )}
+          </div>
+        </div>
+      </AttachmentHoverCardContent>
+    </AttachmentHoverCard>
   );
 };
 
