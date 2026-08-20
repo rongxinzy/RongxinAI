@@ -127,21 +127,15 @@ export function WorkbenchTaskAuditView({
               </span>
               <Select value={task.id} onValueChange={value => value && onSelectTask(value)}>
                 <SelectTrigger className="w-full" disabled={loading}>
-                  <SelectValue />
+                  <SelectValue>
+                    <TaskHistorySummary task={task} />
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent align="start">
                   <SelectGroup>
                     {tasks.map(historyTask => (
                       <SelectItem key={historyTask.id} value={historyTask.id}>
-                        <span className="flex min-w-0 items-center gap-2">
-                          <Badge variant={statusBadgeVariant(historyTask.status)}>
-                            {statusLabel(historyTask.status)}
-                          </Badge>
-                          <span className="max-w-96 truncate">{historyTask.goal}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatTimestamp(historyTask.createdAt)}
-                          </span>
-                        </span>
+                        <TaskHistorySummary task={historyTask} />
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -284,5 +278,16 @@ function TaskMetadata({ label, value }: { label: string; value: string }) {
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="break-words text-foreground">{value}</dd>
     </div>
+  );
+}
+function TaskHistorySummary({ task }: { task: WorkbenchTask }) {
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-2">
+      <Badge variant={statusBadgeVariant(task.status)}>{statusLabel(task.status)}</Badge>
+      <span className="min-w-0 flex-1 truncate">{task.goal}</span>
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {formatTimestamp(task.createdAt)}
+      </span>
+    </span>
   );
 }
