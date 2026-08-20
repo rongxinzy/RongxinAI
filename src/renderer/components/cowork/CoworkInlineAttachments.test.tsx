@@ -4,10 +4,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { i18nService } from '../../services/i18n';
+import {
+  CoworkAttachmentMediaType,
+  CoworkAttachmentMediaTypeByExtension,
+} from './constants';
 import { CoworkInlineAttachments } from './CoworkInlineAttachments';
 
 describe('CoworkInlineAttachments', () => {
-  test('renders documents with the AI Elements inline variant and removes them', () => {
+  test('infers CSV media type and removes inline attachments', async () => {
     const onRemove = vi.fn();
 
     render(
@@ -19,6 +23,12 @@ describe('CoworkInlineAttachments', () => {
 
     const attachment = screen.getByText('metrics.csv').closest('.group');
     expect(attachment).toHaveClass('h-8');
+    fireEvent.focus(attachment!);
+
+    await waitFor(() => {
+      expect(screen.getByText(CoworkAttachmentMediaTypeByExtension.csv)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(CoworkAttachmentMediaType.Binary)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText(i18nService.t('coworkAttachmentRemove')));
     expect(onRemove).toHaveBeenCalledWith('C:\\reports\\metrics.csv');
@@ -31,7 +41,7 @@ describe('CoworkInlineAttachments', () => {
           {
             path: 'C:\\reports\\brief.pdf',
             name: 'brief.pdf',
-            mediaType: 'application/pdf',
+            mediaType: CoworkAttachmentMediaTypeByExtension.pdf,
           },
         ]}
         onRemove={vi.fn()}
@@ -50,8 +60,34 @@ describe('CoworkInlineAttachments', () => {
     fireEvent.focus(attachment!);
 
     await waitFor(() => {
-      expect(screen.getByText('application/pdf')).toBeInTheDocument();
+      expect(
+        screen.getByText(CoworkAttachmentMediaTypeByExtension.pdf),
+      ).toBeInTheDocument();
     });
+  });
+
+  test('shows an unknown extension instead of the generic binary media type', async () => {
+    render(
+      <CoworkInlineAttachments
+        attachments={[
+          {
+            path: 'C:\\reports\\archive.custom',
+            name: 'archive.custom',
+            extension: 'CUSTOM',
+          },
+        ]}
+      />,
+    );
+
+    const attachment = screen
+      .getByText('archive.custom')
+      .closest('[data-slot="hover-card-trigger"]');
+    fireEvent.focus(attachment!);
+
+    await waitFor(() => {
+      expect(screen.getByText('CUSTOM')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(CoworkAttachmentMediaType.Binary)).not.toBeInTheDocument();
   });
 
   test('loads local image previews and supports keyboard opening', async () => {
