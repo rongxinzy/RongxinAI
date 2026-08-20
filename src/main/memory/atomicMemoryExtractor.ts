@@ -79,8 +79,8 @@ Schema:
     "title": string,
     "content": string,
     "kind": "decision" | "preference",
-    "importance": number,
-    "confidence": number,
+    "importance": number (0 to 1 inclusive, e.g. 0.5; 1 = most important),
+    "confidence": number (0 to 1 inclusive, e.g. 0.5; 1 = most confident),
     "sensitivity": "normal" | "sensitive",
     "evidenceSourceIds": string[]
   }]
@@ -162,25 +162,63 @@ export function parseAtomicMemoryResponse(
   }
   const result = AtomicMemoryResponseSchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(`Atomic memory response failed validation: ${result.error.message}`);
-  }
-  if (!result.data.shouldSave) {
-    if (result.data.memories.length > 0) {
-      throw new Error('Atomic memory response returned memories while shouldSave is false.');
+    // Out-of-range importance/confidence is the most common model slip. The
+    // prompt now states the 0-1 range; as a fallback, clamp those numeric
+    // scores instead of dropping the whole migration. Other schema errors
+    // still surface unchanged.
+    const repaired = clampOutOfRangeScores(parsed);
+    const retried = repaired ? AtomicMemoryResponseSchema.safeParse(repaired) : null;
+    if (!retried?.success) {
+      throw new Error(`Atomic memory response failed validation: ${result.error.message}`);
     }
-    return [];
+    console.warn('[AtomicMemory] clamped out-of-range importance/confidence values.');
+    return finish(retried.data);
   }
-  if (result.data.memories.length === 0 || result.data.memories.length > maxItems) {
-    throw new Error('Atomic memory response returned an invalid number of memories.');
-  }
-  for (const memory of result.data.memories) {
-    for (const sourceId of memory.evidenceSourceIds) {
-      if (!allowedSourceIds.has(sourceId)) {
-        throw new Error(`Atomic memory referenced unknown evidence source ${sourceId}.`);
+  return finish(result.data);
+
+  function finish(data: z.infer<typeof AtomicMemoryResponseSchema>): AtomicMemoryItem[] {
+    if (!data.shouldSave) {
+      if (data.memories.length > 0) {
+        throw new Error('Atomic memory response returned memories while shouldSave is false.');
+      }
+      return [];
+    }
+    if (data.memories.length === 0 || data.memories.length > maxItems) {
+      throw new Error('Atomic memory response returned an invalid number of memories.');
+    }
+    for (const memory of data.memories) {
+      for (const sourceId of memory.evidenceSourceIds) {
+        if (!allowedSourceIds.has(sourceId)) {
+          throw new Error(`Atomic memory referenced unknown evidence source ${sourceId}.`);
+        }
       }
     }
+    return data.memories;
   }
-  return result.data.memories;
+}
+
+/**
+ * Clamp numeric importance/confidence scores into [0, 1] on a parsed model
+ * response. Returns null when the payload shape does not allow safe repair
+ * (e.g. scores are non-numeric), so genuine schema errors still fail loudly.
+ */
+function clampOutOfRangeScores(parsed: unknown): unknown {
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    !Array.isArray((parsed as { memories?: unknown }).memories)
+  ) {
+    return null;
+  }
+  const repaired = structuredClone(parsed) as { memories: Array<Record<string, unknown>> };
+  for (const memory of repaired.memories) {
+    for (const key of ['importance', 'confidence'] as const) {
+      const value = memory[key];
+      if (typeof value !== 'number') continue;
+      if (value < 0 || value > 1) memory[key] = Math.min(1, Math.max(0, value));
+    }
+  }
+  return repaired;
 }
 
 export function buildAtomicMemorySources(sources: AtomicMemorySource[]): AtomicMemorySource[] {
