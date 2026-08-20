@@ -50,7 +50,7 @@ import {
   resolveEffectiveModel,
   useAgentSelectedModel,
 } from './agentModelSelection';
-import AttachmentCard from './AttachmentCard';
+import { CoworkInlineAttachments } from './CoworkInlineAttachments';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SessionStatsLine } from './SessionStatsLine';
 import { CoworkModelPicker } from './CoworkModelPicker';
@@ -1157,13 +1157,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               {resumeTaskActive && onCancelTaskResume && (
                 <ResumeTaskContextBadge onCancel={onCancelTaskResume} />
               )}
-              {attachments.map(attachment => (
-                <AttachmentCard
-                  key={attachment.path}
-                  attachment={attachment}
-                  onRemove={handleRemoveAttachment}
-                />
-              ))}
+              <CoworkInlineAttachments
+                attachments={attachments}
+                className="max-w-full"
+                onRemove={handleRemoveAttachment}
+              />
             </PromptInputHeader>
           )}
           <PromptInputBody>
