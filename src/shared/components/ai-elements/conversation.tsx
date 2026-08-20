@@ -34,8 +34,9 @@ export const ConversationContent = ({
   ...props
 }: ConversationContentProps) => {
   const context = useStickToBottomContext();
+  const resolvedScrollClassName = cn('min-w-0 overflow-x-hidden overflow-y-auto', scrollClassName);
   const contentClassName = cn(
-    'flex gap-8 p-4',
+    'flex min-w-0 gap-8 p-4',
     reverse ? 'flex-col-reverse' : 'flex-col',
     className,
   );
@@ -50,7 +51,7 @@ export const ConversationContent = ({
     return (
       <StickToBottom.Content
         className={contentClassName}
-        scrollClassName={scrollClassName}
+        scrollClassName={resolvedScrollClassName}
         {...props}
       >
         {children}
@@ -61,7 +62,7 @@ export const ConversationContent = ({
   return (
     <div
       ref={context.scrollRef}
-      className={scrollClassName}
+      className={resolvedScrollClassName}
       style={{ height: '100%', width: '100%', scrollbarGutter: 'stable both-edges' }}
     >
       <div {...props} ref={passiveContentRef} className={contentClassName}>
