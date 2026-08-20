@@ -211,35 +211,39 @@ export function WorkbenchTaskAuditView({
         )}
 
         <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-          <WorkbenchTaskAuditSection
-            title={i18nService.t('workbenchTaskRuns')}
-            count={filteredDetail.runs.length}
-          >
-            <RunAuditTab runs={filteredDetail.runs} activeRunId={task.activeRunId} />
-          </WorkbenchTaskAuditSection>
-          <WorkbenchTaskAuditSection
-            title={i18nService.t('workbenchTaskEvents')}
-            count={filteredDetail.events.length}
-          >
-            <EventAuditTab events={filteredDetail.events} runs={detail.runs} />
-          </WorkbenchTaskAuditSection>
-          <WorkbenchTaskAuditSection
-            title={i18nService.t('workbenchTaskArtifacts')}
-            count={filteredDetail.artifacts.length}
-          >
-            <ArtifactAuditTab artifacts={filteredDetail.artifacts} runs={detail.runs} />
-          </WorkbenchTaskAuditSection>
-          <WorkbenchTaskAuditSection
-            title={i18nService.t('workbenchTaskApprovals')}
-            count={filteredDetail.approvals.length}
-          >
-            <ApprovalAuditTab
-              approvals={filteredDetail.approvals}
-              runs={detail.runs}
-              busy={busy}
-              onRespond={onRespondToApproval}
-            />
-          </WorkbenchTaskAuditSection>
+          <div className="flex min-w-0 flex-col gap-4">
+            <WorkbenchTaskAuditSection
+              title={i18nService.t('workbenchTaskRuns')}
+              count={filteredDetail.runs.length}
+            >
+              <RunAuditTab runs={filteredDetail.runs} activeRunId={task.activeRunId} />
+            </WorkbenchTaskAuditSection>
+            <WorkbenchTaskAuditSection
+              title={i18nService.t('workbenchTaskArtifacts')}
+              count={filteredDetail.artifacts.length}
+            >
+              <ArtifactAuditTab artifacts={filteredDetail.artifacts} runs={detail.runs} />
+            </WorkbenchTaskAuditSection>
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <WorkbenchTaskAuditSection
+              title={i18nService.t('workbenchTaskEvents')}
+              count={filteredDetail.events.length}
+            >
+              <EventAuditTab events={filteredDetail.events} runs={detail.runs} />
+            </WorkbenchTaskAuditSection>
+            <WorkbenchTaskAuditSection
+              title={i18nService.t('workbenchTaskApprovals')}
+              count={filteredDetail.approvals.length}
+            >
+              <ApprovalAuditTab
+                approvals={filteredDetail.approvals}
+                runs={detail.runs}
+                busy={busy}
+                onRespond={onRespondToApproval}
+              />
+            </WorkbenchTaskAuditSection>
+          </div>
         </div>
       </div>
     </ScrollArea>

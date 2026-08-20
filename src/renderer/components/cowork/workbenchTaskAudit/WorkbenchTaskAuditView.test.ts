@@ -76,3 +76,50 @@ test('renders the selected task summary instead of its id in the history trigger
   expect(within(historyTrigger).getByText(formatTimestamp(currentTask.createdAt))).toBeTruthy();
   expect(historyTrigger).not.toHaveTextContent(currentTask.id);
 });
+
+test('stacks audit sections in independent desktop columns', () => {
+  const task = createTask(
+    'task-layout-id',
+    'Inspect the audit layout',
+    WorkbenchTaskStatus.Completed,
+    Date.UTC(2026, 7, 20, 8, 30, 0),
+  );
+  const detail: WorkbenchTaskDetail = {
+    task,
+    runs: [],
+    events: [],
+    artifacts: [],
+    approvals: [],
+  };
+
+  render(
+    createElement(WorkbenchTaskAuditView, {
+      detail,
+      tasks: [task],
+      busy: false,
+      loading: false,
+      onSelectTask: vi.fn(),
+      onRespondToApproval: vi.fn(),
+    }),
+  );
+
+  const runsSection = screen.getByRole('region', {
+    name: `${i18nService.t('workbenchTaskRuns')} (0)`,
+  });
+  const eventsSection = screen.getByRole('region', {
+    name: `${i18nService.t('workbenchTaskEvents')} (0)`,
+  });
+  const artifactsSection = screen.getByRole('region', {
+    name: `${i18nService.t('workbenchTaskArtifacts')} (0)`,
+  });
+  const approvalsSection = screen.getByRole('region', {
+    name: `${i18nService.t('workbenchTaskApprovals')} (0)`,
+  });
+
+  expect(runsSection.parentElement).toBe(artifactsSection.parentElement);
+  expect(eventsSection.parentElement).toBe(approvalsSection.parentElement);
+  expect(runsSection.parentElement).not.toBe(eventsSection.parentElement);
+  expect(runsSection.parentElement).toHaveClass('flex', 'flex-col', 'gap-4');
+  expect(eventsSection.parentElement).toHaveClass('flex', 'flex-col', 'gap-4');
+  expect(runsSection.parentElement?.parentElement).toHaveClass('grid', 'md:grid-cols-2');
+});
