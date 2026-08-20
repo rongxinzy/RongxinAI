@@ -18,7 +18,33 @@ license: MIT
 | 通俗解读 | 用中文对每个指标和系数给出"什么意思/该怎么看"的说明 |
 | 自动检测 | 目标变量为 0/1 时自动切换逻辑回归 |
 
+## Tooling
+
+在 ZhiYuan/Pi 内**必须**通过 `run_skill_script` 执行本技能脚本，禁止用 bash 直跑 `python3` 或 `python`：
+
+```json
+{
+  "skillId": "regression-insight",
+  "script": "scripts/regression_analyzer.py",
+  "args": ["<数据文件>", "--target", "<目标列>"]
+}
+```
+
+- `args` 与下方"详细用法"的命令行参数一一对应（去掉 `python3 scripts/regression_analyzer.py` 前缀）。
+- 脚本依赖（pandas / numpy / scipy / statsmodels，见 `requirements.txt`）由应用管理的技能 Python 运行时保证，**不需要也不应该**手动 `pip install` 或寻找系统 Python。
+- 若执行返回依赖缺失或运行时不可用错误，**不要**改用系统 `python3` 或手写替代实现（例如用纯 Python 循环重算回归）——直接报告该错误，说明需要技能 Python 运行时提供依赖。
+
 ## Quick Start
+
+```json
+{
+  "skillId": "regression-insight",
+  "script": "scripts/regression_analyzer.py",
+  "args": ["data.csv", "--target", "price"]
+}
+```
+
+完整命令示例（展示参数映射，实际执行一律经 `run_skill_script`）：
 
 ```bash
 # 线性回归：预测 price，用所有数值列做自变量
@@ -32,6 +58,8 @@ python3 scripts/regression_analyzer.py data.csv --target sales --output result.j
 ```
 
 ## 详细用法
+
+以下命令示例仅用于展示参数映射——实际执行一律通过 `run_skill_script`，将参数放入 `args` 数组（见上方 Tooling 段）。禁止在 bash 中直跑 `python3` 调用本脚本。
 
 ### 基本调用
 
@@ -97,11 +125,7 @@ python3 scripts/regression_analyzer.py data.csv -t price
 
 ## 依赖
 
-- Python 3.8+
-- pandas
-- numpy
-- statsmodels
-- scipy
+运行时依赖（pandas、numpy、statsmodels、scipy）由应用管理的技能 Python 运行时按 `requirements.txt` 提供，**无需也不应手动安装**。仅在本地独立调试（不经过 ZhiYuan 运行时）时才需要：
 
 ```bash
 pip install pandas numpy statsmodels scipy
