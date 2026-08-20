@@ -41,9 +41,9 @@ describe('UserBubble', () => {
     expect(timestamp.compareDocumentPosition(copyButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
-    expect(copyButton.compareDocumentPosition(reEditButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    );
+    expect(
+      copyButton.compareDocumentPosition(reEditButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   test('renders copy and re-edit actions for a local user message', () => {
@@ -77,7 +77,7 @@ describe('UserBubble', () => {
     expect(screen.queryByText('minimax-docx')).not.toBeInTheDocument();
   });
 
-  test('bounds inline image attachments to a compact preview', () => {
+  test('renders sent images as inline attachments and preserves expansion', () => {
     render(
       <UserBubble
         message={{
@@ -93,13 +93,13 @@ describe('UserBubble', () => {
     );
 
     const image = screen.getByRole('img', { name: 'screenshot.png' });
+    const attachment = image.closest('[role="button"]');
 
-    expect(image).toHaveClass('h-36');
-    expect(image).toHaveClass('w-64');
-    expect(image).not.toHaveClass('border');
-    expect(image).not.toHaveClass('border-border');
+    expect(attachment).not.toBeNull();
+    expect(attachment).toHaveClass('h-8');
+    expect(image).toHaveClass('size-full');
 
-    fireEvent.click(image);
+    fireEvent.click(attachment!);
 
     const expandedImage = screen.getAllByRole('img', { name: 'screenshot.png' })[1];
     expect(expandedImage).toHaveClass('max-h-[72vh]');
@@ -139,7 +139,9 @@ describe('UserBubble', () => {
     );
 
     const preview = await screen.findByAltText('reference.png');
+    const attachment = preview.closest('[role="button"]');
     expect(preview).toHaveAttribute('src', 'data:image/png;base64,aGVsbG8=');
+    expect(attachment).toHaveClass('h-8');
     expect(screen.queryByText('PNG')).not.toBeInTheDocument();
   });
 
@@ -154,8 +156,9 @@ describe('UserBubble', () => {
       />,
     );
 
-    expect(screen.getByText('brief.docx')).toBeInTheDocument();
-    expect(screen.getByText('DOCX')).toBeInTheDocument();
+    const attachment = screen.getByText('brief.docx').closest('.group');
+    expect(attachment).toHaveClass('h-8');
+    expect(screen.queryByText('DOCX')).not.toBeInTheDocument();
     expect(screen.getByText('请总结这份文件')).toBeInTheDocument();
     expect(screen.queryByText(/输入文件：C:/)).not.toBeInTheDocument();
   });
@@ -171,8 +174,9 @@ describe('UserBubble', () => {
       />,
     );
 
-    expect(screen.getByText('contract.docx')).toBeInTheDocument();
-    expect(screen.getByText('DOCX')).toBeInTheDocument();
+    const attachment = screen.getByText('contract.docx').closest('.group');
+    expect(attachment).toHaveClass('h-8');
+    expect(screen.queryByText('DOCX')).not.toBeInTheDocument();
     expect(screen.queryByText(/Input Files:/)).not.toBeInTheDocument();
   });
 });
