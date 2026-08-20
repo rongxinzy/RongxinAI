@@ -16,12 +16,17 @@ import type { KeyboardEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import {
+  CoworkAttachmentMediaType,
+  CoworkAttachmentMediaTypeByExtension,
+} from './constants';
 
 export interface CoworkInlineAttachment {
   path: string;
   name: string;
   isImage?: boolean;
   dataUrl?: string;
+  extension?: string;
   mediaType?: string;
 }
 
@@ -41,6 +46,23 @@ interface CoworkInlineAttachmentItemProps {
 const getDataUrlMediaType = (dataUrl?: string | null): string | null => {
   if (!dataUrl) return null;
   return /^data:([^;,]+)[;,]/.exec(dataUrl)?.[1] ?? null;
+};
+
+const getAttachmentExtension = (attachment: CoworkInlineAttachment): string | null => {
+  const providedExtension = attachment.extension?.trim().replace(/^\./, '').toLowerCase();
+  if (providedExtension) return providedExtension;
+
+  const baseName = attachment.name.replace(/\\/g, '/').split('/').pop() ?? attachment.name;
+  const dotIndex = baseName.lastIndexOf('.');
+  if (dotIndex <= 0 || dotIndex === baseName.length - 1) return null;
+  return baseName.slice(dotIndex + 1).toLowerCase();
+};
+
+const getSpecificMediaType = (mediaType?: string | null): string | null => {
+  const trimmedMediaType = mediaType?.trim();
+  if (!trimmedMediaType) return null;
+  const baseMediaType = trimmedMediaType.split(';', 1)[0].toLowerCase();
+  return baseMediaType === CoworkAttachmentMediaType.Binary ? null : trimmedMediaType;
 };
 
 const CoworkInlineAttachmentItem = ({
@@ -71,19 +93,31 @@ const CoworkInlineAttachmentItem = ({
     };
   }, [attachment.dataUrl, attachment.isImage, attachment.path]);
 
+  const attachmentExtension = getAttachmentExtension(attachment);
   const data = useMemo<AttachmentData>(
-    () => ({
-      type: 'file',
-      id: attachment.path,
-      filename: attachment.name,
-      mediaType:
-        attachment.mediaType ??
-        getDataUrlMediaType(resolvedDataUrl) ??
-        (attachment.isImage ? 'image/*' : 'application/octet-stream'),
-      url: resolvedDataUrl ?? '',
-    }),
-    [attachment, resolvedDataUrl],
+    () => {
+      const mediaType =
+        getSpecificMediaType(attachment.mediaType) ??
+        getSpecificMediaType(getDataUrlMediaType(resolvedDataUrl)) ??
+        (attachmentExtension && CoworkAttachmentMediaTypeByExtension[attachmentExtension]) ??
+        (attachment.isImage
+          ? CoworkAttachmentMediaType.GenericImage
+          : CoworkAttachmentMediaType.Binary);
+
+      return {
+        type: 'file',
+        id: attachment.path,
+        filename: attachment.name,
+        mediaType,
+        url: resolvedDataUrl ?? '',
+      };
+    },
+    [attachment, attachmentExtension, resolvedDataUrl],
   );
+  const mediaTypeLabel =
+    data.mediaType === CoworkAttachmentMediaType.Binary
+      ? attachmentExtension?.toUpperCase()
+      : data.mediaType;
   const mediaCategory = getMediaCategory(data);
   const label = getAttachmentLabel(data);
   const canOpenImage = Boolean(attachment.isImage && resolvedDataUrl && onOpenImage);
@@ -145,8 +179,8 @@ const CoworkInlineAttachmentItem = ({
           )}
           <div className="flex min-w-0 flex-col gap-1 px-0.5">
             <h4 className="truncate text-sm font-semibold leading-none">{label}</h4>
-            {data.mediaType && (
-              <p className="truncate font-mono text-xs text-muted-foreground">{data.mediaType}</p>
+            {mediaTypeLabel && (
+              <p className="truncate font-mono text-xs text-muted-foreground">{mediaTypeLabel}</p>
             )}
           </div>
         </div>
