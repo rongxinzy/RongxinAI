@@ -84,16 +84,18 @@ export function ArtifactAuditTab({ artifacts, runs }: ArtifactAuditTabProps) {
 
   return (
     <TooltipProvider>
-      <Table>
+      <Table className="min-w-max">
         <TableHeader>
           <TableRow>
-            <TableHead>{i18nService.t('workbenchTaskAttempt')}</TableHead>
-            <TableHead>{i18nService.t('workbenchTaskReference')}</TableHead>
-            <TableHead>{i18nService.t('workbenchTaskType')}</TableHead>
-            <TableHead>{i18nService.t('workbenchTaskSource')}</TableHead>
-            <TableHead>{i18nService.t('workbenchTaskHash')}</TableHead>
-            <TableHead>{i18nService.t('workbenchTaskVerification')}</TableHead>
-            <TableHead className="text-right">{i18nService.t('workbenchTaskActions')}</TableHead>
+            <TableHead className="w-12">{i18nService.t('workbenchTaskAttempt')}</TableHead>
+            <TableHead className="w-56">{i18nService.t('workbenchTaskReference')}</TableHead>
+            <TableHead className="w-20">{i18nService.t('workbenchTaskType')}</TableHead>
+            <TableHead className="w-24">{i18nService.t('workbenchTaskSource')}</TableHead>
+            <TableHead className="w-56">{i18nService.t('workbenchTaskHash')}</TableHead>
+            <TableHead className="w-24">{i18nService.t('workbenchTaskVerification')}</TableHead>
+            <TableHead className="w-28 text-right">
+              {i18nService.t('workbenchTaskActions')}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -101,16 +103,24 @@ export function ArtifactAuditTab({ artifacts, runs }: ArtifactAuditTabProps) {
             const filePath = resolveArtifactFilePath(artifact, runs);
             return (
               <TableRow key={artifact.id}>
-                <TableCell>{getRunAttempt(runs, artifact.runId) ?? '-'}</TableCell>
-                <TableCell className="max-w-[320px] break-all">{artifact.reference}</TableCell>
-                <TableCell>{artifactKindLabel(artifact.kind)}</TableCell>
-                <TableCell>{artifactProvenanceLabel(artifact.provenance)}</TableCell>
-                <TableCell className="max-w-64 break-all font-mono text-xs">
-                  {artifact.contentHash}
+                <TableCell className="w-12">{getRunAttempt(runs, artifact.runId) ?? '-'}</TableCell>
+                <TableCell className="w-56">
+                  <span className="block w-56 truncate">{artifact.reference}</span>
                 </TableCell>
-                <TableCell>{artifactVerificationLabel(artifact.verificationStatus)}</TableCell>
-                <TableCell>
-                  <div className="flex justify-end gap-1">
+                <TableCell className="w-20">{artifactKindLabel(artifact.kind)}</TableCell>
+                <TableCell className="w-24">
+                  {artifactProvenanceLabel(artifact.provenance)}
+                </TableCell>
+                <TableCell className="w-56">
+                  <code className="block w-56 truncate font-mono text-xs">
+                    {artifact.contentHash}
+                  </code>
+                </TableCell>
+                <TableCell className="w-24">
+                  {artifactVerificationLabel(artifact.verificationStatus)}
+                </TableCell>
+                <TableCell className="w-28">
+                  <div className="flex shrink-0 justify-end gap-1">
                     {filePath && (
                       <>
                         <ArtifactAction
