@@ -125,3 +125,80 @@ test('returns no memory for non-durable evidence', async () => {
     }),
   ).resolves.toBeNull();
 });
+
+test('clamps out-of-range importance and confidence instead of failing', () => {
+  const parsed = parseAtomicMemoryResponse(
+    JSON.stringify({
+      shouldSave: true,
+      memories: [
+        {
+          title: 'Urgent decision',
+          content: 'Roll out the migration this week.',
+          kind: MemoryKind.Decision,
+          importance: 2,
+          confidence: 1.5,
+          sensitivity: MemorySensitivity.Normal,
+          evidenceSourceIds: ['message-1'],
+        },
+        {
+          title: 'Low priority',
+          content: 'Revisit the dashboard layout later.',
+          kind: MemoryKind.Preference,
+          importance: -0.5,
+          confidence: 3,
+          sensitivity: MemorySensitivity.Normal,
+          evidenceSourceIds: ['message-1'],
+        },
+      ],
+    }),
+    new Set(['message-1']),
+  );
+
+  expect(parsed).toHaveLength(2);
+  expect(parsed[0]).toMatchObject({ importance: 1, confidence: 1 });
+  expect(parsed[1]).toMatchObject({ importance: 0, confidence: 1 });
+});
+
+test('genuine schema errors still fail after clamp repair', () => {
+  expect(() =>
+    parseAtomicMemoryResponse(
+      JSON.stringify({
+        shouldSave: true,
+        memories: [
+          {
+            title: 'Bad kind',
+            content: 'This memory has an invalid kind.',
+            kind: 'not-a-kind',
+            importance: 2,
+            confidence: 0.5,
+            sensitivity: MemorySensitivity.Normal,
+            evidenceSourceIds: ['message-1'],
+          },
+        ],
+      }),
+      new Set(['message-1']),
+    ),
+  ).toThrow(/failed validation/);
+});
+
+test('non-numeric scores are not silently repaired', () => {
+  expect(() =>
+    parseAtomicMemoryResponse(
+      JSON.stringify({
+        shouldSave: true,
+        memories: [
+          {
+            title: 'String score',
+            content: 'importance as a string cannot be clamped.',
+            kind: MemoryKind.Decision,
+            importance: 'high',
+            confidence: 0.5,
+            sensitivity: MemorySensitivity.Normal,
+            evidenceSourceIds: ['message-1'],
+          },
+        ],
+      }),
+      new Set(['message-1']),
+    ),
+  ).toThrow(/failed validation/);
+});
