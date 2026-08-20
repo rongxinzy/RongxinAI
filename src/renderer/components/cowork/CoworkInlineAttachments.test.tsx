@@ -66,6 +66,34 @@ describe('CoworkInlineAttachments', () => {
     });
   });
 
+  test('uses a fixed-width muted label with the filename tail and full hover name', async () => {
+    const filename = 'very-long-financial-report-2026-final.csv';
+
+    render(
+      <CoworkInlineAttachments
+        attachments={[{ path: `C:\\reports\\${filename}`, name: filename }]}
+      />,
+    );
+
+    const leading = screen.getByText('very-long-financial-report-20');
+    const trailing = screen.getByText('26-final.csv');
+    const filenameLabel = trailing.parentElement;
+    const attachment = filenameLabel?.closest('.group');
+
+    expect(leading).toHaveClass('truncate');
+    expect(trailing).toHaveClass('shrink-0');
+    expect(filenameLabel).toHaveClass('text-muted-foreground');
+    expect(attachment).toHaveClass('w-52', 'max-w-full');
+
+    const trigger = attachment?.closest('[data-slot="hover-card-trigger"]');
+    fireEvent.focus(trigger!);
+
+    const fullName = await screen.findByRole('heading', { name: filename });
+    expect(fullName).toHaveClass('whitespace-nowrap');
+    expect(fullName.parentElement?.parentElement).toHaveClass('w-max');
+    expect(fullName.parentElement?.parentElement).not.toHaveClass('max-w-80');
+  });
+
   test('shows an unknown extension instead of the generic binary media type', async () => {
     render(
       <CoworkInlineAttachments

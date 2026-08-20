@@ -3,7 +3,6 @@ import {
   AttachmentHoverCard,
   AttachmentHoverCardContent,
   AttachmentHoverCardTrigger,
-  AttachmentInfo,
   AttachmentPreview,
   AttachmentRemove,
   Attachments,
@@ -37,11 +36,34 @@ interface CoworkInlineAttachmentsProps {
   onOpenImage?: (image: { src: string; alt: string; name: string }) => void;
 }
 
+interface AttachmentFilenameParts {
+  leading: string;
+  trailing: string | null;
+}
+
+const ATTACHMENT_FILENAME_TAIL_LENGTH = 8;
+
 interface CoworkInlineAttachmentItemProps {
   attachment: CoworkInlineAttachment;
   onRemove?: (path: string) => void;
   onOpenImage?: CoworkInlineAttachmentsProps['onOpenImage'];
 }
+
+const getAttachmentFilenameParts = (filename: string): AttachmentFilenameParts => {
+  const dotIndex = filename.lastIndexOf('.');
+  const hasExtension = dotIndex > 0 && dotIndex < filename.length - 1;
+  const stem = hasExtension ? filename.slice(0, dotIndex) : filename;
+  const extension = hasExtension ? filename.slice(dotIndex) : '';
+
+  if (stem.length <= ATTACHMENT_FILENAME_TAIL_LENGTH * 2) {
+    return { leading: filename, trailing: null };
+  }
+
+  return {
+    leading: stem.slice(0, -ATTACHMENT_FILENAME_TAIL_LENGTH),
+    trailing: `${stem.slice(-ATTACHMENT_FILENAME_TAIL_LENGTH)}${extension}`,
+  };
+};
 
 const getDataUrlMediaType = (dataUrl?: string | null): string | null => {
   if (!dataUrl) return null;
@@ -118,6 +140,7 @@ const CoworkInlineAttachmentItem = ({
     data.mediaType === CoworkAttachmentMediaType.Binary
       ? attachmentExtension?.toUpperCase()
       : data.mediaType;
+  const filenameParts = getAttachmentFilenameParts(attachment.name);
   const mediaCategory = getMediaCategory(data);
   const label = getAttachmentLabel(data);
   const canOpenImage = Boolean(attachment.isImage && resolvedDataUrl && onOpenImage);
@@ -139,6 +162,7 @@ const CoworkInlineAttachmentItem = ({
         render={
           <Attachment
             data={data}
+            className="w-52 max-w-full"
             onClick={canOpenImage ? openImage : undefined}
             onKeyDown={canOpenImage ? handleKeyDown : undefined}
             onRemove={onRemove ? () => onRemove(attachment.path) : undefined}
@@ -160,12 +184,17 @@ const CoworkInlineAttachmentItem = ({
                 label={i18nService.t('coworkAttachmentRemove')}
               />
             </div>
-            <AttachmentInfo />
+            <div className="flex min-w-0 flex-1 items-center text-sm text-muted-foreground">
+              <span className="min-w-0 truncate">{filenameParts.leading}</span>
+              {filenameParts.trailing && (
+                <span className="shrink-0">{filenameParts.trailing}</span>
+              )}
+            </div>
           </Attachment>
         }
       />
       <AttachmentHoverCardContent align="start">
-        <div className="flex max-w-80 flex-col gap-3">
+        <div className="flex w-max flex-col gap-3">
           {mediaCategory === 'image' && data.type === 'file' && data.url && (
             <div className="flex max-h-96 w-80 items-center justify-center overflow-hidden rounded-md border border-border">
               <img
@@ -178,9 +207,11 @@ const CoworkInlineAttachmentItem = ({
             </div>
           )}
           <div className="flex min-w-0 flex-col gap-1 px-0.5">
-            <h4 className="truncate text-sm font-semibold leading-none">{label}</h4>
+            <h4 className="whitespace-nowrap text-sm font-semibold leading-none">{label}</h4>
             {mediaTypeLabel && (
-              <p className="truncate font-mono text-xs text-muted-foreground">{mediaTypeLabel}</p>
+              <p className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                {mediaTypeLabel}
+              </p>
             )}
           </div>
         </div>
