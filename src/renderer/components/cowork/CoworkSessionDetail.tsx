@@ -1478,18 +1478,21 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               )}
           </div>
 
+          {!isSessionSwitching && inlinePermission && onRespondToInlinePermission && (
+            <div className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4">
+              <div className="w-full max-w-5xl min-w-[320px] mx-auto pl-4">
+                <CoworkPermissionModal
+                  permission={inlinePermission}
+                  onRespond={onRespondToInlinePermission}
+                  inline
+                />
+              </div>
+            </div>
+          )}
+
           {/* Input Area */}
           <div className="px-4 pb-4 shrink-0">
             <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
-              {!isSessionSwitching && inlinePermission && onRespondToInlinePermission && (
-                <div className="mb-2">
-                  <CoworkPermissionModal
-                    permission={inlinePermission}
-                    onRespond={onRespondToInlinePermission}
-                    inline
-                  />
-                </div>
-              )}
               <CoworkPromptInput
                 ref={promptInputRef}
                 topAccessory={
