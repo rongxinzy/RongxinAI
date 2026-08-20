@@ -8,14 +8,24 @@ const source = readFileSync(
   'utf8',
 );
 
-test('anchors inline permission approval directly above the prompt input', () => {
+test('overlays inline permission approval on the prompt input', () => {
+  const overlay = source.indexOf('className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4"');
+  const permissionContainer = source.indexOf(
+    'className="w-full max-w-5xl min-w-[320px] mx-auto pl-4"',
+    overlay,
+  );
+  const permission = source.indexOf('<CoworkPermissionModal', overlay);
   const inputArea = source.indexOf('{/* Input Area */}');
-  const permission = source.indexOf('<CoworkPermissionModal', inputArea);
+  const promptContainer = source.indexOf(
+    'className="max-w-5xl min-w-[320px] mx-auto pl-4"',
+    inputArea,
+  );
   const promptInput = source.indexOf('<CoworkPromptInput', inputArea);
 
-  expect(inputArea).toBeGreaterThanOrEqual(0);
-  expect(permission).toBeGreaterThan(inputArea);
-  expect(promptInput).toBeGreaterThan(permission);
-  expect(source.slice(inputArea, permission)).toContain('className="mb-2"');
-  expect(source).not.toContain('absolute inset-x-0 bottom-0 z-20 px-4 pb-4');
+  expect(overlay).toBeGreaterThanOrEqual(0);
+  expect(permissionContainer).toBeGreaterThan(overlay);
+  expect(permission).toBeGreaterThan(permissionContainer);
+  expect(inputArea).toBeGreaterThan(permission);
+  expect(promptContainer).toBeGreaterThan(inputArea);
+  expect(promptInput).toBeGreaterThan(promptContainer);
 });
