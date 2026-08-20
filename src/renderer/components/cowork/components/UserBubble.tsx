@@ -1,6 +1,5 @@
 import { Message, MessageContent } from '@shared/components/ai-elements/message';
-import { Button } from '@shared/components/ui/button';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import type {
@@ -16,9 +15,9 @@ import type { Skill } from '../../../types/skill';
 import { formatMessageDateTime } from '../../../utils/tokenFormat';
 import { parseUserMessageForDisplay } from '../../../utils/userMessageDisplay';
 import ImagePreviewModal, { type ImagePreviewSource } from '../ImagePreviewModal';
+import { CoworkInlineAttachments, type CoworkInlineAttachment } from '../CoworkInlineAttachments';
 import { findChatSkillShortcut } from '../../chat/constants';
 import { CopyButton, ReEditButton } from './CopyButton';
-import FileTypeIcon from '../../icons/fileTypes/FileTypeIcon';
 
 const getMessageModelLabel = (metadata?: CoworkMessageMetadata | null): string | null => {
   const model = typeof metadata?.model === 'string' ? metadata.model.trim() : '';
@@ -76,64 +75,6 @@ const removePromptAttachmentFallbacks = (content: string): string => {
     .replace(/^\n+|\n+$/g, '');
 };
 
-const FileAttachmentCard: React.FC<{ file: CoworkFileAttachment }> = ({ file }) => (
-  <div
-    className="flex h-20 w-64 shrink-0 items-center gap-3 rounded-lg border border-border-subtle bg-surface-raised px-4"
-    title={file.path}
-  >
-    <FileTypeIcon fileName={file.name} className="h-12 w-12 shrink-0" />
-    <div className="min-w-0">
-      <div className="truncate text-base text-foreground">{file.name}</div>
-      <div className="truncate text-sm text-muted-foreground">{file.extension}</div>
-    </div>
-  </div>
-);
-
-const LocalImageAttachmentPreview: React.FC<{
-  file: CoworkFileAttachment;
-  onExpand: (image: ImagePreviewSource) => void;
-}> = ({ file, onExpand }) => {
-  const [dataUrl, setDataUrl] = useState<string | null>(null);
-  const [readFailed, setReadFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setDataUrl(null);
-    setReadFailed(false);
-    void window.electron.dialog.readFileAsDataUrl(file.path).then(result => {
-      if (cancelled) return;
-      if (result.success && result.dataUrl) {
-        setDataUrl(result.dataUrl);
-      } else {
-        setReadFailed(true);
-      }
-    }).catch(() => {
-      if (!cancelled) setReadFailed(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [file.path]);
-
-  if (!dataUrl) {
-    return readFailed ? <FileAttachmentCard file={file} /> : null;
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      className="block h-auto w-auto min-h-0 shrink-0 cursor-zoom-in rounded-lg p-0 shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50"
-      onClick={() => onExpand({ src: dataUrl, alt: file.name, name: file.name })}
-    >
-      <img
-        src={dataUrl}
-        alt={file.name || 'image'}
-        className="block h-36 w-64 max-w-full rounded-lg object-contain"
-      />
-    </Button>
-  );
-};
-
 export const UserBubble: React.FC<{
   message: CoworkMessage;
   skills: Skill[];
@@ -165,19 +106,15 @@ export const UserBubble: React.FC<{
         []) as CoworkImageAttachment[],
     [message.metadata],
   );
-  const fileAttachments = useMemo(
-    () => {
-      const persisted =
-        ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
-          []) as CoworkFileAttachment[];
-      const knownPaths = new Set(persisted.map(file => file.path));
-      const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
-        file => !knownPaths.has(file.path),
-      );
-      return [...persisted, ...fallbacks];
-    },
-    [message.content, message.metadata],
-  );
+  const fileAttachments = useMemo(() => {
+    const persisted = ((message.metadata as CoworkMessageMetadata)?.fileAttachments ??
+      []) as CoworkFileAttachment[];
+    const knownPaths = new Set(persisted.map(file => file.path));
+    const fallbacks = getPromptAttachmentFallbacks(message.content || '').filter(
+      file => !knownPaths.has(file.path),
+    );
+    return [...persisted, ...fallbacks];
+  }, [message.content, message.metadata]);
   const textContent = useMemo(() => {
     const contentWithoutFallbacks = removePromptAttachmentFallbacks(displayContent);
     if (fileAttachments.length === 0) return contentWithoutFallbacks;
@@ -188,13 +125,18 @@ export const UserBubble: React.FC<{
       .join('\n')
       .replace(/^\n+|\n+$/g, '');
   }, [displayContent, fileAttachments]);
-  const localImageAttachments = useMemo(
-    () => fileAttachments.filter(file => file.isImage),
-    [fileAttachments],
-  );
-  const documentAttachments = useMemo(
-    () => fileAttachments.filter(file => !file.isImage),
-    [fileAttachments],
+  const inlineAttachments = useMemo<CoworkInlineAttachment[]>(
+    () => [
+      ...imageAttachments.map((image, index) => ({
+        path: `inline:${message.id}:${index}`,
+        name: image.name,
+        isImage: true,
+        mediaType: image.mimeType,
+        dataUrl: `data:${image.mimeType};base64,${image.base64Data}`,
+      })),
+      ...fileAttachments,
+    ],
+    [fileAttachments, imageAttachments, message.id],
   );
   const hasTextContent = Boolean(textContent.trim()) || messageSkills.length > 0;
 
@@ -207,47 +149,12 @@ export const UserBubble: React.FC<{
       onBlur={handleBlur}
     >
       <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end">
-        {imageAttachments.length > 0 && (
-          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
-            {imageAttachments.map((img, idx) => (
-              <Button
-                key={idx}
-                variant="ghost"
-                className="block h-auto w-auto min-h-0 shrink-0 cursor-zoom-in rounded-lg p-0 shadow-none hover:bg-transparent focus-visible:ring-2 focus-visible:ring-primary/50"
-                onClick={() =>
-                  setExpandedImage({
-                    src: `data:${img.mimeType};base64,${img.base64Data}`,
-                    alt: img.name,
-                    name: img.name,
-                  })
-                }
-              >
-                <img
-                  src={`data:${img.mimeType};base64,${img.base64Data}`}
-                  alt={img.name || 'image'}
-                  className="block h-36 w-64 max-w-full rounded-lg object-contain"
-                />
-              </Button>
-            ))}
-          </div>
-        )}
-
-        {localImageAttachments.length > 0 && (
-          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
-            {localImageAttachments.map(file => (
-              <LocalImageAttachmentPreview
-                key={file.path}
-                file={file}
-                onExpand={setExpandedImage}
-              />
-            ))}
-          </div>
-        )}
-
-        {documentAttachments.length > 0 && (
-          <div className="ml-auto mb-2 flex w-fit max-w-full flex-wrap justify-end gap-2">
-            {documentAttachments.map(file => <FileAttachmentCard key={file.path} file={file} />)}
-          </div>
+        {inlineAttachments.length > 0 && (
+          <CoworkInlineAttachments
+            attachments={inlineAttachments}
+            className="mb-2 ml-auto max-w-full justify-end"
+            onOpenImage={setExpandedImage}
+          />
         )}
 
         {hasTextContent && (
@@ -270,9 +177,7 @@ export const UserBubble: React.FC<{
           <span>{formatMessageDateTime(message.timestamp)}</span>
           {modelLabel && <span className="opacity-70">{modelLabel}</span>}
           <CopyButton content={message.content} visible={isHovered} />
-          {onReEdit && (
-            <ReEditButton visible={isHovered} onClick={() => onReEdit(message)} />
-          )}
+          {onReEdit && <ReEditButton visible={isHovered} onClick={() => onReEdit(message)} />}
         </div>
       </div>
       {expandedImage &&
@@ -286,9 +191,7 @@ export const UserBubble: React.FC<{
 
 const MessageSkillSummary: React.FC<{ skill: Skill }> = ({ skill }) => {
   const shortcut = findChatSkillShortcut(skill.id);
-  const label = shortcut
-    ? i18nService.t(shortcut.labelKey)
-    : skill.displayName || skill.name;
+  const label = shortcut ? i18nService.t(shortcut.labelKey) : skill.displayName || skill.name;
   const ShortcutIcon = shortcut?.icon;
 
   return (
