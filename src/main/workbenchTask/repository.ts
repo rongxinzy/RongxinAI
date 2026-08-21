@@ -281,6 +281,32 @@ export class WorkbenchTaskRepository {
     return this.requireRun(runId);
   }
 
+  /**
+   * Persist the run's final answer so later steps (e.g. user acceptance)
+   * can still dispatch the verified-run memory promotion, which consumes
+   * the answer text as extraction evidence.
+   */
+  updateFinalAnswer(runId: string, finalAnswer: string): WorkbenchRun {
+    this.requireRun(runId);
+    this.db
+      .prepare('UPDATE workbench_runs SET final_answer_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(finalAnswer), Date.now(), runId);
+    return this.requireRun(runId);
+  }
+
+  getRunFinalAnswer(runId: string): string {
+    const row = this.db
+      .prepare('SELECT final_answer_json FROM workbench_runs WHERE id = ?')
+      .get(runId) as { final_answer_json: string | null } | undefined;
+    if (!row || !row.final_answer_json) return '';
+    try {
+      const parsed = JSON.parse(row.final_answer_json);
+      return typeof parsed === 'string' ? parsed : '';
+    } catch {
+      return '';
+    }
+  }
+
   updateRunStatus(
     runId: string,
     status: WorkbenchRunStatusType,
@@ -440,6 +466,16 @@ export class WorkbenchTaskRepository {
         WorkbenchArtifactVerificationStatus.Pending,
       );
     return result.changes;
+  }
+
+  countPendingArtifacts(runId: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM workbench_artifacts
+         WHERE run_id = ? AND verification_status = ?`,
+      )
+      .get(runId, WorkbenchArtifactVerificationStatus.Pending) as { n: number };
+    return row.n;
   }
 
   createApproval(
