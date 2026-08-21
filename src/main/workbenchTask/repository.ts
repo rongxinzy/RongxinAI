@@ -281,6 +281,32 @@ export class WorkbenchTaskRepository {
     return this.requireRun(runId);
   }
 
+  /**
+   * Persist the run's final answer so later steps (e.g. user acceptance)
+   * can still dispatch the verified-run memory promotion, which consumes
+   * the answer text as extraction evidence.
+   */
+  updateFinalAnswer(runId: string, finalAnswer: string): WorkbenchRun {
+    this.requireRun(runId);
+    this.db
+      .prepare('UPDATE workbench_runs SET final_answer_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(finalAnswer), Date.now(), runId);
+    return this.requireRun(runId);
+  }
+
+  getRunFinalAnswer(runId: string): string {
+    const row = this.db
+      .prepare('SELECT final_answer_json FROM workbench_runs WHERE id = ?')
+      .get(runId) as { final_answer_json: string | null } | undefined;
+    if (!row || !row.final_answer_json) return '';
+    try {
+      const parsed = JSON.parse(row.final_answer_json);
+      return typeof parsed === 'string' ? parsed : '';
+    } catch {
+      return '';
+    }
+  }
+
   updateRunStatus(
     runId: string,
     status: WorkbenchRunStatusType,
@@ -418,6 +444,38 @@ export class WorkbenchTaskRepository {
     return this.mapArtifact(
       this.db.prepare('SELECT * FROM workbench_artifacts WHERE id = ?').get(id) as ArtifactRow,
     );
+  }
+
+  /**
+   * Promote every pending artifact of a run to verified. Invoked when the
+   * run's own verification gate succeeds — deterministic verification pass
+   * or explicit user acceptance — because pending workspace artifacts have
+   * no other verifier. Verified and failed artifacts are left untouched.
+   */
+  markArtifactsVerified(runId: string): number {
+    const result = this.db
+      .prepare(
+        `UPDATE workbench_artifacts
+         SET verification_status = ?, updated_at = ?
+         WHERE run_id = ? AND verification_status = ?`,
+      )
+      .run(
+        WorkbenchArtifactVerificationStatus.Verified,
+        Date.now(),
+        runId,
+        WorkbenchArtifactVerificationStatus.Pending,
+      );
+    return result.changes;
+  }
+
+  countPendingArtifacts(runId: string): number {
+    const row = this.db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM workbench_artifacts
+         WHERE run_id = ? AND verification_status = ?`,
+      )
+      .get(runId, WorkbenchArtifactVerificationStatus.Pending) as { n: number };
+    return row.n;
   }
 
   createApproval(
