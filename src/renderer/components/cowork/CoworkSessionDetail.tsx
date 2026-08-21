@@ -93,6 +93,10 @@ import {
 import { useSessionHistoryPagination } from './hooks/useSessionHistoryPagination';
 import { useRecoverableWorkbenchTaskId } from './hooks/useRecoverableWorkbenchTaskId';
 import { useConversationRailScrollSync } from './hooks/useConversationRailScrollSync';
+import {
+  COWORK_COMPOSER_INSET_VALUE,
+  useCoworkComposerInset,
+} from './hooks/useCoworkComposerInset';
 import { useTodoQueueLifecycle } from './hooks/useTodoQueueLifecycle';
 import { TodoQueue } from './TodoQueue';
 import AskUserQuestionCard from './AskUserQuestionCard';
@@ -214,6 +218,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const detailRootRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
+  const composerOverlayRef = useCoworkComposerInset(detailRootRef);
 
   const sessionId = currentSession?.id;
   const recoverableTaskId = useRecoverableWorkbenchTaskId(sessionId);
@@ -1207,7 +1212,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 resize={isStreaming ? 'smooth' : 'instant'}
               >
                 <ConversationContent
-                  className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
+                  className="pt-3"
                   observeContentResize={false}
                   reverse={false}
                   scrollClassName="cowork-conversation-scroll"
@@ -1227,11 +1232,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                         <WorkbenchTaskAcceptanceCard sessionId={sessionId} />
                       </div>
                     )}
-                    <div className="h-20" />
+                    <div
+                      aria-hidden="true"
+                      style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}
+                    />
                   </div>
                 </ConversationContent>
                 <ConversationScrollButton
-                  className={todoQueue.todos.length > 0 ? 'bottom-14' : undefined}
+                  style={{ bottom: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}
                 />
               </Conversation>
             )}
@@ -1478,74 +1486,76 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               )}
           </div>
 
-          {!isSessionSwitching && inlinePermission && onRespondToInlinePermission && (
-            <div className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4">
-              <div className="w-full max-w-5xl min-w-[320px] mx-auto pl-4">
-                <CoworkPermissionModal
-                  permission={inlinePermission}
-                  onRespond={onRespondToInlinePermission}
-                  inline
-                />
-              </div>
-            </div>
-          )}
-
           {/* Input Area */}
-          <div className="px-4 pb-4 shrink-0">
-            <div className="max-w-5xl min-w-[320px] mx-auto pl-4">
-              <CoworkPromptInput
-                ref={promptInputRef}
-                topAccessory={
-                  isSessionSwitching ? null : (
-                    <>
-                      {workMode === CoworkSessionMode.Work &&
-                        !isDirectChat &&
-                        currentSession?.id && (
-                          <PendingMessageQueue
-                            sessionId={currentSession.id}
-                            isStreaming={isStreaming}
-                          />
-                        )}
-                      <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
-                    </>
-                  )
-                }
-                onSubmit={onContinue}
-                onStop={onStop}
-                isStreaming={isSessionSwitching ? false : isStreaming}
-                placeholder={i18nService.t(
-                  !isSessionSwitching && remoteManaged
-                    ? 'coworkRemoteManagedPlaceholder'
-                    : workMode === 'chat'
-                      ? 'chatPlaceholder'
-                      : 'coworkContinuePlaceholder',
-                )}
-                disabled={
-                  !isSessionSwitching &&
-                  (remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission))
-                }
-                sessionContextPending={isSessionSwitching}
-                size="large"
-                remoteManaged={!isSessionSwitching && remoteManaged}
-                onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
-                onManageConnectors={
-                  !isSessionSwitching && remoteManaged ? undefined : onManageConnectors
-                }
-                showPermissionModeSelector={workMode === 'work'}
-                permissionMode={permissionMode}
-                onPermissionModeChange={onPermissionModeChange}
-                showModelSelector={true}
-                isDirectChat={isDirectChat}
-                showLocalThinkingToggle={isDirectChat}
-                localThinkingEnabled={localThinkingEnabled}
-                onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
-                resumeTaskActive={Boolean(resumeTaskId)}
-                onCancelTaskResume={onCancelTaskResume}
-                sessionId={displayedSessionId ?? currentSession?.id}
-              />
-              <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
-                {i18nService.t('aiGeneratedDisclaimer')}
-              </p>
+          <div
+            ref={composerOverlayRef}
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
+          >
+            <div className="mx-auto grid w-full max-w-5xl min-w-[320px] pl-4">
+              <div className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4">
+                <CoworkPromptInput
+                  ref={promptInputRef}
+                  topAccessory={
+                    isSessionSwitching ? null : (
+                      <>
+                        {workMode === CoworkSessionMode.Work &&
+                          !isDirectChat &&
+                          currentSession?.id && (
+                            <PendingMessageQueue
+                              sessionId={currentSession.id}
+                              isStreaming={isStreaming}
+                            />
+                          )}
+                        <TodoQueue todos={todoQueue.todos} isDismissing={todoQueue.isDismissing} />
+                      </>
+                    )
+                  }
+                  onSubmit={onContinue}
+                  onStop={onStop}
+                  isStreaming={isSessionSwitching ? false : isStreaming}
+                  placeholder={i18nService.t(
+                    !isSessionSwitching && remoteManaged
+                      ? 'coworkRemoteManagedPlaceholder'
+                      : workMode === 'chat'
+                        ? 'chatPlaceholder'
+                        : 'coworkContinuePlaceholder',
+                  )}
+                  disabled={
+                    !isSessionSwitching &&
+                    (remoteManaged || isAwaitingInlineQuestion || Boolean(inlinePermission))
+                  }
+                  sessionContextPending={isSessionSwitching}
+                  size="large"
+                  remoteManaged={!isSessionSwitching && remoteManaged}
+                  onManageSkills={!isSessionSwitching && remoteManaged ? undefined : onManageSkills}
+                  onManageConnectors={
+                    !isSessionSwitching && remoteManaged ? undefined : onManageConnectors
+                  }
+                  showPermissionModeSelector={workMode === 'work'}
+                  permissionMode={permissionMode}
+                  onPermissionModeChange={onPermissionModeChange}
+                  showModelSelector={true}
+                  isDirectChat={isDirectChat}
+                  showLocalThinkingToggle={isDirectChat}
+                  localThinkingEnabled={localThinkingEnabled}
+                  onLocalThinkingEnabledChange={onLocalThinkingEnabledChange}
+                  resumeTaskActive={Boolean(resumeTaskId)}
+                  onCancelTaskResume={onCancelTaskResume}
+                  sessionId={displayedSessionId ?? currentSession?.id}
+                />
+                <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
+                  {i18nService.t('aiGeneratedDisclaimer')}
+                </p>
+              </div>
+              {!isSessionSwitching && inlinePermission && onRespondToInlinePermission && (
+                <div className="pointer-events-auto relative z-10 col-start-1 row-start-1 self-end">
+                  <CoworkPermissionModal
+                    permission={inlinePermission}
+                    onRespond={onRespondToInlinePermission}
+                    inline
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -142,13 +142,13 @@ export const UserBubble: React.FC<{
 
   return (
     <div
-      className="w-full py-2 px-4 focus:outline-none"
+      className="w-full py-2 focus:outline-none"
       tabIndex={0}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={handleMouseLeave}
       onBlur={handleBlur}
     >
-      <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end">
+      <div className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end pl-4">
         {inlineAttachments.length > 0 && (
           <CoworkInlineAttachments
             attachments={inlineAttachments}
