@@ -420,6 +420,28 @@ export class WorkbenchTaskRepository {
     );
   }
 
+  /**
+   * Promote every pending artifact of a run to verified. Invoked when the
+   * run's own verification gate succeeds — deterministic verification pass
+   * or explicit user acceptance — because pending workspace artifacts have
+   * no other verifier. Verified and failed artifacts are left untouched.
+   */
+  markArtifactsVerified(runId: string): number {
+    const result = this.db
+      .prepare(
+        `UPDATE workbench_artifacts
+         SET verification_status = ?, updated_at = ?
+         WHERE run_id = ? AND verification_status = ?`,
+      )
+      .run(
+        WorkbenchArtifactVerificationStatus.Verified,
+        Date.now(),
+        runId,
+        WorkbenchArtifactVerificationStatus.Pending,
+      );
+    return result.changes;
+  }
+
   createApproval(
     input: Pick<
       WorkbenchApproval,

@@ -200,6 +200,78 @@ test('promotes an existing pending artifact when verified evidence arrives', () 
   }
 });
 
+test('marks only pending artifacts of a run as verified', () => {
+  const { db, repository } = createRepository();
+  try {
+    const task = repository.createTask('session', 'goal', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    const pending = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/plain',
+      reference: 'pending.txt',
+      contentHash: 'pending-hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: { role: 'deliverable' },
+    });
+    const failed = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/plain',
+      reference: 'failed.txt',
+      contentHash: 'failed-hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Failed,
+      metadata: {},
+    });
+    const verified = repository.addArtifact({
+      taskId: task.id,
+      runId: run.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/plain',
+      reference: 'verified.txt',
+      contentHash: 'verified-hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+      metadata: {},
+    });
+    const otherRun = repository.createRun(task.id, WorkbenchRunTrigger.Retry);
+    const otherPending = repository.addArtifact({
+      taskId: task.id,
+      runId: otherRun.id,
+      kind: WorkbenchArtifactKind.File,
+      mimeType: 'text/plain',
+      reference: 'other.txt',
+      contentHash: 'other-hash',
+      provenance: WorkbenchArtifactProvenance.Workspace,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+      metadata: {},
+    });
+
+    const changes = repository.markArtifactsVerified(run.id);
+
+    expect(changes).toBe(1);
+    const artifacts = repository.getDetail(task.id)?.artifacts ?? [];
+    expect(artifacts.find(artifact => artifact.id === pending.id)?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Verified,
+    );
+    expect(artifacts.find(artifact => artifact.id === failed.id)?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Failed,
+    );
+    expect(artifacts.find(artifact => artifact.id === verified.id)?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Verified,
+    );
+    expect(artifacts.find(artifact => artifact.id === otherPending.id)?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Pending,
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test('preserves declared identity when pending tool evidence is deduplicated', () => {
   const { db, repository } = createRepository();
   try {

@@ -321,6 +321,108 @@ test('keeps acceptance-required production work ready until explicit user accept
   }
 });
 
+test('user acceptance promotes pending workspace artifacts to verified', () => {
+  const { db, service } = createService();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-accept-artifact-'));
+  const filePath = path.join(workspace, 'report.md');
+  fs.writeFileSync(filePath, '# report');
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    };
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'complete generic work',
+      contract,
+    });
+    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
+    service.registerArtifact({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      candidate: {
+        path: filePath,
+        role: 'deliverable',
+        source: WorkbenchArtifactCandidateSource.Declaration,
+      },
+    });
+
+    const pending = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'done',
+    });
+    expect(pending.artifacts[0]?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Pending,
+    );
+
+    const accepted = service.acceptTask(task.id);
+    expect(accepted.artifacts[0]?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Verified,
+    );
+    expect(accepted.events).toContainEqual(
+      expect.objectContaining({
+        type: WorkbenchRunEventType.VerificationFinished,
+        payload: expect.objectContaining({ verifiedArtifacts: 1, acceptedByUser: true }),
+      }),
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
+test('baseline pass without the production workflow verifies pending artifacts', () => {
+  const { db, service } = createService();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-baseline-artifact-'));
+  const filePath = path.join(workspace, 'report.md');
+  fs.writeFileSync(filePath, '# report');
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: false,
+    };
+    const { run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'produce a quick report',
+      contract,
+    });
+    service.registerArtifact({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      candidate: {
+        path: filePath,
+        role: 'deliverable',
+        source: WorkbenchArtifactCandidateSource.Declaration,
+      },
+    });
+
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'done',
+    });
+
+    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(detail.artifacts[0]?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Verified,
+    );
+    expect(detail.events).toContainEqual(
+      expect.objectContaining({
+        type: WorkbenchRunEventType.VerificationFinished,
+        payload: expect.objectContaining({ verifiedArtifacts: 1, outcome: 'passed' }),
+      }),
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
 test('creates a new task for each ordinary user message', () => {
   const { db, service } = createService();
   try {

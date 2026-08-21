@@ -332,9 +332,18 @@ export class WorkbenchTaskService extends EventEmitter {
         });
         this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.NeedsReview, run.id);
       }
+      // A passed verification is the only verifier pending workspace artifacts
+      // have when the production workflow is absent (or was skipped): promote
+      // them along with the run. Acceptance-required runs are promoted in
+      // acceptTask instead.
+      const verifiedArtifacts =
+        result.outcome === WorkbenchVerificationOutcome.Passed
+          ? this.repository.markArtifactsVerified(run.id)
+          : 0;
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: result.outcome,
         summary: result.summary,
+        verifiedArtifacts,
       });
       this.measurement.recordVerification(run.id, {
         passed: result.outcome === WorkbenchVerificationOutcome.Passed,
@@ -395,9 +404,13 @@ export class WorkbenchTaskService extends EventEmitter {
         verificationResult: acceptedResult,
       });
       this.repository.updateTaskStatus(taskId, WorkbenchTaskStatus.Completed, null);
+      // User acceptance is the final verifier: promote every pending artifact
+      // (workspace declarations and tool effects) alongside the accepted run.
+      const verifiedArtifacts = this.repository.markArtifactsVerified(run.id);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
         outcome: acceptedResult.outcome,
         acceptedByUser: true,
+        verifiedArtifacts,
       });
       this.productionLoop.recordVerificationResult(
         run.id,
