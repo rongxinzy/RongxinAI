@@ -1212,7 +1212,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                 resize={isStreaming ? 'smooth' : 'instant'}
               >
                 <ConversationContent
-                  className={`pt-3 ${turns.length > 1 ? 'pr-8' : 'pr-3'}`}
+                  className="pt-3"
                   observeContentResize={false}
                   reverse={false}
                   scrollClassName="cowork-conversation-scroll"
@@ -1489,10 +1489,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {/* Input Area */}
           <div
             ref={composerOverlayRef}
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
           >
             <div className="mx-auto grid w-full max-w-5xl min-w-[320px] pl-4">
-              <div className="pointer-events-auto col-start-1 row-start-1 self-end">
+              <div className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4">
                 <CoworkPromptInput
                   ref={promptInputRef}
                   topAccessory={
