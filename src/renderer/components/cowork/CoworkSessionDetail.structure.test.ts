@@ -8,24 +8,20 @@ const source = readFileSync(
   'utf8',
 );
 
-test('overlays inline permission approval on the prompt input', () => {
-  const overlay = source.indexOf('className="absolute inset-x-0 bottom-0 z-20 px-4 pb-4"');
-  const permissionContainer = source.indexOf(
-    'className="w-full max-w-5xl min-w-[320px] mx-auto pl-4"',
-    overlay,
-  );
-  const permission = source.indexOf('<CoworkPermissionModal', overlay);
+test('lets the conversation fill the pane behind the floating composer', () => {
   const inputArea = source.indexOf('{/* Input Area */}');
-  const promptContainer = source.indexOf(
-    'className="max-w-5xl min-w-[320px] mx-auto pl-4"',
-    inputArea,
-  );
+  const overlay = source.indexOf('ref={composerOverlayRef}', inputArea);
   const promptInput = source.indexOf('<CoworkPromptInput', inputArea);
+  const permission = source.indexOf('<CoworkPermissionModal', promptInput);
 
-  expect(overlay).toBeGreaterThanOrEqual(0);
-  expect(permissionContainer).toBeGreaterThan(overlay);
-  expect(permission).toBeGreaterThan(permissionContainer);
-  expect(inputArea).toBeGreaterThan(permission);
-  expect(promptContainer).toBeGreaterThan(inputArea);
-  expect(promptInput).toBeGreaterThan(promptContainer);
+  expect(source).toContain('const composerOverlayRef = useCoworkComposerInset(detailRootRef);');
+  expect(source).toContain('style={{ height: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
+  expect(source).toContain('style={{ bottom: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
+  expect(inputArea).toBeGreaterThanOrEqual(0);
+  expect(overlay).toBeGreaterThan(inputArea);
+  expect(source.slice(overlay, promptInput)).toContain(
+    'className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4"',
+  );
+  expect(promptInput).toBeGreaterThan(overlay);
+  expect(permission).toBeGreaterThan(promptInput);
 });
