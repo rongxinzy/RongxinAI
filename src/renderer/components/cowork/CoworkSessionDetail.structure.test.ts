@@ -7,6 +7,14 @@ const source = readFileSync(
   fileURLToPath(new URL('./CoworkSessionDetail.tsx', import.meta.url)),
   'utf8',
 );
+const turnBlockSource = readFileSync(
+  fileURLToPath(new URL('./components/TurnBlock.tsx', import.meta.url)),
+  'utf8',
+);
+const userBubbleSource = readFileSync(
+  fileURLToPath(new URL('./components/UserBubble.tsx', import.meta.url)),
+  'utf8',
+);
 
 test('lets the conversation fill the pane behind the floating composer', () => {
   const inputArea = source.indexOf('{/* Input Area */}');
@@ -20,8 +28,17 @@ test('lets the conversation fill the pane behind the floating composer', () => {
   expect(inputArea).toBeGreaterThanOrEqual(0);
   expect(overlay).toBeGreaterThan(inputArea);
   expect(source.slice(overlay, promptInput)).toContain(
-    'className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4 pb-4"',
+    'className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"',
   );
+  expect(source.slice(overlay, promptInput)).toContain(
+    'className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4"',
+  );
+  expect(turnBlockSource).toContain('className="mx-auto w-full max-w-5xl min-w-[320px] pl-4"');
+  expect(turnBlockSource).toContain('className="flex min-w-0 flex-1 flex-col gap-3 py-3"');
+  expect(userBubbleSource).toContain(
+    'className="mx-auto flex w-full max-w-5xl min-w-[320px] flex-col items-end pl-4"',
+  );
+  expect(source).toMatch(/<ConversationContent\r?\n\s+className="pt-3"/);
   expect(promptInput).toBeGreaterThan(overlay);
   expect(permission).toBeGreaterThan(promptInput);
 });
