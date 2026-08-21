@@ -200,6 +200,22 @@ test('promotes an existing pending artifact when verified evidence arrives', () 
   }
 });
 
+test('persists and restores the run final answer', () => {
+  const { db, repository } = createRepository();
+  try {
+    const task = repository.createTask('session', 'goal', contract);
+    const run = repository.createRun(task.id, WorkbenchRunTrigger.Message);
+    expect(repository.getRunFinalAnswer(run.id)).toBe('');
+    expect(repository.getRunFinalAnswer('missing-run')).toBe('');
+
+    repository.updateFinalAnswer(run.id, 'final answer text');
+
+    expect(repository.getRunFinalAnswer(run.id)).toBe('final answer text');
+  } finally {
+    db.close();
+  }
+});
+
 test('marks only pending artifacts of a run as verified', () => {
   const { db, repository } = createRepository();
   try {

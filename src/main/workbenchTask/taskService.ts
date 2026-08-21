@@ -307,6 +307,7 @@ export class WorkbenchTaskService extends EventEmitter {
           : [];
       });
     const artifactCandidates = [...toolArtifactCandidates, ...(input.artifactCandidates ?? [])];
+    let finalResult = result;
     this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Verifying);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationStarted);
@@ -321,40 +322,58 @@ export class WorkbenchTaskService extends EventEmitter {
       })) {
         this.repository.addArtifact(artifact);
       }
+      // A passed baseline only attests a non-empty final response and a
+      // cleanly closed stream; it says nothing about artifact content. Pending
+      // artifacts therefore have no verifier on the baseline-only path and
+      // must go through explicit user acceptance instead. Pending artifacts
+      // are promoted to verified exclusively by acceptTask.
       if (result.outcome === WorkbenchVerificationOutcome.Passed) {
+        const pendingCount = this.repository.countPendingArtifacts(run.id);
+        if (pendingCount > 0) {
+          finalResult = {
+            outcome: WorkbenchVerificationOutcome.AcceptanceRequired,
+            checks: [
+              {
+                name: 'artifact_verification',
+                status: WorkbenchVerificationCheckStatus.Skipped,
+                detail: `${pendingCount} artifact(s) require explicit user acceptance.`,
+              },
+              ...result.checks,
+            ],
+            evidence: result.evidence,
+            summary: `The work result produced ${pendingCount} artifact(s) that require explicit user acceptance.`,
+          };
+        }
+      }
+      if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
-          verificationResult: result,
+          verificationResult: finalResult,
         });
         this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Completed, null);
       } else {
         this.repository.updateRunStatus(run.id, WorkbenchRunStatus.NeedsReview, {
-          verificationResult: result,
+          verificationResult: finalResult,
         });
         this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.NeedsReview, run.id);
       }
-      // A passed verification is the only verifier pending workspace artifacts
-      // have when the production workflow is absent (or was skipped): promote
-      // them along with the run. Acceptance-required runs are promoted in
-      // acceptTask instead.
-      const verifiedArtifacts =
-        result.outcome === WorkbenchVerificationOutcome.Passed
-          ? this.repository.markArtifactsVerified(run.id)
-          : 0;
+      // Keep the completion context so user acceptance can still dispatch the
+      // verified-run memory promotion with the same evidence the automatic
+      // path uses.
+      this.repository.updateFinalAnswer(run.id, input.finalAnswer);
       this.repository.appendRunEvent(run.id, WorkbenchRunEventType.VerificationFinished, {
-        outcome: result.outcome,
-        summary: result.summary,
-        verifiedArtifacts,
+        outcome: finalResult.outcome,
+        summary: finalResult.summary,
       });
       this.measurement.recordVerification(run.id, {
-        passed: result.outcome === WorkbenchVerificationOutcome.Passed,
-        outcome: result.outcome,
-        checks: result.checks.map(check => ({ name: check.name, status: check.status })),
+        passed: finalResult.outcome === WorkbenchVerificationOutcome.Passed,
+        outcome: finalResult.outcome,
+        checks: finalResult.checks.map(check => ({ name: check.name, status: check.status })),
       });
-      this.productionLoop.recordVerificationResult(run.id, result.outcome, result.summary);
+      this.productionLoop.recordVerificationResult(run.id, finalResult.outcome, finalResult.summary);
     });
     const detail = this.repository.getDetail(task.id);
     if (!detail) throw new Error('Workbench task detail disappeared after verification.');
-    if (result.outcome === WorkbenchVerificationOutcome.Passed) {
+    if (finalResult.outcome === WorkbenchVerificationOutcome.Passed) {
       const verifiedRun = detail.runs.find(candidate => candidate.id === run.id);
       if (verifiedRun) {
         try {
@@ -399,6 +418,10 @@ export class WorkbenchTaskService extends EventEmitter {
       ],
       summary: 'The user accepted the work result.',
     };
+    // Recover the completion context persisted at completeRun so acceptance
+    // can dispatch the same verified-run promotion the automatic path uses.
+    const workspaceRoot = run.context?.workspaceRoot ?? '';
+    const finalAnswer = this.repository.getRunFinalAnswer(run.id);
     this.repository.transaction(() => {
       this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Succeeded, {
         verificationResult: acceptedResult,
@@ -420,6 +443,22 @@ export class WorkbenchTaskService extends EventEmitter {
     });
     const accepted = this.repository.getDetail(taskId);
     if (!accepted) throw new Error('Workbench task not found after acceptance.');
+    const acceptedRun = accepted.runs.find(candidate => candidate.id === run.id);
+    if (acceptedRun) {
+      try {
+        this.options.onVerifiedRun?.({
+          task: accepted.task,
+          run: acceptedRun,
+          artifacts: accepted.artifacts.filter(artifact => artifact.runId === run.id),
+          approvals: accepted.approvals.filter(approval => approval.runId === run.id),
+          verificationResult: acceptedResult,
+          workspaceRoot,
+          finalAnswer,
+        });
+      } catch (error) {
+        console.warn('[WorkbenchTask] Failed to propose accepted run memory:', error);
+      }
+    }
     this.emitChanged(accepted.task);
     return accepted;
   }

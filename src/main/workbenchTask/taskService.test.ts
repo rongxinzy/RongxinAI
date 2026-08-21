@@ -374,7 +374,7 @@ test('user acceptance promotes pending workspace artifacts to verified', () => {
   }
 });
 
-test('baseline pass without the production workflow verifies pending artifacts', () => {
+test('baseline pass without the production workflow requires acceptance when artifacts exist', () => {
   const { db, service } = createService();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-baseline-artifact-'));
   const filePath = path.join(workspace, 'report.md');
@@ -384,7 +384,7 @@ test('baseline pass without the production workflow verifies pending artifacts',
       kind: WorkbenchContractKind.GenericWork,
       requiresUserAcceptance: false,
     };
-    const { run } = service.beginRun({
+    const { task, run } = service.beginRun({
       sessionId: 'session',
       goal: 'produce a quick report',
       contract,
@@ -407,14 +407,126 @@ test('baseline pass without the production workflow verifies pending artifacts',
       finalAnswer: 'done',
     });
 
-    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+    // A passed baseline only attests a non-empty final response and a clean
+    // stream — it says nothing about artifact content. Pending artifacts must
+    // therefore go through explicit user acceptance instead of being
+    // auto-promoted to verified.
+    expect(detail.task.status).toBe(WorkbenchTaskStatus.NeedsReview);
+    expect(detail.runs[0].verificationResult?.outcome).toBe(
+      WorkbenchVerificationOutcome.AcceptanceRequired,
+    );
+    expect(detail.runs[0].verificationResult?.checks).toContainEqual(
+      expect.objectContaining({ name: 'artifact_verification', status: 'skipped' }),
+    );
     expect(detail.artifacts[0]?.verificationStatus).toBe(
-      WorkbenchArtifactVerificationStatus.Verified,
+      WorkbenchArtifactVerificationStatus.Pending,
     );
     expect(detail.events).toContainEqual(
       expect.objectContaining({
         type: WorkbenchRunEventType.VerificationFinished,
-        payload: expect.objectContaining({ verifiedArtifacts: 1, outcome: 'passed' }),
+        payload: expect.objectContaining({ outcome: 'acceptance_required' }),
+      }),
+    );
+
+    const accepted = service.acceptTask(task.id);
+    expect(accepted.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(accepted.artifacts[0]?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Verified,
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
+test('baseline pass without artifacts completes without acceptance', () => {
+  const { db, service } = createService();
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: false,
+    };
+    const { run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'answer a simple question',
+      contract,
+    });
+
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: process.cwd(),
+      finalAnswer: 'done',
+    });
+
+    expect(detail.task.status).toBe(WorkbenchTaskStatus.Completed);
+    expect(detail.runs[0].verificationResult?.outcome).toBe(
+      WorkbenchVerificationOutcome.Passed,
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test('user acceptance dispatches the verified-run memory promotion', () => {
+  const onVerifiedRun = vi.fn();
+  const { db, service } = createService({ onVerifiedRun });
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-accept-promotion-'));
+  const filePath = path.join(workspace, 'report.md');
+  fs.writeFileSync(filePath, '# report');
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    };
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'complete generic work',
+      contract,
+    });
+    service.updateRunContext(run.id, {
+      model: 'test-model',
+      provider: 'test-provider',
+      reasoningProfile: 'default',
+      workspaceRoot: workspace,
+      skillIds: [],
+    });
+    prepareProductionDelivery(service, task.id, run.id, WorkbenchContractKind.GenericWork);
+    service.registerArtifact({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      candidate: {
+        path: filePath,
+        role: 'deliverable',
+        source: WorkbenchArtifactCandidateSource.Declaration,
+      },
+    });
+    service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'done',
+    });
+    expect(onVerifiedRun).not.toHaveBeenCalled();
+
+    service.acceptTask(task.id);
+
+    expect(onVerifiedRun).toHaveBeenCalledOnce();
+    expect(onVerifiedRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        task: expect.objectContaining({ id: task.id }),
+        run: expect.objectContaining({ id: run.id, status: WorkbenchRunStatus.Succeeded }),
+        verificationResult: expect.objectContaining({
+          outcome: WorkbenchVerificationOutcome.Passed,
+        }),
+        workspaceRoot: workspace,
+        finalAnswer: 'done',
+        artifacts: expect.arrayContaining([
+          expect.objectContaining({
+            verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+          }),
+        ]),
       }),
     );
   } finally {
