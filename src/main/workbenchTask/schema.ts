@@ -108,4 +108,7 @@ export function initializeWorkbenchTaskSchema(db: Database.Database): void {
   if (!runColumns.some(column => column.name === 'context_json')) {
     db.exec('ALTER TABLE workbench_runs ADD COLUMN context_json TEXT');
   }
+  if (!runColumns.some(column => column.name === 'final_answer_json')) {
+    db.exec('ALTER TABLE workbench_runs ADD COLUMN final_answer_json TEXT');
+  }
 }
