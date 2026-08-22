@@ -39,7 +39,7 @@ jobs:
           node-version: "24.x"
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.3.14"
+          bun-version: "1.4.0"
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
@@ -50,9 +50,9 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
             vendor/engram-runtime
             vendor/channel-runtime
-          key: windows-installer-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: windows-installer-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
-            windows-installer-node24-bun1.3.14-
+            windows-installer-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
       - name: Set up offline Windows runtimes
         run: |

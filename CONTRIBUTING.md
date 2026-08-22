@@ -17,7 +17,7 @@ Please read this guide and [`AGENTS.md`](AGENTS.md) before making a code change.
 
 - Git
 - Node.js `>=24 <25`
-- Bun `>=1.3`
+- Bun `>=1.4 <1.5`
 
 Windows release builds also require PortableGit. Native dependencies such as `better-sqlite3` may require Python and a supported C/C++ build toolchain when a prebuilt binary is unavailable.
 

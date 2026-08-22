@@ -102,7 +102,7 @@ Scheduled tasks can be created with natural language or through the GUI. A run s
 
 - Git
 - Node.js `24.x`
-- Bun `1.3+`
+- Bun `1.4.x`
 
 On Windows, native dependency builds may also require:
 

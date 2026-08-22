@@ -7,6 +7,7 @@
     "email": "dev@zhiyuanagent.com"
   },
   "license": "AGPL-3.0-only",
+  "packageManager": "bun@1.4.0",
   "version": "2026.7.16",
   "llamacpp": {
     "runtimeRepo": "https://github.com/ggml-org/llama.cpp.git",
