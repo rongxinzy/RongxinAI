@@ -68,7 +68,7 @@ jobs:
       - uses: actions/setup-node@v6
         with: { node-version: '24.x' }
       - uses: oven-sh/setup-bun@v2
-        with: { bun-version: '1.3.14' }
+        with: { bun-version: '1.4.0' }
       # Installs only the exact Bun lockfile graph and never runs dependency
       # lifecycle scripts. This catches a lockfile/integrity mismatch before
       # a release build begins.
@@ -126,7 +126,7 @@ jobs:
       - uses: actions/setup-node@v6
         with: { node-version: '24.x' }
       - uses: oven-sh/setup-bun@v2
-        with: { bun-version: '1.3.14' }
+        with: { bun-version: '1.4.0' }
       # These are application-bundled runtimes, not package-manager caches.
       # GitLab's release runners retain them independently; keep the same
       # boundary here so changing an unrelated build script does not require
@@ -154,9 +154,9 @@ jobs:
             ~/AppData/Local/electron/Cache
             ~/AppData/Local/electron-builder/Cache
             vendor/channel-runtime
-          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
+          key: packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-${{ hashFiles('bun.lock', 'package.json', 'scripts/**') }}
           restore-keys: |
-            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.3.14-
+            packaging-${{ runner.os }}-${{ matrix.runtime_target }}-node24-bun1.4.0-
       - name: Install Electron and virtual desktop dependencies
         if: ${{ matrix.platform == 'linux' }}
         run: |
