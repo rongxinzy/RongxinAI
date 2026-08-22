@@ -131,6 +131,8 @@ import { resolvePiBuiltinProviderId } from './piProviderIds';
 import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
+import { PiStreamAccumulator } from './piStreamAccumulator';
+import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { createPiWorkLoop } from './piWorkLoop';
 import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
@@ -251,6 +253,7 @@ interface ActivePiSession {
   answerText: string;
   /** Latest full snapshot of thinking text for the current turn. */
   thinkingText: string;
+  streamAccumulator: PiStreamAccumulator;
   thinkingLifecycle: PiThinkingLifecycle;
   /** Latest completed answer message, promoted to final only when the agent run ends. */
   lastCompletedAnswerMessageId: string | null;
@@ -1060,6 +1063,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         thinkingMessageId: null,
         answerText: '',
         thinkingText: '',
+        streamAccumulator: new PiStreamAccumulator(),
         thinkingLifecycle: new PiThinkingLifecycle(),
         lastCompletedAnswerMessageId: null,
         lastCompletedAnswerText: '',
@@ -2172,6 +2176,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.thinkingMessageId = null;
         active.answerText = '';
         active.thinkingText = '';
+        active.streamAccumulator.reset();
         active.thinkingLifecycle.reset();
         break;
 
@@ -2199,13 +2204,15 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             if (activityEvent) this.emit('toolActivity', sessionId, activityEvent);
           }
         }
-        // message.content is the FULL accumulating snapshot (not a delta), split into
-        // text and thinking blocks. Derive full snapshots and SET (never append) —
-        // appending the snapshot each tick is what caused the repeated content.
-        const { text, thinking } = extractStreamingSnapshot(event.message);
+        // Pi 0.84 emits fine-grained assistantMessageEvent deltas. Keep support
+        // for older cumulative snapshots, then reconcile against message_end.
+        const { text, thinking } = active.streamAccumulator.update(
+          event.assistantMessageEvent,
+          event.message,
+        );
         const segmentEventType = event.assistantMessageEvent?.type;
-        const thinkingEnded = segmentEventType === 'thinking_end';
-        if (segmentEventType === 'thinking_delta') {
+        const thinkingEnded = segmentEventType === PiAssistantEventType.ThinkingEnd;
+        if (segmentEventType === PiAssistantEventType.ThinkingDelta) {
           active.thinkingLifecycle.start();
         } else if (thinkingEnded) {
           active.thinkingLifecycle.finish();
@@ -2231,7 +2238,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (event.message?.role === 'assistant') {
           active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
           if (event.message.stopReason === 'error') {
-            const { thinking } = extractStreamingSnapshot(event.message);
+            const { thinking } = active.streamAccumulator.reconcile(event.message);
             if (thinking && thinking !== active.thinkingText) {
               active.thinkingText = thinking;
               active.thinkingLifecycle.markContentStreaming();
@@ -2258,7 +2265,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           active.pendingError = null;
           active.turnFailed = false;
 
-          const { text, thinking } = extractStreamingSnapshot(event.message);
+          const { text, thinking } = active.streamAccumulator.reconcile(event.message);
           const finalThinking = thinking || active.thinkingText;
           const finalAnswer = text || active.answerText;
 
@@ -2291,6 +2298,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           active.thinkingMessageId = null;
           active.answerText = '';
           active.thinkingText = '';
+          active.streamAccumulator.reset();
         }
         break;
       }
@@ -3520,38 +3528,6 @@ async function resolvePiModel(
     capabilities: resolution.endpoint?.capabilities ?? resolution.providerMetadata.capabilities,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
   };
-}
-
-// ── Text extraction helpers ──
-
-/**
- * Extract full text and thinking snapshots from a Pi message.
- *
- * For message_update / message_end, `content` is the FULL accumulating snapshot
- * (array of {type:'text',text} / {type:'thinking',thinking} blocks), NOT a delta.
- * We concatenate each kind so callers can SET (not append) their buffers.
- */
-function extractStreamingSnapshot(message?: PiEvent['message']): {
-  text: string;
-  thinking: string;
-} {
-  if (!message?.content) return { text: '', thinking: '' };
-  if (typeof message.content === 'string') return { text: message.content, thinking: '' };
-  if (typeof message.content[Symbol.iterator] !== 'function') {
-    console.warn(
-      '[PiRuntime] message.content is not iterable (type=%s), returning empty snapshot',
-      typeof message.content,
-    );
-    return { text: '', thinking: '' };
-  }
-
-  let text = '';
-  let thinking = '';
-  for (const block of message.content) {
-    if (block.type === 'text' && block.text) text += block.text;
-    else if (block.type === 'thinking' && block.thinking) thinking += block.thinking;
-  }
-  return { text, thinking };
 }
 
 /** Normalize Pi tool args into a plain record for CoworkMessage metadata. */
