@@ -74,6 +74,7 @@ jobs:
       # a release build begins.
       - name: Verify frozen Bun dependency graph
         run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       # Verifies npm registry signatures for every checked-in npm lockfile.
       # This is intentionally not `npm audit`: known CVEs are not a release
       # gate here; registry provenance and tampered package metadata are.
@@ -165,6 +166,7 @@ jobs:
             libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       - name: Set up Windows runtimes
         if: ${{ matrix.platform == 'windows' }}
         run: |

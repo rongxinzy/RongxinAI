@@ -101,6 +101,7 @@ jobs:
             libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 \
             libxss1 libxtst6 libuuid1 xdg-utils xvfb
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       - name: Set up Windows runtimes
         if: ${{ matrix.platform == 'windows' }}
         run: |

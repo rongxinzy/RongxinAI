@@ -1,8 +1,7 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 7cdf28a..936b65c 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -1113,6 +1113,9 @@ export class AgentSession {
+@@ -1111,6 +1111,9 @@ export class AgentSession {
          if (typeof content === "string") {
              text = content;
          }
@@ -12,7 +11,7 @@ index 7cdf28a..936b65c 100644
          else {
              const textParts = [];
              images = [];
-@@ -2621,12 +2624,14 @@ export class AgentSession {
+@@ -2648,12 +2651,14 @@ export class AgentSession {
                  return false;
              const msg = m;
              // Skip aborted messages with no content
@@ -29,10 +28,9 @@ index 7cdf28a..936b65c 100644
          for (const content of lastAssistant.content) {
              if (content.type === "text") {
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-index b570dc5..c6808be 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/compaction.js
-@@ -147,6 +147,9 @@ function estimateTextAndImageContentChars(content) {
+@@ -170,6 +170,9 @@ function estimateTextAndImageContentChars(content) {
      if (typeof content === "string") {
          return content.length;
      }
@@ -42,24 +40,24 @@ index b570dc5..c6808be 100644
      let chars = 0;
      for (const block of content) {
          if (block.type === "text" && block.text) {
-@@ -171,6 +174,7 @@ export function estimateTokens(message) {
+@@ -194,6 +197,8 @@ export function estimateTokens(message) {
          }
          case "assistant": {
              const assistant = message;
-+            if (!assistant.content || typeof assistant.content[Symbol.iterator] !== "function") return 0;
++            if (!assistant.content || typeof assistant.content[Symbol.iterator] !== "function")
++                return 0;
              for (const block of assistant.content) {
                  if (block.type === "text") {
                      chars += block.text.length;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-index 9a6462a..10a9864 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/compaction/utils.js
-@@ -104,6 +104,8 @@ export function serializeConversation(messages) {
+@@ -100,6 +100,8 @@ export function serializeConversation(messages) {
                  parts.push(`[User]: ${content}`);
          }
          else if (msg.role === "assistant") {
 +            if (!msg.content || typeof msg.content[Symbol.iterator] !== "function")
 +                continue;
-             const textParts = [];
              const thinkingParts = [];
              const toolCalls = [];
+             for (const block of msg.content) {

@@ -54,6 +54,7 @@ jobs:
           restore-keys: |
             windows-installer-node24-bun1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       - name: Set up offline Windows runtimes
         run: |
           bun run setup:uv-runtime

@@ -36,6 +36,7 @@ jobs:
           restore-keys: |
             bun-${{ runner.os }}-1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       - name: Validate bundled Skill frontmatter
         run: bun run validate:skills
       - name: Enforce retired runtime decoupling
@@ -64,6 +65,7 @@ jobs:
           restore-keys: |
             test-${{ runner.os }}-1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       - name: Compile Electron sources used by integration tests
         run: bun run compile:electron
       - name: Run tests
@@ -91,6 +93,7 @@ jobs:
           restore-keys: |
             bun-${{ runner.os }}-1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
       - name: Build renderer bundle
         run: bun run build:vite
         env:
