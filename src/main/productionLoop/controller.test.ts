@@ -84,6 +84,114 @@ const reachCritique = (controller: ProductionLoopController) => {
   controller.requestCritique();
 };
 
+test('re-submitting the same plan is idempotent and keeps item IDs stable', () => {
+  const { controller } = createController();
+  const plan = {
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  };
+  const first = controller.commitPlan(plan);
+  const itemId = first.planItems[0].id;
+  const versionAfterFirst = first.progressVersion;
+
+  const second = controller.commitPlan(plan);
+
+  expect(second).toMatchObject({
+    phase: ProductionLoopPhase.Execute,
+    progressVersion: versionAfterFirst,
+  });
+  expect(second.planItems[0].id).toBe(itemId);
+  expect(second.planItems).toHaveLength(1);
+});
+
+test('re-submitting a different plan after commit is rejected, not silently replaced', () => {
+  const { controller } = createController();
+  controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+
+  expect(() =>
+    controller.commitPlan({
+      items: [{ title: 'Different plan' }],
+      constraints: [],
+      acceptanceCriteria: ['Preview passes'],
+      expectedArtifacts: [],
+      expectedVerifiers: [{ name: 'preview', deterministic: true }],
+    }),
+  ).toThrow(/only be committed during the plan phase/);
+});
+
+test('model view is phase-slim and excludes replay data', () => {
+  const { controller } = createController();
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build', detail: 'Create the artifact' }],
+    constraints: ['Stay in scope'],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  controller.updatePlanItem(planned.planItems[0].id, 'completed');
+  controller.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+
+  const view = controller.getModelState();
+  expect(view).toMatchObject({
+    phase: ProductionLoopPhase.Execute,
+    status: ProductionLoopStatus.Active,
+    planItems: [{ id: planned.planItems[0].id, title: 'Build', status: 'completed' }],
+    acceptanceCriteria: ['Preview passes'],
+    critic: { requested: false, passed: false },
+  });
+  expect(typeof view.progressVersion).toBe('number');
+  // Replay data and fields the model does not need never enter the view.
+  expect(view).not.toHaveProperty('observedToolResults');
+  expect(view).not.toHaveProperty('recoveries');
+  expect(view).not.toHaveProperty('prototypes');
+  expect(view).not.toHaveProperty('inspections');
+  expect(view).not.toHaveProperty('constraints');
+  expect(view).not.toHaveProperty('goal');
+  expect(view).not.toHaveProperty('critic.execution');
+});
+
+test('deliver-phase view steers the terminal handoff instead of get_state', () => {
+  const { controller, service } = createController();
+  reachCritique(controller);
+  const runId = controller.getState().runId;
+  service.recordCriticStart(runId, 'critic-call');
+  service.recordCriticResult(
+    runId,
+    'critic-call',
+    JSON.stringify({ verdict: 'pass', findings: [] }),
+    false,
+  );
+  controller.requestCompletion('approved');
+  const full = controller.getState();
+  expect(full.phase).toBe(ProductionLoopPhase.Deliver);
+  expect(full.status).toBe(ProductionLoopStatus.ReadyToDeliver);
+
+  const view = controller.getModelState();
+  expect(view.nextStep).toEqual({ tool: 'agent_loop', action: 'done' });
+  expect(view.deliveryReason).toBe('approved');
+});
+
+test('model view exposes critic findings but never the full critic state', () => {
+  const { controller } = createController();
+  reachCritique(controller);
+  const full = controller.getState();
+
+  const view = controller.getModelState();
+  expect(view.critic).toMatchObject({ requested: true, passed: false });
+  expect(view.critic).not.toHaveProperty('execution');
+  expect(view.critic).not.toHaveProperty('toolCallId');
+  expect(full.critic).toHaveProperty('execution');
+});
+
 test('blocks premature finalization and returns a recovery prompt', () => {
   const { controller, downstream } = createController();
   expect(controller.requestCompletion('done')).toContain('Completion blocked');
