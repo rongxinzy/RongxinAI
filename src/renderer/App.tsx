@@ -482,6 +482,13 @@ const App: React.FC = () => {
 
   const handleTrySkill = useCallback(
     (skillId: string) => {
+      const skill = store.getState().skill.skills.find(candidate => candidate.id === skillId);
+      if (!skill?.enabled) {
+        window.dispatchEvent(
+          new CustomEvent('app:showToast', { detail: i18nService.t('chatSkillUnavailable') }),
+        );
+        return;
+      }
       dispatch(setActiveSkillIds([skillId]));
       dispatch(setWorkMode(WorkMode.Work));
       openNewConversation();
