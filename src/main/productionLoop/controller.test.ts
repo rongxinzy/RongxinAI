@@ -152,10 +152,16 @@ test('lightweight generic work skips the reviewer, reaches delivery, and exposes
   expect(state.status).toBe(ProductionLoopStatus.ReadyToDeliver);
   expect(state.critic.skipped).toBe(true);
   expect(state.critic.passed).toBe(false);
-  // A skipped review is not a passed review: artifacts stay pending until
-  // user acceptance elevates them.
+  // A skipped review is not a passed review: artifacts are not projected as
+  // verified...
   expect(controller.getReviewedArtifacts()).toEqual([]);
   expect(controller.getSnapshot().criticSkipped).toBe(true);
+  // ...but they are preserved for the completion chain, mapped to pending so
+  // user acceptance can elevate them.
+  expect(controller.getDeliveryArtifacts()).toEqual([
+    { kind: 'report', reference: 'output/report.md' },
+  ]);
+  expect(controller.getReviewOutcome()).toEqual({ passed: false, skipped: true });
 });
 
 test('approved unknown-risk approvals force the full reviewer', () => {

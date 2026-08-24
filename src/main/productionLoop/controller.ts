@@ -593,14 +593,33 @@ export class ProductionLoopController {
     if (
       !this.state ||
       this.state.phase !== ProductionLoopPhase.Deliver ||
-      // A skipped review is not a passed review: lightweight artifacts stay
-      // pending until user acceptance elevates them.
+      // A skipped review is not a passed review: only a real reviewer pass
+      // projects artifacts as verified.
       !this.state.critic.passed
     ) {
       return [];
     }
     const latestInspection = this.state.inspections[this.state.inspections.length - 1];
     return latestInspection ? structuredClone(latestInspection.artifacts) : [];
+  }
+
+  /**
+   * Deliver-phase inspection artifacts regardless of review outcome. Lightweight
+   * runs still declare their artifacts — the caller maps them to pending so
+   * user acceptance can elevate them. Empty outside the deliver phase.
+   */
+  getDeliveryArtifacts(): ProductionArtifactEvidence[] {
+    this.refreshIfStarted();
+    if (!this.state || this.state.phase !== ProductionLoopPhase.Deliver) return [];
+    const latestInspection = this.state.inspections[this.state.inspections.length - 1];
+    return latestInspection ? structuredClone(latestInspection.artifacts) : [];
+  }
+
+  /** Review outcome for artifact status mapping (verified vs pending). */
+  getReviewOutcome(): { passed: boolean; skipped: boolean } {
+    this.refreshIfStarted();
+    if (!this.state) return { passed: false, skipped: false };
+    return { passed: this.state.critic.passed, skipped: this.state.critic.skipped === true };
   }
 
   private activate(): ProductionLoopState {

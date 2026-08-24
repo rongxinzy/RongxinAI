@@ -2533,14 +2533,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 : null,
             domain: domainWorkflowSnapshot,
           });
-          const artifactCandidates = active.productionLoop
-            ?.getReviewedArtifacts()
+          // Deliver-phase artifacts are preserved regardless of review
+          // outcome: a reviewer pass marks them Verified, a lightweight skip
+          // leaves them Pending so user acceptance can elevate them
+          // (markArtifactsVerified on accept).
+          const deliveryArtifacts = active.productionLoop
+            ?.getDeliveryArtifacts()
             .map(artifact => ({
               path: artifact.reference,
               kind: artifact.kind,
               role: artifact.kind,
               source: WorkbenchArtifactCandidateSource.ProductionInspection,
-              verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+              verificationStatus: active.productionLoop?.getReviewOutcome().skipped
+                ? WorkbenchArtifactVerificationStatus.Pending
+                : WorkbenchArtifactVerificationStatus.Verified,
             }));
           this.workbenchTaskService.completeRun({
             sessionId,
@@ -2552,7 +2558,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               ? active.agentLoop.getState().done
               : undefined,
             workflowSnapshot,
-            artifactCandidates,
+            artifactCandidates: deliveryArtifacts,
           });
         }
         void this.runPostTurnMemoryMaintenance(
