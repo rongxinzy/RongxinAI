@@ -65,6 +65,8 @@ import { useLocalInferenceAccessSettings } from './hooks/useLocalInferenceAccess
 import { useLocalInferenceMemorySettings } from './hooks/useLocalInferenceMemorySettings';
 import { useMarketplaceRecommendations } from './hooks/useMarketplaceRecommendations';
 import { shouldCloseLaunchLogPanelForModel, useModelLaunchLogs } from './hooks/useModelLaunchLogs';
+import { useRuntimeInstallBackgroundNotifications } from './hooks/useRuntimeInstallBackgroundNotifications';
+import { useRuntimeInstallProgress } from './hooks/useRuntimeInstallProgress';
 import { MarketplacePanel } from './panels/MarketplacePanel';
 import { ModelsPanel } from './panels/ModelsPanel';
 import type {
@@ -96,6 +98,7 @@ import {
 
 interface LocalInferenceViewProps {
   installRequestId?: string;
+  onInstallRequestHandled?: (requestId: string) => void;
   isSidebarCollapsed?: boolean;
   isVisible?: boolean;
   onToggleSidebar?: () => void;
@@ -141,6 +144,7 @@ let cachedStatus: OllamaStatusSnapshot | null = null;
 
 const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   installRequestId,
+  onInstallRequestHandled,
   isSidebarCollapsed,
   isVisible = true,
   onToggleSidebar,
@@ -219,6 +223,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceHardwareChecked, setMarketplaceHardwareChecked] = useState(false);
   useI18nLanguage();
   const launchLogs = useModelLaunchLogs();
+  const runtimeInstallProgress = useRuntimeInstallProgress();
+  const { notifyBackgroundContinuation } = useRuntimeInstallBackgroundNotifications({
+    isVisible,
+    snapshot: runtimeInstallProgress.snapshot,
+    refresh: runtimeInstallProgress.refresh,
+  });
   const [launchLogFullscreen, setLaunchLogFullscreen] = useState(false);
   const marketplaceSearchRef = useRef<number>(0);
   const marketplaceRequestIdRef = useRef<string | null>(null);
@@ -302,6 +312,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
       });
     },
     [],
+  );
+
+  const handleRuntimeSettingsOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) void notifyBackgroundContinuation();
+      setRuntimeSettingsOpen(open);
+    },
+    [notifyBackgroundContinuation],
   );
 
   const openMarketplaceDownloadPanel = useCallback(() => {
@@ -1243,12 +1261,17 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
       </Tabs>
 
-      <Dialog open={runtimeSettingsOpen} onOpenChange={setRuntimeSettingsOpen}>
+      <Dialog open={runtimeSettingsOpen} onOpenChange={handleRuntimeSettingsOpenChange}>
         <DialogContent className="w-[min(48rem,calc(100%-2rem))] max-h-[85vh] gap-4 overflow-y-auto sm:max-w-2xl">
           <DialogHeader className="gap-1 pr-8">
             <DialogTitle>{i18nService.t('localInferenceRuntimeSettings')}</DialogTitle>
           </DialogHeader>
-          <RuntimeInstallCard installRequestId={installRequestId} />
+          <RuntimeInstallCard
+            installRequestId={installRequestId}
+            runtimeInstallSnapshot={runtimeInstallProgress.snapshot}
+            onInstallRequestHandled={onInstallRequestHandled}
+            onNotify={showToast}
+          />
         </DialogContent>
       </Dialog>
 

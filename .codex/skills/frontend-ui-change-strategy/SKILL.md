@@ -63,6 +63,7 @@ After approval:
 - Keep visible strings in `src/renderer/services/i18n.ts` with both Chinese and English keys.
 - Use existing constants for discriminants and selectors when values are compared or reused.
 - Keep code formatting consistent with the repository.
+- Add concise comments that explain non-obvious reasoning, state transitions, or constraints introduced by the change; do not narrate self-evident code.
 
 ### 6. Verify
 

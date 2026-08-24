@@ -259,7 +259,6 @@ test('passes the request id and abort signal through the native tool loop', asyn
   const requestId = call[4];
   expect(typeof requestId).toBe('string');
   expect(call[5]).toBe(abortController.signal);
-  expect(call[3]).toMatchObject({ conversationId: 'chat-1' });
 
   abortController.abort();
   await collectChunks(stream);

@@ -28,6 +28,20 @@ import {
 } from './llamacppManager';
 import { MarketplaceService } from './marketplaceService';
 
+test('initializes the configured model library directory', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'llamacpp-model-library-'));
+  const modelsDir = path.join(root, 'models');
+
+  try {
+    const manager = new LlamaCppManager(() => ({ modelsDir }));
+
+    expect(manager.initializeModelsDir()).toBe(modelsDir);
+    expect(fs.statSync(modelsDir).isDirectory()).toBe(true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('buildLlamaCppExecutableCandidates orders managed and explicit runtime paths', () => {
   expect(
     buildLlamaCppExecutableCandidates({

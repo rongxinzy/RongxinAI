@@ -1,5 +1,4 @@
 import {
-  ApiFormat,
   isProviderEnabled,
   type ModelCapabilities,
   ModelCapabilityStatus,
@@ -61,7 +60,6 @@ class ApiService {
     string,
     Promise<Partial<ModelCapabilities>>
   >();
-  private readonly localInferenceConfigByConversation = new Map<string, ApiConfig>();
   private runtimeCapabilityGeneration = 0;
 
   setConfig(config: ApiConfig) {
@@ -420,41 +418,8 @@ class ApiService {
   }
 
   // 获取指定 provider 的配置
-  private async getProviderConfig(
-    provider: string,
-    conversationId?: string,
-  ): Promise<ApiConfig | null> {
+  private getProviderConfig(provider: string): ApiConfig | null {
     const appConfig = configService.getConfig();
-    if (provider === ProviderName.LlamaCpp) {
-      const cachedConfig = conversationId
-        ? this.localInferenceConfigByConversation.get(conversationId)
-        : undefined;
-      if (cachedConfig) return cachedConfig;
-
-      const providerConfig = appConfig?.providers?.[ProviderName.LlamaCpp];
-      const providerDefinition = ProviderRegistry.get(ProviderName.LlamaCpp);
-      let baseUrl = providerConfig?.baseUrl?.trim() || providerDefinition?.defaultBaseUrl || '';
-      try {
-        const serviceConfig = await window.electron.llamacpp.getServiceConfig();
-        const host = serviceConfig.host?.trim() || '127.0.0.1';
-        const port = serviceConfig.port?.trim();
-        if (port) {
-          baseUrl = `http://${host}:${port}/v1`;
-        }
-      } catch {
-        // Keep the stored endpoint available when the local service IPC is unavailable.
-      }
-      const localConfig: ApiConfig = {
-        apiKey: '',
-        baseUrl,
-        provider,
-        apiFormat: ApiFormat.OpenAI,
-      };
-      if (conversationId) {
-        this.localInferenceConfigByConversation.set(conversationId, localConfig);
-      }
-      return localConfig;
-    }
 
     if (appConfig?.providers?.[provider]) {
       const providerConfig = appConfig.providers[provider];
@@ -497,6 +462,8 @@ class ApiService {
     reasoning?: string;
     usage?: TokenUsage;
   }> {
+    const configuredApi = this.getConfiguredApi();
+
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
     const requestedProviderKey = options.modelProviderKey?.trim();
@@ -517,8 +484,12 @@ class ApiService {
         ? { content: message }
         : { content: message.content || '', images: message.images };
 
-    const providerConfig = await this.getProviderConfig(provider, options.conversationId);
-    const effectiveConfig = providerConfig ?? this.getConfiguredApi();
+    // 尝试获取模型对应 provider 的配置
+    let effectiveConfig = configuredApi;
+    const providerConfig = this.getProviderConfig(provider);
+    if (providerConfig) {
+      effectiveConfig = providerConfig;
+    }
 
     if (this.providerRequiresApiKey(provider) && !effectiveConfig.apiKey) {
       throw new ApiError(
@@ -661,6 +632,7 @@ class ApiService {
     reasoning?: string;
     usage?: TokenUsage;
   }> {
+    const configuredApi = this.getConfiguredApi();
     const modelState = store.getState().model;
     const requestedModelId = options.modelId?.trim();
     const requestedProviderKey = options.modelProviderKey?.trim();
@@ -676,8 +648,7 @@ class ApiService {
       selectedModel.id,
       selectedModel.providerKey ?? selectedModel.provider,
     );
-    const config =
-      (await this.getProviderConfig(provider, options.conversationId)) ?? this.getConfiguredApi();
+    const config = this.getProviderConfig(provider) ?? configuredApi;
     if (this.providerRequiresApiKey(provider) && !config.apiKey) {
       throw new ApiError(
         'API key is not configured. Please set your API key in the settings menu.',

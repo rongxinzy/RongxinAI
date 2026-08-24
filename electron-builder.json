@@ -63,6 +63,11 @@
       "filter": ["**/*"]
     },
     {
+      "from": "resources/llamacpp-backends",
+      "to": "llamacpp-backends",
+      "filter": ["**/*"]
+    },
+    {
       "from": "resources/modelscope.tokens.local.json",
       "to": "modelscope.tokens.local.json"
     },

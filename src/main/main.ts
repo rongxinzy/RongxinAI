@@ -6830,7 +6830,11 @@ if (!gotTheLock) {
     getStore().onDidChange<AppConfigSettings>('app_config', () => {
       piModelCatalogRefreshCoordinator?.notifyConfigurationChanged();
     });
-    registerLlamaCppIpcHandlers(getLlamaCppManager(), { getStore });
+    const localInferenceManager = getLlamaCppManager();
+    localInferenceManager.initializeModelsDir();
+    registerLlamaCppIpcHandlers(localInferenceManager, { getStore });
+    // Warm the short-lived backend cache before the runtime settings dialog is opened.
+    void localInferenceManager.listBackends();
     registerTriageIpcHandlers({ getStore });
     registerOllamaIpcHandlers(getOllamaManager(), {
       getStore,
