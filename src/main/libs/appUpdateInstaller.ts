@@ -3,6 +3,8 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
+import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
+
 /**
  * Preserve the assisted, visible NSIS handoff. electron-updater owns the
  * verified download, but its default quitAndInstall handoff cannot guarantee
@@ -56,5 +58,6 @@ export async function installWindowsNsis(exePath: string): Promise<void> {
   const launcher = spawn('wscript.exe', [vbsPath], { detached: true, stdio: 'ignore' });
   launcher.unref();
   console.log(`[AppUpdate] Launcher PID: ${launcher.pid}, calling app.quit()`);
+  recordAppQuitOrigin(AppQuitOrigin.UpdateInstall);
   app.quit();
 }
