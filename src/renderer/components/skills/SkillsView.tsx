@@ -60,11 +60,8 @@ const SkillsView: React.FC<SkillsViewProps> = ({
         <WindowTitleBar inline />
       </div>
 
-      <div
-        ref={detailContainerRef}
-        className="relative flex-1 overflow-y-auto min-h-0 scrollbar-gutter-stable"
-      >
-        <div className="mx-auto w-full max-w-4xl px-4 py-4 sm:px-6">
+      <div ref={detailContainerRef} className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="mx-auto flex h-full w-full max-w-4xl flex-col px-4 py-4 sm:px-6">
           <SkillsManager
             readOnly={readOnly}
             onCreateByChat={onCreateSkillByChat}
