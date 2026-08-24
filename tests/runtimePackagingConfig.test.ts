@@ -251,6 +251,81 @@ test("Windows release workflow runs the clean-path bundled runtime gate", () => 
   assert.match(packageScript, /windows-runtime-smoke\.ps1/);
 });
 
+test("protected Windows releases authenticate with Certum and require valid signatures", () => {
+  const packageJson = JSON.parse(
+    readFileSync(path.join(root, "package.json"), "utf8"),
+  ) as { scripts: Record<string, string> };
+  assert.match(
+    packageJson.scripts["dist:win:signed"],
+    /electron-builder\.windows-signed\.cjs/,
+  );
+  assert.match(packageJson.scripts["dist:win:offline"], /electron-builder\.json/);
+
+  for (const workflowName of [
+    "online-update-release.yml",
+    "release-candidate.yml",
+  ]) {
+    const workflow = readFileSync(
+      path.join(root, ".github", "workflows", workflowName),
+      "utf8",
+    );
+    assert.match(workflow, /\.\/\.github\/actions\/setup-certum-signing/);
+    assert.match(workflow, /bun run dist:win:signed/);
+    assert.match(workflow, /CERTUM_CERT_THUMBPRINT:/);
+    assert.match(workflow, /verify-windows-authenticode\.ps1/);
+  }
+
+  const setupAction = readFileSync(
+    path.join(
+      root,
+      ".github",
+      "actions",
+      "setup-certum-signing",
+      "action.yml",
+    ),
+    "utf8",
+  );
+  assert.match(
+    setupAction,
+    /dismine\/windows-app-signing-setup-action@[0-9a-f]{40}/,
+  );
+  assert.match(setupAction, /SimplySignDesktop-9\.4\.3\.90-64-bit-en\.msi/);
+  assert.match(setupAction, /SignerCertificate\.Subject[\s\S]*Asseco Data Systems/);
+  assert.match(setupAction, /capture-diagnostics: false/);
+
+  const signedConfigPath = path.join(
+    root,
+    "electron-builder.windows-signed.cjs",
+  );
+  const signedConfig = JSON.parse(
+    execFileSync(
+      process.execPath,
+      [
+        "-e",
+        "const c=require(process.argv[1]); process.stdout.write(JSON.stringify(c.win.signtoolOptions));",
+        signedConfigPath,
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          CERTUM_CERT_THUMBPRINT: "0123456789abcdef0123456789abcdef01234567",
+        },
+      },
+    ),
+  ) as {
+    certificateSha1: string;
+    signingHashAlgorithms: string[];
+    rfc3161TimeStampServer: string;
+  };
+  assert.equal(
+    signedConfig.certificateSha1,
+    "0123456789ABCDEF0123456789ABCDEF01234567",
+  );
+  assert.deepEqual(signedConfig.signingHashAlgorithms, ["sha256"]);
+  assert.equal(signedConfig.rfc3161TimeStampServer, "http://time.certum.pl");
+});
+
 test("installer-related pull requests build and exercise the Windows installer", () => {
   const workflow = readFileSync(
     path.join(root, ".github", "workflows", "windows-installer-pr.yml"),

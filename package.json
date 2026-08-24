@@ -106,6 +106,7 @@
     "dist:mac:universal": "npm run prepare:update-release && npm run build && npm run compile:electron && npm run build:skills && npm run channel:runtime:mac-universal && npm run engram:runtime:mac-arm64 && npm run prepare:modelscope-tokens && electron-builder --mac --universal",
     "dist:win": "npm run dist:win:offline",
     "dist:win:offline": "npm run channel:runtime:win-x64 && npm run engram:runtime:win-x64 && npm run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && npm run build && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win nsis --x64 --config electron-builder.json --publish never",
+    "dist:win:signed": "npm run channel:runtime:win-x64 && npm run engram:runtime:win-x64 && npm run prepare:update-release && cross-env ZHIYUAN_UPDATE_VARIANT=lite node scripts/ensure-build-version.js && npm run build && npm run build:skills && npm run prepare:modelscope-tokens && electron-builder --win nsis --x64 --config electron-builder.windows-signed.cjs --publish never",
     "dist:win:lite": "npm run dist:win:offline",
     "predist:linux": "npm run channel:runtime:linux-x64 && npm run engram:runtime:linux-x64 && node scripts/ensure-build-version.js && npm run prepare:update-release",
     "dist:linux": "npm run build && npm run compile:electron && npm run build:skills && npm run engram:runtime:linux-x64 && npm run prepare:modelscope-tokens && electron-builder --linux --publish never",

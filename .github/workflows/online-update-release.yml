@@ -177,11 +177,20 @@ jobs:
         run: |
           bun run setup:posix-uv-runtime
           bun run setup:posix-python-runtime
+      - name: Connect Certum SimplySign
+        if: ${{ matrix.platform == 'windows' }}
+        id: certum-signing
+        uses: ./.github/actions/setup-certum-signing
+        with:
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
       - name: Build Windows package
         if: ${{ matrix.platform == 'windows' }}
-        run: bun run dist:win:lite
+        run: bun run dist:win:signed
         env:
           APP_BUILD_VERSION: ${{ needs.prepare-release.outputs.version }}
+          CERTUM_CERT_THUMBPRINT: ${{ steps.certum-signing.outputs.thumbprint }}
           UPDATE_MANIFEST_KEY_ID: ${{ secrets.UPDATE_MANIFEST_KEY_ID }}
           UPDATE_MANIFEST_PUBLIC_KEY_BASE64: ${{ secrets.UPDATE_MANIFEST_PUBLIC_KEY_BASE64 }}
           MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
@@ -275,6 +284,14 @@ jobs:
       - name: Verify packaged app version
         shell: bash
         run: node scripts/ci/verify-packaged-app-version.mjs '${{ needs.prepare-release.outputs.version }}'
+      - name: Verify Windows Authenticode signatures
+        if: ${{ matrix.platform == 'windows' }}
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File scripts/ci/verify-windows-authenticode.ps1
+          -ProjectRoot ${{ github.workspace }}
+          -ExpectedThumbprint '${{ steps.certum-signing.outputs.thumbprint }}'
       - name: Verify Windows package runtimes with a clean PATH
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
