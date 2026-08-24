@@ -2,18 +2,23 @@ import {
   ProductionLoopPhase,
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
+  ProductionPlanItemStatus,
   type ProductionArtifactEvidence,
   type ProductionLoopState,
 } from '../../shared/productionLoop';
 import type { WorkbenchContractKind, WorkbenchJsonObject } from '../../shared/workbenchTask';
 import type { PiAgentLoopEndSignal } from '../libs/agentEngine/piAgentLoop';
 import {
+  PiAgentLoopAction,
+  PiAgentLoopToolName,
+} from '../libs/agentEngine/piAgentLoop';
+import {
   PiSubagentProfileId,
   PiSubagentTerminationReason,
 } from '../libs/agentEngine/piSubagentConstants';
 import type { PiSubagentExecutionMetadata } from '../libs/agentEngine/piSubagentExecution';
 import { buildProductionReviewContract } from './reviewContract';
-import type { ProductionLoopService } from './service';
+import { canonicalPlanInput, type ProductionLoopService } from './service';
 
 interface DownstreamCompletionWorkflow {
   readonly goal: string;
@@ -46,6 +51,73 @@ const isStandaloneProductionReviewer = (args: unknown): boolean => {
   );
 };
 
+const truncate = (value: string, max: number): string =>
+  value.length <= max ? value : `${value.slice(0, max - 1)}…`;
+
+/**
+ * One-line next-step text derived from the full workflow context — phase,
+ * status, skip state, critic result, and plan completion — not phase alone.
+ * Shown after every production_loop tool result so the model never needs a
+ * get_state round-trip to learn what to do next.
+ */
+export const buildNextHint = (
+  state: Pick<
+    ProductionLoopState,
+    | 'phase'
+    | 'status'
+    | 'skip'
+    | 'critic'
+    | 'planItems'
+    | 'deliveryReason'
+  >,
+): string => {
+  if (state.skip) {
+    return 'Answer directly and end the turn.';
+  }
+  switch (state.phase) {
+    case ProductionLoopPhase.Explore:
+      return 'Create a concrete prototype (record_prototype), then commit the plan once a direction is selected.';
+    case ProductionLoopPhase.Plan:
+      return 'Commit the executable plan (commit_plan) before using write tools.';
+    case ProductionLoopPhase.Execute: {
+      const remaining = state.planItems.filter(
+        item => item.status !== ProductionPlanItemStatus.Completed,
+      ).length;
+      return remaining === 0
+        ? 'All plan items are completed: run the deterministic checks, then start_inspection with their evidence.'
+        : `Continue plan execution: update the ${remaining} remaining item(s) (update_plan_item), then start_inspection once all are completed.`;
+    }
+    case ProductionLoopPhase.Inspect:
+      return 'Request an independent critique (request_critique) using the evidence already submitted.';
+    case ProductionLoopPhase.Critique:
+      return state.critic.passed
+        ? 'Reviewer passed: call get_state, then agent_loop done to deliver.'
+        : 'Address reviewer findings with record_revision, re-run deterministic checks, and inspect again.';
+    case ProductionLoopPhase.Revise:
+      return 'Re-run deterministic checks, start_inspection with fresh evidence, then request_critique again.';
+    case ProductionLoopPhase.Deliver:
+      return 'Call agent_loop done to request deterministic completion verification.';
+  }
+};
+
+const samePlan = (
+  state: ProductionLoopState,
+  input: Parameters<ProductionLoopService['commitPlan']>[1],
+): boolean => {
+  // canonicalPlanInput dedupes and trims on both sides, so plans that the
+  // service layer would normalize to the same shape compare equal here too.
+  const requested = canonicalPlanInput(input);
+  const committed = canonicalPlanInput({
+    items: state.planItems.map(item => ({ title: item.title, detail: item.detail })),
+    constraints: state.constraints,
+    acceptanceCriteria: state.acceptanceCriteria,
+    expectedArtifacts: state.expectedArtifacts,
+    expectedVerifiers: state.expectedVerifiers,
+    selectedDirection: state.selectedDirection,
+  });
+  return JSON.stringify(requested) === JSON.stringify(committed);
+};
+
 export class ProductionLoopController {
   private state: ProductionLoopState | null;
   private initial: ProductionLoopRunInput;
@@ -73,6 +145,14 @@ export class ProductionLoopController {
     return structuredClone(this.state);
   }
 
+  /**
+   * Model-facing state for tool content and details. Field set mirrors the
+   * pre-existing content whitelist — replay data (observedToolResults,
+   * recoveries, inspections, critic execution metadata) never entered the
+   * model payload and still does not; this view additionally truncates
+   * long text, carries progressVersion for sinceVersion short-circuits, and
+   * exposes a terminal nextStep (agent_loop done) during delivery.
+   */
   getModelState(): Record<string, unknown> {
     this.refreshIfStarted();
     if (!this.state) {
@@ -90,7 +170,43 @@ export class ProductionLoopController {
               ],
       };
     }
-    return structuredClone(this.state) as unknown as Record<string, unknown>;
+    const state = this.state;
+    const view: Record<string, unknown> = {
+      phase: state.phase,
+      status: state.status,
+      progressVersion: state.progressVersion,
+      planItems: state.planItems.map(item => ({
+        id: item.id,
+        title: truncate(item.title, 120),
+        status: item.status,
+        ...(item.detail ? { detail: truncate(item.detail, 200) } : {}),
+      })),
+      acceptanceCriteria: state.acceptanceCriteria.map(criterion => truncate(criterion, 200)),
+      expectedArtifacts: state.expectedArtifacts.map(artifact => ({
+        kind: truncate(artifact.kind, 60),
+        description: truncate(artifact.description, 160),
+        required: artifact.required,
+      })),
+      expectedVerifiers: state.expectedVerifiers,
+      critic: {
+        requested: state.critic.requested,
+        passed: state.critic.passed,
+        findings: state.critic.findings,
+        ...(state.critic.outputSummary
+          ? { outputSummary: truncate(state.critic.outputSummary, 200) }
+          : {}),
+      },
+      availableVerifierEvidence: this.getAvailableVerifierEvidence(),
+    };
+    if (state.deliveryReason) {
+      view.deliveryReason = truncate(state.deliveryReason, 200);
+    }
+    if (state.phase === ProductionLoopPhase.Deliver) {
+      // The next step is not a production_loop action; steer the terminal
+      // handoff explicitly so the model stops short of another get_state.
+      view.nextStep = { tool: PiAgentLoopToolName, action: PiAgentLoopAction.Done };
+    }
+    return view;
   }
 
   getStaleCount(): number {
@@ -177,6 +293,17 @@ export class ProductionLoopController {
   }
 
   commitPlan(input: Parameters<ProductionLoopService['commitPlan']>[1]): ProductionLoopState {
+    this.refreshIfStarted();
+    // Idempotent short-circuit: after a plan is committed the phase is
+    // Execute, so the service would reject any further commit as
+    // "only during the plan phase". A repeated identical commit short-
+    // circuits here into a successful no-op instead — keeping the plan
+    // item IDs the model already holds valid, without advancing
+    // progressVersion, so the stale-progress detector still catches
+    // models that spin on re-commits.
+    if (this.state && this.state.phase === ProductionLoopPhase.Execute && samePlan(this.state, input)) {
+      return this.getState();
+    }
     const state = this.activate();
     return this.update(this.service.commitPlan(state.runId, input));
   }
