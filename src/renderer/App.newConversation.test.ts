@@ -30,6 +30,7 @@ test('resets active skills for every blank conversation entry point', () => {
 test('preserves the selected skill when starting from use-this-skill', () => {
   const handleTrySkill = callbackBody(appSource, 'handleTrySkill', 'dismissToast');
 
+  expect(handleTrySkill).toContain('if (!skill?.enabled)');
   expect(handleTrySkill).toContain('dispatch(setActiveSkillIds([skillId]));');
   expect(handleTrySkill).toContain('openNewConversation();');
   expect(handleTrySkill).not.toContain('handleNewChat();');

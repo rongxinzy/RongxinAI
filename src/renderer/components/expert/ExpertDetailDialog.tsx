@@ -9,7 +9,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
-import { MessageCircle } from 'lucide-react';
+import { Download, MessageCircle } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
 import { ExpertAvatar } from './expertAvatars';
@@ -29,15 +29,19 @@ export interface PresetExpertSummary {
 interface ExpertDetailDialogProps {
   expert: PresetExpertSummary | null;
   isInstalling: boolean;
+  isInstalled: boolean;
   onClose: () => void;
-  onUseExpert: (expert: PresetExpertSummary) => void | Promise<void>;
+  onInstall: (expert: PresetExpertSummary) => void | Promise<void>;
+  onChat: () => void;
 }
 
 export function ExpertDetailDialog({
   expert,
   isInstalling,
+  isInstalled,
   onClose,
-  onUseExpert,
+  onInstall,
+  onChat,
 }: ExpertDetailDialogProps) {
   if (!expert) return null;
 
@@ -91,15 +95,23 @@ export function ExpertDetailDialog({
         </ScrollArea>
 
         <DialogFooter className="m-0 rounded-none px-6 py-4">
-          <Button type="button" disabled={isInstalling} onClick={() => void onUseExpert(expert)}>
+          <Button
+            type="button"
+            disabled={isInstalling}
+            onClick={() => (isInstalled ? onChat() : void onInstall(expert))}
+          >
             {isInstalling ? (
               <Spinner data-icon="inline-start" />
-            ) : (
+            ) : isInstalled ? (
               <MessageCircle data-icon="inline-start" />
+            ) : (
+              <Download data-icon="inline-start" />
             )}
             {isInstalling
               ? i18nService.t('expertInstalling')
-              : i18nService.t('expertGoToConversation')}
+              : isInstalled
+                ? i18nService.t('expertGoToConversation')
+                : i18nService.t('expertInstall')}
           </Button>
         </DialogFooter>
       </DialogContent>

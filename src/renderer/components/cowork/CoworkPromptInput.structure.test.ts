@@ -64,6 +64,20 @@ test('keeps the session permission selector available during an active run', () 
   expect(permissionMenu).not.toContain('disabled={disabled || isStreaming}');
 });
 
+test('places the active expert identity between permissions and MCP controls', () => {
+  const permissionMenu = source.indexOf('<PermissionModeMenu');
+  const expertBadge = source.lastIndexOf('<ActiveExpertBadge');
+  const mcpBadge = source.lastIndexOf('<ActiveMcpBadge');
+
+  expect(permissionMenu).toBeGreaterThanOrEqual(0);
+  expect(expertBadge).toBeGreaterThan(permissionMenu);
+  expect(mcpBadge).toBeGreaterThan(expertBadge);
+  expect(source.slice(expertBadge, mcpBadge)).toContain('expertId={selectedExpertIds[0]}');
+  expect(source.slice(expertBadge, mcpBadge)).toContain(
+    'onRemove={() => setSelectedExpertIds([])}',
+  );
+});
+
 test('keeps streaming controls gated without obscuring the prompt', () => {
   expect(source).not.toContain('bg-input/50 dark:bg-input/80');
   expect(source).not.toContain("className={isStreaming ? 'relative z-20' : undefined}");
