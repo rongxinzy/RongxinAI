@@ -189,6 +189,10 @@ import {
 import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
+import {
+  disposeZhiyuanEnterpriseExtension,
+  initializeZhiyuanEnterpriseExtension,
+} from './enterpriseExtension/host';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
@@ -6500,6 +6504,10 @@ if (!gotTheLock) {
     destroyTray();
     skillManager?.stopWatching();
 
+    await disposeZhiyuanEnterpriseExtension().catch(error => {
+      console.error('[EnterpriseExtension] Failed to dispose enterprise extension:', error);
+    });
+
     // Stop all active Pi sessions without blocking shutdown.
     console.log('[Main] Stopping cowork sessions...');
     if (piRuntimeAdapter) piRuntimeAdapter.stopAllSessions();
@@ -6616,6 +6624,20 @@ if (!gotTheLock) {
     await app.whenReady();
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
+
+    const enterpriseExtension = await initializeZhiyuanEnterpriseExtension({
+      appVersion: app.getVersion(),
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      resourcesPath: process.resourcesPath,
+      userDataPath: app.getPath('userData'),
+      developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
+    });
+    if (enterpriseExtension.extensionId) {
+      console.log(
+        `[EnterpriseExtension] Initialized ${enterpriseExtension.extensionId} with API version 1.`,
+      );
+    }
 
     void getEngramManager()
       .start()
