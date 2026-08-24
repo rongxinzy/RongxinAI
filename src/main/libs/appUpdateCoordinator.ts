@@ -19,6 +19,7 @@ import {
   AppUpdateStatus,
 } from '../../shared/appUpdate/constants';
 import { APP_UPDATE_TRUSTED_KEYS } from '../../shared/appUpdate/trustedKeys';
+import { AppQuitOrigin, recordAppQuitOrigin } from '../appQuitOrigin';
 import type { SqliteStore } from '../sqliteStore';
 import { installWindowsNsis } from './appUpdateInstaller';
 
@@ -353,6 +354,7 @@ export class AppUpdateCoordinator {
       if (process.platform === 'win32') {
         await installWindowsNsis(readyFilePath);
       } else {
+        recordAppQuitOrigin(AppQuitOrigin.UpdateInstall);
         this.updater.quitAndInstall(false, true);
       }
       return { success: true, state: this.getState() };
