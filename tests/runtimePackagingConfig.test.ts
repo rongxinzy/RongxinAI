@@ -324,6 +324,15 @@ test("protected Windows releases authenticate with Certum and require valid sign
   );
   assert.deepEqual(signedConfig.signingHashAlgorithms, ["sha256"]);
   assert.equal(signedConfig.rfc3161TimeStampServer, "http://time.certum.pl");
+
+  const signatureVerifier = readFileSync(
+    path.join(root, "scripts", "ci", "verify-windows-authenticode.ps1"),
+    "utf8",
+  );
+  assert.match(
+    signatureVerifier,
+    /electron-builder\.json'[\s\S]*-Raw -Encoding UTF8 \| ConvertFrom-Json/,
+  );
 });
 
 test("installer-related pull requests build and exercise the Windows installer", () => {
