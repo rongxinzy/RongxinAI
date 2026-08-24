@@ -45,6 +45,50 @@ const normalizeStrings = (values: string[]): string[] => [
   ...new Set(values.map(value => value.trim()).filter(Boolean)),
 ];
 
+export interface CanonicalPlanInput {
+  items: Array<{ title: string; detail?: string }>;
+  constraints: string[];
+  acceptanceCriteria: string[];
+  expectedArtifacts: ProductionExpectedArtifact[];
+  expectedVerifiers: ProductionExpectedVerifier[];
+  selectedDirection?: string | null;
+}
+
+/**
+ * Single canonicalization used by both commitPlan (persistence) and the
+ * controller's idempotency comparison. Keeping one implementation prevents
+ * drift — e.g. a duplicate constraint rejected by the service layer but
+ * treated as a different plan by the controller.
+ */
+export const canonicalPlanInput = (
+  input: CanonicalPlanInput,
+): {
+  items: Array<{ title: string; detail?: string }>;
+  constraints: string[];
+  acceptanceCriteria: string[];
+  expectedArtifacts: ProductionExpectedArtifact[];
+  expectedVerifiers: ProductionExpectedVerifier[];
+  selectedDirection: string | null;
+} => ({
+  items: input.items
+    .map(item => ({ title: item.title.trim(), detail: item.detail?.trim() || undefined }))
+    .filter(item => item.title),
+  constraints: normalizeStrings(input.constraints),
+  acceptanceCriteria: normalizeStrings(input.acceptanceCriteria),
+  expectedArtifacts: input.expectedArtifacts.flatMap(artifact => {
+    const kind = artifact.kind?.trim();
+    const description = artifact.description?.trim();
+    return kind && description
+      ? [{ kind, description, required: artifact.required !== false }]
+      : [];
+  }),
+  expectedVerifiers: input.expectedVerifiers.flatMap(verifier => {
+    const name = verifier.name?.trim();
+    return name ? [{ name, deterministic: verifier.deterministic === true }] : [];
+  }),
+  selectedDirection: input.selectedDirection?.trim() || null,
+});
+
 const parseJsonRecord = (output: string): Record<string, unknown> => {
   const trimmed = output.trim();
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
@@ -293,22 +337,19 @@ export class ProductionLoopService {
       if (state.phase !== ProductionLoopPhase.Plan) {
         throw new Error('The execution plan can only be committed during the plan phase.');
       }
-      const items = input.items
-        .map(item => ({ title: item.title.trim(), detail: item.detail?.trim() }))
-        .filter(item => item.title);
-      const acceptanceCriteria = normalizeStrings(input.acceptanceCriteria);
-      const expectedArtifacts = input.expectedArtifacts.flatMap(artifact => {
-        const kind = artifact.kind?.trim();
-        const description = artifact.description?.trim();
-        return kind && description
-          ? [{ kind, description, required: artifact.required !== false }]
-          : [];
+      const canonical = canonicalPlanInput({
+        items: input.items,
+        constraints: input.constraints,
+        acceptanceCriteria: input.acceptanceCriteria,
+        expectedArtifacts: input.expectedArtifacts,
+        expectedVerifiers: input.expectedVerifiers,
+        selectedDirection: input.selectedDirection,
       });
-      const expectedVerifiers = input.expectedVerifiers.flatMap(verifier => {
-        const name = verifier.name?.trim();
-        return name ? [{ name, deterministic: verifier.deterministic === true }] : [];
-      });
-      const selectedDirection = input.selectedDirection?.trim() || null;
+      const items = canonical.items;
+      const acceptanceCriteria = canonical.acceptanceCriteria;
+      const expectedArtifacts = canonical.expectedArtifacts;
+      const expectedVerifiers = canonical.expectedVerifiers;
+      const selectedDirection = canonical.selectedDirection;
       if (
         items.length === 0 ||
         acceptanceCriteria.length === 0 ||
@@ -466,26 +507,32 @@ export class ProductionLoopService {
     runId: string,
     input: Omit<ProductionObservedToolResult, 'createdAt' | 'progressVersion'>,
   ): ProductionLoopState {
-    return this.mutate(runId, state => {
-      const toolCallId = input.toolCallId.trim();
-      const toolName = input.toolName.trim();
-      if (!toolCallId || !toolName) return;
-      const result: ProductionObservedToolResult = {
-        toolCallId,
-        toolName,
-        output: input.output.slice(0, MAX_CRITIC_OUTPUT_LENGTH),
-        isError: input.isError,
-        progressVersion: state.progressVersion,
-        createdAt: Date.now(),
-      };
-      state.observedToolResults = (state.observedToolResults ?? []).filter(
-        existing => existing.toolCallId !== toolCallId,
-      );
-      state.observedToolResults.push(result);
-      if (state.observedToolResults.length > MAX_OBSERVED_TOOL_RESULTS) {
-        state.observedToolResults = state.observedToolResults.slice(-MAX_OBSERVED_TOOL_RESULTS);
-      }
-    });
+    // Tool results are factual observations from the agent loop, not
+    // production control actions: they must still land after a skip.
+    return this.mutate(
+      runId,
+      state => {
+        const toolCallId = input.toolCallId.trim();
+        const toolName = input.toolName.trim();
+        if (!toolCallId || !toolName) return;
+        const result: ProductionObservedToolResult = {
+          toolCallId,
+          toolName,
+          output: input.output.slice(0, MAX_CRITIC_OUTPUT_LENGTH),
+          isError: input.isError,
+          progressVersion: state.progressVersion,
+          createdAt: Date.now(),
+        };
+        state.observedToolResults = (state.observedToolResults ?? []).filter(
+          existing => existing.toolCallId !== toolCallId,
+        );
+        state.observedToolResults.push(result);
+        if (state.observedToolResults.length > MAX_OBSERVED_TOOL_RESULTS) {
+          state.observedToolResults = state.observedToolResults.slice(-MAX_OBSERVED_TOOL_RESULTS);
+        }
+      },
+      { allowAfterSkip: true },
+    );
   }
 
   recordCriticStart(runId: string, toolCallId: string): ProductionLoopState {
@@ -581,20 +628,26 @@ export class ProductionLoopService {
     reason: ProductionLoopRecoveryReason,
     detail: string,
   ): ProductionLoopState {
-    return this.mutate(runId, state => {
-      state.recoveries.push({ reason, detail, createdAt: Date.now() });
-      if (state.progressVersion === state.lastObservedProgressVersion) state.staleCount += 1;
-      else state.staleCount = 0;
-      state.lastObservedProgressVersion = state.progressVersion;
-      this.measurement.recordActivation(runId, {
-        activation:
-          reason === ProductionLoopRecoveryReason.StaleProgress
-            ? HarnessActivationType.StaleIterationPivoted
-            : HarnessActivationType.RecoveryTriggered,
-        mechanism: 'production_loop',
-        evidence: { reason, staleCount: state.staleCount },
-      });
-    });
+    // Recovery recording is diagnostic, not a production control action: it
+    // must still run after a skip so stale/spin detection keeps working.
+    return this.mutate(
+      runId,
+      state => {
+        state.recoveries.push({ reason, detail, createdAt: Date.now() });
+        if (state.progressVersion === state.lastObservedProgressVersion) state.staleCount += 1;
+        else state.staleCount = 0;
+        state.lastObservedProgressVersion = state.progressVersion;
+        this.measurement.recordActivation(runId, {
+          activation:
+            reason === ProductionLoopRecoveryReason.StaleProgress
+              ? HarnessActivationType.StaleIterationPivoted
+              : HarnessActivationType.RecoveryTriggered,
+          mechanism: 'production_loop',
+          evidence: { reason, staleCount: state.staleCount },
+        });
+      },
+      { allowAfterSkip: true },
+    );
   }
 
   recordDeliveryRequest(runId: string, reason: string): ProductionLoopState {
@@ -613,22 +666,29 @@ export class ProductionLoopService {
    * gate; deterministic verification still applies on run completion.
    */
   skipWorkflow(runId: string, reason: string): ProductionLoopState {
-    return this.mutate(runId, state => {
-      if (state.skip) return;
-      if (state.phase !== ProductionLoopPhase.Explore && state.phase !== ProductionLoopPhase.Plan) {
-        throw new Error('The workflow can only be skipped before a plan is committed.');
-      }
-      const normalized = reason.trim();
-      if (!normalized) throw new Error('A skip reason is required.');
-      state.skip = { reason: normalized, createdAt: Date.now() };
-      state.status = ProductionLoopStatus.Completed;
-      state.progressVersion += 1;
-      this.measurement.recordActivation(runId, {
-        activation: HarnessActivationType.WorkflowSkipped,
-        mechanism: 'production_loop',
-        evidence: { reason: normalized },
-      });
-    });
+    // allowAfterSkip: the internal skip guard below is the idempotency — a
+    // repeated skip must stay a successful no-op (and not advance
+    // progressVersion), not become an error behind the generic guard.
+    return this.mutate(
+      runId,
+      state => {
+        if (state.skip) return;
+        if (state.phase !== ProductionLoopPhase.Explore && state.phase !== ProductionLoopPhase.Plan) {
+          throw new Error('The workflow can only be skipped before a plan is committed.');
+        }
+        const normalized = reason.trim();
+        if (!normalized) throw new Error('A skip reason is required.');
+        state.skip = { reason: normalized, createdAt: Date.now() };
+        state.status = ProductionLoopStatus.Completed;
+        state.progressVersion += 1;
+        this.measurement.recordActivation(runId, {
+          activation: HarnessActivationType.WorkflowSkipped,
+          mechanism: 'production_loop',
+          evidence: { reason: normalized },
+        });
+      },
+      { allowAfterSkip: true },
+    );
   }
 
   recordVerificationResult(
@@ -637,36 +697,42 @@ export class ProductionLoopService {
     summary: string,
   ): ProductionLoopState | null {
     if (!this.repository.get(runId)) return null;
-    return this.mutate(runId, state => {
-      // The loop may have been skipped or never reached delivery readiness
-      // (e.g. the run settled outside the workflow). That is not an error:
-      // verification outcome still applies to the underlying run.
-      if (state.status !== ProductionLoopStatus.ReadyToDeliver || !state.deliveryReason) {
-        return;
-      }
-      if (outcome === WorkbenchVerificationOutcome.Passed) {
-        state.status = ProductionLoopStatus.Completed;
-        return;
-      }
-      if (outcome === WorkbenchVerificationOutcome.AcceptanceRequired) return;
-      this.transition(state, ProductionLoopPhase.Revise);
-      state.status = ProductionLoopStatus.NeedsRevision;
-      state.critic = {
-        requested: false,
-        toolCallId: null,
-        passed: false,
-        findings: [
-          {
-            severity: ProductionCriticSeverity.Major,
-            summary: 'Deterministic completion verification failed.',
-            evidence: summary,
-          },
-        ],
-        outputSummary: null,
-        execution: null,
-      };
-      state.deliveryReason = null;
-    });
+    return this.mutate(
+      runId,
+      state => {
+        // The loop may have been skipped or never reached delivery readiness
+        // (e.g. the run settled outside the workflow). That is not an error:
+        // verification outcome still applies to the underlying run.
+        if (state.status !== ProductionLoopStatus.ReadyToDeliver || !state.deliveryReason) {
+          return;
+        }
+        if (outcome === WorkbenchVerificationOutcome.Passed) {
+          state.status = ProductionLoopStatus.Completed;
+          return;
+        }
+        if (outcome === WorkbenchVerificationOutcome.AcceptanceRequired) return;
+        this.transition(state, ProductionLoopPhase.Revise);
+        state.status = ProductionLoopStatus.NeedsRevision;
+        state.critic = {
+          requested: false,
+          toolCallId: null,
+          passed: false,
+          findings: [
+            {
+              severity: ProductionCriticSeverity.Major,
+              summary: 'Deterministic completion verification failed.',
+              evidence: summary,
+            },
+          ],
+          outputSummary: null,
+          execution: null,
+        };
+        state.deliveryReason = null;
+      },
+      // Verification outcomes apply to the underlying run even when the loop
+      // was skipped; the internal status guard above is the real gate.
+      { allowAfterSkip: true },
+    );
   }
 
   deleteSession(sessionId: string): void {
@@ -676,10 +742,16 @@ export class ProductionLoopService {
   private mutate(
     runId: string,
     operation: (state: ProductionLoopState) => void,
+    options: { allowAfterSkip?: boolean } = {},
   ): ProductionLoopState {
     return this.repository.transaction(() => {
       const state = this.repository.get(runId);
       if (!state) throw new Error(`Production loop not found: ${runId}`);
+      if (state.skip && !options.allowAfterSkip) {
+        throw new Error(
+          'The production workflow has been skipped; production actions are not allowed.',
+        );
+      }
       operation(state);
       return this.repository.update(state);
     });

@@ -5,8 +5,9 @@ import {
   type ProductionArtifactEvidence,
   type ProductionExpectedArtifact,
   type ProductionExpectedVerifier,
+  type ProductionLoopState,
 } from '../../shared/productionLoop';
-import type { ProductionLoopController } from './controller';
+import { buildNextHint, type ProductionLoopController } from './controller';
 
 interface ProductionLoopToolResult {
   content: Array<{ type: 'text'; text: string }>;
@@ -69,25 +70,15 @@ const verifierEvidence = (value: unknown): Array<{ name: string; evidenceRef: st
 export function buildProductionLoopTool(
   controller: ProductionLoopController,
 ): Record<string, unknown> {
-  const stateForModel = (): string => {
-    const state = controller.getModelState();
-    if (state.decision === 'undecided') return JSON.stringify(state);
-    return JSON.stringify({
-      phase: state.phase,
-      status: state.status,
-      acceptanceCriteria: state.acceptanceCriteria,
-      expectedArtifacts: state.expectedArtifacts,
-      expectedVerifiers: state.expectedVerifiers,
-      planItems: state.planItems,
-      critic: state.critic,
-      deliveryReason: state.deliveryReason,
-      availableVerifierEvidence: controller.getAvailableVerifierEvidence(),
-    });
-  };
+  // The model view is phase-slim; full state never leaves the controller.
+  const stateForModel = (): Record<string, unknown> => controller.getModelState();
   const result = (text: string): ProductionLoopToolResult => ({
     content: [{ type: 'text', text }],
-    details: controller.getModelState(),
+    details: stateForModel(),
   });
+  /** Succeed with a summary plus a next-step hint derived from full context. */
+  const step = (text: string, state: ProductionLoopState): ProductionLoopToolResult =>
+    result(`${text}\nNext: ${buildNextHint(state)}`);
 
   return {
     name: ProductionLoopToolName,
@@ -176,6 +167,11 @@ export function buildProductionLoopTool(
           type: 'string',
           description: 'Required for skip_workflow: why this task needs no production workflow.',
         },
+        sinceVersion: {
+          type: 'number',
+          description:
+            'Optional for get_state: the progressVersion this model already has. When the state has not advanced, the tool returns a short "no change" result instead of the full phase view.',
+        },
       },
       required: ['action'],
       additionalProperties: false,
@@ -187,15 +183,16 @@ export function buildProductionLoopTool(
       try {
         switch (params.action) {
           case ProductionLoopAction.RecordPrototype:
-            controller.recordPrototype(
+            const prototypeState = controller.recordPrototype(
               String(params.reference || ''),
               String(params.summary || ''),
             );
-            return result(
-              'Prototype recorded. Commit the execution plan when the direction is selected.',
+            return step(
+              `Prototype recorded: ${String(params.summary || '').slice(0, 80)}`,
+              prototypeState,
             );
           case ProductionLoopAction.CommitPlan:
-            controller.commitPlan({
+            const planState = controller.commitPlan({
               items: Array.isArray(params.items)
                 ? params.items.flatMap(value => {
                     if (!value || typeof value !== 'object') return [];
@@ -217,27 +214,37 @@ export function buildProductionLoopTool(
               selectedDirection:
                 typeof params.selectedDirection === 'string' ? params.selectedDirection : undefined,
             });
-            return result(
-              `Plan committed. Use these generated item IDs with update_plan_item:\n${stateForModel()}`,
+            return step(
+              `Plan committed (${planState.planItems.length} item(s)). Use the generated item IDs in this state with update_plan_item.\n${JSON.stringify(stateForModel())}`,
+              planState,
             );
           case ProductionLoopAction.UpdatePlanItem:
-            controller.updatePlanItem(
+            const itemState = controller.updatePlanItem(
               String(params.itemId || ''),
               params.status as ProductionPlanItemStatus,
             );
-            return result('Plan item updated.');
+            return step(
+              `Plan item ${String(params.itemId || '').slice(0, 12)} marked ${String(params.status || 'unknown')}.`,
+              itemState,
+            );
           case ProductionLoopAction.StartInspection:
-            controller.startInspection({
+            const inspectionState = controller.startInspection({
               artifacts: artifactEvidence(params.artifactEvidence),
               verifiers: verifierEvidence(params.verifierEvidence),
             });
-            return result(
-              'Inspection phase started. Run deterministic checks, then request critique.',
+            return step(
+              `Inspection started (${inspectionState.inspections.length} inspection(s) recorded).`,
+              inspectionState,
             );
-          case ProductionLoopAction.RequestCritique:
+          case ProductionLoopAction.RequestCritique: {
+            // The critic prompt is already a complete next-step instruction
+            // (call the reviewer subagent); a generic phase hint would
+            // contradict it — e.g. advising record_revision before the
+            // reviewer has even run.
             return result(controller.requestCritique());
+          }
           case ProductionLoopAction.RecordRevision:
-            controller.recordRevision(
+            const revisionState = controller.recordRevision(
               String(params.summary || ''),
               params.evidence &&
                 typeof params.evidence === 'object' &&
@@ -245,16 +252,32 @@ export function buildProductionLoopTool(
                 ? (params.evidence as Record<string, unknown>)
                 : {},
             );
-            return result(
-              'Revision recorded. Inspect the revised result and request critique again.',
+            return step(
+              `Revision recorded: ${String(params.summary || '').slice(0, 80)}`,
+              revisionState,
             );
           case ProductionLoopAction.SkipWorkflow:
-            controller.skipWorkflow(String(params.reason || ''));
-            return result(
-              'Production workflow skipped for this task. Answer directly and end the turn.',
+            const skipState = controller.skipWorkflow(String(params.reason || ''));
+            return step(
+              'Production workflow skipped for this task.',
+              skipState,
             );
-          case ProductionLoopAction.GetState:
-            return result(stateForModel());
+          case ProductionLoopAction.GetState: {
+            const view = stateForModel();
+            const sinceVersion =
+              typeof params.sinceVersion === 'number' ? params.sinceVersion : undefined;
+            if (
+              sinceVersion !== undefined &&
+              typeof view.progressVersion === 'number' &&
+              view.progressVersion === sinceVersion
+            ) {
+              return result(
+                `No state change since version ${sinceVersion}. Phase: ${String(view.phase)}. Next: ${buildNextHint(controller.getState())}`,
+              );
+            }
+            // Pure JSON so the model can parse it directly.
+            return result(JSON.stringify(view));
+          }
           default:
             return result(`Unknown production_loop action: ${String(params.action || '')}`);
         }
@@ -262,7 +285,10 @@ export function buildProductionLoopTool(
         const message = error instanceof Error ? error.message : String(error);
         return result(
           params.action === ProductionLoopAction.StartInspection
-            ? `${message}\nCurrent inspection state:\n${stateForModel()}`
+            ? `${message}\nCurrent state:\n${JSON.stringify({
+                ...stateForModel(),
+                availableVerifierEvidence: controller.getAvailableVerifierEvidence(),
+              })}`
             : message,
         );
       }
