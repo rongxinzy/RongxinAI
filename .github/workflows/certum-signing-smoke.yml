@@ -114,7 +114,24 @@ jobs:
           }
 
           $smokeExecutable = Join-Path $env:RUNNER_TEMP 'certum-signing-smoke.exe'
-          Copy-Item -LiteralPath "$env:WINDIR\System32\where.exe" -Destination $smokeExecutable
+          $smokeSource = Join-Path $env:RUNNER_TEMP 'certum-signing-smoke.cs'
+          $compiler = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+            throw 'The Windows C# compiler was not found on the runner.'
+          }
+          [IO.File]::WriteAllText(
+            $smokeSource,
+            'public static class SigningSmoke { public static int Main() { return 0; } }'
+          )
+          & $compiler /nologo /target:exe "/out:$smokeExecutable" $smokeSource
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $smokeExecutable)) {
+            throw 'Failed to compile the ephemeral unsigned executable.'
+          }
+
+          $unsignedSignature = Get-AuthenticodeSignature -FilePath $smokeExecutable
+          if ($unsignedSignature.Status -ne 'NotSigned') {
+            throw "The smoke executable unexpectedly starts with status $($unsignedSignature.Status)."
+          }
           try {
             & $signTool sign /v /fd sha256 /sha1 $thumbprint `
               /tr http://time.certum.pl /td sha256 $smokeExecutable
@@ -145,6 +162,7 @@ jobs:
             Write-Output 'Certum cloud signing smoke test passed.'
           }
           finally {
-            Remove-Item -LiteralPath $smokeExecutable -Force -ErrorAction SilentlyContinue
+            Remove-Item -LiteralPath $smokeExecutable, $smokeSource `
+              -Force -ErrorAction SilentlyContinue
             Set-Clipboard -Value ' '
           }
