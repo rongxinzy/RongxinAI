@@ -11,17 +11,15 @@ import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { CalendarClock, PanelLeftOpen } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
 import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
 import WindowTitleBar from '../window/WindowTitleBar';
 import AllRunsHistory from './AllRunsHistory';
 import DeleteConfirmModal from './DeleteConfirmModal';
-import TaskDetail from './TaskDetail';
 import TaskForm from './TaskForm';
 import TaskList from './TaskList';
 import TaskTemplateGallery, { type TaskTemplateValues } from './TaskTemplateGallery';
@@ -49,10 +47,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const dispatch = useDispatch();
   const isMac = window.electron.platform === 'darwin';
-  const viewMode = useSelector((state: RootState) => state.scheduledTask.viewMode);
-  const selectedTaskId = useSelector((state: RootState) => state.scheduledTask.selectedTaskId);
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
@@ -122,25 +117,16 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   const [createPrefill, setCreatePrefill] = useState<TaskTemplateValues | undefined>();
   const [createFormKey, setCreateFormKey] = useState(0);
 
-  // Task detail / edit modal, driven by mirroring redux selection
-  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
-  const [detailEdit, setDetailEdit] = useState(false);
-  const detailTask = detailTaskId ? (tasks.find(t => t.id === detailTaskId) ?? null) : null;
-
-  // Mirror redux selection (from TaskList card-click / dropdown edit) into the modal,
-  // then clear the selection so list and modal stay decoupled.
-  useEffect(() => {
-    if (!selectedTaskId) return;
-    if (viewMode === 'detail' || viewMode === 'edit') {
-      setDetailTaskId(selectedTaskId);
-      setDetailEdit(viewMode === 'edit');
-      dispatch(selectTask(null));
-      dispatch(setViewMode('list'));
-    }
-  }, [selectedTaskId, viewMode, dispatch]);
+  // The list's edit action owns the only per-task modal. Detail views are intentionally omitted.
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const editingTask = editingTaskId ? (tasks.find(t => t.id === editingTaskId) ?? null) : null;
 
   const handleRequestDelete = useCallback((taskId: string, taskName: string) => {
     setDeleteTaskInfo({ id: taskId, name: taskName });
+  }, []);
+
+  const handleRequestEdit = useCallback((taskId: string) => {
+    setEditingTaskId(taskId);
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
@@ -148,11 +134,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     const taskId = deleteTaskInfo.id;
     setDeleteTaskInfo(null);
     await scheduledTaskService.deleteTask(taskId);
-    if (detailTaskId === taskId) {
-      setDetailTaskId(null);
-      setDetailEdit(false);
+    if (editingTaskId === taskId) {
+      setEditingTaskId(null);
     }
-  }, [deleteTaskInfo, detailTaskId]);
+  }, [deleteTaskInfo, editingTaskId]);
 
   const handleCancelDelete = useCallback(() => {
     setDeleteTaskInfo(null);
@@ -201,14 +186,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     [],
   );
 
-  const handleCreateSaved = useCallback((newTaskId?: string) => {
+  const handleCreateSaved = useCallback(() => {
     setCreateOpen(false);
     setCreatePrefill(undefined);
     setActiveTab(AUTO_TAB.Tasks);
-    if (newTaskId) {
-      setDetailTaskId(newTaskId);
-      setDetailEdit(false);
-    }
   }, []);
 
   if (!initialDataLoaded) {
@@ -329,7 +310,9 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
               />
             )}
 
-            {activeTab === AUTO_TAB.Tasks && <TaskList onRequestDelete={handleRequestDelete} />}
+            {activeTab === AUTO_TAB.Tasks && (
+              <TaskList onRequestDelete={handleRequestDelete} onRequestEdit={handleRequestEdit} />
+            )}
 
             {activeTab === AUTO_TAB.History && <AllRunsHistory />}
           </div>
@@ -356,34 +339,30 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Task detail / edit modal */}
+      {/* Task edit modal */}
       <Dialog
-        open={detailTask !== null}
+        open={editingTask !== null}
         onOpenChange={open => {
           if (!open) {
-            setDetailTaskId(null);
-            setDetailEdit(false);
+            setEditingTaskId(null);
           }
         }}
       >
         <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
           <DialogHeader className="sr-only">
-            <DialogTitle>{detailTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
-            <DialogDescription>{detailTask?.name ?? ''}</DialogDescription>
+            <DialogTitle>{editingTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
+            <DialogDescription>{editingTask?.name ?? ''}</DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto rounded-b-xl px-4 pt-9">
-            {detailTask &&
-              (detailEdit ? (
-                <TaskForm
-                  mode="edit"
-                  task={detailTask}
-                  onCancel={() => setDetailEdit(false)}
-                  onSaved={() => setDetailEdit(false)}
-                  onDirtyChange={() => {}}
-                />
-              ) : (
-                <TaskDetail task={detailTask} onRequestDelete={handleRequestDelete} />
-              ))}
+            {editingTask && (
+              <TaskForm
+                mode="edit"
+                task={editingTask}
+                onCancel={() => setEditingTaskId(null)}
+                onSaved={() => setEditingTaskId(null)}
+                onDirtyChange={() => {}}
+              />
+            )}
           </div>
         </DialogContent>
       </Dialog>

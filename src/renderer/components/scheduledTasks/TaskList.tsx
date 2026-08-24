@@ -13,13 +13,12 @@ import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
 import { CircleAlert, Clock, EllipsisVertical, RefreshCw } from 'lucide-react';
 import React from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 
 import type { ScheduledTask } from '../../../scheduledTask/types';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
 import { formatNextRunRelative, formatScheduleLabel, getStatusLabelKey } from './utils';
 
 // ── Status to text color mapping ──
@@ -36,11 +35,10 @@ const statusTextClass: Record<string, string> = {
 interface TaskListItemProps {
   task: ScheduledTask;
   onRequestDelete: (taskId: string, taskName: string) => void;
+  onRequestEdit: (taskId: string) => void;
 }
 
-const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) => {
-  const dispatch = useDispatch();
-
+const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRequestEdit }) => {
   const isRunning = task.state.runningAtMs !== null;
   const displayStatus = isRunning ? 'running' : task.state.lastStatus;
   const statusLabel = i18nService.t(getStatusLabelKey(displayStatus));
@@ -50,10 +48,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
       : null;
 
   return (
-    <Card
-      className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3 ring-0 transition-colors hover:bg-muted"
-      onClick={() => dispatch(selectTask(task.id))}
-    >
+    <Card className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3">
       <CardContent className="flex min-w-0 flex-1 items-center gap-3 p-0">
         <CardTitle
           className={cn(
@@ -122,8 +117,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
             className="text-muted-foreground"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
-              dispatch(selectTask(task.id));
-              dispatch(setViewMode('edit'));
+              onRequestEdit(task.id);
             }}
           >
             {i18nService.t('scheduledTasksEdit')}
@@ -147,9 +141,10 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete }) =>
 
 interface TaskListProps {
   onRequestDelete: (taskId: string, taskName: string) => void;
+  onRequestEdit: (taskId: string) => void;
 }
 
-const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
+const TaskList: React.FC<TaskListProps> = ({ onRequestDelete, onRequestEdit }) => {
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const loading = useSelector((state: RootState) => state.scheduledTask.loading);
   const listError = useSelector((state: RootState) => state.scheduledTask.listError);
@@ -195,7 +190,12 @@ const TaskList: React.FC<TaskListProps> = ({ onRequestDelete }) => {
     <div className="flex flex-col gap-3">
       {loadErrorAlert}
       {tasks.map(task => (
-        <TaskListItem key={task.id} task={task} onRequestDelete={onRequestDelete} />
+        <TaskListItem
+          key={task.id}
+          task={task}
+          onRequestDelete={onRequestDelete}
+          onRequestEdit={onRequestEdit}
+        />
       ))}
     </div>
   );
