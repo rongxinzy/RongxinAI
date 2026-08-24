@@ -12,7 +12,6 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  SIMPLYSIGN_URL: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.3.90/SimplySignDesktop-9.4.3.90-64-bit-en.msi
 
 jobs:
   sign-smoke:
@@ -22,54 +21,14 @@ jobs:
     timeout-minutes: 25
     environment: release
     steps:
-      - name: Require protected Certum configuration
-        id: certum
-        shell: pwsh
-        env:
-          CERTUM_USER_ID: ${{ secrets.CERTUM_USER_ID }}
-          CERTUM_OTP_URI: ${{ secrets.CERTUM_OTP_URI }}
-          CERTUM_CERT_THUMBPRINT: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:CERTUM_USER_ID)) {
-            throw 'CERTUM_USER_ID is not configured.'
-          }
-          if ($env:CERTUM_OTP_URI -notmatch '^otpauth://totp/') {
-            throw 'CERTUM_OTP_URI must contain the complete SimplySign TOTP URI.'
-          }
-
-          $thumbprint = (
-            $env:CERTUM_CERT_THUMBPRINT -replace '[^0-9A-Fa-f]', ''
-          ).ToUpperInvariant()
-          if ($thumbprint -notmatch '^[0-9A-F]{40}$') {
-            throw 'CERTUM_CERT_THUMBPRINT must contain a SHA-1 certificate thumbprint.'
-          }
-
-          Write-Output "::add-mask::$thumbprint"
-          "thumbprint=$thumbprint" |
-            Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-      - name: Download and verify SimplySign Desktop
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri $env:SIMPLYSIGN_URL -OutFile SimplySignDesktop.msi
-          $signature = Get-AuthenticodeSignature -FilePath SimplySignDesktop.msi
-          if ($signature.Status -ne 'Valid') {
-            throw "SimplySign Desktop installer signature is $($signature.Status), expected Valid."
-          }
-          if ($signature.SignerCertificate.Subject -notmatch 'Asseco Data Systems') {
-            throw 'SimplySign Desktop installer is not signed by Asseco Data Systems.'
-          }
-
-      # This third-party action receives the long-lived TOTP credential, so it
-      # is pinned to the exact revision reviewed for this workflow.
+      - uses: actions/checkout@v6
       - name: Connect Certum SimplySign
-        uses: dismine/windows-app-signing-setup-action@89ae3b032d4bc7a5b98d1a42a34e61ecb6faad64
+        id: certum
+        uses: ./.github/actions/setup-certum-signing
         with:
-          certum-username: ${{ secrets.CERTUM_USER_ID }}
-          certum-otp-uri: ${{ secrets.CERTUM_OTP_URI }}
-          certum-key-id: ${{ steps.certum.outputs.thumbprint }}
-          simplysign-url: ${{ env.SIMPLYSIGN_URL }}
-          capture-diagnostics: false
+          user-id: ${{ secrets.CERTUM_USER_ID }}
+          otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certificate-thumbprint: ${{ secrets.CERTUM_CERT_THUMBPRINT }}
 
       - name: Sign and verify an ephemeral executable
         shell: pwsh
