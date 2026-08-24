@@ -31,7 +31,7 @@ $expectedCertificateDer = [Convert]::ToBase64String(
 
 $builderConfig = Get-Content -LiteralPath (
   Join-Path $ProjectRoot 'electron-builder.json'
-) -Raw | ConvertFrom-Json
+) -Raw -Encoding UTF8 | ConvertFrom-Json
 $appExecutable = Join-Path $ProjectRoot (
   "release\win-unpacked\$($builderConfig.executableName).exe"
 )
