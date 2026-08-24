@@ -4,6 +4,7 @@ import http from 'http';
 import os from 'os';
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { app } from 'electron';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { ZipFile } from 'yazl';
 
@@ -459,8 +460,8 @@ describe('llamacpp backend manager', () => {
     const originalFetch = global.fetch;
     const originalPlatform = process.platform;
     const projectRoot = createRuntimeRoot();
-    const manifestDir = path.join(projectRoot, 'build', 'win-lite');
-    const archiveDir = path.join(projectRoot, 'build', 'win-full');
+    const manifestDir = path.join(projectRoot, 'resources', 'llamacpp-backends');
+    const archiveDir = manifestDir;
     fs.mkdirSync(manifestDir, { recursive: true });
     fs.mkdirSync(archiveDir, { recursive: true });
     fs.writeFileSync(
@@ -507,6 +508,64 @@ describe('llamacpp backend manager', () => {
         value: originalPlatform,
       });
       process.chdir(originalCwd);
+    }
+  });
+
+  test('reads the packaged backend manifest without requesting the remote manifest', async () => {
+    const originalFetch = global.fetch;
+    const originalPlatform = process.platform;
+    const originalPackaged = app.isPackaged;
+    const originalResourcesPath = Object.getOwnPropertyDescriptor(process, 'resourcesPath');
+    const packagedResourcesDir = createRuntimeRoot();
+    const manifestDir = path.join(packagedResourcesDir, 'llamacpp-backends');
+    fs.mkdirSync(manifestDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(manifestDir, 'manifest.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        defaultVersion: 'b9244',
+        releaseBaseUrl: 'https://example.com/llamacpp/b9244',
+        backends: [
+          {
+            version: 'b9244',
+            backend: 'win-x64',
+            platform: 'win32',
+            arch: 'x64',
+            accelerator: 'cpu',
+          },
+        ],
+      }),
+      'utf8',
+    );
+
+    // Simulate the post-packaging resources directory used by Electron.
+    Object.defineProperty(app, 'isPackaged', { configurable: true, value: true });
+    Object.defineProperty(process, 'resourcesPath', {
+      configurable: true,
+      value: packagedResourcesDir,
+    });
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('fetch should not be called');
+      }) as typeof fetch,
+    );
+
+    try {
+      const manifest = await fetchLlamaCppBackendManifest({});
+
+      expect(manifest.defaultVersion).toBe('b9244');
+      expect(manifest.backends).toHaveLength(1);
+    } finally {
+      global.fetch = originalFetch;
+      Object.defineProperty(app, 'isPackaged', { configurable: true, value: originalPackaged });
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      if (originalResourcesPath) {
+        Object.defineProperty(process, 'resourcesPath', originalResourcesPath);
+      } else {
+        delete (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+      }
     }
   });
 

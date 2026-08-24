@@ -4,7 +4,6 @@ import {
   Card,
   CardContent,
   CardFooter,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from '@shared/components/ui/card';
@@ -16,23 +15,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
+import { Skeleton } from '@shared/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
-import { ArrowRightLeft, Check, Download, RotateCcw, X } from 'lucide-react';
+import { ArrowRightLeft, Download, LoaderCircle, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import type {
   LlamaCppBackendInfo,
   LlamaCppInstallProgress,
+  LlamaCppRuntimeInstallSnapshot,
   LlamaCppStatusSnapshot,
 } from '../../../../shared/llamacpp';
 import { LlamaCppBackendError } from '../../../../shared/llamacpp';
 import { i18nService } from '../../../services/i18n';
-import { InstallProgressBar } from './Common';
 import { BreathingDot } from './BreathingDot';
-import { formatBytes, formatInstallProgressSummary } from '../utils/progress';
+import { InstallProgressBar } from './Common';
+import { LocalInferenceToastKind } from '../types';
+import { formatBytes } from '../utils/progress';
 
-const RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
 const handledInstallerRequests = new Set<string>();
+
+const RuntimeMetadataStatus = {
+  Loading: 'loading',
+  Ready: 'ready',
+  Error: 'error',
+} as const;
+type RuntimeMetadataStatus =
+  (typeof RuntimeMetadataStatus)[keyof typeof RuntimeMetadataStatus];
+
+const RuntimeDownloadPhase = {
+  Downloading: 'downloading',
+  DownloadingProgress: 'downloading-progress',
+} as const;
 
 function translateRuntimeError(error: string | undefined): string | undefined {
   if (error === LlamaCppBackendError.CudaRequiresNvidiaGpu) {
@@ -44,12 +58,15 @@ function translateRuntimeError(error: string | undefined): string | undefined {
   return error;
 }
 
-function formatCompactBytes(value: number): string {
-  return formatBytes(value).replace(' ', '');
-}
-
 type RuntimeInstallCardProps = {
   installRequestId?: string;
+  runtimeInstallSnapshot: LlamaCppRuntimeInstallSnapshot;
+  onInstallRequestHandled?: (requestId: string) => void;
+  onNotify?: (
+    message: string,
+    kind: LocalInferenceToastKind,
+    autoDismiss?: boolean,
+  ) => void;
 };
 
 function isInstalled(status: LlamaCppStatusSnapshot | null): boolean {
@@ -66,19 +83,48 @@ function canCancel(progress: LlamaCppInstallProgress | null): boolean {
   return Boolean(progress && ['starting', 'downloading', 'downloading-progress'].includes(progress.phase));
 }
 
-export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps) {
+function isRuntimeDownloadProgress(progress: LlamaCppInstallProgress | null): boolean {
+  return Boolean(
+    progress &&
+      (progress.phase === RuntimeDownloadPhase.Downloading ||
+        progress.phase === RuntimeDownloadPhase.DownloadingProgress),
+  );
+}
+
+export function RuntimeInstallCard({
+  installRequestId,
+  runtimeInstallSnapshot,
+  onInstallRequestHandled,
+  onNotify,
+}: RuntimeInstallCardProps) {
   const [backends, setBackends] = useState<LlamaCppBackendInfo[]>([]);
   const [selectedKey, setSelectedKey] = useState('');
+  // Keep an unresolved backend list distinct from a confirmed empty list.
+  const [metadataStatus, setMetadataStatus] = useState<RuntimeMetadataStatus>(
+    RuntimeMetadataStatus.Loading,
+  );
   const [status, setStatus] = useState<LlamaCppStatusSnapshot | null>(null);
-  const [progress, setProgress] = useState<LlamaCppInstallProgress | null>(null);
   const [error, setError] = useState<string>();
-  const [resolvedDownloadSizes, setResolvedDownloadSizes] = useState<Record<string, number>>({});
-  const active = isActive(progress);
+  const progress = runtimeInstallSnapshot.progress ?? null;
+  const active = runtimeInstallSnapshot.active || isActive(progress);
   const cancellable = canCancel(progress);
+
+  // Route transient runtime feedback through the page-level notification host.
+  const notify = useCallback(
+    (message: string, kind: LocalInferenceToastKind, autoDismiss = true) => {
+      onNotify?.(message, kind, autoDismiss);
+    },
+    [onNotify],
+  );
 
   const selectedBackend = useMemo(
     () => backends.find(backend => backend.versionBackend === selectedKey),
     [backends, selectedKey],
+  );
+  // The select may point to a candidate; only current marks the version already enabled.
+  const currentBackend = useMemo(
+    () => backends.find(backend => backend.current),
+    [backends],
   );
 
   const loadMetadata = useCallback(async (): Promise<LlamaCppBackendInfo | undefined> => {
@@ -103,18 +149,8 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
         ? current
         : (preferred?.versionBackend ?? ''),
     );
+    setMetadataStatus(RuntimeMetadataStatus.Ready);
     return preferred;
-  }, []);
-
-  const loadDownloadSize = useCallback(async (backend: LlamaCppBackendInfo): Promise<void> => {
-    const sizeBytes =
-      backend.downloadSizeBytes ??
-      (await window.electron.llamacpp.getBackendDownloadSize(backend)).sizeBytes;
-    if (sizeBytes === undefined) return;
-    setResolvedDownloadSizes(current => ({
-      ...current,
-      [backend.versionBackend]: sizeBytes,
-    }));
   }, []);
 
   const startInstall = useCallback(
@@ -123,10 +159,6 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
       setError(undefined);
       try {
         const backend = preferredBackend ?? selectedBackend ?? (await loadMetadata());
-        setProgress({ phase: 'starting', modelId: RUNTIME_PROGRESS_KEY });
-        // Metadata is optional presentation data. Do not put a network HEAD
-        // request in front of the cancellable runtime install IPC.
-        if (backend) void loadDownloadSize(backend);
         const result = backend
           ? await window.electron.llamacpp.installBackend(backend)
           : await window.electron.llamacpp.install();
@@ -134,63 +166,68 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
           setError(translateRuntimeError(result.error) || i18nService.t('localInferenceRuntimeMissing'));
         }
         await loadMetadata();
+        if (result.success) {
+          notify(
+            backend
+              ? i18nService
+                  .t('localInferenceRuntimeVersionSwitched')
+                  .replace('{version}', backend.versionBackend)
+              : i18nService.t('localInferenceRuntimeReady'),
+            LocalInferenceToastKind.Success,
+          );
+        }
       } catch (installError) {
         setError(
           installError instanceof Error
             ? translateRuntimeError(installError.message)
             : i18nService.t('localInferenceRuntimeMissing'),
         );
-        setProgress(current => ({
-          ...(current ?? { modelId: RUNTIME_PROGRESS_KEY }),
-          phase: 'failed',
-        }));
       }
     },
-    [active, loadDownloadSize, loadMetadata, selectedBackend],
+    [active, loadMetadata, notify, selectedBackend],
   );
 
   useEffect(() => {
     void loadMetadata().catch(metadataError => {
+      setMetadataStatus(RuntimeMetadataStatus.Error);
       setError(metadataError instanceof Error ? metadataError.message : String(metadataError));
     });
     return window.electron.llamacpp.onStatusChanged(setStatus);
   }, [loadMetadata]);
 
-  useEffect(
-    () =>
-      window.electron.llamacpp.onInstallProgress(nextProgress => {
-        if (nextProgress.modelId !== RUNTIME_PROGRESS_KEY) return;
-        setProgress(nextProgress);
-        if (nextProgress.phase === 'failed') {
-          setError(translateRuntimeError(nextProgress.error) || i18nService.t('localInferenceRuntimeMissing'));
-        } else if (nextProgress.phase === 'cancelled') {
-          setError(undefined);
-        } else if (nextProgress.phase === 'done') {
-          setError(undefined);
-        }
-      }),
-    [],
-  );
+  useEffect(() => {
+    if (!error) return;
+    notify(error, LocalInferenceToastKind.Error);
+  }, [error, notify]);
 
   useEffect(() => {
     if (!installRequestId || handledInstallerRequests.has(installRequestId)) return;
     handledInstallerRequests.add(installRequestId);
+    // Consume the one-time navigation request before any async work can remount this card.
+    onInstallRequestHandled?.(installRequestId);
     void loadMetadata()
       .then(backend => startInstall(backend))
       .catch(metadataError => {
         setError(metadataError instanceof Error ? metadataError.message : String(metadataError));
       });
-  }, [installRequestId, loadMetadata, startInstall]);
+  }, [installRequestId, loadMetadata, onInstallRequestHandled, startInstall]);
 
-  useEffect(() => {
-    if (backends.length === 0) return;
-    void Promise.all(backends.map(backend => loadDownloadSize(backend)));
-  }, [backends, loadDownloadSize]);
-
-  const summary = progress ? formatInstallProgressSummary(progress) : null;
   const ready = isInstalled(status);
   const selectedInstalled = Boolean(selectedBackend?.installed);
   const selectedCurrent = Boolean(selectedBackend?.current);
+  const metadataLoading = metadataStatus === RuntimeMetadataStatus.Loading;
+  const downloading = active && isRuntimeDownloadProgress(progress);
+  const downloadName = progress?.modelName || selectedBackend?.versionBackend || '';
+  // The manifest may omit sizes, so wait for the downloader's server-confirmed total.
+  const downloadTotal = progress?.total && progress.total > 0 ? formatBytes(progress.total) : undefined;
+  const downloadSpeed = progress?.speed && progress.speed > 0 ? formatBytes(progress.speed) : undefined;
+  const downloadProgress =
+    progress?.completed !== undefined && downloadTotal
+      ? i18nService
+          .t('localInferenceRuntimeDownloadProgress')
+          .replace('{completed}', formatBytes(progress.completed))
+          .replace('{total}', downloadTotal)
+      : undefined;
   const serviceRunning = status?.status === 'running';
   const serviceProgramAvailable = ready || Boolean(status?.executablePath);
   const serviceStatusLabel = serviceRunning
@@ -203,41 +240,10 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
     : serviceProgramAvailable
       ? 'var(--zy-warning)'
       : 'var(--zy-text-muted)';
-  const runtimeBackendLabel =
-    status?.versionBackend?.trim() ||
-    selectedBackend?.versionBackend ||
-    i18nService.t('localInferenceBackendNone');
-
   const cancelInstall = async () => {
-    setProgress(current => ({
-      ...(current ?? { modelId: RUNTIME_PROGRESS_KEY }),
-      phase: 'cancelling',
-    }));
     const result = await window.electron.llamacpp.cancelRuntimeInstall();
-    if (!result.cancelled) {
-      setProgress(current =>
-        current?.phase === 'cancelling'
-          ? { ...current, phase: 'cancelled' }
-          : current,
-      );
-    }
-  };
-
-  const switchBackend = async () => {
-    if (active || !selectedBackend) return;
-    setError(undefined);
-    try {
-      const result = await window.electron.llamacpp.setBackendSelection(selectedBackend);
-      if (!result.success) {
-        setError(translateRuntimeError(result.error) || i18nService.t('localInferenceRuntimeMissing'));
-      }
-      await loadMetadata();
-    } catch (switchError) {
-      setError(
-        switchError instanceof Error
-          ? switchError.message
-          : i18nService.t('localInferenceRuntimeMissing'),
-      );
+    if (result.cancelled) {
+      notify(i18nService.t('localInferenceRuntimeInstallCancelled'), LocalInferenceToastKind.Info);
     }
   };
 
@@ -268,10 +274,32 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
           <Select
             value={selectedKey}
             onValueChange={value => setSelectedKey(value ?? '')}
-            disabled={active || backends.length === 0}
+            disabled={active || metadataLoading || backends.length === 0}
           >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={i18nService.t('localInferenceBackendNone')} />
+            <SelectTrigger className="w-full" aria-busy={metadataLoading}>
+              {metadataLoading ? (
+                <Skeleton className="h-4 w-40" />
+              ) : (
+                <SelectValue>
+                  {value =>
+                    value ? (
+                      <>
+                        <span>{value}</span>
+                        {selectedBackend?.recommended ? (
+                          <>
+                            <span> · </span>
+                            <span className="font-semibold text-foreground">
+                              {i18nService.t('localInferenceBackendRecommendedLabel')}
+                            </span>
+                          </>
+                        ) : null}
+                      </>
+                    ) : (
+                      i18nService.t('localInferenceBackendNone')
+                    )
+                  }
+                </SelectValue>
+              )}
             </SelectTrigger>
             <SelectContent
               alignItemWithTrigger={false}
@@ -285,14 +313,9 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
             >
               <SelectGroup>
                 {backends.map(backend => {
-                  const downloadSize =
-                    backend.downloadSizeBytes ?? resolvedDownloadSizes[backend.versionBackend];
                   return (
                     <SelectItem key={backend.versionBackend} value={backend.versionBackend}>
                       {backend.versionBackend}
-                      {downloadSize !== undefined
-                        ? ` · ${formatCompactBytes(downloadSize)}`
-                        : ''}
                       {backend.recommended ? (
                         <>
                           <span> · </span>
@@ -309,63 +332,97 @@ export function RuntimeInstallCard({ installRequestId }: RuntimeInstallCardProps
           </Select>
         </div>
       </CardHeader>
-      {progress || summary || error ? (
+      {downloading ? (
         <CardContent className="space-y-2 px-0">
-          {progress ? <InstallProgressBar progress={progress} /> : null}
-          {summary ? (
-            <div className="text-xs text-muted-foreground">
-              {progress?.phase === 'failed' || summary.phase === summary.primary
-                ? ''
-                : summary.phase
-                  ? `${summary.phase} · `
-                  : ''}
-              {progress?.phase === 'failed' ? '' : summary.primary}
-            </div>
-          ) : null}
-          {error ? <div className="text-xs text-destructive">{error}</div> : null}
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="min-w-0 truncate font-medium text-foreground">
+              {i18nService.t('localInferenceRuntimeDownloading').replace('{name}', downloadName)}
+            </span>
+            {downloadTotal ? (
+              <span className="shrink-0 tabular-nums text-muted-foreground">
+                {i18nService.t('localInferenceRuntimeDownloadTotal').replace('{size}', downloadTotal)}
+              </span>
+            ) : (
+              <Skeleton className="h-4 w-20 shrink-0" />
+            )}
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs tabular-nums text-muted-foreground">
+            {downloadSpeed ? (
+              <span>
+                {i18nService.t('localInferenceRuntimeDownloadSpeed').replace('{speed}', downloadSpeed)}
+              </span>
+            ) : (
+              <Skeleton className="h-3 w-24" />
+            )}
+            {downloadProgress ? <span className="shrink-0">{downloadProgress}</span> : null}
+          </div>
+          <InstallProgressBar progress={progress ?? undefined} />
         </CardContent>
       ) : null}
-      <CardFooter className="justify-between border-0 bg-transparent p-0 pb-2">
-        <CardDescription>
-          {ready
-            ? i18nService
-                .t('localInferenceRuntimeReadyWithBackend')
-                .replace('{backend}', runtimeBackendLabel)
-            : i18nService.t('localInferenceRuntimeNotInstalledMessage')}
-        </CardDescription>
-        {active && cancellable ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => void cancelInstall()}>
-            <X data-icon="inline-start" />
-            {i18nService.t('cancel')}
-          </Button>
-        ) : active ? (
-          <Button type="button" variant="outline" size="sm" disabled>
-            {i18nService.t('localInferenceRuntimeInstalling')}
-          </Button>
-        ) : !selectedInstalled ? (
-          <Button21st
-            type="button"
-            variant="primary"
-            size="sm"
-            className="-mr-2.5 h-8 min-w-16 px-3"
-            onClick={() => void startInstall()}
-          >
-            {error ? <RotateCcw data-icon="inline-start" /> : <Download data-icon="inline-start" />}
-            {error
-              ? i18nService.t('localInferenceRuntimeRetry')
-              : i18nService.t('localInferenceInstall')}
-          </Button21st>
-        ) : selectedCurrent ? (
-          <Button type="button" variant="outline" size="sm" disabled>
-            <Check data-icon="inline-start" />
-            {i18nService.t('localInferenceBackendInUse')}
-          </Button>
-        ) : (
-          <Button type="button" variant="outline" size="sm" onClick={() => void switchBackend()}>
-            <ArrowRightLeft data-icon="inline-start" />
-            {i18nService.t('localInferenceBackendSwitch')}
-          </Button>
-        )}
+      <CardFooter className="justify-between gap-2 border-0 bg-transparent p-0 pb-2">
+        <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+          {metadataLoading ? (
+            <Skeleton className="h-4 w-36" />
+          ) : currentBackend ? (
+            i18nService
+              .t('localInferenceRuntimeReadyWithBackend')
+              .replace('{backend}', currentBackend.versionBackend)
+          ) : (
+            i18nService.t('localInferenceRuntimeNoSelectedVersion')
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Preserve identical control metrics while the install action changes to cancellation. */}
+          {active && cancellable ? (
+            <Button21st
+              type="button"
+              variant="primary"
+              size="sm"
+              className="h-8 min-w-16 translate-x-1.5 px-3 leading-tight"
+              onClick={() => void cancelInstall()}
+            >
+              <X data-icon="inline-start" />
+              {i18nService.t('cancel')}
+            </Button21st>
+          ) : active ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              disabled
+              aria-label={i18nService.t('localInferenceRuntimeInstalling')}
+            >
+              <LoaderCircle className="animate-spin" />
+            </Button>
+          ) : (
+            <>
+              {/* Keep installation separate from selecting an already installed version. */}
+              <Button21st
+                type="button"
+                variant="primary"
+                size="sm"
+                className="h-8 min-w-16 translate-x-1.5 px-3"
+                disabled={selectedInstalled}
+                onClick={() => void startInstall()}
+              >
+                {error && !selectedInstalled ? (
+                  <RotateCcw data-icon="inline-start" />
+                ) : (
+                  <Download data-icon="inline-start" />
+                )}
+                {error && !selectedInstalled
+                  ? i18nService.t('localInferenceRuntimeRetry')
+                  : i18nService.t('localInferenceInstall')}
+              </Button21st>
+              {selectedInstalled && !selectedCurrent ? (
+                <Button type="button" variant="outline" size="sm" onClick={() => void startInstall()}>
+                  <ArrowRightLeft data-icon="inline-start" />
+                  {i18nService.t('localInferenceRuntimeEnableVersion')}
+                </Button>
+              ) : null}
+            </>
+          )}
+        </div>
       </CardFooter>
     </Card>
   );
