@@ -9,6 +9,7 @@ import {
   type ZhiyuanEnterpriseExtensionSnapshot,
   ZhiyuanEnterpriseExtensionStatus,
   type ZhiyuanEnterpriseHostContext,
+  type ZhiyuanEnterpriseRendererHostCapability,
   type ZhiyuanEnterpriseSessionHostCapability,
 } from './contract';
 
@@ -24,6 +25,9 @@ export interface ZhiyuanEnterpriseExtensionHostOptions {
   readonly userDataPath: string;
   readonly developmentExtensionPath?: string;
   readonly sessionCapability?: ZhiyuanEnterpriseSessionHostCapability;
+  readonly createRendererCapability?: (
+    extensionDirectory: string,
+  ) => ZhiyuanEnterpriseRendererHostCapability;
 }
 
 type ExtensionModuleImporter = (modulePath: string) => Promise<unknown>;
@@ -100,7 +104,7 @@ export class ZhiyuanEnterpriseExtensionHost {
       const extensionModule = resolveExtensionModule(imported);
       extension = await extensionModule.createZhiyuanEnterpriseExtension();
       validateExtension(extension);
-      await extension.initialize(createHostContext(options));
+      await extension.initialize(createHostContext(options, path.dirname(modulePath)));
       this.#extension = extension;
       this.#status = ZhiyuanEnterpriseExtensionStatus.Active;
       return this.snapshot();
@@ -170,6 +174,7 @@ function validateExtension(extension: unknown): asserts extension is ZhiyuanEnte
 
 function createHostContext(
   options: ZhiyuanEnterpriseExtensionHostOptions,
+  extensionDirectory: string,
 ): ZhiyuanEnterpriseHostContext {
   const paths = Object.freeze({
     resources: path.resolve(options.resourcesPath),
@@ -177,6 +182,7 @@ function createHostContext(
   });
   const capabilities = Object.freeze({
     session: options.sessionCapability ?? null,
+    renderer: options.createRendererCapability?.(extensionDirectory) ?? null,
   });
   return Object.freeze({
     apiVersion: ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION,

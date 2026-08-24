@@ -67,6 +67,7 @@ describe('Zhiyuan enterprise extension host', () => {
     expect(Object.isFrozen(receivedContext!.paths)).toBe(true);
     expect(Object.isFrozen(receivedContext!.capabilities)).toBe(true);
     expect(receivedContext!.capabilities.session).toBeNull();
+    expect(receivedContext!.capabilities.renderer).toBeNull();
 
     await host.dispose();
     await host.dispose();
@@ -112,6 +113,29 @@ describe('Zhiyuan enterprise extension host', () => {
 
     expect(receivedContext!.capabilities.session).toBe(sessionCapability);
     expect(receivedContext!.capabilities.session?.apiVersion).toBe(1);
+  });
+
+  test('scopes the renderer capability to the loaded extension directory', async () => {
+    const root = createTemporaryDirectory();
+    const modulePath = path.join(root, 'resources', 'zhiyuan-enterprise', 'extension.cjs');
+    fs.mkdirSync(path.dirname(modulePath), { recursive: true });
+    fs.writeFileSync(modulePath, 'module placeholder');
+    const rendererCapability = { apiVersion: 1 as const, registerSessionGate: vi.fn() };
+    const createRendererCapability = vi.fn(() => rendererCapability);
+    let receivedContext: ZhiyuanEnterpriseHostContext | null = null;
+    const host = new ZhiyuanEnterpriseExtensionHost(async () => ({
+      createZhiyuanEnterpriseExtension: () => ({
+        ...validExtension(),
+        initialize: async (context: ZhiyuanEnterpriseHostContext) => {
+          receivedContext = context;
+        },
+      }),
+    }));
+
+    await host.initialize({ ...options(root, true), createRendererCapability });
+
+    expect(createRendererCapability).toHaveBeenCalledWith(path.dirname(modulePath));
+    expect(receivedContext!.capabilities.renderer).toBe(rendererCapability);
   });
 
   test('imports a real CommonJS development bundle', async () => {

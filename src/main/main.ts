@@ -76,6 +76,7 @@ import {
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
+import { EnterpriseRendererIpc } from '../shared/enterpriseRenderer';
 import {
   CoworkQueueEnqueueSchema,
   CoworkQueueItemSchema,
@@ -194,6 +195,10 @@ import {
   disposeZhiyuanEnterpriseExtension,
   initializeZhiyuanEnterpriseExtension,
 } from './enterpriseExtension/host';
+import {
+  ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
+  zhiyuanEnterpriseRendererBridge,
+} from './enterpriseExtension/rendererBridge';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
@@ -267,6 +272,13 @@ import {
 // 设置应用程序名称
 app.name = APP_NAME;
 app.setName(APP_NAME);
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true },
+  },
+]);
 
 const INVALID_FILE_NAME_PATTERN = /[<>:"/\\|?*\u0000-\u001F]/g;
 const IPC_MESSAGE_CONTENT_MAX_CHARS = 120_000;
@@ -2457,6 +2469,9 @@ if (!gotTheLock) {
     zhiyuanEnterpriseSessionBridge.changePassword(input),
   );
   ipcMain.handle(EnterpriseSessionIpc.Logout, () => zhiyuanEnterpriseSessionBridge.logout());
+  ipcMain.handle(EnterpriseRendererIpc.SessionGateEntrypoint, () =>
+    zhiyuanEnterpriseRendererBridge.sessionGateEntrypoint(),
+  );
 
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
   ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
@@ -6635,6 +6650,13 @@ if (!gotTheLock) {
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
 
+    protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, request => {
+      const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
+      return assetPath
+        ? net.fetch(pathToFileURL(assetPath).toString())
+        : Promise.resolve(new Response(null, { status: 404 }));
+    });
+
     const enterpriseExtension = await initializeZhiyuanEnterpriseExtension({
       appVersion: app.getVersion(),
       isPackaged: app.isPackaged,
@@ -6643,6 +6665,8 @@ if (!gotTheLock) {
       userDataPath: app.getPath('userData'),
       developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
       sessionCapability: zhiyuanEnterpriseSessionBridge,
+      createRendererCapability: extensionDirectory =>
+        zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
     });
     if (enterpriseExtension.extensionId) {
       console.log(

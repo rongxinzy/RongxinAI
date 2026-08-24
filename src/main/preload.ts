@@ -51,6 +51,7 @@ import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
 import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
+import { EnterpriseRendererIpc } from '../shared/enterpriseRenderer';
 import type {
   ProviderModelDiscoveryRequest,
   ProviderModelDiscoveryResult,
@@ -272,6 +273,10 @@ contextBridge.exposeInMainWorld('electron', {
 
   enterprise: {
     getConfig: () => ipcRenderer.invoke(EnterpriseIpc.GetConfig),
+    renderer: {
+      sessionGateEntrypoint: () =>
+        ipcRenderer.invoke(EnterpriseRendererIpc.SessionGateEntrypoint) as Promise<string | null>,
+    },
     session: {
       snapshot: () => ipcRenderer.invoke(EnterpriseSessionIpc.Snapshot),
       login: (input: unknown) => ipcRenderer.invoke(EnterpriseSessionIpc.Login, input),
