@@ -50,6 +50,7 @@ import {
   resolveEffectiveModel,
   useAgentSelectedModel,
 } from './agentModelSelection';
+import ActiveExpertBadge from './ActiveExpertBadge';
 import { CoworkInlineAttachments } from './CoworkInlineAttachments';
 import { ContextUsageIndicator } from './ContextUsageIndicator';
 import { SessionStatsLine } from './SessionStatsLine';
@@ -1239,6 +1240,12 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                       value={permissionMode ?? CoworkPermissionMode.Ask}
                       onChange={mode => onPermissionModeChange?.(mode)}
                       disabled={disabled}
+                    />
+                  )}
+                  {isWorkVariant && (
+                    <ActiveExpertBadge
+                      expertId={selectedExpertIds[0]}
+                      onRemove={() => setSelectedExpertIds([])}
                     />
                   )}
                   {isWorkVariant && goalMode && (

@@ -1,5 +1,7 @@
 import { AgentId } from '@shared/agent';
 
+import { CoworkSessionExpertSource } from '../../shared/cowork/sessionExperts';
+
 import { store } from '../store';
 import {
   addAgent,
@@ -185,7 +187,10 @@ class AgentService {
     store.dispatch(setCurrentAgentId(agentId));
     store.dispatch(clearCurrentSession());
     const agent = store.getState().agent.agents.find(a => a.id === agentId);
-    if (agent?.skillIds?.length) {
+    const isExpertAgent =
+      agent?.source === CoworkSessionExpertSource.Package ||
+      agent?.source === CoworkSessionExpertSource.Member;
+    if (agent?.skillIds?.length && !isExpertAgent) {
       store.dispatch(setActiveSkillIds(agent.skillIds));
     } else {
       store.dispatch(clearActiveSkills());

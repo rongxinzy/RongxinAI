@@ -151,11 +151,11 @@ const ActiveMcpBadge: React.FC = () => {
             className="sidebar-interactive-surface hover:shadow-subtle"
             aria-label={i18nService.t('connectors')}
           >
-            <span className="flex h-7 items-center rounded-md bg-muted px-1">
+            <span className="flex h-7 items-center rounded-md bg-transparent px-1">
               {enabledServers.map(server => (
                 <span
                   key={server.id}
-                  className="-ml-2 flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted first:ml-0"
+                  className="-ml-2 flex size-5 shrink-0 items-center justify-center rounded-sm bg-transparent first:ml-0"
                 >
                   {serverIcons[server.id] ? (
                     <img src={serverIcons[server.id]} alt="" className="size-4 object-contain" />

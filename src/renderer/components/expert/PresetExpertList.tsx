@@ -1,10 +1,11 @@
 import { Button } from '@shared/components/ui/button';
 import { Card } from '@shared/components/ui/card';
 import { Spinner } from '@shared/components/ui/spinner';
-import { AlertCircle, MessageCircle, Sparkles } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import { AlertCircle, Download, MessageCircle, Sparkles } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { agentService } from '../../services/agent';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
@@ -18,7 +19,8 @@ interface PresetExpertListProps {
 const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert }) => {
   const [experts, setExperts] = useState<PresetExpertSummary[]>([]);
   const [selectedExpert, setSelectedExpert] = useState<PresetExpertSummary | null>(null);
-  const [installing, setInstalling] = useState<string | null>(null);
+  const [installingExpertIds, setInstallingExpertIds] = useState<Set<string>>(() => new Set());
+  const installingExpertIdsRef = useRef(new Set<string>());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const agents = useSelector((state: RootState) => state.agent.agents);
 
@@ -30,45 +32,38 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
     });
   }, []);
 
-  const handleUseExpert = useCallback(
-    async (expert: PresetExpertSummary) => {
-      const installedAgent = agents.find(
-        agent => agent.source === 'expert-package' && agent.presetId === expert.name,
-      );
-      if (installedAgent) {
-        onChatWithExpert?.(installedAgent.id);
-        return;
-      }
+  const handleInstallExpert = useCallback(async (expert: PresetExpertSummary) => {
+    if (installingExpertIdsRef.current.has(expert.name)) return;
 
-      setInstalling(expert.name);
-      setErrors(prev => {
-        const next = { ...prev };
-        delete next[expert.name];
-        return next;
-      });
-      try {
-        const result = await agentService.importExpertPackage(expert.path);
-        const agentId = result?.agentIds?.[0];
-        if (result?.success && agentId) {
-          await agentService.loadAgents();
-          onChatWithExpert?.(agentId);
-        } else {
-          setErrors(prev => ({
-            ...prev,
-            [expert.name]: result?.error || i18nService.t('expertInstallError'),
-          }));
-        }
-      } catch (err) {
+    installingExpertIdsRef.current.add(expert.name);
+    setInstallingExpertIds(previous => new Set(previous).add(expert.name));
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next[expert.name];
+      return next;
+    });
+    try {
+      const result = await agentService.importExpertPackage(expert.path);
+      if (!result?.success || !result.agentIds?.[0]) {
         setErrors(prev => ({
           ...prev,
-          [expert.name]: err instanceof Error ? err.message : i18nService.t('expertInstallError'),
+          [expert.name]: result?.error || i18nService.t('expertInstallError'),
         }));
-      } finally {
-        setInstalling(null);
       }
-    },
-    [agents, onChatWithExpert],
-  );
+    } catch (err) {
+      setErrors(prev => ({
+        ...prev,
+        [expert.name]: err instanceof Error ? err.message : i18nService.t('expertInstallError'),
+      }));
+    } finally {
+      installingExpertIdsRef.current.delete(expert.name);
+      setInstallingExpertIds(previous => {
+        const next = new Set(previous);
+        next.delete(expert.name);
+        return next;
+      });
+    }
+  }, []);
 
   if (experts.length === 0) {
     return (
@@ -83,9 +78,13 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
     <>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {experts.map(expert => {
-          const isCurrent = installing === expert.name;
+          const isInstalling = installingExpertIds.has(expert.name);
           const errMsg = errors[expert.name];
           const displayName = isZh ? expert.displayName.zh : expert.displayName.en;
+          const installedAgent = agents.find(
+            agent =>
+              agent.source === CoworkSessionExpertSource.Package && agent.presetId === expert.name,
+          );
 
           return (
             <Card
@@ -123,12 +122,20 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
                   type="button"
                   variant="ghost"
                   size="icon"
-                  disabled={isCurrent || !onChatWithExpert}
-                  aria-label={i18nService.t('expertGoToConversation')}
-                  title={i18nService.t('expertGoToConversation')}
-                  onClick={() => void handleUseExpert(expert)}
+                  disabled={isInstalling || (installedAgent !== undefined && !onChatWithExpert)}
+                  aria-label={i18nService.t(
+                    installedAgent ? 'expertGoToConversation' : 'expertInstall',
+                  )}
+                  title={i18nService.t(installedAgent ? 'expertGoToConversation' : 'expertInstall')}
+                  onClick={() => {
+                    if (installedAgent) {
+                      onChatWithExpert?.(installedAgent.id);
+                      return;
+                    }
+                    void handleInstallExpert(expert);
+                  }}
                 >
-                  {isCurrent ? <Spinner /> : <MessageCircle />}
+                  {isInstalling ? <Spinner /> : installedAgent ? <MessageCircle /> : <Download />}
                 </Button>
               </div>
             </Card>
@@ -138,9 +145,22 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
 
       <ExpertDetailDialog
         expert={selectedExpert}
-        isInstalling={installing === selectedExpert?.name}
+        isInstalling={selectedExpert ? installingExpertIds.has(selectedExpert.name) : false}
+        isInstalled={agents.some(
+          agent =>
+            agent.source === CoworkSessionExpertSource.Package &&
+            agent.presetId === selectedExpert?.name,
+        )}
         onClose={() => setSelectedExpert(null)}
-        onUseExpert={handleUseExpert}
+        onInstall={handleInstallExpert}
+        onChat={() => {
+          const installedAgent = agents.find(
+            agent =>
+              agent.source === CoworkSessionExpertSource.Package &&
+              agent.presetId === selectedExpert?.name,
+          );
+          if (installedAgent) onChatWithExpert?.(installedAgent.id);
+        }}
       />
     </>
   );

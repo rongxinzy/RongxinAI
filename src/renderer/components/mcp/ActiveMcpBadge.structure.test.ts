@@ -19,7 +19,7 @@ test('renders enabled MCPs as one stacked dropdown trigger', () => {
   expect(source).toContain(
     'const enabledServers = useMemo(() => servers.filter(server => server.enabled), [servers]);',
   );
-  expect(source).toContain('className="flex h-7 items-center rounded-md bg-muted px-1"');
+  expect(source).toContain('className="flex h-7 items-center rounded-md bg-transparent px-1"');
   expect(source).toContain('className="-ml-2 flex size-5 shrink-0');
   expect(source.match(/enabledServers\.map\(server => \(/g)).toHaveLength(2);
   expect(source).not.toContain('data-popup-open:shadow-subtle');

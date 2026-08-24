@@ -76,17 +76,18 @@ export function InstalledSkillGrid({
             </div>
 
             <div className="pointer-events-none relative z-10 flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={!onTrySkill}
-                aria-label={i18nService.t('skillGoToConversation')}
-                title={i18nService.t('skillGoToConversation')}
-                onClick={() => onTrySkill?.(skill.id)}
-              >
-                <MessageCircle />
-              </Button>
+              {skill.enabled && onTrySkill && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={i18nService.t('skillGoToConversation')}
+                  title={i18nService.t('skillGoToConversation')}
+                  onClick={() => onTrySkill(skill.id)}
+                >
+                  <MessageCircle />
+                </Button>
+              )}
               <Switch
                 checked={skill.enabled}
                 disabled={readOnly || isCoreSkill(skill.id)}
