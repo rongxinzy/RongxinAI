@@ -13,7 +13,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { PanelLeft, Pencil } from 'lucide-react';
+import { PanelLeftOpen } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -35,6 +35,7 @@ import { notifyLlamaCppRunningModelsChanged } from '../../services/availableMode
 import { i18nService } from '../../services/i18n';
 import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
 import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import {
   GalleryThumbnailsIcon,
 } from '../icons/GalleryThumbnailsIcon';
@@ -1054,11 +1055,11 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={onToggleSidebar}
-                  aria-label={i18nService.t('collapse')}
-                  title={i18nService.t('collapse')}
+                  aria-label={i18nService.t('expand')}
+                  title={i18nService.t('expand')}
                   className="text-foreground/70 hover:text-foreground"
                 >
-                  <PanelLeft />
+                  <PanelLeftOpen />
                 </Button>
                 <Button
                   type="button"
@@ -1069,7 +1070,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   title={i18nService.t('newChat')}
                   className="text-foreground/70 hover:text-foreground"
                 >
-                  <Pencil />
+                  <SidebarAnimatedMessageCirclePlusIcon />
                 </Button>
                 {updateBadge}
               </div>

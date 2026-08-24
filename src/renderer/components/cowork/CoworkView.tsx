@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeftOpen } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -1525,7 +1525,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
               onClick={onToggleSidebar}
               className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
             >
-              <PanelLeft className="size-4" />
+              <PanelLeftOpen className="size-4" />
             </Button>
             <Button
               variant="ghost"
