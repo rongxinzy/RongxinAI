@@ -55,6 +55,53 @@ const begin = (prototypeRequired = false) => {
   };
 };
 
+test('skipped workflows reject every production control action', () => {
+  const { run } = begin();
+  service.skipWorkflow(run.id, 'Direct answer requiring no tools or deliverable');
+  const planned = {
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  };
+
+  // commit_plan must not succeed after skip — even though the phase still
+  // reads Plan, the skip flag is the authoritative terminal state.
+  expect(() => service.commitPlan(run.id, planned)).toThrow(/skipped/);
+  expect(() =>
+    service.startInspection(run.id, {
+      artifacts: [],
+      verifiers: [{ name: 'preview', evidenceRef: 'ev-1' }],
+    }),
+  ).toThrow(/skipped/);
+  expect(() => service.recordRevision(run.id, 'revise', {})).toThrow(/skipped/);
+
+  // Factual observations and verification outcomes still apply.
+  service.recordToolResult(run.id, {
+    toolCallId: 'bash-1',
+    toolName: 'bash',
+    output: 'ok',
+    isError: false,
+  });
+  service.recordVerificationResult(run.id, WorkbenchVerificationOutcome.Passed, 'passed');
+  const state = service.getState(run.id);
+  expect(state.skip).not.toBeNull();
+  expect(state.status).toBe(ProductionLoopStatus.Completed);
+  expect(state.observedToolResults).toHaveLength(1);
+});
+
+test('repeated skip_workflow stays a no-op without advancing progressVersion', () => {
+  const { run } = begin();
+  const first = service.skipWorkflow(run.id, 'Direct answer');
+
+  const second = service.skipWorkflow(run.id, 'Different reason');
+
+  expect(second.progressVersion).toBe(first.progressVersion);
+  expect(second.skip?.reason).toBe('Direct answer');
+  expect(second.status).toBe(ProductionLoopStatus.Completed);
+});
+
 const commitPlan = (runId: string) =>
   service.commitPlan(runId, {
     items: [{ title: 'Create artifact' }, { title: 'Run checks' }],
