@@ -81,6 +81,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   // (e.g. the count badge appearing/disappearing).
   const tabRefs = useRef<Record<string, HTMLElement | null>>({});
   const tabRowRef = useRef<HTMLDivElement>(null);
+  const activePaneScrollRef = useRef<HTMLDivElement>(null);
   const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
   useLayoutEffect(() => {
     let raf = 0;
@@ -111,6 +112,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       window.removeEventListener('resize', measure);
     };
   }, [activeTab, tasks.length]);
+
+  useLayoutEffect(() => {
+    activePaneScrollRef.current?.scrollTo({ top: 0 });
+  }, [activeTab, initialDataLoaded]);
 
   // Create-task modal (template-prefilled or blank custom)
   const [createOpen, setCreateOpen] = useState(false);
@@ -237,7 +242,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         <WindowTitleBar inline />
       </div>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-8">
+      <div className="mx-auto w-full max-w-2xl shrink-0 px-8">
         {/* ── Hero ── */}
         <section className="animate-fade-in-up shrink-0 pt-8 pb-6">
           <div className="flex items-center gap-4">
@@ -302,8 +307,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             }}
           />
         </div>
+      </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
+      <div ref={activePaneScrollRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+        <div className="mx-auto w-full max-w-2xl px-8">
           <div
             key={`${activeTab}-${tabDir ?? 'init'}`}
             className={cn(

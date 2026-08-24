@@ -93,7 +93,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
   onCustom,
 }) => {
   return (
-    <div className="flex flex-col gap-6 max-w-2xl mx-auto py-6">
+    <div className="flex w-full flex-col gap-6 py-6">
       <div>
         <h2 className="text-base font-semibold text-foreground mb-1">
           {i18nService.t('taskTemplateSectionTitle')}
@@ -102,7 +102,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
       </div>
 
       {/* Template Cards Grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {TEMPLATES.map(tpl => (
           <Card
             key={tpl.id}
