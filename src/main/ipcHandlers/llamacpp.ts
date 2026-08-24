@@ -13,12 +13,14 @@ import type {
   LlamaCppModelPreferences,
   LlamaCppModelUnloadResult,
   LlamaCppRunningModel,
+  LlamaCppRuntimeInstallSnapshot,
   LlamaCppServiceConfig,
   LlamaCppSetModelPreferenceInput,
   LlamaCppStatusSnapshot,
 } from '../../shared/llamacpp';
 import {
   DEFAULT_LLAMACPP_SERVICE_CONFIG,
+  LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   getLlamaCppAcceleratorDevices,
   getLlamaCppModelsMaxLimitViolation,
   LLAMACPP_GPU_LAYERS_MAX,
@@ -57,6 +59,7 @@ import {
 } from '../libs/llamacppModelLoadErrors';
 import { LlamaCppModelLoadLock } from '../libs/llamacppModelLoadLock';
 import { loadLlamaCppModelThroughPipeline } from '../libs/llamacppModelLoadPipeline';
+import { createLlamaCppRuntimeInstallState } from '../libs/llamacppRuntimeInstallState';
 import {
   buildLlamaCppRunningModelBinding,
   type LlamaCppAgentAppConfig,
@@ -317,7 +320,13 @@ export function registerLlamaCppIpcHandlers(
   manager.on('status', status => {
     sendStatus(status);
   });
-  manager.on('install-progress', sendProgress);
+  const runtimeInstallState = createLlamaCppRuntimeInstallState();
+  manager.on('install-progress', progress => {
+    if (progress.modelId === LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID) {
+      runtimeInstallState.update(progress);
+    }
+    sendProgress(progress);
+  });
   manager.on(LlamaCppManagerLifecycleEvent.ModelsUnloadedForQuit, event => {
     for (const modelName of event.modelNames) {
       clearModelLaunchLog(modelName);
@@ -333,8 +342,10 @@ export function registerLlamaCppIpcHandlers(
   ): Promise<RuntimeInstallResult> => {
     if (activeRuntimeInstall) return activeRuntimeInstall;
     const controller = new AbortController();
+    runtimeInstallState.start();
     runtimeInstallController = controller;
     const installPromise = install(controller.signal).finally(() => {
+      runtimeInstallState.finish();
       if (activeRuntimeInstall === installPromise) activeRuntimeInstall = null;
       if (runtimeInstallController === controller) runtimeInstallController = null;
     });
@@ -345,6 +356,10 @@ export function registerLlamaCppIpcHandlers(
   ipcMain.handle(LlamaCppIpcChannel.Status, async () => manager.detect());
   ipcMain.handle(LlamaCppIpcChannel.Install, async () =>
     runRuntimeInstall(signal => manager.installRuntime({ signal })),
+  );
+  ipcMain.handle(
+    LlamaCppIpcChannel.GetRuntimeInstallSnapshot,
+    (): LlamaCppRuntimeInstallSnapshot => runtimeInstallState.snapshot(),
   );
   ipcMain.handle(LlamaCppIpcChannel.CancelRuntimeInstall, async () => {
     const controller = runtimeInstallController;

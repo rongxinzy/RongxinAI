@@ -417,10 +417,14 @@ test('waits for runtime install cleanup before confirming cancellation', async (
 
   const installHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Install);
   const cancelHandler = electronMocks.handlers.get(LlamaCppIpcChannel.CancelRuntimeInstall);
-  if (!installHandler || !cancelHandler) throw new Error('Runtime install IPC handlers were not registered.');
+  const snapshotHandler = electronMocks.handlers.get(LlamaCppIpcChannel.GetRuntimeInstallSnapshot);
+  if (!installHandler || !cancelHandler || !snapshotHandler) {
+    throw new Error('Runtime install IPC handlers were not registered.');
+  }
 
   const install = Promise.resolve(installHandler());
   await Promise.resolve();
+  await expect(Promise.resolve(snapshotHandler())).resolves.toEqual({ active: true });
   let cancelSettled = false;
   const cancel = Promise.resolve(cancelHandler()).then(result => {
     cancelSettled = true;
@@ -435,6 +439,7 @@ test('waits for runtime install cleanup before confirming cancellation', async (
 
   await expect(cancel).resolves.toEqual({ success: true, cancelled: true });
   await expect(install).resolves.toEqual({ success: false, cancelled: true });
+  await expect(Promise.resolve(snapshotHandler())).resolves.toEqual({ active: false });
 });
 
 test('computes total free VRAM from nvidia-smi snapshots', () => {

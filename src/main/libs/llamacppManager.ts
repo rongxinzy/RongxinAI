@@ -23,7 +23,7 @@ import type {
 import type { LlamaCppBackendRef } from '../../shared/llamacpp';
 import {
   applyAutomaticLlamaCppServiceDefaults,
-  LlamaCppBackendError,
+  LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID,
   resolveLlamaCppLaunchContext,
 } from '../../shared/llamacpp';
 import {
@@ -44,6 +44,10 @@ import {
   backendRequiresDeviceValidation,
   validateBackendDevices,
 } from './llamacppBackendValidation';
+import {
+  prepareLlamaCppBackendVersionSwitch,
+  restartLlamaCppBackendVersionService,
+} from './llamacppBackendVersionSwitch';
 import { LlamaCppClient } from './llamacppClient';
 import { isPathInside, mergeLocalModels, scanLocalGgufModels } from './llamacppModelCatalog';
 import {
@@ -87,10 +91,17 @@ const DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS = 120_000;
 const LLAMACPP_RUNNING_MODELS_DEFAULT_TIMEOUT_MS = 2_000;
 const QUIT_RUNNING_MODELS_TIMEOUT_MS = 1500;
 const QUIT_UNLOAD_MODEL_TIMEOUT_MS = 3000;
-const LLAMACPP_RUNTIME_PROGRESS_KEY = '__llamacpp_runtime__';
+const LLAMACPP_RUNTIME_PROGRESS_KEY = LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID;
 const LLAMACPP_LAST_LOADED_MODEL_KEY = 'llamacpp_last_loaded_model';
+const LLAMACPP_BACKEND_LIST_CACHE_TTL_MS = 60_000;
 
 type RequestOptions = { signal?: AbortSignal };
+
+type LlamaCppBackendListCacheEntry = {
+  key: string;
+  expiresAt: number;
+  result: LlamaCppBackendListResult;
+};
 
 type LlamaCppManagerStorage = {
   get<T = unknown>(key: string): T | undefined;
@@ -133,6 +144,7 @@ export class LlamaCppManager extends EventEmitter {
   private startupStderr = '';
   private readonly marketplaceService: MarketplaceService;
   private readonly storage?: LlamaCppManagerStorage;
+  private backendListCache: LlamaCppBackendListCacheEntry | null = null;
   private status: LlamaCppStatusSnapshot = {
     status: 'unknown',
     checkedAt: new Date().toISOString(),
@@ -196,6 +208,12 @@ export class LlamaCppManager extends EventEmitter {
     );
   }
 
+  initializeModelsDir(): string {
+    const modelsDir = this.getModelsDir();
+    fs.mkdirSync(modelsDir, { recursive: true });
+    return modelsDir;
+  }
+
   getPresetPath(): string {
     return path.join(app.getPath('userData'), 'llamacpp', 'models-preset.ini');
   }
@@ -204,6 +222,20 @@ export class LlamaCppManager extends EventEmitter {
     const configuredSeconds = normalizePositiveInteger(this.getServiceConfig().timeout);
     if (!configuredSeconds) return DEFAULT_CONNECTION_AND_LOAD_TIMEOUT_MS;
     return configuredSeconds * 1000;
+  }
+
+  private getBackendListCacheKey(): string {
+    const config = this.getServiceConfig();
+    return [
+      process.platform,
+      process.arch,
+      config.runtimeVersion?.trim() ?? '',
+      config.runtimeBackend ?? '',
+    ].join(':');
+  }
+
+  private clearBackendListCache(): void {
+    this.backendListCache = null;
   }
 
   private async resolveRuntimeServiceConfig(): Promise<LlamaCppServiceConfig> {
@@ -345,6 +377,7 @@ export class LlamaCppManager extends EventEmitter {
   async installRuntime(
     options: { signal?: AbortSignal } = {},
   ): Promise<LlamaCppRuntimeInstallResult> {
+    this.clearBackendListCache();
     this.emit('install-progress', {
       phase: 'starting',
       modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
@@ -506,6 +539,12 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async listBackends(): Promise<LlamaCppBackendListResult> {
+    const cacheKey = this.getBackendListCacheKey();
+    const cached = this.backendListCache;
+    if (cached && cached.key === cacheKey && cached.expiresAt > Date.now()) {
+      return cached.result;
+    }
+
     try {
       const nvidiaSnapshot = process.platform === 'win32' ? await getNvidiaSmiSnapshot() : null;
       const result = await listLlamaCppBackends({
@@ -515,7 +554,14 @@ export class LlamaCppManager extends EventEmitter {
         hasNvidiaGpu: Boolean(nvidiaSnapshot?.available && nvidiaSnapshot.gpus.length > 0),
         config: this.getServiceConfig(),
       });
-      return { success: true, ...result };
+      const nextResult = { success: true as const, ...result };
+      // Cache only a successful, short-lived snapshot; installed-state changes clear it.
+      this.backendListCache = {
+        key: cacheKey,
+        expiresAt: Date.now() + LLAMACPP_BACKEND_LIST_CACHE_TTL_MS,
+        result: nextResult,
+      };
+      return nextResult;
     } catch (error) {
       return {
         success: false,
@@ -546,16 +592,7 @@ export class LlamaCppManager extends EventEmitter {
     ref: LlamaCppBackendRef,
     options: { signal?: AbortSignal } = {},
   ): Promise<LlamaCppRuntimeInstallResult> {
-    if (this.status.status === 'running' || this.status.status === 'starting') {
-      return {
-        success: false,
-        error: LlamaCppBackendError.SwitchRequiresStoppedService,
-        plan: {
-          kind: 'needs-manual',
-          message: LlamaCppBackendError.SwitchRequiresStoppedService,
-        },
-      };
-    }
+    this.clearBackendListCache();
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     const installedExecutablePath = getLlamaCppBackendExecutablePath(
       runtimeRoot,
@@ -667,6 +704,27 @@ export class LlamaCppManager extends EventEmitter {
           };
         }
       }
+      const switchPreparation = await prepareLlamaCppBackendVersionSwitch({
+        serviceStatus: this.status.status,
+        listRunningModels: () => this.listRunningModels(),
+        stop: () => this.stop(),
+      });
+      if (switchPreparation.success === false) {
+        if (!backendAlreadyInstalled) {
+          this.emit('install-progress', {
+            phase: 'failed',
+            modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+            modelName: ref.versionBackend,
+            error: switchPreparation.error,
+          } satisfies LlamaCppInstallProgress);
+        }
+        return {
+          ...result,
+          success: false,
+          error: switchPreparation.error,
+          plan: { kind: 'needs-manual', message: switchPreparation.error },
+        };
+      }
       syncCurrentBackend(runtimeRoot, ref);
       const currentExecutablePath = getLlamaCppCurrentExecutablePath(runtimeRoot, process.platform);
       this.executablePath = currentExecutablePath;
@@ -675,6 +733,27 @@ export class LlamaCppManager extends EventEmitter {
         executablePath: currentExecutablePath,
         managedByApp: false,
       });
+      if (switchPreparation.restartService) {
+        const restartResult = await restartLlamaCppBackendVersionService({
+          start: () => this.start(),
+        });
+        if (restartResult.success === false) {
+          if (!backendAlreadyInstalled) {
+            this.emit('install-progress', {
+              phase: 'failed',
+              modelId: LLAMACPP_RUNTIME_PROGRESS_KEY,
+              modelName: ref.versionBackend,
+              error: restartResult.error,
+            } satisfies LlamaCppInstallProgress);
+          }
+          return {
+            ...result,
+            success: false,
+            error: restartResult.error,
+            plan: { kind: 'needs-manual', message: restartResult.error },
+          };
+        }
+      }
       if (!backendAlreadyInstalled) {
         this.emit('install-progress', {
           phase: 'done',
@@ -792,6 +871,7 @@ export class LlamaCppManager extends EventEmitter {
    * automatically by copying the full directory.
    */
   async importRuntime(sourceDir: string): Promise<LlamaCppRuntimeImportResult> {
+    this.clearBackendListCache();
     const executableName = resolveLlamaCppExecutableName(process.platform);
     const sourceExecutable = path.join(sourceDir, executableName);
 
@@ -834,6 +914,7 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async uninstallRuntime(): Promise<LlamaCppRuntimeUninstallResult> {
+    this.clearBackendListCache();
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     try {
       const result = await uninstallLlamaCppBackend({
@@ -867,6 +948,7 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async uninstallBackend(ref: LlamaCppBackendRef): Promise<LlamaCppRuntimeUninstallResult> {
+    this.clearBackendListCache();
     const runtimeRoot = getUserLlamaCppRuntimeRoot();
     try {
       const result = await uninstallLlamaCppBackend({

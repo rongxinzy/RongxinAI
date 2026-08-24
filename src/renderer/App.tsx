@@ -496,6 +496,12 @@ const App: React.FC = () => {
     [dispatch, openNewConversation],
   );
 
+  const handleLocalInferenceInstallRequestHandled = useCallback((requestId: string) => {
+    setLocalInferenceInstallRequestId(current =>
+      current === requestId ? undefined : current,
+    );
+  }, []);
+
   const handleChatWithExpert = useCallback(
     async (agentId: string) => {
       agentService.switchAgent(agentId);
@@ -842,6 +848,7 @@ const App: React.FC = () => {
                     <React.Suspense fallback={null}>
                       <LocalInferenceView
                         installRequestId={localInferenceInstallRequestId}
+                        onInstallRequestHandled={handleLocalInferenceInstallRequestHandled}
                         isSidebarCollapsed={isSidebarCollapsed}
                         isVisible={mainView === 'localInference'}
                         onToggleSidebar={handleToggleSidebar}

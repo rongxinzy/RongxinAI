@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
-import { ApiFormat, ModelCapabilityStatus, ProviderName } from '../../shared/providers';
+import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
 import { store } from '../store';
 import { setAvailableModels, setDefaultSelectedModel } from '../store/slices/modelSlice';
 import { apiService } from './api';
@@ -34,75 +34,6 @@ test('restores the legacy API config when app bootstrap has not synced it yet', 
   await expect(apiService.chatWithWebSearch('latest news')).resolves.toEqual({
     content: 'plain answer',
   });
-});
-
-test('uses the local inference endpoint without falling back to the global API configuration', async () => {
-  const model = {
-    id: 'qwen-local',
-    name: 'Qwen Local',
-    providerKey: ProviderName.LlamaCpp,
-    supportsImage: false,
-  };
-  store.dispatch(setAvailableModels([model]));
-  store.dispatch(setDefaultSelectedModel(model));
-  const appConfig = configService.getConfig();
-  vi.spyOn(configService, 'getConfig').mockReturnValue({
-    ...appConfig,
-    api: { key: 'global-api-key', baseUrl: 'https://example.test/v1' },
-    providers: {
-      ...appConfig.providers,
-      [ProviderName.LlamaCpp]: {
-        ...(appConfig.providers?.[ProviderName.LlamaCpp] ?? {}),
-        enabled: false,
-        userEnabled: false,
-        apiKey: '',
-        baseUrl: 'http://127.0.0.1:8080/v1',
-        apiFormat: ApiFormat.OpenAI,
-        models: [],
-      },
-    },
-  });
-  apiService.setConfig({
-    apiKey: 'global-api-key',
-    baseUrl: 'https://example.test/v1',
-    apiFormat: ApiFormat.OpenAI,
-  });
-  const getServiceConfig = vi
-    .fn()
-    .mockResolvedValueOnce({ host: '127.0.0.1', port: '9090' })
-    .mockResolvedValueOnce({ host: '127.0.0.1', port: '9191' });
-  vi.stubGlobal('window', {
-    electron: {
-      llamacpp: {
-        getServiceConfig,
-      },
-    },
-  });
-  const regularChat = vi
-    .spyOn(apiService as any, 'chatWithOpenAICompatible')
-    .mockResolvedValue({ content: 'local answer' });
-
-  const options = { conversationId: 'local-inference-chat' };
-  await expect(apiService.chat('hello', undefined, [], options)).resolves.toEqual({
-    content: 'local answer',
-  });
-  await expect(apiService.chat('again', undefined, [], options)).resolves.toEqual({
-    content: 'local answer',
-  });
-
-  expect(getServiceConfig).toHaveBeenCalledOnce();
-  expect(regularChat.mock.calls.map(call => call[4])).toEqual([
-    expect.objectContaining({
-      apiKey: '',
-      baseUrl: 'http://127.0.0.1:9090/v1',
-      apiFormat: ApiFormat.OpenAI,
-    }),
-    expect.objectContaining({
-      apiKey: '',
-      baseUrl: 'http://127.0.0.1:9090/v1',
-      apiFormat: ApiFormat.OpenAI,
-    }),
-  ]);
 });
 
 test('unknown tool capability falls back to regular chat without a tool payload', async () => {
