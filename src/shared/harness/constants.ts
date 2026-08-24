@@ -39,6 +39,7 @@ export const HarnessActivationType = {
   RevisionApplied: 'revision_applied',
   WorkflowSkipped: 'workflow_skipped',
   RecoveryTriggered: 'recovery_triggered',
+  LightweightReviewSkipped: 'lightweight_review_skipped',
 } as const;
 export type HarnessActivationType =
   (typeof HarnessActivationType)[keyof typeof HarnessActivationType];

@@ -44,6 +44,8 @@ import {
 } from '../../../shared/harness';
 import { MAX_STALE_PRODUCTION_ITERATIONS } from '../../../shared/productionLoop';
 import {
+  WorkbenchApprovalDecision,
+  WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
@@ -997,6 +999,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 deferDecision:
                   options.goalMode !== true && options._productionWorkflowEnabled === undefined,
                 skipAllowed: options.goalMode !== true,
+                // System-side risk probe: an approved irreversible approval
+                // (classified by riskClassifier, not by the model) forces the
+                // full reviewer even in lightweight mode.
+                resolveIrreversibleRisk: probeRunId =>
+                  this.workbenchTaskService?.repository
+                    .listApprovalsForRun(probeRunId)
+                    .some(
+                      approval =>
+                        approval.riskLevel === WorkbenchApprovalRiskLevel.Irreversible &&
+                        approval.decision === WorkbenchApprovalDecision.Approved,
+                    ) ?? false,
               },
               completionWorkflow || undefined,
             )

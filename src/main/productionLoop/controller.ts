@@ -6,7 +6,10 @@ import {
   type ProductionArtifactEvidence,
   type ProductionLoopState,
 } from '../../shared/productionLoop';
-import type { WorkbenchContractKind, WorkbenchJsonObject } from '../../shared/workbenchTask';
+import {
+  WorkbenchContractKind,
+  type WorkbenchJsonObject,
+} from '../../shared/workbenchTask';
 import type { PiAgentLoopEndSignal } from '../libs/agentEngine/piAgentLoop';
 import {
   PiAgentLoopAction,
@@ -39,6 +42,19 @@ interface ProductionLoopRunInput {
   prototypeRequired: boolean;
   deferDecision?: boolean;
   skipAllowed?: boolean;
+  /**
+   * Explicit review-mode override. 'standard' forces the full reviewer
+   * (evaluation harnesses and strictly-gated callers); without it, generic
+   * work runs lightweight unless the risk probe reports an approved
+   * irreversible approval.
+   */
+  reviewMode?: 'standard' | 'lightweight';
+  /**
+   * System-side risk probe evaluated at critique time: true when this run has
+   * an approved irreversible approval on record. The model cannot influence
+   * it; lightweight mode is bypassed and the full reviewer runs instead.
+   */
+  resolveIrreversibleRisk?: (runId: string) => boolean;
 }
 
 const isStandaloneProductionReviewer = (args: unknown): boolean => {
@@ -61,15 +77,7 @@ const truncate = (value: string, max: number): string =>
  * get_state round-trip to learn what to do next.
  */
 export const buildNextHint = (
-  state: Pick<
-    ProductionLoopState,
-    | 'phase'
-    | 'status'
-    | 'skip'
-    | 'critic'
-    | 'planItems'
-    | 'deliveryReason'
-  >,
+  state: Pick<ProductionLoopState, 'phase' | 'status' | 'skip' | 'planItems' | 'deliveryReason'>,
 ): string => {
   if (state.skip) {
     return 'Answer directly and end the turn.';
@@ -90,9 +98,8 @@ export const buildNextHint = (
     case ProductionLoopPhase.Inspect:
       return 'Request an independent critique (request_critique) using the evidence already submitted.';
     case ProductionLoopPhase.Critique:
-      return state.critic.passed
-        ? 'Reviewer passed: call get_state, then agent_loop done to deliver.'
-        : 'Address reviewer findings with record_revision, re-run deterministic checks, and inspect again.';
+      // The reviewer has been requested but has not returned yet.
+      return 'Wait for the reviewer result; revise with record_revision if findings exist, otherwise deliver.';
     case ProductionLoopPhase.Revise:
       return 'Re-run deterministic checks, start_inspection with fresh evidence, then request_critique again.';
     case ProductionLoopPhase.Deliver:
@@ -325,8 +332,36 @@ export class ProductionLoopController {
 
   requestCritique(): string {
     const state = this.requireState();
+    if (this.isLightweightReview()) {
+      // Enter the critique phase first so the audit trail records the request,
+      // then skip the reviewer dispatch.
+      this.update(this.service.requestCritique(state.runId));
+      this.update(
+        this.service.skipCritique(
+          state.runId,
+          'Lightweight mode: the run has no approved irreversible approvals; the independent reviewer is skipped.',
+        ),
+      );
+      return (
+        'Independent review skipped (lightweight mode). ' +
+        'Deterministic verification and your acceptance remain the gates; ' +
+        'continue to delivery and end the turn.'
+      );
+    }
     this.update(this.service.requestCritique(state.runId));
     return this.requestCriticPrompt();
+  }
+
+  /**
+   * Lightweight review applies to generic_work runs only, and is revoked at
+   * critique time when the run carries an approved irreversible approval.
+   * Explicit reviewMode 'standard' always runs the full reviewer (evaluation
+   * harnesses measure the full gate); domain workflows also stay standard.
+   */
+  private isLightweightReview(): boolean {
+    if (this.initial.reviewMode === 'standard') return false;
+    if (this.initial.workflowKind !== WorkbenchContractKind.GenericWork) return false;
+    return !(this.initial.resolveIrreversibleRisk?.(this.initial.runId) ?? false);
   }
 
   recordSubagentStart(toolCallId: string, args: unknown): void {

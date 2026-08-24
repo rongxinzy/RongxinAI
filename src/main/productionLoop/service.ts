@@ -544,6 +544,31 @@ export class ProductionLoopService {
     });
   }
 
+  /**
+   * Bypass the independent reviewer in lightweight mode. The critique phase
+   * still runs through the normal state machine (Critique → Deliver), but no
+   * subagent is dispatched: passed stays true so reviewed-artifact projection
+   * keeps working, and skipped records the distinction for audit.
+   */
+  skipCritique(runId: string, reason: string): ProductionLoopState {
+    return this.mutate(runId, state => {
+      if (state.phase !== ProductionLoopPhase.Critique || !state.critic.requested) {
+        throw new Error('The production loop is not waiting for a critic.');
+      }
+      state.critic.passed = true;
+      state.critic.skipped = true;
+      state.critic.outputSummary = reason.trim() || 'Independent review skipped.';
+      state.progressVersion += 1;
+      this.transition(state, ProductionLoopPhase.Deliver);
+      state.status = ProductionLoopStatus.ReadyToDeliver;
+      this.measurement.recordActivation(runId, {
+        activation: HarnessActivationType.LightweightReviewSkipped,
+        mechanism: 'production_loop_reviewer',
+        evidence: { reason: reason.trim() },
+      });
+    });
+  }
+
   recordCriticResult(
     runId: string,
     toolCallId: string,
