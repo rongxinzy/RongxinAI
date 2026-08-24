@@ -278,6 +278,10 @@ contextBridge.exposeInMainWorld('electron', {
     renderer: {
       sessionGateEntrypoint: () =>
         ipcRenderer.invoke(EnterpriseRendererIpc.SessionGateEntrypoint) as Promise<string | null>,
+      settingsPage: () =>
+        ipcRenderer.invoke(EnterpriseRendererIpc.SettingsPage) as Promise<
+          import('../shared/enterpriseRenderer').EnterpriseRendererSettingsPage | null
+        >,
     },
     session: {
       snapshot: () => ipcRenderer.invoke(EnterpriseSessionIpc.Snapshot),

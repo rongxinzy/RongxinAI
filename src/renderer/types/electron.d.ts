@@ -1207,6 +1207,9 @@ interface IElectronAPI {
     } | null>;
     renderer: {
       sessionGateEntrypoint: () => Promise<string | null>;
+      settingsPage: () => Promise<
+        import('../../shared/enterpriseRenderer').EnterpriseRendererSettingsPage | null
+      >;
     };
     session: {
       snapshot: () => Promise<EnterpriseSessionResult>;

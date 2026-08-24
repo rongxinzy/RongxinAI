@@ -2472,6 +2472,9 @@ if (!gotTheLock) {
   ipcMain.handle(EnterpriseRendererIpc.SessionGateEntrypoint, () =>
     zhiyuanEnterpriseRendererBridge.sessionGateEntrypoint(),
   );
+  ipcMain.handle(EnterpriseRendererIpc.SettingsPage, () =>
+    zhiyuanEnterpriseRendererBridge.settingsPage(),
+  );
 
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
   ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
@@ -6667,6 +6670,8 @@ if (!gotTheLock) {
       sessionCapability: zhiyuanEnterpriseSessionBridge,
       createRendererCapability: extensionDirectory =>
         zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
+      createSettingsCapability: extensionDirectory =>
+        zhiyuanEnterpriseRendererBridge.createScopedSettingsCapability(extensionDirectory),
     });
     if (enterpriseExtension.extensionId) {
       console.log(

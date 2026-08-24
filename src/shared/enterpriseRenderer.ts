@@ -6,7 +6,24 @@ import type {
 
 export const EnterpriseRendererIpc = {
   SessionGateEntrypoint: 'enterprise:renderer:session-gate-entrypoint',
+  SettingsPage: 'enterprise:renderer:settings-page',
 } as const;
+
+export interface EnterpriseRendererSettingsPage {
+  readonly entrypoint: string;
+  readonly labels: {
+    readonly zh: string;
+    readonly en: string;
+  };
+}
+
+export const EnterpriseRendererSurface = {
+  SessionGate: 'session-gate',
+  Settings: 'settings',
+} as const;
+
+export type EnterpriseRendererSurface =
+  (typeof EnterpriseRendererSurface)[keyof typeof EnterpriseRendererSurface];
 
 export const EnterpriseRendererMessageSource = {
   Host: 'zhiyuan.enterprise.host',
@@ -43,6 +60,7 @@ export interface EnterpriseRendererInitializeMessage {
   readonly source: typeof EnterpriseRendererMessageSource.Host;
   readonly apiVersion: 1;
   readonly type: typeof EnterpriseRendererMessageType.Initialize;
+  readonly surface: EnterpriseRendererSurface;
   readonly language: EnterpriseRendererLanguage;
   readonly theme: EnterpriseRendererTheme;
   readonly session: EnterpriseSessionResult;

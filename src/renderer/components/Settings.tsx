@@ -121,6 +121,8 @@ import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
 import { ModelCapabilitySettingsModal } from './localInference/components/ModelCapabilitySettingsModal';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
+import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
+import { EnterpriseSettingsPage } from './enterprise/EnterpriseSettingsPage';
 
 type TabType =
   | 'general'
@@ -132,6 +134,7 @@ type TabType =
   | 'shortcuts'
   | 'im'
   | 'email'
+  | 'extension'
   | 'about';
 
 type AnimatedIconHandle = {
@@ -717,6 +720,8 @@ const Settings: React.FC<SettingsProps> = ({
 }) => {
   // 状态
   const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
+  const [enterpriseSettingsPage, setEnterpriseSettingsPage] =
+    useState<EnterpriseRendererSettingsPage | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [language, setLanguage] = useState<LanguageType>('zh');
   const [autoLaunch, setAutoLaunchState] = useState(false);
@@ -771,6 +776,21 @@ const Settings: React.FC<SettingsProps> = ({
     shortcuts: shortcutsIconRef,
     about: aboutIconRef,
   };
+
+  useEffect(() => {
+    let active = true;
+    void window.electron.enterprise.renderer
+      .settingsPage()
+      .then(page => {
+        if (active) setEnterpriseSettingsPage(page);
+      })
+      .catch(() => {
+        if (active) setEnterpriseSettingsPage(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const startSettingsIconAnimation = (tab: TabType) => {
     if (!prefersReducedMotion) settingsIconRefs[tab]?.current?.startAnimation();
@@ -2874,6 +2894,13 @@ const Settings: React.FC<SettingsProps> = ({
         icon: <SettingsAnimatedCircleHelpIcon ref={aboutIconRef} />,
       },
     ];
+    if (enterpriseSettingsPage) {
+      allTabs.splice(allTabs.length - 1, 0, {
+        key: 'extension',
+        label: enterpriseSettingsPage.labels[language],
+        icon: <ShieldCheck aria-hidden="true" />,
+      });
+    }
     // Filter out tabs hidden by enterprise config
     // Filter out tabs with 'hide' action in enterprise config
     // e.g., ui: { "settings.im": "hide" } → hide the 'im' tab
@@ -3119,6 +3146,11 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'email':
         return null;
+
+      case 'extension':
+        return enterpriseSettingsPage ? (
+          <EnterpriseSettingsPage page={enterpriseSettingsPage} title={activeTabLabel} />
+        ) : null;
 
       case 'coworkMemory':
         return (
@@ -5192,7 +5224,10 @@ const Settings: React.FC<SettingsProps> = ({
             {/* Tab content */}
             <div
               ref={contentRef}
-              className="px-4 sm:px-6 py-4 flex-1 overflow-y-auto"
+              className={cn(
+                'flex-1',
+                activeTab === 'extension' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-4 sm:px-6',
+              )}
               style={{ scrollbarGutter: 'stable' }}
             >
               <div className={activeTab === 'email' ? 'block' : 'hidden'}>
@@ -5202,25 +5237,27 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Footer buttons */}
-            <div className="flex flex-wrap items-center justify-end gap-2 border-border border-t bg-background p-4 shrink-0">
-              <Button
-                type="button"
-                variant="outline"
-                className={localInferenceCompactButtonClass}
-                onClick={onClose}
-                disabled={isSaving}
-              >
-                {i18nService.t('cancel')}
-              </Button>
-              <Button
-                type="submit"
-                variant="outline"
-                className={localInferenceCompactButtonClass}
-                disabled={isSaving}
-              >
-                {isSaving ? i18nService.t('saving') : i18nService.t('save')}
-              </Button>
-            </div>
+            {activeTab !== 'extension' && (
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-background p-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={localInferenceCompactButtonClass}
+                  onClick={onClose}
+                  disabled={isSaving}
+                >
+                  {i18nService.t('cancel')}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="outline"
+                  className={localInferenceCompactButtonClass}
+                  disabled={isSaving}
+                >
+                  {isSaving ? i18nService.t('saving') : i18nService.t('save')}
+                </Button>
+              </div>
+            )}
           </form>
         </div>
 
