@@ -6,6 +6,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import {
   ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION,
+  ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION,
   ZhiyuanEnterpriseExtensionStatus,
   type ZhiyuanEnterpriseHostContext,
 } from './contract';
@@ -64,6 +65,8 @@ describe('Zhiyuan enterprise extension host', () => {
     });
     expect(Object.isFrozen(receivedContext)).toBe(true);
     expect(Object.isFrozen(receivedContext!.paths)).toBe(true);
+    expect(Object.isFrozen(receivedContext!.capabilities)).toBe(true);
+    expect(receivedContext!.capabilities.session).toBeNull();
 
     await host.dispose();
     await host.dispose();
@@ -83,6 +86,32 @@ describe('Zhiyuan enterprise extension host', () => {
     const packagedHost = new ZhiyuanEnterpriseExtensionHost(importModule);
     await packagedHost.initialize(options(root, true, developmentModule));
     expect(importModule).toHaveBeenCalledTimes(1);
+  });
+
+  test('passes the versioned session capability to the extension', async () => {
+    const root = createTemporaryDirectory();
+    const modulePath = path.join(root, 'resources', 'zhiyuan-enterprise', 'extension.cjs');
+    fs.mkdirSync(path.dirname(modulePath), { recursive: true });
+    fs.writeFileSync(modulePath, 'module placeholder');
+    const registerProvider = vi.fn();
+    const sessionCapability = {
+      apiVersion: ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION,
+      registerProvider,
+    };
+    let receivedContext: ZhiyuanEnterpriseHostContext | null = null;
+    const host = new ZhiyuanEnterpriseExtensionHost(async () => ({
+      createZhiyuanEnterpriseExtension: () => ({
+        ...validExtension(),
+        initialize: async (context: ZhiyuanEnterpriseHostContext) => {
+          receivedContext = context;
+        },
+      }),
+    }));
+
+    await host.initialize({ ...options(root, true), sessionCapability });
+
+    expect(receivedContext!.capabilities.session).toBe(sessionCapability);
+    expect(receivedContext!.capabilities.session?.apiVersion).toBe(1);
   });
 
   test('imports a real CommonJS development bundle', async () => {

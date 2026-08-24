@@ -9,6 +9,7 @@ import {
   type ZhiyuanEnterpriseExtensionSnapshot,
   ZhiyuanEnterpriseExtensionStatus,
   type ZhiyuanEnterpriseHostContext,
+  type ZhiyuanEnterpriseSessionHostCapability,
 } from './contract';
 
 const ENTERPRISE_RESOURCE_DIRECTORY = 'zhiyuan-enterprise';
@@ -22,6 +23,7 @@ export interface ZhiyuanEnterpriseExtensionHostOptions {
   readonly resourcesPath: string;
   readonly userDataPath: string;
   readonly developmentExtensionPath?: string;
+  readonly sessionCapability?: ZhiyuanEnterpriseSessionHostCapability;
 }
 
 type ExtensionModuleImporter = (modulePath: string) => Promise<unknown>;
@@ -173,12 +175,16 @@ function createHostContext(
     resources: path.resolve(options.resourcesPath),
     userData: path.resolve(options.userDataPath),
   });
+  const capabilities = Object.freeze({
+    session: options.sessionCapability ?? null,
+  });
   return Object.freeze({
     apiVersion: ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION,
     appVersion: options.appVersion,
     isPackaged: options.isPackaged,
     platform: options.platform,
     paths,
+    capabilities,
   });
 }
 

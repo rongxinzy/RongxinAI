@@ -303,6 +303,11 @@ interface McpConnectionTestResult {
 }
 
 import type { Platform } from '@shared/platform';
+import type {
+  EnterprisePasswordChangeInput,
+  EnterprisePasswordLoginInput,
+  EnterpriseSessionResult,
+} from '../../shared/enterpriseSession';
 
 import type { Agent } from './agent';
 
@@ -1197,6 +1202,12 @@ interface IElectronAPI {
       version: string;
       name: string;
     } | null>;
+    session: {
+      snapshot: () => Promise<EnterpriseSessionResult>;
+      login: (input: EnterprisePasswordLoginInput) => Promise<EnterpriseSessionResult>;
+      changePassword: (input: EnterprisePasswordChangeInput) => Promise<EnterpriseSessionResult>;
+      logout: () => Promise<EnterpriseSessionResult>;
+    };
   };
   networkStatus: {
     send: (status: 'online' | 'offline') => void;

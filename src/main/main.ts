@@ -75,6 +75,7 @@ import {
   SkillsIpc,
   WeixinInstallIpc,
 } from '../shared/ipc/channels';
+import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
 import {
   CoworkQueueEnqueueSchema,
   CoworkQueueItemSchema,
@@ -193,6 +194,7 @@ import {
   disposeZhiyuanEnterpriseExtension,
   initializeZhiyuanEnterpriseExtension,
 } from './enterpriseExtension/host';
+import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
@@ -2447,6 +2449,14 @@ if (!gotTheLock) {
       return null;
     }
   });
+  ipcMain.handle(EnterpriseSessionIpc.Snapshot, () => zhiyuanEnterpriseSessionBridge.snapshot());
+  ipcMain.handle(EnterpriseSessionIpc.Login, (_event, input: unknown) =>
+    zhiyuanEnterpriseSessionBridge.login(input),
+  );
+  ipcMain.handle(EnterpriseSessionIpc.ChangePassword, (_event, input: unknown) =>
+    zhiyuanEnterpriseSessionBridge.changePassword(input),
+  );
+  ipcMain.handle(EnterpriseSessionIpc.Logout, () => zhiyuanEnterpriseSessionBridge.logout());
 
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
   ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
@@ -6632,6 +6642,7 @@ if (!gotTheLock) {
       resourcesPath: process.resourcesPath,
       userDataPath: app.getPath('userData'),
       developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
+      sessionCapability: zhiyuanEnterpriseSessionBridge,
     });
     if (enterpriseExtension.extensionId) {
       console.log(
