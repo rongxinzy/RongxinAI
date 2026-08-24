@@ -999,16 +999,19 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 deferDecision:
                   options.goalMode !== true && options._productionWorkflowEnabled === undefined,
                 skipAllowed: options.goalMode !== true,
-                // System-side risk probe: an approved irreversible approval
-                // (classified by riskClassifier, not by the model) forces the
-                // full reviewer even in lightweight mode.
-                resolveIrreversibleRisk: probeRunId =>
+                // System-side risk probe: an approved approval whose risk was
+                // classified as irreversible OR unknown (e.g. mcp tools,
+                // unclassified shell commands) forces the full reviewer —
+                // lightweight review is fail-open only for positively
+                // read-only/reversible runs.
+                resolveElevatedRisk: probeRunId =>
                   this.workbenchTaskService?.repository
                     .listApprovalsForRun(probeRunId)
                     .some(
                       approval =>
-                        approval.riskLevel === WorkbenchApprovalRiskLevel.Irreversible &&
-                        approval.decision === WorkbenchApprovalDecision.Approved,
+                        approval.decision === WorkbenchApprovalDecision.Approved &&
+                        (approval.riskLevel === WorkbenchApprovalRiskLevel.Irreversible ||
+                          approval.riskLevel === WorkbenchApprovalRiskLevel.Unknown),
                     ) ?? false,
               },
               completionWorkflow || undefined,

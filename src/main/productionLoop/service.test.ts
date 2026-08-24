@@ -118,7 +118,8 @@ test('skipCritique moves a critique-phase run to delivery without a reviewer', (
   expect(after.phase).toBe(ProductionLoopPhase.Deliver);
   expect(after.status).toBe(ProductionLoopStatus.ReadyToDeliver);
   expect(after.critic.skipped).toBe(true);
-  expect(after.critic.passed).toBe(true);
+  // A skipped review is not a passed review.
+  expect(after.critic.passed).toBe(false);
   expect(after.progressVersion).toBeGreaterThan(before.progressVersion);
 });
 

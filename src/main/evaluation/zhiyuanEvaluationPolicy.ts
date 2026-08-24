@@ -94,7 +94,7 @@ export function createZhiyuanEvaluationPolicy(
     prototypeRequired: false,
     // Evaluation measures the full harness gate, including the independent
     // reviewer; never run evaluation runs in lightweight mode.
-    reviewMode: 'standard',
+    forceStandardReview: true,
   });
   const productionTool = buildProductionLoopTool(controller) as ZhiyuanEvaluationTool;
   const executeProductionTool = productionTool.execute.bind(productionTool);

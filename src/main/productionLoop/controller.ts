@@ -43,18 +43,19 @@ interface ProductionLoopRunInput {
   deferDecision?: boolean;
   skipAllowed?: boolean;
   /**
-   * Explicit review-mode override. 'standard' forces the full reviewer
-   * (evaluation harnesses and strictly-gated callers); without it, generic
-   * work runs lightweight unless the risk probe reports an approved
-   * irreversible approval.
+   * Force the full independent reviewer regardless of workflow kind or risk
+   * probe (evaluation harnesses measure the complete gate). There is no
+   * force-lightweight counterpart: lightweight applies by default only to
+   * generic work below the elevated-risk threshold.
    */
-  reviewMode?: 'standard' | 'lightweight';
+  forceStandardReview?: boolean;
   /**
    * System-side risk probe evaluated at critique time: true when this run has
-   * an approved irreversible approval on record. The model cannot influence
-   * it; lightweight mode is bypassed and the full reviewer runs instead.
+   * an approved elevated-risk (irreversible or unknown) approval on record.
+   * The model cannot influence it. When the probe is absent the run is
+   * treated as elevated — fail closed.
    */
-  resolveIrreversibleRisk?: (runId: string) => boolean;
+  resolveElevatedRisk?: (runId: string) => boolean;
 }
 
 const isStandaloneProductionReviewer = (args: unknown): boolean => {
@@ -353,15 +354,17 @@ export class ProductionLoopController {
   }
 
   /**
-   * Lightweight review applies to generic_work runs only, and is revoked at
-   * critique time when the run carries an approved irreversible approval.
-   * Explicit reviewMode 'standard' always runs the full reviewer (evaluation
-   * harnesses measure the full gate); domain workflows also stay standard.
+   * Lightweight review applies to generic_work runs only, and only when the
+   * risk probe positively reports no approved elevated-risk approval.
+   * forceStandardReview always runs the full reviewer (evaluation harnesses
+   * measure the full gate); domain workflows stay standard; a missing probe
+   * fails closed into standard review.
    */
   private isLightweightReview(): boolean {
-    if (this.initial.reviewMode === 'standard') return false;
+    if (this.initial.forceStandardReview) return false;
     if (this.initial.workflowKind !== WorkbenchContractKind.GenericWork) return false;
-    return !(this.initial.resolveIrreversibleRisk?.(this.initial.runId) ?? false);
+    if (!this.initial.resolveElevatedRisk) return false;
+    return !this.initial.resolveElevatedRisk(this.initial.runId);
   }
 
   recordSubagentStart(toolCallId: string, args: unknown): void {
@@ -573,6 +576,9 @@ export class ProductionLoopController {
       phase: this.state.phase,
       status: this.state.status,
       skipped: Boolean(this.state.skip),
+      // Distinguishes "reviewer passed" from "reviewer skipped (lightweight)"
+      // for the completion verification chain and audit UIs.
+      criticSkipped: this.state.critic.skipped === true,
       planItems: this.state.planItems.map(item => ({
         status: item.status,
         title: item.title,
@@ -587,6 +593,8 @@ export class ProductionLoopController {
     if (
       !this.state ||
       this.state.phase !== ProductionLoopPhase.Deliver ||
+      // A skipped review is not a passed review: lightweight artifacts stay
+      // pending until user acceptance elevates them.
       !this.state.critic.passed
     ) {
       return [];
