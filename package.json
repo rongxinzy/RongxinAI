@@ -1,5 +1,6 @@
 {
   "name": "zhiyuan-agent",
+  "desktopName": "zhiyuan.desktop",
   "description": "知远 - AI-assisted coding and productivity tool",
   "private": true,
   "author": {
