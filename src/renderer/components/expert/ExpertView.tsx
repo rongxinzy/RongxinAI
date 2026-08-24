@@ -5,10 +5,11 @@ import {
   LayeredTabsSeparatorEdge,
 } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { PanelLeft, Pencil, Users } from 'lucide-react';
+import { PanelLeftOpen, Users } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import McpManager from '../mcp/McpManager';
 import SkillsManager from '../skills/SkillsManager';
 import WindowTitleBar from '../window/WindowTitleBar';
@@ -76,10 +77,10 @@ const ExpertView: React.FC<ExpertViewProps> = ({
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
               <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeft className="h-4 w-4" />
+                <PanelLeftOpen className="h-4 w-4" />
               </Button>
               <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
-                <Pencil className="h-4 w-4" />
+                <SidebarAnimatedMessageCirclePlusIcon />
               </Button>
               {updateBadge}
             </div>

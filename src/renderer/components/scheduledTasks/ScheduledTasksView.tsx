@@ -9,11 +9,12 @@ import {
 } from '@shared/components/ui/dialog';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { CalendarClock, PanelLeft, Pencil } from 'lucide-react';
+import { CalendarClock, PanelLeftOpen } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { selectTask, setViewMode } from '../../store/slices/scheduledTaskSlice';
@@ -224,10 +225,10 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
               <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeft />
+                <PanelLeftOpen />
               </Button>
               <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
-                <Pencil />
+                <SidebarAnimatedMessageCirclePlusIcon />
               </Button>
               {updateBadge}
             </div>

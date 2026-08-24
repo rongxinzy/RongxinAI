@@ -1,7 +1,7 @@
 import { Button } from '@shared/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { cn } from '@shared/lib/utils';
-import { PanelLeft } from 'lucide-react';
+import { PanelLeftOpen } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -76,7 +76,7 @@ export function CoworkSessionLayout({
                   onClick={onToggleSidebar}
                   aria-label={i18nService.t('coworkShowSidebar')}
                 >
-                  <PanelLeft />
+                  <PanelLeftOpen />
                 </Button>
                 <Button
                   variant="ghost"
