@@ -95,7 +95,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       {/* Header chrome — same shell as the other feature views. */}
-      <div className="flex items-center justify-between pl-4">
+      <div className="flex shrink-0 items-center justify-between pl-4">
         <div className="flex items-center gap-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
@@ -112,94 +112,96 @@ const ActivityView: React.FC<ActivityViewProps> = ({
         <WindowTitleBar inline />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-8 pb-10">
-          {/* Hero */}
-          <section className="animate-fade-in-up pt-8 pb-6">
-            <div className="flex items-center gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-                <Activity className="size-6 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xxl font-semibold text-foreground">
-                  {i18nService.t('activityTitle')}
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {i18nService.t('activityHeroDesc')}
-                </p>
-              </div>
+      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-8">
+        {/* Hero */}
+        <section className="animate-fade-in-up shrink-0 pt-8 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+              <Activity className="size-6 text-primary" />
             </div>
-          </section>
-
-          {/* Filters: trigger on the left, status toggles on the right. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-4">
-            <ButtonGroup>
-              {triggerOptions.map(option => (
-                <Button
-                  key={option.value}
-                  variant="outline"
-                  size="sm"
-                  className={
-                    triggerFilter === option.value
-                      ? 'bg-secondary text-foreground'
-                      : 'bg-card text-muted-foreground'
-                  }
-                  aria-pressed={triggerFilter === option.value}
-                  onClick={() => setTriggerFilter(option.value)}
-                >
-                  {i18nService.t(option.labelKey)}
-                </Button>
-              ))}
-            </ButtonGroup>
-            <ButtonGroup>
-              {statusOptions.map(option => (
-                <Button
-                  key={option.value}
-                  variant="outline"
-                  size="sm"
-                  className={
-                    statusFilter === option.value
-                      ? 'bg-secondary text-foreground'
-                      : 'bg-card text-muted-foreground'
-                  }
-                  aria-pressed={statusFilter === option.value}
-                  onClick={() =>
-                    setStatusFilter(current =>
-                      current === option.value ? ActivityStatusFilter.All : option.value,
-                    )
-                  }
-                >
-                  {i18nService.t(option.labelKey)}
-                </Button>
-              ))}
-            </ButtonGroup>
-          </div>
-
-          {/* Feed */}
-          {!hasAnyRun || dayGroups.length === 0 ? (
-            <div className="flex items-center justify-center py-16">
-              <p className="text-sm text-muted-foreground">
-                {i18nService.t(hasAnyRun ? 'activityFilterEmpty' : 'activityEmpty')}
+            <div className="min-w-0">
+              <h1 className="text-xxl font-semibold text-foreground">
+                {i18nService.t('activityTitle')}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {i18nService.t('activityHeroDesc')}
               </p>
             </div>
-          ) : (
-            dayGroups.map(group => (
-              <section key={group.label} className="pb-4">
-                <h2 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
-                  {group.label}
-                </h2>
-                <div className="flex flex-col">
-                  {group.runs.map(run => (
-                    <ActivityRunRow
-                      key={run.id}
-                      run={run}
-                      animateEntrance={run.updatedAt > openedAtRef.current}
-                    />
-                  ))}
-                </div>
-              </section>
-            ))
-          )}
+          </div>
+        </section>
+
+        {/* Filters: trigger on the left, status toggles on the right. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
+          <ButtonGroup>
+            {triggerOptions.map(option => (
+              <Button
+                key={option.value}
+                variant="outline"
+                size="sm"
+                className={
+                  triggerFilter === option.value
+                    ? 'bg-secondary text-foreground'
+                    : 'bg-card text-muted-foreground'
+                }
+                aria-pressed={triggerFilter === option.value}
+                onClick={() => setTriggerFilter(option.value)}
+              >
+                {i18nService.t(option.labelKey)}
+              </Button>
+            ))}
+          </ButtonGroup>
+          <ButtonGroup>
+            {statusOptions.map(option => (
+              <Button
+                key={option.value}
+                variant="outline"
+                size="sm"
+                className={
+                  statusFilter === option.value
+                    ? 'bg-secondary text-foreground'
+                    : 'bg-card text-muted-foreground'
+                }
+                aria-pressed={statusFilter === option.value}
+                onClick={() =>
+                  setStatusFilter(current =>
+                    current === option.value ? ActivityStatusFilter.All : option.value,
+                  )
+                }
+              >
+                {i18nService.t(option.labelKey)}
+              </Button>
+            ))}
+          </ButtonGroup>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
+          <div className="pb-10">
+            {/* Feed */}
+            {!hasAnyRun || dayGroups.length === 0 ? (
+              <div className="flex items-center justify-center py-16">
+                <p className="text-sm text-muted-foreground">
+                  {i18nService.t(hasAnyRun ? 'activityFilterEmpty' : 'activityEmpty')}
+                </p>
+              </div>
+            ) : (
+              dayGroups.map(group => (
+                <section key={group.label} className="pb-4">
+                  <h2 className="px-3 pb-1 text-xs font-medium text-muted-foreground">
+                    {group.label}
+                  </h2>
+                  <div className="flex flex-col">
+                    {group.runs.map(run => (
+                      <ActivityRunRow
+                        key={run.id}
+                        run={run}
+                        animateEntrance={run.updatedAt > openedAtRef.current}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
