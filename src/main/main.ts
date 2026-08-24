@@ -240,6 +240,7 @@ import { ChannelInboxStore } from './im/channelInboxStore';
 import { ChannelTurnCoordinator } from './im/channelTurnCoordinator';
 import { createIMScheduledTaskRequestDetector } from './im/imScheduledTaskHandler';
 import { IMStore } from './im/imStore';
+import { shouldReloadRendererProcess } from './rendererProcessRecovery';
 import { configureRendererStartup } from './rendererStartup';
 import { SkillManager } from './skillManager';
 import { listPresetExperts } from './presetExpertCatalog';
@@ -771,14 +772,8 @@ app.on('ready', () => {
 
 // 添加错误处理
 app.on('render-process-gone', (_event, webContents, details) => {
-  console.error('Render process gone:', details);
-  const shouldReload =
-    details.reason === 'crashed' ||
-    details.reason === 'killed' ||
-    details.reason === 'oom' ||
-    details.reason === 'launch-failed' ||
-    details.reason === 'integrity-failure';
-  if (shouldReload) {
+  console.error('[RendererProcess] Render process exited:', details);
+  if (shouldReloadRendererProcess(details.reason, isQuitting)) {
     scheduleReload(`render-process-gone (${details.reason})`, webContents);
   }
 });
@@ -2194,6 +2189,10 @@ const showSystemMenu = (position?: { x?: number; y?: number }) => {
 };
 
 const scheduleReload = (reason: string, webContents?: WebContents) => {
+  if (isQuitting) {
+    console.debug(`[RendererProcess] Skipping reload during shutdown (${reason}).`);
+    return;
+  }
   const target = webContents ?? mainWindow?.webContents;
   if (!target || target.isDestroyed()) {
     return;
@@ -6345,12 +6344,6 @@ if (!gotTheLock) {
       }
     });
 
-    // 处理渲染进程崩溃或退出
-    mainWindow.webContents.on('render-process-gone', (_event, details) => {
-      console.error('Window render process gone:', details);
-      scheduleReload('webContents-crashed');
-    });
-
     if (isDev) {
       // 开发环境
       const maxRetries = 3;
@@ -6419,6 +6412,22 @@ if (!gotTheLock) {
     mainWindow.on('leave-full-screen', forwardAndPersistWindowState);
     mainWindow.on('focus', forwardWindowState);
     mainWindow.on('blur', forwardWindowState);
+
+    // Some Linux desktop/GPU combinations finish loading without emitting ready-to-show.
+    // Show the loaded window so the first launch does not remain hidden until a second click.
+    mainWindow.webContents.once('did-finish-load', () => {
+      if (
+        mainWindow &&
+        !mainWindow.isDestroyed() &&
+        !mainWindow.isVisible() &&
+        (isLinuxRendererSmoke || !isAutoLaunched())
+      ) {
+        console.warn(
+          '[MainWindow] Page loaded before ready-to-show; showing the initial window now.',
+        );
+        mainWindow.show();
+      }
+    });
 
     // 等待内容加载完成后再显示窗口
     mainWindow.once('ready-to-show', () => {
