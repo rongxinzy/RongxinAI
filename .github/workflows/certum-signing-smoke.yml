@@ -131,7 +131,10 @@ jobs:
             if ($signature.Status -ne 'Valid') {
               throw "Authenticode status is $($signature.Status), expected Valid."
             }
-            if ($signature.SignerCertificate.Thumbprint -ne $thumbprint) {
+            $actualSignerThumbprint = (
+              $signature.SignerCertificate.Thumbprint -replace '[^0-9A-Fa-f]', ''
+            ).ToUpperInvariant()
+            if ($actualSignerThumbprint -ne $thumbprint) {
               throw 'The Authenticode signer does not match the configured Certum certificate.'
             }
             if ($null -eq $signature.TimeStamperCertificate) {
