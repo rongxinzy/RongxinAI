@@ -113,6 +113,7 @@ import {
   resolveAnySearchGatewayUrl,
 } from './libs/anysearchGatewayCredentials';
 import { APP_DATA_DIR_NAME, APP_NAME, DB_FILENAME } from './appConstants';
+import { AppQuitOrigin, getAppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { getAutoLaunchEnabled, isAutoLaunched, setAutoLaunchEnabled } from './autoLaunchManager';
 import { getChangedSessionPermissionModes } from './coworkPermissionModeChanges';
 import type { CoworkPromptLanguage } from './coworkLanguagePrompt';
@@ -2576,6 +2577,7 @@ if (!gotTheLock) {
 
   ipcMain.handle('app:relaunch', () => {
     console.log('[Main] app:relaunch requested, scheduling restart...');
+    recordAppQuitOrigin(AppQuitOrigin.RendererRelaunch);
     app.relaunch();
     app.quit();
   });
@@ -6419,6 +6421,10 @@ if (!gotTheLock) {
     mainWindow.on('leave-full-screen', forwardAndPersistWindowState);
     mainWindow.on('focus', forwardWindowState);
     mainWindow.on('blur', forwardWindowState);
+    mainWindow.on('session-end', () => {
+      recordAppQuitOrigin(AppQuitOrigin.OperatingSystemSessionEnd);
+      logAppQuitContextOnce();
+    });
 
     // 等待内容加载完成后再显示窗口
     mainWindow.once('ready-to-show', () => {
@@ -6465,9 +6471,23 @@ if (!gotTheLock) {
 
   let isCleanupFinished = false;
   let isCleanupInProgress = false;
+  let hasLoggedAppQuitContext = false;
+
+  const logAppQuitContextOnce = (): void => {
+    if (hasLoggedAppQuitContext) return;
+    hasLoggedAppQuitContext = true;
+
+    const origin = getAppQuitOrigin();
+    const windowCount = BrowserWindow.getAllWindows().length;
+    const appImageContext = process.env.APPIMAGE ? ` from AppImage ${process.env.APPIMAGE}` : '';
+    console.log(
+      `[AppLifecycle] Quit requested by ${origin} on ${process.platform} with ${windowCount} open window(s) ` +
+        `(pid ${process.pid}, executable ${process.execPath}${appImageContext}).`,
+    );
+  };
 
   const runAppCleanup = async (): Promise<void> => {
-    console.log('[Main] App is quitting, starting cleanup...');
+    console.log('[AppLifecycle] App cleanup started.');
     destroyTray();
     skillManager?.stopWatching();
 
@@ -6540,6 +6560,7 @@ if (!gotTheLock) {
       return;
     }
 
+    logAppQuitContextOnce();
     isCleanupInProgress = true;
     isQuitting = true;
 
@@ -6554,11 +6575,13 @@ if (!gotTheLock) {
       });
   });
 
-  const handleTerminationSignal = (signal: NodeJS.Signals) => {
+  const handleTerminationSignal = (signal: NodeJS.Signals, origin: AppQuitOrigin) => {
     if (isCleanupFinished || isCleanupInProgress) {
       return;
     }
-    console.log(`[Main] Received ${signal}, running cleanup before exit...`);
+    recordAppQuitOrigin(origin);
+    logAppQuitContextOnce();
+    console.log(`[AppLifecycle] Received ${signal}; running cleanup before exit.`);
     isCleanupInProgress = true;
     isQuitting = true;
     void runAppCleanup()
@@ -6572,8 +6595,8 @@ if (!gotTheLock) {
       });
   };
 
-  process.once('SIGINT', () => handleTerminationSignal('SIGINT'));
-  process.once('SIGTERM', () => handleTerminationSignal('SIGTERM'));
+  process.once('SIGINT', () => handleTerminationSignal('SIGINT', AppQuitOrigin.SignalInterrupt));
+  process.once('SIGTERM', () => handleTerminationSignal('SIGTERM', AppQuitOrigin.SignalTerminate));
 
   // 初始化应用
   const initApp = async () => {
@@ -7073,6 +7096,7 @@ if (!gotTheLock) {
   // 当所有窗口关闭时退出应用
   app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
+      recordAppQuitOrigin(AppQuitOrigin.WindowAllClosed);
       app.quit();
     }
   });

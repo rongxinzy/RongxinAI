@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
 import path from 'path';
 
 import { APP_NAME } from './appConstants';
+import { AppQuitOrigin, recordAppQuitOrigin } from './appQuitOrigin';
 import { t } from './i18n';
 
 let tray: Tray | null = null;
@@ -79,6 +80,7 @@ function buildContextMenu(getWindow: () => BrowserWindow | null): Menu {
     {
       label: labels.quit,
       click: () => {
+        recordAppQuitOrigin(AppQuitOrigin.TrayMenu);
         app.quit();
       },
     },
