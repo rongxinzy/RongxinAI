@@ -1,8 +1,9 @@
 import { Button } from '@shared/components/ui/button';
-import { PanelLeft, Pencil } from 'lucide-react';
+import { PanelLeftOpen } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../../services/i18n';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import McpManager from './McpManager';
 import type { McpRegistryId } from './constants';
@@ -40,7 +41,7 @@ const McpView: React.FC<McpViewProps> = ({
                 onClick={onToggleSidebar}
                 className="h-8 w-8"
               >
-                <PanelLeft className="h-4 w-4" />
+                <PanelLeftOpen className="h-4 w-4" />
               </Button>
               <Button
                 type="button"
@@ -49,7 +50,7 @@ const McpView: React.FC<McpViewProps> = ({
                 onClick={onNewChat}
                 className="h-8 w-8"
               >
-                <Pencil className="h-4 w-4" />
+                <SidebarAnimatedMessageCirclePlusIcon />
               </Button>
               {updateBadge}
             </div>

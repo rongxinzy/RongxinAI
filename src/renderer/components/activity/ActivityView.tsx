@@ -1,6 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { ButtonGroup } from '@shared/components/ui/button-group';
-import { Activity, PanelLeft, Pencil } from 'lucide-react';
+import { Activity, PanelLeftOpen } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -8,6 +8,7 @@ import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import { selectActivityRuns } from '../../store/selectors/activitySelectors';
 import type { ActivityRun } from '../../../shared/activity/types';
+import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
 import ActivityRunRow from './ActivityRunRow';
 import { ActivityStatusFilter, ActivityTriggerFilter } from './constants';
@@ -99,10 +100,10 @@ const ActivityView: React.FC<ActivityViewProps> = ({
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
               <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeft />
+                <PanelLeftOpen />
               </Button>
               <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
-                <Pencil />
+                <SidebarAnimatedMessageCirclePlusIcon />
               </Button>
               {updateBadge}
             </div>
