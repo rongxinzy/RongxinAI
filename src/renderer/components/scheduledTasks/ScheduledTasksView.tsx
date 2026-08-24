@@ -237,79 +237,77 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
         <WindowTitleBar inline />
       </div>
 
-      {/* Scrollable content */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-8 pb-10">
-          {/* ── Hero ── */}
-          <section className="animate-fade-in-up pt-8 pb-6">
-            <div className="flex items-center gap-4">
-              <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-                <CalendarClock className="size-6 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xxl font-semibold text-foreground">
-                  {i18nService.t('scheduledTasksTitle')}
-                </h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {i18nService.t('scheduledTasksHeroDesc')}
-                </p>
-              </div>
+      <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-8">
+        {/* ── Hero ── */}
+        <section className="animate-fade-in-up shrink-0 pt-8 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
+              <CalendarClock className="size-6 text-primary" />
             </div>
-          </section>
-
-          {/* ── Tab list on the divider line, with a sliding underline ── */}
-          <div className="relative border-b border-border">
-            <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
-              {(
-                [
-                  { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
-                  { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
-                  { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
-                ] as const
-              ).map(tab => {
-                const active = activeTab === tab.value;
-                return (
-                  <Button
-                    key={tab.value}
-                    variant="ghost"
-                    ref={el => {
-                      tabRefs.current[tab.value] = el;
-                    }}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    tabIndex={active ? 0 : -1}
-                    onClick={() => setActiveTab(tab.value)}
-                    onKeyDown={e => handleTabKeyDown(e, tab.value)}
-                    className={cn(
-                      'relative -mb-px h-auto gap-2 rounded-none border-b-2 border-transparent px-0 pb-2.5 hover:bg-transparent focus-visible:text-foreground active:translate-y-0 dark:hover:bg-transparent',
-                      active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                    )}
-                  >
-                    {tab.label}
-                    {tab.value === AUTO_TAB.Tasks && tasks.length > 0 && (
-                      <Badge variant="secondary">{tasks.length}</Badge>
-                    )}
-                  </Button>
-                );
-              })}
+            <div className="min-w-0">
+              <h1 className="text-xxl font-semibold text-foreground">
+                {i18nService.t('scheduledTasksTitle')}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {i18nService.t('scheduledTasksHeroDesc')}
+              </p>
             </div>
-            <span
-              aria-hidden
-              className="absolute bottom-0 h-0.5 rounded-full bg-primary transition-[left,width] duration-300 ease-smooth"
-              style={{
-                left: indicator?.left ?? 0,
-                width: indicator?.width ?? 0,
-                opacity: indicator ? 1 : 0,
-              }}
-            />
           </div>
+        </section>
 
-          {/* ── Active pane (directional slide) ── */}
+        {/* ── Tab list on the divider line, with a sliding underline ── */}
+        <div className="relative shrink-0 border-b border-border">
+          <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
+            {(
+              [
+                { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
+                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
+                { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
+              ] as const
+            ).map(tab => {
+              const active = activeTab === tab.value;
+              return (
+                <Button
+                  key={tab.value}
+                  variant="ghost"
+                  ref={el => {
+                    tabRefs.current[tab.value] = el;
+                  }}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => setActiveTab(tab.value)}
+                  onKeyDown={e => handleTabKeyDown(e, tab.value)}
+                  className={cn(
+                    'relative -mb-px h-auto gap-2 rounded-none border-b-2 border-transparent px-0 pb-2.5 hover:bg-transparent focus-visible:text-foreground active:translate-y-0 dark:hover:bg-transparent',
+                    active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {tab.label}
+                  {tab.value === AUTO_TAB.Tasks && tasks.length > 0 && (
+                    <Badge variant="secondary">{tasks.length}</Badge>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
+          <span
+            aria-hidden
+            className="absolute bottom-0 h-0.5 rounded-full bg-primary transition-[left,width] duration-300 ease-smooth"
+            style={{
+              left: indicator?.left ?? 0,
+              width: indicator?.width ?? 0,
+              opacity: indicator ? 1 : 0,
+            }}
+          />
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">
           <div
             key={`${activeTab}-${tabDir ?? 'init'}`}
             className={cn(
-              'pt-6',
+              'min-h-full pt-6 pb-10',
               tabDir === 'right'
                 ? 'animate-slide-in-right'
                 : tabDir === 'left'

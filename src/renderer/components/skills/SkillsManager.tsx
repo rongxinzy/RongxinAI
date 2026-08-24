@@ -94,6 +94,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
 
   const importInputRef = useRef<HTMLInputElement>(null);
   const marketplaceLoadedRef = useRef(false);
+  const installedGridScrollRef = useRef<HTMLDivElement>(null);
 
   const refreshMarketplace = useCallback(async (forceRefresh = false) => {
     setIsLoadingMarketplace(true);
@@ -261,6 +262,10 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     setInstalledPageNumber(current => Math.min(current, installedPageCount));
   }, [installedPageCount]);
 
+  useEffect(() => {
+    installedGridScrollRef.current?.scrollTo({ top: 0 });
+  }, [installedPageNumber]);
+
   const selectedVisibleIds = useMemo(() => {
     const visibleIds = new Set(filteredInstalledSkills.map(skill => skill.id));
     return new Set([...selectedInstalledIds].filter(id => visibleIds.has(id)));
@@ -303,18 +308,12 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
       dispatch(setSkills(updatedSkills));
       setSkillActionError('');
       showToast(
-        enabled
-          ? i18nService.t('skillEnableSuccess')
-          : i18nService.t('skillDisableSuccess'),
+        enabled ? i18nService.t('skillEnableSuccess') : i18nService.t('skillDisableSuccess'),
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : i18nService.t('skillUpdateFailed');
       setSkillActionError(message);
-      showToast(
-        enabled
-          ? i18nService.t('skillEnableFailed')
-          : i18nService.t('skillDisableFailed'),
-      );
+      showToast(enabled ? i18nService.t('skillEnableFailed') : i18nService.t('skillDisableFailed'));
     } finally {
       setIsBatchUpdating(false);
     }
@@ -775,7 +774,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         </div>
         <div className="min-h-0 flex-1 overflow-hidden">
           {activeTab === SkillTab.Installed && (
-            <div className="flex h-full min-h-0 flex-col overflow-y-auto">
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">
               <div
                 className={cn(
                   'mb-4 flex w-full min-h-9 flex-wrap items-center gap-3 px-1 text-sm text-muted-foreground',
@@ -873,7 +872,10 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                   </>
                 )}
               </div>
-              <div className="flex-1">
+              <div
+                ref={installedGridScrollRef}
+                className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable"
+              >
                 <InstalledSkillGrid
                   skills={paginatedInstalledSkills}
                   readOnly={readOnly}
@@ -889,7 +891,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
               <ListPagination
                 page={installedPageNumber}
                 totalPages={installedPageCount}
-                className="py-4"
+                className="shrink-0 py-4"
                 onPageChange={setInstalledPageNumber}
               />
             </div>
@@ -901,28 +903,30 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 {i18nService.t('loading')}
               </div>
             ) : (
-              <div className="h-full overflow-y-auto pr-2">
-                <MarketplaceSkillGrid
-                  skills={filteredMarketplaceSkills}
-                  installedSkillIds={installedSkillIds}
-                  installedSkillNames={installedSkillNames}
-                  isInstallingSkillId={installingSkillId}
-                  readOnly={readOnly}
-                  onSelect={handleSelectMarketplaceSkill}
-                  onInstall={handleInstallMarketplaceSkill}
-                  installProgress={installProgress}
-                  isDetailOpen={Boolean(selectedMarketplaceSkill)}
-                />
-                {isLoadingMoreMarketplace && (
-                  <div className="py-4 text-center text-sm text-muted-foreground">
-                    {i18nService.t('loading')}
-                  </div>
-                )}
+              <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                <div className="min-h-0 flex-1 overflow-y-auto pr-2 scrollbar-gutter-stable">
+                  <MarketplaceSkillGrid
+                    skills={filteredMarketplaceSkills}
+                    installedSkillIds={installedSkillIds}
+                    installedSkillNames={installedSkillNames}
+                    isInstallingSkillId={installingSkillId}
+                    readOnly={readOnly}
+                    onSelect={handleSelectMarketplaceSkill}
+                    onInstall={handleInstallMarketplaceSkill}
+                    installProgress={installProgress}
+                    isDetailOpen={Boolean(selectedMarketplaceSkill)}
+                  />
+                  {isLoadingMoreMarketplace && (
+                    <div className="py-4 text-center text-sm text-muted-foreground">
+                      {i18nService.t('loading')}
+                    </div>
+                  )}
+                </div>
                 <ListPagination
                   page={marketplacePageNumber}
                   hasNext={marketplaceHasMore}
                   disabled={isLoadingMoreMarketplace}
-                  className="py-4"
+                  className="shrink-0 py-4"
                   onPageChange={page => void loadMarketplacePage(page)}
                 />
               </div>
