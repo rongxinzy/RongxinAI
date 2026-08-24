@@ -462,6 +462,9 @@ interface IElectronAPI {
     installBackend: (
       input?: import('../../shared/llamacpp').LlamaCppBackendRef,
     ) => Promise<LlamaCppRuntimeInstallResult>;
+    getRuntimeInstallSnapshot: () => Promise<
+      import('../../shared/llamacpp').LlamaCppRuntimeInstallSnapshot
+    >;
     uninstallBackend: (
       input?: import('../../shared/llamacpp').LlamaCppBackendRef,
     ) => Promise<LlamaCppRuntimeUninstallResult>;

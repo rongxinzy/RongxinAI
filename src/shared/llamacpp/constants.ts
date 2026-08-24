@@ -1,6 +1,7 @@
 export const LlamaCppIpcChannel = {
   Status: 'llamacpp:status',
   Install: 'llamacpp:install',
+  GetRuntimeInstallSnapshot: 'llamacpp:runtime:install:snapshot',
   CancelRuntimeInstall: 'llamacpp:runtime:install:cancel',
   UninstallRuntime: 'llamacpp:runtime:uninstall',
   Start: 'llamacpp:start',
@@ -40,6 +41,8 @@ export const LlamaCppIpcChannel = {
   OpenModelLaunchLogWindow: 'llamacpp:model-launch-log-window:open',
   ModelLaunchLogWindowTargetChanged: 'llamacpp:model-launch-log-window:target-changed',
 } as const;
+
+export const LLAMACPP_RUNTIME_INSTALL_PROGRESS_ID = '__llamacpp_runtime__';
 
 export type LlamaCppIpcChannel = (typeof LlamaCppIpcChannel)[keyof typeof LlamaCppIpcChannel];
 

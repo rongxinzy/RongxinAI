@@ -34,6 +34,7 @@ const DEFAULT_RUNTIME_VERSION = 'b9518';
 const DEFAULT_RELEASE_BASE_URL = 'https://rongxinai.krli.org/llamacpp';
 const GITHUB_RELEASE_BASE_URL = 'https://github.com/ggml-org/llama.cpp/releases/download';
 const BUILD_INFO_FILE = 'runtime-build-info.json';
+const LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS = 2_000;
 let hasLoggedManifestFallback = false;
 const backendDownloadSizeCache = new Map<string, number>();
 
@@ -135,6 +136,8 @@ function resolveBundledManifestUrl(): string {
 async function fetchManifestFromUrl(manifestUrl: string): Promise<LlamaCppBackendManifest> {
   const response = await fetch(manifestUrl, {
     headers: { 'User-Agent': 'ZhiYuanAgent/llamacpp-backend-manager' },
+    // Listing must fall back promptly when the optional remote manifest is unavailable.
+    signal: AbortSignal.timeout(LLAMACPP_BACKEND_MANIFEST_FETCH_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status} ${response.statusText}`);
   const parsed = (await response.json()) as LlamaCppBackendManifest | LlamaCppBackendRootManifest;

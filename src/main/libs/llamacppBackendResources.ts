@@ -15,14 +15,12 @@ export function resolveBundledLlamaCppBackendDir(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, LLAMACPP_BACKEND_RESOURCES_DIR);
   }
-  return path.join(process.cwd(), 'build', 'win-full');
+  // Keep development and packaged resources in the same directory layout.
+  return path.join(process.cwd(), 'resources', LLAMACPP_BACKEND_RESOURCES_DIR);
 }
 
 export function resolveBundledLlamaCppBackendManifestPath(): string {
-  if (app.isPackaged) {
-    return path.join(resolveBundledLlamaCppBackendDir(), 'manifest.json');
-  }
-  return path.join(process.cwd(), 'build', 'win-lite', 'manifest.json');
+  return path.join(resolveBundledLlamaCppBackendDir(), 'manifest.json');
 }
 
 export function readBundledLlamaCppBackendManifest(): LlamaCppBackendManifest | undefined {

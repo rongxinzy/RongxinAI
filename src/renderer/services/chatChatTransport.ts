@@ -64,7 +64,6 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
   // -- ChatTransport impl --------------------------------------------
 
   async sendMessages({
-    chatId,
     messages,
     abortSignal,
   }: {
@@ -74,10 +73,7 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
     messages: UIMessage[];
     abortSignal: AbortSignal | undefined;
   } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
-    const directChatOptions: DirectChatRequestOptions = {
-      ...this.options,
-      conversationId: chatId,
-    };
+    const directChatOptions = this.options;
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     const prompt = lastUser ? extractText(lastUser) : '';
     if (!prompt.trim()) throw new Error('No prompt to send.');

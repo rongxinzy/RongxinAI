@@ -222,6 +222,11 @@ export type LlamaCppInstallProgress = {
   error?: string;
 };
 
+export type LlamaCppRuntimeInstallSnapshot = {
+  active: boolean;
+  progress?: LlamaCppInstallProgress;
+};
+
 export type LlamaCppModelLaunchLogEvent = {
   sessionId: string;
   modelName: string;

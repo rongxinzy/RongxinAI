@@ -6,15 +6,16 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
-    localInferenceBackendSwitchRequiresStoppedService: '请先停止本地推理服务，再切换后端。',
+    localInferenceBackendSwitchRequiresStoppedService: '请先停止本地推理服务，再切换版本。',
     localInferenceBackendInUse: '正在使用',
-    localInferenceCudaRequiresNvidiaGpu: 'CUDA 后端需要 NVIDIA 显卡，请切换到 CPU 后端。',
+    localInferenceCudaRequiresNvidiaGpu: 'CUDA 版本需要 NVIDIA 显卡，请切换到 CPU 版本。',
     localInferenceSettings: '本地模型设置',
     localInferenceRuntimeSettings: '运行环境',
     localInferenceAccessMenuItem: '访问',
     localInferenceMemoryMenuItem: '统一内存',
     localInferenceLibraryMenuItem: '模型库',
     localInferenceRuntimeReadyWithBackend: '当前版本：{backend}',
+    localInferenceRuntimeNoSelectedVersion: '当前未选择版本',
     localInferenceRuntimeNotInstalledMessage: '未安装本地推理引擎',
     localInferenceRuntimeServiceRunning: '服务运行中',
     localInferenceRuntimeServiceNotRunning: '服务程序已安装但未运行',
@@ -247,7 +248,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceServiceConfigSplitTensor: '按张量拆分',
     localInferenceServiceConfigRestartHint: '当前服务正在运行，保存后需要重启本地推理才会应用。',
     localInferenceServiceConfigStartHint: '保存后下次启动本地推理时应用。',
-    localInferenceInstall: '安装本地推理',
+    localInferenceInstall: '安装',
     localInferenceRuntimeCardTitle: '本地推理运行环境',
     localInferenceRuntimeCardDescription:
       '可选组件，不影响知远的其他功能。选择后在应用内下载、校验和安装。',
@@ -331,7 +332,17 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '4. 导入成功后，backend 会出现在当前配置列表中，可直接切换或安装使用。如果压缩包与当前机器系统、架构或显卡能力不匹配，安装或切换时会失败。',
     localInferenceImportRuntimeFailed: '导入失败',
     localInferenceRuntimeReady: '本地推理已安装就绪。',
-    localInferenceRuntimeInstalling: '正在安装…',
+    localInferenceRuntimeDownloading: '正在下载：{name}',
+    localInferenceRuntimeDownloadTotal: '总大小：{size}',
+    localInferenceRuntimeDownloadSpeed: '下载速度：{speed}/s',
+    localInferenceRuntimeDownloadProgress: '下载进度：{completed} / {total}',
+    localInferenceRuntimeInstallCancelled: '已取消安装。',
+    localInferenceRuntimeEnableVersion: '启用版本',
+    localInferenceRuntimeVersionSwitched: '已切换至版本：{version}。',
+    localInferenceRuntimeBackgroundInstallContinues: '版本 {version} 正在后台下载，关闭此窗口不会中断。',
+    localInferenceRuntimeBackgroundInstallContinuesGeneric: '本地推理运行环境正在后台下载，关闭此窗口不会中断。',
+    localInferenceRuntimeBackgroundInstallDone: '版本 {version} 已下载完成。',
+    localInferenceRuntimeBackgroundInstallFailed: '版本 {version} 下载失败。',
     localInferenceRuntimeMissing: '本地推理安装失败，请检查网络后重试。',
     localInferenceServiceNeedsBackendInstall: '请先在本地推理配置中安装 backend，然后再启动服务。',
     localInferenceServiceNeedsBackendSwitch:
@@ -2919,7 +2930,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
   },
   en: {
     localInferenceBackendSwitchRequiresStoppedService:
-      'Stop the local inference service before switching backends.',
+      'Stop the local inference service before switching versions.',
     localInferenceBackendInUse: 'In use',
     localInferenceSettings: 'Local Settings',
     localInferenceRuntimeSettings: 'Runtime',
@@ -2927,6 +2938,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceMemoryMenuItem: 'Memory Management',
     localInferenceLibraryMenuItem: 'Model Library',
     localInferenceRuntimeReadyWithBackend: 'Current version: {backend}',
+    localInferenceRuntimeNoSelectedVersion: 'No version selected',
     localInferenceRuntimeNotInstalledMessage: 'The local inference engine is not installed.',
     localInferenceRuntimeServiceRunning: 'Service is running',
     localInferenceRuntimeServiceNotRunning: 'Service is installed but not running',
@@ -3187,7 +3199,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'local inference is running. Restart the service to apply saved values.',
     localInferenceServiceConfigStartHint:
       'Saved values apply the next time local inference starts.',
-    localInferenceInstall: 'Install local inference',
+    localInferenceInstall: 'Install',
     localInferenceRuntimeCardTitle: 'Local inference runtime',
     localInferenceRuntimeCardDescription:
       'Optional and independent from the rest of the app. Download, verification, and installation run here.',
@@ -3274,11 +3286,23 @@ const translations: Record<LanguageType, Record<string, string>> = {
     localInferenceImportGuideInlineStepResult:
       '4. After a successful import, the backend appears in the current config list and can be switched to or installed. Installation or switching will fail if the archive does not match the current machine OS, architecture, or GPU capability.',
     localInferenceRuntimeReady: 'local inference is installed and ready.',
-    localInferenceRuntimeInstalling: 'Installing…',
+    localInferenceRuntimeDownloading: 'Downloading: {name}',
+    localInferenceRuntimeDownloadTotal: 'Total: {size}',
+    localInferenceRuntimeDownloadSpeed: 'Speed: {speed}/s',
+    localInferenceRuntimeDownloadProgress: 'Progress: {completed} / {total}',
+    localInferenceRuntimeInstallCancelled: 'Installation cancelled.',
+    localInferenceRuntimeEnableVersion: 'Enable version',
+    localInferenceRuntimeVersionSwitched: 'Switched to version: {version}.',
+    localInferenceRuntimeBackgroundInstallContinues:
+      'Version {version} is downloading in the background. Closing this window will not interrupt it.',
+    localInferenceRuntimeBackgroundInstallContinuesGeneric:
+      'The local inference runtime is downloading in the background. Closing this window will not interrupt it.',
+    localInferenceRuntimeBackgroundInstallDone: 'Version {version} has finished downloading.',
+    localInferenceRuntimeBackgroundInstallFailed: 'Version {version} failed to download.',
     localInferenceRuntimeMissing:
       'Failed to install local inference. Check the network and try again.',
     localInferenceCudaRequiresNvidiaGpu:
-      'The CUDA backend requires an NVIDIA GPU. Please select the CPU backend.',
+      'The CUDA version requires an NVIDIA GPU. Please select the CPU version.',
     localInferenceServiceNeedsBackendInstall:
       'Install a backend in local inference Config before starting the service.',
     localInferenceServiceNeedsBackendSwitch:
