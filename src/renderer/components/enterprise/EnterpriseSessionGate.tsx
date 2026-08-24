@@ -1,19 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-import {
-  EnterpriseRendererMessageSource,
-  EnterpriseRendererMessageType,
-  type EnterpriseRendererInitializeMessage,
-  type EnterpriseRendererLanguage,
-  type EnterpriseRendererSessionResponseMessage,
-  type EnterpriseRendererTheme,
-} from '../../../shared/enterpriseRenderer';
+import { EnterpriseRendererSurface } from '../../../shared/enterpriseRenderer';
 import type { EnterpriseSessionResult } from '../../../shared/enterpriseSession';
-import {
-  executeEnterpriseSessionRequest,
-  isEnterpriseRendererReadyMessage,
-  parseEnterpriseSessionRequest,
-} from '../../services/enterpriseRenderer';
+import { subscribeToEnterpriseSession } from '../../services/enterpriseSessionEvents';
+import { EnterpriseRendererFrame } from './EnterpriseRendererFrame';
 import WindowTitleBar from '../window/WindowTitleBar';
 
 export const EnterpriseSessionGateState = {
@@ -35,7 +25,6 @@ interface GateContext {
 }
 
 export function EnterpriseSessionGate({ children }: EnterpriseSessionGateProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [state, setState] = useState<EnterpriseSessionGateState>(
     EnterpriseSessionGateState.Checking,
   );
@@ -49,12 +38,16 @@ export function EnterpriseSessionGate({ children }: EnterpriseSessionGateProps) 
     ])
       .then(([entrypoint, session]) => {
         if (!active) return;
-        if (!entrypoint || canEnterApplication(session)) {
+        if (!entrypoint) {
           setState(EnterpriseSessionGateState.Passed);
           return;
         }
         setGateContext({ entrypoint, session });
-        setState(EnterpriseSessionGateState.Open);
+        setState(
+          canEnterApplication(session)
+            ? EnterpriseSessionGateState.Passed
+            : EnterpriseSessionGateState.Open,
+        );
       })
       .catch(() => {
         if (active) setState(EnterpriseSessionGateState.Passed);
@@ -65,50 +58,17 @@ export function EnterpriseSessionGate({ children }: EnterpriseSessionGateProps) 
   }, []);
 
   useEffect(() => {
-    if (state !== EnterpriseSessionGateState.Open || !gateContext) return;
-
-    const sendInitialization = () => {
-      const target = iframeRef.current?.contentWindow;
-      if (!target) return;
-      const message: EnterpriseRendererInitializeMessage = {
-        source: EnterpriseRendererMessageSource.Host,
-        apiVersion: 1,
-        type: EnterpriseRendererMessageType.Initialize,
-        language: resolveLanguage(),
-        theme: resolveTheme(),
-        session: gateContext.session,
-      };
-      target.postMessage(message, '*');
-    };
-
-    const handleMessage = (event: MessageEvent<unknown>) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
-      if (isEnterpriseRendererReadyMessage(event.data)) {
-        sendInitialization();
-        return;
-      }
-      const request = parseEnterpriseSessionRequest(event.data);
-      if (!request) return;
-
-      void executeEnterpriseSessionRequest(request).then(result => {
-        const target = iframeRef.current?.contentWindow;
-        if (target) {
-          const response: EnterpriseRendererSessionResponseMessage = {
-            source: EnterpriseRendererMessageSource.Host,
-            apiVersion: 1,
-            type: EnterpriseRendererMessageType.SessionResponse,
-            requestId: request.requestId,
-            result,
-          };
-          target.postMessage(response, '*');
-        }
-        if (canEnterApplication(result)) setState(EnterpriseSessionGateState.Passed);
-      });
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [gateContext, state]);
+    const entrypoint = gateContext?.entrypoint;
+    if (!entrypoint) return;
+    return subscribeToEnterpriseSession(session => {
+      setGateContext({ entrypoint, session });
+      setState(
+        canEnterApplication(session)
+          ? EnterpriseSessionGateState.Passed
+          : EnterpriseSessionGateState.Open,
+      );
+    });
+  }, [gateContext?.entrypoint]);
 
   if (state === EnterpriseSessionGateState.Passed) return children;
 
@@ -120,11 +80,11 @@ export function EnterpriseSessionGate({ children }: EnterpriseSessionGateProps) 
         </div>
       ) : null}
       {state === EnterpriseSessionGateState.Open && gateContext ? (
-        <iframe
-          ref={iframeRef}
+        <EnterpriseRendererFrame
           src={gateContext.entrypoint}
           title="Zhiyuan"
-          sandbox="allow-scripts"
+          surface={EnterpriseRendererSurface.SessionGate}
+          session={gateContext.session}
           className="min-h-0 flex-1 border-0 bg-background"
         />
       ) : (
@@ -140,12 +100,4 @@ function canEnterApplication(result: EnterpriseSessionResult): boolean {
     result.snapshot.status === 'unavailable' ||
     (result.snapshot.status === 'authenticated' && !result.snapshot.identity.passwordChangeRequired)
   );
-}
-
-function resolveLanguage(): EnterpriseRendererLanguage {
-  return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-}
-
-function resolveTheme(): EnterpriseRendererTheme {
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
 }

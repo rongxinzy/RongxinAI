@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { EnterpriseSessionResult } from '../../../shared/enterpriseSession';
 import { EnterpriseSessionGate } from './EnterpriseSessionGate';
+import { publishEnterpriseSessionResult } from '../../services/enterpriseSessionEvents';
 
 const sessionGateEntrypoint = vi.fn<() => Promise<string | null>>();
 const snapshot = vi.fn<() => Promise<EnterpriseSessionResult>>();
@@ -86,6 +87,23 @@ describe('EnterpriseSessionGate', () => {
     );
 
     await waitFor(() => expect(screen.getByTitle('Zhiyuan')).toBeInTheDocument());
+    expect(screen.queryByText('application')).not.toBeInTheDocument();
+  });
+
+  test('reopens the gate when a settings page signs out', async () => {
+    sessionGateEntrypoint.mockResolvedValue('zhiyuan-enterprise-ui://renderer/index.html');
+    snapshot.mockResolvedValue(authenticated(false));
+
+    render(
+      <EnterpriseSessionGate>
+        <div>application</div>
+      </EnterpriseSessionGate>,
+    );
+    expect(await screen.findByText('application')).toBeInTheDocument();
+
+    act(() => publishEnterpriseSessionResult({ ok: true, snapshot: { status: 'signed-out' } }));
+
+    expect(await screen.findByTitle('Zhiyuan')).toBeInTheDocument();
     expect(screen.queryByText('application')).not.toBeInTheDocument();
   });
 });
