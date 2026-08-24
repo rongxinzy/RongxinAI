@@ -9,6 +9,7 @@ import {
   LlamaCppModelLaunchLogWindowQuery,
   LlamaCppModelLaunchLogWindowView,
 } from '../shared/llamacpp';
+import { EnterpriseSessionGate } from './components/enterprise/EnterpriseSessionGate';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -47,9 +48,11 @@ async function renderRoot(): Promise<void> {
 
   root.render(
     <React.StrictMode>
-      <Provider store={store}>
-        <App />
-      </Provider>
+      <EnterpriseSessionGate>
+        <Provider store={store}>
+          <App />
+        </Provider>
+      </EnterpriseSessionGate>
     </React.StrictMode>,
   );
 }

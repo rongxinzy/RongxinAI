@@ -1202,6 +1202,9 @@ interface IElectronAPI {
       version: string;
       name: string;
     } | null>;
+    renderer: {
+      sessionGateEntrypoint: () => Promise<string | null>;
+    };
     session: {
       snapshot: () => Promise<EnterpriseSessionResult>;
       login: (input: EnterprisePasswordLoginInput) => Promise<EnterpriseSessionResult>;

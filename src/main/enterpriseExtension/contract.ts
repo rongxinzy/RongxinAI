@@ -6,6 +6,7 @@ import type {
 
 export const ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION = 1 as const;
+export const ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION = 1 as const;
 
 export interface ZhiyuanEnterpriseSessionProvider {
   snapshot(): EnterpriseSessionSnapshot | Promise<EnterpriseSessionSnapshot>;
@@ -17,6 +18,11 @@ export interface ZhiyuanEnterpriseSessionProvider {
 export interface ZhiyuanEnterpriseSessionHostCapability {
   readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION;
   registerProvider(provider: ZhiyuanEnterpriseSessionProvider): () => void;
+}
+
+export interface ZhiyuanEnterpriseRendererHostCapability {
+  readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION;
+  registerSessionGate(entrypoint: string): () => void;
 }
 
 export const ZhiyuanEnterpriseExtensionStatus = {
@@ -41,6 +47,7 @@ export interface ZhiyuanEnterpriseHostContext {
   };
   readonly capabilities: {
     readonly session: ZhiyuanEnterpriseSessionHostCapability | null;
+    readonly renderer: ZhiyuanEnterpriseRendererHostCapability | null;
   };
 }
 
