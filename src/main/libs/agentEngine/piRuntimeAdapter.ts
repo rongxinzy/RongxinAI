@@ -44,6 +44,8 @@ import {
 } from '../../../shared/harness';
 import { MAX_STALE_PRODUCTION_ITERATIONS } from '../../../shared/productionLoop';
 import {
+  WorkbenchApprovalDecision,
+  WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
@@ -997,6 +999,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 deferDecision:
                   options.goalMode !== true && options._productionWorkflowEnabled === undefined,
                 skipAllowed: options.goalMode !== true,
+                // System-side risk probe: an approved approval whose risk was
+                // classified as irreversible OR unknown (e.g. mcp tools,
+                // unclassified shell commands) forces the full reviewer —
+                // lightweight review is fail-open only for positively
+                // read-only/reversible runs.
+                resolveElevatedRisk: probeRunId =>
+                  this.workbenchTaskService?.repository
+                    .listApprovalsForRun(probeRunId)
+                    .some(
+                      approval =>
+                        approval.decision === WorkbenchApprovalDecision.Approved &&
+                        (approval.riskLevel === WorkbenchApprovalRiskLevel.Irreversible ||
+                          approval.riskLevel === WorkbenchApprovalRiskLevel.Unknown),
+                    ) ?? false,
               },
               completionWorkflow || undefined,
             )
@@ -2517,14 +2533,20 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 : null,
             domain: domainWorkflowSnapshot,
           });
-          const artifactCandidates = active.productionLoop
-            ?.getReviewedArtifacts()
+          // Deliver-phase artifacts are preserved regardless of review
+          // outcome: a reviewer pass marks them Verified, a lightweight skip
+          // leaves them Pending so user acceptance can elevate them
+          // (markArtifactsVerified on accept).
+          const deliveryArtifacts = active.productionLoop
+            ?.getDeliveryArtifacts()
             .map(artifact => ({
               path: artifact.reference,
               kind: artifact.kind,
               role: artifact.kind,
               source: WorkbenchArtifactCandidateSource.ProductionInspection,
-              verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+              verificationStatus: active.productionLoop?.getReviewOutcome().skipped
+                ? WorkbenchArtifactVerificationStatus.Pending
+                : WorkbenchArtifactVerificationStatus.Verified,
             }));
           this.workbenchTaskService.completeRun({
             sessionId,
@@ -2536,7 +2558,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               ? active.agentLoop.getState().done
               : undefined,
             workflowSnapshot,
-            artifactCandidates,
+            artifactCandidates: deliveryArtifacts,
           });
         }
         void this.runPostTurnMemoryMaintenance(

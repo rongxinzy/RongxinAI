@@ -92,6 +92,9 @@ export function createZhiyuanEvaluationPolicy(
     workflowKind: WorkbenchContractKind.GenericWork,
     goal: context.prompt,
     prototypeRequired: false,
+    // Evaluation measures the full harness gate, including the independent
+    // reviewer; never run evaluation runs in lightweight mode.
+    forceStandardReview: true,
   });
   const productionTool = buildProductionLoopTool(controller) as ZhiyuanEvaluationTool;
   const executeProductionTool = productionTool.execute.bind(productionTool);

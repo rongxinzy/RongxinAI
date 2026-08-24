@@ -87,6 +87,12 @@ export interface ProductionCriticState {
   findings: ProductionCriticFinding[];
   outputSummary: string | null;
   execution: ProductionCriticExecution | null;
+  /**
+   * True when the critique phase was bypassed by lightweight review mode.
+   * passed stays true so reviewed-artifact projection keeps working; the
+   * flag preserves the distinction for audit.
+   */
+  skipped?: boolean;
 }
 
 export interface ProductionRevision {

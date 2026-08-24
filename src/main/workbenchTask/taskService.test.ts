@@ -535,6 +535,56 @@ test('user acceptance dispatches the verified-run memory promotion', () => {
   }
 });
 
+test('lightweight inspected artifacts enter pending and are elevated by acceptance', () => {
+  const { db, service } = createService();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'workbench-lightweight-artifact-'));
+  const filePath = path.join(workspace, 'report.md');
+  fs.writeFileSync(filePath, '# report');
+  try {
+    const contract = {
+      kind: WorkbenchContractKind.GenericWork,
+      requiresUserAcceptance: true,
+    };
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'analyze gpu logs',
+      contract,
+    });
+    // Lightweight production runs submit inspection artifacts that the
+    // reviewer never passed: they must land as pending (not be dropped),
+    // then be elevated by user acceptance.
+    const detail = service.completeRun({
+      sessionId: 'session',
+      runId: run.id,
+      workspaceRoot: workspace,
+      finalAnswer: 'done',
+      artifactCandidates: [
+        {
+          path: filePath,
+          kind: 'report',
+          role: 'report',
+          source: WorkbenchArtifactCandidateSource.ProductionInspection,
+          verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+        },
+      ],
+    });
+
+    expect(detail.artifacts).toHaveLength(1);
+    expect(detail.artifacts[0]).toMatchObject({
+      provenance: WorkbenchArtifactProvenance.Controller,
+      verificationStatus: WorkbenchArtifactVerificationStatus.Pending,
+    });
+
+    const accepted = service.acceptTask(task.id);
+    expect(accepted.artifacts[0]?.verificationStatus).toBe(
+      WorkbenchArtifactVerificationStatus.Verified,
+    );
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+    db.close();
+  }
+});
+
 test('creates a new task for each ordinary user message', () => {
   const { db, service } = createService();
   try {
