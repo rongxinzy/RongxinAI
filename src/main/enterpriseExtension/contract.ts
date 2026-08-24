@@ -1,4 +1,23 @@
+import type {
+  EnterprisePasswordChangeInput,
+  EnterprisePasswordLoginInput,
+  EnterpriseSessionSnapshot,
+} from '../../shared/enterpriseSession';
+
 export const ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION = 1 as const;
+export const ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION = 1 as const;
+
+export interface ZhiyuanEnterpriseSessionProvider {
+  snapshot(): EnterpriseSessionSnapshot | Promise<EnterpriseSessionSnapshot>;
+  login(input: EnterprisePasswordLoginInput): Promise<EnterpriseSessionSnapshot>;
+  changePassword(input: EnterprisePasswordChangeInput): Promise<EnterpriseSessionSnapshot>;
+  logout(): Promise<EnterpriseSessionSnapshot>;
+}
+
+export interface ZhiyuanEnterpriseSessionHostCapability {
+  readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION;
+  registerProvider(provider: ZhiyuanEnterpriseSessionProvider): () => void;
+}
 
 export const ZhiyuanEnterpriseExtensionStatus = {
   Idle: 'idle',
@@ -19,6 +38,9 @@ export interface ZhiyuanEnterpriseHostContext {
   readonly paths: {
     readonly resources: string;
     readonly userData: string;
+  };
+  readonly capabilities: {
+    readonly session: ZhiyuanEnterpriseSessionHostCapability | null;
   };
 }
 

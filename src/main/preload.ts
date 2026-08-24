@@ -50,6 +50,7 @@ import { MarketplaceIpcChannel } from '../shared/marketplace/constants';
 import type { MarketplaceSearchRequest } from '../shared/marketplace/types';
 import { OllamaIpcChannel } from '../shared/ollama/constants';
 import type { Platform } from '../shared/platform';
+import { EnterpriseSessionIpc } from '../shared/enterpriseSession';
 import type {
   ProviderModelDiscoveryRequest,
   ProviderModelDiscoveryResult,
@@ -271,6 +272,13 @@ contextBridge.exposeInMainWorld('electron', {
 
   enterprise: {
     getConfig: () => ipcRenderer.invoke(EnterpriseIpc.GetConfig),
+    session: {
+      snapshot: () => ipcRenderer.invoke(EnterpriseSessionIpc.Snapshot),
+      login: (input: unknown) => ipcRenderer.invoke(EnterpriseSessionIpc.Login, input),
+      changePassword: (input: unknown) =>
+        ipcRenderer.invoke(EnterpriseSessionIpc.ChangePassword, input),
+      logout: () => ipcRenderer.invoke(EnterpriseSessionIpc.Logout),
+    },
   },
 
   api: {

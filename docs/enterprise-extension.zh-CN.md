@@ -23,3 +23,9 @@ Bundle 导出 `createZhiyuanEnterpriseExtension`。返回对象声明 `apiVersio
 私有仓库负责扩展 bundle、企业测试、发布清单、签名输入和 Electron Builder 覆盖配置，并必须锁定准确的 Zhiyuan tag 与 commit。企业构建不能覆盖 `src/` 文件、不能在打包时修改公开应用源码，也不能依赖未版本化分支。
 
 API v1 有意只开放生命周期和非敏感宿主上下文。认证 IPC、托管模型投影、Skill 收敛和管控事件操作必须作为明确的版本化能力逐步加入，不能直接导入 Renderer 状态或应用私有内部模块。
+
+### 会话能力 v1
+
+API v1 上下文提供可选、独立版本化的 `capabilities.session` 对象。企业扩展可以注册一个密码会话 provider，并必须在退出时注销。社区构建保留相同的固定 Renderer 接口，但未注册 provider 时只返回 `UNAVAILABLE`。
+
+Preload 桥只允许 `snapshot`、`login`、`changePassword` 和 `logout`。主进程会复制并校验有长度边界的输入字段、规范化身份快照、禁止返回任何 token，并在进入 Renderer 前将 provider 异常替换为通用错误。该桥不开放任意扩展方法或任意 IPC channel 名称。
