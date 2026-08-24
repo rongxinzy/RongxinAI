@@ -84,6 +84,201 @@ const reachCritique = (controller: ProductionLoopController) => {
   controller.requestCritique();
 };
 
+const createGenericWorkController = (
+  options: { resolveElevatedRisk?: (runId: string) => boolean } = {},
+) => {
+  const workbench = new WorkbenchTaskRepository(db);
+  const task = workbench.createTask('session', 'Analyze GPU logs', {
+    kind: WorkbenchContractKind.GenericWork,
+    requiresUserAcceptance: true,
+  });
+  const run = workbench.createRun(task.id, WorkbenchRunTrigger.Message);
+  const service = new ProductionLoopService(
+    new ProductionLoopRepository(db),
+    new HarnessMeasurementService(workbench),
+  );
+  const downstream = {
+    goal: 'Analyzed result',
+    requestCompletion: vi.fn(() => 'downstream requested'),
+    onAgentEnd: vi.fn(() => ({ shouldFinish: true, reason: 'downstream passed' })),
+  };
+  return {
+    controller: new ProductionLoopController(
+      service,
+      {
+        taskId: task.id,
+        runId: run.id,
+        workflowKind: WorkbenchContractKind.GenericWork,
+        goal: task.goal,
+        prototypeRequired: false,
+        ...options,
+      },
+      downstream,
+    ),
+    service,
+    downstream,
+  };
+};
+
+test('lightweight generic work skips the reviewer, reaches delivery, and exposes no reviewed artifacts', () => {
+  // Full split coverage lives in 'risk probe consulted at critique time'
+  // (lightweight branch, standard branch, and the probe flip).
+  const { controller } = createGenericWorkController({
+    resolveElevatedRisk: () => false,
+  });
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [{ kind: 'report', description: 'Final report', required: true }],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  for (const item of planned.planItems) {
+    controller.updatePlanItem(item.id, 'completed');
+  }
+  controller.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+  const evidenceRef = controller.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
+  controller.startInspection({
+    artifacts: [{ kind: 'report', reference: 'output/report.md' }],
+    verifiers: [{ name: 'preview', evidenceRef }],
+  });
+
+  const prompt = controller.requestCritique();
+
+  expect(prompt).toContain('skipped');
+  expect(prompt).not.toContain('subagent');
+  const state = controller.getState();
+  expect(state.phase).toBe(ProductionLoopPhase.Deliver);
+  expect(state.status).toBe(ProductionLoopStatus.ReadyToDeliver);
+  expect(state.critic.skipped).toBe(true);
+  expect(state.critic.passed).toBe(false);
+  // A skipped review is not a passed review: artifacts are not projected as
+  // verified...
+  expect(controller.getReviewedArtifacts()).toEqual([]);
+  expect(controller.getSnapshot().criticSkipped).toBe(true);
+  // ...but they are preserved for the completion chain, mapped to pending so
+  // user acceptance can elevate them.
+  expect(controller.getDeliveryArtifacts()).toEqual([
+    { kind: 'report', reference: 'output/report.md' },
+  ]);
+  expect(controller.getReviewOutcome()).toEqual({ passed: false, skipped: true });
+});
+
+test('approved unknown-risk approvals force the full reviewer', () => {
+  // Unknown-classified operations (mcp tools, unclassified shell commands)
+  // must not be treated as low risk: lightweight review is fail-open only
+  // for positively read-only/reversible runs.
+  const { controller } = createGenericWorkController({
+    resolveElevatedRisk: () => true, // approved Unknown approval present
+  });
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  for (const item of planned.planItems) {
+    controller.updatePlanItem(item.id, 'completed');
+  }
+  controller.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+  const evidenceRef = controller.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
+  controller.startInspection({
+    artifacts: [],
+    verifiers: [{ name: 'preview', evidenceRef }],
+  });
+
+  const prompt = controller.requestCritique();
+  expect(prompt).toContain('production-reviewer');
+  expect(prompt).not.toContain('skipped');
+});
+
+test('a missing risk probe fails closed into the full reviewer', () => {
+  const { controller } = createGenericWorkController();
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  for (const item of planned.planItems) {
+    controller.updatePlanItem(item.id, 'completed');
+  }
+  controller.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+  const evidenceRef = controller.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
+  controller.startInspection({
+    artifacts: [],
+    verifiers: [{ name: 'preview', evidenceRef }],
+  });
+
+  const prompt = controller.requestCritique();
+  expect(prompt).toContain('production-reviewer');
+});
+
+test('domain workflows always run the full reviewer', () => {
+  const { controller } = createController();
+  reachCritique(controller);
+  // createController uses Shortcut: requestCritique inside reachCritique
+  // requested the reviewer, so the state is waiting for a critic.
+  expect(controller.getState().phase).toBe(ProductionLoopPhase.Critique);
+  expect(controller.getState().critic.requested).toBe(true);
+});
+
+test('elevated-risk probe consulted at critique time revokes lightweight mode', () => {
+  let risky = false;
+  const { controller } = createGenericWorkController({
+    resolveElevatedRisk: () => risky,
+  });
+  const planned = controller.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  for (const item of planned.planItems) {
+    controller.updatePlanItem(item.id, 'completed');
+  }
+  controller.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+  const evidenceRef = controller.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
+  controller.startInspection({
+    artifacts: [],
+    verifiers: [{ name: 'preview', evidenceRef }],
+  });
+
+  // No risk at critique time: lightweight skip.
+  const lightweightPrompt = controller.requestCritique();
+  expect(lightweightPrompt).toContain('skipped');
+  expect(controller.getState().phase).toBe(ProductionLoopPhase.Deliver);
+
+  // A risk-free run stays lightweight; a risky run is the standard branch.
+  risky = true;
+  const { controller: riskyController } = createGenericWorkController({
+    resolveElevatedRisk: () => risky,
+  });
+  const riskyPlanned = riskyController.commitPlan({
+    items: [{ title: 'Build' }],
+    constraints: [],
+    acceptanceCriteria: ['Preview passes'],
+    expectedArtifacts: [],
+    expectedVerifiers: [{ name: 'preview', deterministic: true }],
+  });
+  for (const item of riskyPlanned.planItems) {
+    riskyController.updatePlanItem(item.id, 'completed');
+  }
+  riskyController.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+  const riskyEvidenceRef =
+    riskyController.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
+  riskyController.startInspection({
+    artifacts: [],
+    verifiers: [{ name: 'preview', evidenceRef: riskyEvidenceRef }],
+  });
+  const fullPrompt = riskyController.requestCritique();
+  expect(fullPrompt).toContain('production-reviewer');
+  expect(fullPrompt).not.toContain('skipped');
+});
+
 test('re-submitting the same plan is idempotent and keeps item IDs stable', () => {
   const { controller } = createController();
   const plan = {

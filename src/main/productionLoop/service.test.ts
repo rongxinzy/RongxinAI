@@ -102,6 +102,34 @@ test('repeated skip_workflow stays a no-op without advancing progressVersion', (
   expect(second.status).toBe(ProductionLoopStatus.Completed);
 });
 
+test('skipCritique moves a critique-phase run to delivery without a reviewer', () => {
+  const { run } = begin();
+  const planned = commitPlan(run.id);
+  for (const item of planned.planItems) {
+    service.updatePlanItem(run.id, item.id, ProductionPlanItemStatus.Completed);
+  }
+  startInspection(run.id);
+  service.requestCritique(run.id);
+  const before = service.getState(run.id);
+  expect(before.phase).toBe(ProductionLoopPhase.Critique);
+
+  const after = service.skipCritique(run.id, 'Lightweight mode');
+
+  expect(after.phase).toBe(ProductionLoopPhase.Deliver);
+  expect(after.status).toBe(ProductionLoopStatus.ReadyToDeliver);
+  expect(after.critic.skipped).toBe(true);
+  // A skipped review is not a passed review.
+  expect(after.critic.passed).toBe(false);
+  expect(after.progressVersion).toBeGreaterThan(before.progressVersion);
+});
+
+test('skipCritique is rejected outside the critique phase', () => {
+  const { run } = begin();
+  commitPlan(run.id);
+  expect(() => service.skipCritique(run.id, 'nope')).toThrow(/not waiting for a critic/);
+  expect(() => service.skipCritique('missing-run', 'nope')).toThrow(/not found/);
+});
+
 const commitPlan = (runId: string) =>
   service.commitPlan(runId, {
     items: [{ title: 'Create artifact' }, { title: 'Run checks' }],
