@@ -1,11 +1,7 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import {
-  ProductionLoopPhase,
-  ProductionLoopStatus,
-  ProductionSkipSource,
-} from '../../shared/productionLoop';
+import { ProductionLoopPhase, ProductionLoopStatus } from '../../shared/productionLoop';
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
@@ -271,7 +267,12 @@ test('elevated-risk probe consulted at critique time revokes lightweight mode', 
   for (const item of riskyPlanned.planItems) {
     riskyController.updatePlanItem(item.id, 'completed');
   }
-  riskyController.recordToolResult('preview-check', 'bash', 'Preview completed successfully.', false);
+  riskyController.recordToolResult(
+    'preview-check',
+    'bash',
+    'Preview completed successfully.',
+    false,
+  );
   const riskyEvidenceRef =
     riskyController.getAvailableVerifierEvidence()[0]?.evidenceRef ?? 'missing';
   riskyController.startInspection({
@@ -398,7 +399,7 @@ test('blocks premature finalization and returns a recovery prompt', () => {
   expect(controller.onAgentEnd({ next: false })).toMatchObject({ shouldFinish: false });
 });
 
-test('defers persistent state until the model records a start or skip decision', () => {
+test('keeps production dormant until the model starts a substantive workflow', () => {
   const workbench = new WorkbenchTaskRepository(db);
   const task = workbench.createTask('session', 'Answer or build', {
     kind: WorkbenchContractKind.GenericWork,
@@ -418,18 +419,16 @@ test('defers persistent state until the model records a start or skip decision',
     deferDecision: true,
   });
 
-  expect(controller.getModelState()).toMatchObject({ decision: 'undecided' });
+  expect(controller.getModelState()).toMatchObject({ productionActive: false });
   expect(service.repository.get(run.id)).toBeNull();
-  expect(controller.buildInitialPrompt()).toContain('Before any other tool call');
-  expect(controller.buildInitialPrompt()).toContain('Final user acceptance is Workbench-owned');
-  expect(controller.onAgentEnd({ next: false })).toMatchObject({ shouldFinish: false });
-  expect(service.repository.get(run.id)).toBeNull();
-
-  controller.skipWorkflow('Direct answer requiring no tools or deliverable');
-  expect(service.repository.get(run.id)).toMatchObject({
-    status: ProductionLoopStatus.Completed,
-    skip: { reason: 'Direct answer requiring no tools or deliverable' },
+  expect(controller.buildInitialPrompt()).toBe('');
+  expect(controller.requestCompletion('answered')).toContain('No production workflow is active');
+  expect(controller.onAgentEnd({ next: false })).toEqual({
+    shouldFinish: true,
+    reason: 'No production workflow was activated.',
   });
+  expect(service.repository.get(run.id)).toBeNull();
+  expect(controller.getSnapshot()).toMatchObject({ productionActive: false, skipped: false });
 });
 
 test('exposes record_prototype as the first action for deferred prototype workflows', () => {
@@ -453,11 +452,11 @@ test('exposes record_prototype as the first action for deferred prototype workfl
   });
 
   expect(controller.getModelState()).toMatchObject({
-    decision: 'undecided',
+    productionActive: false,
     prototypeRequired: true,
-    availableActions: ['record_prototype', 'skip_workflow'],
+    availableActions: ['record_prototype'],
   });
-  expect(controller.buildInitialPrompt()).toContain('start with production_loop record_prototype');
+  expect(controller.buildInitialPrompt()).toBe('');
 });
 
 test('starts deferred production state when the model commits a plan', () => {
@@ -764,28 +763,6 @@ test('skip_workflow lets the agent finish without the completion gate', () => {
   expect(controller.onAgentEnd({ next: false })).toEqual({
     shouldFinish: true,
     reason: 'Pure information request with no work to plan',
-  });
-  expect(downstream.onAgentEnd).not.toHaveBeenCalled();
-});
-
-test('system policy completes a direct turn before the model sees the decision gate', () => {
-  const { controller, downstream } = createController();
-
-  controller.skipWorkflowBySystemPolicy('Direct conversational turn');
-
-  expect(controller.getState()).toMatchObject({
-    status: ProductionLoopStatus.Completed,
-    skip: {
-      reason: 'Direct conversational turn',
-      source: ProductionSkipSource.SystemPolicy,
-    },
-  });
-  expect(controller.buildInitialPrompt()).toContain('Answer directly');
-  expect(controller.buildInitialPrompt()).not.toContain('Production workflow decision');
-  expect(controller.getSnapshot().skipSource).toBe(ProductionSkipSource.SystemPolicy);
-  expect(controller.onAgentEnd({ next: false })).toEqual({
-    shouldFinish: true,
-    reason: 'Direct conversational turn',
   });
   expect(downstream.onAgentEnd).not.toHaveBeenCalled();
 });

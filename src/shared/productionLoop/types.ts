@@ -5,7 +5,6 @@ import type {
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
-  ProductionSkipSource,
 } from './constants';
 
 export interface ProductionPlanItem {
@@ -111,8 +110,6 @@ export interface ProductionRecovery {
 
 export interface ProductionSkip {
   reason: string;
-  /** Missing on production-loop records created before skip sources existed. */
-  source?: ProductionSkipSource;
   createdAt: number;
 }
 

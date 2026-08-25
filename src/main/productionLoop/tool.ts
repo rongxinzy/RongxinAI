@@ -84,7 +84,7 @@ export function buildProductionLoopTool(
     name: ProductionLoopToolName,
     label: 'Production Workflow',
     description:
-      'Decide and control the Work production workflow. Start substantive work with the first action named by get_state (record_prototype when exploration is required, otherwise commit_plan), or use skip_workflow only for a direct answer requiring no tools or deliverable. Active workflows must be inspected, independently reviewed, revised when needed, and delivered only after all gates pass.',
+      'Optional control for substantive Work requests. Do not call this tool for direct conversation or a simple answer; answer those normally. Activate production work with record_prototype when exploration is required, otherwise commit_plan. Once activated, the workflow must be inspected, independently reviewed when required, revised when needed, and delivered only after all gates pass.',
     parameters: {
       type: 'object',
       properties: {
@@ -165,7 +165,8 @@ export function buildProductionLoopTool(
         evidence: { type: 'object' },
         reason: {
           type: 'string',
-          description: 'Required for skip_workflow: why this task needs no production workflow.',
+          description:
+            'Required for skip_workflow. Direct answers do not need this action; end those turns normally.',
         },
         sinceVersion: {
           type: 'number',
@@ -258,10 +259,7 @@ export function buildProductionLoopTool(
             );
           case ProductionLoopAction.SkipWorkflow:
             const skipState = controller.skipWorkflow(String(params.reason || ''));
-            return step(
-              'Production workflow skipped for this task.',
-              skipState,
-            );
+            return step('Production workflow skipped for this task.', skipState);
           case ProductionLoopAction.GetState: {
             const view = stateForModel();
             const sinceVersion =
