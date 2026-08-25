@@ -228,10 +228,12 @@ export function resolveModelEndpoint(
     ...(runtime.detectedCapabilities ?? {}),
     ...explicitUserCapabilities,
   } as { -readonly [K in keyof ModelCapabilities]: ModelCapabilities[K] };
-  if (userSupportsImage !== undefined) {
-    capabilities.imageInput = userSupportsImage
-      ? ModelCapabilityStatus.Supported
-      : ModelCapabilityStatus.Unsupported;
+  // Settings always persists a supportsImage boolean (an unstated
+  // capability derives to false). Only a positively checked toggle is a
+  // verdict here; a derived false must not overwrite an unknown
+  // capability that the resolver preserved.
+  if (userSupportsImage === true) {
+    capabilities.imageInput = ModelCapabilityStatus.Supported;
   }
   const explicitApiKey = options.apiKey ?? providerConfig?.apiKey;
   const contextWindow =

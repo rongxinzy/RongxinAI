@@ -159,6 +159,32 @@ test('explicit unsupported user capability still wins in the endpoint layer', ()
   expect(endpoint.capabilities.toolCalling).toBe(ModelCapabilityStatus.Unsupported);
 });
 
+test('derived supportsImage false preserves an unstated image capability', () => {
+  // Settings always persists supportsImage (unstated -> false). The
+  // endpoint layer must not convert that derived false into an explicit
+  // Unsupported, or the three-state capability selector's unknown state
+  // is lost on reload.
+  const endpoint = resolveModelEndpoint(ProviderName.DeepSeek, 'deepseek-v4-flash-vision-exp', {
+    providerConfig: {
+      apiKey: 'key',
+      baseUrl: 'https://api.deepseek.com',
+      apiFormat: 'openai',
+      models: [
+        {
+          id: 'deepseek-v4-flash-vision-exp',
+          name: 'DeepSeek V4 Flash Vision Exp',
+          supportsImage: false,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ],
+    },
+  });
+
+  expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Unknown);
+});
+
 test('runtime context never exceeds trained context', () => {
   expect(clampRuntimeContextWindow(32_000, 16_000)).toBe(16_000);
   expect(clampRuntimeContextWindow(8_000, 16_000)).toBe(8_000);

@@ -195,14 +195,17 @@ describe('ProviderRegistry', () => {
         },
       ).imageInput,
     ).toBe(ModelCapabilityStatus.Supported);
-    // Without the toggle, an unregistered model stays conservatively
-    // Unknown (no supportsImage signal to resolve against).
+    // Without the toggle, the unstated imageInput stays conservatively
+    // Unknown. Settings always writes a supportsImage boolean (Unknown
+    // derives to false), so the real stored shape must not degrade an
+    // unstated capability into an explicit "unsupported".
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.DeepSeek,
         'deepseek-v4-flash-vision-exp',
         ApiFormat.OpenAI,
         {
+          supportsImage: false,
           capabilities: {
             imageInput: ModelCapabilityStatus.Unknown,
           },

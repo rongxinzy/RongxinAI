@@ -1476,9 +1476,12 @@ class ProviderRegistryImpl {
     );
     // Same residue rule as toolCalling: an explicit configured
     // supported/unsupported is user intent and wins; "unknown" is the
-    // default residue of the capability form and must fall through to the
-    // supportsImage-based resolution so the image toggle actually takes
-    // effect.
+    // default residue of the capability form and must fall through.
+    // Falling through lands on the toggle only when it is positively
+    // checked — Settings always writes a supportsImage boolean, so a
+    // derived false must not turn an unstated "unknown" into
+    // "unsupported" (it would lose the three-state capability selector's
+    // unknown state on reload).
     const declaredImageCapability =
       (providerModel?.capabilities?.imageInput === ModelCapabilityStatus.Supported ||
       providerModel?.capabilities?.imageInput === ModelCapabilityStatus.Unsupported
@@ -1490,11 +1493,13 @@ class ProviderRegistryImpl {
         : undefined);
     const imageCapability =
       declaredImageCapability ??
-      (isCatalogModel || configured?.supportsImage !== undefined
-        ? imageSupport
-          ? ModelCapabilityStatus.Supported
-          : ModelCapabilityStatus.Unsupported
-        : ModelCapabilityStatus.Unknown);
+      (configured?.supportsImage === true
+        ? ModelCapabilityStatus.Supported
+        : isCatalogModel
+          ? imageSupport
+            ? ModelCapabilityStatus.Supported
+            : ModelCapabilityStatus.Unsupported
+          : ModelCapabilityStatus.Unknown);
     return {
       ...UNKNOWN_MODEL_CAPABILITIES,
       ...catalogCapabilities,
