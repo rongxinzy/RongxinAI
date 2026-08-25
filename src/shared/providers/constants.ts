@@ -1495,8 +1495,25 @@ class ProviderRegistryImpl {
         (endpointToolCalling === ModelCapabilityStatus.Unsupported
           ? ModelCapabilityStatus.Unsupported
           : undefined) ??
-        configuredCapabilities?.toolCalling ??
-        (isCatalogModel && hasVerifiedCatalogToolCalling ? endpointToolCalling : undefined) ??
+        // An explicit configured supported/unsupported is user intent and
+        // wins. An explicit "unknown" is not a verdict — it is the default
+        // residue of the capability form (DEFAULT_CUSTOM_MODEL_CAPABILITIES),
+        // so it must not short-circuit the endpoint declaration below.
+        (configuredCapabilities?.toolCalling === ModelCapabilityStatus.Supported ||
+        configuredCapabilities?.toolCalling === ModelCapabilityStatus.Unsupported
+          ? configuredCapabilities.toolCalling
+          : undefined) ??
+        // Catalog models keep their evidence requirement — an endpoint
+        // accepting `tools` does not prove every model can emit tool calls.
+        // User-added models outside the catalog have no catalog evidence at
+        // all, so the endpoint declaration is the only reasonable default
+        // (this restores the pre-#314 behavior: unknown user models trusted
+        // the endpoint).
+        (isCatalogModel
+          ? hasVerifiedCatalogToolCalling
+            ? endpointToolCalling
+            : undefined
+          : endpointToolCalling) ??
         ModelCapabilityStatus.Unknown,
     };
   }

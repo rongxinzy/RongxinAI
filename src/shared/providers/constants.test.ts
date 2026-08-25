@@ -151,7 +151,8 @@ describe('ProviderRegistry', () => {
         'unregistered-openai-compatible-model',
         ApiFormat.OpenAI,
       ).toolCalling,
-    ).toBe(ModelCapabilityStatus.Unknown);
+    ).toBe(ModelCapabilityStatus.Supported);
+    // An explicit configured "unsupported" is user intent and still wins.
     expect(
       ProviderRegistry.resolveModelCapabilities(
         ProviderName.OpenAI,
@@ -162,6 +163,31 @@ describe('ProviderRegistry', () => {
         },
       ).toolCalling,
     ).toBe(ModelCapabilityStatus.Unsupported);
+    // A configured "unknown" is the default residue of the capability form,
+    // not a verdict: it must not short-circuit the endpoint declaration.
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          supportsImage: true,
+          capabilities: {
+            toolCalling: ModelCapabilityStatus.Unknown,
+            imageInput: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Supported);
+    // Providers without an endpoint tool declaration keep failing closed
+    // (llamacpp/Ollama/custom rely on runtime probing instead).
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.LlamaCpp,
+        'unlisted-local-model',
+        ApiFormat.OpenAI,
+      ).toolCalling,
+    ).toBe(ModelCapabilityStatus.Unknown);
     for (const provider of [ProviderName.Zhipu, ProviderName.Volcengine]) {
       const capability = ProviderRegistry.resolveModelCapabilities(
         provider,
