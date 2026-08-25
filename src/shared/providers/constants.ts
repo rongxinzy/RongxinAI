@@ -1474,15 +1474,36 @@ class ProviderRegistryImpl {
       modelId,
       configured?.supportsImage,
     );
+    // Same residue rule as toolCalling: an explicit configured
+    // supported/unsupported is user intent and wins; "unknown" is the
+    // default residue of the capability form and must fall through.
+    // Falling through lands on the toggle only when it is positively
+    // checked — Settings always writes a supportsImage boolean, so a
+    // derived false must not turn an unstated "unknown" into
+    // "unsupported" (it would lose the three-state capability selector's
+    // unknown state on reload).
     const declaredImageCapability =
-      providerModel?.capabilities?.imageInput ?? configuredCapabilities?.imageInput;
+      (providerModel?.capabilities?.imageInput === ModelCapabilityStatus.Supported ||
+      providerModel?.capabilities?.imageInput === ModelCapabilityStatus.Unsupported
+        ? providerModel?.capabilities?.imageInput
+        : undefined) ??
+      (configuredCapabilities?.imageInput === ModelCapabilityStatus.Supported ||
+      configuredCapabilities?.imageInput === ModelCapabilityStatus.Unsupported
+        ? configuredCapabilities?.imageInput
+        : undefined);
     const imageCapability =
       declaredImageCapability ??
-      (isCatalogModel || configured?.supportsImage !== undefined
-        ? imageSupport
+      (isCatalogModel
+        ? // Catalog declarations are authoritative even against a stale
+          // configured toggle (resolveModelSupportsImage repairs known
+          // provider metadata); only user-added models fall back to the
+          // positively checked toggle.
+          imageSupport
           ? ModelCapabilityStatus.Supported
           : ModelCapabilityStatus.Unsupported
-        : ModelCapabilityStatus.Unknown);
+        : configured?.supportsImage === true
+          ? ModelCapabilityStatus.Supported
+          : ModelCapabilityStatus.Unknown);
     return {
       ...UNKNOWN_MODEL_CAPABILITIES,
       ...catalogCapabilities,
