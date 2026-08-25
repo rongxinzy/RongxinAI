@@ -17,6 +17,7 @@ export function createContentSecurityPolicy(options: ContentSecurityPolicyOption
     "media-src 'self'",
     "worker-src 'self' blob:",
     "frame-src 'self' file: zhiyuan-enterprise-ui:",
+    "form-action 'none'",
   ];
 
   return directives.join('; ');
