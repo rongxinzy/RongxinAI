@@ -85,7 +85,7 @@ export function EnterpriseRendererFrame({
       ref={iframeRef}
       src={src}
       title={title}
-      sandbox="allow-scripts"
+      sandbox="allow-forms allow-scripts"
       className={cn('border-0 bg-background', className)}
     />
   );

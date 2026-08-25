@@ -7,6 +7,7 @@ describe('content security policy', () => {
     const policy = createContentSecurityPolicy({ isDev: false });
 
     expect(policy).toContain("frame-src 'self' file: zhiyuan-enterprise-ui:");
+    expect(policy).toContain("form-action 'none'");
     expect(policy).not.toContain('frame-src *');
   });
 

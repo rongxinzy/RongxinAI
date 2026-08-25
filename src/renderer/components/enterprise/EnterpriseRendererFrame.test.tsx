@@ -57,7 +57,7 @@ describe('EnterpriseRendererFrame', () => {
       }),
     );
 
-    expect(frame).toHaveAttribute('sandbox', 'allow-scripts');
+    expect(frame).toHaveAttribute('sandbox', 'allow-forms allow-scripts');
     expect(postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         source: EnterpriseRendererMessageSource.Host,
