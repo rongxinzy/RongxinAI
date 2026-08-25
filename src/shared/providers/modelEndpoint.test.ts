@@ -111,6 +111,54 @@ test('explicit metadata wins over runtime and registry values', () => {
   expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Unsupported);
 });
 
+test('configured unknown residue does not clobber the resolved capability', () => {
+  // The capability form writes all six keys as unknown by default. A
+  // user-added model outside the catalog (deepseek-v4-flash-vision-exp)
+  // resolves to endpoint-supported; re-expanding the raw unknown entries
+  // must not overwrite that verdict.
+  const endpoint = resolveModelEndpoint(ProviderName.DeepSeek, 'deepseek-v4-flash-vision-exp', {
+    providerConfig: {
+      apiKey: 'key',
+      baseUrl: 'https://api.deepseek.com',
+      apiFormat: 'openai',
+      models: [
+        {
+          id: 'deepseek-v4-flash-vision-exp',
+          name: 'DeepSeek V4 Flash Vision Exp',
+          supportsImage: true,
+          capabilities: {
+            toolCalling: ModelCapabilityStatus.Unknown,
+            imageInput: ModelCapabilityStatus.Unknown,
+            reasoning: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ],
+    },
+  });
+
+  expect(endpoint.capabilities.toolCalling).toBe(ModelCapabilityStatus.Supported);
+  expect(endpoint.capabilities.imageInput).toBe(ModelCapabilityStatus.Supported);
+});
+
+test('explicit unsupported user capability still wins in the endpoint layer', () => {
+  const endpoint = resolveModelEndpoint(ProviderName.DeepSeek, 'deepseek-v4-flash-vision-exp', {
+    providerConfig: {
+      apiKey: 'key',
+      baseUrl: 'https://api.deepseek.com',
+      apiFormat: 'openai',
+      models: [
+        {
+          id: 'deepseek-v4-flash-vision-exp',
+          name: 'DeepSeek V4 Flash Vision Exp',
+          capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+        },
+      ],
+    },
+  });
+
+  expect(endpoint.capabilities.toolCalling).toBe(ModelCapabilityStatus.Unsupported);
+});
+
 test('runtime context never exceeds trained context', () => {
   expect(clampRuntimeContextWindow(32_000, 16_000)).toBe(16_000);
   expect(clampRuntimeContextWindow(8_000, 16_000)).toBe(8_000);
