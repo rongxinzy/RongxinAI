@@ -57,7 +57,7 @@ describe('EnterpriseSessionGate', () => {
     );
 
     const frame = await screen.findByTitle('Zhiyuan');
-    expect(frame).toHaveAttribute('sandbox', 'allow-scripts');
+    expect(frame).toHaveAttribute('sandbox', 'allow-forms allow-scripts');
     expect(frame).toHaveAttribute('src', 'zhiyuan-enterprise-ui://renderer/index.html');
     expect(screen.queryByText('application')).not.toBeInTheDocument();
   });
