@@ -21,6 +21,7 @@ import {
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
+import { ProductionSkipSource } from '../../../shared/productionLoop';
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
@@ -778,13 +779,30 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
-      adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
 
       try {
         await adapter.startSession('adaptive-gate', '你好', {
           sessionMode: 'work',
           workspaceRoot: createTemporaryWorkspace(),
         });
+
+        const greetingPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
+        expect(greetingPrompt).toContain('Answer directly');
+        expect(greetingPrompt).not.toContain('## Production workflow decision');
+        const greetingRunId = service.getCurrent('adaptive-gate')?.runs[0]?.id;
+        expect(greetingRunId).toBeDefined();
+        expect(service.productionLoop.getState(greetingRunId!).skip?.source).toBe(
+          ProductionSkipSource.SystemPolicy,
+        );
+        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
+          type: string;
+        }) => void;
+        listener({ type: 'agent_end' });
+        await Promise.resolve();
+        expect(mockSession.prompt).toHaveBeenCalledOnce();
+
         await adapter.continueSession('adaptive-gate', '修复登录流程中的刷新问题', {
           sessionMode: 'work',
         });

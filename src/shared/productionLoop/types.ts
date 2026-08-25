@@ -5,6 +5,7 @@ import type {
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
+  ProductionSkipSource,
 } from './constants';
 
 export interface ProductionPlanItem {
@@ -89,8 +90,8 @@ export interface ProductionCriticState {
   execution: ProductionCriticExecution | null;
   /**
    * True when the critique phase was bypassed by lightweight review mode.
-   * passed stays true so reviewed-artifact projection keeps working; the
-   * flag preserves the distinction for audit.
+   * passed stays false so skipped review cannot be mistaken for approval;
+   * the flag preserves the distinction for audit.
    */
   skipped?: boolean;
 }
@@ -110,6 +111,8 @@ export interface ProductionRecovery {
 
 export interface ProductionSkip {
   reason: string;
+  /** Missing on production-loop records created before skip sources existed. */
+  source?: ProductionSkipSource;
   createdAt: number;
 }
 

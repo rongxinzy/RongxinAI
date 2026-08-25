@@ -8,6 +8,7 @@ import {
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
+  ProductionSkipSource,
   type ProductionAvailableVerifierEvidence,
   type ProductionCriticFinding,
   type ProductionCriticExecution,
@@ -691,7 +692,11 @@ export class ProductionLoopService {
    * is marked completed so the agent may end the turn without a completion
    * gate; deterministic verification still applies on run completion.
    */
-  skipWorkflow(runId: string, reason: string): ProductionLoopState {
+  skipWorkflow(
+    runId: string,
+    reason: string,
+    source: ProductionSkipSource = ProductionSkipSource.Model,
+  ): ProductionLoopState {
     // allowAfterSkip: the internal skip guard below is the idempotency — a
     // repeated skip must stay a successful no-op (and not advance
     // progressVersion), not become an error behind the generic guard.
@@ -704,13 +709,13 @@ export class ProductionLoopService {
         }
         const normalized = reason.trim();
         if (!normalized) throw new Error('A skip reason is required.');
-        state.skip = { reason: normalized, createdAt: Date.now() };
+        state.skip = { reason: normalized, source, createdAt: Date.now() };
         state.status = ProductionLoopStatus.Completed;
         state.progressVersion += 1;
         this.measurement.recordActivation(runId, {
           activation: HarnessActivationType.WorkflowSkipped,
           mechanism: 'production_loop',
-          evidence: { reason: normalized },
+          evidence: { reason: normalized, source },
         });
       },
       { allowAfterSkip: true },

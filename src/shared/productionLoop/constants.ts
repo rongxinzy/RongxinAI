@@ -64,6 +64,12 @@ export const ProductionLoopAction = {
 } as const;
 export type ProductionLoopAction = (typeof ProductionLoopAction)[keyof typeof ProductionLoopAction];
 
+export const ProductionSkipSource = {
+  Model: 'model',
+  SystemPolicy: 'system_policy',
+} as const;
+export type ProductionSkipSource = (typeof ProductionSkipSource)[keyof typeof ProductionSkipSource];
+
 export const ProductionLoopToolName = 'production_loop';
 
 /** Stop automatic continuation after repeated turns make no production progress. */
