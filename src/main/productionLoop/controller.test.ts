@@ -1,7 +1,11 @@
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
-import { ProductionLoopPhase, ProductionLoopStatus } from '../../shared/productionLoop';
+import {
+  ProductionLoopPhase,
+  ProductionLoopStatus,
+  ProductionSkipSource,
+} from '../../shared/productionLoop';
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
@@ -760,6 +764,28 @@ test('skip_workflow lets the agent finish without the completion gate', () => {
   expect(controller.onAgentEnd({ next: false })).toEqual({
     shouldFinish: true,
     reason: 'Pure information request with no work to plan',
+  });
+  expect(downstream.onAgentEnd).not.toHaveBeenCalled();
+});
+
+test('system policy completes a direct turn before the model sees the decision gate', () => {
+  const { controller, downstream } = createController();
+
+  controller.skipWorkflowBySystemPolicy('Direct conversational turn');
+
+  expect(controller.getState()).toMatchObject({
+    status: ProductionLoopStatus.Completed,
+    skip: {
+      reason: 'Direct conversational turn',
+      source: ProductionSkipSource.SystemPolicy,
+    },
+  });
+  expect(controller.buildInitialPrompt()).toContain('Answer directly');
+  expect(controller.buildInitialPrompt()).not.toContain('Production workflow decision');
+  expect(controller.getSnapshot().skipSource).toBe(ProductionSkipSource.SystemPolicy);
+  expect(controller.onAgentEnd({ next: false })).toEqual({
+    shouldFinish: true,
+    reason: 'Direct conversational turn',
   });
   expect(downstream.onAgentEnd).not.toHaveBeenCalled();
 });

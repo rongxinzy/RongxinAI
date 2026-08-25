@@ -3,6 +3,7 @@ import {
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
+  ProductionSkipSource,
   type ProductionArtifactEvidence,
   type ProductionLoopState,
 } from '../../shared/productionLoop';
@@ -237,6 +238,9 @@ export class ProductionLoopController {
   buildInitialPrompt(): string {
     this.refreshIfStarted();
     if (!this.state) return this.buildDecisionPrompt();
+    if (this.state.skip?.source === ProductionSkipSource.SystemPolicy) {
+      return 'Production control is already complete for this direct conversational turn. Answer directly without calling production_loop or agent_loop.';
+    }
     const phaseInstruction = (() => {
       if (this.state.phase === ProductionLoopPhase.Explore) {
         return 'Begin by creating a concrete prototype or materially distinct direction, then record it with production_loop record_prototype.';
@@ -421,6 +425,16 @@ export class ProductionLoopController {
     return this.update(this.service.skipWorkflow(state.runId, reason));
   }
 
+  skipWorkflowBySystemPolicy(reason: string): ProductionLoopState {
+    if (this.initial.skipAllowed === false) {
+      throw new Error('This run requires the production workflow and cannot be skipped.');
+    }
+    const state = this.activate();
+    return this.update(
+      this.service.skipWorkflow(state.runId, reason, ProductionSkipSource.SystemPolicy),
+    );
+  }
+
   requestCompletion(reason: string): string {
     this.refreshIfStarted();
     if (!this.state) {
@@ -576,6 +590,7 @@ export class ProductionLoopController {
       phase: this.state.phase,
       status: this.state.status,
       skipped: Boolean(this.state.skip),
+      skipSource: this.state.skip ? (this.state.skip.source ?? ProductionSkipSource.Model) : null,
       // Distinguishes "reviewer passed" from "reviewer skipped (lightweight)"
       // for the completion verification chain and audit UIs.
       criticSkipped: this.state.critic.skipped === true,
