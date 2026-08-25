@@ -226,6 +226,26 @@ describe('ProviderRegistry', () => {
         },
       ).imageInput,
     ).toBe(ModelCapabilityStatus.Unsupported);
+    // Catalog declarations stay authoritative against a stale configured
+    // toggle: a non-vision catalog model must not be upgraded to
+    // Supported by an old supportsImage: true (deepseek-reasoner and
+    // qwen3-coder-plus are explicitly non-vision in the catalog).
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-reasoner',
+        ApiFormat.OpenAI,
+        { supportsImage: true },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unsupported);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Qwen,
+        'qwen3-coder-plus',
+        ApiFormat.OpenAI,
+        { supportsImage: true },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unsupported);
     // Providers without an endpoint tool declaration keep failing closed
     // (llamacpp/Ollama/custom rely on runtime probing instead).
     expect(

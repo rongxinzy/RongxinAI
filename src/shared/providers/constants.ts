@@ -1493,12 +1493,16 @@ class ProviderRegistryImpl {
         : undefined);
     const imageCapability =
       declaredImageCapability ??
-      (configured?.supportsImage === true
-        ? ModelCapabilityStatus.Supported
-        : isCatalogModel
-          ? imageSupport
-            ? ModelCapabilityStatus.Supported
-            : ModelCapabilityStatus.Unsupported
+      (isCatalogModel
+        ? // Catalog declarations are authoritative even against a stale
+          // configured toggle (resolveModelSupportsImage repairs known
+          // provider metadata); only user-added models fall back to the
+          // positively checked toggle.
+          imageSupport
+          ? ModelCapabilityStatus.Supported
+          : ModelCapabilityStatus.Unsupported
+        : configured?.supportsImage === true
+          ? ModelCapabilityStatus.Supported
           : ModelCapabilityStatus.Unknown);
     return {
       ...UNKNOWN_MODEL_CAPABILITIES,
