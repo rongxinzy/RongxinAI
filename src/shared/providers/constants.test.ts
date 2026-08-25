@@ -179,6 +179,50 @@ describe('ProviderRegistry', () => {
         },
       ).toolCalling,
     ).toBe(ModelCapabilityStatus.Supported);
+    // Same residue rule for imageInput: the image toggle (supportsImage)
+    // must take effect despite the configured unknown residue, so the
+    // renderer store resolves the model as vision-capable.
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          supportsImage: true,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Supported);
+    // Without the toggle, an unregistered model stays conservatively
+    // Unknown (no supportsImage signal to resolve against).
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    // An explicit configured unsupported imageInput still wins.
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          supportsImage: true,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unsupported,
+          },
+        },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unsupported);
     // Providers without an endpoint tool declaration keep failing closed
     // (llamacpp/Ollama/custom rely on runtime probing instead).
     expect(
