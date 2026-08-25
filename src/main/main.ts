@@ -189,6 +189,7 @@ import {
   probeCoworkModelReadiness,
 } from './libs/coworkUtil';
 import { resolveBundledNpmRuntime, NpmCli } from './libs/npmRuntime';
+import { createContentSecurityPolicy } from './contentSecurityPolicy';
 import { refreshEndpointsTestMode } from './libs/endpoints';
 import { resolveEnterpriseConfigPath, syncEnterpriseConfig } from './libs/enterpriseConfigSync';
 import {
@@ -6215,26 +6216,13 @@ if (!gotTheLock) {
         return;
       }
 
-      const devPort = process.env.ELECTRON_START_URL?.match(/:(\d+)/)?.[1] || '5175';
-      const cspDirectives = [
-        "default-src 'self'",
-        isDev
-          ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:${devPort} ws://localhost:${devPort}`
-          : "script-src 'self' 'unsafe-eval'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https: http: localfile:",
-        // 允许连接到所有域名，不做限制
-        'connect-src *',
-        "font-src 'self' data:",
-        "media-src 'self'",
-        "worker-src 'self' blob:",
-        "frame-src 'self' file:",
-      ];
-
       callback({
         responseHeaders: {
           ...details.responseHeaders,
-          'Content-Security-Policy': cspDirectives.join('; '),
+          'Content-Security-Policy': createContentSecurityPolicy({
+            isDev,
+            electronStartUrl: process.env.ELECTRON_START_URL,
+          }),
         },
       });
     });
