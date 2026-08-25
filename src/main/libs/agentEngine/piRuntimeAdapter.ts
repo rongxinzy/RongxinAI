@@ -83,6 +83,7 @@ import type {
   WorkbenchApprovalRequestedEvent,
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
+import { externalModelBridge } from '../../enterpriseExtension/externalModelBridge';
 import { composeWorkbenchWorkflowSnapshot } from '../../workbenchTask/workflowSnapshot';
 import { ProductionLoopController } from '../../productionLoop/controller';
 import { shouldExposeProductionControls } from '../../productionLoop/entryPolicy';
@@ -238,6 +239,7 @@ interface ActivePiSession {
   model: Record<string, unknown>;
   modelRuntime: PiModelRuntime | null;
   modelRequestOptions?: { apiKey?: string };
+  externalModelRef?: string;
   capabilities: ModelCapabilities;
   harnessModelProfile: HarnessModelProfileInput;
   /** System prompt requested by the current Cowork session snapshot. */
@@ -375,6 +377,7 @@ type PiResolvedModel = {
   requestOptions?: {
     apiKey?: string;
   };
+  externalModelRef?: string;
 };
 
 function preparePiPrompt(
@@ -1054,6 +1057,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         model: resolvedModel.model,
         modelRuntime: resolvedModel.modelRuntime,
         modelRequestOptions: resolvedModel.requestOptions,
+        externalModelRef: resolvedModel.externalModelRef,
         capabilities: {
           toolCalling: ModelCapabilityStatus.Unknown,
           imageInput: ModelCapabilityStatus.Unknown,
@@ -1232,6 +1236,37 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? CoworkSessionMode.Chat
         : CoworkSessionMode.Work);
     const nextGoalMode = options.goalMode ?? active.goalMode;
+    if (active.externalModelRef) {
+      const refreshedModel = await externalModelBridge.resolveModelRef(active.externalModelRef);
+      if (!refreshedModel) {
+        throw new Error(`External model ${active.externalModelRef} is unavailable.`);
+      }
+      const connectionChanged =
+        active.model.provider !== refreshedModel.provider.id ||
+        active.model.id !== refreshedModel.connection.modelId ||
+        normalizePiBaseUrl(active.model.baseUrl) !==
+          normalizePiBaseUrl(refreshedModel.connection.baseUrl);
+      if (connectionChanged) {
+        const history = this.store?.getSession(sessionId)?.messages ?? [];
+        this.disposeSessionForRecreation(sessionId, active);
+        return this.startSession(sessionId, prompt, {
+          ...options,
+          sessionMode: requestedSessionMode,
+          systemPrompt: requestedSystemPrompt ?? active.requestedSystemPrompt,
+          skillIds: requestedSkillIds,
+          expertIds: requestedExpertIds,
+          workspaceRoot: options.workspaceRoot ?? active.workspaceRoot,
+          modelOverride: active.externalModelRef,
+          goalMode: nextGoalMode,
+          _piPromptOverride: buildPiConversationPrompt(history, prompt),
+        });
+      }
+      await active.modelRuntime?.setRuntimeApiKey(
+        refreshedModel.provider.id,
+        refreshedModel.connection.apiKey,
+      );
+      active.modelRequestOptions = { apiKey: refreshedModel.connection.apiKey };
+    }
     const productionControlsAvailable = shouldExposeProductionControls({
       sessionMode: requestedSessionMode,
       prompt,
@@ -3510,9 +3545,29 @@ async function resolvePiModel(
   existingModelRuntime?: PiModelRuntime | null,
 ): Promise<PiResolvedModel> {
   const normalizedModelRef = modelRef?.trim() || '';
-  const resolution = normalizedModelRef
-    ? resolveRawApiConfigForModelRef(normalizedModelRef)
-    : resolveRawApiConfig();
+  const externalModel = normalizedModelRef
+    ? await externalModelBridge.resolveModelRef(normalizedModelRef)
+    : null;
+  const resolution: ApiConfigResolution = externalModel
+    ? {
+        config: {
+          apiKey: externalModel.connection.apiKey,
+          baseURL: externalModel.connection.baseUrl,
+          model: externalModel.connection.modelId,
+          apiType: 'openai',
+        },
+        providerMetadata: {
+          providerName: externalModel.provider.id,
+          codingPlanEnabled: false,
+          supportsImage: externalModel.capabilities?.imageInput === ModelCapabilityStatus.Supported,
+          modelName: externalModel.displayName,
+          contextWindow: externalModel.contextWindow,
+          capabilities: externalModel.capabilities,
+        },
+      }
+    : normalizedModelRef
+      ? resolveRawApiConfigForModelRef(normalizedModelRef)
+      : resolveRawApiConfig();
 
   if (!resolution.config || !resolution.providerMetadata) {
     throw new Error(resolution.error || 'Pi model configuration is unavailable.');
@@ -3549,6 +3604,7 @@ async function resolvePiModel(
     providerName: resolution.providerMetadata.providerName,
     capabilities: resolution.endpoint?.capabilities ?? resolution.providerMetadata.capabilities,
     requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
+    externalModelRef: externalModel ? normalizedModelRef : undefined,
   };
 }
 

@@ -21,6 +21,7 @@ import {
   DialogIpc,
   DingTalkInstallIpc,
   EnterpriseIpc,
+  ExternalModelIpc,
   FeishuInstallIpc,
   GitHubCopilotIpc,
   HardwareIpc,
@@ -290,6 +291,14 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.invoke(EnterpriseSessionIpc.ChangePassword, input),
       logout: () => ipcRenderer.invoke(EnterpriseSessionIpc.Logout),
     },
+  },
+
+  externalModels: {
+    list: () =>
+      ipcRenderer.invoke(ExternalModelIpc.List) as Promise<
+        readonly import('../shared/externalModels').ExternalModel[]
+      >,
+    onChanged: (callback: () => void) => onPushVoid(ExternalModelIpc.Changed, callback),
   },
 
   api: {
