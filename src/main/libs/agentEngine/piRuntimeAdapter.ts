@@ -85,7 +85,10 @@ import type {
 } from '../../workbenchTask/taskService';
 import { composeWorkbenchWorkflowSnapshot } from '../../workbenchTask/workflowSnapshot';
 import { ProductionLoopController } from '../../productionLoop/controller';
-import { shouldEnableProductionWorkflow } from '../../productionLoop/entryPolicy';
+import {
+  shouldAutoSkipDirectConversation,
+  shouldEnableProductionWorkflow,
+} from '../../productionLoop/entryPolicy';
 import { buildProductionLoopTool } from '../../productionLoop/tool';
 import {
   type ApiConfigResolution,
@@ -714,6 +717,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         goalMode: options.goalMode,
         inheritedProductionWorkflow: options._productionWorkflowEnabled,
       });
+      const autoSkipDirectConversation =
+        productionWorkflowEnabled &&
+        shouldAutoSkipDirectConversation({
+          sessionMode: options.sessionMode,
+          prompt,
+          goalMode: options.goalMode,
+          inheritedProductionWorkflow: options._productionWorkflowEnabled,
+          skillIds: resourceState.skillIds,
+          expertIds,
+          attachmentCount:
+            (options.imageAttachments?.length ?? 0) + (options.fileAttachments?.length ?? 0),
+        });
       const workbenchContract = this.createWorkbenchContract(
         options.sessionMode,
         resourceState.skillIds,
@@ -1017,6 +1032,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               completionWorkflow || undefined,
             )
           : null;
+      if (productionLoop && autoSkipDirectConversation) {
+        productionLoop.skipWorkflowBySystemPolicy(
+          'Direct conversational turn matched the system fast path.',
+        );
+      }
       if (productionLoop) customTools.push(buildProductionLoopTool(productionLoop));
       const shouldRunGoalLoop =
         options.goalMode === true && options.sessionMode === CoworkSessionMode.Work;
@@ -1238,6 +1258,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       goalMode: nextGoalMode,
       inheritedProductionWorkflow: options._productionWorkflowEnabled,
     });
+    const autoSkipDirectConversation =
+      productionWorkflowEnabled &&
+      shouldAutoSkipDirectConversation({
+        sessionMode: requestedSessionMode,
+        prompt,
+        goalMode: nextGoalMode,
+        inheritedProductionWorkflow: options._productionWorkflowEnabled,
+        skillIds: requestedSkillIds,
+        expertIds: requestedExpertIds,
+        attachmentCount:
+          (options.imageAttachments?.length ?? 0) + (options.fileAttachments?.length ?? 0),
+      });
     const productionWorkflowTopologyChanged =
       productionWorkflowEnabled !== active.productionWorkflowEnabled;
     const mcpToolTopologyChanged =
@@ -1353,6 +1385,11 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           deferDecision: nextGoalMode !== true && options._productionWorkflowEnabled === undefined,
           skipAllowed: nextGoalMode !== true,
         });
+        if (autoSkipDirectConversation) {
+          active.productionLoop?.skipWorkflowBySystemPolicy(
+            'Direct conversational turn matched the system fast path.',
+          );
+        }
       }
     }
 
