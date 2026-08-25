@@ -85,10 +85,7 @@ import type {
 } from '../../workbenchTask/taskService';
 import { composeWorkbenchWorkflowSnapshot } from '../../workbenchTask/workflowSnapshot';
 import { ProductionLoopController } from '../../productionLoop/controller';
-import {
-  shouldAutoSkipDirectConversation,
-  shouldEnableProductionWorkflow,
-} from '../../productionLoop/entryPolicy';
+import { shouldExposeProductionControls } from '../../productionLoop/entryPolicy';
 import { buildProductionLoopTool } from '../../productionLoop/tool';
 import {
   type ApiConfigResolution,
@@ -284,7 +281,7 @@ interface ActivePiSession {
   shortcutWorkflow: PiShortcutWorkflowController | null;
   productionLoop: ProductionLoopController | null;
   /** Whether the current turn owns durable completion and production gates. */
-  productionWorkflowEnabled: boolean;
+  productionControlsAvailable: boolean;
   /** Whether this Work session was explicitly started in Goal mode. */
   goalMode: boolean;
   writeTokenLimitRecovery: PiWriteTokenLimitRecovery;
@@ -711,28 +708,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const shortcutKindForContract = isAcademicResearchSkillSet(resourceState.skillIds)
         ? null
         : resolveShortcutWorkflowKind(resourceState.skillIds);
-      const productionWorkflowEnabled = shouldEnableProductionWorkflow({
+      const productionControlsAvailable = shouldExposeProductionControls({
         sessionMode: options.sessionMode,
         prompt,
         goalMode: options.goalMode,
-        inheritedProductionWorkflow: options._productionWorkflowEnabled,
+        inheritedProductionRequired: options._productionWorkflowRequired,
       });
-      const autoSkipDirectConversation =
-        productionWorkflowEnabled &&
-        shouldAutoSkipDirectConversation({
-          sessionMode: options.sessionMode,
-          prompt,
-          goalMode: options.goalMode,
-          inheritedProductionWorkflow: options._productionWorkflowEnabled,
-          skillIds: resourceState.skillIds,
-          expertIds,
-          attachmentCount:
-            (options.imageAttachments?.length ?? 0) + (options.fileAttachments?.length ?? 0),
-        });
       const workbenchContract = this.createWorkbenchContract(
         options.sessionMode,
         resourceState.skillIds,
-        productionWorkflowEnabled,
+        productionControlsAvailable,
       );
       if (this.workbenchTaskService) {
         const workbench = this.workbenchTaskService.beginRun({
@@ -890,7 +875,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // It owns durable state and completion gates for the lifetime of this
       // session (and reloads the same state directory after a session restart).
       const researchRun =
-        productionWorkflowEnabled && isAcademicResearchSkillSet(resourceState.skillIds)
+        productionControlsAvailable && isAcademicResearchSkillSet(resourceState.skillIds)
           ? new PiResearchRunController({
               sessionId,
               workspaceRoot,
@@ -904,7 +889,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
       const shortcutKind = researchRun ? null : shortcutKindForContract;
       const shortcutWorkflow =
-        shortcutKind && productionWorkflowEnabled
+        shortcutKind && productionControlsAvailable
           ? new PiShortcutWorkflowController({
               sessionId,
               workspaceRoot,
@@ -962,7 +947,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workspaceRoot,
         webSearchSkillPath:
           researchRun ||
-          (productionWorkflowEnabled && shortcutKind === ShortcutWorkflowKind.DeepResearch)
+          (productionControlsAvailable && shortcutKind === ShortcutWorkflowKind.DeepResearch)
             ? path.join(getSkillsRoot(), 'web-search')
             : undefined,
         createPiResourceLoader: (
@@ -999,7 +984,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // loops; the controller continues the session on agent_end.
       const completionWorkflow = researchRun || shortcutWorkflow;
       const productionLoop =
-        productionWorkflowEnabled &&
+        productionControlsAvailable &&
         workbenchTaskId &&
         workbenchRunId &&
         this.workbenchTaskService?.productionLoop
@@ -1012,7 +997,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                 goal: workbenchTaskGoal,
                 prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
                 deferDecision:
-                  options.goalMode !== true && options._productionWorkflowEnabled === undefined,
+                  options.goalMode !== true && options._productionWorkflowRequired !== true,
                 skipAllowed: options.goalMode !== true,
                 // System-side risk probe: an approved approval whose risk was
                 // classified as irreversible OR unknown (e.g. mcp tools,
@@ -1032,11 +1017,6 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               completionWorkflow || undefined,
             )
           : null;
-      if (productionLoop && autoSkipDirectConversation) {
-        productionLoop.skipWorkflowBySystemPolicy(
-          'Direct conversational turn matched the system fast path.',
-        );
-      }
       if (productionLoop) customTools.push(buildProductionLoopTool(productionLoop));
       const shouldRunGoalLoop =
         options.goalMode === true && options.sessionMode === CoworkSessionMode.Work;
@@ -1116,7 +1096,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         researchRun,
         shortcutWorkflow,
         productionLoop,
-        productionWorkflowEnabled,
+        productionControlsAvailable,
         goalMode: options.goalMode === true,
         writeTokenLimitRecovery: new PiWriteTokenLimitRecovery(resolvedModel.maxOutputTokens),
         pendingError: null,
@@ -1252,26 +1232,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? CoworkSessionMode.Chat
         : CoworkSessionMode.Work);
     const nextGoalMode = options.goalMode ?? active.goalMode;
-    const productionWorkflowEnabled = shouldEnableProductionWorkflow({
+    const productionControlsAvailable = shouldExposeProductionControls({
       sessionMode: requestedSessionMode,
       prompt,
       goalMode: nextGoalMode,
-      inheritedProductionWorkflow: options._productionWorkflowEnabled,
+      inheritedProductionRequired: options._productionWorkflowRequired,
     });
-    const autoSkipDirectConversation =
-      productionWorkflowEnabled &&
-      shouldAutoSkipDirectConversation({
-        sessionMode: requestedSessionMode,
-        prompt,
-        goalMode: nextGoalMode,
-        inheritedProductionWorkflow: options._productionWorkflowEnabled,
-        skillIds: requestedSkillIds,
-        expertIds: requestedExpertIds,
-        attachmentCount:
-          (options.imageAttachments?.length ?? 0) + (options.fileAttachments?.length ?? 0),
-      });
     const productionWorkflowTopologyChanged =
-      productionWorkflowEnabled !== active.productionWorkflowEnabled;
+      productionControlsAvailable !== active.productionControlsAvailable;
     const mcpToolTopologyChanged =
       active.mcpToolManifestGeneration !== this.mcpToolManifestGeneration;
     if (
@@ -1349,7 +1317,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       const workbenchContract = this.createWorkbenchContract(
         requestedSessionMode,
         requestedSkillIds,
-        productionWorkflowEnabled,
+        productionControlsAvailable,
       );
       const workbench = this.workbenchTaskService.beginRun({
         sessionId,
@@ -1375,21 +1343,16 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workspaceRoot: active.workspaceRoot,
         skillIds: requestedSkillIds ?? [],
       });
-      if (productionWorkflowEnabled && workbench.task?.id) {
+      if (productionControlsAvailable && workbench.task?.id) {
         active.productionLoop?.startRun({
           taskId: workbench.task.id,
           runId: workbench.run.id,
           workflowKind: workbenchContract.kind,
           goal: workbench.task.goal,
           prototypeRequired: workbenchContract.metadata?.requiresPrototype === true,
-          deferDecision: nextGoalMode !== true && options._productionWorkflowEnabled === undefined,
+          deferDecision: nextGoalMode !== true && options._productionWorkflowRequired !== true,
           skipAllowed: nextGoalMode !== true,
         });
-        if (autoSkipDirectConversation) {
-          active.productionLoop?.skipWorkflowBySystemPolicy(
-            'Direct conversational turn matched the system fast path.',
-          );
-        }
       }
     }
 
@@ -1448,10 +1411,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
 
     let nextPrompt = prompt;
-    const domainCompletionWorkflow = active.productionWorkflowEnabled
+    const domainCompletionWorkflow = active.productionControlsAvailable
       ? active.researchRun || active.shortcutWorkflow
       : null;
-    const completionWorkflow = active.productionWorkflowEnabled
+    const completionWorkflow = active.productionControlsAvailable
       ? active.productionLoop || domainCompletionWorkflow
       : null;
     if (options.goalMode !== undefined && !completionWorkflow) {
@@ -1479,7 +1442,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         nextPrompt = `${loopPrompt}\n\n${nextPrompt}`;
       }
     }
-    if (active.productionLoop && productionWorkflowEnabled) {
+    if (active.productionLoop && productionControlsAvailable) {
       nextPrompt = prependProductionWorkflowPrompt(
         nextPrompt,
         active.productionLoop.buildInitialPrompt(),
@@ -2565,7 +2528,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               : null;
           const workflowSnapshot = composeWorkbenchWorkflowSnapshot({
             production:
-              active.productionWorkflowEnabled && active.productionLoop
+              active.productionControlsAvailable && active.productionLoop
                 ? active.productionLoop.getSnapshot()
                 : null,
             domain: domainWorkflowSnapshot,
@@ -2574,24 +2537,22 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           // outcome: a reviewer pass marks them Verified, a lightweight skip
           // leaves them Pending so user acceptance can elevate them
           // (markArtifactsVerified on accept).
-          const deliveryArtifacts = active.productionLoop
-            ?.getDeliveryArtifacts()
-            .map(artifact => ({
-              path: artifact.reference,
-              kind: artifact.kind,
-              role: artifact.kind,
-              source: WorkbenchArtifactCandidateSource.ProductionInspection,
-              verificationStatus: active.productionLoop?.getReviewOutcome().skipped
-                ? WorkbenchArtifactVerificationStatus.Pending
-                : WorkbenchArtifactVerificationStatus.Verified,
-            }));
+          const deliveryArtifacts = active.productionLoop?.getDeliveryArtifacts().map(artifact => ({
+            path: artifact.reference,
+            kind: artifact.kind,
+            role: artifact.kind,
+            source: WorkbenchArtifactCandidateSource.ProductionInspection,
+            verificationStatus: active.productionLoop?.getReviewOutcome().skipped
+              ? WorkbenchArtifactVerificationStatus.Pending
+              : WorkbenchArtifactVerificationStatus.Verified,
+          }));
           this.workbenchTaskService.completeRun({
             sessionId,
             runId: active.workbenchRunId,
             workspaceRoot: active.workspaceRoot,
             finalAnswer: active.lastCompletedAnswerText,
             finalMessageId: active.lastCompletedAnswerMessageId,
-            workflowCompleted: active.productionWorkflowEnabled
+            workflowCompleted: active.productionControlsAvailable
               ? active.agentLoop.getState().done
               : undefined,
             workflowSnapshot,
@@ -3317,27 +3278,29 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
   private createWorkbenchContract(
     sessionMode: PiStartOptions['sessionMode'],
     skillIds: string[] | undefined,
-    managedWorkflow = true,
+    productionControlsAvailable = true,
   ): WorkbenchTaskContract {
-    const research = managedWorkflow && isAcademicResearchSkillSet(skillIds);
+    const research = productionControlsAvailable && isAcademicResearchSkillSet(skillIds);
     const shortcut = research ? null : resolveShortcutWorkflowKind(skillIds);
     const kind =
       sessionMode === 'chat'
         ? WorkbenchContractKind.Chat
         : research
           ? WorkbenchContractKind.Research
-          : managedWorkflow && shortcut
+          : productionControlsAvailable && shortcut
             ? WorkbenchContractKind.Shortcut
             : WorkbenchContractKind.GenericWork;
     return {
       kind,
-      // Generic work without the production workflow (simple questions, trivial
-      // requests) is gated by the baseline checks alone and never needs manual
-      // acceptance. The production workflow owns the acceptance gate instead.
+      // Generic Work keeps production controls available. Verification uses
+      // the controller snapshot to distinguish a dormant direct answer from
+      // an activated production run; only the latter owns the acceptance gate.
       requiresUserAcceptance:
-        sessionMode !== 'chat' && kind === WorkbenchContractKind.GenericWork && managedWorkflow,
+        sessionMode !== 'chat' &&
+        kind === WorkbenchContractKind.GenericWork &&
+        productionControlsAvailable,
       metadata: {
-        productionWorkflowEnabled: managedWorkflow,
+        productionControlsAvailable,
         ...(skillIds?.length ? { skillIds } : {}),
       },
     };

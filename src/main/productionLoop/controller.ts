@@ -1,21 +1,15 @@
 import {
+  ProductionLoopAction,
   ProductionLoopPhase,
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
-  ProductionSkipSource,
   type ProductionArtifactEvidence,
   type ProductionLoopState,
 } from '../../shared/productionLoop';
-import {
-  WorkbenchContractKind,
-  type WorkbenchJsonObject,
-} from '../../shared/workbenchTask';
+import { WorkbenchContractKind, type WorkbenchJsonObject } from '../../shared/workbenchTask';
 import type { PiAgentLoopEndSignal } from '../libs/agentEngine/piAgentLoop';
-import {
-  PiAgentLoopAction,
-  PiAgentLoopToolName,
-} from '../libs/agentEngine/piAgentLoop';
+import { PiAgentLoopAction, PiAgentLoopToolName } from '../libs/agentEngine/piAgentLoop';
 import {
   PiSubagentProfileId,
   PiSubagentTerminationReason,
@@ -130,7 +124,6 @@ const samePlan = (
 export class ProductionLoopController {
   private state: ProductionLoopState | null;
   private initial: ProductionLoopRunInput;
-  private decisionMissCount = 0;
 
   constructor(
     private readonly service: ProductionLoopService,
@@ -149,7 +142,7 @@ export class ProductionLoopController {
   getState(): ProductionLoopState {
     this.refreshIfStarted();
     if (!this.state) {
-      throw new Error('The production workflow decision is still pending.');
+      throw new Error('The production workflow is not active.');
     }
     return structuredClone(this.state);
   }
@@ -166,21 +159,19 @@ export class ProductionLoopController {
     this.refreshIfStarted();
     if (!this.state) {
       return {
-        decision: 'undecided',
+        productionActive: false,
         goal: this.initial.goal,
         prototypeRequired: this.initial.prototypeRequired,
-        skipAllowed: this.initial.skipAllowed !== false,
-        availableActions:
-          this.initial.skipAllowed === false
-            ? [this.initial.prototypeRequired ? 'record_prototype' : 'commit_plan']
-            : [
-                this.initial.prototypeRequired ? 'record_prototype' : 'commit_plan',
-                'skip_workflow',
-              ],
+        availableActions: [
+          this.initial.prototypeRequired
+            ? ProductionLoopAction.RecordPrototype
+            : ProductionLoopAction.CommitPlan,
+        ],
       };
     }
     const state = this.state;
     const view: Record<string, unknown> = {
+      productionActive: true,
       phase: state.phase,
       status: state.status,
       progressVersion: state.progressVersion,
@@ -220,7 +211,7 @@ export class ProductionLoopController {
 
   getStaleCount(): number {
     this.refreshIfStarted();
-    return this.state?.staleCount ?? this.decisionMissCount;
+    return this.state?.staleCount ?? 0;
   }
 
   getAvailableVerifierEvidence() {
@@ -231,16 +222,12 @@ export class ProductionLoopController {
   startRun(input: ProductionLoopRunInput): void {
     this.downstream?.resumeForPrompt?.(input.goal);
     this.initial = input;
-    this.decisionMissCount = 0;
     this.state = input.deferDecision ? null : this.service.beginRun(input);
   }
 
   buildInitialPrompt(): string {
     this.refreshIfStarted();
-    if (!this.state) return this.buildDecisionPrompt();
-    if (this.state.skip?.source === ProductionSkipSource.SystemPolicy) {
-      return 'Production control is already complete for this direct conversational turn. Answer directly without calling production_loop or agent_loop.';
-    }
+    if (!this.state) return '';
     const phaseInstruction = (() => {
       if (this.state.phase === ProductionLoopPhase.Explore) {
         return 'Begin by creating a concrete prototype or materially distinct direction, then record it with production_loop record_prototype.';
@@ -263,24 +250,6 @@ export class ProductionLoopController {
       'A reviewer PASS does not replace artifact verification or the completion contract.',
       'When findings exist, revise the work, record_revision, inspect again, and request another critique.',
       'Call agent_loop done only after the production loop reports ready_to_deliver.',
-      'Final user acceptance is Workbench-owned. Never use AskUserQuestion or another model-initiated question as a final acceptance gate.',
-    ].join('\n');
-  }
-
-  private buildDecisionPrompt(): string {
-    return [
-      '## Production workflow decision',
-      'Before any other tool call, decide whether this Work request needs the production workflow.',
-      'Start it when the request needs external evidence, a domain Skill, multiple steps, an artifact, modification, validation, review, or another substantive deliverable.',
-      this.initial.prototypeRequired
-        ? 'This workflow requires exploration: start with production_loop record_prototype, then commit_plan after selecting a direction.'
-        : 'Start the workflow with production_loop commit_plan.',
-      'An expert SOP is the domain method, not a reason to bypass production control. Map the applicable expert phases into the production plan.',
-      'Do not skip merely because the request is short. When uncertain, start the workflow.',
-      this.initial.skipAllowed === false
-        ? 'This run requires the production workflow. Commit the plan; skip_workflow is not allowed.'
-        : 'Only direct conversation or a simple answer requiring no tools or deliverable may call production_loop skip_workflow with a concrete reason, then answer directly.',
-      'Do not answer the user until this decision has been recorded.',
       'Final user acceptance is Workbench-owned. Never use AskUserQuestion or another model-initiated question as a final acceptance gate.',
     ].join('\n');
   }
@@ -313,7 +282,11 @@ export class ProductionLoopController {
     // item IDs the model already holds valid, without advancing
     // progressVersion, so the stale-progress detector still catches
     // models that spin on re-commits.
-    if (this.state && this.state.phase === ProductionLoopPhase.Execute && samePlan(this.state, input)) {
+    if (
+      this.state &&
+      this.state.phase === ProductionLoopPhase.Execute &&
+      samePlan(this.state, input)
+    ) {
       return this.getState();
     }
     const state = this.activate();
@@ -425,21 +398,10 @@ export class ProductionLoopController {
     return this.update(this.service.skipWorkflow(state.runId, reason));
   }
 
-  skipWorkflowBySystemPolicy(reason: string): ProductionLoopState {
-    if (this.initial.skipAllowed === false) {
-      throw new Error('This run requires the production workflow and cannot be skipped.');
-    }
-    const state = this.activate();
-    return this.update(
-      this.service.skipWorkflow(state.runId, reason, ProductionSkipSource.SystemPolicy),
-    );
-  }
-
   requestCompletion(reason: string): string {
     this.refreshIfStarted();
     if (!this.state) {
-      this.decisionMissCount += 1;
-      return 'Completion blocked: decide whether to commit_plan or skip_workflow before answering.';
+      return 'No production workflow is active. End the turn normally.';
     }
     if (this.state.skip) {
       return this.downstream
@@ -469,14 +431,9 @@ export class ProductionLoopController {
   } {
     this.refreshIfStarted();
     if (!this.state) {
-      this.decisionMissCount += 1;
       return {
-        shouldFinish: false,
-        nextPrompt: [
-          '## Production workflow decision required',
-          'The previous turn ended without choosing commit_plan or skip_workflow.',
-          this.buildDecisionPrompt(),
-        ].join('\n'),
+        shouldFinish: true,
+        reason: 'No production workflow was activated.',
       };
     }
     if (this.state.skip) {
@@ -579,7 +536,7 @@ export class ProductionLoopController {
     this.refreshIfStarted();
     if (!this.state) {
       return {
-        decision: 'undecided',
+        productionActive: false,
         skipped: false,
         planItems: [],
         inspections: 0,
@@ -589,8 +546,8 @@ export class ProductionLoopController {
     return {
       phase: this.state.phase,
       status: this.state.status,
+      productionActive: true,
       skipped: Boolean(this.state.skip),
-      skipSource: this.state.skip ? (this.state.skip.source ?? ProductionSkipSource.Model) : null,
       // Distinguishes "reviewer passed" from "reviewer skipped (lightweight)"
       // for the completion verification chain and audit UIs.
       criticSkipped: this.state.critic.skipped === true,
@@ -640,7 +597,6 @@ export class ProductionLoopController {
   private activate(): ProductionLoopState {
     if (!this.state) {
       this.state = this.service.beginRun(this.initial);
-      this.decisionMissCount = 0;
     } else {
       this.refreshIfStarted();
     }
@@ -650,7 +606,7 @@ export class ProductionLoopController {
   private requireState(): ProductionLoopState {
     this.refreshIfStarted();
     if (!this.state) {
-      throw new Error('Choose commit_plan or skip_workflow before using this production action.');
+      throw new Error('Start production with commit_plan or record_prototype before this action.');
     }
     return this.state;
   }

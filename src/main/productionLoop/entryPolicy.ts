@@ -2,92 +2,37 @@ import {
   CoworkSessionMode,
   type CoworkSessionMode as CoworkSessionModeValue,
 } from '../../shared/cowork/constants';
+import type { ProductionLoopState } from '../../shared/productionLoop';
+import { WorkbenchContractKind } from '../../shared/workbenchTask';
 
 export interface ProductionWorkflowEntryInput {
   sessionMode?: CoworkSessionModeValue;
   prompt: string;
   goalMode?: boolean;
-  inheritedProductionWorkflow?: boolean;
+  inheritedProductionRequired?: boolean;
 }
-
-export interface DirectConversationFastPathInput extends ProductionWorkflowEntryInput {
-  skillIds?: readonly string[];
-  expertIds?: readonly string[];
-  attachmentCount?: number;
-}
-
-const DIRECT_CONVERSATION_PHRASES = new Set([
-  '你好',
-  '您好',
-  '哈喽',
-  '哈啰',
-  '嗨',
-  '早上好',
-  '上午好',
-  '中午好',
-  '下午好',
-  '晚上好',
-  '谢谢',
-  '多谢',
-  '感谢',
-  '好',
-  '好的',
-  '行',
-  '可以',
-  '收到',
-  '明白',
-  '明白了',
-  '知道了',
-  '了解',
-  '没问题',
-  '再见',
-  '拜拜',
-  '回见',
-  'hi',
-  'hello',
-  'hey',
-  'thanks',
-  'thank you',
-  'thx',
-  'ok',
-  'okay',
-  'got it',
-  'sounds good',
-  'bye',
-  'goodbye',
-  'see you',
-]);
-
-const normalizeDirectConversation = (prompt: string): string =>
-  prompt
-    .trim()
-    .replace(/\s+/g, ' ')
-    .replace(/[!.\s,~。！、，～]+$/u, '')
-    .toLowerCase();
 
 /**
- * Strict system-owned fast path for turns that cannot contain substantive
- * work. Full-string matching is intentional: prefixed instructions such as
- * "你好，删除这个文件" must continue through the model decision gate.
+ * This gate controls production tool topology, not per-turn activation. New
+ * Work turns keep the controls available in a dormant state; the model starts
+ * the workflow only when the request is substantive. Chat stays tool-free and
+ * resume activation is resolved separately from the owning task's state.
  */
-export const shouldAutoSkipDirectConversation = (
-  input: DirectConversationFastPathInput,
-): boolean => {
+export const shouldExposeProductionControls = (input: ProductionWorkflowEntryInput): boolean => {
   if (input.sessionMode === CoworkSessionMode.Chat) return false;
-  if (input.goalMode || input.inheritedProductionWorkflow !== undefined) return false;
-  if (input.skillIds?.length || input.expertIds?.length || input.attachmentCount) return false;
-  return DIRECT_CONVERSATION_PHRASES.has(normalizeDirectConversation(input.prompt));
+  return true;
 };
 
-/**
- * This gate only resolves deterministic runtime state and keeps the production
- * tool topology stable for Work sessions. The separate direct-conversation
- * fast path may persist a system-owned skip without disabling these tools.
- */
-export const shouldEnableProductionWorkflow = (input: ProductionWorkflowEntryInput): boolean => {
-  if (input.sessionMode === CoworkSessionMode.Chat) return false;
-  if (input.inheritedProductionWorkflow !== undefined) {
-    return input.inheritedProductionWorkflow;
+export const shouldRequireProductionOnResume = (
+  workflowKind: WorkbenchContractKind,
+  previousProduction: Pick<ProductionLoopState, 'skip'> | null,
+): boolean => {
+  if (
+    workflowKind === WorkbenchContractKind.Research ||
+    workflowKind === WorkbenchContractKind.Shortcut
+  ) {
+    return true;
   }
-  return true;
+  if (workflowKind !== WorkbenchContractKind.GenericWork) return false;
+  return Boolean(previousProduction && !previousProduction.skip);
 };
