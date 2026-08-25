@@ -200,6 +200,10 @@ import {
   ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
   zhiyuanEnterpriseRendererBridge,
 } from './enterpriseExtension/rendererBridge';
+import {
+  allowEnterpriseRendererOpaqueOrigin,
+  ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES,
+} from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
@@ -277,7 +281,7 @@ app.setName(APP_NAME);
 protocol.registerSchemesAsPrivileged([
   {
     scheme: ZHIYUAN_ENTERPRISE_RENDERER_SCHEME,
-    privileges: { standard: true, secure: true, supportFetchAPI: true },
+    privileges: ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES,
   },
 ]);
 
@@ -6641,11 +6645,11 @@ if (!gotTheLock) {
     profiler.measure('app.whenReady');
     console.log('[Main] initApp: app is ready');
 
-    protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, request => {
+    protocol.handle(ZHIYUAN_ENTERPRISE_RENDERER_SCHEME, async request => {
       const assetPath = zhiyuanEnterpriseRendererBridge.resolveAsset(request.url);
-      return assetPath
-        ? net.fetch(pathToFileURL(assetPath).toString())
-        : Promise.resolve(new Response(null, { status: 404 }));
+      if (!assetPath) return new Response(null, { status: 404 });
+      const response = await net.fetch(pathToFileURL(assetPath).toString());
+      return allowEnterpriseRendererOpaqueOrigin(response);
     });
 
     const enterpriseExtension = await initializeZhiyuanEnterpriseExtension({
