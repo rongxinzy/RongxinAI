@@ -1218,6 +1218,10 @@ interface IElectronAPI {
       logout: () => Promise<EnterpriseSessionResult>;
     };
   };
+  externalModels: {
+    list: () => Promise<readonly import('../../shared/externalModels').ExternalModel[]>;
+    onChanged: (callback: () => void) => () => void;
+  };
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
   };
