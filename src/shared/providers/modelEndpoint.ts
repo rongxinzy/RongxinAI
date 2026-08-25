@@ -211,11 +211,22 @@ export function resolveModelEndpoint(
           ...(userModel?.capabilities ? { capabilities: userModel.capabilities } : {}),
         },
   );
+  // Re-expanding the raw user capabilities would let the configured
+  // "unknown" residue (DEFAULT_CUSTOM_MODEL_CAPABILITIES) clobber the
+  // resolver's verdict. Only explicit supported/unsupported is user intent
+  // and wins here; unknown entries fall through to the resolved value.
+  const explicitUserCapabilities = userModel?.capabilities
+    ? Object.fromEntries(
+        Object.entries(userModel.capabilities).filter(
+          ([, value]) => value !== ModelCapabilityStatus.Unknown,
+        ),
+      )
+    : {};
   const capabilities = {
     ...UNKNOWN_CAPABILITIES,
     ...catalogCapabilities,
     ...(runtime.detectedCapabilities ?? {}),
-    ...(userModel?.capabilities ?? {}),
+    ...explicitUserCapabilities,
   } as { -readonly [K in keyof ModelCapabilities]: ModelCapabilities[K] };
   if (userSupportsImage !== undefined) {
     capabilities.imageInput = userSupportsImage
