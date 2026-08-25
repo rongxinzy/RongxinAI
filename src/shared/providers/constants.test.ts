@@ -179,6 +179,73 @@ describe('ProviderRegistry', () => {
         },
       ).toolCalling,
     ).toBe(ModelCapabilityStatus.Supported);
+    // Same residue rule for imageInput: the image toggle (supportsImage)
+    // must take effect despite the configured unknown residue, so the
+    // renderer store resolves the model as vision-capable.
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          supportsImage: true,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Supported);
+    // Without the toggle, the unstated imageInput stays conservatively
+    // Unknown. Settings always writes a supportsImage boolean (Unknown
+    // derives to false), so the real stored shape must not degrade an
+    // unstated capability into an explicit "unsupported".
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          supportsImage: false,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unknown,
+          },
+        },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unknown);
+    // An explicit configured unsupported imageInput still wins.
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-v4-flash-vision-exp',
+        ApiFormat.OpenAI,
+        {
+          supportsImage: true,
+          capabilities: {
+            imageInput: ModelCapabilityStatus.Unsupported,
+          },
+        },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unsupported);
+    // Catalog declarations stay authoritative against a stale configured
+    // toggle: a non-vision catalog model must not be upgraded to
+    // Supported by an old supportsImage: true (deepseek-reasoner and
+    // qwen3-coder-plus are explicitly non-vision in the catalog).
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.DeepSeek,
+        'deepseek-reasoner',
+        ApiFormat.OpenAI,
+        { supportsImage: true },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unsupported);
+    expect(
+      ProviderRegistry.resolveModelCapabilities(
+        ProviderName.Qwen,
+        'qwen3-coder-plus',
+        ApiFormat.OpenAI,
+        { supportsImage: true },
+      ).imageInput,
+    ).toBe(ModelCapabilityStatus.Unsupported);
     // Providers without an endpoint tool declaration keep failing closed
     // (llamacpp/Ollama/custom rely on runtime probing instead).
     expect(
