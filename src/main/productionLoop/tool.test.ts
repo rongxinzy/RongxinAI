@@ -46,6 +46,15 @@ const createTool = () => {
   return { controller, tool };
 };
 
+test('describes production as opt-in for substantive Work', () => {
+  const { tool } = createTool();
+  const description = (tool as unknown as { description: string }).description;
+
+  expect(description).toContain('Optional control for substantive Work requests');
+  expect(description).toContain('Do not call this tool for direct conversation');
+  expect(description).toContain('Activate production work with');
+});
+
 test('publishes concrete nested schemas for model-generated plans', () => {
   const { tool } = createTool();
   const parameters = (

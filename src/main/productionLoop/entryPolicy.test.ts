@@ -1,23 +1,24 @@
 import { expect, test } from 'vitest';
 
 import { CoworkSessionMode } from '../../shared/cowork/constants';
-import { shouldAutoSkipDirectConversation, shouldEnableProductionWorkflow } from './entryPolicy';
+import { WorkbenchContractKind } from '../../shared/workbenchTask';
+import { shouldExposeProductionControls, shouldRequireProductionOnResume } from './entryPolicy';
 
 const workRequest = (prompt: string) => ({ sessionMode: CoworkSessionMode.Work, prompt });
 
-test('offers the model a production workflow decision for every new Work turn', () => {
-  expect(shouldEnableProductionWorkflow(workRequest('你好'))).toBe(true);
-  expect(shouldEnableProductionWorkflow(workRequest('为什么天空是蓝色的？'))).toBe(true);
-  expect(shouldEnableProductionWorkflow(workRequest('预测一下五粮液走向'))).toBe(true);
-  expect(shouldEnableProductionWorkflow(workRequest('Create and validate a release report'))).toBe(
+test('keeps production controls available for every new Work turn', () => {
+  expect(shouldExposeProductionControls(workRequest('你好'))).toBe(true);
+  expect(shouldExposeProductionControls(workRequest('为什么天空是蓝色的？'))).toBe(true);
+  expect(shouldExposeProductionControls(workRequest('预测一下五粮液走向'))).toBe(true);
+  expect(shouldExposeProductionControls(workRequest('Create and validate a release report'))).toBe(
     true,
   );
-  expect(shouldEnableProductionWorkflow({ prompt: 'Handle the request' })).toBe(true);
+  expect(shouldExposeProductionControls({ prompt: 'Handle the request' })).toBe(true);
 });
 
 test('keeps Chat mode outside the production workflow', () => {
   expect(
-    shouldEnableProductionWorkflow({
+    shouldExposeProductionControls({
       sessionMode: CoworkSessionMode.Chat,
       prompt: 'Create and validate a release report',
       goalMode: true,
@@ -25,19 +26,19 @@ test('keeps Chat mode outside the production workflow', () => {
   ).toBe(false);
 });
 
-test('uses the owning task policy for explicit resume and retry operations', () => {
+test('keeps controls available while carrying resume activation separately', () => {
   expect(
-    shouldEnableProductionWorkflow({
+    shouldExposeProductionControls({
       ...workRequest('Continue'),
-      inheritedProductionWorkflow: true,
+      inheritedProductionRequired: true,
     }),
   ).toBe(true);
   expect(
-    shouldEnableProductionWorkflow({
+    shouldExposeProductionControls({
       ...workRequest('Continue'),
-      inheritedProductionWorkflow: false,
+      inheritedProductionRequired: false,
     }),
-  ).toBe(false);
+  ).toBe(true);
 });
 
 test('does not classify natural-language intent or incidental resources', () => {
@@ -48,46 +49,26 @@ test('does not classify natural-language intent or incidental resources', () => 
     imageAttachmentCount: 1,
     resumeRun: true,
   };
-  expect(shouldEnableProductionWorkflow(incidentalContext)).toBe(true);
+  expect(shouldExposeProductionControls(incidentalContext)).toBe(true);
   expect(
-    shouldEnableProductionWorkflow({
+    shouldExposeProductionControls({
       ...incidentalContext,
       prompt: 'Read package.json',
     }),
   ).toBe(true);
 });
 
-test.each(['哈喽', '你好！', '您好', '谢谢', '收到', 'hello', 'got it'])(
-  'auto-skips an exact direct-conversation turn: %s',
-  prompt => {
-    expect(shouldAutoSkipDirectConversation(workRequest(prompt))).toBe(true);
-  },
-);
-
-test.each(['你好，删除这个文件', '谢谢，继续执行', '为什么天空是蓝色的？', '可以？'])(
-  'keeps ambiguous or substantive text in the model decision path: %s',
-  prompt => {
-    expect(shouldAutoSkipDirectConversation(workRequest(prompt))).toBe(false);
-  },
-);
-
-test('disables the direct-conversation fast path when runtime context may carry work', () => {
-  const greeting = workRequest('你好');
-  expect(
-    shouldAutoSkipDirectConversation({ ...greeting, sessionMode: CoworkSessionMode.Chat }),
-  ).toBe(false);
-  expect(shouldAutoSkipDirectConversation({ ...greeting, goalMode: true })).toBe(false);
-  expect(shouldAutoSkipDirectConversation({ ...greeting, inheritedProductionWorkflow: true })).toBe(
-    false,
+test('resumes only production that was previously activated or domain-controlled', () => {
+  expect(shouldRequireProductionOnResume(WorkbenchContractKind.GenericWork, null)).toBe(false);
+  expect(shouldRequireProductionOnResume(WorkbenchContractKind.GenericWork, { skip: null })).toBe(
+    true,
   );
   expect(
-    shouldAutoSkipDirectConversation({ ...greeting, inheritedProductionWorkflow: false }),
+    shouldRequireProductionOnResume(WorkbenchContractKind.GenericWork, {
+      skip: { reason: 'Direct answer', createdAt: 1 },
+    }),
   ).toBe(false);
-  expect(shouldAutoSkipDirectConversation({ ...greeting, skillIds: ['report'] })).toBe(false);
-  expect(shouldAutoSkipDirectConversation({ ...greeting, expertIds: ['reviewer'] })).toBe(false);
-  expect(shouldAutoSkipDirectConversation({ ...greeting, attachmentCount: 1 })).toBe(false);
-});
-
-test('treats an omitted session mode as Work, matching the production entry policy', () => {
-  expect(shouldAutoSkipDirectConversation({ prompt: 'Hello!' })).toBe(true);
+  expect(shouldRequireProductionOnResume(WorkbenchContractKind.Research, null)).toBe(true);
+  expect(shouldRequireProductionOnResume(WorkbenchContractKind.Shortcut, null)).toBe(true);
+  expect(shouldRequireProductionOnResume(WorkbenchContractKind.Chat, null)).toBe(false);
 });

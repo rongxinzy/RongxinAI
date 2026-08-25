@@ -88,6 +88,25 @@ export function verifyWorkbenchRun(
     };
   }
 
+  // Production controls are available to every Work turn, but a simple answer
+  // may finish without activating them. In that dormant state the baseline is
+  // the complete contract; activation changes this snapshot to true and makes
+  // the production controller enforce its full lifecycle before agent_end.
+  if (context.workflowSnapshot?.productionActive === false) {
+    return {
+      outcome: WorkbenchVerificationOutcome.Passed,
+      checks: [
+        {
+          name: 'production_not_activated',
+          status: WorkbenchVerificationCheckStatus.Passed,
+        },
+        ...baselineChecks,
+      ],
+      evidence: [context.workflowSnapshot],
+      summary: 'The response passed baseline checks without activating production control.',
+    };
+  }
+
   // The production workflow was declared unnecessary (skip_workflow): the
   // baseline checks already passed, so there is nothing left to accept.
   if (context.workflowSnapshot?.skipped === true) {

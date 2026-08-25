@@ -158,6 +158,7 @@ import {
 import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
+import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
@@ -6793,6 +6794,8 @@ if (!gotTheLock) {
         const amendment = resumeInput?.amendment?.trim() ?? '';
         const prompt =
           amendment || 'Continue the current task from its persisted state and verify the result.';
+        const previousProduction =
+          getWorkbenchTaskService().productionLoop.repository.getLatestForTask(task.id, run.id);
         await getPiRuntimeAdapter().continueSession(session.id, prompt, {
           systemPrompt: session.systemPrompt,
           skillIds: resumeInput?.skillIds ?? session.activeSkillIds,
@@ -6809,7 +6812,10 @@ if (!gotTheLock) {
           imageAttachments: resumeInput?.imageAttachments,
           fileAttachments: resumeInput?.fileAttachments,
           _workbenchRunId: run.id,
-          _productionWorkflowEnabled: task.contract.metadata?.productionWorkflowEnabled === true,
+          _productionWorkflowRequired: shouldRequireProductionOnResume(
+            task.contract.kind,
+            previousProduction,
+          ),
           _skipUserMessage: !amendment,
         });
       },

@@ -21,7 +21,7 @@ import {
 } from '../../../shared/providers';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
-import { ProductionSkipSource } from '../../../shared/productionLoop';
+import { ProductionLoopAction } from '../../../shared/productionLoop';
 import {
   WorkbenchContractKind,
   WorkbenchRunTrigger,
@@ -438,7 +438,8 @@ describe('PiRuntimeAdapter', () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
-      adapter.setWorkbenchTaskService(new RealWorkbenchTaskService(db));
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
       const onPermissionRequest = vi.fn();
       const onComplete = vi.fn();
       adapter.on('permissionRequest', onPermissionRequest);
@@ -456,8 +457,11 @@ describe('PiRuntimeAdapter', () => {
         );
 
         expect(mockSession.prompt).toHaveBeenCalledWith(
-          expect.stringContaining('## Production workflow decision'),
+          expect.not.stringContaining('## Production workflow decision'),
         );
+        expect(
+          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
+        ).toEqual({ count: 0 });
 
         const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
           customTools: Array<{
@@ -470,9 +474,24 @@ describe('PiRuntimeAdapter', () => {
         };
         const toolNames = sessionOptions.customTools.map(tool => tool.name);
         const loopTool = sessionOptions.customTools.find(tool => tool.name === 'agent_loop');
+        const productionTool = sessionOptions.customTools.find(
+          tool => tool.name === 'production_loop',
+        );
         expect(toolNames).toContain('production_loop');
         expect(toolNames).toContain('run_skill_script');
         expect(toolNames).not.toContain('work_acceptance');
+
+        await productionTool!.execute('start-production', {
+          action: ProductionLoopAction.CommitPlan,
+          items: [{ title: 'Analyze and report' }],
+          constraints: [],
+          acceptanceCriteria: ['Report findings are verified'],
+          expectedArtifacts: [{ kind: 'report', description: 'Review report' }],
+          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
+        });
+        const runId = service.getCurrent('generic-work-skill')?.runs[0]?.id;
+        expect(runId).toBeDefined();
+        expect(service.productionLoop.getState(runId!).planItems).toHaveLength(1);
 
         const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
           type: string;
@@ -484,7 +503,7 @@ describe('PiRuntimeAdapter', () => {
         listener({ type: 'agent_end' });
         await Promise.resolve();
         expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Production workflow decision required'),
+          expect.stringContaining('Production workflow continuation'),
           { streamingBehavior: 'followUp' },
         );
         expect(onPermissionRequest).not.toHaveBeenCalled();
@@ -493,7 +512,7 @@ describe('PiRuntimeAdapter', () => {
         db.close();
       }
     });
-    it('offers a lazy production decision for every Work turn', async () => {
+    it('keeps production controls available but dormant for ordinary Work turns', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -537,22 +556,29 @@ describe('PiRuntimeAdapter', () => {
         expect(chatOptions.customTools?.map(tool => tool.name) || []).not.toContain(
           'production_loop',
         );
+        expect(mockSession.prompt.mock.calls[0]?.[0]).not.toContain(
+          '## Production workflow decision',
+        );
+        expect(mockSession.prompt.mock.calls[1]?.[0]).not.toContain(
+          '## Production workflow decision',
+        );
         expect(
           db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
         ).toEqual({ count: 0 });
         expect(
-          service.getCurrent('production-work')?.task.contract.metadata?.productionWorkflowEnabled,
+          service.getCurrent('production-work')?.task.contract.metadata
+            ?.productionControlsAvailable,
         ).toBe(true);
         expect(
           service.getCurrent('production-simple')?.task.contract.metadata
-            ?.productionWorkflowEnabled,
+            ?.productionControlsAvailable,
         ).toBe(true);
       } finally {
         db.close();
       }
     });
 
-    it('lets the model coordinate or skip expert methods through the outer decision', async () => {
+    it('lets the model activate expert production only for substantive requests', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -580,10 +606,10 @@ describe('PiRuntimeAdapter', () => {
         expect(productionPrompt).toContain(ExpertProductionWorkflowHeading);
         expect(productionPrompt).toContain('expert workflow only as the domain method');
         expect(directPrompt).toContain(ExpertProductionWorkflowHeading);
-        expect(directPrompt).toContain('may skip production with a concrete reason');
+        expect(directPrompt).toContain('answer normally without calling production_loop');
         expect(directOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
         expect(
-          service.getCurrent('expert-direct')?.task.contract.metadata?.productionWorkflowEnabled,
+          service.getCurrent('expert-direct')?.task.contract.metadata?.productionControlsAvailable,
         ).toBe(true);
       } finally {
         db.close();
@@ -649,6 +675,26 @@ describe('PiRuntimeAdapter', () => {
           workspaceRoot,
         });
         const originalTask = service.getCurrent('resume-production')!.task;
+        const originalOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools: Array<{
+            name: string;
+            execute(
+              toolCallId: string,
+              params: Record<string, unknown>,
+            ): Promise<{ content: Array<{ text: string }> }>;
+          }>;
+        };
+        const productionTool = originalOptions.customTools.find(
+          tool => tool.name === 'production_loop',
+        );
+        await productionTool!.execute('start-production', {
+          action: ProductionLoopAction.CommitPlan,
+          items: [{ title: 'Create release report' }],
+          constraints: [],
+          acceptanceCriteria: ['Release report is verified'],
+          expectedArtifacts: [{ kind: 'report', description: 'Release report' }],
+          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
+        });
         await adapter.stopSession('resume-production');
         const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
 
@@ -656,8 +702,7 @@ describe('PiRuntimeAdapter', () => {
           sessionMode: 'work',
           workspaceRoot,
           _workbenchRunId: prepared.run.id,
-          _productionWorkflowEnabled:
-            originalTask.contract.metadata?.productionWorkflowEnabled === true,
+          _productionWorkflowRequired: true,
           _skipUserMessage: true,
         });
 
@@ -668,14 +713,54 @@ describe('PiRuntimeAdapter', () => {
         expect(service.getCurrent('resume-production')?.task.id).toBe(originalTask.id);
         expect(service.productionLoop.getState(prepared.run.id).goal).toBe(originalTask.goal);
         expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('Persistent phase: plan'),
+          expect.stringContaining('Persistent phase: execute'),
         );
       } finally {
         db.close();
       }
     });
 
-    it('reinjects the production protocol when a reused runtime starts a new task', async () => {
+    it('keeps production optional when resuming a task that never activated it', async () => {
+      const db = new Database(':memory:');
+      initializeWorkbenchTaskSchema(db);
+      initializeProductionLoopSchema(db);
+      const service = new RealWorkbenchTaskService(db);
+      adapter.setWorkbenchTaskService(service);
+      const workspaceRoot = createTemporaryWorkspace();
+
+      try {
+        await adapter.startSession('resume-dormant', '你好', {
+          sessionMode: 'work',
+          workspaceRoot,
+        });
+        const originalTask = service.getCurrent('resume-dormant')!.task;
+        await adapter.stopSession('resume-dormant');
+        const prepared = service.prepareRun(originalTask.id, WorkbenchRunTrigger.Resume);
+
+        await adapter.continueSession('resume-dormant', 'Please expand this into a report', {
+          sessionMode: 'work',
+          workspaceRoot,
+          _workbenchRunId: prepared.run.id,
+          _productionWorkflowRequired: false,
+          _skipUserMessage: true,
+        });
+
+        const resumedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+          customTools?: Array<{ name: string }>;
+        };
+        expect(resumedOptions.customTools?.map(tool => tool.name)).toContain('production_loop');
+        expect(
+          db.prepare('SELECT COUNT(*) AS count FROM workbench_production_loops').get(),
+        ).toEqual({ count: 0 });
+        expect(mockSession.prompt).toHaveBeenLastCalledWith(
+          expect.not.stringContaining('## Production workflow decision'),
+        );
+      } finally {
+        db.close();
+      }
+    });
+
+    it('keeps production dormant when a reused runtime starts a new task', async () => {
       const db = new Database(':memory:');
       initializeWorkbenchTaskSchema(db);
       initializeProductionLoopSchema(db);
@@ -699,10 +784,7 @@ describe('PiRuntimeAdapter', () => {
 
         expect(mockCreateAgentSession).toHaveBeenCalledOnce();
         expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('## Production workflow'),
-        );
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('## Production workflow decision'),
+          'Create and validate a second release report',
         );
       } finally {
         db.close();
@@ -759,12 +841,33 @@ describe('PiRuntimeAdapter', () => {
         const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
           type: string;
         }) => void;
+        const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+          customTools: Array<{
+            name: string;
+            execute(
+              toolCallId: string,
+              params: Record<string, unknown>,
+            ): Promise<{ content: Array<{ text: string }> }>;
+          }>;
+        };
+        const productionTool = sessionOptions.customTools.find(
+          tool => tool.name === 'production_loop',
+        );
+        await productionTool!.execute('start-production', {
+          action: ProductionLoopAction.CommitPlan,
+          items: [{ title: 'Create report' }],
+          constraints: [],
+          acceptanceCriteria: ['Report is verified'],
+          expectedArtifacts: [{ kind: 'report', description: 'Release report' }],
+          expectedVerifiers: [{ name: 'report_check', deterministic: true }],
+        });
 
         listener({ type: 'agent_end' });
         listener({ type: 'agent_end' });
         listener({ type: 'agent_end' });
+        listener({ type: 'agent_end' });
 
-        expect(mockSession.prompt).toHaveBeenCalledTimes(3);
+        expect(mockSession.prompt).toHaveBeenCalledTimes(4);
         expect(mockSession.abort).toHaveBeenCalledOnce();
         expect(service.getCurrent('stale-production')?.runs[0].status).toBe(
           WorkbenchRunStatus.Paused,
@@ -789,19 +892,26 @@ describe('PiRuntimeAdapter', () => {
         });
 
         const greetingPrompt = mockSession.prompt.mock.calls[0]?.[0] as string;
-        expect(greetingPrompt).toContain('Answer directly');
+        expect(greetingPrompt).toBe('你好');
         expect(greetingPrompt).not.toContain('## Production workflow decision');
         const greetingRunId = service.getCurrent('adaptive-gate')?.runs[0]?.id;
         expect(greetingRunId).toBeDefined();
-        expect(service.productionLoop.getState(greetingRunId!).skip?.source).toBe(
-          ProductionSkipSource.SystemPolicy,
-        );
-        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: {
-          type: string;
-        }) => void;
+        expect(service.productionLoop.repository.get(greetingRunId!)).toBeNull();
+        const listener = mockSession.subscribe.mock.calls[0]?.[0] as (event: unknown) => void;
+        listener({
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'text', text: '你好，有什么可以帮你？' }],
+            stopReason: 'stop',
+          },
+        });
         listener({ type: 'agent_end' });
         await Promise.resolve();
         expect(mockSession.prompt).toHaveBeenCalledOnce();
+        expect(service.getCurrent('adaptive-gate')?.runs[0].status).toBe(
+          WorkbenchRunStatus.Succeeded,
+        );
 
         await adapter.continueSession('adaptive-gate', '修复登录流程中的刷新问题', {
           sessionMode: 'work',
@@ -817,9 +927,9 @@ describe('PiRuntimeAdapter', () => {
         expect(mockCreateAgentSession).toHaveBeenCalledOnce();
         expect(mockSession.abort).not.toHaveBeenCalled();
         expect(mockSession.prompt).toHaveBeenCalledTimes(3);
-        expect(mockSession.prompt).toHaveBeenLastCalledWith(
-          expect.stringContaining('## Production workflow decision'),
-        );
+        for (const [sentPrompt] of mockSession.prompt.mock.calls) {
+          expect(sentPrompt).not.toContain('## Production workflow decision');
+        }
       } finally {
         db.close();
       }

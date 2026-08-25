@@ -6,7 +6,6 @@ import {
   ProductionLoopRecoveryReason,
   ProductionLoopStatus,
   ProductionPlanItemStatus,
-  ProductionSkipSource,
 } from '../../shared/productionLoop';
 import {
   WorkbenchContractKind,
@@ -101,22 +100,6 @@ test('repeated skip_workflow stays a no-op without advancing progressVersion', (
   expect(second.progressVersion).toBe(first.progressVersion);
   expect(second.skip?.reason).toBe('Direct answer');
   expect(second.status).toBe(ProductionLoopStatus.Completed);
-});
-
-test('records whether the model or system policy skipped the workflow', () => {
-  const modelRun = begin().run;
-  expect(service.skipWorkflow(modelRun.id, 'Direct answer').skip?.source).toBe(
-    ProductionSkipSource.Model,
-  );
-
-  const systemRun = begin().run;
-  expect(
-    service.skipWorkflow(
-      systemRun.id,
-      'Direct conversational turn',
-      ProductionSkipSource.SystemPolicy,
-    ).skip?.source,
-  ).toBe(ProductionSkipSource.SystemPolicy);
 });
 
 test('skipCritique moves a critique-phase run to delivery without a reviewer', () => {
