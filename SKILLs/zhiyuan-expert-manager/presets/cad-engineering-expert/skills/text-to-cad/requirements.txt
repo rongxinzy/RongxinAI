@@ -1,0 +1,10 @@
+cadgen==0.4.28
+playwright
+trimesh
+numpy
+rtree
+scipy
+networkx
+lxml
+ezdxf
+shapely

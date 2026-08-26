@@ -20,6 +20,14 @@ test('reads a bundled expert preset live from disk', () => {
   );
 });
 
+test('loads the complete text-to-cad skill set for the CAD engineering expert', () => {
+  const snapshot = resolveBundledPresetExpertSnapshot(skillsRoot, 'cad-engineering-expert');
+
+  expect(snapshot).not.toBeNull();
+  expect(snapshot?.promptSnapshot).toContain('CAD 工程专家');
+  expect(snapshot?.skillIds).toEqual(['text-to-cad']);
+});
+
 test('returns null for a missing preset', () => {
   expect(resolveBundledPresetExpertSnapshot(skillsRoot, 'no-such-preset')).toBeNull();
 });

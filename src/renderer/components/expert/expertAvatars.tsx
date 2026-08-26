@@ -5,6 +5,7 @@ import {
   Calculator,
   ChartColumn,
   ClipboardCheck,
+  DraftingCompass,
   Feather,
   Megaphone,
   MoonStar,
@@ -36,6 +37,11 @@ const tile = (gradient: string) => `${TILE_SHEEN}, ${gradient}`;
  * initial-letter avatar rendered by {@link ExpertAvatar}.
  */
 export const PRESET_EXPERT_AVATARS: Record<string, PresetExpertAvatarStyle> = {
+  // CAD 工程专家 — drafting compass on steel blue
+  'cad-engineering-expert': {
+    icon: DraftingCompass,
+    background: tile('linear-gradient(135deg, oklch(0.62 0.11 235), oklch(0.45 0.12 250))'),
+  },
   // 文案创作专家 — quill on warm amber
   'content-writer': {
     icon: Feather,
