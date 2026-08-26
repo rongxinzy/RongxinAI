@@ -78,13 +78,6 @@ export const EnterpriseIpc = {
 } as const;
 export type EnterpriseIpc = (typeof EnterpriseIpc)[keyof typeof EnterpriseIpc];
 
-// ─── External Models ───────────────────────────────────────────────────────
-export const ExternalModelIpc = {
-  List: 'external-models:list',
-  Changed: 'external-models:changed',
-} as const;
-export type ExternalModelIpc = (typeof ExternalModelIpc)[keyof typeof ExternalModelIpc];
-
 // ─── API (HTTP proxy) ───────────────────────────────────────────────────────
 export const ApiIpc = {
   Fetch: 'api:fetch',

@@ -1,7 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
-import { ExternalModelProtocol } from '../../shared/externalModels';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
@@ -49,7 +48,6 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
       llamacpp: {
         listRunningModels,
       },
-      externalModels: { list: vi.fn(async () => []) },
     },
   });
 
@@ -71,7 +69,6 @@ test('does not expose the legacy default model when no provider is configured', 
   vi.stubGlobal('window', {
     electron: {
       llamacpp: { listRunningModels: vi.fn(async () => []) },
-      externalModels: { list: vi.fn(async () => []) },
     },
   });
 
@@ -92,7 +89,6 @@ test('collectAvailableModels merges running llama.cpp model metadata', async () 
       llamacpp: {
         listRunningModels,
       },
-      externalModels: { list: vi.fn(async () => []) },
     },
   });
   const config = createConfig();
@@ -117,48 +113,6 @@ test('collectAvailableModels merges running llama.cpp model metadata', async () 
     trainedContextWindow: 32768,
   });
   expect(llamaCppModel?.supportsThinkingToggle).toBe(true);
-});
-
-test('collectAvailableModels merges external models without persisting connections', async () => {
-  vi.stubGlobal('window', {
-    electron: {
-      llamacpp: { listRunningModels: vi.fn(async () => []) },
-      externalModels: {
-        list: vi.fn(async () => [
-          {
-            id: 'assigned-model',
-            displayName: 'Assigned Model',
-            protocol: ExternalModelProtocol.OpenAICompatible,
-            provider: { id: 'external.fixture', displayName: 'Fixture Gateway' },
-            capabilities: {
-              imageInput: ModelCapabilityStatus.Supported,
-              toolCalling: ModelCapabilityStatus.Supported,
-            },
-            contextWindow: 128_000,
-          },
-        ]),
-      },
-    },
-  });
-
-  const models = await collectAvailableModels(createConfig());
-  const external = models.find(model => model.providerKey === 'external.fixture');
-
-  expect(external).toEqual({
-    id: 'assigned-model',
-    name: 'Assigned Model',
-    provider: 'Fixture Gateway',
-    providerKey: 'external.fixture',
-    agentProviderId: 'external.fixture',
-    supportsImage: true,
-    capabilities: {
-      imageInput: ModelCapabilityStatus.Supported,
-      toolCalling: ModelCapabilityStatus.Supported,
-    },
-    contextWindow: 128_000,
-  });
-  expect(external).not.toHaveProperty('apiKey');
-  expect(external).not.toHaveProperty('baseUrl');
 });
 
 test('preserves contextTokens for custom cloud models', () => {

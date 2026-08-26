@@ -68,7 +68,6 @@ import {
   CoworkQueueIpc,
   CoworkSessionIpc,
   CoworkStreamIpc,
-  ExternalModelIpc,
   HardwareIpc,
   ImIpc,
   McpIpc,
@@ -207,7 +206,6 @@ import {
   ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES,
 } from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
-import { externalModelBridge } from './enterpriseExtension/externalModelBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
@@ -2483,12 +2481,6 @@ if (!gotTheLock) {
   ipcMain.handle(EnterpriseRendererIpc.SettingsPage, () =>
     zhiyuanEnterpriseRendererBridge.settingsPage(),
   );
-  ipcMain.handle(ExternalModelIpc.List, () => externalModelBridge.listModels());
-  externalModelBridge.onDidChange(() => {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(ExternalModelIpc.Changed);
-    }
-  });
 
   ipcMain.handle('hardware:nvidia-smi', async () => getNvidiaSmiSnapshot());
   ipcMain.handle(HardwareIpc.SystemMemory, async () => getSystemMemorySnapshot());
@@ -6669,7 +6661,6 @@ if (!gotTheLock) {
       userDataPath: app.getPath('userData'),
       developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
       sessionCapability: zhiyuanEnterpriseSessionBridge,
-      modelCapability: externalModelBridge,
       createRendererCapability: extensionDirectory =>
         zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
       createSettingsCapability: extensionDirectory =>

@@ -3,13 +3,11 @@ import type {
   EnterprisePasswordLoginInput,
   EnterpriseSessionSnapshot,
 } from '../../shared/enterpriseSession';
-import type { ExternalModelConnection, ExternalModelDescriptor } from '../../shared/externalModels';
 
 export const ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SETTINGS_CAPABILITY_API_VERSION = 1 as const;
-export const EXTERNAL_MODEL_CAPABILITY_API_VERSION = 1 as const;
 
 export interface ZhiyuanEnterpriseSessionProvider {
   snapshot(): EnterpriseSessionSnapshot | Promise<EnterpriseSessionSnapshot>;
@@ -41,19 +39,6 @@ export interface ZhiyuanEnterpriseSettingsHostCapability {
   registerPage(page: ZhiyuanEnterpriseSettingsPageRegistration): () => void;
 }
 
-export interface ExternalModelProvider {
-  readonly id: string;
-  readonly displayName: string;
-  listModels(): Promise<readonly ExternalModelDescriptor[]>;
-  resolveConnection(modelId: string): Promise<ExternalModelConnection>;
-  onDidChange?(listener: () => void): () => void;
-}
-
-export interface ExternalModelHostCapability {
-  readonly apiVersion: typeof EXTERNAL_MODEL_CAPABILITY_API_VERSION;
-  registerProvider(provider: ExternalModelProvider): () => void;
-}
-
 export const ZhiyuanEnterpriseExtensionStatus = {
   Idle: 'idle',
   Absent: 'absent',
@@ -78,7 +63,6 @@ export interface ZhiyuanEnterpriseHostContext {
     readonly session: ZhiyuanEnterpriseSessionHostCapability | null;
     readonly renderer: ZhiyuanEnterpriseRendererHostCapability | null;
     readonly settings: ZhiyuanEnterpriseSettingsHostCapability | null;
-    readonly models: ExternalModelHostCapability | null;
   };
 }
 
