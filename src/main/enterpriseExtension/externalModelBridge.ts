@@ -3,11 +3,13 @@ import { ModelCapabilityStatus } from '../../shared/providers';
 import {
   ExternalModelAccessMode,
   ExternalModelProtocol,
+  ExternalModelThinkingFormat,
   OPEN_EXTERNAL_MODEL_ACCESS_POLICY,
   type ExternalModelAccessPolicy,
   type ExternalModel,
   type ExternalModelConnection,
   type ExternalModelDescriptor,
+  type ExternalModelReasoningCompatibility,
   type ResolvedExternalModel,
 } from '../../shared/externalModels';
 import {
@@ -232,6 +234,7 @@ function normalizeModel(value: ExternalModelDescriptor): ExternalModelDescriptor
     throw new Error('External model protocol is not supported.');
   }
   const capabilities = normalizeCapabilities(value.capabilities);
+  const reasoningCompatibility = normalizeReasoningCompatibility(value.reasoningCompatibility);
   const contextWindow = positiveInteger(value.contextWindow);
   if (value.contextWindow !== undefined && !contextWindow) {
     throw new Error('External model context window is invalid.');
@@ -244,8 +247,30 @@ function normalizeModel(value: ExternalModelDescriptor): ExternalModelDescriptor
     displayName,
     protocol: ExternalModelProtocol.OpenAICompatible,
     ...(capabilities ? { capabilities } : {}),
+    ...(reasoningCompatibility ? { reasoningCompatibility } : {}),
     ...(contextWindow ? { contextWindow } : {}),
     ...(value.isDefault === undefined ? {} : { isDefault: value.isDefault }),
+  });
+}
+
+function normalizeReasoningCompatibility(
+  value: ExternalModelReasoningCompatibility | undefined,
+): ExternalModelReasoningCompatibility | undefined {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('External model reasoning compatibility is invalid.');
+  }
+  if (
+    value.thinkingFormat !== ExternalModelThinkingFormat.DeepSeek ||
+    value.supportsReasoningEffort !== true ||
+    value.requiresReasoningContentOnAssistantMessages !== true
+  ) {
+    throw new Error('External model reasoning compatibility is not supported.');
+  }
+  return Object.freeze({
+    thinkingFormat: ExternalModelThinkingFormat.DeepSeek,
+    supportsReasoningEffort: true,
+    requiresReasoningContentOnAssistantMessages: true,
   });
 }
 
