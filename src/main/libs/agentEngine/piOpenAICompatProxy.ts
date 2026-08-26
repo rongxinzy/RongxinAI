@@ -7,6 +7,13 @@ interface PiOpenAICompatUpstream {
   apiKey?: string;
 }
 
+export type PiOpenAICompatTokenRefresher = () => Promise<string>;
+
+interface PiOpenAICompatTokenRefreshRegistration {
+  readonly refresher: PiOpenAICompatTokenRefresher;
+  refreshPromise: Promise<string> | null;
+}
+
 interface OpenAIStreamNormalizeState {
   hasFinishReason: boolean;
   sentDone: boolean;
@@ -17,6 +24,7 @@ const OPENAI_STREAM_DONE_MARKER = '[DONE]';
 const FALLBACK_FINISH_REASON = 'stop';
 
 const upstreams = new Map<string, PiOpenAICompatUpstream>();
+const tokenRefreshers = new Map<string, PiOpenAICompatTokenRefreshRegistration>();
 let proxyServer: http.Server | null = null;
 let proxyPort: number | null = null;
 let proxyStartPromise: Promise<number> | null = null;
@@ -59,6 +67,46 @@ function createFetchHeaders(request: IncomingMessage, upstream: PiOpenAICompatUp
   }
 
   return headers;
+}
+
+async function refreshPiOpenAICompatToken(
+  providerId: string,
+  rejectedApiKey: string | undefined,
+): Promise<boolean> {
+  const upstream = upstreams.get(providerId);
+  if (!upstream) return false;
+  if (upstream.apiKey !== rejectedApiKey) return true;
+
+  const registration = tokenRefreshers.get(providerId);
+  if (!registration) return false;
+  if (!registration.refreshPromise) {
+    registration.refreshPromise = registration
+      .refresher()
+      .then(apiKey => {
+        const normalized = apiKey.trim();
+        if (!normalized)
+          throw new Error('Pi OpenAI compatibility token refresh returned no token.');
+        return normalized;
+      })
+      .finally(() => {
+        registration.refreshPromise = null;
+      });
+  }
+
+  try {
+    const apiKey = await registration.refreshPromise;
+    if (tokenRefreshers.get(providerId) !== registration) return false;
+    const currentUpstream = upstreams.get(providerId);
+    if (!currentUpstream) return false;
+    currentUpstream.apiKey = apiKey;
+    return true;
+  } catch (error) {
+    console.warn(
+      `[PiOpenAICompatProxy] failed to refresh credentials for provider ${providerId}:`,
+      error,
+    );
+    return false;
+  }
 }
 
 async function readRequestBody(request: IncomingMessage): Promise<Buffer> {
@@ -360,11 +408,22 @@ async function handleProxyRequest(
   const body = await readRequestBody(request);
   const model = extractRequestModel(body);
   const upstreamURL = buildOpenAIChatCompletionsURL(upstream.baseURL);
-  const upstreamResponse = await fetch(upstreamURL, {
-    method: 'POST',
-    headers: createFetchHeaders(request, upstream),
-    body: body.toString('utf8'),
-  });
+  const rejectedApiKey = upstream.apiKey;
+  const fetchUpstream = (): Promise<Response> =>
+    fetch(upstreamURL, {
+      method: 'POST',
+      headers: createFetchHeaders(request, upstream),
+      body: body.toString('utf8'),
+    });
+  let upstreamResponse = await fetchUpstream();
+
+  if (
+    (upstreamResponse.status === 401 || upstreamResponse.status === 403) &&
+    (await refreshPiOpenAICompatToken(providerId, rejectedApiKey))
+  ) {
+    await upstreamResponse.body?.cancel();
+    upstreamResponse = await fetchUpstream();
+  }
 
   const contentType = upstreamResponse.headers.get('content-type') ?? '';
   const upstreamTextShouldPassThrough = !upstreamResponse.ok;
@@ -454,8 +513,25 @@ export async function registerPiOpenAICompatUpstream(
   )}/v1`;
 }
 
+export function registerPiOpenAICompatTokenRefresher(
+  providerId: string,
+  refresher: PiOpenAICompatTokenRefresher,
+): () => void {
+  const registration: PiOpenAICompatTokenRefreshRegistration = {
+    refresher,
+    refreshPromise: null,
+  };
+  tokenRefreshers.set(providerId, registration);
+  return () => {
+    if (tokenRefreshers.get(providerId) === registration) {
+      tokenRefreshers.delete(providerId);
+    }
+  };
+}
+
 export async function stopPiOpenAICompatProxyForTests(): Promise<void> {
   upstreams.clear();
+  tokenRefreshers.clear();
   proxyPort = null;
   proxyStartPromise = null;
   const server = proxyServer;
