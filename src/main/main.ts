@@ -24,6 +24,7 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 
 import { buildSessionTitleFromInput } from '../common/sessionTitle';
+import { classifyCoworkError } from '../common/coworkError';
 import {
   migrateLegacyScheduledTaskRunsToCanonical,
   migrateLegacyScheduledTasksToCanonical,
@@ -3731,7 +3732,7 @@ if (!gotTheLock) {
                 if (win.isDestroyed()) return;
                 win.webContents.send(CoworkStreamIpc.Error, {
                   sessionId: session.id,
-                  error: errorMessage,
+                  error: classifyCoworkError(errorMessage),
                 });
               });
             } catch (handlerError) {
@@ -3860,7 +3861,7 @@ if (!gotTheLock) {
               if (win.isDestroyed()) return;
               win.webContents.send(CoworkStreamIpc.Error, {
                 sessionId: options.sessionId,
-                error: errorMessage,
+                error: classifyCoworkError(errorMessage),
               });
             });
           } catch (handlerError) {
