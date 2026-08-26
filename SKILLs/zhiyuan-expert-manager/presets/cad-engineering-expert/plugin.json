@@ -1,0 +1,64 @@
+{
+  "name": "cad-engineering-expert",
+  "version": "0.4.28",
+  "description": "CAD engineering expert for validated parametric modeling, robot descriptions, fabrication checks, slicing, and local artifact review.",
+  "author": {
+    "name": "earthtojake",
+    "email": ""
+  },
+  "license": "MIT",
+  "expertType": "agent",
+  "agentName": "cad-engineering-expert",
+  "agents": [
+    "./agents/cad-engineering-expert.md"
+  ],
+  "displayName": {
+    "en": "CAD Engineering Expert",
+    "zh": "CAD 工程专家"
+  },
+  "profession": {
+    "en": "CAD and Digital Manufacturing Engineer",
+    "zh": "CAD 与数字制造工程师"
+  },
+  "displayDescription": {
+    "en": "Turns natural-language requirements and drawings into validated CAD, robot-description, and manufacturing artifacts with inspection and local review.",
+    "zh": "将自然语言和图纸转为可验证的 CAD、机器人描述与制造文件，覆盖建模、检查、切片和交付。"
+  },
+  "categoryId": "02-Engineering",
+  "defaultInitPrompt": {
+    "zh": "帮我根据这份需求生成一个可验证的 STEP 零件",
+    "en": "Create a validated STEP part from this specification"
+  },
+  "plugin": "cad-engineering-expert",
+  "tags": [
+    {
+      "en": "CAD Modeling",
+      "zh": "CAD 建模"
+    },
+    {
+      "en": "Robot Description",
+      "zh": "机器人描述"
+    },
+    {
+      "en": "Digital Fabrication",
+      "zh": "数字制造"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "帮我根据这份需求生成一个可验证的 STEP 零件",
+      "en": "Create a validated STEP part from this specification"
+    },
+    {
+      "zh": "检查这个模型是否适合 3D 打印，并给出修复建议",
+      "en": "Check whether this model is suitable for 3D printing and suggest fixes"
+    },
+    {
+      "zh": "为这套机器人机构生成并校验 URDF 与 SRDF",
+      "en": "Generate and validate URDF and SRDF files for this robot mechanism"
+    }
+  ],
+  "skills": [
+    "./skills/text-to-cad"
+  ]
+}

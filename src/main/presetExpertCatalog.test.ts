@@ -21,6 +21,6 @@ test('extracts phase titles from the primary workflow only', () => {
 test('loads workflow steps for every bundled preset expert', () => {
   const experts = listPresetExperts(path.resolve('SKILLs'));
 
-  expect(experts).toHaveLength(9);
+  expect(experts).toHaveLength(10);
   expect(experts.every(expert => expert.workflow.length > 0)).toBe(true);
 });
