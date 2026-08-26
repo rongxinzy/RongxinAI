@@ -3,11 +3,13 @@ import type {
   EnterprisePasswordLoginInput,
   EnterpriseSessionSnapshot,
 } from '../../shared/enterpriseSession';
+import type { ProviderConfig } from '../../shared/providers';
 
 export const ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SETTINGS_CAPABILITY_API_VERSION = 1 as const;
+export const ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION = 1 as const;
 
 export interface ZhiyuanEnterpriseSessionProvider {
   snapshot(): EnterpriseSessionSnapshot | Promise<EnterpriseSessionSnapshot>;
@@ -27,11 +29,24 @@ export interface ZhiyuanEnterpriseRendererHostCapability {
 }
 
 export interface ZhiyuanEnterpriseSettingsPageRegistration {
+  readonly id: string;
   readonly entrypoint: string;
   readonly labels: {
     readonly zh: string;
     readonly en: string;
   };
+}
+
+export interface ZhiyuanManagedProviderSource {
+  readonly providerKey: string;
+  readonly exclusive: boolean;
+  snapshot(): Promise<ProviderConfig>;
+  onDidChange?(listener: () => void): () => void;
+}
+
+export interface ZhiyuanManagedProviderHostCapability {
+  readonly apiVersion: typeof ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION;
+  registerSource(source: ZhiyuanManagedProviderSource): () => void;
 }
 
 export interface ZhiyuanEnterpriseSettingsHostCapability {
@@ -63,6 +78,7 @@ export interface ZhiyuanEnterpriseHostContext {
     readonly session: ZhiyuanEnterpriseSessionHostCapability | null;
     readonly renderer: ZhiyuanEnterpriseRendererHostCapability | null;
     readonly settings: ZhiyuanEnterpriseSettingsHostCapability | null;
+    readonly managedProvider: ZhiyuanManagedProviderHostCapability | null;
   };
 }
 

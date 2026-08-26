@@ -78,6 +78,13 @@ export const EnterpriseIpc = {
 } as const;
 export type EnterpriseIpc = (typeof EnterpriseIpc)[keyof typeof EnterpriseIpc];
 
+export const ManagedProviderIpc = {
+  Policy: 'enterprise:managed-provider:policy',
+  Catalog: 'enterprise:managed-provider:catalog',
+  Changed: 'enterprise:managed-provider:changed',
+} as const;
+export type ManagedProviderIpc = (typeof ManagedProviderIpc)[keyof typeof ManagedProviderIpc];
+
 // ─── API (HTTP proxy) ───────────────────────────────────────────────────────
 export const ApiIpc = {
   Fetch: 'api:fetch',

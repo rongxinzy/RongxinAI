@@ -1,5 +1,10 @@
 import type { LlamaCppModelPreferences, LlamaCppRunningModel } from '../../shared/llamacpp';
 import {
+  ManagedProviderAccessMode,
+  OPEN_MANAGED_PROVIDER_ACCESS_POLICY,
+  type ManagedProviderAccessPolicy,
+} from '../../shared/managedProviders';
+import {
   isProviderEnabled,
   ProviderName,
   ProviderRegistry,
@@ -16,7 +21,10 @@ type ModelLike = Pick<Model, 'id' | 'providerKey'>;
 const sameModelIdentity = (modelA: ModelLike, modelB: ModelLike): boolean =>
   modelA.id === modelB.id && (modelA.providerKey ?? '') === (modelB.providerKey ?? '');
 
-export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
+export function buildConfiguredAvailableModels(
+  config: AppConfig,
+  allowedProviderKeys?: ReadonlySet<string>,
+): Model[] {
   const models: Model[] = [];
 
   if (!config.providers) {
@@ -24,6 +32,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   }
 
   Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
+    if (allowedProviderKeys && !allowedProviderKeys.has(providerName)) return;
     if (providerName === ProviderName.LlamaCpp) {
       return;
     }
@@ -126,7 +135,13 @@ export function mergeAvailableModels(
 }
 
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
-  const configuredModels = buildConfiguredAvailableModels(config);
+  const policy = await getManagedProviderAccessPolicy();
+  const configuredModels = buildConfiguredAvailableModels(
+    config,
+    policy.mode === ManagedProviderAccessMode.Exclusive ? new Set(policy.providerKeys) : undefined,
+  );
+
+  if (policy.mode === ManagedProviderAccessMode.Exclusive) return configuredModels;
 
   try {
     const runningModels = await window.electron.llamacpp.listRunningModels();
@@ -143,6 +158,13 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
   } catch {
     return configuredModels;
   }
+}
+
+export async function getManagedProviderAccessPolicy(): Promise<ManagedProviderAccessPolicy> {
+  return (
+    (await window.electron.managedProviders?.policy().catch(() => null)) ??
+    OPEN_MANAGED_PROVIDER_ACCESS_POLICY
+  );
 }
 
 export function notifyLlamaCppRunningModelsChanged(): void {

@@ -69,6 +69,7 @@ describe('Zhiyuan enterprise extension host', () => {
     expect(receivedContext!.capabilities.session).toBeNull();
     expect(receivedContext!.capabilities.renderer).toBeNull();
     expect(receivedContext!.capabilities.settings).toBeNull();
+    expect(receivedContext!.capabilities.managedProvider).toBeNull();
 
     await host.dispose();
     await host.dispose();

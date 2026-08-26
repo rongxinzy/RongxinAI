@@ -29,3 +29,9 @@ API v1 is deliberately limited to lifecycle and non-secret host context. Authent
 The API v1 context exposes an optional, independently versioned `capabilities.session` object. An enterprise extension may register one password-session provider and must unregister it during disposal. Community builds expose the same fixed renderer surface but return `UNAVAILABLE` when no provider is registered.
 
 The preload bridge permits only `snapshot`, `login`, `changePassword`, and `logout`. Main-process validation copies bounded input fields, normalizes identity snapshots, never returns tokens, and replaces provider exceptions with a generic error before crossing into the renderer. The bridge does not expose arbitrary extension methods or IPC channel names.
+
+### Settings and managed provider capabilities v1
+
+An extension may register multiple settings pages with stable IDs. Zhiyuan renders each page as an independent settings-sidebar entry; account and model management therefore remain separate destinations even when they share one renderer bundle.
+
+`capabilities.managedProvider` accepts one managed configuration source. The source must use the existing `custom_` provider namespace and return the public application's standard `ProviderConfig`. The host synchronizes that configuration into `app_config.providers`, so model selection, OpenAI-compatible transport, capability checks, reasoning compatibility, and Pi runtime all use the same code path as a user-created custom provider. An exclusive source hides editable provider and local-inference entry points without introducing a second model runtime.
