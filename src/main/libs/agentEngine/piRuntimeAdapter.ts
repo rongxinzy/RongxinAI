@@ -2254,10 +2254,14 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         if (event.message?.role === 'assistant') {
           active.writeTokenLimitRecovery.queueIfNeeded(event.message, active.piSession);
           if (event.message.stopReason === 'error') {
-            const { thinking } = active.streamAccumulator.reconcile(event.message);
+            const { text, thinking } = active.streamAccumulator.reconcile(event.message);
             if (thinking && thinking !== active.thinkingText) {
               active.thinkingText = thinking;
               active.thinkingLifecycle.markContentStreaming();
+            }
+            if (text) {
+              active.answerText = text;
+              active.firstVisibleTextAt ??= Date.now();
             }
             this.finalizeActiveThinking(sessionId, active);
             const errMsg = event.message.errorMessage || 'Pi agent error';
@@ -2619,19 +2623,29 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     active.pendingError = null;
     active.turnFailed = true;
     active.isRunning = false;
+    if (active.answerText.trim()) {
+      this.finalizeMessage(sessionId, active, 'answer', active.answerText);
+      active.assistantMessageId = null;
+      active.answerText = '';
+    }
     this.workbenchTaskService?.failRun?.(sessionId, { message: pending.message });
     // Persist a system error message so the error survives session switching
     // and is visible in the message list. The classified kind lets the renderer
     // translate it into a user-friendly i18n message; the raw message is kept
     // for console diagnostics only.
+    const errorMessageSeed: CoworkMessage = {
+      id: randomUUID(),
+      type: 'system',
+      content: '',
+      timestamp: Date.now(),
+      metadata: { error: pending.message, errorKind: pending.classified.kind },
+    };
+    let errorMessage = errorMessageSeed;
     if (this.store) {
       this.store.updateSession(sessionId, { status: 'error' });
-      this.store.addMessage(sessionId, {
-        type: 'system',
-        content: '',
-        metadata: { error: pending.message, errorKind: pending.classified.kind },
-      });
+      errorMessage = this.store.addMessage(sessionId, errorMessageSeed);
     }
+    this.emit('message', sessionId, errorMessage);
     this.emit('error', sessionId, pending.classified);
   }
 

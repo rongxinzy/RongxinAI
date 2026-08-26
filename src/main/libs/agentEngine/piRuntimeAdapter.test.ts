@@ -2799,6 +2799,7 @@ describe('PiRuntimeAdapter', () => {
     };
     let errors: CoworkError[];
     let completes: string[];
+    let emittedMessages: Array<Record<string, unknown>>;
 
     const failedAttempt = (errorMessage: string) => {
       listener!({
@@ -2847,6 +2848,10 @@ describe('PiRuntimeAdapter', () => {
       adapter.setCoworkStore(mockStore as unknown as CoworkStore);
       errors = [];
       completes = [];
+      emittedMessages = [];
+      adapter.on('message', (_sid, message) =>
+        emittedMessages.push(message as unknown as Record<string, unknown>),
+      );
       adapter.on('error', (_sid, error) => errors.push(error as CoworkError));
       adapter.on('complete', sessionId => completes.push(sessionId));
     });
@@ -2863,6 +2868,7 @@ describe('PiRuntimeAdapter', () => {
 
       expect(errors).toHaveLength(0);
       expect(systemErrorMessages()).toHaveLength(0);
+      expect(emittedMessages.filter(message => message.type === 'system')).toHaveLength(0);
       expect(mockStore.updateSession).not.toHaveBeenCalledWith(
         'test',
         expect.objectContaining({ status: 'error' }),
@@ -2893,6 +2899,7 @@ describe('PiRuntimeAdapter', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].kind).toBe(CoworkErrorKind.RateLimited);
       expect(systemErrorMessages()).toHaveLength(1);
+      expect(emittedMessages.filter(message => message.type === 'system')).toHaveLength(1);
       expect(mockStore.updateSession).toHaveBeenCalledWith('test', { status: 'error' });
       expect(mockStore.updateSession).not.toHaveBeenCalledWith('test', { status: 'completed' });
       expect(completes).toHaveLength(0);
@@ -2908,7 +2915,38 @@ describe('PiRuntimeAdapter', () => {
       expect(errors).toHaveLength(1);
       expect(errors[0].kind).toBe(CoworkErrorKind.AuthExpired);
       expect(systemErrorMessages()).toHaveLength(1);
+      expect(emittedMessages.filter(message => message.type === 'system')).toHaveLength(1);
       expect(completes).toHaveLength(0);
+    });
+
+    it('finalizes a partial answer before surfacing the terminal error', async () => {
+      const updates: Array<{
+        messageId: string;
+        content: string;
+        metadata?: Record<string, unknown>;
+      }> = [];
+      adapter.on('messageUpdate', (_sid, messageId, content, metadata) =>
+        updates.push({ messageId, content, metadata }),
+      );
+      await adapter.startSession('test', 'Hi');
+
+      listener!({ type: 'turn_start' });
+      listener!({
+        type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'text', text: 'Partial answer' }] },
+      });
+      failedAttempt('network error');
+      listener!({ type: 'agent_settled' });
+
+      expect(
+        updates.some(
+          update =>
+            update.content === 'Partial answer' &&
+            update.metadata?.isStreaming === false &&
+            update.metadata?.isFinal === true,
+        ),
+      ).toBe(true);
+      expect(emittedMessages.map(message => message.type)).toEqual(['user', 'assistant', 'system']);
     });
 
     it('does not complete or continue the agent loop on a failed turn', async () => {
