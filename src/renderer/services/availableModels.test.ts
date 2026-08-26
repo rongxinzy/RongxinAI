@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
-import { ExternalModelProtocol } from '../../shared/externalModels';
+import { ExternalModelAccessMode, ExternalModelProtocol } from '../../shared/externalModels';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
@@ -159,6 +159,36 @@ test('collectAvailableModels merges external models without persisting connectio
   });
   expect(external).not.toHaveProperty('apiKey');
   expect(external).not.toHaveProperty('baseUrl');
+});
+
+test('exclusive policy exposes only managed external models without querying local inference', async () => {
+  const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
+  const getModelPreferences = vi.fn(async () => ({}));
+  vi.stubGlobal('window', {
+    electron: {
+      llamacpp: { listRunningModels, getModelPreferences },
+      externalModels: {
+        policy: vi.fn(async () => ({
+          mode: ExternalModelAccessMode.Exclusive,
+          providerIds: ['external.managed'],
+        })),
+        list: vi.fn(async () => [
+          {
+            id: 'assigned-model',
+            displayName: 'Assigned Model',
+            protocol: ExternalModelProtocol.OpenAICompatible,
+            provider: { id: 'external.managed', displayName: 'Managed Gateway' },
+          },
+        ]),
+      },
+    },
+  });
+
+  await expect(collectAvailableModels(createConfig())).resolves.toEqual([
+    expect.objectContaining({ id: 'assigned-model', providerKey: 'external.managed' }),
+  ]);
+  expect(listRunningModels).not.toHaveBeenCalled();
+  expect(getModelPreferences).not.toHaveBeenCalled();
 });
 
 test('preserves contextTokens for custom cloud models', () => {

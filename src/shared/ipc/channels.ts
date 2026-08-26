@@ -81,6 +81,7 @@ export type EnterpriseIpc = (typeof EnterpriseIpc)[keyof typeof EnterpriseIpc];
 // ─── External Models ───────────────────────────────────────────────────────
 export const ExternalModelIpc = {
   List: 'external-models:list',
+  Policy: 'external-models:policy',
   Changed: 'external-models:changed',
 } as const;
 export type ExternalModelIpc = (typeof ExternalModelIpc)[keyof typeof ExternalModelIpc];
