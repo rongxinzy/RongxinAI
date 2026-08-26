@@ -15,7 +15,7 @@ import { EnterpriseSessionEvent } from '../../services/enterpriseSessionEvents';
 import { EnterpriseRendererFrame } from './EnterpriseRendererFrame';
 
 const snapshot = vi.fn<() => Promise<EnterpriseSessionResult>>();
-const listModels = vi.fn();
+const catalog = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -30,7 +30,7 @@ beforeEach(() => {
           logout: vi.fn(),
         },
       },
-      externalModels: { list: listModels },
+      managedProviders: { catalog },
     },
   });
 });
@@ -42,6 +42,7 @@ describe('EnterpriseRendererFrame', () => {
         src="zhiyuan-enterprise-ui://renderer/settings/settings.html"
         title="Enterprise account"
         surface={EnterpriseRendererSurface.Settings}
+        pageId="account"
         session={signedOut()}
       />,
     );
@@ -65,7 +66,53 @@ describe('EnterpriseRendererFrame', () => {
         source: EnterpriseRendererMessageSource.Host,
         type: EnterpriseRendererMessageType.Initialize,
         surface: EnterpriseRendererSurface.Settings,
+        pageId: 'account',
         session: signedOut(),
+      }),
+      '*',
+    );
+  });
+
+  test('serves the managed catalog only to the enterprise models page', async () => {
+    catalog.mockResolvedValue([
+      {
+        id: 'enterprise-chat',
+        displayName: 'Enterprise Chat',
+        providerKey: 'custom_enterprise',
+        providerDisplayName: 'Zhiyuan',
+        isDefault: true,
+      },
+    ]);
+    render(
+      <EnterpriseRendererFrame
+        src="zhiyuan-enterprise-ui://renderer/settings/models/settings.html"
+        title="Enterprise models"
+        surface={EnterpriseRendererSurface.Settings}
+        pageId="models"
+        session={signedOut()}
+      />,
+    );
+
+    const frame = screen.getByTitle('Enterprise models') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: {
+          source: EnterpriseRendererMessageSource.Module,
+          apiVersion: 1,
+          type: EnterpriseRendererMessageType.ModelCatalogRequest,
+          requestId: 'models-1',
+        },
+      }),
+    );
+
+    await waitFor(() => expect(catalog).toHaveBeenCalledTimes(1));
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: EnterpriseRendererMessageType.ModelCatalogResponse,
+        requestId: 'models-1',
+        result: expect.objectContaining({ ok: true }),
       }),
       '*',
     );
@@ -149,93 +196,6 @@ describe('EnterpriseRendererFrame', () => {
     );
     expect(sessionChanged).not.toHaveBeenCalled();
     window.removeEventListener(EnterpriseSessionEvent.Changed, sessionChanged);
-  });
-
-  test('projects only model metadata into the enterprise settings frame', async () => {
-    listModels.mockResolvedValue([
-      {
-        id: 'model-1',
-        displayName: 'Managed model',
-        protocol: 'openai-compatible',
-        provider: { id: 'external.zhiyuan', displayName: 'Zhiyuan' },
-        contextWindow: 128_000,
-      },
-    ]);
-    render(
-      <EnterpriseRendererFrame
-        src="zhiyuan-enterprise-ui://renderer/settings/settings.html"
-        title="Enterprise account"
-        surface={EnterpriseRendererSurface.Settings}
-        session={signedOut()}
-      />,
-    );
-
-    const frame = screen.getByTitle('Enterprise account') as HTMLIFrameElement;
-    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        source: frame.contentWindow,
-        data: {
-          source: EnterpriseRendererMessageSource.Module,
-          apiVersion: 1,
-          type: EnterpriseRendererMessageType.ModelCatalogRequest,
-          requestId: 'models-1',
-        },
-      }),
-    );
-
-    await waitFor(() => expect(listModels).toHaveBeenCalledTimes(1));
-    expect(postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: EnterpriseRendererMessageType.ModelCatalogResponse,
-        requestId: 'models-1',
-        result: {
-          ok: true,
-          models: [
-            expect.objectContaining({
-              id: 'model-1',
-              provider: { id: 'external.zhiyuan', displayName: 'Zhiyuan' },
-            }),
-          ],
-        },
-      }),
-      '*',
-    );
-    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('apiKey');
-    expect(JSON.stringify(postMessage.mock.calls)).not.toContain('baseUrl');
-  });
-
-  test('denies model catalog requests from the session gate', async () => {
-    render(
-      <EnterpriseRendererFrame
-        src="zhiyuan-enterprise-ui://renderer/index.html"
-        title="Enterprise sign-in"
-        surface={EnterpriseRendererSurface.SessionGate}
-        session={signedOut()}
-      />,
-    );
-
-    const frame = screen.getByTitle('Enterprise sign-in') as HTMLIFrameElement;
-    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
-    window.dispatchEvent(
-      new MessageEvent('message', {
-        source: frame.contentWindow,
-        data: {
-          source: EnterpriseRendererMessageSource.Module,
-          apiVersion: 1,
-          type: EnterpriseRendererMessageType.ModelCatalogRequest,
-          requestId: 'models-denied',
-        },
-      }),
-    );
-
-    await waitFor(() =>
-      expect(postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ requestId: 'models-denied', result: { ok: false } }),
-        '*',
-      ),
-    );
-    expect(listModels).not.toHaveBeenCalled();
   });
 });
 

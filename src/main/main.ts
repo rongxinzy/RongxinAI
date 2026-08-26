@@ -68,10 +68,10 @@ import {
   CoworkQueueIpc,
   CoworkSessionIpc,
   CoworkStreamIpc,
-  ExternalModelIpc,
   HardwareIpc,
   ImIpc,
   McpIpc,
+  ManagedProviderIpc,
   ProjectIpc,
   SkillsIpc,
   WeixinInstallIpc,
@@ -207,7 +207,7 @@ import {
   ZHIYUAN_ENTERPRISE_RENDERER_PROTOCOL_PRIVILEGES,
 } from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
-import { externalModelBridge } from './enterpriseExtension/externalModelBridge';
+import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
@@ -237,10 +237,7 @@ import { getSystemMemorySnapshot } from './libs/systemMemory';
 import { OllamaManager } from './libs/ollamaManager';
 import { resolveQualifiedAgentModelRef } from './libs/agentModels';
 import { consumePendingLocalInferenceInstall } from './libs/pendingLocalInferenceInstall';
-import {
-  readBootstrapFile,
-  writeBootstrapFile,
-} from './libs/agentMemoryFile';
+import { readBootstrapFile, writeBootstrapFile } from './libs/agentMemoryFile';
 import { appendPythonRuntimeToEnv, ensurePythonRuntimeReady } from './libs/pythonRuntime';
 import { serializeForLog } from './libs/sanitizeForLog';
 import { SqliteBackupManager } from './libs/sqliteBackup/sqliteBackupManager';
@@ -841,12 +838,16 @@ const getWorkbenchTaskService = (): WorkbenchTaskService => {
       onVerifiedRun: event => {
         const complete = getPiRuntimeAdapter().getSessionMemoryCompletion(event.task.sessionId);
         if (!complete) {
-          console.warn('[Memory] Skipped verified run extraction because the session model is unavailable.');
+          console.warn(
+            '[Memory] Skipped verified run extraction because the session model is unavailable.',
+          );
           return;
         }
-        void promoteVerifiedWorkbenchRun(getProjectMemoryService(), event, complete).catch(error => {
-          console.warn('[Memory] Failed to extract verified run memory:', error);
-        });
+        void promoteVerifiedWorkbenchRun(getProjectMemoryService(), event, complete).catch(
+          error => {
+            console.warn('[Memory] Failed to extract verified run memory:', error);
+          },
+        );
       },
     });
   }
@@ -2480,14 +2481,14 @@ if (!gotTheLock) {
   ipcMain.handle(EnterpriseRendererIpc.SessionGateEntrypoint, () =>
     zhiyuanEnterpriseRendererBridge.sessionGateEntrypoint(),
   );
-  ipcMain.handle(EnterpriseRendererIpc.SettingsPage, () =>
-    zhiyuanEnterpriseRendererBridge.settingsPage(),
+  ipcMain.handle(EnterpriseRendererIpc.SettingsPages, () =>
+    zhiyuanEnterpriseRendererBridge.settingsPages(),
   );
-  ipcMain.handle(ExternalModelIpc.List, () => externalModelBridge.listModels());
-  ipcMain.handle(ExternalModelIpc.Policy, () => externalModelBridge.accessPolicy());
-  externalModelBridge.onDidChange(() => {
+  ipcMain.handle(ManagedProviderIpc.Policy, () => zhiyuanManagedProviderBridge.accessPolicy());
+  ipcMain.handle(ManagedProviderIpc.Catalog, () => zhiyuanManagedProviderBridge.catalog());
+  zhiyuanManagedProviderBridge.onDidChange(() => {
     for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) window.webContents.send(ExternalModelIpc.Changed);
+      if (!window.isDestroyed()) window.webContents.send(ManagedProviderIpc.Changed);
     }
   });
 
@@ -6670,7 +6671,7 @@ if (!gotTheLock) {
       userDataPath: app.getPath('userData'),
       developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
       sessionCapability: zhiyuanEnterpriseSessionBridge,
-      modelCapability: externalModelBridge,
+      managedProviderCapability: zhiyuanManagedProviderBridge,
       createRendererCapability: extensionDirectory =>
         zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
       createSettingsCapability: extensionDirectory =>
@@ -6715,6 +6716,7 @@ if (!gotTheLock) {
     profiler.mark('initStore');
     console.log('[Main] initApp: starting initStore()');
     store = await initStore();
+    zhiyuanManagedProviderBridge.attachStore(store);
     profiler.measure('initStore');
     console.log('[Main] initApp: store initialized');
     try {

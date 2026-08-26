@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
-import { ExternalModelAccessMode, ExternalModelProtocol } from '../../shared/externalModels';
+import { ManagedProviderAccessMode } from '../../shared/managedProviders';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
@@ -49,7 +49,6 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
       llamacpp: {
         listRunningModels,
       },
-      externalModels: { list: vi.fn(async () => []) },
     },
   });
 
@@ -58,6 +57,38 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
   expect(listRunningModels).toHaveBeenCalledTimes(1);
   expect(models.some(model => model.providerKey === ProviderName.LlamaCpp)).toBe(true);
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
+});
+
+test('exclusive managed policy exposes only the synchronized custom provider', async () => {
+  const config = createConfig();
+  config.providers = {
+    ...config.providers,
+    custom_enterprise: {
+      enabled: true,
+      apiKey: 'managed-token',
+      baseUrl: 'http://127.0.0.1:8090/v1',
+      apiFormat: 'openai',
+      displayName: 'Zhiyuan',
+      models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
+    },
+  };
+  const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
+  vi.stubGlobal('window', {
+    electron: {
+      managedProviders: {
+        policy: vi.fn(async () => ({
+          mode: ManagedProviderAccessMode.Exclusive,
+          providerKeys: ['custom_enterprise'],
+        })),
+      },
+      llamacpp: { listRunningModels },
+    },
+  });
+
+  await expect(collectAvailableModels(config)).resolves.toEqual([
+    expect.objectContaining({ id: 'enterprise-chat', providerKey: 'custom_enterprise' }),
+  ]);
+  expect(listRunningModels).not.toHaveBeenCalled();
 });
 
 test('does not expose the legacy default model when no provider is configured', async () => {
@@ -71,7 +102,6 @@ test('does not expose the legacy default model when no provider is configured', 
   vi.stubGlobal('window', {
     electron: {
       llamacpp: { listRunningModels: vi.fn(async () => []) },
-      externalModels: { list: vi.fn(async () => []) },
     },
   });
 
@@ -92,7 +122,6 @@ test('collectAvailableModels merges running llama.cpp model metadata', async () 
       llamacpp: {
         listRunningModels,
       },
-      externalModels: { list: vi.fn(async () => []) },
     },
   });
   const config = createConfig();
@@ -117,78 +146,6 @@ test('collectAvailableModels merges running llama.cpp model metadata', async () 
     trainedContextWindow: 32768,
   });
   expect(llamaCppModel?.supportsThinkingToggle).toBe(true);
-});
-
-test('collectAvailableModels merges external models without persisting connections', async () => {
-  vi.stubGlobal('window', {
-    electron: {
-      llamacpp: { listRunningModels: vi.fn(async () => []) },
-      externalModels: {
-        list: vi.fn(async () => [
-          {
-            id: 'assigned-model',
-            displayName: 'Assigned Model',
-            protocol: ExternalModelProtocol.OpenAICompatible,
-            provider: { id: 'external.fixture', displayName: 'Fixture Gateway' },
-            capabilities: {
-              imageInput: ModelCapabilityStatus.Supported,
-              toolCalling: ModelCapabilityStatus.Supported,
-            },
-            contextWindow: 128_000,
-          },
-        ]),
-      },
-    },
-  });
-
-  const models = await collectAvailableModels(createConfig());
-  const external = models.find(model => model.providerKey === 'external.fixture');
-
-  expect(external).toEqual({
-    id: 'assigned-model',
-    name: 'Assigned Model',
-    provider: 'Fixture Gateway',
-    providerKey: 'external.fixture',
-    agentProviderId: 'external.fixture',
-    supportsImage: true,
-    capabilities: {
-      imageInput: ModelCapabilityStatus.Supported,
-      toolCalling: ModelCapabilityStatus.Supported,
-    },
-    contextWindow: 128_000,
-  });
-  expect(external).not.toHaveProperty('apiKey');
-  expect(external).not.toHaveProperty('baseUrl');
-});
-
-test('exclusive policy exposes only managed external models without querying local inference', async () => {
-  const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
-  const getModelPreferences = vi.fn(async () => ({}));
-  vi.stubGlobal('window', {
-    electron: {
-      llamacpp: { listRunningModels, getModelPreferences },
-      externalModels: {
-        policy: vi.fn(async () => ({
-          mode: ExternalModelAccessMode.Exclusive,
-          providerIds: ['external.managed'],
-        })),
-        list: vi.fn(async () => [
-          {
-            id: 'assigned-model',
-            displayName: 'Assigned Model',
-            protocol: ExternalModelProtocol.OpenAICompatible,
-            provider: { id: 'external.managed', displayName: 'Managed Gateway' },
-          },
-        ]),
-      },
-    },
-  });
-
-  await expect(collectAvailableModels(createConfig())).resolves.toEqual([
-    expect.objectContaining({ id: 'assigned-model', providerKey: 'external.managed' }),
-  ]);
-  expect(listRunningModels).not.toHaveBeenCalled();
-  expect(getModelPreferences).not.toHaveBeenCalled();
 });
 
 test('preserves contextTokens for custom cloud models', () => {

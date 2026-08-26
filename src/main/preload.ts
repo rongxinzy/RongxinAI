@@ -21,13 +21,13 @@ import {
   DialogIpc,
   DingTalkInstallIpc,
   EnterpriseIpc,
-  ExternalModelIpc,
   FeishuInstallIpc,
   GitHubCopilotIpc,
   HardwareIpc,
   ImInstanceIpc,
   ImIpc,
   LogIpc,
+  ManagedProviderIpc,
   McpIpc,
   NetworkIpc,
   OpenAICodexOAuthIpc,
@@ -279,9 +279,9 @@ contextBridge.exposeInMainWorld('electron', {
     renderer: {
       sessionGateEntrypoint: () =>
         ipcRenderer.invoke(EnterpriseRendererIpc.SessionGateEntrypoint) as Promise<string | null>,
-      settingsPage: () =>
-        ipcRenderer.invoke(EnterpriseRendererIpc.SettingsPage) as Promise<
-          import('../shared/enterpriseRenderer').EnterpriseRendererSettingsPage | null
+      settingsPages: () =>
+        ipcRenderer.invoke(EnterpriseRendererIpc.SettingsPages) as Promise<
+          readonly import('../shared/enterpriseRenderer').EnterpriseRendererSettingsPage[]
         >,
     },
     session: {
@@ -293,16 +293,16 @@ contextBridge.exposeInMainWorld('electron', {
     },
   },
 
-  externalModels: {
+  managedProviders: {
     policy: () =>
-      ipcRenderer.invoke(ExternalModelIpc.Policy) as Promise<
-        import('../shared/externalModels').ExternalModelAccessPolicy
+      ipcRenderer.invoke(ManagedProviderIpc.Policy) as Promise<
+        import('../shared/managedProviders').ManagedProviderAccessPolicy
       >,
-    list: () =>
-      ipcRenderer.invoke(ExternalModelIpc.List) as Promise<
-        readonly import('../shared/externalModels').ExternalModel[]
+    catalog: () =>
+      ipcRenderer.invoke(ManagedProviderIpc.Catalog) as Promise<
+        readonly import('../shared/managedProviders').ManagedProviderCatalogModel[]
       >,
-    onChanged: (callback: () => void) => onPushVoid(ExternalModelIpc.Changed, callback),
+    onChanged: (callback: () => void) => onPushVoid(ManagedProviderIpc.Changed, callback),
   },
 
   api: {

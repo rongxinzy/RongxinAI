@@ -69,7 +69,7 @@ describe('Zhiyuan enterprise extension host', () => {
     expect(receivedContext!.capabilities.session).toBeNull();
     expect(receivedContext!.capabilities.renderer).toBeNull();
     expect(receivedContext!.capabilities.settings).toBeNull();
-    expect(receivedContext!.capabilities.models).toBeNull();
+    expect(receivedContext!.capabilities.managedProvider).toBeNull();
 
     await host.dispose();
     await host.dispose();
@@ -115,28 +115,6 @@ describe('Zhiyuan enterprise extension host', () => {
 
     expect(receivedContext!.capabilities.session).toBe(sessionCapability);
     expect(receivedContext!.capabilities.session?.apiVersion).toBe(1);
-  });
-
-  test('passes the versioned external model capability to the extension', async () => {
-    const root = createTemporaryDirectory();
-    const modulePath = path.join(root, 'resources', 'zhiyuan-enterprise', 'extension.cjs');
-    fs.mkdirSync(path.dirname(modulePath), { recursive: true });
-    fs.writeFileSync(modulePath, 'module placeholder');
-    const modelCapability = { apiVersion: 1 as const, registerProvider: vi.fn() };
-    let receivedContext: ZhiyuanEnterpriseHostContext | null = null;
-    const host = new ZhiyuanEnterpriseExtensionHost(async () => ({
-      createZhiyuanEnterpriseExtension: () => ({
-        ...validExtension(),
-        initialize: async (context: ZhiyuanEnterpriseHostContext) => {
-          receivedContext = context;
-        },
-      }),
-    }));
-
-    await host.initialize({ ...options(root, true), modelCapability });
-
-    expect(receivedContext!.capabilities.models).toBe(modelCapability);
-    expect(receivedContext!.capabilities.models?.apiVersion).toBe(1);
   });
 
   test('scopes the renderer capability to the loaded extension directory', async () => {

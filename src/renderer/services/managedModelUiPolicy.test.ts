@@ -7,25 +7,21 @@ import {
 } from './managedModelUiPolicy';
 
 describe('managed model UI policy', () => {
-  test('hides only the model settings tab when managed models are exclusive', () => {
-    const tabs = [{ key: 'general' }, { key: 'model' }, { key: 'about' }];
-
-    expect(filterManagedModelSettingsTabs(tabs, true)).toEqual([
-      { key: 'general' },
-      { key: 'about' },
-    ]);
-    expect(filterManagedModelSettingsTabs(tabs, false)).toEqual(tabs);
+  test('replaces the editable model tab with the enterprise models page', () => {
+    expect(
+      filterManagedModelSettingsTabs(
+        [{ key: 'general' }, { key: 'model' }, { key: 'extension:models' }],
+        true,
+      ),
+    ).toEqual([{ key: 'general' }, { key: 'extension:models' }]);
+    expect(resolveManagedModelSettingsTab('model', true, 'extension:models')).toBe(
+      'extension:models',
+    );
   });
 
-  test('moves a hidden active tab to enterprise settings when available', () => {
-    expect(resolveManagedModelSettingsTab('model', true, true)).toBe('extension');
-    expect(resolveManagedModelSettingsTab('model', true, false)).toBe('general');
-    expect(resolveManagedModelSettingsTab('model', false, true)).toBe('model');
-  });
-
-  test('hides local inference in chat mode and managed model mode', () => {
+  test('hides local inference navigation only for exclusive managed models', () => {
+    expect(shouldShowLocalInferenceNavigation(false, true)).toBe(false);
     expect(shouldShowLocalInferenceNavigation(false, false)).toBe(true);
     expect(shouldShowLocalInferenceNavigation(true, false)).toBe(false);
-    expect(shouldShowLocalInferenceNavigation(false, true)).toBe(false);
   });
 });
