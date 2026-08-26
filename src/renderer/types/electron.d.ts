@@ -1219,7 +1219,6 @@ interface IElectronAPI {
     };
   };
   externalModels: {
-    policy: () => Promise<import('../../shared/externalModels').ExternalModelAccessPolicy>;
     list: () => Promise<readonly import('../../shared/externalModels').ExternalModel[]>;
     onChanged: (callback: () => void) => () => void;
   };

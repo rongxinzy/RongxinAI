@@ -1,10 +1,5 @@
 import type { LlamaCppModelPreferences, LlamaCppRunningModel } from '../../shared/llamacpp';
-import {
-  ExternalModelAccessMode,
-  OPEN_EXTERNAL_MODEL_ACCESS_POLICY,
-  type ExternalModel,
-  type ExternalModelAccessPolicy,
-} from '../../shared/externalModels';
+import type { ExternalModel } from '../../shared/externalModels';
 import {
   isProviderEnabled,
   ModelCapabilityStatus,
@@ -147,23 +142,11 @@ export function mergeAvailableModels(
   return merged;
 }
 
-export async function getExternalModelAccessPolicy(): Promise<ExternalModelAccessPolicy> {
-  return (
-    (await window.electron.externalModels?.policy?.().catch(() => null)) ??
-    OPEN_EXTERNAL_MODEL_ACCESS_POLICY
-  );
-}
-
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
-  const policy = await getExternalModelAccessPolicy();
+  const configuredModels = buildConfiguredAvailableModels(config);
   const externalModelsPromise =
     window.electron.externalModels?.list().catch((): readonly ExternalModel[] => []) ??
     Promise.resolve([]);
-  if (policy.mode === ExternalModelAccessMode.Exclusive) {
-    return buildExternalAvailableModels(await externalModelsPromise);
-  }
-
-  const configuredModels = buildConfiguredAvailableModels(config);
 
   try {
     const [runningModels, externalModels] = await Promise.all([

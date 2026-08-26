@@ -294,10 +294,6 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   externalModels: {
-    policy: () =>
-      ipcRenderer.invoke(ExternalModelIpc.Policy) as Promise<
-        import('../shared/externalModels').ExternalModelAccessPolicy
-      >,
     list: () =>
       ipcRenderer.invoke(ExternalModelIpc.List) as Promise<
         readonly import('../shared/externalModels').ExternalModel[]

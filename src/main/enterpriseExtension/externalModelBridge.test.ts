@@ -1,10 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
 
-import {
-  ExternalModelAccessMode,
-  ExternalModelProtocol,
-  OPEN_EXTERNAL_MODEL_ACCESS_POLICY,
-} from '../../shared/externalModels';
+import { ExternalModelProtocol } from '../../shared/externalModels';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import type { ExternalModelProvider } from './contract';
 import { ExternalModelBridge } from './externalModelBridge';
@@ -24,8 +20,6 @@ describe('ExternalModelBridge', () => {
     });
 
     const unregister = bridge.registerProvider(provider);
-
-    expect(bridge.accessPolicy()).toBe(OPEN_EXTERNAL_MODEL_ACCESS_POLICY);
 
     await expect(bridge.listModels()).resolves.toEqual([
       {
@@ -108,70 +102,6 @@ describe('ExternalModelBridge', () => {
     await expect(
       invalidConnectionBridge.resolveModelRef('external.fixture/assigned-model'),
     ).rejects.toThrow('base URL is invalid');
-  });
-
-  test('limits model access to exclusive providers and restores open access on disposal', async () => {
-    const bridge = new ExternalModelBridge(vi.fn());
-    bridge.registerProvider(
-      fixtureProvider({
-        id: 'external.optional',
-        displayName: 'Optional Gateway',
-      }),
-    );
-    const unregisterExclusive = bridge.registerProvider(
-      fixtureProvider({
-        id: 'external.managed',
-        displayName: 'Managed Gateway',
-        exclusive: true,
-      }),
-    );
-
-    expect(bridge.accessPolicy()).toEqual({
-      mode: ExternalModelAccessMode.Exclusive,
-      providerIds: ['external.managed'],
-    });
-    await expect(bridge.listModels()).resolves.toEqual([
-      expect.objectContaining({
-        provider: { id: 'external.managed', displayName: 'Managed Gateway' },
-      }),
-    ]);
-    expect(() => bridge.assertModelRefAllowed('external.managed/assigned-model')).not.toThrow();
-    for (const modelRef of [
-      undefined,
-      '',
-      'openai/gpt-5',
-      'external.managed/',
-      'external.optional/assigned-model',
-    ]) {
-      expect(() => bridge.assertModelRefAllowed(modelRef)).toThrow('managed model policy');
-    }
-    await expect(bridge.resolveModelRef('external.optional/assigned-model')).rejects.toThrow(
-      'managed model policy',
-    );
-
-    unregisterExclusive();
-    expect(bridge.accessPolicy()).toBe(OPEN_EXTERNAL_MODEL_ACCESS_POLICY);
-    await expect(bridge.listModels()).resolves.toEqual([
-      expect.objectContaining({
-        provider: { id: 'external.optional', displayName: 'Optional Gateway' },
-      }),
-    ]);
-  });
-
-  test('keeps an exclusive provider closed when its managed catalog is empty', async () => {
-    const bridge = new ExternalModelBridge(vi.fn());
-    bridge.registerProvider(
-      fixtureProvider({
-        exclusive: true,
-        listModels: vi.fn(async () => []),
-      }),
-    );
-
-    expect(bridge.accessPolicy().mode).toBe(ExternalModelAccessMode.Exclusive);
-    await expect(bridge.listModels()).resolves.toEqual([]);
-    await expect(bridge.resolveModelRef('external.fixture/assigned-model')).rejects.toThrow(
-      'unavailable',
-    );
   });
 });
 

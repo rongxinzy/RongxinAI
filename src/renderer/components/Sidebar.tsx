@@ -61,7 +61,6 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   updateEntry?: React.ReactNode;
   hideLogin?: boolean;
-  managedModelsOnly?: boolean;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
@@ -83,7 +82,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   updateEntry,
   hideLogin,
-  managedModelsOnly = false,
   onPrefetchView,
 }) => {
   const dispatch = useDispatch();
@@ -535,7 +533,6 @@ const Sidebar: React.FC<SidebarProps> = ({
               onShowActivity={onShowActivity}
               onWorkModeChange={handleWorkModeChange}
               workMode={workMode}
-              managedModelsOnly={managedModelsOnly}
               onPrefetchView={onPrefetchView}
             />
           </div>
