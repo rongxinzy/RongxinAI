@@ -77,7 +77,7 @@
 ## 知远智能体如何工作
 
 <p align="center">
-  <img src="public/readme/rongxinai_architecture_zh.svg" alt="知远智能体架构" width="760">
+  <img src="public/readme/zhiyuan_agent_architecture_zh.svg" alt="知远智能体架构" width="760">
 </p>
 
 知远使用 Electron 严格进程隔离架构。Renderer 承载 React UI，Preload 通过 `contextBridge` 暴露受控 IPC，Main Process 负责 Agent 会话、本地推理、存储、技能系统、MCP、定时任务和消息网关。
@@ -114,8 +114,8 @@
 ### 本地运行
 
 ```bash
-git clone https://github.com/rongxinzy/RongxinAI.git
-cd RongxinAI
+git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent
+cd ZhiYuanAgent
 bun install
 bun run electron:dev
 ```

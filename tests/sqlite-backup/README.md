@@ -31,7 +31,7 @@ This directory contains utilities and notes for SQLite backup and recovery perfo
    Confirm the target database path. The default desktop user-data path is usually:
 
    ```bash
-   ~/Library/Application\ Support/RongxinAI/app.sqlite
+   ~/Library/Application\ Support/ZhiYuanAgent/zhiyuan.sqlite
    ```
 
 3. 建议先退出应用，避免写入测试数据时与正在运行的进程竞争数据库锁。  
@@ -46,7 +46,7 @@ First, generate enough data for backup performance testing.
 
 ```bash
 npm run test:sqlite-backup:seed -- \
-  --db '/Users/jj.deng/Library/Application Support/RongxinAI/app.sqlite' \
+  --db '/Users/jj.deng/Library/Application Support/ZhiYuanAgent/zhiyuan.sqlite' \
   --sessions 10 \
   --messages-per-session 2000 \
   --payload-kb 8
@@ -56,7 +56,7 @@ npm run test:sqlite-backup:seed -- \
 
 ```bash
 npm run test:sqlite-backup:seed -- \
-  --db '/Users/jj.deng/Library/Application Support/RongxinAI/app.sqlite' \
+  --db '/Users/jj.deng/Library/Application Support/ZhiYuanAgent/zhiyuan.sqlite' \
   --sessions 50 \
   --messages-per-session 10000 \
   --payload-kb 16
@@ -131,7 +131,7 @@ Without the force env var, startup will first check:
 After backup completes, verify that the backup file exists:
 
 ```bash
-ls -lh ~/Library/Application\ Support/RongxinAI/backups/sqlite/snapshots/
+ls -lh ~/Library/Application\ Support/ZhiYuanAgent/backups/sqlite/snapshots/
 ```
 
 当前单文件备份名为：  
@@ -167,7 +167,7 @@ Make sure a valid backup exists first, then intentionally corrupt the main datab
 Example:
 
 ```bash
-printf 'not-a-sqlite-db' > ~/Library/Application\ Support/RongxinAI/app.sqlite
+printf 'not-a-sqlite-db' > ~/Library/Application\ Support/ZhiYuanAgent/zhiyuan.sqlite
 ```
 
 然后启动应用。  

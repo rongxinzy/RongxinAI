@@ -77,7 +77,7 @@ bash "$SKILLS_ROOT/web-search/scripts/search.sh" "query" 10
    - All relative paths work correctly
 
 2. **Production Mode**:
-   - `SKILLS_ROOT` → `~/Library/Application Support/RongxinAI/SKILLs` (macOS)
+   - `SKILLS_ROOT` → `~/Library/Application Support/ZhiYuanAgent/SKILLs` (macOS)
    - Skills are copied to userData during first launch
    - Scripts execute from packaged location
 
