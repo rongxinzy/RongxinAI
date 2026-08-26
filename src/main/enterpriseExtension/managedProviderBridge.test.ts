@@ -23,7 +23,13 @@ describe('Zhiyuan managed provider bridge', () => {
         return vi.fn();
       },
     };
-    const bridge = new ZhiyuanManagedProviderBridge();
+    let refreshToken: (() => Promise<string>) | null = null;
+    const unregisterTokenRefresher = vi.fn();
+    const registerTokenRefresher = vi.fn((_providerId, refresher) => {
+      refreshToken = refresher;
+      return unregisterTokenRefresher;
+    });
+    const bridge = new ZhiyuanManagedProviderBridge(registerTokenRefresher);
     const changed = vi.fn();
     bridge.onDidChange(changed);
     const unregister = bridge.registerSource(source);
@@ -55,6 +61,11 @@ describe('Zhiyuan managed provider bridge', () => {
         },
       },
     });
+    expect(registerTokenRefresher).toHaveBeenCalledWith('custom_enterprise', expect.any(Function));
+
+    vi.mocked(source.snapshot).mockResolvedValue(providerConfig({ apiKey: 'refreshed-token' }));
+    await expect(refreshToken?.()).resolves.toBe('refreshed-token');
+    expect(store.get<any>('app_config').providers.custom_enterprise.apiKey).toBe('refreshed-token');
 
     notifyChanged?.();
     await bridge.refresh();
@@ -62,6 +73,7 @@ describe('Zhiyuan managed provider bridge', () => {
     expect(changed).toHaveBeenCalled();
 
     unregister();
+    expect(unregisterTokenRefresher).toHaveBeenCalledOnce();
     expect(store.get<any>('app_config').providers.custom_enterprise).toBeUndefined();
     expect(store.get<any>('app_config').providers.deepseek).toBeDefined();
   });

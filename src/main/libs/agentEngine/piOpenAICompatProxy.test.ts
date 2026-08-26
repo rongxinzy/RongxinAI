@@ -6,6 +6,7 @@ import {
   convertOpenAIChatCompletionTextToSSEForPi,
   normalizeOpenAISSETextForPi,
   openAIStreamPayloadHasFinishReason,
+  registerPiOpenAICompatTokenRefresher,
   registerPiOpenAICompatUpstream,
   remapDeveloperRolesForOpenAICompletions,
   stopPiOpenAICompatProxyForTests,
@@ -223,4 +224,103 @@ describe('piOpenAICompatProxy', () => {
       await new Promise<void>(resolve => upstream.close(() => resolve()));
     }
   });
+
+  it('refreshes a rejected provider token once and retries the request', async () => {
+    const authorizations: Array<string | undefined> = [];
+    const upstream = http.createServer((request, response) => {
+      authorizations.push(request.headers.authorization);
+      if (request.headers.authorization === 'Bearer old-token') {
+        response.writeHead(401, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: 'expired token' }));
+        return;
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          choices: [{ index: 0, message: { content: 'refreshed' }, finish_reason: 'stop' }],
+        }),
+      );
+    });
+    const upstreamBaseURL = await listen(upstream);
+    let refreshCount = 0;
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream('custom_enterprise', {
+        baseURL: upstreamBaseURL,
+        apiKey: 'old-token',
+      });
+      registerPiOpenAICompatTokenRefresher('custom_enterprise', async () => {
+        refreshCount += 1;
+        return 'new-token';
+      });
+
+      const response = await fetch(`${proxyBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'enterprise-chat', messages: [] }),
+      });
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).toContain('refreshed');
+      expect(authorizations).toEqual(['Bearer old-token', 'Bearer new-token']);
+      expect(refreshCount).toBe(1);
+    } finally {
+      await close(upstream);
+    }
+  });
+
+  it('coalesces concurrent token refreshes and never retries more than once', async () => {
+    let upstreamRequestCount = 0;
+    const upstream = http.createServer((_request, response) => {
+      upstreamRequestCount += 1;
+      response.writeHead(401, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ error: 'rejected token' }));
+    });
+    const upstreamBaseURL = await listen(upstream);
+    let refreshCount = 0;
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream('custom_enterprise', {
+        baseURL: upstreamBaseURL,
+        apiKey: 'old-token',
+      });
+      registerPiOpenAICompatTokenRefresher('custom_enterprise', async () => {
+        refreshCount += 1;
+        await new Promise(resolve => setTimeout(resolve, 20));
+        return 'new-token';
+      });
+      const request = () =>
+        fetch(`${proxyBaseURL}/chat/completions`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ model: 'enterprise-chat', messages: [] }),
+        });
+
+      const responses = await Promise.all([request(), request()]);
+
+      expect(responses.map(response => response.status)).toEqual([401, 401]);
+      expect(refreshCount).toBe(1);
+      expect(upstreamRequestCount).toBe(4);
+    } finally {
+      await close(upstream);
+    }
+  });
 });
+
+async function listen(server: http.Server): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        reject(new Error('upstream did not receive a TCP port'));
+        return;
+      }
+      resolve(`http://127.0.0.1:${address.port}`);
+    });
+  });
+}
+
+async function close(server: http.Server): Promise<void> {
+  await new Promise<void>(resolve => server.close(() => resolve()));
+}
