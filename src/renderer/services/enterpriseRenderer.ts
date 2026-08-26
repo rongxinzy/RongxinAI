@@ -2,8 +2,6 @@ import {
   EnterpriseRendererMessageSource,
   EnterpriseRendererMessageType,
   EnterpriseRendererSessionOperation,
-  type EnterpriseRendererModelCatalogRequestMessage,
-  type EnterpriseRendererModelCatalogResult,
   type EnterpriseRendererReadyMessage,
   type EnterpriseRendererSessionRequestMessage,
 } from '../../shared/enterpriseRenderer';
@@ -54,23 +52,6 @@ export function parseEnterpriseSessionRequest(
   }
 }
 
-export function parseEnterpriseModelCatalogRequest(
-  value: unknown,
-): EnterpriseRendererModelCatalogRequestMessage | null {
-  const message = asRecord(value);
-  if (
-    message?.source !== EnterpriseRendererMessageSource.Module ||
-    message.apiVersion !== 1 ||
-    message.type !== EnterpriseRendererMessageType.ModelCatalogRequest ||
-    typeof message.requestId !== 'string' ||
-    message.requestId.length === 0 ||
-    message.requestId.length > MAX_REQUEST_ID_LENGTH
-  ) {
-    return null;
-  }
-  return message as unknown as EnterpriseRendererModelCatalogRequestMessage;
-}
-
 export function executeEnterpriseSessionRequest(
   request: EnterpriseRendererSessionRequestMessage,
 ): Promise<EnterpriseSessionResult> {
@@ -84,12 +65,6 @@ export function executeEnterpriseSessionRequest(
     case EnterpriseRendererSessionOperation.Logout:
       return window.electron.enterprise.session.logout();
   }
-}
-
-export async function executeEnterpriseModelCatalogRequest(): Promise<EnterpriseRendererModelCatalogResult> {
-  const externalModels = window.electron.externalModels;
-  if (!externalModels) return { ok: false };
-  return { ok: true, models: await externalModels.list() };
 }
 
 function isLoginInput(value: unknown): boolean {

@@ -4,19 +4,14 @@ import { useEffect, useRef } from 'react';
 import {
   EnterpriseRendererMessageSource,
   EnterpriseRendererMessageType,
-  EnterpriseRendererSurface,
   type EnterpriseRendererInitializeMessage,
-  type EnterpriseRendererModelCatalogResponseMessage,
-  type EnterpriseRendererModelCatalogResult,
   type EnterpriseRendererSessionResponseMessage,
-  type EnterpriseRendererSurface as EnterpriseRendererSurfaceValue,
+  type EnterpriseRendererSurface,
 } from '../../../shared/enterpriseRenderer';
 import type { EnterpriseSessionResult } from '../../../shared/enterpriseSession';
 import {
-  executeEnterpriseModelCatalogRequest,
   executeEnterpriseSessionRequest,
   isEnterpriseRendererReadyMessage,
-  parseEnterpriseModelCatalogRequest,
   parseEnterpriseSessionRequest,
 } from '../../services/enterpriseRenderer';
 import { publishEnterpriseSessionResult } from '../../services/enterpriseSessionEvents';
@@ -24,7 +19,7 @@ import { publishEnterpriseSessionResult } from '../../services/enterpriseSession
 interface EnterpriseRendererFrameProps {
   readonly src: string;
   readonly title: string;
-  readonly surface: EnterpriseRendererSurfaceValue;
+  readonly surface: EnterpriseRendererSurface;
   readonly session: EnterpriseSessionResult;
   readonly className?: string;
 }
@@ -61,45 +56,23 @@ export function EnterpriseRendererFrame({
         return;
       }
       const request = parseEnterpriseSessionRequest(event.data);
-      if (request) {
-        void executeEnterpriseSessionRequest(request)
-          .catch((): EnterpriseSessionResult => operationFailed())
-          .then(result => {
-            const target = iframeRef.current?.contentWindow;
-            if (target) {
-              const response: EnterpriseRendererSessionResponseMessage = {
-                source: EnterpriseRendererMessageSource.Host,
-                apiVersion: 1,
-                type: EnterpriseRendererMessageType.SessionResponse,
-                requestId: request.requestId,
-                result,
-              };
-              target.postMessage(response, '*');
-            }
-            if (result.ok) publishEnterpriseSessionResult(result);
-          });
-        return;
-      }
+      if (!request) return;
 
-      const modelCatalogRequest = parseEnterpriseModelCatalogRequest(event.data);
-      if (!modelCatalogRequest) return;
-      const catalog =
-        surface === EnterpriseRendererSurface.Settings
-          ? executeEnterpriseModelCatalogRequest()
-          : Promise.resolve<EnterpriseRendererModelCatalogResult>({ ok: false });
-      void catalog
-        .catch((): EnterpriseRendererModelCatalogResult => ({ ok: false }))
+      void executeEnterpriseSessionRequest(request)
+        .catch((): EnterpriseSessionResult => operationFailed())
         .then(result => {
           const target = iframeRef.current?.contentWindow;
-          if (!target) return;
-          const response: EnterpriseRendererModelCatalogResponseMessage = {
-            source: EnterpriseRendererMessageSource.Host,
-            apiVersion: 1,
-            type: EnterpriseRendererMessageType.ModelCatalogResponse,
-            requestId: modelCatalogRequest.requestId,
-            result,
-          };
-          target.postMessage(response, '*');
+          if (target) {
+            const response: EnterpriseRendererSessionResponseMessage = {
+              source: EnterpriseRendererMessageSource.Host,
+              apiVersion: 1,
+              type: EnterpriseRendererMessageType.SessionResponse,
+              requestId: request.requestId,
+              result,
+            };
+            target.postMessage(response, '*');
+          }
+          if (result.ok) publishEnterpriseSessionResult(result);
         });
     };
 
