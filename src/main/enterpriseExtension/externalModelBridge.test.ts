@@ -3,7 +3,6 @@ import { describe, expect, test, vi } from 'vitest';
 import {
   ExternalModelAccessMode,
   ExternalModelProtocol,
-  ExternalModelThinkingFormat,
   OPEN_EXTERNAL_MODEL_ACCESS_POLICY,
 } from '../../shared/externalModels';
 import { ModelCapabilityStatus } from '../../shared/providers';
@@ -34,11 +33,6 @@ describe('ExternalModelBridge', () => {
         displayName: 'Assigned Model',
         protocol: ExternalModelProtocol.OpenAICompatible,
         capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-        reasoningCompatibility: {
-          thinkingFormat: ExternalModelThinkingFormat.DeepSeek,
-          supportsReasoningEffort: true,
-          requiresReasoningContentOnAssistantMessages: true,
-        },
         contextWindow: 128_000,
         isDefault: true,
         provider: { id: 'external.fixture', displayName: 'Fixture Gateway' },
@@ -49,11 +43,6 @@ describe('ExternalModelBridge', () => {
       displayName: 'Assigned Model',
       protocol: ExternalModelProtocol.OpenAICompatible,
       capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-      reasoningCompatibility: {
-        thinkingFormat: ExternalModelThinkingFormat.DeepSeek,
-        supportsReasoningEffort: true,
-        requiresReasoningContentOnAssistantMessages: true,
-      },
       contextWindow: 128_000,
       isDefault: true,
       provider: { id: 'external.fixture', displayName: 'Fixture Gateway' },
@@ -96,28 +85,6 @@ describe('ExternalModelBridge', () => {
     await expect(bridge.resolveModelRef('external.broken/escape')).rejects.toThrow(
       'model ID is invalid',
     );
-  });
-
-  test('rejects unsupported reasoning compatibility', async () => {
-    const bridge = new ExternalModelBridge(vi.fn());
-    bridge.registerProvider(
-      fixtureProvider({
-        listModels: vi.fn(async () => [
-          {
-            id: 'assigned-model',
-            displayName: 'Assigned Model',
-            protocol: ExternalModelProtocol.OpenAICompatible,
-            reasoningCompatibility: {
-              thinkingFormat: ExternalModelThinkingFormat.DeepSeek,
-              supportsReasoningEffort: false,
-              requiresReasoningContentOnAssistantMessages: true,
-            },
-          },
-        ]),
-      }),
-    );
-
-    await expect(bridge.listModels()).resolves.toEqual([]);
   });
 
   test('validates provider identity, duplicate registration, and connections', async () => {
@@ -220,11 +187,6 @@ function fixtureProvider(
         displayName: 'Assigned Model',
         protocol: ExternalModelProtocol.OpenAICompatible,
         capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-        reasoningCompatibility: {
-          thinkingFormat: ExternalModelThinkingFormat.DeepSeek,
-          supportsReasoningEffort: true,
-          requiresReasoningContentOnAssistantMessages: true,
-        },
         contextWindow: 128_000,
         isDefault: true,
       },
