@@ -1,8 +1,6 @@
 import type { LlamaCppModelPreferences, LlamaCppRunningModel } from '../../shared/llamacpp';
-import type { ExternalModel } from '../../shared/externalModels';
 import {
   isProviderEnabled,
-  ModelCapabilityStatus,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -112,21 +110,6 @@ export function buildLlamaCppRunningModels(
   return models;
 }
 
-export function buildExternalAvailableModels(models: readonly ExternalModel[]): Model[] {
-  return [...models]
-    .sort((left, right) => Number(right.isDefault) - Number(left.isDefault))
-    .map(model => ({
-      id: model.id,
-      name: model.displayName,
-      provider: model.provider.displayName,
-      providerKey: model.provider.id,
-      agentProviderId: model.provider.id,
-      supportsImage: model.capabilities?.imageInput === ModelCapabilityStatus.Supported,
-      capabilities: model.capabilities,
-      contextWindow: model.contextWindow,
-    }));
-}
-
 export function mergeAvailableModels(
   configuredModels: Model[],
   llamaCppRunningModels: Model[],
@@ -144,15 +127,9 @@ export function mergeAvailableModels(
 
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
   const configuredModels = buildConfiguredAvailableModels(config);
-  const externalModelsPromise =
-    window.electron.externalModels?.list().catch((): readonly ExternalModel[] => []) ??
-    Promise.resolve([]);
 
   try {
-    const [runningModels, externalModels] = await Promise.all([
-      window.electron.llamacpp.listRunningModels(),
-      externalModelsPromise,
-    ]);
+    const runningModels = await window.electron.llamacpp.listRunningModels();
     let preferences: LlamaCppModelPreferences = {};
     try {
       preferences = (await window.electron.llamacpp.getModelPreferences?.()) ?? {};
@@ -160,17 +137,11 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
       // Model preferences are optional metadata; keep the running model list available.
     }
     return mergeAvailableModels(
-      mergeAvailableModels(
-        configuredModels,
-        buildLlamaCppRunningModels(runningModels, preferences),
-      ),
-      buildExternalAvailableModels(externalModels),
+      configuredModels,
+      buildLlamaCppRunningModels(runningModels, preferences),
     );
   } catch {
-    return mergeAvailableModels(
-      configuredModels,
-      buildExternalAvailableModels(await externalModelsPromise),
-    );
+    return configuredModels;
   }
 }
 

@@ -19,7 +19,6 @@ import {
   ProviderModelPiApi,
   ProviderModelPiMaxTokensField,
 } from '../../../shared/providers';
-import { ExternalModelProtocol } from '../../../shared/externalModels';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { ProductionLoopAction } from '../../../shared/productionLoop';
@@ -30,7 +29,6 @@ import {
   WorkbenchTaskStatus,
 } from '../../../shared/workbenchTask';
 import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
-import { externalModelBridge } from '../../enterpriseExtension/externalModelBridge';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -1047,68 +1045,6 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
         expect.objectContaining({ modelRuntime: mockModelRuntime }),
       );
-    });
-
-    it('refreshes an external model connection for each conversation turn', async () => {
-      const resolveConnection = vi.fn(async () => ({
-        baseUrl: 'https://gateway.example/v1',
-        apiKey: 'short-lived-token',
-        modelId: 'upstream-model',
-      }));
-      const unregister = externalModelBridge.registerProvider({
-        id: 'external.fixture',
-        displayName: 'Fixture Gateway',
-        listModels: async () => [
-          {
-            id: 'assigned-model',
-            displayName: 'Assigned Model',
-            protocol: ExternalModelProtocol.OpenAICompatible,
-            capabilities: { toolCalling: ModelCapabilityStatus.Supported },
-            contextWindow: 128_000,
-          },
-        ],
-        resolveConnection,
-      });
-
-      try {
-        await adapter.startSession('external-model', 'Hello gateway', {
-          modelOverride: 'external.fixture/assigned-model',
-        });
-
-        expect(resolveConnection).toHaveBeenCalledWith('assigned-model');
-        expect(mockResolveRawApiConfigForModelRef).not.toHaveBeenCalled();
-        expect(mockModelRuntime.registerProvider).toHaveBeenCalledWith(
-          'external.fixture',
-          expect.objectContaining({
-            baseUrl: 'https://gateway.example/v1',
-            models: [
-              expect.objectContaining({
-                id: 'upstream-model',
-                name: 'Assigned Model',
-                provider: 'external.fixture',
-              }),
-            ],
-          }),
-        );
-        expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenCalledWith(
-          'external.fixture',
-          'short-lived-token',
-        );
-        resolveConnection.mockResolvedValueOnce({
-          baseUrl: 'https://gateway.example/v1',
-          apiKey: 'rotated-token',
-          modelId: 'upstream-model',
-        });
-        await adapter.continueSession('external-model', 'Continue');
-        expect(resolveConnection).toHaveBeenCalledTimes(2);
-        expect(mockModelRuntime.setRuntimeApiKey).toHaveBeenLastCalledWith(
-          'external.fixture',
-          'rotated-token',
-        );
-        expect(mockCreateAgentSession).toHaveBeenCalledOnce();
-      } finally {
-        unregister();
-      }
     });
 
     it('should keep supported remote models on the Pi built-in path', async () => {

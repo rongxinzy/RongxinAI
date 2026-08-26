@@ -285,9 +285,6 @@ const App: React.FC = () => {
     const handleLlamaCppRunningModelsChanged = () => {
       void refreshAvailableModels().catch(() => undefined);
     };
-    const unsubscribeExternalModels = window.electron.externalModels?.onChanged(
-      handleLlamaCppRunningModelsChanged,
-    );
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
@@ -300,7 +297,6 @@ const App: React.FC = () => {
         LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
         handleLlamaCppRunningModelsChanged,
       );
-      unsubscribeExternalModels?.();
     };
   }, [dispatch, isInitialized]);
 
