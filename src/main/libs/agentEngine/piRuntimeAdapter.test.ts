@@ -1111,6 +1111,48 @@ describe('PiRuntimeAdapter', () => {
       }
     });
 
+    it('enforces exclusive external model access before resolving Pi models', async () => {
+      adapter.on('error', () => undefined);
+      const unregister = externalModelBridge.registerProvider({
+        id: 'external.managed',
+        displayName: 'Managed Gateway',
+        exclusive: true,
+        listModels: async () => [
+          {
+            id: 'assigned-model',
+            displayName: 'Assigned Model',
+            protocol: ExternalModelProtocol.OpenAICompatible,
+          },
+        ],
+        resolveConnection: async () => ({
+          baseUrl: 'https://gateway.example/v1',
+          apiKey: 'short-lived-token',
+          modelId: 'upstream-model',
+        }),
+      });
+
+      try {
+        await expect(
+          adapter.startSession('managed-model', 'Hello gateway', {
+            modelOverride: 'external.managed/assigned-model',
+          }),
+        ).resolves.toBeUndefined();
+
+        for (const [sessionId, modelOverride] of [
+          ['builtin-model', 'openai/gpt-5.2'],
+          ['custom-model', 'custom_0/private-model'],
+          ['local-model', 'llamacpp/qwen-local'],
+          ['missing-model', undefined],
+        ] as const) {
+          await expect(
+            adapter.startSession(sessionId, 'Blocked', { modelOverride }),
+          ).rejects.toThrow('managed model policy');
+        }
+      } finally {
+        unregister();
+      }
+    });
+
     it('should keep supported remote models on the Pi built-in path', async () => {
       await adapter.startSession('test', 'Hello Pi', { modelOverride: 'openai/gpt-5.2' });
 

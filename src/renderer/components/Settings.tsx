@@ -123,6 +123,10 @@ import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
 import { EnterpriseSettingsPage } from './enterprise/EnterpriseSettingsPage';
+import {
+  filterManagedModelSettingsTabs,
+  resolveManagedModelSettingsTab,
+} from '../services/managedModelUiPolicy';
 
 type TabType =
   | 'general'
@@ -156,6 +160,7 @@ interface SettingsProps extends SettingsOpenOptions {
     disableUpdate?: boolean;
   } | null;
   appUpdateState?: AppUpdateRuntimeState;
+  managedModelsOnly?: boolean;
 }
 
 const CUSTOM_PROVIDER_KEYS = [
@@ -717,11 +722,17 @@ const Settings: React.FC<SettingsProps> = ({
   noticeExtra,
   enterpriseConfig,
   appUpdateState,
+  managedModelsOnly = false,
 }) => {
   // 状态
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
+  const [requestedActiveTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
   const [enterpriseSettingsPage, setEnterpriseSettingsPage] =
     useState<EnterpriseRendererSettingsPage | null>(null);
+  const activeTab = resolveManagedModelSettingsTab(
+    requestedActiveTab,
+    managedModelsOnly,
+    Boolean(enterpriseSettingsPage),
+  );
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [language, setLanguage] = useState<LanguageType>('zh');
   const [autoLaunch, setAutoLaunchState] = useState(false);
@@ -2905,10 +2916,10 @@ const Settings: React.FC<SettingsProps> = ({
     // Filter out tabs with 'hide' action in enterprise config
     // e.g., ui: { "settings.im": "hide" } → hide the 'im' tab
     const ui = enterpriseConfig?.ui;
-    if (ui) {
-      return allTabs.filter(tab => ui[`settings.${tab.key}`] !== 'hide');
-    }
-    return allTabs;
+    const configuredTabs = ui
+      ? allTabs.filter(tab => ui[`settings.${tab.key}`] !== 'hide')
+      : allTabs;
+    return filterManagedModelSettingsTabs(configuredTabs, managedModelsOnly);
   })();
 
   const activeTabLabel = useMemo(() => {

@@ -3545,6 +3545,7 @@ async function resolvePiModel(
   existingModelRuntime?: PiModelRuntime | null,
 ): Promise<PiResolvedModel> {
   const normalizedModelRef = modelRef?.trim() || '';
+  externalModelBridge.assertModelRefAllowed(normalizedModelRef);
   const externalModel = normalizedModelRef
     ? await externalModelBridge.resolveModelRef(normalizedModelRef)
     : null;
