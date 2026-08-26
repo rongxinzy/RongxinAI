@@ -7,12 +7,51 @@ import {
   normalizeOpenAISSETextForPi,
   openAIStreamPayloadHasFinishReason,
   registerPiOpenAICompatUpstream,
+  remapDeveloperRolesForOpenAICompletions,
   stopPiOpenAICompatProxyForTests,
 } from './piOpenAICompatProxy';
 
 describe('piOpenAICompatProxy', () => {
   afterEach(async () => {
     await stopPiOpenAICompatProxyForTests();
+  });
+
+  it('remaps developer roles to system for gateway compatibility', () => {
+    const body = Buffer.from(
+      JSON.stringify({
+        model: 'kimi-for-coding',
+        stream: true,
+        messages: [
+          { role: 'developer', content: 'You are a helpful assistant.' },
+          { role: 'user', content: 'Hi' },
+          { role: 'assistant', content: 'Hello' },
+        ],
+      }),
+      'utf8',
+    );
+
+    const remapped = remapDeveloperRolesForOpenAICompletions(body);
+
+    const parsed = JSON.parse(remapped.toString('utf8')) as {
+      stream?: boolean;
+      messages: Array<{ role: string; content: string }>;
+    };
+    expect(parsed.messages.map(message => message.role)).toEqual(['system', 'user', 'assistant']);
+    expect(parsed.stream).toBe(true);
+    expect(parsed.messages[0].content).toBe('You are a helpful assistant.');
+  });
+
+  it('passes payloads without developer roles through unchanged', () => {
+    const body = Buffer.from(
+      JSON.stringify({ messages: [{ role: 'user', content: 'Hi' }] }),
+      'utf8',
+    );
+    expect(remapDeveloperRolesForOpenAICompletions(body)).toEqual(body);
+  });
+
+  it('passes malformed payloads through unchanged', () => {
+    const body = Buffer.from('not-json', 'utf8');
+    expect(remapDeveloperRolesForOpenAICompletions(body)).toEqual(body);
   });
   it('detects OpenAI stream finish reasons', () => {
     expect(
@@ -90,6 +129,56 @@ describe('piOpenAICompatProxy', () => {
 
     expect((normalized.match(/finish_reason/g) ?? []).length).toBe(1);
     expect(normalized).toContain('"finish_reason":"tool_calls"');
+  });
+
+  it('remaps developer roles to system before forwarding to the upstream', async () => {
+    let receivedBody = '';
+    const upstream = http.createServer(async (request, response) => {
+      for await (const chunk of request) {
+        receivedBody += chunk.toString('utf8');
+      }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(
+        JSON.stringify({
+          choices: [{ index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' }],
+        }),
+      );
+    });
+    const upstreamBaseURL = await new Promise<string>((resolve, reject) => {
+      upstream.once('error', reject);
+      upstream.listen(0, '127.0.0.1', () => {
+        const address = upstream.address();
+        if (!address || typeof address === 'string') {
+          reject(new Error('upstream did not receive a TCP port'));
+          return;
+        }
+        resolve(`http://127.0.0.1:${address.port}`);
+      });
+    });
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream('custom_9', {
+        baseURL: upstreamBaseURL,
+        apiKey: 'sk-test',
+      });
+      const response = await fetch(`${proxyBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: 'agent-model',
+          messages: [
+            { role: 'developer', content: 'You are a helpful assistant.' },
+            { role: 'user', content: 'Hi' },
+          ],
+        }),
+      });
+      expect(response.ok).toBe(true);
+
+      const parsed = JSON.parse(receivedBody) as { messages: Array<{ role: string }> };
+      expect(parsed.messages.map(message => message.role)).toEqual(['system', 'user']);
+    } finally {
+      upstream.close();
+    }
   });
 
   it('proxies upstream SSE and injects missing finish_reason through the local server', async () => {
