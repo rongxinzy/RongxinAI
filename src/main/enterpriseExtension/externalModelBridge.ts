@@ -1,7 +1,10 @@
 import type { ModelCapabilities } from '../../shared/providers';
 import { ModelCapabilityStatus } from '../../shared/providers';
 import {
+  ExternalModelAccessMode,
   ExternalModelProtocol,
+  OPEN_EXTERNAL_MODEL_ACCESS_POLICY,
+  type ExternalModelAccessPolicy,
   type ExternalModel,
   type ExternalModelConnection,
   type ExternalModelDescriptor,
@@ -77,20 +80,55 @@ export class ExternalModelBridge implements ExternalModelHostCapability {
   }
 
   async listModels(): Promise<readonly ExternalModel[]> {
+    const policy = this.accessPolicy();
+    const allowedProviderIds = new Set(policy.providerIds);
     const groups = await Promise.all(
-      [...this.#providers.values()].map(async ({ provider }) => {
-        try {
-          return await listProviderModels(provider);
-        } catch {
-          this.#logError(`[ExternalModels] Could not list models for ${provider.id}.`);
-          return [];
-        }
-      }),
+      [...this.#providers.values()]
+        .filter(
+          ({ provider }) =>
+            policy.mode === ExternalModelAccessMode.Open || allowedProviderIds.has(provider.id),
+        )
+        .map(async ({ provider }) => {
+          try {
+            return await listProviderModels(provider);
+          } catch {
+            this.#logError(`[ExternalModels] Could not list models for ${provider.id}.`);
+            return [];
+          }
+        }),
     );
     return Object.freeze(groups.flat());
   }
 
+  accessPolicy(): ExternalModelAccessPolicy {
+    const providerIds = [...this.#providers.values()]
+      .filter(({ provider }) => provider.exclusive)
+      .map(({ provider }) => provider.id)
+      .sort();
+    if (providerIds.length === 0) return OPEN_EXTERNAL_MODEL_ACCESS_POLICY;
+    return Object.freeze({
+      mode: ExternalModelAccessMode.Exclusive,
+      providerIds: Object.freeze(providerIds),
+    });
+  }
+
+  assertModelRefAllowed(modelRef: string | undefined): void {
+    const policy = this.accessPolicy();
+    if (policy.mode !== ExternalModelAccessMode.Exclusive) return;
+    const normalizedModelRef = modelRef?.trim() ?? '';
+    const separator = normalizedModelRef.indexOf('/');
+    const providerId = separator > 0 ? normalizedModelRef.slice(0, separator) : '';
+    if (
+      !providerId ||
+      separator === normalizedModelRef.length - 1 ||
+      !policy.providerIds.includes(providerId)
+    ) {
+      throw new Error('The selected model is not allowed by the managed model policy.');
+    }
+  }
+
   async resolveModelRef(modelRef: string): Promise<ResolvedExternalModel | null> {
+    this.assertModelRefAllowed(modelRef);
     const separator = modelRef.indexOf('/');
     if (separator <= 0 || separator === modelRef.length - 1) return null;
     const providerId = modelRef.slice(0, separator);
@@ -145,9 +183,13 @@ function normalizeProvider(provider: ExternalModelProvider): ExternalModelProvid
   if (provider.onDidChange !== undefined && typeof provider.onDidChange !== 'function') {
     throw new Error('External model provider change listener is invalid.');
   }
+  if (provider.exclusive !== undefined && typeof provider.exclusive !== 'boolean') {
+    throw new Error('External model provider exclusive flag is invalid.');
+  }
   return Object.freeze({
     id,
     displayName,
+    ...(provider.exclusive === undefined ? {} : { exclusive: provider.exclusive }),
     listModels: () => provider.listModels(),
     resolveConnection: (modelId: string) => provider.resolveConnection(modelId),
     ...(provider.onDidChange

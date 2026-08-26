@@ -5,6 +5,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate/constants';
+import { ExternalModelAccessMode, type ExternalModelAccessPolicy } from '../shared/externalModels';
 import { CoworkView } from './components/cowork';
 import {
   hasAskUserQuestions,
@@ -24,6 +25,7 @@ import { agentService } from './services/agent';
 import { apiService } from './services/api';
 import {
   collectAvailableModels,
+  getExternalModelAccessPolicy,
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
 } from './services/availableModels';
 import { configService } from './services/config';
@@ -124,6 +126,9 @@ const App: React.FC = () => {
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
   } | null>(null);
+  const [externalModelPolicy, setExternalModelPolicy] = useState<ExternalModelAccessPolicy | null>(
+    null,
+  );
   const toastTimerRef = useRef<number | null>(null);
   const toastOnCloseRef = useRef<(() => void) | null>(null);
   const hasInitialized = useRef(false);
@@ -141,6 +146,7 @@ const App: React.FC = () => {
     selectPendingPermissionForSession(state, currentSessionId),
   );
   const isWindows = window.electron.platform === 'win32';
+  const managedModelsOnly = externalModelPolicy?.mode === ExternalModelAccessMode.Exclusive;
 
   const waitWithTimeout = useCallback(
     async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
@@ -207,11 +213,13 @@ const App: React.FC = () => {
 
         // Enterprise and i18n only depend on config initialization.
         mark('enterprise/i18n init begin');
-        const [entConfig] = await Promise.all([
+        const [entConfig, , modelPolicy] = await Promise.all([
           window.electron.enterprise.getConfig(),
           waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
+          getExternalModelAccessPolicy(),
         ]);
         setEnterpriseConfig(entConfig);
+        setExternalModelPolicy(modelPolicy);
         mark('enterprise/i18n init done');
 
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
@@ -270,7 +278,15 @@ const App: React.FC = () => {
 
     const refreshAvailableModels = async () => {
       const config = configService.getConfig();
-      const allModels = await collectAvailableModels(config);
+      const [policy, allModels] = await Promise.all([
+        getExternalModelAccessPolicy(),
+        collectAvailableModels(config),
+      ]);
+      setExternalModelPolicy(policy);
+      if (policy.mode === ExternalModelAccessMode.Exclusive) {
+        setLocalInferenceInstallRequestId(undefined);
+        setMainView(currentView => (currentView === 'localInference' ? 'cowork' : currentView));
+      }
       dispatch(setAvailableModels(allModels));
     };
 
@@ -342,6 +358,7 @@ const App: React.FC = () => {
   }, [mainView]);
 
   useEffect(() => {
+    if (!externalModelPolicy || managedModelsOnly) return;
     let active = true;
     void window.electron.appInfo
       .consumePendingLocalInferenceInstall()
@@ -357,7 +374,7 @@ const App: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [externalModelPolicy, managedModelsOnly]);
 
   // Network status monitoring
   useEffect(() => {
@@ -435,8 +452,9 @@ const App: React.FC = () => {
   }, []);
 
   const handleShowLocalInference = useCallback(() => {
+    if (managedModelsOnly) return;
     setMainView('localInference');
-  }, []);
+  }, [managedModelsOnly]);
 
   const handleShowExpert = useCallback(() => {
     setExpertInitialTab(undefined);
@@ -713,12 +731,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handler = () => {
+      if (managedModelsOnly) return;
       setShowSettings(false);
       setMainView('localInference');
     };
     window.addEventListener('app:show-local-inference', handler);
     return () => window.removeEventListener('app:show-local-inference', handler);
-  }, []);
+  }, [managedModelsOnly]);
 
   // 监听托盘菜单打开设置的 IPC 事件
   useEffect(() => {
@@ -802,6 +821,7 @@ const App: React.FC = () => {
                   notice={settingsOptions.notice}
                   enterpriseConfig={enterpriseConfig}
                   appUpdateState={appUpdateState}
+                  managedModelsOnly={managedModelsOnly}
                 />
               </React.Suspense>
             </LazyChunkErrorBoundary>
@@ -835,13 +855,14 @@ const App: React.FC = () => {
             onToggleCollapse={handleToggleSidebar}
             updateEntry={!isSidebarCollapsed ? updateEntry : null}
             hideLogin={false}
+            managedModelsOnly={managedModelsOnly}
             onPrefetchView={prefetchFeatureView}
           />
           <div
             className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
           >
             <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
-              {hasMountedLocalInference && (
+              {hasMountedLocalInference && !managedModelsOnly && (
                 <div
                   className={
                     mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
@@ -950,6 +971,7 @@ const App: React.FC = () => {
                 notice={settingsOptions.notice}
                 enterpriseConfig={enterpriseConfig}
                 appUpdateState={appUpdateState}
+                managedModelsOnly={managedModelsOnly}
               />
             </React.Suspense>
           </LazyChunkErrorBoundary>
