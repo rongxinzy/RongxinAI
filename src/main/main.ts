@@ -209,6 +209,7 @@ import {
 } from './enterpriseExtension/rendererProtocol';
 import { zhiyuanEnterpriseSessionBridge } from './enterpriseExtension/sessionBridge';
 import { zhiyuanManagedProviderBridge } from './enterpriseExtension/managedProviderBridge';
+import { ZhiyuanEnterpriseSkillBridge } from './enterpriseExtension/skillBridge';
 import { LlamaCppManager } from './libs/llamacppManager';
 import { CcConnectBridgeServer } from './libs/ccConnectBridgeServer';
 import { serializeCcConnectSidecarConfig } from './libs/ccConnectSidecarConfig';
@@ -6673,6 +6674,11 @@ if (!gotTheLock) {
       developmentExtensionPath: process.env.ZHIYUAN_ENTERPRISE_EXTENSION_DEV_PATH,
       sessionCapability: zhiyuanEnterpriseSessionBridge,
       managedProviderCapability: zhiyuanManagedProviderBridge,
+      createSkillCapability: () =>
+        new ZhiyuanEnterpriseSkillBridge({
+          userDataPath: app.getPath('userData'),
+          refreshSkills: () => getSkillManager().handleWorkingDirectoryChange(),
+        }),
       createRendererCapability: extensionDirectory =>
         zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
       createSettingsCapability: extensionDirectory =>

@@ -24,6 +24,7 @@ import type {
   SkillSecurityReport,
 } from './libs/skillSecurity/skillSecurityTypes';
 import { SqliteStore } from './sqliteStore';
+import { skillRootRegistry } from './skillRootRegistry';
 
 /**
  * Resolve the user's login shell PATH on macOS/Linux.
@@ -2922,7 +2923,7 @@ export class SkillManager {
     if (appRoot !== resolvedPrimary && fs.existsSync(appRoot)) {
       roots.push(appRoot);
     }
-    return roots;
+    return skillRootRegistry.appendTo(roots);
   }
 
   getBundledSkillsRoot(): string {
