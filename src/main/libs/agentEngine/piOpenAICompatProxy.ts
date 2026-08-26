@@ -78,6 +78,37 @@ function extractRequestModel(body: Buffer): string | undefined {
   }
 }
 
+/**
+ * OpenAI's newer protocol uses the 'developer' role; most self-hosted
+ * OpenAI-compatible gateways (new-api / one-api and similar) validate
+ * roles against user/assistant/system/tool and reject it. The proxy
+ * serves user-added providers exactly, so remap developer to system
+ * before forwarding. Both roles are accepted by the models themselves;
+ * system is the broadly supported spelling.
+ */
+export function remapDeveloperRolesForOpenAICompletions(body: Buffer): Buffer {
+  try {
+    const parsed = JSON.parse(body.toString('utf8')) as Record<string, unknown>;
+    const messages = Array.isArray(parsed.messages) ? parsed.messages : [];
+    let changed = false;
+    for (const message of messages) {
+      if (typeof message !== 'object' || message === null || Array.isArray(message)) {
+        continue;
+      }
+      const record = message as Record<string, unknown>;
+      if (record.role === 'developer') {
+        record.role = 'system';
+        changed = true;
+      }
+    }
+    if (!changed) return body;
+    return Buffer.from(JSON.stringify(parsed), 'utf8');
+  } catch {
+    // Non-JSON or an unexpected payload shape: pass through unchanged.
+    return body;
+  }
+}
+
 function requestWantsStream(body: Buffer): boolean {
   try {
     const parsed = JSON.parse(body.toString('utf8')) as { stream?: unknown };
@@ -357,7 +388,7 @@ async function handleProxyRequest(
     return;
   }
 
-  const body = await readRequestBody(request);
+  const body = remapDeveloperRolesForOpenAICompletions(await readRequestBody(request));
   const model = extractRequestModel(body);
   const upstreamURL = buildOpenAIChatCompletionsURL(upstream.baseURL);
   const upstreamResponse = await fetch(upstreamURL, {
