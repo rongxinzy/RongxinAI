@@ -1,0 +1,34 @@
+{
+  "name": "cadjs",
+  "version": "0.4.28",
+  "private": true,
+  "type": "module",
+  "description": "Reusable CAD render/viewer runtime for docs, CAD Viewer, and generated snapshot browser assets.",
+  "exports": {
+    ".": "./src/index.js",
+    "./common/*": "./src/common/*",
+    "./glb/*": "./src/glb/*",
+    "./implicit/model": "./src/implicit/model.js",
+    "./implicit/export": "./src/implicit/export.js",
+    "./implicit/exportModel": "./src/implicit/exportModel.js",
+    "./implicit/graphicsSettings": "./src/implicit/graphicsSettings.js",
+    "./implicit/loader": "./src/implicit/loader.js",
+    "./implicit/render": "./src/implicit/render.js",
+    "./implicit/parameters": "./src/implicit/parameters.js",
+    "./lib/*": "./src/lib/*"
+  },
+  "scripts": {
+    "test": "node scripts/run-tests.mjs"
+  },
+  "sideEffects": [
+    "./src/common/headlessRenderEntry.js",
+    "./src/common/render.html"
+  ],
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "implicitjs": "file:../implicitjs",
+    "meshoptimizer": "^1.2.0",
+    "three": "0.161.0",
+    "three-mesh-bvh": "0.8.0"
+  }
+}
