@@ -1,1 +1,0 @@
-"""SDF robot snapshot CLI."""

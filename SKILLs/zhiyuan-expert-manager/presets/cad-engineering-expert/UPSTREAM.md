@@ -8,6 +8,9 @@ The bundled skills in `skills/` are copied from
 - Retrieved: 2026-08-26
 - License: MIT
 
-Each bundled skill retains its upstream `LICENSE` file. Update the complete
-skill set together so cross-skill handoffs and embedded runtime packages stay
-on one upstream revision.
+The complete upstream runtime is stored in
+`skills/text-to-cad/vendor/text-to-cad-0.4.28.tar.gz` with SHA-256
+`db236fa8f34bfd01f01d1bc033732e8a451abb6c730f306d8758f98890c79252`.
+It is extracted only after checksum and path-safety validation. Each extracted
+skill retains its upstream `LICENSE` file. Update the complete archive together
+so cross-skill handoffs and embedded runtime packages stay on one revision.

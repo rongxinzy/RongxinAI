@@ -59,17 +59,6 @@
     }
   ],
   "skills": [
-    "./skills/cad",
-    "./skills/cad-viewer",
-    "./skills/step-parts",
-    "./skills/dxf",
-    "./skills/urdf",
-    "./skills/srdf",
-    "./skills/sdf",
-    "./skills/sendcutsend",
-    "./skills/dfam-check",
-    "./skills/gcode",
-    "./skills/bambu-labs",
-    "./skills/implicit-cad"
+    "./skills/text-to-cad"
   ]
 }

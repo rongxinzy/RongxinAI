@@ -25,20 +25,7 @@ test('loads the complete text-to-cad skill set for the CAD engineering expert', 
 
   expect(snapshot).not.toBeNull();
   expect(snapshot?.promptSnapshot).toContain('CAD 工程专家');
-  expect(snapshot?.skillIds).toEqual([
-    'cad',
-    'cad-viewer',
-    'step-parts',
-    'dxf',
-    'urdf',
-    'srdf',
-    'sdf',
-    'sendcutsend',
-    'dfam-check',
-    'gcode',
-    'bambu-labs',
-    'implicit-cad',
-  ]);
+  expect(snapshot?.skillIds).toEqual(['text-to-cad']);
 });
 
 test('returns null for a missing preset', () => {

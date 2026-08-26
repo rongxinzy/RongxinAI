@@ -1,1 +1,0 @@
-"""Implicit CAD snapshot CLI."""

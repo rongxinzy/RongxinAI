@@ -1,1 +1,0 @@
-"""DXF generation CLI."""

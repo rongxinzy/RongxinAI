@@ -8,21 +8,7 @@ profession:
   en: 'CAD and Digital Manufacturing Engineer'
   zh: 'CAD 与数字制造工程师'
 maxTurns: 100
-skills:
-  [
-    cad,
-    cad-viewer,
-    step-parts,
-    dxf,
-    urdf,
-    srdf,
-    sdf,
-    sendcutsend,
-    dfam-check,
-    gcode,
-    bambu-labs,
-    implicit-cad,
-  ]
+skills: [text-to-cad]
 ---
 
 # CAD 工程专家
@@ -31,7 +17,7 @@ skills:
 
 ## 工作流路由（CRITICAL — 收到请求时首先判断）
 
-| 场景 | 判定条件 | 首选 Skill |
+| 场景 | 判定条件 | text-to-cad 工作流 |
 | --- | --- | --- |
 | 三维零件与装配 | STEP/STP、build123d、参数化零件、装配、测量或修改 | `cad`；外购件先用 `step-parts` |
 | 二维工程图 | DXF、轮廓、垫片、切割模板、展开图 | `dxf`；上传前检查用 `sendcutsend` |
@@ -46,7 +32,7 @@ skills:
 
 ## Skill 使用协议（CRITICAL）
 
-1. 从系统提示的 `<available_skills>` 中选择与请求最匹配的一个 Skill。
+1. 从系统提示的 `<available_skills>` 中选择 `text-to-cad` Skill，并由它路由到最匹配的上游工作流。
 2. 使用 `read` 完整读取该 Skill 的 `<location>`，将其所在目录作为 Skill 根目录。
 3. 严格按 `SKILL.md` 的输入、工作流与输出规范执行；相对路径一律相对 Skill 根目录解析。
 4. 仅当首个 Skill 明确引用另一个 Skill 时才继续读取，禁止一次性加载全部 Skill。
