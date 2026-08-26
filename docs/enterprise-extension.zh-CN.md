@@ -35,5 +35,3 @@ Preload 桥只允许 `snapshot`、`login`、`changePassword` 和 `logout`。主�
 可选的 `capabilities.models` 对象允许扩展注册使用保留 `external.*` 命名空间的 provider。Provider 提供有数量边界的模型列表、按所选模型解析连接，并可通知宿主列表已变化。v1 只支持 OpenAI-compatible 端点。模型进入 Renderer 或运行时前，宿主会校验 provider 身份、模型 ID 唯一性、模型元数据、HTTP(S) 端点和连接字段。
 
 Renderer 只能取得模型元数据，base URL 和 API key 始终留在主进程。运行时会在模型首次使用前解析连接，并在后续每个对话回合刷新连接，使短期凭证轮换和授权撤销及时生效，同时不把秘密写入公开应用的配置或数据库。单个 provider 失败不会影响其他 provider，日志也不会包含 provider 抛出的异常内容。
-
-OpenAI-compatible 模型可以声明经过宿主校验的 `reasoningCompatibility` 元数据。API v1 当前只接受 DeepSeek 线路格式，并要求支持 reasoning effort，以及在工具调用会话继续执行时回放 assistant 的 `reasoning_content`。宿主负责将这份通用描述转换为内部运行参数，企业扩展不导入、也不依赖应用内部运行时实现。
