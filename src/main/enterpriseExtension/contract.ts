@@ -44,7 +44,6 @@ export interface ZhiyuanEnterpriseSettingsHostCapability {
 export interface ExternalModelProvider {
   readonly id: string;
   readonly displayName: string;
-  readonly exclusive?: boolean;
   listModels(): Promise<readonly ExternalModelDescriptor[]>;
   resolveConnection(modelId: string): Promise<ExternalModelConnection>;
   onDidChange?(listener: () => void): () => void;

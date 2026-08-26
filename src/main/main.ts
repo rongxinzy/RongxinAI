@@ -2484,7 +2484,6 @@ if (!gotTheLock) {
     zhiyuanEnterpriseRendererBridge.settingsPage(),
   );
   ipcMain.handle(ExternalModelIpc.List, () => externalModelBridge.listModels());
-  ipcMain.handle(ExternalModelIpc.Policy, () => externalModelBridge.accessPolicy());
   externalModelBridge.onDidChange(() => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(ExternalModelIpc.Changed);

@@ -1,22 +1,5 @@
 import type { ModelCapabilities } from './providers';
 
-export const ExternalModelAccessMode = {
-  Open: 'open',
-  Exclusive: 'exclusive',
-} as const;
-export type ExternalModelAccessMode =
-  (typeof ExternalModelAccessMode)[keyof typeof ExternalModelAccessMode];
-
-export interface ExternalModelAccessPolicy {
-  readonly mode: ExternalModelAccessMode;
-  readonly providerIds: readonly string[];
-}
-
-export const OPEN_EXTERNAL_MODEL_ACCESS_POLICY: ExternalModelAccessPolicy = Object.freeze({
-  mode: ExternalModelAccessMode.Open,
-  providerIds: Object.freeze([]),
-});
-
 export const ExternalModelProtocol = {
   OpenAICompatible: 'openai-compatible',
 } as const;

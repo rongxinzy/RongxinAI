@@ -11,7 +11,6 @@ import type { RootState } from '../store';
 import { selectHasActiveActivityRun } from '../store/selectors/activitySelectors';
 import { WorkMode } from '../store/workMode/constants';
 import type { PrefetchableFeatureView } from './featureViewPrefetch';
-import { shouldShowLocalInferenceNavigation } from '../services/managedModelUiPolicy';
 import {
   SidebarAnimatedAlarmClockIcon,
   type SidebarAnimatedAlarmClockIconHandle,
@@ -51,7 +50,6 @@ interface SidebarNavigationControlsProps {
   onShowActivity: () => void;
   onWorkModeChange: (checked: boolean) => void;
   workMode: WorkMode;
-  managedModelsOnly?: boolean;
   /** Warms the lazily loaded chunk for a view on hover/focus intent. */
   onPrefetchView?: (view: PrefetchableFeatureView) => void;
 }
@@ -78,7 +76,6 @@ export const SidebarNavigationControls = ({
   onShowActivity,
   onWorkModeChange,
   workMode,
-  managedModelsOnly = false,
   onPrefetchView,
 }: SidebarNavigationControlsProps) => {
   const hasActiveActivityRun = useSelector((state: RootState) => selectHasActiveActivityRun(state));
@@ -156,7 +153,7 @@ export const SidebarNavigationControls = ({
           {workMode === WorkMode.Chat ? i18nService.t('newChat') : i18nService.t('newTask')}
         </Button>
       </div>
-      {shouldShowLocalInferenceNavigation(workMode === WorkMode.Chat, managedModelsOnly) && (
+      {workMode !== WorkMode.Chat && (
         <Button
           type="button"
           variant="ghost"
