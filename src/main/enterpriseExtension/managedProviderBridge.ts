@@ -11,6 +11,10 @@ import {
   type ZhiyuanManagedProviderHostCapability,
   type ZhiyuanManagedProviderSource,
 } from './contract';
+import {
+  registerPiOpenAICompatTokenRefresher,
+  type PiOpenAICompatTokenRefresher,
+} from '../libs/agentEngine/piOpenAICompatProxy';
 
 const MANAGED_PROVIDER_KEY_PATTERN = /^custom_[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const MAX_MODELS = 256;
@@ -31,21 +35,44 @@ interface StoredAppConfig {
   readonly [key: string]: unknown;
 }
 
+type PiOpenAICompatTokenRefresherRegistrar = (
+  providerId: string,
+  refresher: PiOpenAICompatTokenRefresher,
+) => () => void;
+
 export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostCapability {
   readonly apiVersion = ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION;
+  readonly #registerTokenRefresher: PiOpenAICompatTokenRefresherRegistrar;
   readonly #listeners = new Set<() => void>();
   #source: ZhiyuanManagedProviderSource | null = null;
   #disposeSourceListener: (() => void) | null = null;
+  #disposeTokenRefresher: (() => void) | null = null;
   #store: ConfigStore | null = null;
   #snapshot: ManagedProviderSnapshot | null = null;
   #refreshPromise: Promise<void> | null = null;
   #refreshAgain = false;
+
+  constructor(
+    registerTokenRefresher: PiOpenAICompatTokenRefresherRegistrar = registerPiOpenAICompatTokenRefresher,
+  ) {
+    this.#registerTokenRefresher = registerTokenRefresher;
+  }
 
   registerSource(source: ZhiyuanManagedProviderSource): () => void {
     if (this.#source) throw new Error('A Zhiyuan managed provider source is already registered.');
     validateSource(source);
     this.#source = source;
     this.#disposeSourceListener = source.onDidChange?.(() => void this.refresh()) ?? null;
+    this.#disposeTokenRefresher = this.#registerTokenRefresher(source.providerKey, async () => {
+      try {
+        const snapshot = await this.#syncSnapshot(source);
+        this.#emitChanged();
+        return snapshot.config.apiKey;
+      } catch (error) {
+        if (source === this.#source) this.#clearSnapshot();
+        throw error;
+      }
+    });
     void this.refresh();
     let registered = true;
     return () => {
@@ -53,6 +80,8 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
       registered = false;
       this.#disposeSourceListener?.();
       this.#disposeSourceListener = null;
+      this.#disposeTokenRefresher?.();
+      this.#disposeTokenRefresher = null;
       this.#source = null;
       this.#clearSnapshot();
     };
@@ -117,18 +146,30 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     const source = this.#source;
     if (!source || !this.#store) return;
     try {
-      const snapshot = normalizeSnapshot(
-        source.providerKey,
-        source.exclusive,
-        await source.snapshot(),
-      );
-      this.#removeStoredProvider(this.#snapshot?.providerKey);
-      this.#snapshot = snapshot;
-      this.#writeSnapshot(snapshot);
+      await this.#syncSnapshot(source);
     } catch {
       this.#clearSnapshot();
+      return;
     }
     this.#emitChanged();
+  }
+
+  async #syncSnapshot(source: ZhiyuanManagedProviderSource): Promise<ManagedProviderSnapshot> {
+    if (!this.#store || source !== this.#source) {
+      throw new Error('Zhiyuan managed provider source is unavailable.');
+    }
+    const snapshot = normalizeSnapshot(
+      source.providerKey,
+      source.exclusive,
+      await source.snapshot(),
+    );
+    if (source !== this.#source) {
+      throw new Error('Zhiyuan managed provider source changed during refresh.');
+    }
+    this.#removeStoredProvider(this.#snapshot?.providerKey);
+    this.#snapshot = snapshot;
+    this.#writeSnapshot(snapshot);
+    return snapshot;
   }
 
   #writeSnapshot(snapshot: ManagedProviderSnapshot): void {
@@ -216,19 +257,17 @@ function normalizeConfig(value: ProviderConfig): ProviderConfig {
     apiFormat: 'openai',
     displayName: normalizeText(value.displayName ?? 'Zhiyuan', 128),
     models: models.map(model => ({
-        id: normalizeText(model.id, 256),
-        name: normalizeText(model.name, 128),
-        ...(model.supportsImage !== undefined
-          ? { supportsImage: model.supportsImage === true }
-          : {}),
-        ...(model.capabilities ? { capabilities: Object.freeze({ ...model.capabilities }) } : {}),
-        ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
-        ...(model.contextTokens ? { contextTokens: model.contextTokens } : {}),
-        ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
-        ...(model.piRuntime
-          ? { piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime) }
-          : {}),
-      })),
+      id: normalizeText(model.id, 256),
+      name: normalizeText(model.name, 128),
+      ...(model.supportsImage !== undefined ? { supportsImage: model.supportsImage === true } : {}),
+      ...(model.capabilities ? { capabilities: Object.freeze({ ...model.capabilities }) } : {}),
+      ...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
+      ...(model.contextTokens ? { contextTokens: model.contextTokens } : {}),
+      ...(model.maxTokens ? { maxTokens: model.maxTokens } : {}),
+      ...(model.piRuntime
+        ? { piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime) }
+        : {}),
+    })),
   });
 }
 
