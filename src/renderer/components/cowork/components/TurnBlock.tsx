@@ -19,6 +19,7 @@ import {
 } from '../../../../shared/cowork/interruption';
 import type { CoworkToolActivity } from '../../../../shared/cowork/toolActivity';
 import { i18nService } from '../../../services/i18n';
+import { isCoworkTerminalErrorMessage } from '../../../services/coworkTerminalError';
 import { ArtifactRole, type Artifact } from '../../../types/artifact';
 import type { CoworkMessage, CoworkMessageMetadata } from '../../../types/cowork';
 import ArtifactPreviewCard from '../../artifacts/ArtifactPreviewCard';
@@ -31,7 +32,7 @@ import {
   getFinalAnswerIndex,
   getToolActivityExecutionStatus,
 } from '../helpers/executionStatus';
-import type { ConversationTurn } from '../helpers/messageGrouping';
+import type { AssistantTurnItem, ConversationTurn } from '../helpers/messageGrouping';
 import { getToolResultLineCount, getVisibleAssistantItems } from '../helpers/messageGrouping';
 import { getThinkingPresentation } from '../helpers/thinkingPresentation';
 import { getToolResultDisplay, hasText } from '../helpers/toolUtils';
@@ -63,8 +64,17 @@ export const getTurnPrimaryExpert = (
   const assistantItem = turn.assistantItems.find(
     item => item.type === 'assistant' && Array.isArray(item.message.metadata?.experts),
   );
-  return assistantItem?.type === 'assistant' ? assistantItem.message.metadata?.experts?.[0] : undefined;
+  return assistantItem?.type === 'assistant'
+    ? assistantItem.message.metadata?.experts?.[0]
+    : undefined;
 };
+
+export const isTerminalErrorItem = (item: AssistantTurnItem): boolean =>
+  item.type === 'system' && isCoworkTerminalErrorMessage(item.message);
+
+const isStandaloneSystemItem = (item: AssistantTurnItem): boolean =>
+  item.type === 'system' &&
+  (Boolean(item.message.metadata?.interruption) || isTerminalErrorItem(item));
 
 const TurnBlockComponent: React.FC<{
   turn: ConversationTurn;
@@ -99,7 +109,7 @@ const TurnBlockComponent: React.FC<{
 
   const renderSystemMessage = (message: CoworkMessage) => {
     const interruption = message.metadata?.interruption as CoworkSessionInterruption | undefined;
-    const isError = !hasText(message.content) && typeof message.metadata?.error === 'string';
+    const isError = isCoworkTerminalErrorMessage(message);
     const errorKind = message.metadata?.errorKind as CoworkErrorKind | undefined;
     const i18nKey = isError && errorKind ? getUserErrorI18nKey(errorKind) : null;
     const i18nMessage = i18nKey ? i18nService.t(i18nKey) : null;
@@ -306,7 +316,7 @@ const TurnBlockComponent: React.FC<{
     };
 
     for (const item of visibleAssistantItems) {
-      const isInterruption = item.type === 'system' && Boolean(item.message.metadata?.interruption);
+      const isStandaloneSystem = isStandaloneSystemItem(item);
       const isAnswer =
         item.type === 'assistant' &&
         !item.message.metadata?.isThinking &&
@@ -317,7 +327,7 @@ const TurnBlockComponent: React.FC<{
         item.type === 'tool_result' ||
         item.type === 'system';
 
-      if (isAnswer || isInterruption) {
+      if (isAnswer || isStandaloneSystem) {
         flush(isAnswer);
         result.push({
           items: [item],
@@ -347,15 +357,11 @@ const TurnBlockComponent: React.FC<{
   const visibleGroups = groups.filter(group => !isEmptyAnswerGroup(group));
   const finalAnswerIndex = getFinalAnswerIndex(visibleAssistantItems, isTurnComplete);
   const finalAnswerItem = finalAnswerIndex >= 0 ? visibleAssistantItems[finalAnswerIndex] : null;
-  const interruptionItems = visibleAssistantItems.filter(
-    item => item.type === 'system' && Boolean(item.message.metadata?.interruption),
-  );
+  const standaloneSystemItems = visibleAssistantItems.filter(isStandaloneSystemItem);
   const executionItems =
     finalAnswerIndex >= 0
       ? visibleAssistantItems.filter(
-          (item, index) =>
-            index !== finalAnswerIndex &&
-            !(item.type === 'system' && Boolean(item.message.metadata?.interruption)),
+          (item, index) => index !== finalAnswerIndex && !isStandaloneSystemItem(item),
         )
       : [];
   const executionSummary = getExecutionSummary(executionItems);
@@ -370,13 +376,14 @@ const TurnBlockComponent: React.FC<{
     !(
       lastVisibleGroupFirstItem.type === 'assistant' &&
       !lastVisibleGroupFirstItem.message.metadata?.isThinking
-    ),
+    ) &&
+    !isStandaloneSystemItem(lastVisibleGroupFirstItem),
   );
 
   const isExecutionStep = (item: (typeof visibleAssistantItems)[number] | undefined) =>
     item?.type === 'tool_group' ||
     item?.type === 'tool_result' ||
-    item?.type === 'system' ||
+    (item?.type === 'system' && !isStandaloneSystemItem(item)) ||
     (item?.type === 'assistant' && Boolean(item.message.metadata?.isThinking));
 
   const renderExecutionGroup = (
@@ -386,9 +393,7 @@ const TurnBlockComponent: React.FC<{
   ) => {
     const firstItem = group.items[0];
     const isAnswerItem = firstItem?.type === 'assistant' && !firstItem.message.metadata?.isThinking;
-    const isInterruptionItem =
-      firstItem?.type === 'system' && Boolean(firstItem.message.metadata?.interruption);
-    if (isAnswerItem || isInterruptionItem) {
+    if (isAnswerItem || (firstItem && isStandaloneSystemItem(firstItem))) {
       return renderItem(firstItem, 0, isFinalAnswer);
     }
 
@@ -453,7 +458,7 @@ const TurnBlockComponent: React.FC<{
             {finalAnswerItem ? (
               <>
                 {renderItem(finalAnswerItem, finalAnswerIndex, true)}
-                {interruptionItems.map((item, index) => renderItem(item, index, false))}
+                {standaloneSystemItems.map((item, index) => renderItem(item, index, false))}
               </>
             ) : (
               visibleGroups.map((group, index) =>
