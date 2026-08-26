@@ -215,8 +215,7 @@ function normalizeConfig(value: ProviderConfig): ProviderConfig {
     baseUrl: normalizeHttpUrl(value.baseUrl),
     apiFormat: 'openai',
     displayName: normalizeText(value.displayName ?? 'Zhiyuan', 128),
-    models: Object.freeze(
-      models.map(model => ({
+    models: models.map(model => ({
         id: normalizeText(model.id, 256),
         name: normalizeText(model.name, 128),
         ...(model.supportsImage !== undefined
@@ -230,7 +229,6 @@ function normalizeConfig(value: ProviderConfig): ProviderConfig {
           ? { piRuntime: normalizeProviderModelPiRuntimeConfig(model.piRuntime) }
           : {}),
       })),
-    ),
   });
 }
 
