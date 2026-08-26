@@ -18,8 +18,9 @@ import {
   ModelCapabilityStatus,
   ProviderModelPiApi,
   ProviderModelPiMaxTokensField,
+  ProviderModelPiThinkingFormat,
 } from '../../../shared/providers';
-import { ExternalModelProtocol } from '../../../shared/externalModels';
+import { ExternalModelProtocol, ExternalModelThinkingFormat } from '../../../shared/externalModels';
 import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { ProductionLoopAction } from '../../../shared/productionLoop';
@@ -1064,6 +1065,11 @@ describe('PiRuntimeAdapter', () => {
             displayName: 'Assigned Model',
             protocol: ExternalModelProtocol.OpenAICompatible,
             capabilities: { toolCalling: ModelCapabilityStatus.Supported },
+            reasoningCompatibility: {
+              thinkingFormat: ExternalModelThinkingFormat.DeepSeek,
+              supportsReasoningEffort: true,
+              requiresReasoningContentOnAssistantMessages: true,
+            },
             contextWindow: 128_000,
           },
         ],
@@ -1086,6 +1092,12 @@ describe('PiRuntimeAdapter', () => {
                 id: 'upstream-model',
                 name: 'Assigned Model',
                 provider: 'external.fixture',
+                reasoning: true,
+                compat: {
+                  thinkingFormat: ProviderModelPiThinkingFormat.DeepSeek,
+                  supportsReasoningEffort: true,
+                  requiresReasoningContentOnAssistantMessages: true,
+                },
               }),
             ],
           }),
