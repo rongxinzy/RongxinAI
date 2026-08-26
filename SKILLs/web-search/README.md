@@ -1,10 +1,10 @@
 # Web Search Skill
 
-Real-time web search capability for RongxinAI using Playwright-controlled browser automation.
+Real-time web search capability for ZhiYuan Agent using Playwright-controlled browser automation.
 
 ## Overview
 
-The Web Search Skill enables RongxinAI to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance. It runs headless first to avoid interrupting the desktop, then retries once with a visible browser when headless search appears blocked.
+The Web Search Skill enables ZhiYuan Agent to perform live web searches using Google and Bing, with automatic fallback when one provider is unavailable. The skill uses Playwright to control a local Chrome browser instance. It runs headless first to avoid interrupting the desktop, then retries once with a visible browser when headless search appears blocked.
 
 ## Features
 
@@ -328,7 +328,7 @@ GNU Affero General Public License v3.0 - See LICENSE.txt
 
 ## Contributing
 
-This skill is part of the RongxinAI project. For issues or suggestions:
+This skill is part of the ZhiYuan Agent project. For issues or suggestions:
 
 1. Check existing issues
 2. Create detailed bug reports

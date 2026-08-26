@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "rongxinai",
+      "name": "zhiyuan-agent",
       "dependencies": {
         "@earendil-works/pi-tui": "0.84.2",
         "@firecrawl/anydoc": "0.1.3",

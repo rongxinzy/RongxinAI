@@ -24,8 +24,8 @@ Windows release builds also require PortableGit. Native dependencies such as `be
 ### Install and Run
 
 ```bash
-git clone https://github.com/rongxinzy/RongxinAI.git
-cd RongxinAI
+git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent
+cd ZhiYuanAgent
 bun install
 ```
 

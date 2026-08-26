@@ -1,7 +1,7 @@
 # .gitlab-ci.yml — 对齐 .github/workflows/ci.yml
 #
 # Stage: lint → build → test
-# 镜像：rongxinai-ci:latest（包含 Node 24 + Electron 依赖）
+# 镜像：现有 CI 基础镜像（包含 Node 24 + Electron 依赖）
 # 缓存：使用 GitLab CI 原生 cache，存储在 runner 本地目录，不依赖宿主机卷
 
 workflow:
@@ -231,7 +231,7 @@ build-windows-full:
       when: manual
 
 # ═══════════════════════════════════════════════════════
-# Linux 安装包构建（Docker executor，复用 rongxinai-ci 镜像）
+# Linux 安装包构建（Docker executor，复用现有 CI 基础镜像）
 #
 # 触发条件：
 #   - 推送 v* 格式的 tag（自动）

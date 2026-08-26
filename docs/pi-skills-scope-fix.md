@@ -23,10 +23,10 @@ Pi SDK 的 `DefaultResourceLoader` 在 `reload()` 时会自动从 `agentDir` 的
 
 1. **`createPiResourceLoader()` 新增 loader 选项**：
    - `noSkills: true` — 禁止 resource-loader 从 `agentDir`（`~/.agents/skills`）自动加载技能。注意此选项不影响 `additionalSkillPaths`，仅屏蔽默认的 user/project 技能根。
-   - `additionalSkillPaths: this.resolveRongxinAiSkillDirs()` — 显式声明 知远智能体 的技能目录，由 pi 统一加载、去重、渲染。
+   - `additionalSkillPaths: this.resolveZhiyuanSkillDirs()` — 显式声明知远智能体的技能目录，由 pi 统一加载、去重、渲染。
    - `skillsOverride` — 将会话级 `skillIds` 过滤从手动 prompt 构建迁移到 loader 层（`skillIds === undefined` 表示不过滤，暴露全部技能）。
 
-2. **新增 `resolveRongxinAiSkillDirs()`**：按优先级返回技能目录列表（仅返回存在的目录）：
+2. **新增 `resolveZhiyuanSkillDirs()`**：按优先级返回技能目录列表（仅返回存在的目录）：
    - 生产模式：`userData/SKILLs`（`getSkillsRoot()` 已解析到这里，由 `SkillManager.syncBundledSkillsToUserData()` 填充；应用内市场安装/手动导入/升级的技能也都写入此目录）。
    - 开发模式：项目根 `SKILLs/`（`getSkillsRoot()` 在 `!app.isPackaged` 时解析到这里）+ `userData/SKILLs`（可能由历史打包运行残留，同名技能由 pi 内部按名称去重，先出现者优先）。
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Default skill configuration for RongxinAI",
+  "description": "Default skill configuration for ZhiYuan Agent",
   "retired": ["pptx"],
   "defaults": {
     "docx": { "order": 10, "enabled": true },

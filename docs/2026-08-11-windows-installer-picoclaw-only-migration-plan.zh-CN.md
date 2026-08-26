@@ -27,16 +27,16 @@
 
 ### fork 裁剪边界
 
-所有 cc-connect 产品改动直接落在 `rongxinzy/pi-connect`，RongxinAI 只通过版本化 bridge 协议和固定二进制依赖它。裁剪目标不是保留一个通用 cc-connect 发行版，而是形成知远专用的最小 Channel/Cron sidecar：
+所有 cc-connect 产品改动直接落在 `rongxinzy/pi-connect`，知远智能体只通过版本化 bridge 协议和固定二进制依赖它。裁剪目标不是保留一个通用 cc-connect 发行版，而是形成知远专用的最小 Channel/Cron sidecar：
 
 - 保留当前七频道所需的 platform adapter、消息规范化、重连、去重、媒体和投递逻辑。
 - 保留 Cron 表达式解析、触发注册和必要的进程生命周期；Cron 只产生知远触发事件。
-- 新增唯一的 `zhiyuan` bridge adapter，将入站消息和 Cron trigger 发送给 RongxinAI，不执行模型调用。
+- 新增唯一的 `zhiyuan` bridge adapter，将入站消息和 Cron trigger 发送给知远智能体，不执行模型调用。
 - 删除或在构建期排除上游全部 Agent adapter、Provider presets、skill presets、npm wrapper、通用 Web UI，以及不属于本地健康/频道/Cron 控制面的管理 API。
 - 删除 exec/shell Cron 的创建与执行路径，而非仅在 UI 隐藏；保留的配置 schema 也不得接受该 payload。
 - 以编译目标和产物扫描双重断言禁止裁剪后重新带入被移除模块。
 
-fork 与 RongxinAI 分别发布、分别打 tag；RongxinAI 的 `channel-runtime` manifest 固定记录 pi-connect release tag、commit 和 binary hash，禁止仅记录可漂移的分支名。
+fork 与知远智能体分别发布、分别打 tag；知远智能体的 `channel-runtime` manifest 固定记录 pi-connect release tag、commit 和 binary hash，禁止仅记录可漂移的分支名。
 
 ## 当前基线与问题
 
@@ -248,5 +248,5 @@ Pi 的流式事件、工具调用、审批和最终结果先写入知远 Run，�
 - `src/main/im/imGatewayManager.ts`：当前 OpenClaw Channel 生命周期耦合。
 - `src/scheduledTask/cronJobService.ts`：当前 OpenClaw Cron RPC 耦合。
 - `src/main/libs/openclawEngineManager.ts`：当前 OpenClaw 进程、状态与 Cron 恢复逻辑。
-- `https://github.com/rongxinzy/pi-connect`：知远维护和裁剪的 Channel/Cron sidecar fork，RongxinAI 只依赖其固定 release tag。
+- `https://github.com/rongxinzy/pi-connect`：知远维护和裁剪的 Channel/Cron sidecar fork，知远智能体只依赖其固定 release tag。
 - `https://github.com/chenhg5/cc-connect`：上游来源和行为参考；基线 commit 为 `3fc360ee6acc9bab13ab1b48ddde3af44062903b`。
