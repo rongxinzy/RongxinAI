@@ -7,7 +7,7 @@ if (!process.resourcesPath) {
 
 export const app = {
   getPath: () => '',
-  getName: () => 'RongxinAI',
+  getName: () => 'ZhiYuan Agent',
   getVersion: () => '0.0.0',
   isPackaged: true,
   on: () => {},

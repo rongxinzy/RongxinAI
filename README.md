@@ -69,7 +69,7 @@ If you find ZhiYuan useful, consider giving the repository a star.
 ## How ZhiYuan Agent works
 
 <p align="center">
-  <img src="public/readme/rongxinai_architecture_en.svg" alt="ZhiYuan Agent architecture" width="760">
+  <img src="public/readme/zhiyuan_agent_architecture_en.svg" alt="ZhiYuan Agent architecture" width="760">
 </p>
 
 ZhiYuan Agent uses Electron with strict process isolation. The renderer hosts the React UI, preload exposes controlled IPC through `contextBridge`, and the main process manages agent sessions, local inference, storage, skills, MCP integrations, scheduled tasks, and messaging gateways.
@@ -112,8 +112,8 @@ On Windows, native dependency builds may also require:
 ### Run locally
 
 ```bash
-git clone https://github.com/rongxinzy/RongxinAI.git
-cd RongxinAI
+git clone https://github.com/rongxinzy/RongxinAI.git ZhiYuanAgent
+cd ZhiYuanAgent
 bun install
 bun run electron:dev
 ```

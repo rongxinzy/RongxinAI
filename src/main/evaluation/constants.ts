@@ -1,5 +1,5 @@
 export const ZhiyuanEvaluationPolicyProtocolVersion = '1';
-export const ZhiyuanEvaluationPolicyId = 'rongxinai-production-loop';
+export const ZhiyuanEvaluationPolicyId = 'zhiyuan-production-loop';
 export const ZhiyuanEvaluationPolicyVersion = '237-p2-v3';
 
 export const ZhiyuanEvaluationToolMode = {

@@ -5127,7 +5127,7 @@ const Settings: React.FC<SettingsProps> = ({
                   rel="noopener noreferrer"
                   className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
                 >
-                  github.com/rongxinzy/RongxinAI
+                  {i18nService.t('mcpViewOnGithub')}
                 </a>
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-b border-border">
