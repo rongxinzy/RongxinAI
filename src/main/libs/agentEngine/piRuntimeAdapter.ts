@@ -84,7 +84,6 @@ import type {
   WorkbenchTaskService,
 } from '../../workbenchTask/taskService';
 import { externalModelBridge } from '../../enterpriseExtension/externalModelBridge';
-import { resolveExternalModelRuntime } from '../../enterpriseExtension/externalModelRuntime';
 import { composeWorkbenchWorkflowSnapshot } from '../../workbenchTask/workflowSnapshot';
 import { ProductionLoopController } from '../../productionLoop/controller';
 import { shouldExposeProductionControls } from '../../productionLoop/entryPolicy';
@@ -3565,7 +3564,6 @@ async function resolvePiModel(
           modelName: externalModel.displayName,
           contextWindow: externalModel.contextWindow,
           capabilities: externalModel.capabilities,
-          piRuntime: resolveExternalModelRuntime(externalModel),
         },
       }
     : normalizedModelRef
