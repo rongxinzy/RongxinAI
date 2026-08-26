@@ -24,13 +24,22 @@ test('settles execution counts after an answer or when the turn reaches a termin
 });
 
 test('keeps recoverable interruptions outside reasoning and exposes a message action', () => {
-  expect(source).toContain(
-    "item.type === 'system' && Boolean(item.message.metadata?.interruption)",
-  );
+  expect(source).toContain('Boolean(item.message.metadata?.interruption)');
   expect(source).toContain('interruption.taskId === recoverableTaskId');
   expect(source).toContain('<MessageAction');
   expect(source).toContain("i18nService.t('coworkResumeTaskAction')");
   expect(source).toContain('onClick={() => onResumeTask(interruption)}');
+});
+
+test('keeps terminal errors visible outside execution summaries', () => {
+  expect(source).toContain('const isStandaloneSystem = isStandaloneSystemItem(item);');
+  expect(source).toContain('if (isAnswer || isStandaloneSystem)');
+  expect(source).toContain(
+    '(item, index) => index !== finalAnswerIndex && !isStandaloneSystemItem(item)',
+  );
+  expect(source).toContain(
+    '{standaloneSystemItems.map((item, index) => renderItem(item, index, false))}',
+  );
 });
 
 test('keeps active tool details in the total summary without adding a child row', () => {

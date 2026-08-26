@@ -52,6 +52,11 @@ import type {
 import { i18nService } from './i18n';
 import { respondToPermissionByOrigin } from './coworkPermissionRouting';
 import { prepareCoworkSessionRender } from './coworkSessionRenderPreparation';
+import {
+  createCoworkTerminalErrorMessage,
+  hasMatchingLatestTerminalError,
+  resolveCoworkTerminalError,
+} from './coworkTerminalError';
 import { RafMessageUpdateBatcher } from './rafMessageUpdateBatcher';
 import { workspaceService } from './workspace';
 
@@ -213,30 +218,29 @@ class CoworkService {
 
     // Error listener
     const errorCleanup = cowork.onStreamError(({ sessionId, error }) => {
+      const stateBeforeStatusUpdate = store.getState().cowork;
+      const terminalMessageAlreadyReceived = hasMatchingLatestTerminalError(
+        [
+          stateBeforeStatusUpdate.currentSession,
+          stateBeforeStatusUpdate.streamingSessions[sessionId],
+        ],
+        sessionId,
+        error,
+      );
       store.dispatch(updateSessionStatus({ sessionId, status: 'error' }));
 
-      // Differentiated behavior by error kind:
-      // - Auth expired → trigger global re-auth flow
-      // - Engine not ready → handled separately by engine status overlay
-      // - Rate limited → show transient warning with retry hint
-      // - Others → surface as system message
+      // The runtime normally sends the persisted terminal message first. The
+      // error event owns status/global side effects and only supplies a message
+      // fallback when that canonical message was not delivered.
       if (error.kind === CoworkErrorKind.AuthExpired) {
         window.dispatchEvent(new CustomEvent('core-rpc-auth-expired'));
       }
 
-      const userMessage = error.message || '';
-      if (userMessage) {
-        const i18nKey = getUserErrorI18nKey(error.kind);
-        const content = i18nKey ? i18nService.t(i18nKey) : userMessage;
+      if (error.message && !terminalMessageAlreadyReceived) {
         store.dispatch(
           addMessage({
             sessionId,
-            message: {
-              id: `error-${Date.now()}`,
-              type: 'system',
-              content: content || userMessage,
-              timestamp: Date.now(),
-            },
+            message: createCoworkTerminalErrorMessage(error),
           }),
         );
       }
@@ -438,41 +442,27 @@ class CoworkService {
       fileAttachments: options.fileAttachments,
     });
     if (!result.success) {
+      const terminalError = result.error
+        ? resolveCoworkTerminalError(result.error, result.code)
+        : null;
       if (result.code !== ENGINE_NOT_READY_CODE) {
         store.dispatch(updateSessionStatus({ sessionId: options.sessionId, status: 'error' }));
-        if (result.error) {
+      }
+      if (terminalError) {
+        const state = store.getState().cowork;
+        const alreadyReceived = hasMatchingLatestTerminalError(
+          [state.currentSession, state.streamingSessions[options.sessionId]],
+          options.sessionId,
+          terminalError,
+        );
+        if (!alreadyReceived) {
           store.dispatch(
             addMessage({
               sessionId: options.sessionId,
-              message: {
-                id: `error-${Date.now()}`,
-                type: 'system',
-                content: i18nService
-                  .t('coworkErrorSessionContinueFailed')
-                  .replace('{error}', result.error),
-                timestamp: Date.now(),
-              },
+              message: createCoworkTerminalErrorMessage(terminalError),
             }),
           );
         }
-      }
-      // Show a user-visible error message in the session
-      if (result.error) {
-        const errorContent =
-          result.code === ENGINE_NOT_READY_CODE
-            ? i18nService.t('coworkErrorEngineNotReady')
-            : classifyError(result.error);
-        store.dispatch(
-          addMessage({
-            sessionId: options.sessionId,
-            message: {
-              id: `error-${Date.now()}`,
-              type: 'system',
-              content: errorContent,
-              timestamp: Date.now(),
-            },
-          }),
-        );
       }
       console.error('Failed to continue session:', result.error);
       return false;
