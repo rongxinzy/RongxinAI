@@ -3,13 +3,15 @@ import type {
   EnterprisePasswordLoginInput,
   EnterpriseSessionResult,
 } from './enterpriseSession';
+import type { ManagedProviderCatalogModel } from './managedProviders';
 
 export const EnterpriseRendererIpc = {
   SessionGateEntrypoint: 'enterprise:renderer:session-gate-entrypoint',
-  SettingsPage: 'enterprise:renderer:settings-page',
+  SettingsPages: 'enterprise:renderer:settings-pages',
 } as const;
 
 export interface EnterpriseRendererSettingsPage {
+  readonly id: string;
   readonly entrypoint: string;
   readonly labels: {
     readonly zh: string;
@@ -35,6 +37,8 @@ export const EnterpriseRendererMessageType = {
   Initialize: 'initialize',
   SessionRequest: 'session-request',
   SessionResponse: 'session-response',
+  ModelCatalogRequest: 'model-catalog-request',
+  ModelCatalogResponse: 'model-catalog-response',
 } as const;
 
 export const EnterpriseRendererSessionOperation = {
@@ -61,6 +65,7 @@ export interface EnterpriseRendererInitializeMessage {
   readonly apiVersion: 1;
   readonly type: typeof EnterpriseRendererMessageType.Initialize;
   readonly surface: EnterpriseRendererSurface;
+  readonly pageId: string | null;
   readonly language: EnterpriseRendererLanguage;
   readonly theme: EnterpriseRendererTheme;
   readonly session: EnterpriseSessionResult;
@@ -104,4 +109,23 @@ export interface EnterpriseRendererSessionResponseMessage {
   readonly type: typeof EnterpriseRendererMessageType.SessionResponse;
   readonly requestId: string;
   readonly result: EnterpriseSessionResult;
+}
+
+export interface EnterpriseRendererModelCatalogRequestMessage {
+  readonly source: typeof EnterpriseRendererMessageSource.Module;
+  readonly apiVersion: 1;
+  readonly type: typeof EnterpriseRendererMessageType.ModelCatalogRequest;
+  readonly requestId: string;
+}
+
+export type EnterpriseRendererModelCatalogResult =
+  | { readonly ok: true; readonly models: readonly ManagedProviderCatalogModel[] }
+  | { readonly ok: false };
+
+export interface EnterpriseRendererModelCatalogResponseMessage {
+  readonly source: typeof EnterpriseRendererMessageSource.Host;
+  readonly apiVersion: 1;
+  readonly type: typeof EnterpriseRendererMessageType.ModelCatalogResponse;
+  readonly requestId: string;
+  readonly result: EnterpriseRendererModelCatalogResult;
 }

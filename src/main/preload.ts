@@ -27,6 +27,7 @@ import {
   ImInstanceIpc,
   ImIpc,
   LogIpc,
+  ManagedProviderIpc,
   McpIpc,
   NetworkIpc,
   OpenAICodexOAuthIpc,
@@ -278,9 +279,9 @@ contextBridge.exposeInMainWorld('electron', {
     renderer: {
       sessionGateEntrypoint: () =>
         ipcRenderer.invoke(EnterpriseRendererIpc.SessionGateEntrypoint) as Promise<string | null>,
-      settingsPage: () =>
-        ipcRenderer.invoke(EnterpriseRendererIpc.SettingsPage) as Promise<
-          import('../shared/enterpriseRenderer').EnterpriseRendererSettingsPage | null
+      settingsPages: () =>
+        ipcRenderer.invoke(EnterpriseRendererIpc.SettingsPages) as Promise<
+          readonly import('../shared/enterpriseRenderer').EnterpriseRendererSettingsPage[]
         >,
     },
     session: {
@@ -290,6 +291,18 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.invoke(EnterpriseSessionIpc.ChangePassword, input),
       logout: () => ipcRenderer.invoke(EnterpriseSessionIpc.Logout),
     },
+  },
+
+  managedProviders: {
+    policy: () =>
+      ipcRenderer.invoke(ManagedProviderIpc.Policy) as Promise<
+        import('../shared/managedProviders').ManagedProviderAccessPolicy
+      >,
+    catalog: () =>
+      ipcRenderer.invoke(ManagedProviderIpc.Catalog) as Promise<
+        readonly import('../shared/managedProviders').ManagedProviderCatalogModel[]
+      >,
+    onChanged: (callback: () => void) => onPushVoid(ManagedProviderIpc.Changed, callback),
   },
 
   api: {

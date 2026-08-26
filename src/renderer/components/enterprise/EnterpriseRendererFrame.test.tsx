@@ -15,6 +15,7 @@ import { EnterpriseSessionEvent } from '../../services/enterpriseSessionEvents';
 import { EnterpriseRendererFrame } from './EnterpriseRendererFrame';
 
 const snapshot = vi.fn<() => Promise<EnterpriseSessionResult>>();
+const catalog = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -29,6 +30,7 @@ beforeEach(() => {
           logout: vi.fn(),
         },
       },
+      managedProviders: { catalog },
     },
   });
 });
@@ -40,6 +42,7 @@ describe('EnterpriseRendererFrame', () => {
         src="zhiyuan-enterprise-ui://renderer/settings/settings.html"
         title="Enterprise account"
         surface={EnterpriseRendererSurface.Settings}
+        pageId="account"
         session={signedOut()}
       />,
     );
@@ -63,7 +66,53 @@ describe('EnterpriseRendererFrame', () => {
         source: EnterpriseRendererMessageSource.Host,
         type: EnterpriseRendererMessageType.Initialize,
         surface: EnterpriseRendererSurface.Settings,
+        pageId: 'account',
         session: signedOut(),
+      }),
+      '*',
+    );
+  });
+
+  test('serves the managed catalog only to the enterprise models page', async () => {
+    catalog.mockResolvedValue([
+      {
+        id: 'enterprise-chat',
+        displayName: 'Enterprise Chat',
+        providerKey: 'custom_enterprise',
+        providerDisplayName: 'Zhiyuan',
+        isDefault: true,
+      },
+    ]);
+    render(
+      <EnterpriseRendererFrame
+        src="zhiyuan-enterprise-ui://renderer/settings/models/settings.html"
+        title="Enterprise models"
+        surface={EnterpriseRendererSurface.Settings}
+        pageId="models"
+        session={signedOut()}
+      />,
+    );
+
+    const frame = screen.getByTitle('Enterprise models') as HTMLIFrameElement;
+    const postMessage = vi.spyOn(frame.contentWindow!, 'postMessage');
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        source: frame.contentWindow,
+        data: {
+          source: EnterpriseRendererMessageSource.Module,
+          apiVersion: 1,
+          type: EnterpriseRendererMessageType.ModelCatalogRequest,
+          requestId: 'models-1',
+        },
+      }),
+    );
+
+    await waitFor(() => expect(catalog).toHaveBeenCalledTimes(1));
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: EnterpriseRendererMessageType.ModelCatalogResponse,
+        requestId: 'models-1',
+        result: expect.objectContaining({ ok: true }),
       }),
       '*',
     );

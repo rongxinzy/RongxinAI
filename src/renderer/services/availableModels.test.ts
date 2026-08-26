@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
+import { ManagedProviderAccessMode } from '../../shared/managedProviders';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
@@ -56,6 +57,38 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
   expect(listRunningModels).toHaveBeenCalledTimes(1);
   expect(models.some(model => model.providerKey === ProviderName.LlamaCpp)).toBe(true);
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
+});
+
+test('exclusive managed policy exposes only the synchronized custom provider', async () => {
+  const config = createConfig();
+  config.providers = {
+    ...config.providers,
+    custom_enterprise: {
+      enabled: true,
+      apiKey: 'managed-token',
+      baseUrl: 'http://127.0.0.1:8090/v1',
+      apiFormat: 'openai',
+      displayName: 'Zhiyuan',
+      models: [{ id: 'enterprise-chat', name: 'Enterprise Chat' }],
+    },
+  };
+  const listRunningModels = vi.fn(async () => [{ name: 'qwen-local' }]);
+  vi.stubGlobal('window', {
+    electron: {
+      managedProviders: {
+        policy: vi.fn(async () => ({
+          mode: ManagedProviderAccessMode.Exclusive,
+          providerKeys: ['custom_enterprise'],
+        })),
+      },
+      llamacpp: { listRunningModels },
+    },
+  });
+
+  await expect(collectAvailableModels(config)).resolves.toEqual([
+    expect.objectContaining({ id: 'enterprise-chat', providerKey: 'custom_enterprise' }),
+  ]);
+  expect(listRunningModels).not.toHaveBeenCalled();
 });
 
 test('does not expose the legacy default model when no provider is configured', async () => {

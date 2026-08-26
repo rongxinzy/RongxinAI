@@ -5,6 +5,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../shared/appUpdate/constants';
+import {
+  ManagedProviderAccessMode,
+  type ManagedProviderAccessPolicy,
+} from '../shared/managedProviders';
 import { CoworkView } from './components/cowork';
 import {
   hasAskUserQuestions,
@@ -24,6 +28,7 @@ import { agentService } from './services/agent';
 import { apiService } from './services/api';
 import {
   collectAvailableModels,
+  getManagedProviderAccessPolicy,
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
 } from './services/availableModels';
 import { configService } from './services/config';
@@ -124,6 +129,8 @@ const App: React.FC = () => {
     ui?: Record<string, 'hide' | 'disable' | 'readonly'>;
     disableUpdate?: boolean;
   } | null>(null);
+  const [managedProviderPolicy, setManagedProviderPolicy] =
+    useState<ManagedProviderAccessPolicy | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const toastOnCloseRef = useRef<(() => void) | null>(null);
   const hasInitialized = useRef(false);
@@ -141,6 +148,7 @@ const App: React.FC = () => {
     selectPendingPermissionForSession(state, currentSessionId),
   );
   const isWindows = window.electron.platform === 'win32';
+  const managedModelsOnly = managedProviderPolicy?.mode === ManagedProviderAccessMode.Exclusive;
 
   const waitWithTimeout = useCallback(
     async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
@@ -207,11 +215,13 @@ const App: React.FC = () => {
 
         // Enterprise and i18n only depend on config initialization.
         mark('enterprise/i18n init begin');
-        const [entConfig] = await Promise.all([
+        const [entConfig, , providerPolicy] = await Promise.all([
           window.electron.enterprise.getConfig(),
           waitWithTimeout(i18nService.initialize(), initTimeoutMs, 'i18nService.initialize'),
+          getManagedProviderAccessPolicy(),
         ]);
         setEnterpriseConfig(entConfig);
+        setManagedProviderPolicy(providerPolicy);
         mark('enterprise/i18n init done');
 
         dispatch(setWorkMode(config.workMode ?? WorkMode.Work));
@@ -269,7 +279,15 @@ const App: React.FC = () => {
     }
 
     const refreshAvailableModels = async () => {
-      const config = configService.getConfig();
+      const [config, policy] = await Promise.all([
+        configService.reload(),
+        getManagedProviderAccessPolicy(),
+      ]);
+      setManagedProviderPolicy(policy);
+      if (policy.mode === ManagedProviderAccessMode.Exclusive) {
+        setLocalInferenceInstallRequestId(undefined);
+        setMainView(currentView => (currentView === 'localInference' ? 'cowork' : currentView));
+      }
       const allModels = await collectAvailableModels(config);
       dispatch(setAvailableModels(allModels));
     };
@@ -285,6 +303,9 @@ const App: React.FC = () => {
     const handleLlamaCppRunningModelsChanged = () => {
       void refreshAvailableModels().catch(() => undefined);
     };
+    const unsubscribeManagedProviders = window.electron.managedProviders?.onChanged(
+      handleLlamaCppRunningModelsChanged,
+    );
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
@@ -297,6 +318,7 @@ const App: React.FC = () => {
         LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
         handleLlamaCppRunningModelsChanged,
       );
+      unsubscribeManagedProviders?.();
     };
   }, [dispatch, isInitialized]);
 
@@ -338,6 +360,7 @@ const App: React.FC = () => {
   }, [mainView]);
 
   useEffect(() => {
+    if (!managedProviderPolicy || managedModelsOnly) return;
     let active = true;
     void window.electron.appInfo
       .consumePendingLocalInferenceInstall()
@@ -353,7 +376,7 @@ const App: React.FC = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [managedProviderPolicy, managedModelsOnly]);
 
   // Network status monitoring
   useEffect(() => {
@@ -431,8 +454,9 @@ const App: React.FC = () => {
   }, []);
 
   const handleShowLocalInference = useCallback(() => {
+    if (managedModelsOnly) return;
     setMainView('localInference');
-  }, []);
+  }, [managedModelsOnly]);
 
   const handleShowExpert = useCallback(() => {
     setExpertInitialTab(undefined);
@@ -497,9 +521,7 @@ const App: React.FC = () => {
   );
 
   const handleLocalInferenceInstallRequestHandled = useCallback((requestId: string) => {
-    setLocalInferenceInstallRequestId(current =>
-      current === requestId ? undefined : current,
-    );
+    setLocalInferenceInstallRequestId(current => (current === requestId ? undefined : current));
   }, []);
 
   const handleChatWithExpert = useCallback(
@@ -524,25 +546,28 @@ const App: React.FC = () => {
     onClose?.();
   }, []);
 
-  const showToast = useCallback((message: string, options: AppToastOptions = {}) => {
-    const {
-      autoClose = true,
-      durationMs = DEFAULT_TOAST_DURATION_MS,
-      isError = false,
-      onClose = null,
-    } = options;
-    setToastMessage(message);
-    setIsToastError(isError);
-    toastOnCloseRef.current = onClose;
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
-    }
-    if (autoClose) {
-      toastTimerRef.current = window.setTimeout(dismissToast, durationMs);
-    } else {
-      toastTimerRef.current = null;
-    }
-  }, [dismissToast]);
+  const showToast = useCallback(
+    (message: string, options: AppToastOptions = {}) => {
+      const {
+        autoClose = true,
+        durationMs = DEFAULT_TOAST_DURATION_MS,
+        isError = false,
+        onClose = null,
+      } = options;
+      setToastMessage(message);
+      setIsToastError(isError);
+      toastOnCloseRef.current = onClose;
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      if (autoClose) {
+        toastTimerRef.current = window.setTimeout(dismissToast, durationMs);
+      } else {
+        toastTimerRef.current = null;
+      }
+    },
+    [dismissToast],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -677,7 +702,7 @@ const App: React.FC = () => {
   // Listen for toast events from child components
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ message: string } & AppToastOptions | string>).detail;
+      const detail = (e as CustomEvent<({ message: string } & AppToastOptions) | string>).detail;
       if (!detail) return;
       if (typeof detail === 'string') {
         showToast(detail);
@@ -709,12 +734,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handler = () => {
+      if (managedModelsOnly) return;
       setShowSettings(false);
       setMainView('localInference');
     };
     window.addEventListener('app:show-local-inference', handler);
     return () => window.removeEventListener('app:show-local-inference', handler);
-  }, []);
+  }, [managedModelsOnly]);
 
   // 监听托盘菜单打开设置的 IPC 事件
   useEffect(() => {
@@ -798,6 +824,7 @@ const App: React.FC = () => {
                   notice={settingsOptions.notice}
                   enterpriseConfig={enterpriseConfig}
                   appUpdateState={appUpdateState}
+                  managedModelsOnly={managedModelsOnly}
                 />
               </React.Suspense>
             </LazyChunkErrorBoundary>
@@ -814,7 +841,9 @@ const App: React.FC = () => {
         tabIndex={-1}
         className="h-screen overflow-hidden flex flex-col bg-surface-raised outline-none"
       >
-        {toastMessage && <Toast message={toastMessage} isError={isToastError} onClose={dismissToast} />}
+        {toastMessage && (
+          <Toast message={toastMessage} isError={isToastError} onClose={dismissToast} />
+        )}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar
             onShowSettings={handleShowSettings}
@@ -831,13 +860,14 @@ const App: React.FC = () => {
             onToggleCollapse={handleToggleSidebar}
             updateEntry={!isSidebarCollapsed ? updateEntry : null}
             hideLogin={false}
+            managedModelsOnly={managedModelsOnly}
             onPrefetchView={prefetchFeatureView}
           />
           <div
             className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
           >
             <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
-              {hasMountedLocalInference && (
+              {hasMountedLocalInference && !managedModelsOnly && (
                 <div
                   className={
                     mainView === 'localInference' ? 'h-full min-h-0' : 'hidden h-full min-h-0'
@@ -946,6 +976,7 @@ const App: React.FC = () => {
                 notice={settingsOptions.notice}
                 enterpriseConfig={enterpriseConfig}
                 appUpdateState={appUpdateState}
+                managedModelsOnly={managedModelsOnly}
               />
             </React.Suspense>
           </LazyChunkErrorBoundary>

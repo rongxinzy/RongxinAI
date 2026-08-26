@@ -1207,8 +1207,8 @@ interface IElectronAPI {
     } | null>;
     renderer: {
       sessionGateEntrypoint: () => Promise<string | null>;
-      settingsPage: () => Promise<
-        import('../../shared/enterpriseRenderer').EnterpriseRendererSettingsPage | null
+      settingsPages: () => Promise<
+        readonly import('../../shared/enterpriseRenderer').EnterpriseRendererSettingsPage[]
       >;
     };
     session: {
@@ -1217,6 +1217,13 @@ interface IElectronAPI {
       changePassword: (input: EnterprisePasswordChangeInput) => Promise<EnterpriseSessionResult>;
       logout: () => Promise<EnterpriseSessionResult>;
     };
+  };
+  managedProviders: {
+    policy: () => Promise<import('../../shared/managedProviders').ManagedProviderAccessPolicy>;
+    catalog: () => Promise<
+      readonly import('../../shared/managedProviders').ManagedProviderCatalogModel[]
+    >;
+    onChanged: (callback: () => void) => () => void;
   };
   networkStatus: {
     send: (status: 'online' | 'offline') => void;

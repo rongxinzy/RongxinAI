@@ -29,3 +29,9 @@ API v1 有意只开放生命周期和非敏感宿主上下文。认证 IPC、托
 API v1 上下文提供可选、独立版本化的 `capabilities.session` 对象。企业扩展可以注册一个密码会话 provider，并必须在退出时注销。社区构建保留相同的固定 Renderer 接口，但未注册 provider 时只返回 `UNAVAILABLE`。
 
 Preload 桥只允许 `snapshot`、`login`、`changePassword` 和 `logout`。主进程会复制并校验有长度边界的输入字段、规范化身份快照、禁止返回任何 token，并在进入 Renderer 前将 provider 异常替换为通用错误。该桥不开放任意扩展方法或任意 IPC channel 名称。
+
+### 设置页与受管供应商能力 v1
+
+企业扩展可以使用稳定 ID 注册多个设置页。Zhiyuan 会把每个页面渲染为设置侧边栏中的独立入口，因此企业账户和企业模型即使复用同一个 Renderer bundle，也保持为两个同级目的地。
+
+`capabilities.managedProvider` 只接受一个受管配置源。配置源必须使用现有 `custom_` 供应商命名空间，并返回公开应用标准的 `ProviderConfig`。宿主把该配置同步到 `app_config.providers`，模型选择、OpenAI 兼容传输、能力判断、reasoning 兼容和 Pi runtime 均复用用户自建自定义供应商的同一条代码路径。独占配置源会隐藏可编辑供应商和本地推理入口，但不会建立第二套模型运行时。

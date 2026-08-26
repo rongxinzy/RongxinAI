@@ -2,6 +2,8 @@ import {
   EnterpriseRendererMessageSource,
   EnterpriseRendererMessageType,
   EnterpriseRendererSessionOperation,
+  type EnterpriseRendererModelCatalogRequestMessage,
+  type EnterpriseRendererModelCatalogResult,
   type EnterpriseRendererReadyMessage,
   type EnterpriseRendererSessionRequestMessage,
 } from '../../shared/enterpriseRenderer';
@@ -18,6 +20,23 @@ export function isEnterpriseRendererReadyMessage(
     message.apiVersion === 1 &&
     message.type === EnterpriseRendererMessageType.Ready
   );
+}
+
+export function parseEnterpriseModelCatalogRequest(
+  value: unknown,
+): EnterpriseRendererModelCatalogRequestMessage | null {
+  const message = asRecord(value);
+  if (
+    message?.source !== EnterpriseRendererMessageSource.Module ||
+    message.apiVersion !== 1 ||
+    message.type !== EnterpriseRendererMessageType.ModelCatalogRequest ||
+    typeof message.requestId !== 'string' ||
+    message.requestId.length === 0 ||
+    message.requestId.length > MAX_REQUEST_ID_LENGTH
+  ) {
+    return null;
+  }
+  return message as unknown as EnterpriseRendererModelCatalogRequestMessage;
 }
 
 export function parseEnterpriseSessionRequest(
@@ -64,6 +83,14 @@ export function executeEnterpriseSessionRequest(
       return window.electron.enterprise.session.changePassword(request.input);
     case EnterpriseRendererSessionOperation.Logout:
       return window.electron.enterprise.session.logout();
+  }
+}
+
+export async function executeEnterpriseModelCatalogRequest(): Promise<EnterpriseRendererModelCatalogResult> {
+  try {
+    return { ok: true, models: await window.electron.managedProviders.catalog() };
+  } catch {
+    return { ok: false };
   }
 }
 

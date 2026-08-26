@@ -44,6 +44,7 @@ export function EnterpriseSettingsPage({ page, title }: EnterpriseSettingsPagePr
       src={page.entrypoint}
       title={title}
       surface={EnterpriseRendererSurface.Settings}
+      pageId={page.id}
       session={session}
       className="size-full"
     />
