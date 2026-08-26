@@ -65,30 +65,47 @@ describe('Zhiyuan enterprise renderer bridge', () => {
 
     const unregisterGate = rendererCapability.registerSessionGate('ui/index.html');
     const unregisterSettings = settingsCapability.registerPage({
+      id: 'account',
       entrypoint: 'ui/settings.html',
       labels: { zh: '企业账户', en: 'Enterprise account' },
     });
 
-    expect(bridge.settingsPage()).toEqual({
-      entrypoint: 'zhiyuan-enterprise-ui://renderer/settings/settings.html',
-      labels: { zh: '企业账户', en: 'Enterprise account' },
+    const unregisterModels = settingsCapability.registerPage({
+      id: 'models',
+      entrypoint: 'ui/settings.html',
+      labels: { zh: '企业模型', en: 'Enterprise models' },
     });
-    expect(bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/settings/settings.html')).toBe(
-      fs.realpathSync(path.join(root, 'ui', 'settings.html')),
-    );
-    expect(bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/settings/index.html')).toBe(
+
+    expect(bridge.settingsPages()).toEqual([
+      {
+        id: 'account',
+        entrypoint: 'zhiyuan-enterprise-ui://renderer/settings/account/settings.html',
+        labels: { zh: '企业账户', en: 'Enterprise account' },
+      },
+      {
+        id: 'models',
+        entrypoint: 'zhiyuan-enterprise-ui://renderer/settings/models/settings.html',
+        labels: { zh: '企业模型', en: 'Enterprise models' },
+      },
+    ]);
+    expect(
+      bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/settings/account/settings.html'),
+    ).toBe(fs.realpathSync(path.join(root, 'ui', 'settings.html')));
+    expect(bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/settings/models/index.html')).toBe(
       fs.realpathSync(path.join(root, 'ui', 'index.html')),
     );
     expect(bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/extension.cjs')).toBeNull();
 
     unregisterGate();
-    expect(bridge.settingsPage()).not.toBeNull();
-    expect(bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/settings/settings.html')).toBe(
-      fs.realpathSync(path.join(root, 'ui', 'settings.html')),
-    );
+    expect(bridge.settingsPages()).toHaveLength(2);
+    expect(
+      bridge.resolveAsset('zhiyuan-enterprise-ui://renderer/settings/account/settings.html'),
+    ).toBe(fs.realpathSync(path.join(root, 'ui', 'settings.html')));
     unregisterSettings();
     unregisterSettings();
-    expect(bridge.settingsPage()).toBeNull();
+    expect(bridge.settingsPages()).toHaveLength(1);
+    unregisterModels();
+    expect(bridge.settingsPages()).toEqual([]);
   });
 
   test('rejects invalid settings labels and duplicate settings pages', () => {
@@ -99,22 +116,26 @@ describe('Zhiyuan enterprise renderer bridge', () => {
 
     expect(() =>
       capability.registerPage({
+        id: 'account',
         entrypoint: 'settings.html',
         labels: { zh: '', en: 'Enterprise account' },
       }),
     ).toThrow('label is invalid');
     expect(() =>
       capability.registerPage({
+        id: 'account',
         entrypoint: 'settings.html',
         labels: { zh: '企业账户', en: 'Enterprise\u202eaccount' },
       }),
     ).toThrow('label is invalid');
     capability.registerPage({
+      id: 'account',
       entrypoint: 'settings.html',
       labels: { zh: '企业账户', en: 'Enterprise account' },
     });
     expect(() =>
       capability.registerPage({
+        id: 'account',
         entrypoint: 'settings.html',
         labels: { zh: '企业账户', en: 'Enterprise account' },
       }),

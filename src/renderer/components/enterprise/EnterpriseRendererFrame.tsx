@@ -13,11 +13,11 @@ import {
 } from '../../../shared/enterpriseRenderer';
 import type { EnterpriseSessionResult } from '../../../shared/enterpriseSession';
 import {
-  executeEnterpriseModelCatalogRequest,
   executeEnterpriseSessionRequest,
+  executeEnterpriseModelCatalogRequest,
   isEnterpriseRendererReadyMessage,
-  parseEnterpriseModelCatalogRequest,
   parseEnterpriseSessionRequest,
+  parseEnterpriseModelCatalogRequest,
 } from '../../services/enterpriseRenderer';
 import { publishEnterpriseSessionResult } from '../../services/enterpriseSessionEvents';
 
@@ -26,6 +26,7 @@ interface EnterpriseRendererFrameProps {
   readonly title: string;
   readonly surface: EnterpriseRendererSurfaceValue;
   readonly session: EnterpriseSessionResult;
+  readonly pageId?: string | null;
   readonly className?: string;
 }
 
@@ -34,6 +35,7 @@ export function EnterpriseRendererFrame({
   title,
   surface,
   session,
+  pageId = null,
   className,
 }: EnterpriseRendererFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -47,6 +49,7 @@ export function EnterpriseRendererFrame({
         apiVersion: 1,
         type: EnterpriseRendererMessageType.Initialize,
         surface,
+        pageId,
         language: resolveLanguage(),
         theme: resolveTheme(),
         session,
@@ -60,6 +63,7 @@ export function EnterpriseRendererFrame({
         sendInitialization();
         return;
       }
+
       const request = parseEnterpriseSessionRequest(event.data);
       if (request) {
         void executeEnterpriseSessionRequest(request)
@@ -84,28 +88,26 @@ export function EnterpriseRendererFrame({
       const modelCatalogRequest = parseEnterpriseModelCatalogRequest(event.data);
       if (!modelCatalogRequest) return;
       const catalog =
-        surface === EnterpriseRendererSurface.Settings
+        surface === EnterpriseRendererSurface.Settings && pageId === 'models'
           ? executeEnterpriseModelCatalogRequest()
           : Promise.resolve<EnterpriseRendererModelCatalogResult>({ ok: false });
-      void catalog
-        .catch((): EnterpriseRendererModelCatalogResult => ({ ok: false }))
-        .then(result => {
-          const target = iframeRef.current?.contentWindow;
-          if (!target) return;
-          const response: EnterpriseRendererModelCatalogResponseMessage = {
-            source: EnterpriseRendererMessageSource.Host,
-            apiVersion: 1,
-            type: EnterpriseRendererMessageType.ModelCatalogResponse,
-            requestId: modelCatalogRequest.requestId,
-            result,
-          };
-          target.postMessage(response, '*');
-        });
+      void catalog.then(result => {
+        const target = iframeRef.current?.contentWindow;
+        if (!target) return;
+        const response: EnterpriseRendererModelCatalogResponseMessage = {
+          source: EnterpriseRendererMessageSource.Host,
+          apiVersion: 1,
+          type: EnterpriseRendererMessageType.ModelCatalogResponse,
+          requestId: modelCatalogRequest.requestId,
+          result,
+        };
+        target.postMessage(response, '*');
+      });
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [session, surface]);
+  }, [pageId, session, surface]);
 
   return (
     <iframe

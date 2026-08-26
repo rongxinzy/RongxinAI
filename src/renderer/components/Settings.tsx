@@ -15,6 +15,7 @@ import { Textarea } from '@shared/components/ui/textarea';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
 import {
+  Building2,
   CheckCircle,
   ExternalLink,
   Eye,
@@ -22,8 +23,9 @@ import {
   Key,
   Pencil,
   PlusCircle,
-  ShieldCheck,
   Signal,
+  ServerCog,
+  ShieldCheck,
   Trash2,
   X,
   XCircle,
@@ -138,8 +140,14 @@ type TabType =
   | 'shortcuts'
   | 'im'
   | 'email'
-  | 'extension'
   | 'about';
+type EnterpriseTabType = `extension:${string}`;
+type SettingsTabType = TabType | EnterpriseTabType;
+
+const toEnterpriseTab = (pageId: string): EnterpriseTabType => `extension:${pageId}`;
+const isEnterpriseTab = (tab: SettingsTabType): tab is EnterpriseTabType =>
+  tab.startsWith('extension:');
+const fromEnterpriseTab = (tab: EnterpriseTabType): string => tab.slice('extension:'.length);
 
 type AnimatedIconHandle = {
   startAnimation: () => void;
@@ -147,7 +155,7 @@ type AnimatedIconHandle = {
 };
 
 export type SettingsOpenOptions = {
-  initialTab?: TabType;
+  initialTab?: SettingsTabType;
   notice?: string;
   noticeI18nKey?: string;
   noticeExtra?: string;
@@ -725,13 +733,15 @@ const Settings: React.FC<SettingsProps> = ({
   managedModelsOnly = false,
 }) => {
   // 状态
-  const [requestedActiveTab, setActiveTab] = useState<TabType>(initialTab ?? 'general');
-  const [enterpriseSettingsPage, setEnterpriseSettingsPage] =
-    useState<EnterpriseRendererSettingsPage | null>(null);
+  const [requestedActiveTab, setActiveTab] = useState<SettingsTabType>(initialTab ?? 'general');
+  const [enterpriseSettingsPages, setEnterpriseSettingsPages] = useState<
+    readonly EnterpriseRendererSettingsPage[]
+  >([]);
+  const enterpriseModelTab = enterpriseSettingsPages.find(page => page.id === 'models');
   const activeTab = resolveManagedModelSettingsTab(
     requestedActiveTab,
     managedModelsOnly,
-    Boolean(enterpriseSettingsPage),
+    enterpriseModelTab ? toEnterpriseTab(enterpriseModelTab.id) : undefined,
   );
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [language, setLanguage] = useState<LanguageType>('zh');
@@ -756,7 +766,9 @@ const Settings: React.FC<SettingsProps> = ({
   const [isTestResultModalOpen, setIsTestResultModalOpen] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<ProviderType | null>(null);
-  const [pendingDeleteModel, setPendingDeleteModel] = useState<{ id: string; name: string } | null>(null);
+  const [pendingDeleteModel, setPendingDeleteModel] = useState<{ id: string; name: string } | null>(
+    null,
+  );
   const [isImportingProviders, setIsImportingProviders] = useState(false);
   const [isExportingProviders, setIsExportingProviders] = useState(false);
   // Global triage defaults — Agent-level settings are per-Agent in AgentSettingsPanel
@@ -777,37 +789,38 @@ const Settings: React.FC<SettingsProps> = ({
   const appearanceIconRef = useRef<SettingsAnimatedSunMediumIconHandle>(null);
   const modelIconRef = useRef<SettingsAnimatedBoxIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
-  const settingsIconRefs: Partial<Record<TabType, { current: AnimatedIconHandle | null }>> = {
-    general: generalIconRef,
-    appearance: appearanceIconRef,
-    model: modelIconRef,
-    im: imIconRef,
-    email: emailIconRef,
-    coworkMemory: memoryIconRef,
-    shortcuts: shortcutsIconRef,
-    about: aboutIconRef,
-  };
+  const settingsIconRefs: Partial<Record<SettingsTabType, { current: AnimatedIconHandle | null }>> =
+    {
+      general: generalIconRef,
+      appearance: appearanceIconRef,
+      model: modelIconRef,
+      im: imIconRef,
+      email: emailIconRef,
+      coworkMemory: memoryIconRef,
+      shortcuts: shortcutsIconRef,
+      about: aboutIconRef,
+    };
 
   useEffect(() => {
     let active = true;
     void window.electron.enterprise.renderer
-      .settingsPage()
-      .then(page => {
-        if (active) setEnterpriseSettingsPage(page);
+      .settingsPages()
+      .then(pages => {
+        if (active) setEnterpriseSettingsPages(pages);
       })
       .catch(() => {
-        if (active) setEnterpriseSettingsPage(null);
+        if (active) setEnterpriseSettingsPages([]);
       });
     return () => {
       active = false;
     };
   }, []);
 
-  const startSettingsIconAnimation = (tab: TabType) => {
+  const startSettingsIconAnimation = (tab: SettingsTabType) => {
     if (!prefersReducedMotion) settingsIconRefs[tab]?.current?.startAnimation();
   };
 
-  const stopSettingsIconAnimation = (tab: TabType) => {
+  const stopSettingsIconAnimation = (tab: SettingsTabType) => {
     settingsIconRefs[tab]?.current?.stopAnimation();
   };
 
@@ -2028,16 +2041,14 @@ const Settings: React.FC<SettingsProps> = ({
       didSaveRef.current = true;
       onClose();
     } catch (error) {
-      setError(
-        getSettingsSaveErrorMessage(error, appConfigSaved, key => i18nService.t(key)),
-      );
+      setError(getSettingsSaveErrorMessage(error, appConfigSaved, key => i18nService.t(key)));
     } finally {
       setIsSaving(false);
     }
   };
 
   // 标签页切换处理
-  const handleTabChange = (tab: TabType) => {
+  const handleTabChange = (tab: SettingsTabType) => {
     if (tab !== 'model') {
       setIsAddingModel(false);
       setIsEditingModel(false);
@@ -2862,8 +2873,8 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   // 渲染标签页
-  const sidebarTabs: { key: TabType; label: string; icon: React.ReactNode }[] = (() => {
-    const allTabs = [
+  const sidebarTabs: { key: SettingsTabType; label: string; icon: React.ReactNode }[] = (() => {
+    const allTabs: { key: SettingsTabType; label: string; icon: React.ReactNode }[] = [
       {
         key: 'general' as TabType,
         label: i18nService.t('general'),
@@ -2905,12 +2916,21 @@ const Settings: React.FC<SettingsProps> = ({
         icon: <SettingsAnimatedCircleHelpIcon ref={aboutIconRef} />,
       },
     ];
-    if (enterpriseSettingsPage) {
-      allTabs.splice(allTabs.length - 1, 0, {
-        key: 'extension',
-        label: enterpriseSettingsPage.labels[language],
-        icon: <ShieldCheck aria-hidden="true" />,
-      });
+    if (enterpriseSettingsPages.length > 0) {
+      allTabs.splice(
+        allTabs.length - 1,
+        0,
+        ...enterpriseSettingsPages.map(page => ({
+          key: toEnterpriseTab(page.id),
+          label: page.labels[language],
+          icon:
+            page.id === 'models' ? (
+              <ServerCog aria-hidden="true" />
+            ) : (
+              <Building2 aria-hidden="true" />
+            ),
+        })),
+      );
     }
     // Filter out tabs hidden by enterprise config
     // Filter out tabs with 'hide' action in enterprise config
@@ -3055,6 +3075,11 @@ const Settings: React.FC<SettingsProps> = ({
   );
 
   const renderTabContent = () => {
+    if (isEnterpriseTab(activeTab)) {
+      const pageId = fromEnterpriseTab(activeTab);
+      const page = enterpriseSettingsPages.find(candidate => candidate.id === pageId);
+      return page ? <EnterpriseSettingsPage page={page} title={activeTabLabel} /> : null;
+    }
     switch (activeTab) {
       case 'general':
         return (
@@ -3148,7 +3173,6 @@ const Settings: React.FC<SettingsProps> = ({
                 />
               </label>
             </div>
-
           </div>
         );
 
@@ -3157,11 +3181,6 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'email':
         return null;
-
-      case 'extension':
-        return enterpriseSettingsPage ? (
-          <EnterpriseSettingsPage page={enterpriseSettingsPage} title={activeTabLabel} />
-        ) : null;
 
       case 'coworkMemory':
         return (
@@ -5237,7 +5256,9 @@ const Settings: React.FC<SettingsProps> = ({
               ref={contentRef}
               className={cn(
                 'flex-1',
-                activeTab === 'extension' ? 'overflow-hidden' : 'overflow-y-auto px-4 py-4 sm:px-6',
+                isEnterpriseTab(activeTab)
+                  ? 'overflow-hidden'
+                  : 'overflow-y-auto px-4 py-4 sm:px-6',
               )}
               style={{ scrollbarGutter: 'stable' }}
             >
@@ -5248,7 +5269,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Footer buttons */}
-            {activeTab !== 'extension' && (
+            {!isEnterpriseTab(activeTab) && (
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border bg-background p-4">
                 <Button
                   type="button"
@@ -5349,7 +5370,9 @@ const Settings: React.FC<SettingsProps> = ({
         <DestructiveConfirmDialog
           open={pendingDeleteModel !== null}
           title={i18nService.t('confirmDelete')}
-          description={pendingDeleteModel ? `${i18nService.t('delete')} "${pendingDeleteModel.name}"?` : ''}
+          description={
+            pendingDeleteModel ? `${i18nService.t('delete')} "${pendingDeleteModel.name}"?` : ''
+          }
           cancelLabel={i18nService.t('cancel')}
           confirmLabel={i18nService.t('delete')}
           onCancel={() => setPendingDeleteModel(null)}
@@ -5489,7 +5512,9 @@ const Settings: React.FC<SettingsProps> = ({
                       <div className="flex items-center space-x-2">
                         <Checkbox
                           id={`${activeProvider}-supportsImage`}
-                          checked={newModelCapabilities.imageInput === ModelCapabilityStatus.Supported}
+                          checked={
+                            newModelCapabilities.imageInput === ModelCapabilityStatus.Supported
+                          }
                           onCheckedChange={checked =>
                             setNewModelCapabilities(current => ({
                               ...current,
@@ -5563,7 +5588,6 @@ const Settings: React.FC<SettingsProps> = ({
           provider={ProviderName.Ollama}
           onClose={() => setOllamaCapabilityModel(null)}
         />
-
       </div>
     </Modal>
   );

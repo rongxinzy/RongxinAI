@@ -16,6 +16,7 @@ export const ZHIYUAN_ENTERPRISE_RENDERER_ORIGIN = `${ZHIYUAN_ENTERPRISE_RENDERER
 const MAX_ENTRYPOINT_LENGTH = 512;
 const MAX_LABEL_LENGTH = 64;
 const SETTINGS_RESOURCE_PREFIX = 'settings/';
+const SETTINGS_PAGE_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 
 interface RegisteredRendererPage {
   readonly rootDirectory: string;
@@ -23,12 +24,13 @@ interface RegisteredRendererPage {
 }
 
 interface RegisteredSettingsPage extends RegisteredRendererPage {
+  readonly id: string;
   readonly labels: EnterpriseRendererSettingsPage['labels'];
 }
 
 export class ZhiyuanEnterpriseRendererBridge {
   #sessionGate: RegisteredRendererPage | null = null;
-  #settingsPage: RegisteredSettingsPage | null = null;
+  readonly #settingsPages = new Map<string, RegisteredSettingsPage>();
 
   createScopedCapability(extensionDirectory: string): ZhiyuanEnterpriseRendererHostCapability {
     const rootDirectory = realDirectory(extensionDirectory);
@@ -57,14 +59,16 @@ export class ZhiyuanEnterpriseRendererBridge {
       : null;
   }
 
-  settingsPage(): EnterpriseRendererSettingsPage | null {
-    const registration = this.#settingsPage;
-    return registration
-      ? Object.freeze({
-          entrypoint: `${ZHIYUAN_ENTERPRISE_RENDERER_ORIGIN}/${SETTINGS_RESOURCE_PREFIX}${encodeURIComponent(registration.entrypoint)}`,
+  settingsPages(): readonly EnterpriseRendererSettingsPage[] {
+    return Object.freeze(
+      [...this.#settingsPages.values()].map(registration =>
+        Object.freeze({
+          id: registration.id,
+          entrypoint: `${ZHIYUAN_ENTERPRISE_RENDERER_ORIGIN}/${SETTINGS_RESOURCE_PREFIX}${encodeURIComponent(registration.id)}/${encodeURIComponent(registration.entrypoint)}`,
           labels: registration.labels,
-        })
-      : null;
+        }),
+      ),
+    );
   }
 
   resolveAsset(requestUrl: string): string | null {
@@ -85,11 +89,12 @@ export class ZhiyuanEnterpriseRendererBridge {
       return null;
     }
     if (relativePath.startsWith(SETTINGS_RESOURCE_PREFIX)) {
-      return this.#settingsPage
-        ? resolveRegularFile(
-            this.#settingsPage.rootDirectory,
-            relativePath.slice(SETTINGS_RESOURCE_PREFIX.length),
-          )
+      const settingsPath = relativePath.slice(SETTINGS_RESOURCE_PREFIX.length);
+      const separator = settingsPath.indexOf('/');
+      if (separator <= 0) return null;
+      const registration = this.#settingsPages.get(settingsPath.slice(0, separator));
+      return registration
+        ? resolveRegularFile(registration.rootDirectory, settingsPath.slice(separator + 1))
         : null;
     }
     return this.#sessionGate
@@ -124,11 +129,14 @@ export class ZhiyuanEnterpriseRendererBridge {
     rootDirectory: string,
     page: ZhiyuanEnterpriseSettingsPageRegistration,
   ): () => void {
-    if (this.#settingsPage) {
-      throw new Error('A Zhiyuan enterprise settings page is already registered.');
-    }
     if (!page || typeof page !== 'object') {
       throw new Error('Zhiyuan enterprise settings page registration is invalid.');
+    }
+    if (!SETTINGS_PAGE_ID_PATTERN.test(page.id)) {
+      throw new Error('Zhiyuan enterprise settings page ID is invalid.');
+    }
+    if (this.#settingsPages.has(page.id)) {
+      throw new Error(`Zhiyuan enterprise settings page ${page.id} is already registered.`);
     }
     const normalizedEntrypoint = normalizeRelativePath(page.entrypoint);
     const resolvedEntrypoint = resolveRegularFile(rootDirectory, normalizedEntrypoint);
@@ -140,16 +148,17 @@ export class ZhiyuanEnterpriseRendererBridge {
       en: normalizeLabel(page.labels?.en),
     });
     const registration = Object.freeze({
+      id: page.id,
       rootDirectory: path.dirname(resolvedEntrypoint),
       entrypoint: path.basename(resolvedEntrypoint),
       labels,
     });
-    this.#settingsPage = registration;
+    this.#settingsPages.set(page.id, registration);
     let registered = true;
     return () => {
       if (!registered) return;
       registered = false;
-      if (this.#settingsPage === registration) this.#settingsPage = null;
+      if (this.#settingsPages.get(page.id) === registration) this.#settingsPages.delete(page.id);
     };
   }
 }

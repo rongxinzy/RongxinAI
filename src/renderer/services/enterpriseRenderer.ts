@@ -22,6 +22,23 @@ export function isEnterpriseRendererReadyMessage(
   );
 }
 
+export function parseEnterpriseModelCatalogRequest(
+  value: unknown,
+): EnterpriseRendererModelCatalogRequestMessage | null {
+  const message = asRecord(value);
+  if (
+    message?.source !== EnterpriseRendererMessageSource.Module ||
+    message.apiVersion !== 1 ||
+    message.type !== EnterpriseRendererMessageType.ModelCatalogRequest ||
+    typeof message.requestId !== 'string' ||
+    message.requestId.length === 0 ||
+    message.requestId.length > MAX_REQUEST_ID_LENGTH
+  ) {
+    return null;
+  }
+  return message as unknown as EnterpriseRendererModelCatalogRequestMessage;
+}
+
 export function parseEnterpriseSessionRequest(
   value: unknown,
 ): EnterpriseRendererSessionRequestMessage | null {
@@ -54,23 +71,6 @@ export function parseEnterpriseSessionRequest(
   }
 }
 
-export function parseEnterpriseModelCatalogRequest(
-  value: unknown,
-): EnterpriseRendererModelCatalogRequestMessage | null {
-  const message = asRecord(value);
-  if (
-    message?.source !== EnterpriseRendererMessageSource.Module ||
-    message.apiVersion !== 1 ||
-    message.type !== EnterpriseRendererMessageType.ModelCatalogRequest ||
-    typeof message.requestId !== 'string' ||
-    message.requestId.length === 0 ||
-    message.requestId.length > MAX_REQUEST_ID_LENGTH
-  ) {
-    return null;
-  }
-  return message as unknown as EnterpriseRendererModelCatalogRequestMessage;
-}
-
 export function executeEnterpriseSessionRequest(
   request: EnterpriseRendererSessionRequestMessage,
 ): Promise<EnterpriseSessionResult> {
@@ -87,9 +87,11 @@ export function executeEnterpriseSessionRequest(
 }
 
 export async function executeEnterpriseModelCatalogRequest(): Promise<EnterpriseRendererModelCatalogResult> {
-  const externalModels = window.electron.externalModels;
-  if (!externalModels) return { ok: false };
-  return { ok: true, models: await externalModels.list() };
+  try {
+    return { ok: true, models: await window.electron.managedProviders.catalog() };
+  } catch {
+    return { ok: false };
+  }
 }
 
 function isLoginInput(value: unknown): boolean {

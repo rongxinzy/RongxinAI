@@ -8,11 +8,10 @@ export function filterManagedModelSettingsTabs<T extends { readonly key: string 
 export function resolveManagedModelSettingsTab<T extends string>(
   activeTab: T,
   managedModelsOnly: boolean,
-  hasEnterpriseSettingsPage: boolean,
+  enterpriseTab: T | undefined,
 ): T {
   if (!managedModelsOnly || activeTab !== 'model') return activeTab;
-  const fallback = hasEnterpriseSettingsPage ? 'extension' : 'general';
-  return fallback as T;
+  return enterpriseTab ?? ('general' as T);
 }
 
 export function shouldShowLocalInferenceNavigation(

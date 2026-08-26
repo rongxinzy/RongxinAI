@@ -1,13 +1,11 @@
 import type { LlamaCppModelPreferences, LlamaCppRunningModel } from '../../shared/llamacpp';
 import {
-  ExternalModelAccessMode,
-  OPEN_EXTERNAL_MODEL_ACCESS_POLICY,
-  type ExternalModel,
-  type ExternalModelAccessPolicy,
-} from '../../shared/externalModels';
+  ManagedProviderAccessMode,
+  OPEN_MANAGED_PROVIDER_ACCESS_POLICY,
+  type ManagedProviderAccessPolicy,
+} from '../../shared/managedProviders';
 import {
   isProviderEnabled,
-  ModelCapabilityStatus,
   ProviderName,
   ProviderRegistry,
   resolveCodingPlanBaseUrl,
@@ -23,7 +21,10 @@ type ModelLike = Pick<Model, 'id' | 'providerKey'>;
 const sameModelIdentity = (modelA: ModelLike, modelB: ModelLike): boolean =>
   modelA.id === modelB.id && (modelA.providerKey ?? '') === (modelB.providerKey ?? '');
 
-export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
+export function buildConfiguredAvailableModels(
+  config: AppConfig,
+  allowedProviderKeys?: ReadonlySet<string>,
+): Model[] {
   const models: Model[] = [];
 
   if (!config.providers) {
@@ -31,6 +32,7 @@ export function buildConfiguredAvailableModels(config: AppConfig): Model[] {
   }
 
   Object.entries(config.providers).forEach(([providerName, providerConfig]) => {
+    if (allowedProviderKeys && !allowedProviderKeys.has(providerName)) return;
     if (providerName === ProviderName.LlamaCpp) {
       return;
     }
@@ -117,21 +119,6 @@ export function buildLlamaCppRunningModels(
   return models;
 }
 
-export function buildExternalAvailableModels(models: readonly ExternalModel[]): Model[] {
-  return [...models]
-    .sort((left, right) => Number(right.isDefault) - Number(left.isDefault))
-    .map(model => ({
-      id: model.id,
-      name: model.displayName,
-      provider: model.provider.displayName,
-      providerKey: model.provider.id,
-      agentProviderId: model.provider.id,
-      supportsImage: model.capabilities?.imageInput === ModelCapabilityStatus.Supported,
-      capabilities: model.capabilities,
-      contextWindow: model.contextWindow,
-    }));
-}
-
 export function mergeAvailableModels(
   configuredModels: Model[],
   llamaCppRunningModels: Model[],
@@ -147,29 +134,17 @@ export function mergeAvailableModels(
   return merged;
 }
 
-export async function getExternalModelAccessPolicy(): Promise<ExternalModelAccessPolicy> {
-  return (
-    (await window.electron.externalModels?.policy?.().catch(() => null)) ??
-    OPEN_EXTERNAL_MODEL_ACCESS_POLICY
-  );
-}
-
 export async function collectAvailableModels(config: AppConfig): Promise<Model[]> {
-  const policy = await getExternalModelAccessPolicy();
-  const externalModelsPromise =
-    window.electron.externalModels?.list().catch((): readonly ExternalModel[] => []) ??
-    Promise.resolve([]);
-  if (policy.mode === ExternalModelAccessMode.Exclusive) {
-    return buildExternalAvailableModels(await externalModelsPromise);
-  }
+  const policy = await getManagedProviderAccessPolicy();
+  const configuredModels = buildConfiguredAvailableModels(
+    config,
+    policy.mode === ManagedProviderAccessMode.Exclusive ? new Set(policy.providerKeys) : undefined,
+  );
 
-  const configuredModels = buildConfiguredAvailableModels(config);
+  if (policy.mode === ManagedProviderAccessMode.Exclusive) return configuredModels;
 
   try {
-    const [runningModels, externalModels] = await Promise.all([
-      window.electron.llamacpp.listRunningModels(),
-      externalModelsPromise,
-    ]);
+    const runningModels = await window.electron.llamacpp.listRunningModels();
     let preferences: LlamaCppModelPreferences = {};
     try {
       preferences = (await window.electron.llamacpp.getModelPreferences?.()) ?? {};
@@ -177,18 +152,19 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
       // Model preferences are optional metadata; keep the running model list available.
     }
     return mergeAvailableModels(
-      mergeAvailableModels(
-        configuredModels,
-        buildLlamaCppRunningModels(runningModels, preferences),
-      ),
-      buildExternalAvailableModels(externalModels),
+      configuredModels,
+      buildLlamaCppRunningModels(runningModels, preferences),
     );
   } catch {
-    return mergeAvailableModels(
-      configuredModels,
-      buildExternalAvailableModels(await externalModelsPromise),
-    );
+    return configuredModels;
   }
+}
+
+export async function getManagedProviderAccessPolicy(): Promise<ManagedProviderAccessPolicy> {
+  return (
+    (await window.electron.managedProviders?.policy().catch(() => null)) ??
+    OPEN_MANAGED_PROVIDER_ACCESS_POLICY
+  );
 }
 
 export function notifyLlamaCppRunningModelsChanged(): void {
