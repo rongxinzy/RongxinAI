@@ -18,6 +18,8 @@ type PendingRequest = {
   timeout: ReturnType<typeof setTimeout> | null;
 };
 
+type JsonRpcRequestId = number | string;
+
 type RequestHandler = (
   method: string,
   params: Record<string, unknown>,
@@ -32,7 +34,7 @@ export class AcpConnectionSupervisor {
   private child: ChildProcessWithoutNullStreams | null = null;
   private stdoutBuffer = '';
   private requestId = 0;
-  private readonly pending = new Map<number, PendingRequest>();
+  private readonly pending = new Map<JsonRpcRequestId, PendingRequest>();
   private notificationHandler: ((method: string, params: Record<string, unknown>) => void) | null =
     null;
   private requestHandler: RequestHandler | null = null;
@@ -175,14 +177,14 @@ export class AcpConnectionSupervisor {
       };
       if (typeof message.method === 'string') {
         const params = (message.params ?? {}) as Record<string, unknown>;
-        if (typeof message.id === 'number') {
+        if (typeof message.id === 'number' || typeof message.id === 'string') {
           void this.respondToAgentRequest(message.id, message.method, params);
         } else {
           this.notificationHandler?.(message.method, params);
         }
         return;
       }
-      if (typeof message.id !== 'number') return;
+      if (typeof message.id !== 'number' && typeof message.id !== 'string') return;
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
@@ -196,7 +198,7 @@ export class AcpConnectionSupervisor {
   }
 
   private async respondToAgentRequest(
-    id: number,
+    id: JsonRpcRequestId,
     method: string,
     params: Record<string, unknown>,
   ): Promise<void> {

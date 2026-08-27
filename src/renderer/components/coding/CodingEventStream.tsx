@@ -83,7 +83,9 @@ const EventCard = ({ event }: { event: CodingEvent }) => {
       </Tool>
     );
   }
-  const isUser = event.kind === CodingEventKind.Message && event.payload.role === 'user';
+  const isUser =
+    (event.kind === CodingEventKind.Message || event.kind === CodingEventKind.MessageDelta) &&
+    event.payload.role === 'user';
   return (
     <Message
       from={isUser ? 'user' : 'assistant'}

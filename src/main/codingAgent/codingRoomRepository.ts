@@ -7,6 +7,7 @@ import {
   CodingStreamUpdateMode,
   CodingLaneStatus,
   CodingMissionStatus,
+  type CodingWorkflowStage,
   type CodingAgentLane,
   type CodingAgentConfigOption,
   type CodingAssignment,
@@ -54,6 +55,8 @@ const rowAssignment = (row: Record<string, unknown>): CodingAssignment => ({
   status: row.status as CodingAssignmentStatus,
   workbenchTaskId: row.workbench_task_id as string | null,
   workbenchRunId: row.workbench_run_id as string | null,
+  workflowStage: (row.workflow_stage as CodingWorkflowStage | null) ?? null,
+  previousAssignmentId: (row.previous_assignment_id as string | null) ?? null,
   createdAt: Number(row.created_at),
   updatedAt: Number(row.updated_at),
 });
@@ -206,11 +209,15 @@ export class CodingRoomRepository {
     laneId: string;
     title: string;
     instructions: string;
+    workflowStage?: CodingWorkflowStage | null;
+    previousAssignmentId?: string | null;
   }): CodingAssignment {
     const now = Date.now();
     const assignment: CodingAssignment = {
       id: randomUUID(),
       ...input,
+      workflowStage: input.workflowStage ?? null,
+      previousAssignmentId: input.previousAssignmentId ?? null,
       status: CodingAssignmentStatus.Planned,
       workbenchTaskId: null,
       workbenchRunId: null,
@@ -219,7 +226,7 @@ export class CodingRoomRepository {
     };
     this.db
       .prepare(
-        'INSERT INTO coding_assignments (id, mission_id, lane_id, title, instructions, status, workbench_task_id, workbench_run_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)',
+        'INSERT INTO coding_assignments (id, mission_id, lane_id, title, instructions, workflow_stage, previous_assignment_id, status, workbench_task_id, workbench_run_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, ?)',
       )
       .run(
         assignment.id,
@@ -227,6 +234,8 @@ export class CodingRoomRepository {
         assignment.laneId,
         assignment.title,
         assignment.instructions,
+        assignment.workflowStage,
+        assignment.previousAssignmentId,
         assignment.status,
         now,
         now,

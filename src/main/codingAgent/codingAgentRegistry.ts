@@ -46,6 +46,7 @@ export class CodingAgentRegistry extends EventEmitter {
       authMethods: [],
       command: null,
       args: [],
+      environment: {},
       isBuiltin: true,
     });
   }
@@ -74,7 +75,7 @@ export class CodingAgentRegistry extends EventEmitter {
     this.emit('changed');
   }
   registerExternal(profile: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>): CodingAgentProfile {
-    const registered = { ...profile, id: randomUUID(), isBuiltin: false };
+    const registered = { ...profile, environment: profile.environment ?? {}, id: randomUUID(), isBuiltin: false };
     this.profiles.set(registered.id, registered);
     this.repository?.save(registered);
     this.emit('changed');
@@ -113,6 +114,7 @@ export class CodingAgentRegistry extends EventEmitter {
       authMethods: [],
       command,
       args: input.args,
+      environment: {},
     });
   }
 
@@ -164,7 +166,7 @@ export class CodingAgentRegistry extends EventEmitter {
         executable: profile.command,
         args: profile.args,
         cwd,
-        environment: this.allowedEnvironment(),
+        environment: { ...this.allowedEnvironment(), ...profile.environment },
       });
       const updated = {
         ...profile,

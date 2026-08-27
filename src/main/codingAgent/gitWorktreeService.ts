@@ -127,13 +127,24 @@ export class GitWorktreeService {
     const patch = await this.getWorktreeDiff(input.worktreeRoot);
     if (!patch.trim()) return;
     try {
-      await applyGitPatch(input.repositoryRoot, patch, true);
+      await this.applyPatch(input.repositoryRoot, patch);
     } catch (error) {
       throw new GitWorktreeConflictError(
         error instanceof Error ? error.message : 'The collaborator patch cannot be applied cleanly.',
       );
     }
-    await applyGitPatch(input.repositoryRoot, patch, false);
+  }
+
+  async applyPatch(workspaceRoot: string, patch: string): Promise<void> {
+    if (!patch.trim()) return;
+    try {
+      await applyGitPatch(workspaceRoot, patch, true);
+    } catch (error) {
+      throw new GitWorktreeConflictError(
+        error instanceof Error ? error.message : 'The collaborator patch cannot be applied cleanly.',
+      );
+    }
+    await applyGitPatch(workspaceRoot, patch, false);
   }
 
   async remove(repositoryRoot: string, worktreePath: string): Promise<void> {

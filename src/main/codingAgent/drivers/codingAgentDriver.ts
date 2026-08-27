@@ -23,6 +23,9 @@ export interface CodingAgentSession {
 }
 
 export interface CodingAgentDriver {
+  /** ACP drivers use this to invalidate sessions after their child process restarts. */
+  isConnectionRunning?(): boolean;
+  getConnectionGeneration?(): number;
   getCapabilities(): Promise<CodingAgentCapabilities>;
   getAuthState(): Promise<CodingAgentAuthState>;
   authenticate(request: CodingAgentAuthRequest): Promise<void>;

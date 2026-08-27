@@ -9,14 +9,20 @@ import {
   type CodingAgentProfile,
 } from '../../../shared/codingAgent';
 
-type RegistryBinaryDistribution = { cmd?: unknown; args?: unknown };
+type RegistryLaunchDistribution = {
+  package?: unknown;
+  args?: unknown;
+  env?: unknown;
+};
+type RegistryBinaryDistribution = { cmd?: unknown; args?: unknown; env?: unknown };
 type RegistryAgent = {
   id?: unknown;
   name?: unknown;
   description?: unknown;
   distribution?: {
     binary?: Record<string, RegistryBinaryDistribution>;
-    npx?: { package?: unknown };
+    npx?: RegistryLaunchDistribution;
+    uvx?: RegistryLaunchDistribution;
   };
 };
 type RegistrySnapshot = { agents?: RegistryAgent[] };
@@ -36,6 +42,8 @@ const NO_ACP_CAPABILITIES = {
 const uniqueDirectories = (directories: string[]): string[] => [
   ...new Set(directories.filter(Boolean)),
 ];
+const stringArguments = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((arg): arg is string => typeof arg === 'string') : [];
 
 export const discoveryDirectories = (
   platform: NodeJS.Platform,
@@ -78,7 +86,7 @@ export class AcpDiscoveryService {
     const agents = await this.readRegistry();
     const profiles = await Promise.all(
       agents.map(async agent => {
-        const resolved = await this.resolve(paths, this.executableNames(agent.executable));
+        const resolved = await this.resolve(paths, agent.executables.flatMap(executable => this.executableNames(executable)));
         if (!resolved) return null;
         return {
           name: agent.name,
@@ -89,35 +97,69 @@ export class AcpDiscoveryService {
           authMethods: [] as CodingAgentAuthMethod[],
           command: resolved,
           args: agent.args,
+          environment: agent.environment,
         } satisfies Omit<CodingAgentProfile, 'id' | 'isBuiltin'>;
       }),
     );
     return profiles.filter((profile): profile is NonNullable<typeof profile> => profile !== null);
   }
 
-  private async readRegistry(): Promise<Array<{ name: string; description: string; executable: string; args: string[] }>> {
+  private async readRegistry(): Promise<Array<{
+    name: string;
+    description: string;
+    executables: string[];
+    args: string[];
+    environment: Record<string, string>;
+  }>> {
     const snapshot = JSON.parse(await readFile(this.registryPath, 'utf8')) as RegistrySnapshot;
     const platformKey = this.platformKey();
-    return (snapshot.agents ?? []).flatMap(agent => {
+    return await Promise.all((snapshot.agents ?? []).map(async agent => {
       if (typeof agent.id !== 'string' || typeof agent.name !== 'string') return [];
       const binary = agent.distribution?.binary?.[platformKey];
-      const npxPackage = agent.distribution?.npx?.package;
-      const command =
+      const launcher = agent.distribution?.npx ?? agent.distribution?.uvx;
+      const executables =
         typeof binary?.cmd === 'string'
-          ? path.basename(binary.cmd)
-          : typeof npxPackage === 'string'
-            ? npxPackage.replace(/@[^@]+$/, '').split('/').at(-1)
-            : null;
-      if (!command) return [];
+          ? [path.basename(binary.cmd)]
+          : await this.packageBinNames(launcher?.package);
+      if (!executables.length) return [];
       return [{
         name: agent.name,
         description: typeof agent.description === 'string' ? agent.description : 'ACP agent.',
-        executable: command,
-        args: Array.isArray(binary?.args)
-          ? binary.args.filter((arg): arg is string => typeof arg === 'string')
-          : [],
+        executables,
+        args: stringArguments(binary?.args ?? launcher?.args),
+        environment: this.environment(binary?.env ?? launcher?.env),
       }];
-    });
+    })).then(entries => entries.flat());
+  }
+
+  private environment(value: unknown): Record<string, string> {
+    if (!value || typeof value !== 'object') return {};
+    return Object.fromEntries(
+      Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+    );
+  }
+
+  private async packageBinNames(packageSpec: unknown): Promise<string[]> {
+    if (typeof packageSpec !== 'string') return [];
+    const packageName = packageSpec.replace(/@[^@]+$/, '');
+    const directories = discoveryDirectories(process.platform, process.env);
+    const manifests = [
+      path.join(process.cwd(), 'node_modules', packageName, 'package.json'),
+      ...directories.flatMap(directory => [
+        path.resolve(directory, '..', 'node_modules', packageName, 'package.json'),
+        path.resolve(directory, '..', 'lib', 'node_modules', packageName, 'package.json'),
+      ]),
+    ];
+    for (const manifest of uniqueDirectories(manifests)) {
+      try {
+        const parsed = JSON.parse(await readFile(manifest, 'utf8')) as { bin?: unknown };
+        if (typeof parsed.bin === 'string') return [path.basename(parsed.bin)];
+        if (parsed.bin && typeof parsed.bin === 'object') return Object.keys(parsed.bin);
+      } catch {
+        /* This installation location does not contain the registry package. */
+      }
+    }
+    return [];
   }
 
   private platformKey(): string {

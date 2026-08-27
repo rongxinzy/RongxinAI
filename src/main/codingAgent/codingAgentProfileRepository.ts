@@ -18,6 +18,7 @@ type ProfileRow = {
   auth_methods_json: string;
   command: string | null;
   args_json: string;
+  environment_json: string;
   is_builtin: number;
 };
 
@@ -49,6 +50,7 @@ const mapProfile = (row: ProfileRow): CodingAgentProfile => ({
   authMethods: parseJson<CodingAgentAuthMethod[]>(row.auth_methods_json, []),
   command: row.command,
   args: parseJson<string[]>(row.args_json, []),
+  environment: parseJson<Record<string, string>>(row.environment_json, {}),
   isBuiltin: Boolean(row.is_builtin),
 });
 
@@ -70,12 +72,12 @@ export class CodingAgentProfileRepository {
     this.db
       .prepare(
         `INSERT INTO coding_agent_profiles
-         (id, name, description, driver_kind, status, capabilities_json, auth_methods_json, command, args_json, is_builtin, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (id, name, description, driver_kind, status, capabilities_json, auth_methods_json, command, args_json, environment_json, is_builtin, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(id) DO UPDATE SET
            name = excluded.name, description = excluded.description, driver_kind = excluded.driver_kind,
            status = excluded.status, capabilities_json = excluded.capabilities_json, auth_methods_json = excluded.auth_methods_json, command = excluded.command,
-           args_json = excluded.args_json, is_builtin = excluded.is_builtin, updated_at = excluded.updated_at`,
+           args_json = excluded.args_json, environment_json = excluded.environment_json, is_builtin = excluded.is_builtin, updated_at = excluded.updated_at`,
       )
       .run(
         profile.id,
@@ -87,6 +89,7 @@ export class CodingAgentProfileRepository {
         JSON.stringify(profile.authMethods),
         profile.command,
         JSON.stringify(profile.args),
+        JSON.stringify(profile.environment),
         profile.isBuiltin ? 1 : 0,
         now,
         now,

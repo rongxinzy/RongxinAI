@@ -46,14 +46,18 @@ test('covers Windows user-level npm, pnpm, and Bun locations without scanning di
 });
 
 test('records a resolved absolute executable when PATH contains a relative directory', async () => {
-  const directory = path.join(process.cwd(), `.coding-agent-discovery-${Date.now()}`);
+  const root = path.join(process.cwd(), `.coding-agent-discovery-${Date.now()}`);
+  const directory = path.join(root, 'bin');
   const executable = path.join(directory, 'codex-acp');
+  const packageManifest = path.join(root, 'node_modules', '@agentclientprotocol', 'codex-acp', 'package.json');
   const originalPath = process.env.PATH;
   try {
     await mkdir(directory, { recursive: true });
     await writeFile(executable, '#!/bin/sh\nexit 0\n');
     await chmod(executable, 0o755);
-    process.env.PATH = path.basename(directory);
+    await mkdir(path.dirname(packageManifest), { recursive: true });
+    await writeFile(packageManifest, JSON.stringify({ bin: { 'codex-acp': 'index.js' } }));
+    process.env.PATH = path.relative(process.cwd(), directory);
 
     const profiles = await new AcpDiscoveryService().discover();
     expect(profiles).toContainEqual(
@@ -66,6 +70,6 @@ test('records a resolved absolute executable when PATH contains a relative direc
     );
   } finally {
     process.env.PATH = originalPath;
-    await rm(directory, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
   }
 });

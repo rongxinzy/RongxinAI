@@ -934,6 +934,12 @@ const getCodingRoomService = (): CodingRoomService => {
         completeExternalWorkbenchRun: ({ sessionId, runId, workspaceRoot, finalAnswer }) => {
           getWorkbenchTaskService().completeRun({ sessionId, runId, workspaceRoot, finalAnswer });
         },
+        failExternalWorkbenchRun: ({ sessionId, error }) => {
+          getWorkbenchTaskService().failRun(sessionId, { message: error });
+        },
+        cancelExternalWorkbenchRun: ({ sessionId, runId }) => {
+          getWorkbenchTaskService().cancelRun(sessionId, runId);
+        },
         respondBuiltinPermission: (requestId, approved) =>
           runtime.respondToPermission(
             requestId,
@@ -958,6 +964,10 @@ const getCodingRoomService = (): CodingRoomService => {
           await new GitWorktreeService(
             path.join(app.getPath('userData'), 'coding-worktrees'),
           ).getWorktreeDiffPreview(workspaceRoot),
+        applyWorkspacePatch: async ({ workspaceRoot, patch }) =>
+          await new GitWorktreeService(
+            path.join(app.getPath('userData'), 'coding-worktrees'),
+          ).applyPatch(workspaceRoot, patch),
         getIsolatedWorkspaceDiff: async workspaceRoot =>
           await new GitWorktreeService(
             path.join(app.getPath('userData'), 'coding-worktrees'),

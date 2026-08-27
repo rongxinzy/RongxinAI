@@ -4,6 +4,7 @@ import { EventEmitter } from 'events';
 import {
   CodingAgentDriverKind,
   CodingAssignmentStatus,
+  CodingWorkflowStage,
   CodingEventKind,
   CodingLaneStatus,
   CodingMissionStatus,
@@ -46,6 +47,8 @@ export interface CodingRoomRuntime {
     workspaceRoot: string;
     finalAnswer: string;
   }): void;
+  failExternalWorkbenchRun?(input: { sessionId: string; runId: string; error: string }): void;
+  cancelExternalWorkbenchRun?(input: { sessionId: string; runId: string }): void;
   respondBuiltinPermission?(requestId: string, approved: boolean): void;
   createIsolatedWorkspace?(input: {
     workspaceRoot: string;
@@ -59,7 +62,10 @@ export interface CodingRoomRuntime {
     workspaceRoot: string;
     isolatedWorkspaceRoot: string;
   }): Promise<void>;
+  applyWorkspacePatch?(input: { workspaceRoot: string; patch: string }): Promise<void>;
 }
+
+type DriverSession = { id: string; connectionGeneration: number | null };
 
 const ACP_ENVIRONMENT_KEYS = [
   'PATH',
@@ -75,7 +81,7 @@ const ACP_ENVIRONMENT_KEYS = [
 
 export class CodingRoomService extends EventEmitter {
   private readonly drivers = new Map<string, CodingAgentDriver>();
-  private readonly driverSessionIds = new Map<string, string>();
+  private readonly driverSessionIds = new Map<string, DriverSession>();
   private readonly driverProfileIds = new Map<string, string>();
   private readonly driverFactory: CodingDriverFactory;
   private readonly collaboration = new CollaborationService();
@@ -151,6 +157,7 @@ export class CodingRoomService extends EventEmitter {
       laneId: lane.id,
       title: mission.title,
       instructions: mission.goal,
+      workflowStage: CodingWorkflowStage.Implementation,
     });
     this.repository.setActive(room.id, mission.id, lane.id);
     return this.publish(input.workspaceRoot);
@@ -315,6 +322,13 @@ export class CodingRoomService extends EventEmitter {
     );
     this.cancelledLanes.add(lane.id);
     await driver.cancel(session.id);
+    const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+    if (assignment?.workbenchRunId) {
+      this.runtime.cancelExternalWorkbenchRun?.({
+        sessionId: lane.localSessionId,
+        runId: assignment.workbenchRunId,
+      });
+    }
     if (
       this.requiresWriterLease(snapshot.room.workspaceRoot, this.executionRoot(lane, workspaceRoot))
     ) {
@@ -425,19 +439,28 @@ export class CodingRoomService extends EventEmitter {
     if (!this.runtime.createIsolatedWorkspace) {
       throw new Error('The coding runtime cannot create an isolated workspace.');
     }
+    const implementation = snapshot.assignments.find(
+      assignment =>
+        assignment.missionId === mission.id &&
+        assignment.workflowStage === CodingWorkflowStage.Implementation,
+    );
+    if (!implementation) throw new Error('The coding mission has no implementation assignment.');
     const stages = [
       {
         profileId: input.reviewerProfileId,
+        workflowStage: CodingWorkflowStage.Review,
         title: `Review: ${mission.title}`,
         instructions:
           'Review the implementation in an isolated worktree. Do not apply changes to the primary workspace.',
       },
       {
         profileId: input.verifierProfileId,
+        workflowStage: CodingWorkflowStage.Verification,
         title: `Verify: ${mission.title}`,
         instructions: 'Verify the implementation in an isolated worktree and report test results.',
       },
     ];
+    let previousAssignmentId = implementation.id;
     for (const stage of stages) {
       const profile = this.registry.get(stage.profileId);
       if (!profile) throw new Error('Coding agent profile was not found.');
@@ -451,12 +474,15 @@ export class CodingRoomService extends EventEmitter {
         baseline: this.requireMissionBaseline(mission),
       });
       const lane = this.repository.createLane(mission.id, profile.id, executionRoot, laneId);
-      this.repository.createAssignment({
+      const assignment = this.repository.createAssignment({
         missionId: mission.id,
         laneId: lane.id,
         title: stage.title,
         instructions: stage.instructions,
+        workflowStage: stage.workflowStage,
+        previousAssignmentId,
       });
+      previousAssignmentId = assignment.id;
       this.repository.appendEvent(lane.id, CodingEventKind.Message, {
         role: 'system',
         content: stage.instructions,
@@ -721,8 +747,15 @@ export class CodingRoomService extends EventEmitter {
     lane: CodingAgentLane,
     workspaceRoot: string,
   ): Promise<{ id: string; recoveryContext: string | null }> {
-    const activeSessionId = this.driverSessionIds.get(lane.id);
-    if (activeSessionId) return { id: activeSessionId, recoveryContext: null };
+    const activeSession = this.driverSessionIds.get(lane.id);
+    if (
+      activeSession &&
+      (activeSession.connectionGeneration === null ||
+        (driver.isConnectionRunning?.() &&
+          driver.getConnectionGeneration?.() === activeSession.connectionGeneration))
+    ) {
+      return { id: activeSession.id, recoveryContext: null };
+    }
     let recoveryContext: string | null = null;
     let session;
     if (lane.remoteSessionId) {
@@ -746,7 +779,10 @@ export class CodingRoomService extends EventEmitter {
     } else {
       session = await driver.createSession({ workspaceRoot, localSessionId: lane.localSessionId });
     }
-    this.driverSessionIds.set(lane.id, session.id);
+    this.driverSessionIds.set(lane.id, {
+      id: session.id,
+      connectionGeneration: driver.getConnectionGeneration?.() ?? null,
+    });
     if (session.remoteSessionId !== lane.remoteSessionId) {
       this.repository.updateLaneRemoteSession(lane.id, session.remoteSessionId);
     }
@@ -810,6 +846,14 @@ export class CodingRoomService extends EventEmitter {
       this.publish(roomWorkspaceRoot);
     } catch (error) {
       if (this.cancelledLanes.delete(lane.id)) return;
+      const assignment = this.repository.getLatestAssignmentForLane(lane.id);
+      if (assignment?.workbenchRunId) {
+        this.runtime.failExternalWorkbenchRun?.({
+          sessionId: lane.localSessionId,
+          runId: assignment.workbenchRunId,
+          error: this.errorMessage(error),
+        });
+      }
       this.repository.appendEvent(lane.id, CodingEventKind.TurnFailed, {
         error: this.errorMessage(error),
       });
@@ -893,21 +937,20 @@ export class CodingRoomService extends EventEmitter {
       assignment => assignment.laneId === completedLaneId,
     );
     if (!completedAssignment) return;
-    const completedIndex = snapshot.assignments.findIndex(
-      assignment => assignment.id === completedAssignment.id,
+    const nextAssignment = snapshot.assignments.find(
+      assignment =>
+        assignment.status === CodingAssignmentStatus.Planned &&
+        assignment.previousAssignmentId === completedAssignment.id,
     );
-    const nextAssignment = snapshot.assignments
-      .slice(completedIndex + 1)
-      .find(
-        assignment =>
-          assignment.status === CodingAssignmentStatus.Planned &&
-          /^(Review|Verify):/.test(assignment.title),
-      );
     if (!nextAssignment) return;
     const source = this.requireLane(snapshot.lanes, completedLaneId);
     const target = this.requireLane(snapshot.lanes, nextAssignment.laneId);
     if (source.missionId !== target.missionId) return;
-    const implementation = snapshot.assignments[0];
+    const implementation = snapshot.assignments.find(
+      assignment =>
+        assignment.missionId === source.missionId &&
+        assignment.workflowStage === CodingWorkflowStage.Implementation,
+    );
     const implementationLane = implementation
       ? snapshot.lanes.find(lane => lane.id === implementation.laneId)
       : null;
@@ -924,6 +967,17 @@ export class CodingRoomService extends EventEmitter {
       handoff.implementationDiff = await this.getWorkspaceDiff(
         this.executionRoot(implementationLane, workspaceRoot),
       );
+    }
+    const implementationDiff =
+      typeof handoff.implementationDiff === 'string' ? handoff.implementationDiff : null;
+    if (implementationDiff?.trim()) {
+      if (!this.runtime.applyWorkspacePatch) {
+        throw new Error('The coding runtime cannot materialize a collaborator patch.');
+      }
+      await this.runtime.applyWorkspacePatch({
+        workspaceRoot: this.executionRoot(target, workspaceRoot),
+        patch: implementationDiff,
+      });
     }
     const handoffId = this.repository.createHandoff(source.missionId, source.id, target.id, handoff);
     this.repository.appendEvent(target.id, CodingEventKind.Message, {

@@ -14,7 +14,7 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS coding_agent_profiles (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
       driver_kind TEXT NOT NULL, status TEXT NOT NULL, capabilities_json TEXT NOT NULL, auth_methods_json TEXT NOT NULL DEFAULT '[]',
-      command TEXT, args_json TEXT NOT NULL, is_builtin INTEGER NOT NULL DEFAULT 0,
+      command TEXT, args_json TEXT NOT NULL, environment_json TEXT NOT NULL DEFAULT '{}', is_builtin INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_coding_agent_profiles_command ON coding_agent_profiles(command);
@@ -26,7 +26,7 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     );
     CREATE TABLE IF NOT EXISTS coding_assignments (
       id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, lane_id TEXT NOT NULL,
-      title TEXT NOT NULL, instructions TEXT NOT NULL, status TEXT NOT NULL,
+      title TEXT NOT NULL, instructions TEXT NOT NULL, workflow_stage TEXT, previous_assignment_id TEXT, status TEXT NOT NULL,
       workbench_task_id TEXT, workbench_run_id TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
@@ -76,5 +76,17 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     db.exec(
       "ALTER TABLE coding_agent_profiles ADD COLUMN auth_methods_json TEXT NOT NULL DEFAULT '[]'",
     );
+  }
+  if (!profileColumns.some(column => column.name === 'environment_json')) {
+    db.exec("ALTER TABLE coding_agent_profiles ADD COLUMN environment_json TEXT NOT NULL DEFAULT '{}'");
+  }
+  const assignmentColumns = db.prepare('PRAGMA table_info(coding_assignments)').all() as Array<{
+    name: string;
+  }>;
+  if (!assignmentColumns.some(column => column.name === 'workflow_stage')) {
+    db.exec('ALTER TABLE coding_assignments ADD COLUMN workflow_stage TEXT');
+  }
+  if (!assignmentColumns.some(column => column.name === 'previous_assignment_id')) {
+    db.exec('ALTER TABLE coding_assignments ADD COLUMN previous_assignment_id TEXT');
   }
 }

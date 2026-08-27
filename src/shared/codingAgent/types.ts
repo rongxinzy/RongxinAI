@@ -6,6 +6,7 @@ import type {
   CodingLaneStatus,
   CodingMissionStatus,
   CodingPermissionOutcome,
+  CodingWorkflowStage,
 } from './constants';
 
 export interface CodingAgentCapabilities {
@@ -56,6 +57,7 @@ export interface CodingAgentProfile {
   authMethods: CodingAgentAuthMethod[];
   command: string | null;
   args: string[];
+  environment: Record<string, string>;
   isBuiltin: boolean;
 }
 
@@ -99,6 +101,8 @@ export interface CodingAssignment {
   laneId: string;
   title: string;
   instructions: string;
+  workflowStage: CodingWorkflowStage | null;
+  previousAssignmentId: string | null;
   status: CodingAssignmentStatus;
   workbenchTaskId: string | null;
   workbenchRunId: string | null;

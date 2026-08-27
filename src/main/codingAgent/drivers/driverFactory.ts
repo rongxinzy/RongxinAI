@@ -17,7 +17,7 @@ export class CodingDriverFactory {
     return new AcpCodingDriver({
       executable: profile.command,
       args: profile.args,
-      environment: this.environment,
+      environment: { ...this.environment, ...profile.environment },
     });
   }
 }

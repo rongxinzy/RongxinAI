@@ -104,3 +104,21 @@ test('allows a long-running prompt request to opt out of the short RPC timeout',
   ).resolves.toEqual({ complete: true });
   await supervisor.dispose();
 });
+
+test('responds to agent requests that use a string JSON-RPC ID', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  supervisor.onRequest(async () => ({ accepted: true }));
+  const script = [
+    "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 'agent-request', method: 'fs/read_text_file', params: {} }) + '\\n');",
+    "process.stdin.once('data', chunk => { const response = JSON.parse(String(chunk)); if (response.id !== 'agent-request') process.exit(1); process.exit(response.result?.accepted ? 0 : 1); });",
+  ].join('');
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', script],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+  await new Promise(resolve => setTimeout(resolve, 50));
+  expect(supervisor.isRunning()).toBe(false);
+  await supervisor.dispose();
+});

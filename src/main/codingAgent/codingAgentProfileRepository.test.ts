@@ -81,6 +81,7 @@ test('persists external agent profiles without storing credentials', () => {
     authMethods: [],
     command: '/usr/local/bin/agent',
     args: ['acp'],
+    environment: {},
     isBuiltin: false,
   };
 

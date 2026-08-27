@@ -41,6 +41,14 @@ export const CodingAssignmentStatus = {
 export type CodingAssignmentStatus =
   (typeof CodingAssignmentStatus)[keyof typeof CodingAssignmentStatus];
 
+export const CodingWorkflowStage = {
+  Implementation: 'implementation',
+  Review: 'review',
+  Verification: 'verification',
+} as const;
+export type CodingWorkflowStage =
+  (typeof CodingWorkflowStage)[keyof typeof CodingWorkflowStage];
+
 export const CodingLaneStatus = {
   Idle: 'idle',
   Running: 'running',

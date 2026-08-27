@@ -406,6 +406,7 @@ test('creates deterministic isolated review and verification assignments for a c
     createIsolatedWorkspace: async ({ laneId }) => `/isolated/${laneId}`,
     getWorkspaceBaseline: async () => 'base-commit',
     getWorkspaceDiff: async () => 'diff --git a/file b/file',
+    applyWorkspacePatch: async () => undefined,
   });
   const workspaceRoot = '/workspace/project';
   const initial = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
@@ -422,6 +423,11 @@ test('creates deterministic isolated review and verification assignments for a c
     initial.missions[0].title,
     `Review: ${initial.missions[0].title}`,
     `Verify: ${initial.missions[0].title}`,
+  ]);
+  expect(result.assignments.map(assignment => assignment.workflowStage)).toEqual([
+    'implementation',
+    'review',
+    'verification',
   ]);
   expect(result.lanes.slice(1).every(lane => lane.executionRoot.startsWith('/isolated/'))).toBe(
     true,

@@ -145,6 +145,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
   private readonly streams = new Map<string, EventStream>();
   private readonly configOptionsBySession = new Map<string, CodingAgentConfigOption[]>();
   private readonly permissions = new Map<string, PendingPermission>();
+  private readonly fallbackMessageIds = new Map<string, string>();
   private capabilities = DEFAULT_CAPABILITIES;
   private readonly authMethods = new Map<string, AcpAuthMethod>();
   private initialized = false;
@@ -167,6 +168,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   async getCapabilities(): Promise<CodingAgentCapabilities> {
     return this.capabilities;
+  }
+
+  isConnectionRunning(): boolean {
+    return this.supervisor.isRunning();
+  }
+
+  getConnectionGeneration(): number {
+    return this.supervisor.generation;
   }
 
   async getAuthState(): Promise<CodingAgentAuthState> {
@@ -240,6 +249,8 @@ export class AcpCodingDriver implements CodingAgentDriver {
     prompt: string;
   }): AsyncIterable<DriverEvent> {
     await this.ensureConnected(input.workspaceRoot);
+    this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'assistant'));
+    this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'user'));
     const stream: EventStream = { events: [], waiters: [], done: false, error: null };
     this.streams.set(input.sessionId, stream);
     void this.supervisor
@@ -365,7 +376,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
         normalizeConfigOptions(update.configOptions),
       );
     }
-    for (const event of this.normalizeUpdate(update)) this.pushEvent(params.sessionId, event);
+    for (const event of this.normalizeUpdate(params.sessionId, update)) this.pushEvent(params.sessionId, event);
   }
 
   private async receiveRequest(
@@ -404,7 +415,15 @@ export class AcpCodingDriver implements CodingAgentDriver {
     const target = await this.resolveWorkspacePath(params.path);
     const content = await readFile(target, 'utf8');
     this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, { action: 'read', path: target });
-    return { content };
+    const line = typeof params.line === 'number' && Number.isInteger(params.line) && params.line > 0
+      ? params.line
+      : 1;
+    const limit = typeof params.limit === 'number' && Number.isInteger(params.limit) && params.limit > 0
+      ? params.limit
+      : undefined;
+    if (line === 1 && limit === undefined) return { content };
+    const lines = content.split(/\r?\n/);
+    return { content: lines.slice(line - 1, limit === undefined ? undefined : line - 1 + limit).join('\n') };
   }
 
   private async writeWorkspaceFile(params: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -516,7 +535,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     };
   }
 
-  private normalizeUpdate(update: Record<string, unknown>): DriverEvent[] {
+  private normalizeUpdate(sessionId: string, update: Record<string, unknown>): DriverEvent[] {
     const kind = update.sessionUpdate ?? update.kind;
     if (kind === 'agent_message_chunk' || kind === 'user_message_chunk') {
       const text = readText(update.content);
@@ -527,7 +546,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
               kind: CodingEventKind.MessageDelta,
               payload: {
                 content: text,
-                messageId: typeof update.messageId === 'string' ? update.messageId : randomUUID(),
+                messageId:
+                  typeof update.messageId === 'string'
+                    ? update.messageId
+                    : this.fallbackMessageId(
+                        sessionId,
+                        kind === 'user_message_chunk' ? 'user' : 'assistant',
+                      ),
+                role: kind === 'user_message_chunk' ? 'user' : 'assistant',
                 streamUpdateMode: CodingStreamUpdateMode.Append,
               },
             },
@@ -558,6 +584,19 @@ export class AcpCodingDriver implements CodingAgentDriver {
       return [{ kind: CodingEventKind.Message, payload: { content: update.content } }];
     }
     return [];
+  }
+
+  private messageFallbackKey(sessionId: string, role: 'assistant' | 'user'): string {
+    return `${sessionId}:${role}`;
+  }
+
+  private fallbackMessageId(sessionId: string, role: 'assistant' | 'user'): string {
+    const key = this.messageFallbackKey(sessionId, role);
+    const existing = this.fallbackMessageIds.get(key);
+    if (existing) return existing;
+    const messageId = randomUUID();
+    this.fallbackMessageIds.set(key, messageId);
+    return messageId;
   }
 
   private pushEvent(sessionId: string, event: DriverEvent): void {

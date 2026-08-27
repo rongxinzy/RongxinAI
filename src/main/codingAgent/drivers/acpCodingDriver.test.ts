@@ -53,6 +53,7 @@ test('normalizes ACP session updates into coding events', async () => {
       payload: {
         content: 'Implemented.',
         messageId: 'message-1',
+        role: 'assistant',
         streamUpdateMode: CodingStreamUpdateMode.Append,
       },
     },
