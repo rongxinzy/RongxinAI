@@ -503,6 +503,20 @@ export class WorkbenchTaskService extends EventEmitter {
     this.emitChanged(this.requireTask(task.id));
   }
 
+  cancelRun(sessionId: string, runId: string): void {
+    const run = this.repository.getRun(runId);
+    const task = run ? this.repository.getTask(run.taskId) : null;
+    if (!run || !task || task.sessionId !== sessionId || !this.isRunActive(run.status)) return;
+    this.repository.transaction(() => {
+      this.repository.updateRunStatus(run.id, WorkbenchRunStatus.Cancelled);
+      this.repository.updateTaskStatus(task.id, WorkbenchTaskStatus.Cancelled, null);
+      this.repository.appendRunEvent(run.id, WorkbenchRunEventType.RunCancelled, {
+        reason: 'Cancelled by the coding agent user.',
+      });
+    });
+    this.emitChanged(this.requireTask(task.id));
+  }
+
   async authorizeToolCall(input: {
     sessionId: string;
     runId: string;

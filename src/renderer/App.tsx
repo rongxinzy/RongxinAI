@@ -82,6 +82,9 @@ const LocalInferenceView = React.lazy(() =>
   import('./components/localInference').then(module => ({ default: module.LocalInferenceView })),
 );
 const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
+const CodingWorkbenchView = React.lazy(() =>
+  import('./components/coding').then(module => ({ default: module.CodingWorkbenchView })),
+);
 
 /**
  * Full-area fallback shown while a lazily loaded feature chunk downloads.
@@ -103,7 +106,7 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [mainView, setMainView] = useState<
-    'cowork' | 'skills' | 'scheduledTasks' | 'activity' | 'mcp' | 'localInference' | 'expert'
+    'cowork' | 'skills' | 'scheduledTasks' | 'activity' | 'mcp' | 'localInference' | 'expert' | 'coding'
   >('cowork');
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
@@ -469,6 +472,10 @@ const App: React.FC = () => {
   const handleShowExpert = useCallback(() => {
     setExpertInitialTab(undefined);
     setMainView('expert');
+  }, []);
+
+  const handleShowCoding = useCallback(() => {
+    setMainView('coding');
   }, []);
 
   const handleToggleSidebar = useCallback(() => {
@@ -863,6 +870,7 @@ const App: React.FC = () => {
             onShowMcp={handleShowMcp}
             onShowLocalInference={handleShowLocalInference}
             onShowExpert={handleShowExpert}
+            onShowCoding={handleShowCoding}
             onNewChat={handleNewChat}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
@@ -947,6 +955,8 @@ const App: React.FC = () => {
                       onUseMcp={handleTryMcp}
                       initialTab={expertInitialTab}
                     />
+                  ) : mainView === 'coding' ? (
+                    <CodingWorkbenchView />
                   ) : mainView === 'localInference' ? null : (
                     <CoworkView
                       onRequestAppSettings={handleShowSettings}

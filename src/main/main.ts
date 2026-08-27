@@ -94,7 +94,12 @@ import {
   ProjectCreateDirectorySchema,
 } from '../shared/ipc/schemas';
 import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
-import type { WorkbenchRun, WorkbenchTask } from '../shared/workbenchTask';
+import {
+  WorkbenchContractKind,
+  WorkbenchRunTrigger,
+  type WorkbenchRun,
+  type WorkbenchTask,
+} from '../shared/workbenchTask';
 import { AgentManager } from './agentManager';
 import { ConversationHistoryService } from './conversationHistory/service';
 import { EngramManager } from './memory/engramManager';
@@ -158,6 +163,13 @@ import {
   registerScheduledTaskHandlers,
 } from './ipcHandlers/scheduledTask';
 import { registerTriageIpcHandlers } from './ipcHandlers/triage';
+import { registerCodingAgentIpcHandlers } from './ipcHandlers/codingAgent';
+import { CodingRoomRepository } from './codingAgent/codingRoomRepository';
+import { CodingRoomService } from './codingAgent/codingRoomService';
+import { CodingAgentRegistry } from './codingAgent/codingAgentRegistry';
+import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRepository';
+import { GitWorktreeService } from './codingAgent/gitWorktreeService';
+import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
@@ -829,6 +841,7 @@ let coworkStore: CoworkStore | null = null;
 let piRuntimeAdapter: PiRuntimeAdapter | null = null;
 let piModelCatalogRefreshCoordinator: PiModelCatalogRefreshCoordinator | null = null;
 let workbenchTaskService: WorkbenchTaskService | null = null;
+let codingRoomService: CodingRoomService | null = null;
 let engramManager: EngramManager | null = null;
 let engramAdapter: ZhiYuanEngramAdapter | null = null;
 let memoryRepository: MemoryRepository | null = null;
@@ -854,6 +867,152 @@ const getWorkbenchTaskService = (): WorkbenchTaskService => {
     });
   }
   return workbenchTaskService;
+};
+
+const getCodingRoomService = (): CodingRoomService => {
+  if (!codingRoomService) {
+    const runtime = getPiRuntimeAdapter();
+    codingRoomService = new CodingRoomService(
+      new CodingRoomRepository(getStore().getDatabase()),
+      new CodingAgentRegistry(
+        new CodingAgentProfileRepository(getStore().getDatabase()),
+        () => resolveCurrentApiConfig().config !== null,
+        app.isPackaged
+          ? path.join(process.resourcesPath, 'acp', 'registry.json')
+          : path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
+      ),
+      {
+        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt }) => {
+          const coworkStoreInstance = getCoworkStore();
+          if (!coworkStoreInstance.getSession(sessionId)) {
+            coworkStoreInstance.createSession(
+              t('coworkDefaultSessionTitle'),
+              workspaceRoot,
+              '',
+              'local',
+              [],
+              'main',
+              '',
+              'work',
+              sessionId,
+            );
+          }
+          coworkStoreInstance.updateSession(sessionId, { status: 'running' });
+          await runtime.startSession(sessionId, prompt, {
+            skipInitialUserMessage: true,
+            workspaceRoot,
+            sessionMode: 'work',
+            confirmationMode: 'modal',
+          });
+        },
+        cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
+        getBuiltinWorkbenchLink: sessionId => {
+          const detail = getWorkbenchTaskService().getCurrent(sessionId);
+          const runId = detail?.task.activeRunId;
+          return detail && runId ? { taskId: detail.task.id, runId } : null;
+        },
+        beginExternalWorkbenchRun: ({ sessionId, goal, workspaceRoot }) => {
+          const workbench = getWorkbenchTaskService().beginRun({
+            sessionId,
+            goal,
+            contract: {
+              kind: WorkbenchContractKind.GenericWork,
+              requiresUserAcceptance: true,
+              metadata: { codingAgent: true, workspaceRoot },
+            },
+            trigger: WorkbenchRunTrigger.Message,
+          });
+          getWorkbenchTaskService().updateRunContext(workbench.run.id, {
+            model: 'external-agent',
+            provider: 'external-agent',
+            reasoningProfile: 'external',
+            workspaceRoot,
+            skillIds: [],
+          });
+          return { taskId: workbench.task.id, runId: workbench.run.id };
+        },
+        completeExternalWorkbenchRun: ({ sessionId, runId, workspaceRoot, finalAnswer }) => {
+          getWorkbenchTaskService().completeRun({ sessionId, runId, workspaceRoot, finalAnswer });
+        },
+        failExternalWorkbenchRun: ({ sessionId, error }) => {
+          getWorkbenchTaskService().failRun(sessionId, { message: error });
+        },
+        cancelExternalWorkbenchRun: ({ sessionId, runId }) => {
+          getWorkbenchTaskService().cancelRun(sessionId, runId);
+        },
+        respondBuiltinPermission: (requestId, approved) =>
+          runtime.respondToPermission(
+            requestId,
+            approved
+              ? { behavior: 'allow' }
+              : { behavior: 'deny', message: 'The user denied this coding permission.' },
+          ),
+        createIsolatedWorkspace: async ({ workspaceRoot, laneId, baseline }) => {
+          const service = new GitWorktreeService(
+            path.join(app.getPath('userData'), 'coding-worktrees'),
+          );
+          return await service.create({ repositoryRoot: workspaceRoot, laneId, baseline });
+        },
+        getWorkspaceBaseline: async workspaceRoot => {
+          try {
+            return await GitWorktreeService.getBaseline(workspaceRoot);
+          } catch {
+            return null;
+          }
+        },
+        getWorkspaceDiff: async workspaceRoot =>
+          await new GitWorktreeService(
+            path.join(app.getPath('userData'), 'coding-worktrees'),
+          ).getWorktreeDiffPreview(workspaceRoot),
+        applyWorkspacePatch: async ({ workspaceRoot, patch }) =>
+          await new GitWorktreeService(
+            path.join(app.getPath('userData'), 'coding-worktrees'),
+          ).applyPatch(workspaceRoot, patch),
+        getIsolatedWorkspaceDiff: async workspaceRoot =>
+          await new GitWorktreeService(
+            path.join(app.getPath('userData'), 'coding-worktrees'),
+          ).getWorktreeDiffPreview(workspaceRoot),
+        applyIsolatedWorkspaceDiff: async ({ workspaceRoot, isolatedWorkspaceRoot }) =>
+          await new GitWorktreeService(
+            path.join(app.getPath('userData'), 'coding-worktrees'),
+          ).applyWorktreeDiff({
+            repositoryRoot: workspaceRoot,
+            worktreeRoot: isolatedWorkspaceRoot,
+          }),
+      },
+    );
+    codingRoomService.registry.hydrate();
+    runtime.on('message', (sessionId: string, message: unknown) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Message, { message });
+    });
+    runtime.on('messageUpdate', (sessionId: string, messageId: string, content: string) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.MessageDelta, {
+        content,
+        messageId,
+        streamUpdateMode: CodingStreamUpdateMode.Replace,
+      });
+    });
+    runtime.on('toolActivity', (sessionId: string, event: unknown) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.ToolCall, { event });
+    });
+    runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
+      const requestId =
+        request && typeof request === 'object' && typeof (request as { requestId?: unknown }).requestId === 'string'
+          ? (request as { requestId: string }).requestId
+          : null;
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Permission, {
+        requestId,
+        request,
+      });
+    });
+    runtime.on('complete', (sessionId: string) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnComplete, {});
+    });
+    runtime.on('error', (sessionId: string, error: unknown) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
+    });
+  }
+  return codingRoomService;
 };
 
 const getEngramManager = (): EngramManager => {
@@ -6585,6 +6744,12 @@ if (!gotTheLock) {
       });
     }
 
+    if (codingRoomService) {
+      await codingRoomService.dispose().catch(error => {
+        console.error('[CodingRoom] Failed to dispose coding agent connections on quit:', error);
+      });
+    }
+
     // Stop the cron job polling
     try {
       getCronJobService().stopPolling();
@@ -6839,6 +7004,16 @@ if (!gotTheLock) {
         });
       },
     });
+    registerCodingAgentIpcHandlers(getCodingRoomService);
+    const recoveredCodingLanes = getCodingRoomService().recoverInterruptedState();
+    if (recoveredCodingLanes > 0) {
+      console.warn(`[CodingAgent] recovered ${recoveredCodingLanes} interrupted lane(s) after restart`);
+    }
+    void getCodingRoomService()
+      .registry.discoverExternalAgents()
+      .catch(error => {
+        console.warn('[CodingAgent] External ACP discovery failed:', error);
+      });
     registerMemoryIpcHandlers({
       getService: getProjectMemoryService,
       resolveSessionTitles: sessionIds =>
