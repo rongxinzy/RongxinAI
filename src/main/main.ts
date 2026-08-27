@@ -6664,6 +6664,23 @@ if (!gotTheLock) {
         zhiyuanEnterpriseRendererBridge.createScopedCapability(extensionDirectory),
       createSettingsCapability: extensionDirectory =>
         zhiyuanEnterpriseRendererBridge.createScopedSettingsCapability(extensionDirectory),
+      createSkillCapability: () => ({
+        apiVersion: 1,
+        registerManagedRoot: () => {
+          let active = true;
+          return {
+            // The extension is initialized before the main SQLite store. Resolve the
+            // filesystem root eagerly, but defer manager access until a sync completes.
+            directory: getSkillsRoot(),
+            notifyChanged: () => {
+              if (active) getSkillManager().notifySkillsChanged();
+            },
+            unregister: () => {
+              active = false;
+            },
+          };
+        },
+      }),
     });
     if (enterpriseExtension.extensionId) {
       console.log(

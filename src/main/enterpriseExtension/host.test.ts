@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION,
   ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION,
+  ZHIYUAN_ENTERPRISE_SKILL_CAPABILITY_API_VERSION,
   ZhiyuanEnterpriseExtensionStatus,
   type ZhiyuanEnterpriseHostContext,
 } from './contract';
@@ -69,6 +70,7 @@ describe('Zhiyuan enterprise extension host', () => {
     expect(receivedContext!.capabilities.session).toBeNull();
     expect(receivedContext!.capabilities.renderer).toBeNull();
     expect(receivedContext!.capabilities.settings).toBeNull();
+    expect(receivedContext!.capabilities.skills).toBeNull();
 
     await host.dispose();
     await host.dispose();
@@ -160,6 +162,36 @@ describe('Zhiyuan enterprise extension host', () => {
 
     expect(createSettingsCapability).toHaveBeenCalledWith(path.dirname(modulePath));
     expect(receivedContext!.capabilities.settings).toBe(settingsCapability);
+  });
+
+  test('passes the versioned managed Skill capability to the extension', async () => {
+    const root = createTemporaryDirectory();
+    const modulePath = path.join(root, 'resources', 'zhiyuan-enterprise', 'extension.cjs');
+    fs.mkdirSync(path.dirname(modulePath), { recursive: true });
+    fs.writeFileSync(modulePath, 'module placeholder');
+    const skillCapability = {
+      apiVersion: ZHIYUAN_ENTERPRISE_SKILL_CAPABILITY_API_VERSION,
+      registerManagedRoot: vi.fn(() => ({
+        directory: path.join(root, 'skills'),
+        notifyChanged: vi.fn(),
+        unregister: vi.fn(),
+      })),
+    };
+    let receivedContext: ZhiyuanEnterpriseHostContext | null = null;
+    const host = new ZhiyuanEnterpriseExtensionHost(async () => ({
+      createZhiyuanEnterpriseExtension: () => ({
+        ...validExtension(),
+        initialize: async (context: ZhiyuanEnterpriseHostContext) => {
+          receivedContext = context;
+        },
+      }),
+    }));
+
+    await host.initialize({ ...options(root, true), createSkillCapability: () => skillCapability });
+
+    expect(receivedContext!.capabilities.skills).toBe(skillCapability);
+    expect(receivedContext!.capabilities.skills?.apiVersion).toBe(1);
+    expect(skillCapability.registerManagedRoot).not.toHaveBeenCalled();
   });
 
   test('imports a real CommonJS development bundle', async () => {

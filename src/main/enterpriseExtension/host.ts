@@ -12,6 +12,7 @@ import {
   type ZhiyuanEnterpriseRendererHostCapability,
   type ZhiyuanEnterpriseSettingsHostCapability,
   type ZhiyuanEnterpriseSessionHostCapability,
+  type ZhiyuanEnterpriseSkillHostCapability,
 } from './contract';
 
 const ENTERPRISE_RESOURCE_DIRECTORY = 'zhiyuan-enterprise';
@@ -32,6 +33,7 @@ export interface ZhiyuanEnterpriseExtensionHostOptions {
   readonly createSettingsCapability?: (
     extensionDirectory: string,
   ) => ZhiyuanEnterpriseSettingsHostCapability;
+  readonly createSkillCapability?: () => ZhiyuanEnterpriseSkillHostCapability;
 }
 
 type ExtensionModuleImporter = (modulePath: string) => Promise<unknown>;
@@ -188,6 +190,7 @@ function createHostContext(
     session: options.sessionCapability ?? null,
     renderer: options.createRendererCapability?.(extensionDirectory) ?? null,
     settings: options.createSettingsCapability?.(extensionDirectory) ?? null,
+    skills: options.createSkillCapability?.() ?? null,
   });
   return Object.freeze({
     apiVersion: ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION,

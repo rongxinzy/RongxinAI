@@ -2668,7 +2668,8 @@ export class SkillManager {
     }, WATCH_DEBOUNCE_MS);
   }
 
-  private notifySkillsChanged(): void {
+  /** Notify renderer and runtime listeners that managed Skill contents changed externally. */
+  notifySkillsChanged(): void {
     BrowserWindow.getAllWindows().forEach(win => {
       if (!win.isDestroyed()) {
         win.webContents.send('skills:changed');

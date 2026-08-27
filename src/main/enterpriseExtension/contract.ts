@@ -8,6 +8,7 @@ export const ZHIYUAN_ENTERPRISE_EXTENSION_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SESSION_CAPABILITY_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_RENDERER_CAPABILITY_API_VERSION = 1 as const;
 export const ZHIYUAN_ENTERPRISE_SETTINGS_CAPABILITY_API_VERSION = 1 as const;
+export const ZHIYUAN_ENTERPRISE_SKILL_CAPABILITY_API_VERSION = 1 as const;
 
 export interface ZhiyuanEnterpriseSessionProvider {
   snapshot(): EnterpriseSessionSnapshot | Promise<EnterpriseSessionSnapshot>;
@@ -39,6 +40,17 @@ export interface ZhiyuanEnterpriseSettingsHostCapability {
   registerPage(page: ZhiyuanEnterpriseSettingsPageRegistration): () => void;
 }
 
+export interface ZhiyuanEnterpriseManagedSkillRegistration {
+  readonly directory: string;
+  notifyChanged(): void;
+  unregister(): void;
+}
+
+export interface ZhiyuanEnterpriseSkillHostCapability {
+  readonly apiVersion: typeof ZHIYUAN_ENTERPRISE_SKILL_CAPABILITY_API_VERSION;
+  registerManagedRoot(): ZhiyuanEnterpriseManagedSkillRegistration;
+}
+
 export const ZhiyuanEnterpriseExtensionStatus = {
   Idle: 'idle',
   Absent: 'absent',
@@ -63,6 +75,7 @@ export interface ZhiyuanEnterpriseHostContext {
     readonly session: ZhiyuanEnterpriseSessionHostCapability | null;
     readonly renderer: ZhiyuanEnterpriseRendererHostCapability | null;
     readonly settings: ZhiyuanEnterpriseSettingsHostCapability | null;
+    readonly skills: ZhiyuanEnterpriseSkillHostCapability | null;
   };
 }
 
