@@ -8,6 +8,8 @@ export const ELECTRON_MAIN_EXTERNALS = [
 ];
 
 export const ELECTRON_RUNTIME_DEPENDENCIES = [
+  '@agentclientprotocol/claude-agent-acp',
+  '@agentclientprotocol/codex-acp',
   '@agentclientprotocol/sdk',
   '@earendil-works/pi-tui',
   '@firecrawl/anydoc',

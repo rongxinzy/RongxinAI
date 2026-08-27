@@ -880,6 +880,7 @@ const getCodingRoomService = (): CodingRoomService => {
         app.isPackaged
           ? path.join(process.resourcesPath, 'acp', 'registry.json')
           : path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
+        app.getAppPath(),
       ),
       {
         startBuiltinSession: async ({ sessionId, workspaceRoot, prompt }) => {
@@ -947,6 +948,10 @@ const getCodingRoomService = (): CodingRoomService => {
               ? { behavior: 'allow' }
               : { behavior: 'deny', message: 'The user denied this coding permission.' },
           ),
+        validateBuiltinModel: async () => {
+          const probe = await probeCoworkModelReadiness();
+          if (probe.ok === false) throw new Error(probe.error);
+        },
         createIsolatedWorkspace: async ({ workspaceRoot, laneId, baseline }) => {
           const service = new GitWorktreeService(
             path.join(app.getPath('userData'), 'coding-worktrees'),
@@ -997,7 +1002,9 @@ const getCodingRoomService = (): CodingRoomService => {
     });
     runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
       const requestId =
-        request && typeof request === 'object' && typeof (request as { requestId?: unknown }).requestId === 'string'
+        request &&
+        typeof request === 'object' &&
+        typeof (request as { requestId?: unknown }).requestId === 'string'
           ? (request as { requestId: string }).requestId
           : null;
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Permission, {
@@ -7007,7 +7014,9 @@ if (!gotTheLock) {
     registerCodingAgentIpcHandlers(getCodingRoomService);
     const recoveredCodingLanes = getCodingRoomService().recoverInterruptedState();
     if (recoveredCodingLanes > 0) {
-      console.warn(`[CodingAgent] recovered ${recoveredCodingLanes} interrupted lane(s) after restart`);
+      console.warn(
+        `[CodingAgent] recovered ${recoveredCodingLanes} interrupted lane(s) after restart`,
+      );
     }
     void getCodingRoomService()
       .registry.discoverExternalAgents()

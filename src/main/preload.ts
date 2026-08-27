@@ -600,8 +600,22 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   codingAgent: {
+    listProfiles: () => ipcRenderer.invoke(CodingAgentIpc.ListProfiles),
+    listWorkspaces: () => ipcRenderer.invoke(CodingAgentIpc.ListWorkspaces),
+    createWorkspace: (input: import('../shared/codingAgent').CreateCodingWorkspaceInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.CreateWorkspace, input),
+    updateWorkspace: (input: import('../shared/codingAgent').UpdateCodingWorkspaceInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.UpdateWorkspace, input),
+    deleteWorkspace: (workspaceId: string) =>
+      ipcRenderer.invoke(CodingAgentIpc.DeleteWorkspace, workspaceId),
+    createSession: (input: import('../shared/codingAgent').CreateCodingSessionInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.CreateSession, input),
+    startSession: (input: import('../shared/codingAgent').StartCodingSessionInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.StartSession, input),
     bootstrap: (workspaceRoot: string) =>
       ipcRenderer.invoke(CodingAgentIpc.Bootstrap, workspaceRoot),
+    prepareLane: (input: { workspaceRoot: string; laneId: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.PrepareLane, input),
     createMission: (input: import('../shared/codingAgent').CreateCodingMissionInput) =>
       ipcRenderer.invoke(CodingAgentIpc.CreateMission, input),
     selectLane: (input: { workspaceRoot: string; laneId: string }) =>
@@ -641,6 +655,20 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.PreviewLaneChanges, input),
     applyLaneChanges: (input: { workspaceRoot: string; laneId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.ApplyLaneChanges, input),
+    getGitStatus: (input: import('../shared/codingAgent').CodingGitTargetInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.GetGitStatus, input),
+    getGitDiff: (input: import('../shared/codingAgent').CodingGitDiffInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.GetGitDiff, input),
+    stageGitPaths: (input: import('../shared/codingAgent').CodingGitPathActionInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.StageGitPaths, input),
+    unstageGitPaths: (input: import('../shared/codingAgent').CodingGitPathActionInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.UnstageGitPaths, input),
+    commitGitChanges: (input: import('../shared/codingAgent').CodingGitCommitInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.CommitGitChanges, input),
+    pushGitBranch: (input: import('../shared/codingAgent').CodingGitTargetInput) =>
+      ipcRenderer.invoke(CodingAgentIpc.PushGitBranch, input),
+    discoverAgents: (input: { workspaceRoot: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.DiscoverAgents, input),
     probeAgent: (input: { workspaceRoot: string; profileId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.ProbeAgent, input),
     addProfile: (input: {

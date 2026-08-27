@@ -2,7 +2,7 @@
 
 > 状态：工程实现完成，待真实 ACP 互操作验收
 >
-> 最后更新：2026-08-26
+> 最后更新：2026-08-27
 >
 > 产品名称：知远智能体
 >
@@ -25,6 +25,8 @@
 - 保留现有顶部“工作 / 对话”切换。
 - “编程”是工作模式下的独立导航入口。
 - 进入后，右侧主区域完整切换为独立的编程 Web-TUI。
+- 进入编程模式时，应用主侧边栏下半区切换为编程专用的 Workspace / Session 树；退出后恢复工作模式项目树或对话会话记录。
+- 编程工作台不再创建第二级任务侧边栏，主侧边栏是唯一导航层。
 - 编程模式不作为 Cowork 对话中的 Artifact，也不嵌入 CLI TUI WebView。
 - 切入和切出编程模式不应销毁原有工作、对话或 ACP 会话。
 
@@ -197,9 +199,30 @@ supportsElicitation
 UI 必须按能力渐进增强：
 
 - Agent 支持配置选项时，动态渲染其模型、模式或推理选项。
+- Agent 通过 `available_commands_update` 发布命令时，Composer 输入 `/` 后展示该会话的实时命令快照。
 - Agent 不支持会话恢复时，提供“新建会话并发送交接摘要”。
 - Agent 不支持计划时，不显示空计划面板。
 - 知远不能硬编码某个外部 Agent 一定支持某项能力。
+
+`available_commands_update` 按 ACP 语义是某个 Session 的完整替换快照，不是增量事件。知远按
+Session 持久化 `name`、`description`、`input.hint` 和 `_meta`，后续更新整体覆盖旧值；切换 Lane
+时只显示当前 Agent 当前 Session 声明的命令，不能把一个 Agent 的命令泄漏到另一个 Agent。
+
+斜杠命令是外部 Agent 暴露其 MCP、Skill 和自身操作入口的标准 UI 通道。知远不解析或复制外部
+Agent 的私有 Skill/MCP 配置，也不把知远的模型、Skill 或 MCP 注入外部 Agent。比如 Codex 或
+Claude Code Adapter 声明 `/mcp`、`/skills` 或具体 Skill 命令时，Composer 原样呈现并将用户选中
+后的文本通过 `session/prompt` 发回原 Agent；Agent 自己负责执行与返回 Tool Call 更新。
+
+### 6.4 Codex 与 Claude Code 的内置 ACP 桥接
+
+Codex 与 Claude Code 作为首批一等外部 Agent，采用“用户安装 Agent、知远内置桥接”的交付方式：
+
+- 应用固定打包 `@agentclientprotocol/codex-acp@1.6.2` 与 `@agentclientprotocol/claude-agent-acp@0.70.0`，运行时不执行 `npx`，不联网下载 Adapter。
+- 发现层只被动查找用户设备上的 `codex` 与 `claude`；应用依赖目录中由 Adapter 带入的 CLI 不算作用户安装。
+- Adapter 由当前 Electron 可执行文件通过 `ELECTRON_RUN_AS_NODE=1` 启动，开发环境与 `app.asar` 安装包使用同一条路径模型。
+- Codex 通过 `CODEX_PATH` 指向用户 CLI；Claude Code 通过 `CLAUDE_CODE_EXECUTABLE` 指向用户 CLI，因此继续使用各自账号、模型和配置。
+- 旧版 `needs_adapter` Profile 原地升级并保留 Profile ID，避免已有 Lane 失去引用；Adapter 版本或 CLI 路径变化后重新 Probe。
+- UI 只展示用户安装的 Agent 路径和“检测连接”，不暴露桥接器安装概念。
 
 ## 7. 内置知远编程 Agent
 
@@ -233,21 +256,22 @@ UI 必须按能力渐进增强：
 
 ### 8.1 ACP 映射
 
-| ACP 能力 | 知远内部对象 |
-| --- | --- |
-| `initialize` | Agent Profile、协议和能力快照 |
-| `authenticate` | Agent 认证流程 |
-| `session/new` | 新 Agent Lane 会话 |
-| `session/load` / `session/resume` | 会话恢复 |
-| `session/prompt` | Assignment Run 中的一轮执行 |
-| `session/update` | 规范化事件流 |
-| Agent Plan | 计划展示 |
-| Tool Call / Diff | Tool Event、Changes、Artifact |
-| Permission Request | 持久化 Approval |
-| `fs/*` | Workspace Broker |
-| `terminal/*` | Terminal Broker |
-| `session/cancel` | 取消当前轮次 |
-| `stopReason` | Run 的轮次结束信号，不代表 Mission 完成 |
+| ACP 能力                          | 知远内部对象                            |
+| --------------------------------- | --------------------------------------- |
+| `initialize`                      | Agent Profile、协议和能力快照           |
+| `authenticate`                    | Agent 认证流程                          |
+| `session/new`                     | 新 Agent Lane 会话                      |
+| `session/load` / `session/resume` | 会话恢复                                |
+| `session/prompt`                  | Assignment Run 中的一轮执行             |
+| `session/update`                  | 规范化事件流                            |
+| `available_commands_update`       | 当前 Lane 的斜杠命令完整快照            |
+| Agent Plan                        | 计划展示                                |
+| Tool Call / Diff                  | Tool Event、Changes、Artifact           |
+| Permission Request                | 持久化 Approval                         |
+| `fs/*`                            | Workspace Broker                        |
+| `terminal/*`                      | Terminal Broker                         |
+| `session/cancel`                  | 取消当前轮次                            |
+| `stopReason`                      | Run 的轮次结束信号，不代表 Mission 完成 |
 
 协议参考：
 
@@ -329,14 +353,16 @@ Unavailable     原来可用，但当前可执行文件已消失或启动失败
 
 ACP Registry 只能作为安装和启动元数据来源，不能作为本机已安装的证明。第一版不自动安装 Adapter，只提供明确的管理和安装入口。
 
-## 10. 编程任务领域模型
+## 10. Workspace / Session 领域模型
 
 ### 10.1 层级
 
 ```text
-CodingRoom
-└── CodingMission              左侧列表中的一个“编程任务”
-    ├── AgentLane × N          每个参与 Agent 的独立会话
+CodingWorkspace               用户可见的编程工作区
+├── SourceFolder × N          用户明确挂载的源文件夹
+└── CodingSession × N         创建时永久绑定一个 Agent
+    └── CodingMission         Session 所属的用户目标
+        ├── AgentLane × N      主 Session 与协作 Session 的执行内核
     ├── CodingAssignment × N   分配给某个 Agent 的工作单元
     │   └── Workbench Task
     │       └── Run × N
@@ -345,24 +371,39 @@ CodingRoom
     └── Artifact × N
 ```
 
-### 10.2 CodingRoom
+### 10.2 CodingWorkspace
 
-代表一个逻辑工作区环境，至少保存：
+代表编程模式自有的逻辑工作区，不复用工作模式 Project，也不因重命名而修改磁盘目录。至少保存：
 
-- 工作区根目录。
-- 可额外访问的明确目录。
+- 用户定义的显示名称。
+- 一个主 SourceFolder 和零到多个附加 SourceFolder。
+- 当前选中的 CodingSession。
 - 当前 Mission。
 - 当前 Agent Lane。
 - Git 仓库和冻结基线信息。
 - 协作和写入隔离策略。
 
-### 10.3 CodingMission
+每个 CodingSession 必须选择其中一个 SourceFolder 作为固定 cwd。Workspace 只是访问范围和组织容器，不是把多个目录拼成一个虚拟文件系统。
+
+### 10.3 CodingSession
+
+Session 是侧边栏中用户实际创建和切换的对象，保存：
+
+- 创建它的 Agent Profile ID，创建后不可修改。
+- 固定 SourceFolder / cwd。
+- 本地 Session ID 与外部 ACP opaque Session ID。
+- 独立 Draft、Scroll Position、事件流和 Config Options。
+- 所属 Mission、Assignment 和协作父 Session。
+
+“切换 Agent”的产品语义是切换到另一个 Session，或用目标 Agent 新建 Session；禁止把已有 Session 重新绑定给另一个 Agent。ACP `session/load` 也只能由同一 Agent Profile 在同一 SourceFolder 中恢复。
+
+### 10.4 CodingMission
 
 代表用户在左侧任务列表看到的一个完整编程目标，例如“修复登录刷新问题”。
 
 Mission 不直接等于某个 ACP Session，也不应因为某一轮 `stopReason=end_turn` 就自动完成。
 
-### 10.4 AgentLane
+### 10.5 AgentLane
 
 每个参与 Agent 一条 Lane，保存：
 
@@ -376,9 +417,9 @@ Mission 不直接等于某个 ACP Session，也不应因为某一轮 `stopReason
 - 工作树和 Writer Lease。
 - 运行、等待权限、需认证、断开、完成等状态。
 
-切换 Agent 只修改 `activeAgentLaneId`，不得销毁其他 Lane。
+用户切换 Session 时只修改 `activeAgentLaneId`，不得销毁其他 Lane，也不得修改 Lane 的 Agent Profile ID。协作者会创建新的 Lane/Session，而不是改变原 Session。
 
-### 10.5 CodingAssignment
+### 10.6 CodingAssignment
 
 Mission 中交给单个 Agent 的明确工作单元，例如：
 
@@ -389,7 +430,7 @@ Mission 中交给单个 Agent 的明确工作单元，例如：
 
 每个 Assignment 映射到独立 Workbench Task/Run，避免多个 Agent 争用单一 `active_run_id`。
 
-### 10.6 HandoffPackage
+### 10.7 HandoffPackage
 
 Agent 间交接使用不可变交接包：
 
@@ -465,7 +506,7 @@ sequenceDiagram
 
 ### 12.1 默认 Writer Lease
 
-同一物理工作区默认只有一条 Agent Lane 可以持有写权限：
+同一 SourceFolder 默认只有一条 Agent Lane 可以持有写权限；不同 SourceFolder 的 Lease 相互独立：
 
 - 当前 Writer 可以修改文件和执行会写入的命令。
 - 其他 Agent 默认只读。
@@ -560,28 +601,48 @@ ACP Permission 只能治理 Agent 通过 ACP Client 请求的操作。如果外�
 
 ### 15.1 总体布局
 
-参考 Zed 的 Agent Picker 切入方式，但不照搬其编辑器布局。
+参考 Zed 的 Agent 切入方式，但编程 Workspace 直接接管应用主侧边栏下半区，不在工作台内部叠加第二级侧边栏。
 
 ```text
-┌────────────────────────────────────────────────────────────────────────────┐
-│ 编程  /workspace/project                         工作区        设置        │
-├───────────────────┬────────────────────────────────────┬───────────────────┤
-│ 编程任务       ＋ │ 当前任务参与者                       │ Changes / Files   │
-│                   │ [知远编程 Agent] [Codex] [＋协作者] │ / Terminal        │
-│ 修复登录刷新问题  ├────────────────────────────────────┤                   │
-│ 知远 · 运行中     │                                    │ Diff Preview      │
-│                   │ 当前 Agent 的结构化事件流            │                   │
-│ 审查数据库迁移    │ Message / Plan / Tool / Permission  │                   │
-│ Codex · 已完成    │ / Terminal / Handoff                │                   │
-│                   │                                    │                   │
-│                   ├────────────────────────────────────┤                   │
-│                   │ 发给当前 Agent…              发送   │                   │
-└───────────────────┴────────────────────────────────────┴───────────────────┘
+┌──────────────────────┬────────────────────────────────────┬───────────────────┐
+│ 工作 / 对话          │ 知远智能体 · Codex                │ Changes / Files   │
+│ 新建任务             ├────────────────────────────────────┤ / Terminal        │
+│ 本地推理             │                                    │                   │
+│ 编程                 │ 当前 Session 的结构化事件流         │ Diff Preview      │
+│ 自动化               │ Message / Plan / Tool / Permission │                   │
+│                      │ / Terminal / Handoff                │                   │
+│ 编程工作区        ＋ │                                    │                   │
+│ ▼ 知远智能体      …  │                                    │                   │
+│   Fix login · Codex  ├────────────────────────────────────┤                   │
+│   Review · Claude    │ 发给当前 Agent…              发送   │                   │
+│ + 添加工作区         │                                    │                   │
+└──────────────────────┴────────────────────────────────────┴───────────────────┘
 ```
 
 右侧 Inspector 没有内容时可以折叠，为中央事件流释放空间。
 
-### 15.2 Zed 式 Agent Picker
+### 15.2 主侧边栏模式隔离
+
+- `MainView.Coding` 激活时，主侧边栏下方只渲染编程 Workspace / Session 树。
+- 离开编程模式后，按当前 Work / Chat 状态恢复原项目树或会话记录。
+- 三套树使用独立数据源、选择状态和持久化键，不互相创建、重命名或删除对象。
+- 收起主侧边栏时，工作台标题栏必须保留展开入口。
+- 中央工作台不再显示“编程任务”列表或移动端的第二个任务 Sheet。
+
+### 15.3 Workspace 与 Session 创建
+
+Workspace 创建/编辑 Dialog 包含显示名称、默认 Agent 和一个或多个 SourceFolder。默认 Agent 是新建 Session 草稿的首选项，不会改变已有 Session 的绑定。添加文件夹只挂载现有目录；移除 Workspace 只删除知远中的编程记录，永远不删除磁盘文件。
+
+每个 Workspace 行的 `＋` 创建 Session：
+
+1. 点击后立即进入中央空白对话页，仅创建 renderer 内存中的 Session Draft，不写 SQLite，也不调用 ACP `session/new`。
+2. Draft 默认选中 Workspace 的默认 Agent 和主 SourceFolder；首条消息发送前二者均可更换。
+3. 首次发送时，主进程依次校验 Agent/Profile 与模型可用性、建立 Agent Session、持久化 CodingSession/Mission/Lane，并发送首条 Prompt。
+4. 任一步骤失败都不保留本地 Session 记录；用户仍停留在 Draft 中修改 Agent、目录或消息后重试。
+5. 创建成功后冻结 Agent Profile 和 SourceFolder 绑定，不再提供原地切换入口。
+6. Session 名称不要求用户填写。ACP Agent 的 `session_info_update.title` 是权威名称；在 Agent 尚未上报标题时，用首条请求生成临时名称。
+
+### 15.4 Zed 式 Agent 选择
 
 左侧“编程任务”标题旁的 `＋` 用于新建任务：
 
@@ -608,12 +669,12 @@ ACP Permission 只能治理 Agent 通过 ACP Client 请求的操作。如果外�
 - 内置 Agent 永远在第一组第一项。
 - 不显示内部运行时名称。
 - 状态与选项在同一行可见，不依赖 Hover。
-- 选择 Agent 后创建新 Mission，并为其建立主 Agent Lane。
+- Draft 中选择 Agent 不创建任何持久化对象；首条消息成功发送后才创建 CodingSession、Mission 和主 Agent Lane。
 - `NeedsAuth` Agent 先进入认证流程，认证成功后再创建 Session。
 - `NeedsAdapter` Agent 进入管理页，不自动安装。
 - 自定义命令必须先确认信任。
 
-### 15.3 没有外部 Agent
+### 15.5 没有外部 Agent
 
 ```text
 ┌──────────────────────────────┐
@@ -628,21 +689,21 @@ ACP Permission 只能治理 Agent 通过 ACP Client 请求的操作。如果外�
 ```
 
 - 不出现阻塞式安装引导。
-- 首次进入时可以直接用知远编程 Agent 创建空白任务。
+- 首次进入时可以直接用知远编程 Agent 创建 Session。
 - 扫描外部 Agent 在后台进行，不能阻塞内置 Agent。
 
-### 15.4 新建任务与添加协作者
+### 15.6 新建 Session 与添加协作者
 
 两个入口复用 Agent Picker 组件，但语义不同：
 
-| 入口 | 行为 |
-| --- | --- |
-| 左侧任务列表 `＋` | 创建新 Mission，并选择主 Agent |
-| 任务顶部“添加协作者” | 在当前 Mission 中创建新的 Agent Lane |
-| 点击参与者 | 切换当前 Agent Lane，不产生交接 |
-| “交接给…” | 生成并预览 HandoffPackage，确认后发送 |
+| 入口                 | 行为                                                 |
+| -------------------- | ---------------------------------------------------- |
+| Workspace 行 `＋`    | 打开空白 Draft；首发前可选择 SourceFolder 和主 Agent |
+| 任务顶部“添加协作者” | 在当前 Mission 中创建新的 Agent Lane                 |
+| 点击参与者           | 切换当前 Agent Lane，不产生交接                      |
+| “交接给…”            | 生成并预览 HandoffPackage，确认后发送                |
 
-### 15.5 Composer
+### 15.7 Composer
 
 - 默认目标是当前 Agent。
 - 始终显示“发送给：Agent 名称”。
@@ -650,15 +711,15 @@ ACP Permission 只能治理 Agent 通过 ACP Client 请求的操作。如果外�
 - 第一版不提供含糊的默认“广播给所有 Agent”。
 - 团队任务由协作预设或明确的多 Agent 操作触发。
 
-### 15.6 响应式
+### 15.8 响应式
 
-- 宽屏：任务列表、事件流、Inspector 三栏。
-- 中等宽度：Inspector 折叠，保留任务列表和事件流。
-- 窄屏：任务列表使用 Sheet；Agent Picker 使用 Popover/Sheet；Inspector 使用底部 Sheet。
+- 宽屏：应用主侧边栏、事件流、Inspector。
+- 中等宽度：Inspector 折叠，保留应用主侧边栏和事件流。
+- 窄屏：应用主侧边栏使用现有折叠机制；Inspector 使用底部 Sheet，不再创建编程任务 Sheet。
 - 权限请求、停止按钮和发送目标在任何宽度都不能依赖 Hover。
 - 必须验证浅色、深色、键盘操作和 Focus Visible。
 
-### 15.7 组件约束
+### 15.9 组件约束
 
 实现时必须优先使用现有组件：
 
@@ -689,9 +750,11 @@ ACP Permission 只能治理 Agent 通过 ACP Client 请求的操作。如果外�
 ### 16.2 新建内置任务
 
 ```text
+选择 CodingWorkspace / SourceFolder
+  ↓
 选择知远编程 Agent
   ↓
-创建 CodingMission
+创建 Agent 绑定不可变的 CodingSession / CodingMission
   ↓
 创建 Builtin AgentLane
   ↓
@@ -703,7 +766,7 @@ BuiltinCodingDriver 创建运行时会话
 ### 16.3 新建外部任务
 
 ```text
-选择外部 Agent
+选择 CodingWorkspace / SourceFolder 与外部 Agent
   ↓
 检查 Discovery / Probe 状态
   ↓
@@ -731,6 +794,7 @@ initialize / session/new
 建议新增应用自有 SQLite 表或在现有 Workbench Task 领域上增加清晰关联：
 
 - `coding_rooms`
+- `coding_workspace_sources`
 - `coding_missions`
 - `coding_agent_profiles`
 - `coding_agent_lanes`
@@ -738,6 +802,7 @@ initialize / session/new
 - `coding_handoffs`
 - `coding_events`
 - `coding_workspace_leases`
+- `coding_source_writer_leases`
 
 要求：
 
@@ -779,7 +844,9 @@ src/main/ipcHandlers/
 
 src/renderer/components/coding/
 ├── CodingWorkbenchView.tsx
-├── CodingTaskList.tsx
+├── CodingWorkspaceSidebar.tsx
+├── CodingWorkspaceDialog.tsx
+├── CodingDraftControls.tsx
 ├── CodingAgentPicker.tsx
 ├── CodingParticipants.tsx
 ├── CodingEventStream.tsx
@@ -835,10 +902,12 @@ src/renderer/store/slices/
 目标：外部 Agent 与内置 Agent 在同一 UI 中可选、可切换。
 
 - Agent 被动发现和受控 Probe。
+- Codex 与 Claude Code 官方 Adapter 固定版本随应用打包，并验证 `app.asar` 启动。
 - ACP Connection Supervisor。
 - `AcpCodingDriver`。
 - 外部认证和 Auth Terminal。
 - Config Options。
+- Session 级 Available Commands、`/` 命令菜单以及动态替换。
 - Load/Resume 和崩溃恢复。
 - Agent 管理页。
 
@@ -877,6 +946,7 @@ src/renderer/store/slices/
 - 请求乱序、超时和取消。
 - 版本与能力协商。
 - 同一连接多 Session。
+- `available_commands_update` 在 `session/new` 返回前到达、运行中替换以及 Session 间隔离。
 - Agent 崩溃和重启。
 - Load/Resume 支持与回退。
 
@@ -901,9 +971,11 @@ src/renderer/store/slices/
 ### 20.5 多 Agent
 
 - 切换 Agent 后 Draft、Scroll 和 Session 保持。
+- Session 的 Agent Profile 与 SourceFolder 创建后不可变。
+- 工作、对话、编程三套侧边栏数据和选择状态隔离。
 - 默认 Prompt 只发给当前 Agent。
 - HandoffPackage 内容稳定且不可变。
-- 单工作区 Writer Lease 互斥。
+- 单 SourceFolder Writer Lease 互斥，不同 SourceFolder 可独立执行。
 - Git Worktree 基线一致。
 - 合并冲突不会自动覆盖。
 - 非 Git 工作区禁止并行 Writer。
@@ -920,7 +992,7 @@ src/renderer/store/slices/
 ### 20.7 第一版完成定义
 
 - 用户不安装任何外部 Agent，也能用知远编程 Agent 完成编程任务。
-- 能正确区分并展示外部 Agent 的发现、Adapter、认证和兼容状态。
+- 能正确区分并展示外部 Agent 的发现、连接、认证和兼容状态。
 - 切换 Agent 不丢失会话。
 - 没有知远模型配置被注入外部 Agent。
 - 多 Agent 写入不会未经隔离作用于同一物理目录。
@@ -934,7 +1006,7 @@ src/renderer/store/slices/
 - 把知远模型注入 Claude Code、Codex 或 OpenCode。
 - 用 WebView 嵌入外部 Agent 的 CLI TUI。
 - 默认广播 Prompt 给所有 Agent。
-- 自动安装任何外部 Agent 或 Adapter。
+- 在运行时下载或安装任何外部 Agent；Codex 与 Claude Code 的固定版本 ACP 桥接器随应用交付。
 - 全盘扫描用户设备。
 - 依赖私有 ACP RPC 完成核心协作。
 - 宣称 ACP Permission 等同于系统级强沙箱。
@@ -945,8 +1017,8 @@ src/renderer/store/slices/
 
 以下问题应在 P0 结束时冻结：
 
-1. Claude Code 和 Codex 当前推荐 ACP Adapter 的准确启动方式、版本和凭据复用行为。
-2. 三个目标 Agent 在 macOS、Windows、Linux 上的安装发现规则。
+1. OpenCode 当前推荐 ACP 启动方式、版本和凭据复用行为。
+2. Claude Code、Codex 和 OpenCode 在 Windows、Linux 上的安装发现规则；Codex 的 macOS 规则已经验证。
 3. Workbench Task 当前 Pi 耦合路径的最小解耦方案。
 4. 内置 Agent Session 恢复与 Coding Mission 持久化的映射。
 5. Git Worktree 的目录位置、清理策略和磁盘配额。

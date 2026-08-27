@@ -15,6 +15,7 @@ import {
   isAskUserQuestionPermission,
 } from './components/cowork/askUserQuestion';
 import type { ExpertTab } from './components/expert/ExpertView';
+import type { CodingSidebarSelection } from './components/coding/CodingWorkspaceSidebar';
 import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/Settings';
 import { prefetchFeatureView } from './components/featureViewPrefetch';
@@ -106,7 +107,14 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsOptions, setSettingsOptions] = useState<SettingsOpenOptions>({});
   const [mainView, setMainView] = useState<
-    'cowork' | 'skills' | 'scheduledTasks' | 'activity' | 'mcp' | 'localInference' | 'expert' | 'coding'
+    | 'cowork'
+    | 'skills'
+    | 'scheduledTasks'
+    | 'activity'
+    | 'mcp'
+    | 'localInference'
+    | 'expert'
+    | 'coding'
   >('cowork');
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
@@ -119,6 +127,12 @@ const App: React.FC = () => {
   const [isToastError, setIsToastError] = useState(false);
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [codingSelection, setCodingSelection] = useState<CodingSidebarSelection>({
+    workspaceId: null,
+    workspaceRoot: '',
+    laneId: null,
+    draft: null,
+  });
   const [appUpdateState, setAppUpdateState] = useState<AppUpdateRuntimeState>({
     status: AppUpdateStatus.Idle,
     source: null,
@@ -871,6 +885,8 @@ const App: React.FC = () => {
             onShowLocalInference={handleShowLocalInference}
             onShowExpert={handleShowExpert}
             onShowCoding={handleShowCoding}
+            codingSelection={codingSelection}
+            onCodingSelectionChange={setCodingSelection}
             onNewChat={handleNewChat}
             isCollapsed={isSidebarCollapsed}
             onToggleCollapse={handleToggleSidebar}
@@ -956,7 +972,22 @@ const App: React.FC = () => {
                       initialTab={expertInitialTab}
                     />
                   ) : mainView === 'coding' ? (
-                    <CodingWorkbenchView />
+                    <CodingWorkbenchView
+                      workspaceRoot={codingSelection.workspaceRoot}
+                      selectedLaneId={codingSelection.laneId}
+                      draftSession={codingSelection.draft}
+                      onDraftSessionChange={draft =>
+                        setCodingSelection(current => ({ ...current, draft, laneId: null }))
+                      }
+                      onSessionCreated={laneId =>
+                        setCodingSelection(current => ({ ...current, laneId, draft: null }))
+                      }
+                      onLaneSelected={laneId =>
+                        setCodingSelection(current => ({ ...current, laneId, draft: null }))
+                      }
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                    />
                   ) : mainView === 'localInference' ? null : (
                     <CoworkView
                       onRequestAppSettings={handleShowSettings}
