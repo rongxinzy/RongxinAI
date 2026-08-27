@@ -1,7 +1,6 @@
 import type { LlamaCppInstallProgress } from '../../../../shared/llamacpp';
 import {
   MarketplaceCapability,
-  MarketplaceSortOrder,
   type MarketplaceModel,
   type MarketplaceModelFile,
   type MarketplaceSearchParams,
@@ -32,7 +31,6 @@ export function buildMarketplaceSearchParams(input: {
   size?: MarketplaceSearchParams['size'];
   device?: MarketplaceSearchParams['device'];
   fit?: MarketplaceSearchParams['fit'];
-  sortby?: MarketplaceSearchParams['sortby'];
   minStars?: number;
   featuredOnly?: boolean;
   limit?: number;
@@ -52,7 +50,6 @@ export function buildMarketplaceSearchParams(input: {
       task: input.task,
       size: input.size,
       fit: input.fit ?? 'all',
-      sortby: input.sortby ?? MarketplaceSortOrder.Asc,
       minStars: input.minStars,
     };
   }
@@ -65,7 +62,6 @@ export function buildMarketplaceSearchParams(input: {
     task: input.task,
     size: input.size,
     fit: input.fit,
-    sortby: input.sortby ?? MarketplaceSortOrder.Asc,
     minStars: input.minStars,
   };
 }
@@ -110,39 +106,12 @@ export function getInstallableMarketplaceModels(
   });
 }
 
-const MARKETPLACE_RECOMMENDATION_FIT_PRIORITY = {
-  excellent: 4,
-  good: 3,
-  limited: 2,
-  unknown: 1,
-  unsupported: 0,
-} as const;
-
 export function filterMarketplaceModelsForRecommendation(
   models: MarketplaceModel[],
 ): MarketplaceModel[] {
   return models.filter(model => {
     const status = model.fit?.status ?? 'unknown';
     return status === 'excellent' || status === 'good' || status === 'limited';
-  });
-}
-export function sortMarketplaceModelsForRecommendation(
-  models: MarketplaceModel[],
-): MarketplaceModel[] {
-  return [...models].sort((left, right) => {
-    const leftFit = MARKETPLACE_RECOMMENDATION_FIT_PRIORITY[left.fit?.status ?? 'unknown'];
-    const rightFit = MARKETPLACE_RECOMMENDATION_FIT_PRIORITY[right.fit?.status ?? 'unknown'];
-    if (leftFit !== rightFit) return rightFit - leftFit;
-
-    const leftScore = left.score?.value ?? left.score?.deviceFit ?? left.score?.stars ?? 0;
-    const rightScore = right.score?.value ?? right.score?.deviceFit ?? right.score?.stars ?? 0;
-    if (leftScore !== rightScore) return rightScore - leftScore;
-
-    const leftDeviceFit = left.score?.deviceFit ?? 0;
-    const rightDeviceFit = right.score?.deviceFit ?? 0;
-    if (leftDeviceFit !== rightDeviceFit) return rightDeviceFit - leftDeviceFit;
-
-    return left.repoId.localeCompare(right.repoId);
   });
 }
 export function filterMarketplaceModelsForDevice(

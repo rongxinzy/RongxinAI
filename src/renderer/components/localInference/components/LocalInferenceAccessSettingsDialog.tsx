@@ -19,10 +19,12 @@ type LocalInferenceAccessSettingsDialogProps = {
   isOpen: boolean;
   saving: boolean;
   allowLanAccess: boolean;
+  keepRunningOnAppQuit: boolean;
   willRestartOnSave: boolean;
   port: string;
   exampleModelName?: string;
   onAllowLanAccessChange: (value: boolean) => void;
+  onKeepRunningOnAppQuitChange: (value: boolean) => void;
   onPortChange: (value: string) => void;
   onClose: () => void;
   onSave: () => void;
@@ -36,10 +38,12 @@ export function LocalInferenceAccessSettingsDialog({
   isOpen,
   saving,
   allowLanAccess,
+  keepRunningOnAppQuit,
   willRestartOnSave,
   port,
   exampleModelName,
   onAllowLanAccessChange,
+  onKeepRunningOnAppQuitChange,
   onPortChange,
   onClose,
   onSave,
@@ -98,6 +102,23 @@ export function LocalInferenceAccessSettingsDialog({
                 disabled={saving}
                 aria-invalid={!portValid}
                 className="w-24 shrink-0"
+              />
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-4 sm:col-span-2 sm:border-t sm:border-border sm:pt-3">
+              <div className="flex min-w-0 flex-col gap-1">
+                <Label
+                  htmlFor="llamacpp-keep-running-on-app-quit"
+                  className="text-sm font-medium text-foreground"
+                >
+                  {i18nService.t('localInferenceKeepRunningOnAppQuit')}
+                </Label>
+              </div>
+              <Switch
+                id="llamacpp-keep-running-on-app-quit"
+                checked={keepRunningOnAppQuit}
+                onCheckedChange={onKeepRunningOnAppQuitChange}
+                disabled={saving}
+                className="border-border data-unchecked:bg-muted data-checked:border-primary data-checked:bg-primary"
               />
             </div>
           </div>

@@ -12,6 +12,7 @@ test('llama.cpp service defaults are explicit and stable', () => {
     host: '127.0.0.1',
     port: '8080',
     modelsMax: '3',
+    keepRunningOnAppQuit: true,
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',

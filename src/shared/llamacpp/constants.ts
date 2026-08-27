@@ -33,6 +33,7 @@ export const LlamaCppIpcChannel = {
   UninstallBackend: 'llamacpp:backends:uninstall',
   GetRuntimeCapabilities: 'llamacpp:runtime:get-capabilities',
   StatusChanged: 'llamacpp:status-changed',
+  ModelBindingsChanged: 'llamacpp:model-bindings-changed',
   InstallProgress: 'llamacpp:install-progress',
   ModelLaunchLog: 'llamacpp:model-launch-log',
   ModelLaunchLogCleared: 'llamacpp:model-launch-log:cleared',

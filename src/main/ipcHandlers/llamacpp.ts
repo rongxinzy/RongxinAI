@@ -86,6 +86,37 @@ const LLAMACPP_UNLOAD_VRAM_POLL_INTERVAL_MS = 250;
 const LLAMACPP_UNLOAD_CONFIRM_TIMEOUT_MS = 8_000;
 const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
+const LLAMACPP_STARTUP_BINDING_SYNC_ATTEMPTS = 30;
+const LLAMACPP_STARTUP_BINDING_SYNC_INTERVAL_MS = 1_000;
+
+const LlamaCppServiceStatus = {
+  Running: 'running',
+  Stopped: 'stopped',
+} as const;
+
+type LlamaCppModelBindingRefreshResult = {
+  changed: boolean;
+  hasRunningModels: boolean;
+};
+
+export async function waitForLlamaCppStartupModelBindings(input: {
+  refresh: () => Promise<boolean>;
+  isCurrent: () => boolean;
+  attempts?: number;
+  intervalMs?: number;
+  wait?: (delayMs: number) => Promise<void>;
+}): Promise<void> {
+  const attempts = Math.max(1, input.attempts ?? LLAMACPP_STARTUP_BINDING_SYNC_ATTEMPTS);
+  const intervalMs = input.intervalMs ?? LLAMACPP_STARTUP_BINDING_SYNC_INTERVAL_MS;
+  const wait = input.wait ?? (delayMs => new Promise(resolve => setTimeout(resolve, delayMs)));
+
+  for (let attempt = 0; attempt < attempts && input.isCurrent(); attempt += 1) {
+    if (await input.refresh()) return;
+    if (attempt < attempts - 1 && input.isCurrent()) {
+      await wait(intervalMs);
+    }
+  }
+}
 
 const LLAMACPP_SANITIZED_NUMERIC_DEFAULTS = {
   modelsMax: DEFAULT_LLAMACPP_SERVICE_CONFIG.modelsMax ?? '0',
@@ -240,12 +271,18 @@ export function registerLlamaCppIpcHandlers(
     getStore: () => SqliteStore;
   },
 ): void {
+  const broadcast = (channel: string, payload: unknown): void => {
+    BrowserWindow.getAllWindows().forEach(win => {
+      if (win.isDestroyed()) return;
+      win.webContents.send(channel, payload);
+    });
+  };
   const updateRunningModelBindings = async (
     runningModels: Awaited<ReturnType<LlamaCppManager['listRunningModels']>>,
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     const store = options.getStore();
     const modelPreferences = getLlamaCppModelPreferences(store);
-    const client = await manager.client();
+    const client = runningModels.length > 0 ? await manager.client() : null;
     const bindingModels = (
       await Promise.all(
         runningModels.map(async runningModel => {
@@ -253,9 +290,11 @@ export function registerLlamaCppIpcHandlers(
           if (!model) return null;
           let detectedCapabilities: Partial<ModelCapabilities> = {};
           try {
-            detectedCapabilities = parseLlamaCppRuntimeCapabilities(
-              await client.showModel(model.id),
-            );
+            if (client) {
+              detectedCapabilities = parseLlamaCppRuntimeCapabilities(
+                await client.showModel(model.id),
+              );
+            }
           } catch {
             // Runtime metadata is optional; context and loaded state remain usable.
           }
@@ -271,33 +310,54 @@ export function registerLlamaCppIpcHandlers(
         }),
       )
     ).filter((model): model is NonNullable<typeof model> => Boolean(model));
-    updateLlamaCppRunningModels(bindingModels);
+    const cacheChanged = updateLlamaCppRunningModels(bindingModels);
     const current = store.get<LlamaCppAgentAppConfig>('app_config') ?? {};
-    const appConfigUpdate = upsertLlamaCppProviderInAppConfig(current, bindingModels);
+    // Persist the same endpoint that the managed service uses, including a user-selected port.
+    const appConfigUpdate = upsertLlamaCppProviderInAppConfig(
+      current,
+      bindingModels,
+      getLlamaCppServiceConfig(store),
+    );
     if (appConfigUpdate.changed) {
       store.set('app_config', appConfigUpdate.config);
     }
+    const changed = cacheChanged || appConfigUpdate.changed;
+    if (changed) {
+      broadcast(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
+    }
+    return changed;
   };
 
-  const refreshRunningModelBindings = async (): Promise<void> => {
-    if (bindingRefreshSuppressed) return;
+  const refreshRunningModelBindings = async (
+    input: { preserveExistingWhenEmpty?: boolean } = {},
+  ): Promise<LlamaCppModelBindingRefreshResult> => {
+    if (bindingRefreshSuppressed) {
+      return { changed: false, hasRunningModels: false };
+    }
     const refreshGeneration = bindingRefreshGeneration;
     try {
       const runningModels = await manager.listRunningModels();
-      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
-      await updateRunningModelBindings(runningModels);
-    } catch {
-      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) return;
-      await updateRunningModelBindings([]);
+      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
+        return { changed: false, hasRunningModels: false };
+      }
+      if (input.preserveExistingWhenEmpty && runningModels.length === 0) {
+        // Router health can precede automatic model loading; do not erase bindings during that gap.
+        return { changed: false, hasRunningModels: false };
+      }
+      return {
+        changed: await updateRunningModelBindings(runningModels),
+        hasRunningModels: runningModels.length > 0,
+      };
+    } catch (error) {
+      if (bindingRefreshSuppressed || refreshGeneration !== bindingRefreshGeneration) {
+        return { changed: false, hasRunningModels: false };
+      }
+      // A transient runtime read failure must not erase persisted model settings.
+      console.warn('[LlamaCpp] skipped model binding refresh because running models could not be read:', error);
+      return { changed: false, hasRunningModels: false };
     }
   };
 
-  const broadcast = (channel: string, payload: unknown): void => {
-    BrowserWindow.getAllWindows().forEach(win => {
-      if (win.isDestroyed()) return;
-      win.webContents.send(channel, payload);
-    });
-  };
   const sendStatus = (status: LlamaCppStatusSnapshot) =>
     broadcast(LlamaCppIpcChannel.StatusChanged, status);
   const sendProgress = (progress: LlamaCppInstallProgress) =>
@@ -315,6 +375,16 @@ export function registerLlamaCppIpcHandlers(
     );
   let bindingRefreshSuppressed = false;
   let bindingRefreshGeneration = 0;
+  let startupBindingSyncGeneration = 0;
+
+  const scheduleStartupModelBindingSync = (): void => {
+    const syncGeneration = ++startupBindingSyncGeneration;
+    void waitForLlamaCppStartupModelBindings({
+      refresh: async () =>
+        (await refreshRunningModelBindings({ preserveExistingWhenEmpty: true })).hasRunningModels,
+      isCurrent: () => syncGeneration === startupBindingSyncGeneration,
+    });
+  };
 
   migrateLegacyLlamaCppConfig(options.getStore());
   manager.on('status', status => {
@@ -430,20 +500,41 @@ export function registerLlamaCppIpcHandlers(
 
     return await manager.importRuntime(result.filePaths[0]);
   });
-  ipcMain.handle(LlamaCppIpcChannel.Start, async () => manager.start());
-  ipcMain.handle(LlamaCppIpcChannel.Stop, async () => manager.stop());
+  ipcMain.handle(LlamaCppIpcChannel.Start, async () => {
+    const status = await manager.start();
+    if (status.status === LlamaCppServiceStatus.Running) {
+      const bindingRefresh = await refreshRunningModelBindings({
+        preserveExistingWhenEmpty: true,
+      });
+      if (!bindingRefresh.hasRunningModels) {
+        scheduleStartupModelBindingSync();
+      }
+    }
+    return status;
+  });
+  ipcMain.handle(LlamaCppIpcChannel.Stop, async () => {
+    // Cancel delayed startup polling before the explicit stop clears the model bindings.
+    startupBindingSyncGeneration += 1;
+    const status = await manager.stop();
+    if (status.status === LlamaCppServiceStatus.Stopped) {
+      await updateRunningModelBindings([]);
+    }
+    return status;
+  });
   ipcMain.handle(
     LlamaCppIpcChannel.Restart,
     async () =>
       await runServiceTransition(async () => {
-        const wasRunning = manager.getStatus().status === 'running';
+        const wasRunning = manager.getStatus().status === LlamaCppServiceStatus.Running;
         const nextStatus = await applyLlamaCppServiceTransition({
           wasRunning,
           stop: () => manager.stop(),
           start: () => manager.start(),
           applyConfig: () => undefined,
           clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: () => refreshRunningModelBindings(),
+          refreshBindings: async () => {
+            await refreshRunningModelBindings();
+          },
           setBindingRefreshSuppressed: suppressed => {
             bindingRefreshSuppressed = suppressed;
             if (suppressed) bindingRefreshGeneration += 1;
@@ -491,7 +582,9 @@ export function registerLlamaCppIpcHandlers(
             store.set(LLAMACPP_SERVICE_CONFIG_KEY, nextConfig);
           },
           clearLastLoadedModel: () => manager.clearPersistedLastLoadedModel(),
-          refreshBindings: () => refreshRunningModelBindings(),
+          refreshBindings: async () => {
+            await refreshRunningModelBindings();
+          },
           setBindingRefreshSuppressed: suppressed => {
             bindingRefreshSuppressed = suppressed;
             if (suppressed) bindingRefreshGeneration += 1;
@@ -703,7 +796,8 @@ export function registerLlamaCppIpcHandlers(
                 await (await manager.client()).unloadModel(unloadModelName);
               },
             });
-            await refreshRunningModelBindings();
+            // The pipeline returns the settled router state, avoiding a second read during convergence.
+            await updateRunningModelBindings(result.runningModels);
             launchLogger.info(LlamaCppModelLaunchLogPhase.Succeeded, undefined, {
               runningModelCount: result.runningModels.length,
             });
@@ -1049,6 +1143,7 @@ export function sanitizeLlamaCppServiceConfig(
   const modelsMax =
     sanitizedModelsMax === '0' ? LLAMACPP_SANITIZED_NUMERIC_DEFAULTS.modelsMax : sanitizedModelsMax;
   const modelsAutoload = config?.modelsAutoload as unknown;
+  const keepRunningOnAppQuit = config?.keepRunningOnAppQuit as unknown;
   const timeout = normalizeIntegerStringWithDefault(config?.timeout, {
     min: timeoutRange.min,
     max: timeoutRange.max,
@@ -1143,6 +1238,9 @@ export function sanitizeLlamaCppServiceConfig(
     if (modelsAutoload === 'false') next.modelsAutoload = false;
   } else if (modelsAutoload !== undefined) {
     next.modelsAutoload = false;
+  }
+  if (typeof keepRunningOnAppQuit === 'boolean') {
+    next.keepRunningOnAppQuit = keepRunningOnAppQuit;
   }
   if (timeout) next.timeout = timeout;
   if (threadsHttp) next.threadsHttp = threadsHttp;

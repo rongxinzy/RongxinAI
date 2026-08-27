@@ -1,7 +1,9 @@
 import {
   assessLlamaCppAgentEligibility,
+  DEFAULT_LLAMACPP_SERVICE_CONFIG,
   type LlamaCppAgentEligibility,
   type LlamaCppRunningModel,
+  type LlamaCppServiceConfig,
 } from '../../shared/llamacpp';
 import type { ModelCapabilities, ProviderConfig } from '../../shared/providers';
 import { ApiFormat, ProviderName, ProviderRegistry } from '../../shared/providers';
@@ -16,6 +18,7 @@ export {
 const LLAMACPP_MIN_AGENT_MAX_TOKENS = 512;
 const LLAMACPP_MAX_AGENT_MAX_TOKENS = 4096;
 const LLAMACPP_OUTPUT_TOKEN_RATIO = 0.25;
+const LLAMACPP_PROVIDER_PATH = '/v1';
 
 export type LlamaCppRunningModelBinding = {
   id: string;
@@ -74,6 +77,7 @@ function normalizeLlamaCppProviderModels(
 function buildManagedLlamaCppProviderConfig(
   currentProvider: ProviderConfig | undefined,
   models: NonNullable<ProviderConfig['models']>,
+  baseUrl: string,
 ): ProviderConfig {
   const providerDef = ProviderRegistry.get(ProviderName.LlamaCpp);
   const userEnabled = currentProvider?.userEnabled === true;
@@ -105,7 +109,7 @@ function buildManagedLlamaCppProviderConfig(
     enabled: userEnabled,
     userEnabled,
     apiKey: currentProvider?.apiKey ?? '',
-    baseUrl: providerDef?.defaultBaseUrl ?? 'http://127.0.0.1:8080/v1',
+    baseUrl: baseUrl || providerDef?.defaultBaseUrl || 'http://127.0.0.1:8080/v1',
     apiFormat: ApiFormat.OpenAI,
     models: normalizeLlamaCppProviderModels(managedModels),
   };
@@ -114,9 +118,14 @@ function buildManagedLlamaCppProviderConfig(
 export function upsertLlamaCppProviderInAppConfig(
   current: LlamaCppAgentAppConfig,
   models: NonNullable<ProviderConfig['models']>,
+  serviceConfig: LlamaCppServiceConfig = {},
 ): { config: LlamaCppAgentAppConfig; changed: boolean; clearedDefaultModel: boolean } {
   const currentProvider = current.providers?.[ProviderName.LlamaCpp];
-  const nextProvider = buildManagedLlamaCppProviderConfig(currentProvider, models);
+  const nextProvider = buildManagedLlamaCppProviderConfig(
+    currentProvider,
+    models,
+    getLlamaCppProviderBaseUrl(serviceConfig),
+  );
   const availableModelIds = new Set(
     (nextProvider.models ?? []).map(model => model.id.trim()).filter(Boolean),
   );
@@ -170,12 +179,44 @@ export function removeLlamaCppModelFromAppConfig(
     const name = typeof model?.name === 'string' ? model.name.trim() : '';
     return id !== trimmedModelName && name !== trimmedModelName;
   });
-  const next = upsertLlamaCppProviderInAppConfig(current, nextProviderModels);
+  const next = upsertLlamaCppProviderInAppConfig(current, nextProviderModels, {
+    // Model removal must retain the endpoint previously synchronized from the service configuration.
+    host: readLlamaCppProviderHost(provider?.baseUrl),
+    port: readLlamaCppProviderPort(provider?.baseUrl),
+  });
 
   return {
     config: next.config,
     clearedDefaultModel: next.clearedDefaultModel,
   };
+}
+
+export function getLlamaCppProviderBaseUrl(
+  serviceConfig: Pick<LlamaCppServiceConfig, 'host' | 'port'>,
+): string {
+  const configuredHost = serviceConfig.host?.trim();
+  const host =
+    configuredHost && configuredHost !== '0.0.0.0'
+      ? configuredHost
+      : (DEFAULT_LLAMACPP_SERVICE_CONFIG.host ?? '127.0.0.1');
+  const port = serviceConfig.port?.trim() || DEFAULT_LLAMACPP_SERVICE_CONFIG.port || '8080';
+  return `http://${host}:${port}${LLAMACPP_PROVIDER_PATH}`;
+}
+
+function readLlamaCppProviderHost(baseUrl: string | undefined): string | undefined {
+  try {
+    return new URL(baseUrl).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+function readLlamaCppProviderPort(baseUrl: string | undefined): string | undefined {
+  try {
+    return new URL(baseUrl).port || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function normalizePositiveInteger(value: number | undefined): number | undefined {

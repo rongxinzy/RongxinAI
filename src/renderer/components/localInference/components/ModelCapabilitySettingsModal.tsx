@@ -121,14 +121,11 @@ export function ModelCapabilitySettingsModal({
     provider === ProviderName.LlamaCpp &&
     (preference?.capabilities?.toolCalling !== undefined ||
       detectedCapabilities.toolCalling !== undefined);
-  const contextWindow =
-    runtimeContextWindow ??
-    model.contextWindow ??
-    model.llamaCppRuntimeContextWindow ??
-    model.runtime_context_length ??
-    model.llamaCppTrainedContextWindow ??
-    model.trained_context_length ??
-    model.details?.context_length;
+  const contextWindow = resolveModelCapabilityContextWindow({
+    model,
+    preference,
+    runtimeContextWindow,
+  });
   const maxTokens = model.maxTokens ?? 4096;
   const capabilities: Partial<ModelCapabilities> = {
     ...model.capabilities,
@@ -189,5 +186,26 @@ export function ModelCapabilitySettingsModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+export function resolveModelCapabilityContextWindow({
+  model,
+  preference,
+  runtimeContextWindow,
+}: {
+  model: LocalCapabilityModel;
+  preference?: LlamaCppModelPreference;
+  runtimeContextWindow?: number;
+}): number | undefined {
+  return (
+    preference?.ctxSize ??
+    runtimeContextWindow ??
+    model.contextWindow ??
+    model.llamaCppRuntimeContextWindow ??
+    model.runtime_context_length ??
+    model.llamaCppTrainedContextWindow ??
+    model.trained_context_length ??
+    model.details?.context_length
   );
 }
