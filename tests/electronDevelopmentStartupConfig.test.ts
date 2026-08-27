@@ -12,11 +12,31 @@ test('development startup externalizes package subpaths without redundant delays
     scripts?: Record<string, string>;
   };
   const developmentScript = packageJson.scripts?.['electron:dev'] || '';
+  const electronBuildScript = readFileSync(
+    path.join(root, 'scripts', 'build-electron-development.mjs'),
+    'utf8',
+  );
+  const preloadEntryIndex = viteConfig.indexOf("entry: 'src/main/preload.ts'");
+  const mainEntryIndex = viteConfig.indexOf("entry: 'src/main/main.ts'");
 
   assert.match(viteConfig, /extractExternalDeps\(packageJson, true\)/);
   assert.match(viteConfig, /electronDevelopmentExternalRoots\.has\(packageRoot\(id\)\)/);
+  assert.match(viteConfig, /id\.startsWith\('\\0'\)/);
+  assert.match(viteConfig, /path\.isAbsolute\(id\)/);
+  assert.match(viteConfig, /!id\.startsWith\('@shared\/'\)/);
   assert.match(viteConfig, /command === ['"]serve['"][\s\S]*isElectronDevelopmentExternal/);
+  assert.match(viteConfig, /rolldownOptions:[\s\S]*codeSplitting: false/);
+  assert.doesNotMatch(viteConfig, /inlineDynamicImports/);
+  assert.doesNotMatch(viteConfig, /rollupOptions/);
+  assert.doesNotMatch(viteConfig, /esbuildOptions/);
+  assert.ok(preloadEntryIndex >= 0 && preloadEntryIndex < mainEntryIndex);
+  assert.match(viteConfig, /entry: 'src\/main\/preload\.ts'[\s\S]*watch: null/);
   assert.doesNotMatch(developmentScript, /-d 20000/);
   assert.doesNotMatch(developmentScript, /compile:electron/);
+  assert.match(developmentScript, /build:electron:dev/);
+  assert.match(developmentScript, /VITE_SKIP_ELECTRON=1/);
   assert.match(developmentScript, /dist-electron\/\.electron-ready/);
+  assert.match(electronBuildScript, /src\/main\/preload\.ts/);
+  assert.match(electronBuildScript, /src\/main\/main\.ts/);
+  assert.match(electronBuildScript, /fs\.writeFileSync\(readyPath/);
 });
