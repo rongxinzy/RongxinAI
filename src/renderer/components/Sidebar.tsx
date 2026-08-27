@@ -56,6 +56,7 @@ interface SidebarProps {
   onShowMcp: () => void;
   onShowLocalInference: () => void;
   onShowExpert: () => void;
+  onShowCoding: () => void;
   onNewChat: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -78,6 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowActivity,
   onShowLocalInference,
   onShowExpert,
+  onShowCoding,
   onNewChat,
   isCollapsed,
   onToggleCollapse,
@@ -530,6 +532,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               activeView={activeView}
               onNewChat={onNewChat}
               onShowExpert={onShowExpert}
+              onShowCoding={onShowCoding}
               onShowLocalInference={onShowLocalInference}
               onShowScheduledTasks={onShowScheduledTasks}
               onShowActivity={onShowActivity}

@@ -69,6 +69,26 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import type { TriageConfig } from '../../shared/triage';
+import type { CodingRoomSnapshot } from '../../shared/codingAgent';
+
+interface CodingAgentActionResult {
+  success: boolean;
+  error?: string;
+  conflict?: boolean;
+  snapshot?: CodingRoomSnapshot;
+}
+
+interface CodingHandoffPreviewResult {
+  success: boolean;
+  content?: Record<string, unknown>;
+  error?: string;
+}
+
+interface CodingLaneChangePreviewResult {
+  success: boolean;
+  preview?: import('../../shared/codingAgent').CodingLaneChangePreview;
+  error?: string;
+}
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -896,6 +916,110 @@ interface IElectronAPI {
       input: WorkbenchApprovalResponseInput,
     ) => Promise<WorkbenchTaskActionResult>;
     onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) => () => void;
+  };
+  codingAgent: {
+    bootstrap: (workspaceRoot: string) => Promise<CodingAgentActionResult>;
+    createMission: (
+      input: import('../../shared/codingAgent').CreateCodingMissionInput,
+    ) => Promise<CodingAgentActionResult>;
+    selectLane: (input: {
+      workspaceRoot: string;
+      laneId: string;
+    }) => Promise<CodingAgentActionResult>;
+    prompt: (input: {
+      workspaceRoot: string;
+      prompt: import('../../shared/codingAgent').CodingPromptInput;
+    }) => Promise<CodingAgentActionResult>;
+    confirmSessionRecovery: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      includeRecoveryContext: boolean;
+    }) => Promise<CodingAgentActionResult>;
+    cancel: (input: { workspaceRoot: string; laneId: string }) => Promise<CodingAgentActionResult>;
+    previewHandoff: (input: {
+      workspaceRoot: string;
+      sourceLaneId: string;
+      targetLaneId: string;
+    }) => Promise<CodingHandoffPreviewResult>;
+    handoff: (input: {
+      workspaceRoot: string;
+      sourceLaneId: string;
+      targetLaneId: string;
+    }) => Promise<CodingAgentActionResult>;
+    addLane: (input: {
+      workspaceRoot: string;
+      missionId: string;
+      profileId: string;
+    }) => Promise<CodingAgentActionResult>;
+    createCollaborationPreset: (
+      input: import('../../shared/codingAgent').CreateCodingCollaborationPresetInput,
+    ) => Promise<CodingAgentActionResult>;
+    saveLaneView: (input: {
+      workspaceRoot: string;
+      view: import('../../shared/codingAgent').CodingLaneViewStateInput;
+    }) => Promise<CodingAgentActionResult>;
+    setLaneConfigOption: (input: {
+      workspaceRoot: string;
+      option: import('../../shared/codingAgent').CodingLaneConfigOptionInput;
+    }) => Promise<CodingAgentActionResult>;
+    previewLaneChanges: (input: {
+      workspaceRoot: string;
+      laneId: string;
+    }) => Promise<CodingLaneChangePreviewResult>;
+    applyLaneChanges: (input: {
+      workspaceRoot: string;
+      laneId: string;
+    }) => Promise<CodingAgentActionResult>;
+    probeAgent: (input: {
+      workspaceRoot: string;
+      profileId: string;
+    }) => Promise<CodingAgentActionResult>;
+    addProfile: (input: {
+      workspaceRoot: string;
+      profile: import('../../shared/codingAgent').AddCodingAgentProfileInput;
+    }) => Promise<CodingAgentActionResult>;
+    trustProfile: (input: {
+      workspaceRoot: string;
+      profileId: string;
+    }) => Promise<CodingAgentActionResult>;
+    authenticateProfile: (input: {
+      workspaceRoot: string;
+      profileId: string;
+      methodId: string;
+    }) => Promise<CodingAgentActionResult>;
+    startAuthTerminal: (input: {
+      workspaceRoot: string;
+      profileId: string;
+      methodId: string;
+    }) => Promise<{
+      success: boolean;
+      terminal?: { id: string; profileId: string; methodId: string };
+      error?: string;
+    }>;
+    writeAuthTerminal: (input: { id: string; data: string }) => Promise<CodingAgentActionResult>;
+    resizeAuthTerminal: (input: {
+      id: string;
+      columns: number;
+      rows: number;
+    }) => Promise<CodingAgentActionResult>;
+    cancelAuthTerminal: (id: string) => Promise<CodingAgentActionResult>;
+    respondPermission: (input: {
+      workspaceRoot: string;
+      response: import('../../shared/codingAgent').CodingPermissionResponse;
+    }) => Promise<CodingAgentActionResult>;
+    onChanged: (
+      callback: (snapshot: import('../../shared/codingAgent').CodingRoomSnapshot) => void,
+    ) => () => void;
+    onAuthTerminalData: (callback: (event: { id: string; data: string }) => void) => () => void;
+    onAuthTerminalExit: (
+      callback: (event: {
+        id: string;
+        profileId: string;
+        methodId: string;
+        exitCode: number;
+        signal?: number;
+      }) => void,
+    ) => () => void;
   };
   dialog: {
     selectDirectory: (options?: {

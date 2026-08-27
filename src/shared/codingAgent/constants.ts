@@ -1,0 +1,106 @@
+export const CodingAgentDriverKind = {
+  Builtin: 'builtin',
+  Acp: 'acp',
+} as const;
+export type CodingAgentDriverKind =
+  (typeof CodingAgentDriverKind)[keyof typeof CodingAgentDriverKind];
+
+export const CodingAgentProfileStatus = {
+  Detected: 'detected',
+  Ready: 'ready',
+  NeedsAdapter: 'needs_adapter',
+  NeedsConfiguration: 'needs_configuration',
+  NeedsAuth: 'needs_auth',
+  Incompatible: 'incompatible',
+  Untrusted: 'untrusted',
+  Unavailable: 'unavailable',
+} as const;
+export type CodingAgentProfileStatus =
+  (typeof CodingAgentProfileStatus)[keyof typeof CodingAgentProfileStatus];
+
+export const CodingMissionStatus = {
+  Draft: 'draft',
+  Running: 'running',
+  WaitingApproval: 'waiting_approval',
+  NeedsReview: 'needs_review',
+  Completed: 'completed',
+  Failed: 'failed',
+  Cancelled: 'cancelled',
+} as const;
+export type CodingMissionStatus = (typeof CodingMissionStatus)[keyof typeof CodingMissionStatus];
+
+export const CodingAssignmentStatus = {
+  Planned: 'planned',
+  Running: 'running',
+  WaitingApproval: 'waiting_approval',
+  NeedsReview: 'needs_review',
+  Completed: 'completed',
+  Failed: 'failed',
+  Cancelled: 'cancelled',
+} as const;
+export type CodingAssignmentStatus =
+  (typeof CodingAssignmentStatus)[keyof typeof CodingAssignmentStatus];
+
+export const CodingLaneStatus = {
+  Idle: 'idle',
+  Running: 'running',
+  WaitingApproval: 'waiting_approval',
+  NeedsAuth: 'needs_auth',
+  Disconnected: 'disconnected',
+  Completed: 'completed',
+  Failed: 'failed',
+} as const;
+export type CodingLaneStatus = (typeof CodingLaneStatus)[keyof typeof CodingLaneStatus];
+
+export const CodingEventKind = {
+  Message: 'message',
+  MessageDelta: 'message_delta',
+  Reasoning: 'reasoning',
+  Plan: 'plan',
+  ToolCall: 'tool_call',
+  Permission: 'permission',
+  FileChange: 'file_change',
+  Terminal: 'terminal',
+  Usage: 'usage',
+  TurnComplete: 'turn_complete',
+  TurnCancelled: 'turn_cancelled',
+  TurnFailed: 'turn_failed',
+} as const;
+export type CodingEventKind = (typeof CodingEventKind)[keyof typeof CodingEventKind];
+
+export const CodingPermissionOutcome = {
+  Selected: 'selected',
+  Cancelled: 'cancelled',
+} as const;
+export type CodingPermissionOutcome =
+  (typeof CodingPermissionOutcome)[keyof typeof CodingPermissionOutcome];
+
+export const CodingAgentIpc = {
+  Bootstrap: 'codingAgent:bootstrap',
+  CreateMission: 'codingAgent:createMission',
+  SelectLane: 'codingAgent:selectLane',
+  Prompt: 'codingAgent:prompt',
+  ConfirmSessionRecovery: 'codingAgent:confirmSessionRecovery',
+  Cancel: 'codingAgent:cancel',
+  PreviewHandoff: 'codingAgent:previewHandoff',
+  Handoff: 'codingAgent:handoff',
+  AddLane: 'codingAgent:addLane',
+  CreateCollaborationPreset: 'codingAgent:createCollaborationPreset',
+  SaveLaneView: 'codingAgent:saveLaneView',
+  SetLaneConfigOption: 'codingAgent:setLaneConfigOption',
+  PreviewLaneChanges: 'codingAgent:previewLaneChanges',
+  ApplyLaneChanges: 'codingAgent:applyLaneChanges',
+  ProbeAgent: 'codingAgent:probeAgent',
+  AddProfile: 'codingAgent:addProfile',
+  TrustProfile: 'codingAgent:trustProfile',
+  AuthenticateProfile: 'codingAgent:authenticateProfile',
+  StartAuthTerminal: 'codingAgent:startAuthTerminal',
+  WriteAuthTerminal: 'codingAgent:writeAuthTerminal',
+  ResizeAuthTerminal: 'codingAgent:resizeAuthTerminal',
+  CancelAuthTerminal: 'codingAgent:cancelAuthTerminal',
+  RespondPermission: 'codingAgent:respondPermission',
+  Changed: 'codingAgent:changed',
+  AuthTerminalData: 'codingAgent:authTerminalData',
+  AuthTerminalExit: 'codingAgent:authTerminalExit',
+} as const;
+export type CodingAgentIpc = (typeof CodingAgentIpc)[keyof typeof CodingAgentIpc];

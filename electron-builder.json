@@ -46,7 +46,9 @@
     "!node_modules/npm/docs/**",
     "!node_modules/npm/man/**",
     "!node_modules/better-sqlite3/src/**",
-    "!node_modules/better-sqlite3/deps/**"
+    "!node_modules/better-sqlite3/deps/**",
+    "!node_modules/node-pty/src/**",
+    "!node_modules/node-pty/deps/**"
   ],
   "extraResources": [
     {
@@ -330,6 +332,7 @@
     "node_modules/@img/**",
     "node_modules/@firecrawl/**",
     "node_modules/better-sqlite3/**",
+    "node_modules/node-pty/**",
     "node_modules/npm/**"
   ],
   "asar": true
