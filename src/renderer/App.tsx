@@ -304,11 +304,6 @@ const App: React.FC = () => {
     const handleLlamaCppRunningModelsChanged = () => {
       void refreshAvailableModels().catch(() => undefined);
     };
-<<<<<<< HEAD
-    const unsubscribeManagedProviders = window.electron.managedProviders?.onChanged(
-      handleLlamaCppRunningModelsChanged,
-    );
-=======
     const handleLlamaCppModelBindingsChanged = () => {
       // Reload first so existing settings listeners receive the authoritative model configuration.
       void configService
@@ -316,7 +311,6 @@ const App: React.FC = () => {
         .then(() => notifyLlamaCppRunningModelsChanged())
         .catch(() => undefined);
     };
->>>>>>> 4bf49b75 (feat(模型市场): 新增了模式市场的排序规则)
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
@@ -332,11 +326,7 @@ const App: React.FC = () => {
         LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
         handleLlamaCppRunningModelsChanged,
       );
-<<<<<<< HEAD
-      unsubscribeManagedProviders?.();
-=======
       unsubscribeModelBindings();
->>>>>>> 4bf49b75 (feat(模型市场): 新增了模式市场的排序规则)
     };
   }, [dispatch, isInitialized]);
 
