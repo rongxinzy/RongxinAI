@@ -877,6 +877,9 @@ const getCodingRoomService = (): CodingRoomService => {
       new CodingAgentRegistry(
         new CodingAgentProfileRepository(getStore().getDatabase()),
         () => resolveCurrentApiConfig().config !== null,
+        app.isPackaged
+          ? path.join(process.resourcesPath, 'acp', 'registry.json')
+          : path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
       ),
       {
         startBuiltinSession: async ({ sessionId, workspaceRoot, prompt }) => {

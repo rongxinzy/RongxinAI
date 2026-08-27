@@ -1,4 +1,4 @@
-import { access, realpath } from 'fs/promises';
+import { access, readFile, realpath } from 'fs/promises';
 import { homedir } from 'os';
 import path from 'path';
 
@@ -9,11 +9,17 @@ import {
   type CodingAgentProfile,
 } from '../../../shared/codingAgent';
 
-const CANDIDATES = [
-  { executable: 'claude-acp', name: 'Claude Code', args: [] },
-  { executable: 'codex-acp', name: 'Codex', args: [] },
-  { executable: 'opencode', name: 'OpenCode', args: ['acp'] },
-] as const;
+type RegistryBinaryDistribution = { cmd?: unknown; args?: unknown };
+type RegistryAgent = {
+  id?: unknown;
+  name?: unknown;
+  description?: unknown;
+  distribution?: {
+    binary?: Record<string, RegistryBinaryDistribution>;
+    npx?: { package?: unknown };
+  };
+};
+type RegistrySnapshot = { agents?: RegistryAgent[] };
 
 const NO_ACP_CAPABILITIES = {
   supportsLoadSession: false,
@@ -63,25 +69,62 @@ export const discoveryDirectories = (
 
 /** Passive discovery only: it never starts a discovered executable. */
 export class AcpDiscoveryService {
+  constructor(
+    private readonly registryPath = path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
+  ) {}
+
   async discover(): Promise<Array<Omit<CodingAgentProfile, 'id' | 'isBuiltin'>>> {
     const paths = discoveryDirectories(process.platform, process.env);
+    const agents = await this.readRegistry();
     const profiles = await Promise.all(
-      CANDIDATES.map(async candidate => {
-        const resolved = await this.resolve(paths, this.executableNames(candidate.executable));
+      agents.map(async agent => {
+        const resolved = await this.resolve(paths, this.executableNames(agent.executable));
         if (!resolved) return null;
         return {
-          name: candidate.name,
-          description: 'Detected locally. Probe before using.',
+          name: agent.name,
+          description: `${agent.description} Detected locally. Probe before using.`,
           driverKind: CodingAgentDriverKind.Acp,
           status: CodingAgentProfileStatus.Detected,
           capabilities: NO_ACP_CAPABILITIES,
           authMethods: [] as CodingAgentAuthMethod[],
           command: resolved,
-          args: [...candidate.args],
+          args: agent.args,
         } satisfies Omit<CodingAgentProfile, 'id' | 'isBuiltin'>;
       }),
     );
     return profiles.filter((profile): profile is NonNullable<typeof profile> => profile !== null);
+  }
+
+  private async readRegistry(): Promise<Array<{ name: string; description: string; executable: string; args: string[] }>> {
+    const snapshot = JSON.parse(await readFile(this.registryPath, 'utf8')) as RegistrySnapshot;
+    const platformKey = this.platformKey();
+    return (snapshot.agents ?? []).flatMap(agent => {
+      if (typeof agent.id !== 'string' || typeof agent.name !== 'string') return [];
+      const binary = agent.distribution?.binary?.[platformKey];
+      const npxPackage = agent.distribution?.npx?.package;
+      const command =
+        typeof binary?.cmd === 'string'
+          ? path.basename(binary.cmd)
+          : typeof npxPackage === 'string'
+            ? npxPackage.replace(/@[^@]+$/, '').split('/').at(-1)
+            : null;
+      if (!command) return [];
+      return [{
+        name: agent.name,
+        description: typeof agent.description === 'string' ? agent.description : 'ACP agent.',
+        executable: command,
+        args: Array.isArray(binary?.args)
+          ? binary.args.filter((arg): arg is string => typeof arg === 'string')
+          : [],
+      }];
+    });
+  }
+
+  private platformKey(): string {
+    const architecture = process.arch === 'arm64' ? 'aarch64' : 'x86_64';
+    if (process.platform === 'darwin') return `darwin-${architecture}`;
+    if (process.platform === 'win32') return `windows-${architecture}`;
+    return `linux-${architecture}`;
   }
 
   private executableNames(executable: string): string[] {

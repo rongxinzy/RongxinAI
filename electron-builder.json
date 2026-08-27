@@ -74,6 +74,10 @@
       "to": "modelscope.tokens.local.json"
     },
     {
+      "from": "resources/acp/registry.json",
+      "to": "acp/registry.json"
+    },
+    {
       "from": "vendor/engram-runtime/current",
       "to": "memory",
       "filter": ["engram", "engram.exe", "runtime-build-info.json", "LICENSE"]

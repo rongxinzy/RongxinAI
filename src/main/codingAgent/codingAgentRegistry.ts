@@ -33,6 +33,7 @@ export class CodingAgentRegistry extends EventEmitter {
   constructor(
     private readonly repository?: CodingAgentProfileRepository,
     private readonly isBuiltinReady: () => boolean = () => true,
+    private readonly acpRegistryPath?: string,
   ) {
     super();
     this.profiles.set(BUILTIN_PROFILE_ID, {
@@ -191,7 +192,7 @@ export class CodingAgentRegistry extends EventEmitter {
   }
 
   async discoverExternalAgents(): Promise<void> {
-    const discovered = await new AcpDiscoveryService().discover();
+    const discovered = await new AcpDiscoveryService(this.acpRegistryPath).discover();
     for (const profile of discovered) {
       if (this.list().some(existing => existing.command === profile.command)) continue;
       this.registerExternal(profile);
