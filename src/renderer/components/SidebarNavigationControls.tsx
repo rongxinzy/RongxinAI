@@ -1,6 +1,7 @@
 ﻿import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
+import { Code2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
 import { useSelector } from 'react-redux';
@@ -40,12 +41,14 @@ export type SidebarActiveView =
   | 'activity'
   | 'mcp'
   | 'localInference'
-  | 'expert';
+  | 'expert'
+  | 'coding';
 
 interface SidebarNavigationControlsProps {
   activeView: SidebarActiveView;
   onNewChat: () => void;
   onShowExpert: () => void;
+  onShowCoding: () => void;
   onShowLocalInference: () => void;
   onShowScheduledTasks: () => void;
   onShowActivity: () => void;
@@ -73,6 +76,7 @@ export const SidebarNavigationControls = ({
   activeView,
   onNewChat,
   onShowExpert,
+  onShowCoding,
   onShowLocalInference,
   onShowScheduledTasks,
   onShowActivity,
@@ -176,6 +180,20 @@ export const SidebarNavigationControls = ({
         >
           <SidebarAnimatedBotIcon ref={localInferenceIconRef} />
           {i18nService.t('localInferenceTitle')}
+        </Button>
+      )}
+      {workMode !== WorkMode.Chat && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onShowCoding}
+          className={
+            activeView === 'coding' ? activeSidebarViewNavItemClassName : sidebarViewNavItemClassName
+          }
+          aria-current={activeView === 'coding' ? 'page' : undefined}
+        >
+          <Code2 className="size-4" />
+          {i18nService.t('codingAgent')}
         </Button>
       )}
       {workMode !== WorkMode.Chat && (

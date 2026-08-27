@@ -687,6 +687,11 @@ select::-ms-expand {
 [data-slot='button'].text-destructive {
   color: var(--zy-destructive);
 }
+/* Tailwind's text-primary resolves through hsl(var(--primary)); the project
+   theme stores that token as a hex value, so use the native theme value. */
+.text-primary {
+  color: var(--zy-primary);
+}
 [data-local-inference-model-action-button='true'] {
   transition-property: background-color, border-color, box-shadow, filter, transform;
   transition-duration: 200ms, 200ms, 200ms, 200ms, 120ms;
