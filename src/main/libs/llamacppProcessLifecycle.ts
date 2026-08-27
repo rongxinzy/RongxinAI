@@ -1,4 +1,4 @@
-import type { SpawnOptionsWithoutStdio } from 'child_process';
+import type { SpawnOptions } from 'child_process';
 
 import type { LlamaCppServiceConfig } from '../../shared/llamacpp';
 
@@ -9,7 +9,7 @@ export function shouldKeepLlamaCppServiceRunning(config: LlamaCppServiceConfig):
 export function createLlamaCppServerSpawnOptions(input: {
   config: LlamaCppServiceConfig;
   env: NodeJS.ProcessEnv;
-}): SpawnOptionsWithoutStdio {
+}): SpawnOptions {
   const keepRunningOnAppQuit = shouldKeepLlamaCppServiceRunning(input.config);
 
   return {
