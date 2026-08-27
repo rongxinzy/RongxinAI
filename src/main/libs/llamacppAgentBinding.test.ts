@@ -41,6 +41,30 @@ test('removeLlamaCppModelFromAppConfig removes deleted llama.cpp model and clear
   ]);
 });
 
+test('upsertLlamaCppProviderInAppConfig synchronizes the provider endpoint to the configured service port', () => {
+  const result = upsertLlamaCppProviderInAppConfig(
+    {
+      providers: {
+        [ProviderName.LlamaCpp]: {
+          enabled: true,
+          userEnabled: true,
+          apiKey: '',
+          baseUrl: 'http://127.0.0.1:8080/v1',
+          apiFormat: 'openai',
+          models: [],
+        },
+      },
+    },
+    [{ id: 'qwen-local', name: 'qwen-local', supportsImage: false }],
+    { host: '127.0.0.1', port: '18080' },
+  );
+
+  expect(result.changed).toBe(true);
+  expect(result.config.providers?.[ProviderName.LlamaCpp]?.baseUrl).toBe(
+    'http://127.0.0.1:18080/v1',
+  );
+});
+
 test('buildLlamaCppRunningModelBinding uses runtime context length for Agent contextWindow', () => {
   expect(
     buildLlamaCppRunningModelBinding({

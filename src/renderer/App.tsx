@@ -30,6 +30,7 @@ import {
   collectAvailableModels,
   getManagedProviderAccessPolicy,
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+  notifyLlamaCppRunningModelsChanged,
 } from './services/availableModels';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
@@ -303,14 +304,27 @@ const App: React.FC = () => {
     const handleLlamaCppRunningModelsChanged = () => {
       void refreshAvailableModels().catch(() => undefined);
     };
+<<<<<<< HEAD
     const unsubscribeManagedProviders = window.electron.managedProviders?.onChanged(
       handleLlamaCppRunningModelsChanged,
     );
+=======
+    const handleLlamaCppModelBindingsChanged = () => {
+      // Reload first so existing settings listeners receive the authoritative model configuration.
+      void configService
+        .reload()
+        .then(() => notifyLlamaCppRunningModelsChanged())
+        .catch(() => undefined);
+    };
+>>>>>>> 4bf49b75 (feat(模型市场): 新增了模式市场的排序规则)
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
       LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
       handleLlamaCppRunningModelsChanged,
+    );
+    const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
+      handleLlamaCppModelBindingsChanged,
     );
     return () => {
       window.removeEventListener('config-updated', handleConfigUpdated);
@@ -318,7 +332,11 @@ const App: React.FC = () => {
         LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
         handleLlamaCppRunningModelsChanged,
       );
+<<<<<<< HEAD
       unsubscribeManagedProviders?.();
+=======
+      unsubscribeModelBindings();
+>>>>>>> 4bf49b75 (feat(模型市场): 新增了模式市场的排序规则)
     };
   }, [dispatch, isInitialized]);
 
@@ -883,6 +901,7 @@ const App: React.FC = () => {
                         isVisible={mainView === 'localInference'}
                         onToggleSidebar={handleToggleSidebar}
                         onNewChat={handleNewChat}
+                        onOpenModelSettings={() => handleShowSettings({ initialTab: 'model' })}
                         updateBadge={null}
                       />
                     </React.Suspense>

@@ -294,6 +294,7 @@ export type LlamaCppServiceConfig = {
   memoryBudgetPercent?: number;
   modelsMax?: string;
   modelsAutoload?: boolean;
+  keepRunningOnAppQuit?: boolean;
   timeout?: string;
   threadsHttp?: string;
   cachePrompt?: boolean;

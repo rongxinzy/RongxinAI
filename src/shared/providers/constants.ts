@@ -774,7 +774,7 @@ const PROVIDER_DEFINITIONS = [
   },
   {
     id: ProviderName.LlamaCpp,
-    label: 'Llama.cpp',
+    label: 'llama',
     website: 'https://github.com/ggerganov/llama.cpp',
     agentProviderId: AgentProviderId.LlamaCpp,
     defaultBaseUrl: 'http://127.0.0.1:8080/v1',
