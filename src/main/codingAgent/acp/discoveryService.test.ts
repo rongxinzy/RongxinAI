@@ -47,7 +47,7 @@ test('covers Windows user-level npm, pnpm, and Bun locations without scanning di
 
 test('records a resolved absolute executable when PATH contains a relative directory', async () => {
   const directory = path.join(process.cwd(), `.coding-agent-discovery-${Date.now()}`);
-  const executable = path.join(directory, 'codex');
+  const executable = path.join(directory, 'codex-acp');
   const originalPath = process.env.PATH;
   try {
     await mkdir(directory, { recursive: true });
@@ -60,7 +60,7 @@ test('records a resolved absolute executable when PATH contains a relative direc
       expect.objectContaining({
         name: 'Codex',
         command: await realpath(executable),
-        args: ['app-server'],
+        args: [],
         status: 'detected',
       }),
     );

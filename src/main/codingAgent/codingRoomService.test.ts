@@ -396,14 +396,16 @@ test('requires an isolated lane and an idle primary writer before applying colla
 test('creates deterministic isolated review and verification assignments for a collaboration preset', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
   const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
-    startBuiltinSession: async () => undefined,
+    startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
     beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
     completeExternalWorkbenchRun: () => undefined,
     createIsolatedWorkspace: async ({ laneId }) => `/isolated/${laneId}`,
     getWorkspaceBaseline: async () => 'base-commit',
+    getWorkspaceDiff: async () => 'diff --git a/file b/file',
   });
   const workspaceRoot = '/workspace/project';
   const initial = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
@@ -423,5 +425,24 @@ test('creates deterministic isolated review and verification assignments for a c
   ]);
   expect(result.lanes.slice(1).every(lane => lane.executionRoot.startsWith('/isolated/'))).toBe(
     true,
+  );
+  expect(startBuiltinSession).not.toHaveBeenCalled();
+
+  await service.prompt(workspaceRoot, { laneId: initial.lanes[0].id, prompt: 'Implement it.' });
+  service.recordBuiltinEvent(initial.lanes[0].localSessionId, CodingEventKind.TurnComplete, {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  expect(startBuiltinSession).toHaveBeenCalledTimes(2);
+  expect(startBuiltinSession).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      sessionId: result.lanes[1].localSessionId,
+      prompt: expect.stringContaining('diff --git'),
+    }),
+  );
+  service.recordBuiltinEvent(result.lanes[1].localSessionId, CodingEventKind.TurnComplete, {});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(startBuiltinSession).toHaveBeenCalledTimes(3);
+  expect(startBuiltinSession).toHaveBeenLastCalledWith(
+    expect.objectContaining({ sessionId: result.lanes[2].localSessionId }),
   );
 });

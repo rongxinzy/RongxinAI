@@ -169,7 +169,7 @@ import { CodingRoomService } from './codingAgent/codingRoomService';
 import { CodingAgentRegistry } from './codingAgent/codingAgentRegistry';
 import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRepository';
 import { GitWorktreeService } from './codingAgent/gitWorktreeService';
-import { CodingEventKind } from '../shared/codingAgent';
+import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
@@ -976,6 +976,7 @@ const getCodingRoomService = (): CodingRoomService => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.MessageDelta, {
         content,
         messageId,
+        streamUpdateMode: CodingStreamUpdateMode.Replace,
       });
     });
     runtime.on('toolActivity', (sessionId: string, event: unknown) => {

@@ -76,12 +76,18 @@ export class AcpConnectionSupervisor {
         Boolean(entry[1]),
       ),
     );
-    const child = spawn(options.executable, options.args, {
+    const isWindowsBatch =
+      process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(options.executable);
+    const child = spawn(
+      isWindowsBatch ? process.env.ComSpec || 'cmd.exe' : options.executable,
+      isWindowsBatch ? ['/d', '/s', '/c', options.executable, ...options.args] : options.args,
+      {
       cwd: options.cwd,
       env,
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
-    });
+      },
+    );
     this.child = child;
     this.connectionGeneration += 1;
     child.stdout.setEncoding('utf8');

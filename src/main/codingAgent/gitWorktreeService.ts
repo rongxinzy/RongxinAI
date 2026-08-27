@@ -114,7 +114,7 @@ export class GitWorktreeService {
         readGitPatch(worktreeRoot, ['diff', '--no-index', '--binary', '--', '/dev/null', file]),
       ),
     );
-    return `${trackedPatch}${untrackedPatch.join('')}`;
+    return [trackedPatch, ...untrackedPatch].filter(Boolean).join('\n');
   }
 
   async getWorktreeDiffPreview(worktreeRoot: string): Promise<string> {

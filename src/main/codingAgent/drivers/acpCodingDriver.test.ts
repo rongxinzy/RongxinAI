@@ -4,7 +4,11 @@ import os from 'os';
 import path from 'path';
 import { expect, test } from 'vitest';
 
-import { CodingEventKind, CodingPermissionOutcome } from '../../../shared/codingAgent';
+import {
+  CodingEventKind,
+  CodingPermissionOutcome,
+  CodingStreamUpdateMode,
+} from '../../../shared/codingAgent';
 import { AcpCodingDriver } from './acpCodingDriver';
 
 test('normalizes ACP session updates into coding events', async () => {
@@ -46,7 +50,11 @@ test('normalizes ACP session updates into coding events', async () => {
   expect(events).toEqual([
     {
       kind: CodingEventKind.MessageDelta,
-      payload: { content: 'Implemented.', messageId: 'message-1' },
+      payload: {
+        content: 'Implemented.',
+        messageId: 'message-1',
+        streamUpdateMode: CodingStreamUpdateMode.Append,
+      },
     },
     {
       kind: CodingEventKind.Reasoning,

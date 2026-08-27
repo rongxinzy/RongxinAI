@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { afterEach, expect, test } from 'vitest';
 
-import { CodingEventKind } from '../../shared/codingAgent';
+import { CodingEventKind, CodingStreamUpdateMode } from '../../shared/codingAgent';
 import { initializeCodingAgentSchema } from './schema';
 import { CodingRoomRepository } from './codingRoomRepository';
 
@@ -67,13 +67,34 @@ test('coalesces streamed chunks with the same message ID into one durable event'
   repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
     messageId: 'message-1',
     content: 'First ',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
   });
   repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
     messageId: 'message-1',
     content: 'second',
+    streamUpdateMode: CodingStreamUpdateMode.Append,
   });
 
   expect(repository.listEvents([lane.id])).toEqual([
-    expect.objectContaining({ payload: { messageId: 'message-1', content: 'First second' } }),
+    expect.objectContaining({
+      payload: expect.objectContaining({ messageId: 'message-1', content: 'First second' }),
+    }),
   ]);
+});
+
+test('replaces an in-process streaming snapshot instead of appending it', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Snapshot');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+  for (const content of ['Hel', 'Hello', 'Hello world']) {
+    repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+      messageId: 'pi-message',
+      content,
+      streamUpdateMode: CodingStreamUpdateMode.Replace,
+    });
+  }
+  expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello world');
 });

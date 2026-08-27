@@ -5,6 +5,7 @@ import path from 'path';
 import {
   CodingEventKind,
   CodingPermissionOutcome,
+  CodingStreamUpdateMode,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
   type CodingAgentConfigOptionValue,
@@ -526,8 +527,8 @@ export class AcpCodingDriver implements CodingAgentDriver {
               kind: CodingEventKind.MessageDelta,
               payload: {
                 content: text,
-                messageId:
-                  typeof update.messageId === 'string' ? update.messageId : 'agent-message-stream',
+                messageId: typeof update.messageId === 'string' ? update.messageId : randomUUID(),
+                streamUpdateMode: CodingStreamUpdateMode.Append,
               },
             },
           ];

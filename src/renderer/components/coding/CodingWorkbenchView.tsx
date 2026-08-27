@@ -812,7 +812,11 @@ export const CodingWorkbenchView = () => {
           }}
         />
         <CodingComposer
-          disabled={!activeLane}
+          disabled={
+            !activeLane ||
+            activeLane.status === CodingLaneStatus.Running ||
+            activeLane.status === CodingLaneStatus.WaitingApproval
+          }
           prompt={prompt}
           recipientName={activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
           onChange={next => {

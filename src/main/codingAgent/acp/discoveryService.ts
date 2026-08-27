@@ -10,8 +10,8 @@ import {
 } from '../../../shared/codingAgent';
 
 const CANDIDATES = [
-  { executable: 'claude', name: 'Claude Code', args: ['--acp'] },
-  { executable: 'codex', name: 'Codex', args: ['app-server'] },
+  { executable: 'claude-acp', name: 'Claude Code', args: [] },
+  { executable: 'codex-acp', name: 'Codex', args: [] },
   { executable: 'opencode', name: 'OpenCode', args: ['acp'] },
 ] as const;
 
@@ -77,7 +77,7 @@ export class AcpDiscoveryService {
           capabilities: NO_ACP_CAPABILITIES,
           authMethods: [] as CodingAgentAuthMethod[],
           command: resolved,
-          args: candidate.args,
+          args: [...candidate.args],
         } satisfies Omit<CodingAgentProfile, 'id' | 'isBuiltin'>;
       }),
     );

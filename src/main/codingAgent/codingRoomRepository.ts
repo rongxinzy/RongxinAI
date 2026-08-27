@@ -4,6 +4,7 @@ import type Database from 'better-sqlite3';
 import {
   CodingAssignmentStatus,
   CodingEventKind,
+  CodingStreamUpdateMode,
   CodingLaneStatus,
   CodingMissionStatus,
   type CodingAgentLane,
@@ -293,7 +294,10 @@ export class CodingRoomRepository {
       .get(laneId, kind, messageId) as Record<string, unknown> | undefined;
     if (!previous) return this.appendEvent(laneId, kind, payload);
     const previousPayload = JSON.parse(String(previous.payload_json)) as Record<string, unknown>;
-    const content = `${typeof previousPayload.content === 'string' ? previousPayload.content : ''}${typeof payload.content === 'string' ? payload.content : ''}`;
+    const content =
+      payload.streamUpdateMode === CodingStreamUpdateMode.Replace
+        ? payload.content
+        : `${typeof previousPayload.content === 'string' ? previousPayload.content : ''}${typeof payload.content === 'string' ? payload.content : ''}`;
     const event = {
       id: String(previous.id),
       laneId,

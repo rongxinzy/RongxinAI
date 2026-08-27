@@ -10,7 +10,6 @@ import {
   type ManagedProviderAccessPolicy,
 } from '../shared/managedProviders';
 import { CoworkView } from './components/cowork';
-import { CodingWorkbenchView } from './components/coding';
 import {
   hasAskUserQuestions,
   isAskUserQuestionPermission,
@@ -82,6 +81,9 @@ const LocalInferenceView = React.lazy(() =>
   import('./components/localInference').then(module => ({ default: module.LocalInferenceView })),
 );
 const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
+const CodingWorkbenchView = React.lazy(() =>
+  import('./components/coding').then(module => ({ default: module.CodingWorkbenchView })),
+);
 
 /**
  * Full-area fallback shown while a lazily loaded feature chunk downloads.

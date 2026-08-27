@@ -166,6 +166,12 @@ export class CodingRoomService extends EventEmitter {
   async prompt(workspaceRoot: string, input: CodingPromptInput): Promise<CodingRoomSnapshot> {
     const snapshot = this.bootstrap(workspaceRoot);
     const lane = this.requireLane(snapshot.lanes, input.laneId);
+    if (
+      lane.status === CodingLaneStatus.Running ||
+      lane.status === CodingLaneStatus.WaitingApproval
+    ) {
+      throw new Error('This coding agent lane already has an active turn.');
+    }
     const profile = this.registry.get(lane.profileId);
     if (!profile) throw new Error('Coding agent profile was not found.');
     if (profile.status !== CodingAgentProfileStatus.Ready) {
@@ -455,7 +461,6 @@ export class CodingRoomService extends EventEmitter {
         role: 'system',
         content: stage.instructions,
       });
-      await this.prompt(input.workspaceRoot, { laneId: lane.id, prompt: stage.instructions });
     }
     return this.publish(input.workspaceRoot);
   }
@@ -838,6 +843,9 @@ export class CodingRoomService extends EventEmitter {
     if (this.requiresWriterLease(roomWorkspaceRoot, this.executionRoot(lane, roomWorkspaceRoot))) {
       this.repository.releaseWriterLease(roomId, lane.id);
     }
+    if (laneStatus === CodingLaneStatus.Completed) {
+      void this.startNextCollaborationStage(roomWorkspaceRoot, lane.id);
+    }
   }
 
   private updateLaneAssignmentStatus(
@@ -874,6 +882,56 @@ export class CodingRoomService extends EventEmitter {
       null,
       2,
     )}`;
+  }
+
+  private async startNextCollaborationStage(
+    workspaceRoot: string,
+    completedLaneId: string,
+  ): Promise<void> {
+    const snapshot = this.bootstrap(workspaceRoot);
+    const completedAssignment = snapshot.assignments.find(
+      assignment => assignment.laneId === completedLaneId,
+    );
+    if (!completedAssignment) return;
+    const completedIndex = snapshot.assignments.findIndex(
+      assignment => assignment.id === completedAssignment.id,
+    );
+    const nextAssignment = snapshot.assignments
+      .slice(completedIndex + 1)
+      .find(
+        assignment =>
+          assignment.status === CodingAssignmentStatus.Planned &&
+          /^(Review|Verify):/.test(assignment.title),
+      );
+    if (!nextAssignment) return;
+    const source = this.requireLane(snapshot.lanes, completedLaneId);
+    const target = this.requireLane(snapshot.lanes, nextAssignment.laneId);
+    if (source.missionId !== target.missionId) return;
+    const implementation = snapshot.assignments[0];
+    const implementationLane = implementation
+      ? snapshot.lanes.find(lane => lane.id === implementation.laneId)
+      : null;
+    const handoff = this.collaboration.buildHandoff({
+      snapshot,
+      sourceLane: source,
+      targetLane: target,
+      baseline: this.requireMissionBaseline(
+        snapshot.missions.find(mission => mission.id === source.missionId),
+      ),
+      diff: await this.getWorkspaceDiff(this.executionRoot(source, workspaceRoot)),
+    });
+    if (implementationLane && implementationLane.id !== source.id) {
+      handoff.implementationDiff = await this.getWorkspaceDiff(
+        this.executionRoot(implementationLane, workspaceRoot),
+      );
+    }
+    const handoffId = this.repository.createHandoff(source.missionId, source.id, target.id, handoff);
+    this.repository.appendEvent(target.id, CodingEventKind.Message, {
+      role: 'handoff',
+      handoffId,
+      content: handoff,
+    });
+    await this.prompt(workspaceRoot, { laneId: target.id, prompt: this.handoffPrompt(handoff) });
   }
 
   private buildRecoveryContext(laneId: string): string {

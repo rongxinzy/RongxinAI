@@ -68,6 +68,13 @@ export const CodingEventKind = {
 } as const;
 export type CodingEventKind = (typeof CodingEventKind)[keyof typeof CodingEventKind];
 
+export const CodingStreamUpdateMode = {
+  Append: 'append',
+  Replace: 'replace',
+} as const;
+export type CodingStreamUpdateMode =
+  (typeof CodingStreamUpdateMode)[keyof typeof CodingStreamUpdateMode];
+
 export const CodingPermissionOutcome = {
   Selected: 'selected',
   Cancelled: 'cancelled',
