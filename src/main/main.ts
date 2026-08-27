@@ -972,8 +972,11 @@ const getCodingRoomService = (): CodingRoomService => {
     runtime.on('message', (sessionId: string, message: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Message, { message });
     });
-    runtime.on('messageUpdate', (sessionId: string, _messageId: string, content: string) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.MessageDelta, { content });
+    runtime.on('messageUpdate', (sessionId: string, messageId: string, content: string) => {
+      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.MessageDelta, {
+        content,
+        messageId,
+      });
     });
     runtime.on('toolActivity', (sessionId: string, event: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.ToolCall, { event });

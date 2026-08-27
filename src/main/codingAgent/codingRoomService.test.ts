@@ -297,8 +297,9 @@ test('creates collaborator lanes in isolated workspaces and runs them independen
 test('previews and persists an immutable handoff with the source Git baseline', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
+  const startBuiltinSession = vi.fn(async () => undefined);
   const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
-    startBuiltinSession: async () => undefined,
+    startBuiltinSession,
     cancelBuiltinSession: async () => undefined,
     getBuiltinWorkbenchLink: () => null,
     beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
@@ -327,7 +328,7 @@ test('previews and persists an immutable handoff with the source Git baseline', 
     diff: 'diff --git a/file b/file',
     sourceLaneId: source.id,
   });
-  expect(result.events.at(-1)).toMatchObject({
+  expect(result.events.find(event => event.payload.role === 'handoff')).toMatchObject({
     laneId: target.id,
     kind: CodingEventKind.Message,
     payload: {
@@ -338,6 +339,13 @@ test('previews and persists an immutable handoff with the source Git baseline', 
       }),
     },
   });
+  expect(startBuiltinSession).toHaveBeenCalledWith(
+    expect.objectContaining({
+      sessionId: target.localSessionId,
+      workspaceRoot: target.executionRoot,
+      prompt: expect.stringContaining('base-commit'),
+    }),
+  );
 });
 
 test('requires an isolated lane and an idle primary writer before applying collaborator changes', async () => {

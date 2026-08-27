@@ -61,6 +61,26 @@ test('previews and applies a collaborator worktree diff only when it cleanly app
   await service.remove(root, worktree);
 });
 
+test('previews and applies an untracked collaborator file without staging it', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'coding-worktree-'));
+  roots.push(root);
+  await git(root, ['init']);
+  await git(root, ['config', 'user.email', 'test@example.com']);
+  await git(root, ['config', 'user.name', 'Test']);
+  await writeFile(path.join(root, 'state.txt'), 'baseline');
+  await git(root, ['add', '.']);
+  await git(root, ['commit', '-m', 'baseline']);
+  const service = new GitWorktreeService(path.join(root, '.coding-worktrees'));
+  const worktree = await service.create({ repositoryRoot: root, baseline: 'HEAD', laneId: 'lane-new' });
+  await writeFile(path.join(worktree, 'new-module.ts'), 'export const created = true;\n');
+
+  await expect(service.getWorktreeDiff(worktree)).resolves.toContain('new-module.ts');
+  await service.applyWorktreeDiff({ repositoryRoot: root, worktreeRoot: worktree });
+
+  await expect(readFile(path.join(root, 'new-module.ts'), 'utf8')).resolves.toContain('created');
+  await service.remove(root, worktree);
+});
+
 test('reports a conflict and preserves the primary workspace when a patch no longer applies', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'coding-worktree-'));
   roots.push(root);

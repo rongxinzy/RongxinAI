@@ -32,6 +32,29 @@ const readGit = async (cwd: string, args: string[]): Promise<string> => {
   });
 };
 
+const readGitPatch = async (cwd: string, args: string[]): Promise<string> => {
+  return await new Promise<string>((resolve, reject) => {
+    const child = spawn('git', args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', chunk => (output += chunk));
+    child.stderr.on('data', chunk => (stderr += chunk));
+    child.once('error', reject);
+    child.once('exit', code =>
+      code === 0 || code === 1
+        ? resolve(output)
+        : reject(new Error(stderr.trim() || `git ${args[0]} failed with exit code ${code}.`)),
+    );
+  });
+};
+
+const listUntrackedFiles = async (cwd: string): Promise<string[]> => {
+  const output = await readGit(cwd, ['ls-files', '--others', '--exclude-standard', '-z']);
+  return output.split('\0').filter(Boolean);
+};
+
 const applyGitPatch = async (cwd: string, patch: string, checkOnly: boolean): Promise<void> => {
   await new Promise<void>((resolve, reject) => {
     const args = ['apply', '--whitespace=nowarn'];
@@ -85,7 +108,13 @@ export class GitWorktreeService {
   }
 
   async getWorktreeDiff(worktreeRoot: string): Promise<string> {
-    return await readGit(worktreeRoot, ['diff', '--binary', 'HEAD']);
+    const trackedPatch = await readGit(worktreeRoot, ['diff', '--binary', 'HEAD']);
+    const untrackedPatch = await Promise.all(
+      (await listUntrackedFiles(worktreeRoot)).map(file =>
+        readGitPatch(worktreeRoot, ['diff', '--no-index', '--binary', '--', '/dev/null', file]),
+      ),
+    );
+    return `${trackedPatch}${untrackedPatch.join('')}`;
   }
 
   async getWorktreeDiffPreview(worktreeRoot: string): Promise<string> {

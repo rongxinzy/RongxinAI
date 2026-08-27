@@ -55,3 +55,25 @@ test('writer lease is mutually exclusive and handoffs are immutable records', ()
     expect.any(String),
   );
 });
+
+test('coalesces streamed chunks with the same message ID into one durable event', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Stream');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'message-1',
+    content: 'First ',
+  });
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.MessageDelta, {
+    messageId: 'message-1',
+    content: 'second',
+  });
+
+  expect(repository.listEvents([lane.id])).toEqual([
+    expect.objectContaining({ payload: { messageId: 'message-1', content: 'First second' } }),
+  ]);
+});

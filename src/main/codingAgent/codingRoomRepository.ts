@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 
 import {
   CodingAssignmentStatus,
+  CodingEventKind,
   CodingLaneStatus,
   CodingMissionStatus,
   type CodingAgentLane,
@@ -274,6 +275,36 @@ export class CodingRoomRepository {
     this.db
       .prepare('INSERT INTO coding_events VALUES (?, ?, ?, ?, ?, ?)')
       .run(event.id, laneId, sequence, kind, JSON.stringify(payload), event.createdAt);
+    return event;
+  }
+  appendOrMergeStreamEvent(
+    laneId: string,
+    kind: CodingEvent['kind'],
+    payload: Record<string, unknown>,
+  ): CodingEvent {
+    const messageId = typeof payload.messageId === 'string' ? payload.messageId : null;
+    if (kind !== CodingEventKind.MessageDelta || !messageId) {
+      return this.appendEvent(laneId, kind, payload);
+    }
+    const previous = this.db
+      .prepare(
+        "SELECT * FROM coding_events WHERE lane_id = ? AND kind = ? AND json_extract(payload_json, '$.messageId') = ? ORDER BY sequence DESC LIMIT 1",
+      )
+      .get(laneId, kind, messageId) as Record<string, unknown> | undefined;
+    if (!previous) return this.appendEvent(laneId, kind, payload);
+    const previousPayload = JSON.parse(String(previous.payload_json)) as Record<string, unknown>;
+    const content = `${typeof previousPayload.content === 'string' ? previousPayload.content : ''}${typeof payload.content === 'string' ? payload.content : ''}`;
+    const event = {
+      id: String(previous.id),
+      laneId,
+      sequence: Number(previous.sequence),
+      kind,
+      payload: { ...previousPayload, ...payload, content },
+      createdAt: Number(previous.created_at),
+    } satisfies CodingEvent;
+    this.db
+      .prepare('UPDATE coding_events SET payload_json = ? WHERE id = ?')
+      .run(JSON.stringify(event.payload), event.id);
     return event;
   }
   updateLaneStatus(laneId: string, status: CodingLaneStatus): void {

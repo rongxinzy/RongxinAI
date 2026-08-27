@@ -15,7 +15,7 @@ export interface AcpConnectionLaunchOptions {
 type PendingRequest = {
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
-  timeout: ReturnType<typeof setTimeout>;
+  timeout: ReturnType<typeof setTimeout> | null;
 };
 
 type RequestHandler = (
@@ -101,14 +101,22 @@ export class AcpConnectionSupervisor {
     });
   }
 
-  async request<T>(method: string, params: Record<string, unknown>): Promise<T> {
+  async request<T>(
+    method: string,
+    params: Record<string, unknown>,
+    options: { timeoutMs?: number | null } = {},
+  ): Promise<T> {
     if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
     const id = ++this.requestId;
     const response = new Promise<T>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error(`ACP request timed out: ${method}.`));
-      }, ACP_REQUEST_TIMEOUT_MS);
+      const timeoutMs = options.timeoutMs === undefined ? ACP_REQUEST_TIMEOUT_MS : options.timeoutMs;
+      const timeout =
+        timeoutMs === null
+          ? null
+          : setTimeout(() => {
+              this.pending.delete(id);
+              reject(new Error(`ACP request timed out: ${method}.`));
+            }, timeoutMs);
       this.pending.set(id, { resolve: value => resolve(value as T), reject, timeout });
     });
     this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
@@ -172,7 +180,7 @@ export class AcpConnectionSupervisor {
       const pending = this.pending.get(message.id);
       if (!pending) return;
       this.pending.delete(message.id);
-      clearTimeout(pending.timeout);
+      if (pending.timeout) clearTimeout(pending.timeout);
       if (message.error)
         pending.reject(new Error(String(message.error.message ?? 'ACP request failed.')));
       else pending.resolve(message.result);
@@ -206,7 +214,7 @@ export class AcpConnectionSupervisor {
   private failAll(error: Error): void {
     for (const [id, pending] of this.pending) {
       this.pending.delete(id);
-      clearTimeout(pending.timeout);
+      if (pending.timeout) clearTimeout(pending.timeout);
       pending.reject(error);
     }
   }

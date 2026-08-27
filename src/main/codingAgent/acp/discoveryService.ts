@@ -10,9 +10,9 @@ import {
 } from '../../../shared/codingAgent';
 
 const CANDIDATES = [
-  { executable: 'claude', name: 'Claude Code' },
-  { executable: 'codex', name: 'Codex' },
-  { executable: 'opencode', name: 'OpenCode' },
+  { executable: 'claude', name: 'Claude Code', args: ['--acp'] },
+  { executable: 'codex', name: 'Codex', args: ['app-server'] },
+  { executable: 'opencode', name: 'OpenCode', args: ['acp'] },
 ] as const;
 
 const NO_ACP_CAPABILITIES = {
@@ -71,13 +71,13 @@ export class AcpDiscoveryService {
         if (!resolved) return null;
         return {
           name: candidate.name,
-          description: 'ACP Adapter required',
+          description: 'Detected locally. Probe before using.',
           driverKind: CodingAgentDriverKind.Acp,
-          status: CodingAgentProfileStatus.NeedsAdapter,
+          status: CodingAgentProfileStatus.Detected,
           capabilities: NO_ACP_CAPABILITIES,
           authMethods: [] as CodingAgentAuthMethod[],
           command: resolved,
-          args: [] as string[],
+          args: candidate.args,
         } satisfies Omit<CodingAgentProfile, 'id' | 'isBuiltin'>;
       }),
     );

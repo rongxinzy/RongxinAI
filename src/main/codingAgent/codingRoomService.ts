@@ -80,6 +80,7 @@ export class CodingRoomService extends EventEmitter {
   private readonly driverFactory: CodingDriverFactory;
   private readonly collaboration = new CollaborationService();
   private readonly authTerminals = new AuthTerminalService();
+  private readonly cancelledLanes = new Set<string>();
 
   constructor(
     private readonly repository: CodingRoomRepository,
@@ -306,6 +307,7 @@ export class CodingRoomService extends EventEmitter {
       lane,
       this.executionRoot(lane, workspaceRoot),
     );
+    this.cancelledLanes.add(lane.id);
     await driver.cancel(session.id);
     if (
       this.requiresWriterLease(snapshot.room.workspaceRoot, this.executionRoot(lane, workspaceRoot))
@@ -365,7 +367,12 @@ export class CodingRoomService extends EventEmitter {
       content,
     });
     this.repository.setActive(snapshot.room.id, target.missionId, target.id);
-    return this.publish(workspaceRoot);
+    // A handoff is an executable delivery, not only an activity-log record.  ACP
+    // receives it through the same text content block used for ordinary prompts.
+    return await this.prompt(workspaceRoot, {
+      laneId: target.id,
+      prompt: this.handoffPrompt(content),
+    });
   }
 
   async addLane(
@@ -448,6 +455,7 @@ export class CodingRoomService extends EventEmitter {
         role: 'system',
         content: stage.instructions,
       });
+      await this.prompt(input.workspaceRoot, { laneId: lane.id, prompt: stage.instructions });
     }
     return this.publish(input.workspaceRoot);
   }
@@ -659,7 +667,7 @@ export class CodingRoomService extends EventEmitter {
       const snapshot = this.bootstrap(workspaceRoot);
       const lane = snapshot.lanes.find(candidate => candidate.localSessionId === sessionId);
       if (!lane) continue;
-      this.repository.appendEvent(lane.id, kind, payload);
+      this.repository.appendOrMergeStreamEvent(lane.id, kind, payload);
       if (kind === CodingEventKind.Permission) {
         this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
         this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
@@ -757,7 +765,7 @@ export class CodingRoomService extends EventEmitter {
         workspaceRoot: executionRoot,
         prompt,
       })) {
-        this.repository.appendEvent(lane.id, event.kind, event.payload);
+        this.repository.appendOrMergeStreamEvent(lane.id, event.kind, event.payload);
         this.repository.updateLaneConfigOptions(lane.id, driver.getSessionConfigOptions(sessionId));
         if (event.kind === CodingEventKind.Permission) {
           this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
@@ -772,6 +780,7 @@ export class CodingRoomService extends EventEmitter {
         }
         this.publish(roomWorkspaceRoot);
       }
+      if (this.cancelledLanes.delete(lane.id)) return;
       if (driverKind === CodingAgentDriverKind.Builtin) {
         const workbench = this.runtime.getBuiltinWorkbenchLink(lane.localSessionId);
         const assignment = this.repository.getLatestAssignmentForLane(lane.id);
@@ -795,6 +804,7 @@ export class CodingRoomService extends EventEmitter {
       }
       this.publish(roomWorkspaceRoot);
     } catch (error) {
+      if (this.cancelledLanes.delete(lane.id)) return;
       this.repository.appendEvent(lane.id, CodingEventKind.TurnFailed, {
         error: this.errorMessage(error),
       });
@@ -856,6 +866,14 @@ export class CodingRoomService extends EventEmitter {
       .map(event => event.payload.content)
       .filter((content): content is string => typeof content === 'string')
       .join('\n');
+  }
+
+  private handoffPrompt(content: Record<string, unknown>): string {
+    return `You are receiving a coding handoff. Continue from this handoff package:\n${JSON.stringify(
+      content,
+      null,
+      2,
+    )}`;
   }
 
   private buildRecoveryContext(laneId: string): string {

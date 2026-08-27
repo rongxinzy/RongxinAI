@@ -87,3 +87,20 @@ test('limits background recovery to a finite number of restart attempts', async 
   expect(supervisor.isRunning()).toBe(false);
   await supervisor.dispose();
 });
+
+test('allows a long-running prompt request to opt out of the short RPC timeout', async () => {
+  const supervisor = new AcpConnectionSupervisor();
+  const script =
+    "process.stdin.on('data', chunk => { const request = JSON.parse(String(chunk)); setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { complete: true } }) + '\\n'), 40); });";
+  await supervisor.start({
+    executable: execPath,
+    args: ['-e', script],
+    cwd: process.cwd(),
+    environment: process.env as Record<string, string>,
+  });
+
+  await expect(
+    supervisor.request<{ complete: boolean }>('session/prompt', {}, { timeoutMs: null }),
+  ).resolves.toEqual({ complete: true });
+  await supervisor.dispose();
+});

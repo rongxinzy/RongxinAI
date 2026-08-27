@@ -38,7 +38,10 @@ type AcpInitializeResult = {
 type AcpSessionResult = { sessionId?: string; configOptions?: unknown };
 type EventStream = {
   events: DriverEvent[];
-  waiters: Array<(result: IteratorResult<DriverEvent>) => void>;
+  waiters: Array<{
+    resolve: (result: IteratorResult<DriverEvent>) => void;
+    reject: (error: Error) => void;
+  }>;
   done: boolean;
   error: Error | null;
 };
@@ -75,13 +78,15 @@ const normalizeCapabilities = (result: AcpInitializeResult): CodingAgentCapabili
     ...DEFAULT_CAPABILITIES,
     supportsLoadSession: capabilities.loadSession === true,
     supportsResumeSession: Boolean(sessionCapabilities.resume),
-    supportsPlans: Boolean(capabilities.plan),
-    supportsPermissions: Boolean(capabilities.permissions),
-    supportsFilesystem: Boolean(capabilities.fs),
-    supportsTerminal: Boolean(capabilities.terminal),
-    supportsConfigOptions: Boolean(capabilities.configOptions),
-    supportsUsage: Boolean(capabilities.usage),
-    supportsElicitation: Boolean(capabilities.elicitation),
+    // ACP advertises these as client capabilities or session updates, not agent capabilities.
+    // The driver implements them locally and accepts updates opportunistically.
+    supportsPlans: true,
+    supportsPermissions: true,
+    supportsFilesystem: true,
+    supportsTerminal: true,
+    supportsConfigOptions: false,
+    supportsUsage: true,
+    supportsElicitation: false,
   };
 };
 
@@ -240,7 +245,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
       .request(AcpMethod.SessionPrompt, {
         sessionId: input.sessionId,
         prompt: [{ type: 'text', text: input.prompt }],
-      })
+      }, { timeoutMs: null })
       .then(() => this.finishStream(input.sessionId))
       .catch(error => this.finishStream(input.sessionId, error));
     try {
@@ -256,6 +261,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   async cancel(sessionId: string): Promise<void> {
     this.supervisor.notify(AcpMethod.SessionCancel, { sessionId });
+    this.finishStream(sessionId, new Error('ACP session prompt was cancelled.'));
     for (const [requestId, pending] of this.permissions) {
       pending.resolve({ outcome: { outcome: CodingPermissionOutcome.Cancelled } });
       this.permissions.delete(requestId);
@@ -518,7 +524,11 @@ export class AcpCodingDriver implements CodingAgentDriver {
         : [
             {
               kind: CodingEventKind.MessageDelta,
-              payload: { content: text, messageId: update.messageId },
+              payload: {
+                content: text,
+                messageId:
+                  typeof update.messageId === 'string' ? update.messageId : 'agent-message-stream',
+              },
             },
           ];
     }
@@ -553,7 +563,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     const stream = this.streams.get(sessionId);
     if (!stream || stream.done) return;
     const waiter = stream.waiters.shift();
-    if (waiter) waiter({ done: false, value: event });
+    if (waiter) waiter.resolve({ done: false, value: event });
     else stream.events.push(event);
   }
 
@@ -562,7 +572,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (!stream || stream.done) return;
     stream.done = true;
     stream.error = error instanceof Error ? error : error ? new Error(String(error)) : null;
-    for (const waiter of stream.waiters.splice(0)) waiter({ done: true, value: undefined });
+    for (const waiter of stream.waiters.splice(0)) {
+      if (stream.error) waiter.reject(stream.error);
+      else waiter.resolve({ done: true, value: undefined });
+    }
   }
 
   private async nextEvent(stream: EventStream): Promise<IteratorResult<DriverEvent>> {
@@ -571,6 +584,8 @@ export class AcpCodingDriver implements CodingAgentDriver {
       if (stream.error) throw stream.error;
       return { done: true, value: undefined };
     }
-    return await new Promise<IteratorResult<DriverEvent>>(resolve => stream.waiters.push(resolve));
+    return await new Promise<IteratorResult<DriverEvent>>((resolve, reject) =>
+      stream.waiters.push({ resolve, reject }),
+    );
   }
 }

@@ -57,7 +57,12 @@ test('records a resolved absolute executable when PATH contains a relative direc
 
     const profiles = await new AcpDiscoveryService().discover();
     expect(profiles).toContainEqual(
-      expect.objectContaining({ name: 'Codex', command: await realpath(executable) }),
+      expect.objectContaining({
+        name: 'Codex',
+        command: await realpath(executable),
+        args: ['app-server'],
+        status: 'detected',
+      }),
     );
   } finally {
     process.env.PATH = originalPath;
