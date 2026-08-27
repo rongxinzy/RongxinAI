@@ -21,7 +21,6 @@ import {
   getMarketplacePublisher,
   getMarketplaceRecommendedQuantization,
   groupMarketplaceVariants,
-  sortMarketplaceModelsForRecommendation,
 } from './marketplace';
 
 test('finds marketplace download progress by repository id', () => {
@@ -95,7 +94,7 @@ test('omits a generic GGUF recommendation while preserving a concrete quantizati
   expect(getMarketplaceRecommendedQuantization('Q4_K_M')).toBe('Q4_K_M');
 });
 
-test('recommendations prioritize runnable models and then score', () => {
+test('recommendations filter runnable models without changing catalogue order', () => {
   const models = [
     { id: 'limited-high', repoId: 'Qwen/Limited-High', fit: { status: 'limited' }, score: { value: 99 } },
     { id: 'good-low', repoId: 'Qwen/Good-Low', fit: { status: 'good' }, score: { value: 60 } },
@@ -103,12 +102,6 @@ test('recommendations prioritize runnable models and then score', () => {
     { id: 'excellent-low', repoId: 'Qwen/Excellent-Low', fit: { status: 'excellent' }, score: { value: 72 } },
   ] as unknown as MarketplaceModel[];
 
-  expect(sortMarketplaceModelsForRecommendation(models).map(model => model.id)).toEqual([
-    'excellent-high',
-    'excellent-low',
-    'good-low',
-    'limited-high',
-  ]);
   expect(filterMarketplaceModelsForRecommendation(models).map(model => model.id)).toEqual([
     'limited-high',
     'good-low',
@@ -183,7 +176,6 @@ test('empty query browses all models by default', () => {
   expect(params).toEqual({
     limit: MARKETPLACE_INITIAL_MODEL_COUNT,
     pageNumber: undefined,
-    sortby: 'asc',
     featuredOnly: false,
     task: undefined,
     size: undefined,

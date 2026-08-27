@@ -247,7 +247,7 @@ test('MarketplaceService forwards device profiles and isolates their caches', as
 
 test('MarketplaceService uses the search API for default recommendations', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&sortby=asc');
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&fit=recommended');
     return Response.json({ models: [verifiedModel()], totalCount: 1 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -263,7 +263,7 @@ test('MarketplaceService uses the search API for default recommendations', async
 
 test('MarketplaceService uses the search API for recommendation task tabs', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?task=vision&limit=120&sortby=asc');
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?task=vision&limit=20&fit=recommended');
     return Response.json({
       models: [
         verifiedModel('Qwen/Chat-GGUF'),
@@ -293,7 +293,7 @@ test('MarketplaceService uses the search API for recommendation task tabs', asyn
 
 test('MarketplaceService uses the search API for the recommended all-model view', async () => {
   const fetchMock = vi.fn(async (url: string) => {
-    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&sortby=asc');
+    expect(url).toBe('https://catalog.example.test/v1/catalog/search?limit=8&fit=recommended');
     return Response.json({ models: [verifiedModel()], totalCount: 1 });
   });
   vi.stubGlobal('fetch', fetchMock);
@@ -314,7 +314,7 @@ test('MarketplaceService uses the search API for the recommended all-model view'
   expect(result.models).toHaveLength(1);
 });
 
-test('MarketplaceService keeps live device fit local instead of adding it to the cloud query', async () => {
+test('MarketplaceService forwards the supported fit filter to the cloud query', async () => {
   const fetchMock = vi.fn(async () => Response.json({ models: [verifiedModel()] }));
   vi.stubGlobal('fetch', fetchMock);
   const service = new MarketplaceService(() => createTempDir(), {
@@ -324,7 +324,7 @@ test('MarketplaceService keeps live device fit local instead of adding it to the
   await service.search({ query: 'qwen', fit: 'recommended' });
 
   const requestedUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
-  expect(requestedUrl.searchParams.has('fit')).toBe(false);
+  expect(requestedUrl.searchParams.get('fit')).toBe('recommended');
 });
 
 test('MarketplaceService rejects cloud records without checksum-backed GGUF metadata', async () => {
@@ -360,6 +360,26 @@ test('MarketplaceService keeps the raw cloud page when fit is unrestricted', asy
 
   expect(result.models).toHaveLength(1);
   expect(result.models[0]?.repoId).toBe('owner/unverified-GGUF');
+});
+
+test('MarketplaceService preserves the catalogue order after local annotation', async () => {
+  const fetchMock = vi.fn(async () =>
+    Response.json({
+      models: [
+        { ...verifiedModel('Qwen/8B-GGUF'), parameterCount: 8, publishedAt: '2025-01-01T00:00:00.000Z' },
+        { ...verifiedModel('Qwen/0.5B-GGUF'), parameterCount: 0.5, publishedAt: '2026-01-01T00:00:00.000Z' },
+      ],
+      totalCount: 2,
+    }),
+  );
+  vi.stubGlobal('fetch', fetchMock);
+  const service = new MarketplaceService(() => createTempDir(), {
+    catalogApiUrl: 'https://catalog.example.test',
+  });
+
+  const result = await service.search({ query: 'qwen', fit: 'all' });
+
+  expect(result.models.map(model => model.repoId)).toEqual(['Qwen/8B-GGUF', 'Qwen/0.5B-GGUF']);
 });
 
 test('MarketplaceService filters embedding records even if a malformed cloud response marks them verified', async () => {

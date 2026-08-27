@@ -10,11 +10,14 @@ test('uses the search endpoint without sending the legacy featured query', async
   const fetchMock = vi.fn(async (input: string | Request) => {
     requestedUrl = String(input);
     return Response.json({
+      source: 'd1',
       models: [
         {
           id: 'Qwen/Qwen3-8B-GGUF',
           repoId: 'Qwen/Qwen3-8B-GGUF',
           name: 'Qwen3 8B GGUF',
+          parameterCount: 8,
+          publishedAt: '2025-01-02T03:04:05.000Z',
           files: [
             {
               path: 'Qwen3-8B-Q4_K_M.gguf',
@@ -32,7 +35,7 @@ test('uses the search endpoint without sending the legacy featured query', async
   });
 
   const client = new ModelCatalogClient('https://catalog.example.test', fetchMock);
-  await client.search({
+  const result = await client.search({
     device: MarketplaceDeviceProfile.Pro,
     featuredOnly: true,
     limit: 8,
@@ -46,7 +49,27 @@ test('uses the search endpoint without sending the legacy featured query', async
   expect(url.searchParams.has('page')).toBe(false);
   expect(url.searchParams.get('cursor')).toBe('opaque cursor');
   expect(url.searchParams.get('device')).toBe(MarketplaceDeviceProfile.Pro);
+  expect(url.searchParams.get('fit')).toBeNull();
+  expect(url.searchParams.has('sortby')).toBe(false);
   expect(url.searchParams.has('featured')).toBe(false);
+  expect(result.source).toBe('d1');
+  expect(result.models[0]).toMatchObject({
+    parameterCount: 8,
+    publishedAt: '2025-01-02T03:04:05.000Z',
+  });
+});
+
+test('maps the local compatible fit filter to the catalogue runnable filter', async () => {
+  let requestedUrl = '';
+  const fetchMock = vi.fn(async (input: string | Request) => {
+    requestedUrl = String(input);
+    return Response.json({ models: [] });
+  });
+
+  const client = new ModelCatalogClient('https://catalog.example.test', fetchMock);
+  await client.search({ fit: 'compatible', limit: 8 });
+
+  expect(new URL(requestedUrl).searchParams.get('fit')).toBe('runnable');
 });
 
 test('resolveModel matches repo ids case-insensitively and aliases by model id', async () => {

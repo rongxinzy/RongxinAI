@@ -1,4 +1,4 @@
-import { type ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { type ChildProcess, spawn } from 'child_process';
 import { app, net } from 'electron';
 import { EventEmitter } from 'events';
 import fs from 'fs';
@@ -59,6 +59,10 @@ import {
   resolveManagedModelInstallDir,
 } from './llamacppModelInstallation';
 import { getDefaultLlamaCppModelsDir } from './llamacppModelLibraryPath';
+import {
+  createLlamaCppServerSpawnOptions,
+  shouldKeepLlamaCppServiceRunning,
+} from './llamacppProcessLifecycle';
 import { retryLlamaCppReadRequest } from './llamacppRequestRetry';
 import {
   createLlamaCppRuntimeInstallPlan,
@@ -138,7 +142,7 @@ export type LlamaCppModelsUnloadedForQuitEvent = {
 
 export class LlamaCppManager extends EventEmitter {
   private executablePath: string | null = null;
-  private process: ChildProcessWithoutNullStreams | null = null;
+  private process: ChildProcess | null = null;
   private runtimeContextLengthByModel = new Map<string, number>();
   private thinkingToggleSupportByModel = new Map<string, boolean>();
   private startupStderr = '';
@@ -311,26 +315,28 @@ export class LlamaCppManager extends EventEmitter {
       runtimeCapabilities,
     );
     this.setStatus({ status: 'starting', executablePath: this.executablePath, managedByApp: true });
-    this.process = spawn(
+    const keepRunningOnAppQuit = shouldKeepLlamaCppServiceRunning(filteredRuntimeConfig);
+    const serviceProcess = spawn(
       this.executablePath,
       buildLlamaServerArgs(filteredRuntimeConfig, this.getModelsDir(), this.getPresetPath()),
-      {
-        detached: false,
-        stdio: ['ignore', 'pipe', 'pipe'],
+      createLlamaCppServerSpawnOptions({
+        config: filteredRuntimeConfig,
         env: buildLlamaCppServeEnv(process.env, this.executablePath, process.platform),
-      },
+      }),
     );
+    this.process = serviceProcess;
+    if (keepRunningOnAppQuit) serviceProcess.unref();
 
     this.startupStderr = '';
-    this.process.stdout.on('data', chunk => {
+    serviceProcess.stdout?.on('data', chunk => {
       this.handleProcessOutput(LlamaCppProcessOutputStream.Stdout, chunk);
     });
-    this.process.stderr.on('data', chunk => {
+    serviceProcess.stderr?.on('data', chunk => {
       const text = this.handleProcessOutput(LlamaCppProcessOutputStream.Stderr, chunk);
       if (!text) return;
       this.startupStderr += (this.startupStderr ? '\n' : '') + text;
     });
-    this.process.on('exit', (code, signal) => {
+    serviceProcess.on('exit', (code, signal) => {
       console.log(
         `[LlamaCpp] process exited with code ${code ?? 'null'} and signal ${signal ?? 'null'}`,
       );
@@ -356,7 +362,7 @@ export class LlamaCppManager extends EventEmitter {
         });
       }
     });
-    this.process.on('error', error => {
+    serviceProcess.on('error', error => {
       console.warn('[LlamaCpp] process failed:', error);
       this.setStatus({
         status: 'error',
@@ -366,10 +372,9 @@ export class LlamaCppManager extends EventEmitter {
       });
     });
 
-    const startupProcess = this.process;
     await Promise.race([
       this.waitUntilHealthy(this.getConnectionAndLoadTimeoutMs()),
-      this.waitForStartupProcessExit(startupProcess),
+      this.waitForStartupProcessExit(serviceProcess),
     ]);
     return this.status;
   }
@@ -1293,6 +1298,11 @@ export class LlamaCppManager extends EventEmitter {
   }
 
   async shutdownForQuit(): Promise<LlamaCppStatusSnapshot> {
+    if (shouldKeepLlamaCppServiceRunning(this.getServiceConfig())) {
+      this.process?.unref();
+      console.log('[LlamaCpp] keeping the local inference service running after app quit.');
+      return this.status;
+    }
     await this.unloadAllRunningModels();
     return await this.stop();
   }
@@ -1442,7 +1452,7 @@ export class LlamaCppManager extends EventEmitter {
     }
   }
 
-  private async waitForStartupProcessExit(child: ChildProcessWithoutNullStreams): Promise<void> {
+  private async waitForStartupProcessExit(child: ChildProcess): Promise<void> {
     if (child.exitCode !== null || child.signalCode !== null) return;
     await new Promise<void>(resolve => {
       const settle = () => {

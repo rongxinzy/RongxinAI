@@ -2,6 +2,8 @@ import { Button } from '@shared/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
@@ -83,7 +85,6 @@ import {
   filterMarketplaceModelsForDevice,
   filterMarketplaceModelsForRecommendation,
   groupMarketplaceVariants,
-  sortMarketplaceModelsForRecommendation,
 } from './utils/marketplace';
 import {
   isInstallTerminalPhase,
@@ -103,6 +104,7 @@ interface LocalInferenceViewProps {
   isVisible?: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
+  onOpenModelSettings?: () => void;
   updateBadge?: React.ReactNode;
 }
 
@@ -128,7 +130,6 @@ function marketplacePageCacheKey(params: MarketplaceSearchParams): string {
     size: params.size ?? 'all',
     limit: params.limit ?? 0,
     device: params.device ?? '',
-    sortby: params.sortby ?? 'asc',
     featuredOnly: params.featuredOnly ?? false,
     fit: params.fit ?? 'all',
     quantization: params.quantization ?? '',
@@ -149,6 +150,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   isVisible = true,
   onToggleSidebar,
   onNewChat,
+  onOpenModelSettings,
   updateBadge,
 }) => {
   const prefersReducedMotion = useReducedMotion();
@@ -198,6 +200,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [cancellingModelLoad, setCancellingModelLoad] = useState(false);
   const cancelledModelLoadRef = useRef(false);
   const [unloadingModelName, setUnloadingModelName] = useState<string | null>(null);
+  const [startedModelName, setStartedModelName] = useState<string | null>(null);
   const [toast, setToast] = useState<LocalInferenceToast | null>(null);
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [isMarketplaceInstallPending, setIsMarketplaceInstallPending] = useState(false);
@@ -281,7 +284,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
             marketplaceSearchParams.fit,
             marketplaceSearchParams.minStars,
           );
-    return isRecommendationBrowse ? sortMarketplaceModelsForRecommendation(filtered) : filtered;
+    return filtered;
   }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
   const dismissToast = useCallback(() => {
@@ -698,8 +701,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const {
     accessSettingsOpen,
     draftAllowLanAccess,
+    draftKeepRunningOnAppQuit,
     draftPort,
     exampleModelName,
+    setDraftKeepRunningOnAppQuit,
     setDraftPort,
     refreshServiceConfig,
     openAccessSettings,
@@ -887,6 +892,8 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         setRunningModels(result.runningModels);
         launchLogs.markModelLaunchSucceeded();
         notifyLlamaCppRunningModelsChanged();
+        // Only direct user launches prompt for configuration; background restoration remains silent.
+        setStartedModelName(modelName);
         if (result.warning) {
           showToast(result.warning, LocalInferenceToastKind.Info);
         }
@@ -1261,6 +1268,51 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         </div>
       </Tabs>
 
+      <Dialog
+        open={startedModelName !== null}
+        onOpenChange={open => {
+          if (!open) setStartedModelName(null);
+        }}
+      >
+        <DialogContent
+          className="w-[min(28rem,calc(100%-2rem))] gap-4"
+          disableCloseAnimation
+          showCloseButton={false}
+        >
+          <DialogHeader className="gap-1">
+            <DialogTitle className="text-center">
+              {i18nService.t('localInferenceModelStartedTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {i18nService
+                .t('localInferenceModelStartedDescription')
+                .replace('{name}', startedModelName ?? '')}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t-0 pt-0">
+            <Button
+              type="button"
+              variant="outline"
+              className={localInferenceCompactButtonClass}
+              onClick={() => setStartedModelName(null)}
+            >
+              {i18nService.t('localInferenceConfigureLater')}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={localInferenceCompactButtonClass}
+              onClick={() => {
+                setStartedModelName(null);
+                onOpenModelSettings?.();
+              }}
+            >
+              {i18nService.t('localInferenceOpenModelSettings')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={runtimeSettingsOpen} onOpenChange={handleRuntimeSettingsOpenChange}>
         <DialogContent className="w-[min(48rem,calc(100%-2rem))] max-h-[85vh] gap-4 overflow-y-auto sm:max-w-2xl">
           <DialogHeader className="gap-1 pr-8">
@@ -1289,10 +1341,12 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         isOpen={accessSettingsOpen}
         saving={loading}
         allowLanAccess={draftAllowLanAccess}
+        keepRunningOnAppQuit={draftKeepRunningOnAppQuit}
         willRestartOnSave={isRunning}
         port={draftPort}
         exampleModelName={exampleModelName}
         onAllowLanAccessChange={setDraftAllowLanAccess}
+        onKeepRunningOnAppQuitChange={setDraftKeepRunningOnAppQuit}
         onPortChange={setDraftPort}
         onClose={closeAccessSettings}
         onSave={saveAccessSettings}

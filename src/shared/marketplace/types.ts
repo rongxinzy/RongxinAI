@@ -17,13 +17,6 @@ export const MarketplaceCapability = {
 export type MarketplaceCapability =
   (typeof MarketplaceCapability)[keyof typeof MarketplaceCapability];
 
-export const MarketplaceSortOrder = {
-  Asc: 'asc',
-  Desc: 'desc',
-} as const;
-
-export type MarketplaceSortOrder = (typeof MarketplaceSortOrder)[keyof typeof MarketplaceSortOrder];
-
 export type MarketplaceModel = {
   source: MarketplaceSource;
   id: string;
@@ -39,6 +32,7 @@ export type MarketplaceModel = {
   downloads?: number;
   detailUrl?: string;
   parameterCount?: number;
+  publishedAt?: string;
   installed: boolean;
   installedPath?: string;
   isFeatured?: boolean;
@@ -126,7 +120,6 @@ export type MarketplaceSearchParams = {
   pageNumber?: number;
   cursor?: string;
   device?: MarketplaceDeviceProfile;
-  sortby?: MarketplaceSortOrder;
   featuredOnly?: boolean;
   fit?: 'all' | 'recommended' | 'excellent' | 'compatible' | 'unsupported';
   quantization?: string;
@@ -145,7 +138,7 @@ export type MarketplaceSearchResult = {
   nextCursor?: string;
   hasMore?: boolean;
   warning?: string;
-  source?: 'cloud-catalog' | 'modelscope' | 'curated';
+  source?: 'd1' | 'cloud-catalog' | 'modelscope' | 'curated';
   catalogUpdatedAt?: string;
   scoreVersion?: string;
 };

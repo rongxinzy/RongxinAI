@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Skeleton } from '@shared/components/ui/skeleton';
 
-import { MarketplaceSortOrder, type MarketplaceModel, type MarketplaceSearchParams, type MarketplaceTaskFilter } from '../../../../shared/marketplace';
+import { type MarketplaceModel, type MarketplaceSearchParams, type MarketplaceTaskFilter } from '../../../../shared/marketplace';
 import {
   formatMarketplaceHardwareSummaryParts,
   type MarketplaceHardwareProfile,
@@ -139,7 +139,6 @@ export function MarketplacePanel({
         limit: MARKETPLACE_PAGE_SIZE,
         task: taskFilter,
         fit: fitFilter,
-        sortby: MarketplaceSortOrder.Asc,
         featuredOnly: false,
       };
     },
@@ -198,7 +197,6 @@ export function MarketplacePanel({
       query: '',
       task: 'all',
       fit: 'all',
-      sortby: MarketplaceSortOrder.Asc,
       limit: MARKETPLACE_PAGE_SIZE,
       pageNumber: 1,
       featuredOnly: false,
