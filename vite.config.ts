@@ -24,7 +24,15 @@ function packageRoot(specifier: string): string {
 }
 
 function isElectronDevelopmentExternal(id: string): boolean {
-  return electronDevelopmentExternalRoots.has(packageRoot(id));
+  if (electronDevelopmentExternalRoots.has(packageRoot(id))) {
+    return true;
+  }
+
+  if (id.startsWith('\0') || id.startsWith('.') || path.isAbsolute(id)) {
+    return false;
+  }
+
+  return !id.startsWith('@shared/') && !id.startsWith('@/');
 }
 
 const copyPhotonWasmPlugin = () => ({
@@ -79,6 +87,21 @@ export default defineConfig(async ({ command }) => {
         : [
             electron([
               {
+                // Build preload once before starting the main-process watcher.
+                // Concurrent Rolldown watchers writing the same output directory
+                // can stall the main bundle on Vite 8.
+                entry: 'src/main/preload.ts',
+                vite: {
+                  build: {
+                    watch: null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {
@@ -87,14 +110,14 @@ export default defineConfig(async ({ command }) => {
                     sourcemap: electronSourceMap,
                     outDir: 'dist-electron',
                     minify: false,
-                    rollupOptions: {
+                    rolldownOptions: {
                       external:
                         command === 'serve'
                           ? isElectronDevelopmentExternal
                           : id => ELECTRON_MAIN_EXTERNALS.includes(id),
                       output: {
                         // Keep CJS format (default), but load via ESM loader.mjs
-                        inlineDynamicImports: true,
+                        codeSplitting: false,
                       },
                     },
                   },
@@ -113,18 +136,6 @@ export default defineConfig(async ({ command }) => {
                     fs.copyFileSync(wasmSource, wasmDest);
                   }
                 },
-              },
-              {
-                // 预加载脚本入口文件
-                entry: 'src/main/preload.ts',
-                vite: {
-                  build: {
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
               },
             ]),
           ]),
@@ -145,7 +156,7 @@ export default defineConfig(async ({ command }) => {
       // diagnostics builds only.
       sourcemap: process.env.VITE_RENDERER_SOURCEMAP === '1',
       minify: 'esbuild',
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
           officePreview: path.resolve(__dirname, 'office-preview.html'),
@@ -167,11 +178,6 @@ export default defineConfig(async ({ command }) => {
     },
     optimizeDeps: {
       exclude: ['electron'],
-      esbuildOptions: {
-        define: {
-          __VERSION__: JSON.stringify(katexVersion),
-        },
-      },
     },
     clearScreen: false,
   };
