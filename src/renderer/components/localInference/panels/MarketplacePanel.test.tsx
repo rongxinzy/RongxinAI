@@ -244,7 +244,6 @@ describe('MarketplacePanel result grid', () => {
       expect.objectContaining({
         pageNumber: 2,
         limit: MARKETPLACE_PAGE_SIZE,
-        sortby: 'asc',
       }),
     );
   });

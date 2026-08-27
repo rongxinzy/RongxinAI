@@ -102,7 +102,9 @@ export class ModelCatalogClient {
     if (params.device) url.searchParams.set('device', params.device);
     if (params.limit) url.searchParams.set('limit', String(params.limit));
     if (params.cursor) url.searchParams.set('cursor', params.cursor);
-    if (params.sortby) url.searchParams.set('sortby', params.sortby);
+    if (params.fit === 'recommended' || params.fit === 'compatible') {
+      url.searchParams.set('fit', params.fit === 'compatible' ? 'runnable' : 'recommended');
+    }
     const payload = await this.fetchJson(url.toString(), signal) as CatalogSearchPayload;
     const normalizedModels = (payload.models ?? []).map(normalizeModel);
     return {

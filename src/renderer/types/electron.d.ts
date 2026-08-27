@@ -509,6 +509,7 @@ interface IElectronAPI {
     ) => Promise<{ success: boolean; cancelled?: boolean }>;
     cancelInstall: (modelId: string) => Promise<LlamaCppCancelInstallResult>;
     onStatusChanged: (callback: (snapshot: LlamaCppStatusSnapshot) => void) => () => void;
+    onModelBindingsChanged: (callback: () => void) => () => void;
     onInstallProgress: (callback: (progress: LlamaCppInstallProgress) => void) => () => void;
     onModelLaunchLog: (callback: (event: LlamaCppModelLaunchLogEvent) => void) => () => void;
     onModelLaunchLogCleared: (

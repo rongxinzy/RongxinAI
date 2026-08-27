@@ -30,6 +30,7 @@ import {
   collectAvailableModels,
   getManagedProviderAccessPolicy,
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+  notifyLlamaCppRunningModelsChanged,
 } from './services/availableModels';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
@@ -303,14 +304,21 @@ const App: React.FC = () => {
     const handleLlamaCppRunningModelsChanged = () => {
       void refreshAvailableModels().catch(() => undefined);
     };
-    const unsubscribeManagedProviders = window.electron.managedProviders?.onChanged(
-      handleLlamaCppRunningModelsChanged,
-    );
+    const handleLlamaCppModelBindingsChanged = () => {
+      // Reload first so existing settings listeners receive the authoritative model configuration.
+      void configService
+        .reload()
+        .then(() => notifyLlamaCppRunningModelsChanged())
+        .catch(() => undefined);
+    };
 
     window.addEventListener('config-updated', handleConfigUpdated);
     window.addEventListener(
       LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
       handleLlamaCppRunningModelsChanged,
+    );
+    const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
+      handleLlamaCppModelBindingsChanged,
     );
     return () => {
       window.removeEventListener('config-updated', handleConfigUpdated);
@@ -318,7 +326,7 @@ const App: React.FC = () => {
         LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
         handleLlamaCppRunningModelsChanged,
       );
-      unsubscribeManagedProviders?.();
+      unsubscribeModelBindings();
     };
   }, [dispatch, isInitialized]);
 
@@ -883,6 +891,7 @@ const App: React.FC = () => {
                         isVisible={mainView === 'localInference'}
                         onToggleSidebar={handleToggleSidebar}
                         onNewChat={handleNewChat}
+                        onOpenModelSettings={() => handleShowSettings({ initialTab: 'model' })}
                         updateBadge={null}
                       />
                     </React.Suspense>

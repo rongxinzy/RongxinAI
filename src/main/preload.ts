@@ -231,6 +231,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(LlamaCppIpcChannel.CancelInstall, modelId),
     onStatusChanged: (callback: (snapshot: unknown) => void) =>
       onPush(LlamaCppIpcChannel.StatusChanged, callback),
+    onModelBindingsChanged: (callback: () => void) =>
+      onPushVoid(LlamaCppIpcChannel.ModelBindingsChanged, callback),
     onInstallProgress: (callback: (progress: unknown) => void) =>
       onPush(LlamaCppIpcChannel.InstallProgress, callback),
     onModelLaunchLog: (callback: (event: unknown) => void) =>

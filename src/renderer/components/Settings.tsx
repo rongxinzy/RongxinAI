@@ -4622,9 +4622,11 @@ const Settings: React.FC<SettingsProps> = ({
                               <div className="text-foreground font-medium text-[11px] truncate">
                                 {model.name}
                               </div>
-                              <div className="text-[10px] text-muted-foreground truncate">
-                                {model.id}
-                              </div>
+                              {activeProvider !== ProviderName.LlamaCpp ? (
+                                <div className="text-[10px] text-muted-foreground truncate">
+                                  {model.id}
+                                </div>
+                              ) : null}
                             </div>
                           </div>
                           <div className="flex items-center shrink-0 space-x-1">

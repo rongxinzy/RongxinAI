@@ -29,11 +29,13 @@ export function buildAccessSettingsConfig(
   config: LlamaCppServiceConfig,
   allowLanAccess: boolean,
   port = config.port,
+  keepRunningOnAppQuit = config.keepRunningOnAppQuit ?? true,
 ): LlamaCppServiceConfig {
   return {
     ...config,
     port: port?.trim() || undefined,
     listenHost: allowLanAccess ? LLAMACPP_LAN_HOST : LLAMACPP_LOCALHOST_HOST,
+    keepRunningOnAppQuit,
   };
 }
 
@@ -50,7 +52,9 @@ type UseLocalInferenceAccessSettingsInput = {
 type UseLocalInferenceAccessSettingsResult = {
   accessSettingsOpen: boolean;
   draftAllowLanAccess: boolean;
+  draftKeepRunningOnAppQuit: boolean;
   draftPort: string;
+  setDraftKeepRunningOnAppQuit: (value: boolean) => void;
   setDraftPort: (value: string) => void;
   currentHost: string;
   currentPort: string;
@@ -77,6 +81,7 @@ export function useLocalInferenceAccessSettings(
   const [serviceConfig, setServiceConfig] = useState<LlamaCppServiceConfig>({});
   const [accessSettingsOpen, setAccessSettingsOpen] = useState(false);
   const [draftAllowLanAccess, setDraftAllowLanAccess] = useState(false);
+  const [draftKeepRunningOnAppQuit, setDraftKeepRunningOnAppQuit] = useState(true);
   const [draftPort, setDraftPort] = useState(LLAMACPP_DEFAULT_PORT);
 
   const currentHost =
@@ -102,11 +107,13 @@ export function useLocalInferenceAccessSettings(
         const nextHost =
           nextConfig.listenHost?.trim() || nextConfig.host?.trim() || LLAMACPP_LOCALHOST_HOST;
         setDraftAllowLanAccess(nextHost === LLAMACPP_LAN_HOST);
+        setDraftKeepRunningOnAppQuit(nextConfig.keepRunningOnAppQuit !== false);
         setDraftPort(nextConfig.port?.trim() || LLAMACPP_DEFAULT_PORT);
         setAccessSettingsOpen(true);
       })
       .catch(() => {
         setDraftAllowLanAccess(allowLanAccess);
+        setDraftKeepRunningOnAppQuit(true);
         setDraftPort(currentPort);
         setAccessSettingsOpen(true);
       });
@@ -120,7 +127,12 @@ export function useLocalInferenceAccessSettings(
     void runAction(async () => {
       const previousConfig = await window.electron.llamacpp.getServiceConfig();
       const nextConfig = await window.electron.llamacpp.setServiceConfig(
-        buildAccessSettingsConfig(previousConfig, draftAllowLanAccess, draftPort),
+        buildAccessSettingsConfig(
+          previousConfig,
+          draftAllowLanAccess,
+          draftPort,
+          draftKeepRunningOnAppQuit,
+        ),
       );
 
       try {
@@ -139,6 +151,7 @@ export function useLocalInferenceAccessSettings(
             LLAMACPP_LAN_HOST,
         );
         setDraftPort(nextConfig.port?.trim() || LLAMACPP_DEFAULT_PORT);
+        setDraftKeepRunningOnAppQuit(nextConfig.keepRunningOnAppQuit !== false);
         setAccessSettingsOpen(false);
         showToast(
           isRunning
@@ -152,12 +165,23 @@ export function useLocalInferenceAccessSettings(
         throw error;
       }
     });
-  }, [draftAllowLanAccess, draftPort, isRunning, refreshLocalModels, runAction, onRestartStatus, showToast]);
+  }, [
+    draftAllowLanAccess,
+    draftKeepRunningOnAppQuit,
+    draftPort,
+    isRunning,
+    refreshLocalModels,
+    runAction,
+    onRestartStatus,
+    showToast,
+  ]);
 
   return {
     accessSettingsOpen,
     draftAllowLanAccess,
+    draftKeepRunningOnAppQuit,
     draftPort,
+    setDraftKeepRunningOnAppQuit,
     setDraftPort,
     currentHost,
     currentPort,

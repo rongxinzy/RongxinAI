@@ -4,15 +4,11 @@ import { createHash } from 'crypto';
 
 import {
   MarketplaceCapability,
-  MarketplaceSortOrder,
   type MarketplaceModel,
   type MarketplaceSearchParams,
   type MarketplaceSearchResult,
 } from '../../shared/marketplace';
-import {
-  resolveMarketplaceParameterCount,
-  sortMarketplaceModels,
-} from './marketplaceModelOrder';
+import { resolveMarketplaceParameterCount } from './marketplaceModelOrder';
 import { ModelCatalogClient, type CatalogFetchLike, resolveModelCatalogUrl } from './modelCatalogClient';
 
 type MarketplaceServiceOptions = {
@@ -37,8 +33,8 @@ type InstalledModelRecord = {
   installedPath: string;
 };
 
-const DEFAULT_LIMIT = 120;
-const SEARCH_CACHE_VERSION = 'v3';
+const DEFAULT_LIMIT = 20;
+const SEARCH_CACHE_VERSION = 'v4';
 const CATALOG_ERROR_PREFIX = 'CATALOG_ERROR:';
 const NON_GENERATIVE_GGUF_PATTERN =
   /\b(?:embedding|embed|bge(?:[-_]|\b)|e5(?:[-_]|\b)|gte(?:[-_]|\b)|rerank(?:er)?|sentence[-_ ]transformers?|clip|siglip|colbert|vector(?:izer)?|text[-_ ]embedding)\b/i;
@@ -80,7 +76,7 @@ export class MarketplaceService {
     try {
       if (signal?.aborted) throw signal.reason;
       const client = new ModelCatalogClient(catalogUrl, this.options.fetchImpl);
-      const searchParams = { ...params, sortby: params.sortby ?? MarketplaceSortOrder.Asc };
+      const searchParams = { ...params };
       const cacheKey = searchCacheKey(searchParams);
       const cached = this.cache?.read<MarketplaceSearchResult>(cacheKey);
       if (cached && Date.now() - cached.cachedAt < SEARCH_CACHE_TTL_MS) {
@@ -127,13 +123,9 @@ export class MarketplaceService {
     const models = params.fit === 'all'
       ? catalog.models
       : filterMarketplaceModels(catalog.models, { ...params, fit: undefined });
-    return sortMarketplaceModels(
-      annotateInstalledModels(
-        models,
-        installed,
-      ),
-      params,
-    );
+    // The catalogue owns the global order and cursor boundary. Local metadata
+    // annotation must preserve that order for every page.
+    return annotateInstalledModels(models, installed);
   }
 
   private async fetchCatalog(
@@ -298,7 +290,7 @@ function matchesSizeFilter(
   if (!size || size === 'all') return true;
   const count = resolveMarketplaceParameterCount(model);
   if (count === null) return true;
-  const billions = count / 1_000_000_000;
+  const billions = count;
   if (size === 'small') return billions < 4;
   if (size === 'desktop') return billions >= 4 && billions <= 8;
   if (size === 'workstation') return billions > 8 && billions <= 32;
@@ -387,7 +379,6 @@ function searchCacheKey(params: MarketplaceSearchParams): string {
     params.pageNumber ?? '',
     params.cursor ?? '',
     params.device ?? '',
-    params.sortby ?? '',
     params.featuredOnly ? 'featured' : '',
     params.fit ?? '',
   ];

@@ -16,16 +16,21 @@ import {
   hasRecoveredVram,
   sanitizeLlamaCppServiceConfig,
   waitForLlamaCppModelUnloadConfirmation,
+  waitForLlamaCppStartupModelBindings,
   registerLlamaCppIpcHandlers,
 } from './llamacpp';
 
 const electronMocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
+  windows: [] as Array<{
+    isDestroyed: () => boolean;
+    webContents: { send: ReturnType<typeof vi.fn> };
+  }>,
 }));
 
 vi.mock('electron', () => ({
   app: { getPath: () => 'test-user-data' },
-  BrowserWindow: { getAllWindows: () => [] },
+  BrowserWindow: { getAllWindows: () => electronMocks.windows },
   dialog: { showOpenDialog: vi.fn() },
   ipcMain: {
     handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
@@ -107,6 +112,7 @@ test('getLlamaCppServiceConfig maps legacy listen-all host to listenHost while k
     listenHost: '0.0.0.0',
     port: '8080',
     modelsMax: '3',
+    keepRunningOnAppQuit: true,
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
@@ -311,6 +317,12 @@ test('sanitizeLlamaCppServiceConfig treats an empty modelsMax as the default loa
   });
 });
 
+test('sanitizeLlamaCppServiceConfig preserves the local inference persistence setting', () => {
+  expect(sanitizeLlamaCppServiceConfig({ keepRunningOnAppQuit: false })).toEqual({
+    keepRunningOnAppQuit: false,
+  });
+});
+
 test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not configure it', () => {
   const store = {
     get: () => ({ modelsMax: '1' }),
@@ -320,6 +332,7 @@ test('getLlamaCppServiceConfig keeps modelsAutoload unset when the user did not 
     host: '127.0.0.1',
     port: '8080',
     modelsMax: '1',
+    keepRunningOnAppQuit: true,
     timeout: '120',
     threadsHttp: '4',
     cacheReuse: '256',
@@ -384,6 +397,107 @@ test('does not refresh model capabilities for manager status events', async () =
 
   expect(listRunningModels).not.toHaveBeenCalled();
   expect(client).not.toHaveBeenCalled();
+});
+
+test('retries startup binding synchronization until an automatically loaded model is available', async () => {
+  const refresh = vi
+    .fn<() => Promise<boolean>>()
+    .mockResolvedValueOnce(false)
+    .mockResolvedValueOnce(false)
+    .mockResolvedValueOnce(true);
+  const wait = vi.fn(async () => undefined);
+
+  await waitForLlamaCppStartupModelBindings({
+    refresh,
+    isCurrent: () => true,
+    attempts: 4,
+    intervalMs: 1,
+    wait,
+  });
+
+  expect(refresh).toHaveBeenCalledTimes(3);
+  expect(wait).toHaveBeenCalledTimes(2);
+});
+
+test('stops startup binding synchronization after the service transition is superseded', async () => {
+  const refresh = vi.fn<() => Promise<boolean>>().mockResolvedValue(false);
+  const wait = vi.fn(async () => undefined);
+
+  await waitForLlamaCppStartupModelBindings({
+    refresh,
+    isCurrent: () => false,
+    attempts: 4,
+    intervalMs: 1,
+    wait,
+  });
+
+  expect(refresh).not.toHaveBeenCalled();
+  expect(wait).not.toHaveBeenCalled();
+});
+
+test('synchronizes running models and notifies renderers after service startup', async () => {
+  electronMocks.handlers.clear();
+  electronMocks.windows.length = 0;
+  const send = vi.fn();
+  electronMocks.windows.push({ isDestroyed: () => false, webContents: { send } });
+  const manager = {
+    on: vi.fn(() => manager),
+    start: vi.fn(async () => ({ status: 'running', checkedAt: new Date(0).toISOString() })),
+    listRunningModels: vi.fn(async () => [
+      { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
+    ]),
+    client: vi.fn(async () => ({ showModel: vi.fn(async () => ({})) })),
+  } as unknown as LlamaCppManager;
+  const store = {
+    get: vi.fn(() => undefined),
+    set: vi.fn(),
+  };
+
+  registerLlamaCppIpcHandlers(manager, {
+    getStore: () => store as never,
+  });
+
+  const startHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Start);
+  if (!startHandler) throw new Error('The local inference start handler was not registered.');
+
+  await expect(Promise.resolve(startHandler())).resolves.toMatchObject({ status: 'running' });
+  expect(store.set).toHaveBeenCalledWith(
+    'app_config',
+    expect.objectContaining({
+      providers: expect.objectContaining({
+        llamacpp: expect.objectContaining({
+          models: [expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 })],
+        }),
+      }),
+    }),
+  );
+  expect(send).toHaveBeenCalledWith(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
+});
+
+test('preserves model bindings when the running-model query temporarily fails', async () => {
+  electronMocks.handlers.clear();
+  electronMocks.windows.length = 0;
+  const manager = {
+    on: vi.fn(() => manager),
+    start: vi.fn(async () => ({ status: 'running', checkedAt: new Date(0).toISOString() })),
+    listRunningModels: vi.fn(async () => {
+      throw new Error('temporary connection failure');
+    }),
+  } as unknown as LlamaCppManager;
+  const store = {
+    get: vi.fn(() => ({ providers: { llamacpp: { models: [{ id: 'qwen-local' }] } } })),
+    set: vi.fn(),
+  };
+
+  registerLlamaCppIpcHandlers(manager, {
+    getStore: () => store as never,
+  });
+
+  const startHandler = electronMocks.handlers.get(LlamaCppIpcChannel.Start);
+  if (!startHandler) throw new Error('The local inference start handler was not registered.');
+
+  await expect(Promise.resolve(startHandler())).resolves.toMatchObject({ status: 'running' });
+  expect(store.set).not.toHaveBeenCalledWith('app_config', expect.anything());
 });
 
 test('waits for runtime install cleanup before confirming cancellation', async () => {
