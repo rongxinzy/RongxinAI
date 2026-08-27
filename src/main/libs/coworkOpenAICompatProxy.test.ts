@@ -5,6 +5,14 @@ import { __openAICompatProxyTestUtils, isAllowedProxyHost } from './coworkOpenAI
 
 const testUtils = __openAICompatProxyTestUtils;
 
+test('resolves proxy authentication from Bearer and Anthropic API key headers', () => {
+  expect(testUtils.resolveProxyRequestToken({ authorization: 'Bearer proxy-token' })).toBe(
+    'proxy-token',
+  );
+  expect(testUtils.resolveProxyRequestToken({ 'x-api-key': 'proxy-token' })).toBe('proxy-token');
+  expect(testUtils.resolveProxyRequestToken({})).toBe('');
+});
+
 function createMockResponse() {
   let output = '';
   return {
