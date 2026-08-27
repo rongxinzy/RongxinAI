@@ -155,6 +155,8 @@
     "check:electron-runtime-dependencies": "node scripts/ci/check-electron-runtime-dependencies.mjs"
   },
   "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.70.0",
+    "@agentclientprotocol/codex-acp": "1.6.2",
     "@agentclientprotocol/sdk": "1.4.0",
     "@earendil-works/pi-tui": "0.84.2",
     "@firecrawl/anydoc": "0.1.3",

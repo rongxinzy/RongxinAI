@@ -1,4 +1,5 @@
 import type {
+  CodingAgentAvailableCommand,
   CodingAgentCapabilities,
   CodingAgentConfigOption,
   CodingEvent,
@@ -20,6 +21,7 @@ export interface CodingAgentSession {
   id: string;
   remoteSessionId: string | null;
   configOptions: CodingAgentConfigOption[];
+  availableCommands: CodingAgentAvailableCommand[];
 }
 
 export interface CodingAgentDriver {
@@ -50,6 +52,11 @@ export interface CodingAgentDriver {
     value: string | boolean,
   ): Promise<CodingAgentConfigOption[]>;
   getSessionConfigOptions(sessionId: string): CodingAgentConfigOption[];
+  getSessionAvailableCommands(sessionId: string): CodingAgentAvailableCommand[];
+  onAvailableCommandsChanged(
+    listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,
+  ): () => void;
+  onSessionTitleChanged(listener: (sessionId: string, title: string) => void): () => void;
   disposeSession(sessionId: string): Promise<void>;
   dispose(): Promise<void>;
 }

@@ -6,6 +6,7 @@ import {
   CodingEventKind,
   CodingPermissionOutcome,
   CodingStreamUpdateMode,
+  type CodingAgentAvailableCommand,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
   type CodingAgentConfigOptionValue,
@@ -18,6 +19,7 @@ import {
   ACP_PROTOCOL_VERSION,
   AcpMethod,
   AcpProtocolIncompatibleError,
+  AcpSessionUpdateKind,
 } from '../acp/protocol';
 import { TerminalBroker } from '../terminalBroker';
 import { WorkspaceBroker } from '../workspaceBroker';
@@ -62,6 +64,12 @@ const DEFAULT_CAPABILITIES: CodingAgentCapabilities = {
   supportsUsage: false,
   supportsElicitation: false,
 };
+
+// Starting or restoring a real coding-agent session may include launching the
+// agent's own backend, loading account state, scanning skills, and enumerating
+// models. Keep the short transport timeout for ordinary ACP control requests,
+// but give lifecycle requests enough time to complete on a cold start.
+const ACP_SESSION_LIFECYCLE_TIMEOUT_MS = 60_000;
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -139,11 +147,35 @@ const normalizeConfigOptions = (value: unknown): CodingAgentConfigOption[] => {
   });
 };
 
+const normalizeAvailableCommands = (value: unknown): CodingAgentAvailableCommand[] => {
+  if (!Array.isArray(value)) return [];
+  const commands = new Map<string, CodingAgentAvailableCommand>();
+  for (const item of value) {
+    const command = asRecord(item);
+    const name = typeof command.name === 'string' ? command.name.trim().replace(/^\/+/, '') : '';
+    if (!name || /\s/.test(name) || typeof command.description !== 'string') continue;
+    const input = asRecord(command.input);
+    const meta = asRecord(command._meta);
+    commands.set(name, {
+      name,
+      description: command.description,
+      ...(typeof input.hint === 'string' ? { input: { hint: input.hint } } : {}),
+      ...(Object.keys(meta).length > 0 ? { _meta: meta } : {}),
+    });
+  }
+  return [...commands.values()];
+};
+
 /** ACP stdio driver that exposes normalized coding-room events to its caller. */
 export class AcpCodingDriver implements CodingAgentDriver {
   private readonly supervisor = new AcpConnectionSupervisor();
   private readonly streams = new Map<string, EventStream>();
   private readonly configOptionsBySession = new Map<string, CodingAgentConfigOption[]>();
+  private readonly availableCommandsBySession = new Map<string, CodingAgentAvailableCommand[]>();
+  private readonly availableCommandListeners = new Set<
+    (sessionId: string, commands: CodingAgentAvailableCommand[]) => void
+  >();
+  private readonly sessionTitleListeners = new Set<(sessionId: string, title: string) => void>();
   private readonly permissions = new Map<string, PendingPermission>();
   private readonly fallbackMessageIds = new Map<string, string>();
   private capabilities = DEFAULT_CAPABILITIES;
@@ -197,10 +229,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     localSessionId?: string;
   }): Promise<CodingAgentSession> {
     await this.ensureConnected(input.workspaceRoot);
-    const response = await this.supervisor.request<AcpSessionResult>(AcpMethod.SessionNew, {
-      cwd: input.workspaceRoot,
-      mcpServers: [],
-    });
+    const response = await this.supervisor.request<AcpSessionResult>(
+      AcpMethod.SessionNew,
+      {
+        cwd: input.workspaceRoot,
+        mcpServers: [],
+      },
+      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
+    );
     if (typeof response.sessionId !== 'string')
       throw new Error('ACP agent did not return a session ID.');
     const configOptions = normalizeConfigOptions(response.configOptions);
@@ -212,6 +248,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
       id: response.sessionId,
       remoteSessionId: response.sessionId,
       configOptions,
+      availableCommands: this.getSessionAvailableCommands(response.sessionId),
     };
   }
 
@@ -230,6 +267,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
         cwd: input.workspaceRoot,
         mcpServers: [],
       },
+      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
     );
     const configOptions = normalizeConfigOptions(response.configOptions);
     if (configOptions.length > 0) {
@@ -240,6 +278,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
       id: input.remoteSessionId,
       remoteSessionId: input.remoteSessionId,
       configOptions,
+      availableCommands: this.getSessionAvailableCommands(input.remoteSessionId),
     };
   }
 
@@ -254,10 +293,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     const stream: EventStream = { events: [], waiters: [], done: false, error: null };
     this.streams.set(input.sessionId, stream);
     void this.supervisor
-      .request(AcpMethod.SessionPrompt, {
-        sessionId: input.sessionId,
-        prompt: [{ type: 'text', text: input.prompt }],
-      }, { timeoutMs: null })
+      .request(
+        AcpMethod.SessionPrompt,
+        {
+          sessionId: input.sessionId,
+          prompt: [{ type: 'text', text: input.prompt }],
+        },
+        { timeoutMs: null },
+      )
       .then(() => this.finishStream(input.sessionId))
       .catch(error => this.finishStream(input.sessionId, error));
     try {
@@ -318,11 +361,28 @@ export class AcpCodingDriver implements CodingAgentDriver {
     return this.configOptionsBySession.get(sessionId) ?? [];
   }
 
+  getSessionAvailableCommands(sessionId: string): CodingAgentAvailableCommand[] {
+    return this.availableCommandsBySession.get(sessionId) ?? [];
+  }
+
+  onAvailableCommandsChanged(
+    listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,
+  ): () => void {
+    this.availableCommandListeners.add(listener);
+    return () => this.availableCommandListeners.delete(listener);
+  }
+
+  onSessionTitleChanged(listener: (sessionId: string, title: string) => void): () => void {
+    this.sessionTitleListeners.add(listener);
+    return () => this.sessionTitleListeners.delete(listener);
+  }
+
   async disposeSession(sessionId: string): Promise<void> {
     if (this.initialized && this.supportsSessionClose) {
       await this.supervisor.request(AcpMethod.SessionClose, { sessionId });
     }
     this.configOptionsBySession.delete(sessionId);
+    this.availableCommandsBySession.delete(sessionId);
   }
 
   async dispose(): Promise<void> {
@@ -331,6 +391,9 @@ export class AcpCodingDriver implements CodingAgentDriver {
     }
     this.permissions.clear();
     this.configOptionsBySession.clear();
+    this.availableCommandsBySession.clear();
+    this.availableCommandListeners.clear();
+    this.sessionTitleListeners.clear();
     this.terminalBroker.dispose();
     await this.supervisor.dispose();
   }
@@ -345,7 +408,11 @@ export class AcpCodingDriver implements CodingAgentDriver {
       cwd: workspaceRoot,
       environment: this.launch.environment,
     });
-    if (this.initialized && wasRunning && this.initializedGeneration === this.supervisor.generation) {
+    if (
+      this.initialized &&
+      wasRunning &&
+      this.initializedGeneration === this.supervisor.generation
+    ) {
       return;
     }
     this.initialized = false;
@@ -370,13 +437,28 @@ export class AcpCodingDriver implements CodingAgentDriver {
   private receiveNotification(method: string, params: Record<string, unknown>): void {
     if (method !== AcpMethod.SessionUpdate || typeof params.sessionId !== 'string') return;
     const update = asRecord(params.update);
-    if (update.sessionUpdate === 'config_option_update') {
+    if (update.sessionUpdate === AcpSessionUpdateKind.ConfigOptionUpdate) {
       this.configOptionsBySession.set(
         params.sessionId,
         normalizeConfigOptions(update.configOptions),
       );
     }
-    for (const event of this.normalizeUpdate(params.sessionId, update)) this.pushEvent(params.sessionId, event);
+    if (update.sessionUpdate === AcpSessionUpdateKind.AvailableCommandsUpdate) {
+      const commands = normalizeAvailableCommands(update.availableCommands);
+      this.availableCommandsBySession.set(params.sessionId, commands);
+      for (const listener of this.availableCommandListeners) listener(params.sessionId, commands);
+    }
+    if (
+      update.sessionUpdate === AcpSessionUpdateKind.SessionInfoUpdate &&
+      typeof update.title === 'string' &&
+      update.title.trim()
+    ) {
+      for (const listener of this.sessionTitleListeners) {
+        listener(params.sessionId, update.title.trim());
+      }
+    }
+    for (const event of this.normalizeUpdate(params.sessionId, update))
+      this.pushEvent(params.sessionId, event);
   }
 
   private async receiveRequest(
@@ -394,8 +476,11 @@ export class AcpCodingDriver implements CodingAgentDriver {
     throw new Error(`Unsupported ACP agent request: ${method}.`);
   }
 
-  private async requestPermission(params: Record<string, unknown>): Promise<Record<string, unknown>> {
-    if (typeof params.sessionId !== 'string') throw new Error('ACP permission request has no session ID.');
+  private async requestPermission(
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    if (typeof params.sessionId !== 'string')
+      throw new Error('ACP permission request has no session ID.');
     const requestId = randomUUID();
     this.pushEvent(params.sessionId, {
       kind: CodingEventKind.Permission,
@@ -411,27 +496,41 @@ export class AcpCodingDriver implements CodingAgentDriver {
     });
   }
 
-  private async readWorkspaceFile(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async readWorkspaceFile(
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     const target = await this.resolveWorkspacePath(params.path);
     const content = await readFile(target, 'utf8');
-    this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, { action: 'read', path: target });
-    const line = typeof params.line === 'number' && Number.isInteger(params.line) && params.line > 0
-      ? params.line
-      : 1;
-    const limit = typeof params.limit === 'number' && Number.isInteger(params.limit) && params.limit > 0
-      ? params.limit
-      : undefined;
+    this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, {
+      action: 'read',
+      path: target,
+    });
+    const line =
+      typeof params.line === 'number' && Number.isInteger(params.line) && params.line > 0
+        ? params.line
+        : 1;
+    const limit =
+      typeof params.limit === 'number' && Number.isInteger(params.limit) && params.limit > 0
+        ? params.limit
+        : undefined;
     if (line === 1 && limit === undefined) return { content };
     const lines = content.split(/\r?\n/);
-    return { content: lines.slice(line - 1, limit === undefined ? undefined : line - 1 + limit).join('\n') };
+    return {
+      content: lines.slice(line - 1, limit === undefined ? undefined : line - 1 + limit).join('\n'),
+    };
   }
 
-  private async writeWorkspaceFile(params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async writeWorkspaceFile(
+    params: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
     if (typeof params.content !== 'string') throw new Error('ACP file write has no text content.');
     const target = await this.resolveWorkspacePath(params.path);
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, params.content, 'utf8');
-    this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, { action: 'write', path: target });
+    this.pushToolEvent(params.sessionId, CodingEventKind.FileChange, {
+      action: 'write',
+      path: target,
+    });
     return {};
   }
 
@@ -502,19 +601,28 @@ export class AcpCodingDriver implements CodingAgentDriver {
     for (const variable of value) {
       if (!variable || typeof variable !== 'object') continue;
       const { name, value: variableValue } = variable as { name?: unknown; value?: unknown };
-      if (typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && typeof variableValue === 'string') {
+      if (
+        typeof name === 'string' &&
+        /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+        typeof variableValue === 'string'
+      ) {
         environment[name] = variableValue;
       }
     }
     return environment;
   }
 
-  private pushToolEvent(sessionId: unknown, kind: CodingEventKind, payload: Record<string, unknown>): void {
+  private pushToolEvent(
+    sessionId: unknown,
+    kind: CodingEventKind,
+    payload: Record<string, unknown>,
+  ): void {
     if (typeof sessionId === 'string') this.pushEvent(sessionId, { kind, payload });
   }
 
   private requireTerminalId(value: unknown): string {
-    if (typeof value !== 'string' || !value) throw new Error('ACP terminal request has no terminal ID.');
+    if (typeof value !== 'string' || !value)
+      throw new Error('ACP terminal request has no terminal ID.');
     return value;
   }
 
@@ -524,7 +632,12 @@ export class AcpCodingDriver implements CodingAgentDriver {
     return terminal;
   }
 
-  private toTerminalOutput(terminal: { output: string; truncated: boolean; exitCode: number | null; signal: NodeJS.Signals | null }): Record<string, unknown> {
+  private toTerminalOutput(terminal: {
+    output: string;
+    truncated: boolean;
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+  }): Record<string, unknown> {
     return {
       output: terminal.output,
       truncated: terminal.truncated,
@@ -537,7 +650,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
 
   private normalizeUpdate(sessionId: string, update: Record<string, unknown>): DriverEvent[] {
     const kind = update.sessionUpdate ?? update.kind;
-    if (kind === 'agent_message_chunk' || kind === 'user_message_chunk') {
+    if (
+      kind === AcpSessionUpdateKind.AgentMessageChunk ||
+      kind === AcpSessionUpdateKind.UserMessageChunk
+    ) {
       const text = readText(update.content);
       return text === null
         ? []
@@ -551,22 +667,26 @@ export class AcpCodingDriver implements CodingAgentDriver {
                     ? update.messageId
                     : this.fallbackMessageId(
                         sessionId,
-                        kind === 'user_message_chunk' ? 'user' : 'assistant',
+                        kind === AcpSessionUpdateKind.UserMessageChunk ? 'user' : 'assistant',
                       ),
-                role: kind === 'user_message_chunk' ? 'user' : 'assistant',
+                role: kind === AcpSessionUpdateKind.UserMessageChunk ? 'user' : 'assistant',
                 streamUpdateMode: CodingStreamUpdateMode.Append,
               },
             },
           ];
     }
-    if (kind === 'agent_thought_chunk') {
+    if (kind === AcpSessionUpdateKind.AgentThoughtChunk) {
       const text = readText(update.content);
       return text === null ? [] : [{ kind: CodingEventKind.Reasoning, payload: { content: text } }];
     }
-    if (kind === 'plan' || kind === 'plan_update' || kind === 'plan_removed') {
+    if (
+      kind === AcpSessionUpdateKind.Plan ||
+      kind === AcpSessionUpdateKind.PlanUpdate ||
+      kind === AcpSessionUpdateKind.PlanRemoved
+    ) {
       return [{ kind: CodingEventKind.Plan, payload: update }];
     }
-    if (kind === 'tool_call' || kind === 'tool_call_update') {
+    if (kind === AcpSessionUpdateKind.ToolCall || kind === AcpSessionUpdateKind.ToolCallUpdate) {
       const events: DriverEvent[] = [{ kind: CodingEventKind.ToolCall, payload: update }];
       for (const item of Array.isArray(update.content) ? update.content : []) {
         const content = asRecord(item);
@@ -579,7 +699,9 @@ export class AcpCodingDriver implements CodingAgentDriver {
       }
       return events;
     }
-    if (kind === 'usage_update') return [{ kind: CodingEventKind.Usage, payload: update }];
+    if (kind === AcpSessionUpdateKind.UsageUpdate) {
+      return [{ kind: CodingEventKind.Usage, payload: update }];
+    }
     if (typeof update.content === 'string') {
       return [{ kind: CodingEventKind.Message, payload: { content: update.content } }];
     }

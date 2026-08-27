@@ -10,6 +10,7 @@ import {
   CodingStreamUpdateMode,
 } from '../../../shared/codingAgent';
 import { AcpCodingDriver } from './acpCodingDriver';
+import { AcpSessionUpdateKind } from '../acp/protocol';
 
 test('normalizes ACP session updates into coding events', async () => {
   const script = [
@@ -39,6 +40,7 @@ test('normalizes ACP session updates into coding events', async () => {
     id: 'remote-session',
     remoteSessionId: 'remote-session',
     configOptions: [],
+    availableCommands: [],
   });
   expect(await driver.getCapabilities()).toEqual(
     expect.objectContaining({
@@ -86,6 +88,93 @@ test('declares only the client capabilities implemented by the ACP driver', asyn
   await expect(driver.createSession({ workspaceRoot: process.cwd() })).resolves.toMatchObject({
     id: 'remote-session',
   });
+  await driver.dispose();
+});
+
+test('allows a cold ACP session startup to outlive the short control-request timeout', async () => {
+  const script = [
+    "let buffer='';",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+    "if (request.method === 'session/new') setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'cold-session' } }) + '\\n'), 5100);",
+    '} });',
+  ].join('');
+  const driver = new AcpCodingDriver({
+    executable: execPath,
+    args: ['-e', script],
+    environment: process.env as Record<string, string>,
+  });
+
+  await expect(driver.createSession({ workspaceRoot: process.cwd() })).resolves.toMatchObject({
+    id: 'cold-session',
+  });
+  await driver.dispose();
+});
+
+test('retains authoritative ACP commands even when they arrive before the session response', async () => {
+  const updateKind = JSON.stringify(AcpSessionUpdateKind.AvailableCommandsUpdate);
+  const script = [
+    "let buffer='';",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+    `if (request.method === 'session/new') { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: ${updateKind}, availableCommands: [{ name: 'mcp', description: 'List MCP tools.' }, { name: '/review', description: 'Review changes.', input: { hint: 'instructions' }, _meta: { source: 'agent' } }, { name: 'bad command', description: 'Ignored.' }] } } }) + '\\n'); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n'); }`,
+    `if (request.method === 'session/prompt') { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: ${updateKind}, availableCommands: [{ name: 'skills', description: 'List skills.' }] } } }) + '\\n'); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n'); }`,
+    '} });',
+  ].join('');
+  const driver = new AcpCodingDriver({
+    executable: execPath,
+    args: ['-e', script],
+    environment: process.env as Record<string, string>,
+  });
+  const snapshots: string[][] = [];
+  driver.onAvailableCommandsChanged((_sessionId, commands) => {
+    snapshots.push(commands.map(command => command.name));
+  });
+
+  const session = await driver.createSession({ workspaceRoot: process.cwd() });
+  expect(session.availableCommands).toEqual([
+    { name: 'mcp', description: 'List MCP tools.' },
+    {
+      name: 'review',
+      description: 'Review changes.',
+      input: { hint: 'instructions' },
+      _meta: { source: 'agent' },
+    },
+  ]);
+  for await (const _event of driver.prompt({
+    sessionId: session.id,
+    workspaceRoot: process.cwd(),
+    prompt: '/skills',
+  })) {
+    // Command snapshots are session state, not turn transcript events.
+  }
+  expect(driver.getSessionAvailableCommands(session.id)).toEqual([
+    { name: 'skills', description: 'List skills.' },
+  ]);
+  expect(snapshots).toEqual([['mcp', 'review'], ['skills']]);
+  await driver.dispose();
+});
+
+test('forwards ACP session info titles to the owning coding session', async () => {
+  const updateKind = JSON.stringify(AcpSessionUpdateKind.SessionInfoUpdate);
+  const script = [
+    "let buffer='';",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+    `if (request.method === 'session/new') { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: ${updateKind}, title: 'Fix the login flow' } } }) + '\\n'); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n'); }`,
+    '} });',
+  ].join('');
+  const driver = new AcpCodingDriver({
+    executable: execPath,
+    args: ['-e', script],
+    environment: process.env as Record<string, string>,
+  });
+  const titles: string[] = [];
+  driver.onSessionTitleChanged((_sessionId, title) => titles.push(title));
+
+  await driver.createSession({ workspaceRoot: process.cwd() });
+
+  expect(titles).toEqual(['Fix the login flow']);
   await driver.dispose();
 });
 
@@ -176,6 +265,7 @@ test('uses session resume when the ACP agent advertises it', async () => {
     id: 'previous-session',
     remoteSessionId: 'previous-session',
     configOptions: [],
+    availableCommands: [],
   });
   await driver.dispose();
 });
@@ -256,7 +346,9 @@ test('brokers ACP filesystem and terminal requests inside the lane workspace', a
     }))
       events.push(event);
 
-    await expect(readFile(path.join(workspaceRoot, 'result.txt'), 'utf8')).resolves.toBe('safe output');
+    await expect(readFile(path.join(workspaceRoot, 'result.txt'), 'utf8')).resolves.toBe(
+      'safe output',
+    );
     expect(events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

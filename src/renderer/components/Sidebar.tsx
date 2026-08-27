@@ -35,6 +35,10 @@ import { CoworkSessionStatusValue } from '../types/cowork';
 import AgentTaskRow from './agentSidebar/AgentTaskRow';
 import ChatSkillShortcuts from './chat/ChatSkillShortcuts';
 import {
+  CodingWorkspaceSidebar,
+  type CodingSidebarSelection,
+} from './coding/CodingWorkspaceSidebar';
+import {
   SidebarAnimatedSearchIcon,
   type SidebarAnimatedSearchIconHandle,
 } from './icons/SidebarAnimatedSearchIcon';
@@ -57,6 +61,8 @@ interface SidebarProps {
   onShowLocalInference: () => void;
   onShowExpert: () => void;
   onShowCoding: () => void;
+  codingSelection: CodingSidebarSelection;
+  onCodingSelectionChange: (selection: CodingSidebarSelection) => void;
   onNewChat: () => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -80,6 +86,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onShowLocalInference,
   onShowExpert,
   onShowCoding,
+  codingSelection,
+  onCodingSelectionChange,
   onNewChat,
   isCollapsed,
   onToggleCollapse,
@@ -543,11 +551,27 @@ const Sidebar: React.FC<SidebarProps> = ({
             />
           </div>
           <div className="relative flex min-h-0 flex-1 flex-col">
-            {workMode !== WorkMode.Chat && renderSearchControl()}
+            {activeView === 'coding' ? (
+              <div className="flex min-h-0 flex-1 px-3">
+                <CodingWorkspaceSidebar
+                  selection={codingSelection}
+                  onSelectionChange={onCodingSelectionChange}
+                  onManageAgents={workspaceRoot =>
+                    window.dispatchEvent(
+                      new CustomEvent('coding:manage-agents', { detail: { workspaceRoot } }),
+                    )
+                  }
+                />
+              </div>
+            ) : null}
+            {activeView !== 'coding' && workMode !== WorkMode.Chat && renderSearchControl()}
 
             <div
               ref={agentScrollContainerRef}
-              className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-3 pb-10"
+              className={cn(
+                'scrollbar-hidden min-h-0 flex-1 overflow-y-auto px-3 pb-10',
+                activeView === 'coding' && 'hidden',
+              )}
               onScroll={handleAgentScroll}
             >
               <div className={cn(workMode === WorkMode.Chat && 'hidden')}>
@@ -644,18 +668,22 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </>
               )}
             </div>
-            <div
-              className={cn(
-                'pointer-events-none absolute inset-x-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150',
-                workMode === WorkMode.Chat ? 'top-0' : 'top-8',
-                agentScrollEdges.top ? 'opacity-100' : 'opacity-0',
-              )}
-            />
-            <div
-              className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
-                agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
-              }`}
-            />
+            {activeView !== 'coding' ? (
+              <>
+                <div
+                  className={cn(
+                    'pointer-events-none absolute inset-x-0 z-10 h-24 bg-linear-to-b from-surface-raised to-transparent transition-opacity duration-150',
+                    workMode === WorkMode.Chat ? 'top-0' : 'top-8',
+                    agentScrollEdges.top ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+                <div
+                  className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-linear-to-t from-surface-raised to-transparent transition-opacity duration-150 ${
+                    agentScrollEdges.bottom ? 'opacity-100' : 'opacity-0'
+                  }`}
+                />
+              </>
+            ) : null}
           </div>
           {!isCollapsed && (
             <div
@@ -663,7 +691,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               onMouseDown={handleResizeStart}
             />
           )}
-          {isBatchMode ? (
+          {isBatchMode && activeView !== 'coding' ? (
             <div className="px-3 pb-3 pt-1 flex items-center justify-between">
               <label className="flex items-center justify-start gap-2 cursor-pointer text-sm text-muted-foreground">
                 <Checkbox

@@ -44,7 +44,9 @@ test('allows a later start after the agent process exits', async () => {
     cwd: process.cwd(),
     environment: process.env as Record<string, string>,
   });
-  await expect(supervisor.request<{ restarted: boolean }>(AcpMethod.Initialize, {})).resolves.toEqual({
+  await expect(
+    supervisor.request<{ restarted: boolean }>(AcpMethod.Initialize, {}),
+  ).resolves.toEqual({
     restarted: true,
   });
   await supervisor.dispose();
@@ -118,7 +120,6 @@ test('responds to agent requests that use a string JSON-RPC ID', async () => {
     cwd: process.cwd(),
     environment: process.env as Record<string, string>,
   });
-  await new Promise(resolve => setTimeout(resolve, 50));
-  expect(supervisor.isRunning()).toBe(false);
+  await expect.poll(() => supervisor.isRunning(), { timeout: 1_000 }).toBe(false);
   await supervisor.dispose();
 });

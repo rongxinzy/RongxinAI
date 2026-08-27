@@ -18,6 +18,28 @@ export const CodingAgentProfileStatus = {
 export type CodingAgentProfileStatus =
   (typeof CodingAgentProfileStatus)[keyof typeof CodingAgentProfileStatus];
 
+export const CodingAgentProfileId = {
+  Builtin: 'builtin-zhiyuan-coding',
+} as const;
+export type CodingAgentProfileId = (typeof CodingAgentProfileId)[keyof typeof CodingAgentProfileId];
+
+export const CodingAgentEnvironmentKey = {
+  ElectronRunAsNode: 'ELECTRON_RUN_AS_NODE',
+  ManagedAdapterId: 'ZHIYUAN_ACP_ADAPTER_ID',
+  ManagedAdapterVersion: 'ZHIYUAN_ACP_ADAPTER_VERSION',
+  CodexPath: 'CODEX_PATH',
+  ClaudeCodeExecutable: 'CLAUDE_CODE_EXECUTABLE',
+} as const;
+export type CodingAgentEnvironmentKey =
+  (typeof CodingAgentEnvironmentKey)[keyof typeof CodingAgentEnvironmentKey];
+
+export const CodingAgentManagedAdapterId = {
+  Codex: 'codex',
+  ClaudeCode: 'claude-code',
+} as const;
+export type CodingAgentManagedAdapterId =
+  (typeof CodingAgentManagedAdapterId)[keyof typeof CodingAgentManagedAdapterId];
+
 export const CodingMissionStatus = {
   Draft: 'draft',
   Running: 'running',
@@ -46,8 +68,7 @@ export const CodingWorkflowStage = {
   Review: 'review',
   Verification: 'verification',
 } as const;
-export type CodingWorkflowStage =
-  (typeof CodingWorkflowStage)[keyof typeof CodingWorkflowStage];
+export type CodingWorkflowStage = (typeof CodingWorkflowStage)[keyof typeof CodingWorkflowStage];
 
 export const CodingLaneStatus = {
   Idle: 'idle',
@@ -90,8 +111,35 @@ export const CodingPermissionOutcome = {
 export type CodingPermissionOutcome =
   (typeof CodingPermissionOutcome)[keyof typeof CodingPermissionOutcome];
 
+export const CodingGitFileStatus = {
+  Added: 'added',
+  Modified: 'modified',
+  Deleted: 'deleted',
+  Renamed: 'renamed',
+  Copied: 'copied',
+  Untracked: 'untracked',
+  Conflicted: 'conflicted',
+  TypeChanged: 'type_changed',
+} as const;
+export type CodingGitFileStatus = (typeof CodingGitFileStatus)[keyof typeof CodingGitFileStatus];
+
+export const CodingGitDiffScope = {
+  Staged: 'staged',
+  Unstaged: 'unstaged',
+  Untracked: 'untracked',
+} as const;
+export type CodingGitDiffScope = (typeof CodingGitDiffScope)[keyof typeof CodingGitDiffScope];
+
 export const CodingAgentIpc = {
+  ListProfiles: 'codingAgent:listProfiles',
+  ListWorkspaces: 'codingAgent:listWorkspaces',
+  CreateWorkspace: 'codingAgent:createWorkspace',
+  UpdateWorkspace: 'codingAgent:updateWorkspace',
+  DeleteWorkspace: 'codingAgent:deleteWorkspace',
+  CreateSession: 'codingAgent:createSession',
+  StartSession: 'codingAgent:startSession',
   Bootstrap: 'codingAgent:bootstrap',
+  PrepareLane: 'codingAgent:prepareLane',
   CreateMission: 'codingAgent:createMission',
   SelectLane: 'codingAgent:selectLane',
   Prompt: 'codingAgent:prompt',
@@ -105,6 +153,13 @@ export const CodingAgentIpc = {
   SetLaneConfigOption: 'codingAgent:setLaneConfigOption',
   PreviewLaneChanges: 'codingAgent:previewLaneChanges',
   ApplyLaneChanges: 'codingAgent:applyLaneChanges',
+  GetGitStatus: 'codingAgent:getGitStatus',
+  GetGitDiff: 'codingAgent:getGitDiff',
+  StageGitPaths: 'codingAgent:stageGitPaths',
+  UnstageGitPaths: 'codingAgent:unstageGitPaths',
+  CommitGitChanges: 'codingAgent:commitGitChanges',
+  PushGitBranch: 'codingAgent:pushGitBranch',
+  DiscoverAgents: 'codingAgent:discoverAgents',
   ProbeAgent: 'codingAgent:probeAgent',
   AddProfile: 'codingAgent:addProfile',
   TrustProfile: 'codingAgent:trustProfile',

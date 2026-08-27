@@ -1,6 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Label } from '@shared/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -10,70 +9,78 @@ import {
   DialogTitle,
 } from '@shared/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
-import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
 } from '@shared/components/ui/sheet';
-import { Switch } from '@shared/components/ui/switch';
+import { cn } from '@shared/lib/utils';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@shared/components/ui/dropdown-menu';
-import { Bot, CircleStop, FileDiff, List, PanelRight, UsersRound } from 'lucide-react';
+  FileDiff,
+  FolderGit2,
+  GitBranch,
+  PanelLeftOpen,
+  PanelRight,
+  Settings2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
 
 import type { CodingRoomSnapshot } from '../../../shared/codingAgent';
 import {
+  CodingAgentDriverKind,
   CodingAgentProfileStatus,
   CodingEventKind,
   CodingLaneStatus,
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
-import type { RootState } from '../../store';
-import { CodingAgentPicker } from './CodingAgentPicker';
+import { CodingAgentManager } from './CodingAgentManager';
 import { CodingAuthAndPermissionDialogs } from './CodingAuthAndPermissionDialogs';
 import { CodingComposer } from './CodingComposer';
+import { CodingDraftControls } from './CodingDraftControls';
 import { CodingEventStream } from './CodingEventStream';
+import { CodingGitPanel } from './CodingGitPanel';
 import { CodingInspector } from './CodingInspector';
-import { CodingTaskList } from './CodingTaskList';
+import { CodingParticipants } from './CodingParticipants';
+import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
+import type { CodingSidePanelView as CodingSidePanelViewType } from './constants';
+import type { CodingSessionDraft } from './CodingWorkspaceSidebar';
 
-const profileStatusText = (status: CodingAgentProfileStatus): string => {
-  const keys: Record<CodingAgentProfileStatus, string> = {
-    [CodingAgentProfileStatus.Detected]: 'codingAgentStatusDetected',
-    [CodingAgentProfileStatus.Ready]: 'codingAgentReady',
-    [CodingAgentProfileStatus.NeedsConfiguration]: 'codingAgentStatusNeedsConfiguration',
-    [CodingAgentProfileStatus.NeedsAdapter]: 'codingAgentStatusNeedsAdapter',
-    [CodingAgentProfileStatus.NeedsAuth]: 'codingAgentStatusNeedsAuth',
-    [CodingAgentProfileStatus.Incompatible]: 'codingAgentStatusIncompatible',
-    [CodingAgentProfileStatus.Untrusted]: 'codingAgentStatusUntrusted',
-    [CodingAgentProfileStatus.Unavailable]: 'codingAgentStatusUnavailable',
-  };
-  return i18nService.t(keys[status]);
-};
+const profileStatusText = (status: CodingAgentProfileStatus): string =>
+  i18nService.t(CodingAgentStatusI18nKey[status]);
 
 const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
 
-export const CodingWorkbenchView = () => {
+interface CodingWorkbenchViewProps {
+  workspaceRoot: string;
+  selectedLaneId: string | null;
+  draftSession: CodingSessionDraft | null;
+  onDraftSessionChange: (draft: CodingSessionDraft) => void;
+  onSessionCreated: (laneId: string) => void;
+  onLaneSelected: (laneId: string) => void;
+  isSidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
+}
+
+export const CodingWorkbenchView = ({
+  workspaceRoot,
+  selectedLaneId,
+  draftSession,
+  onDraftSessionChange,
+  onSessionCreated,
+  onLaneSelected,
+  isSidebarCollapsed = false,
+  onToggleSidebar,
+}: CodingWorkbenchViewProps) => {
+  const isMac = window.electron.platform === 'darwin';
   const [snapshot, setSnapshot] = useState<CodingRoomSnapshot | null>(EMPTY_SNAPSHOT);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
+  const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [error, setError] = useState<string | null>(null);
-  const [taskSheetOpen, setTaskSheetOpen] = useState(false);
   const [inspectorSheetOpen, setInspectorSheetOpen] = useState(false);
-  const [handoffTargetLaneId, setHandoffTargetLaneId] = useState<string | null>(null);
-  const [handoffPreview, setHandoffPreview] = useState<Record<string, unknown> | null>(null);
+  const [gitSheetOpen, setGitSheetOpen] = useState(false);
+  const [sidePanelView, setSidePanelView] = useState<CodingSidePanelViewType | null>(null);
   const [laneChangePreview, setLaneChangePreview] = useState<string | null>(null);
   const [applyConflict, setApplyConflict] = useState<string | null>(null);
   const [authTerminal, setAuthTerminal] = useState<{
@@ -82,21 +89,15 @@ export const CodingWorkbenchView = () => {
     output: string;
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
-  const [presetDialogOpen, setPresetDialogOpen] = useState(false);
-  const [reviewerProfileId, setReviewerProfileId] = useState<string | null>(null);
-  const [verifierProfileId, setVerifierProfileId] = useState<string | null>(null);
+  const [agentManagerOpen, setAgentManagerOpen] = useState(false);
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
-  const selectedWorkspaceRoot = useSelector((state: RootState) => {
-    const current = state.workspace.workspaces.find(
-      workspace => workspace.id === state.workspace.currentWorkspaceId,
-    );
-    return current?.path ?? '';
-  });
-  const workspaceRoot = selectedWorkspaceRoot;
-
   useEffect(() => {
+    if (!workspaceRoot) {
+      setSnapshot(null);
+      return;
+    }
     let cancelled = false;
     void window.electron.codingAgent.bootstrap(workspaceRoot).then(result => {
       if (!cancelled && result.success && result.snapshot) setSnapshot(result.snapshot);
@@ -108,6 +109,30 @@ export const CodingWorkbenchView = () => {
       cancelled = true;
       unsubscribe();
     };
+  }, [workspaceRoot]);
+  useEffect(() => {
+    if (
+      !workspaceRoot ||
+      !selectedLaneId ||
+      !snapshot?.lanes.some(lane => lane.id === selectedLaneId) ||
+      snapshot.room.activeLaneId === selectedLaneId
+    ) {
+      return;
+    }
+    void window.electron.codingAgent
+      .selectLane({ workspaceRoot, laneId: selectedLaneId })
+      .then(result => {
+        if (result.success && result.snapshot) setSnapshot(result.snapshot);
+        else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      });
+  }, [selectedLaneId, snapshot, workspaceRoot]);
+  useEffect(() => {
+    const openManager = (event: Event) => {
+      const detail = (event as CustomEvent<{ workspaceRoot?: string }>).detail;
+      if (detail?.workspaceRoot === workspaceRoot) setAgentManagerOpen(true);
+    };
+    window.addEventListener('coding:manage-agents', openManager);
+    return () => window.removeEventListener('coding:manage-agents', openManager);
   }, [workspaceRoot]);
   useEffect(() => {
     const removeData = window.electron.codingAgent.onAuthTerminalData(event => {
@@ -128,18 +153,70 @@ export const CodingWorkbenchView = () => {
   }, []);
 
   const activeLane = useMemo(
-    () => snapshot?.lanes.find(lane => lane.id === snapshot.room.activeLaneId) ?? null,
-    [snapshot],
+    () =>
+      draftSession
+        ? null
+        : (snapshot?.lanes.find(lane => lane.id === snapshot.room.activeLaneId) ?? null),
+    [draftSession, snapshot],
   );
   const activeProfile = useMemo(
-    () => snapshot?.profiles.find(profile => profile.id === activeLane?.profileId) ?? null,
-    [activeLane?.profileId, snapshot],
+    () =>
+      snapshot?.profiles.find(profile =>
+        draftSession ? profile.id === draftSession.profileId : profile.id === activeLane?.profileId,
+      ) ?? null,
+    [activeLane?.profileId, draftSession, snapshot],
   );
+  const activeLaneId = activeLane?.id ?? null;
+  const activeRemoteSessionId = activeLane?.remoteSessionId ?? null;
+  const activeDriverKind = activeProfile?.driverKind ?? null;
+  useEffect(() => {
+    if (!activeLaneId || activeRemoteSessionId || activeDriverKind !== CodingAgentDriverKind.Acp) {
+      return;
+    }
+    let cancelled = false;
+    void window.electron.codingAgent
+      .prepareLane({ workspaceRoot, laneId: activeLaneId })
+      .then(result => {
+        if (cancelled) return;
+        if (result.success && result.snapshot) setSnapshot(result.snapshot);
+        else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      })
+      .catch(() => {
+        if (!cancelled) setError(i18nService.t('codingAgentActionFailed'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, workspaceRoot]);
   const activeEvents = useMemo(
     () =>
       activeLane ? (snapshot?.events.filter(event => event.laneId === activeLane.id) ?? []) : [],
     [activeLane, snapshot],
   );
+  const activeMissionLanes = useMemo(
+    () =>
+      activeLane
+        ? (snapshot?.lanes.filter(lane => lane.missionId === activeLane.missionId) ?? [])
+        : [],
+    [activeLane, snapshot],
+  );
+  const hasInspectorContent = useMemo(
+    () =>
+      activeEvents.some(
+        event =>
+          event.kind === CodingEventKind.FileChange || event.kind === CodingEventKind.Terminal,
+      ),
+    [activeEvents],
+  );
+  const gitSourceRoot =
+    draftSession?.sourceRoot ??
+    activeLane?.sourceRoot ??
+    snapshot?.room.workspaceRoot ??
+    workspaceRoot;
+  const gitRefreshKey = `${activeLane?.id ?? draftSession?.id ?? 'workspace'}:${activeLane?.status ?? 'draft'}:${activeEvents.length}`;
+  const desktopSidePanelOpen =
+    sidePanelView === CodingSidePanelView.Git ||
+    (sidePanelView === CodingSidePanelView.Inspector && hasInspectorContent);
   const activePermission = useMemo(
     () =>
       activeLane?.status === CodingLaneStatus.WaitingApproval
@@ -150,19 +227,6 @@ export const CodingWorkbenchView = () => {
         : null,
     [activeEvents, activeLane?.status],
   );
-  const readyProfiles = useMemo(
-    () =>
-      snapshot?.profiles.filter(profile => profile.status === CodingAgentProfileStatus.Ready) ?? [],
-    [snapshot],
-  );
-  const handoffTargetLane = useMemo(
-    () => snapshot?.lanes.find(lane => lane.id === handoffTargetLaneId) ?? null,
-    [handoffTargetLaneId, snapshot],
-  );
-  const handoffTargetProfile = useMemo(
-    () => snapshot?.profiles.find(profile => profile.id === handoffTargetLane?.profileId) ?? null,
-    [handoffTargetLane?.profileId, snapshot],
-  );
   const recoveryLane =
     activeLane?.pendingRecoveryPrompt && activeLane.pendingRecoveryContext ? activeLane : null;
 
@@ -170,15 +234,26 @@ export const CodingWorkbenchView = () => {
     if (!activeLane) return;
     const frame = requestAnimationFrame(() => {
       const viewport = eventStreamRef.current?.querySelector<HTMLElement>(
-        '[data-slot="scroll-area-viewport"]',
+        '.coding-conversation-scroll',
       );
       if (viewport) viewport.scrollTop = activeLane.scrollPosition;
     });
     return () => cancelAnimationFrame(frame);
   }, [activeLane]);
 
-  const prompt =
-    draftState.laneId === activeLane?.id ? draftState.value : (activeLane?.draft ?? '');
+  useEffect(() => {
+    setSidePanelView(current => (current === CodingSidePanelView.Inspector ? null : current));
+    setInspectorSheetOpen(false);
+    setGitSheetOpen(false);
+  }, [activeLane?.id]);
+
+  const prompt = draftSession
+    ? newSessionDraftState.id === draftSession.id
+      ? newSessionDraftState.value
+      : ''
+    : draftState.laneId === activeLane?.id
+      ? draftState.value
+      : (activeLane?.draft ?? '');
 
   useEffect(
     () => () => {
@@ -214,19 +289,23 @@ export const CodingWorkbenchView = () => {
     [prompt, workspaceRoot],
   );
 
-  const createMission = async (profileId: string) => {
-    const result = await window.electron.codingAgent.createMission({
-      workspaceRoot,
-      profileId,
-      title: i18nService.t('codingAgentNewTask'),
-    });
-    if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+  const discoverAgents = async (): Promise<boolean> => {
+    const result = await window.electron.codingAgent.discoverAgents({ workspaceRoot });
+    if (result.success && result.snapshot) {
+      setSnapshot(result.snapshot);
+      return true;
+    }
+    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    return false;
   };
-  const probeAgent = async (profileId: string) => {
+  const probeAgent = async (profileId: string): Promise<boolean> => {
     const result = await window.electron.codingAgent.probeAgent({ workspaceRoot, profileId });
-    if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    if (result.success && result.snapshot) {
+      setSnapshot(result.snapshot);
+      return true;
+    }
+    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    return false;
   };
   const addProfile = async (
     profile: import('../../../shared/codingAgent').AddCodingAgentProfileInput,
@@ -296,7 +375,26 @@ export const CodingWorkbenchView = () => {
     else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
   };
   const sendPrompt = async () => {
-    if (!activeLane || !prompt.trim()) return;
+    if (!prompt.trim()) return;
+    if (draftSession) {
+      setError(null);
+      const result = await window.electron.codingAgent.startSession({
+        workspaceId: draftSession.workspaceId,
+        sourceRoot: draftSession.sourceRoot,
+        profileId: draftSession.profileId,
+        prompt,
+      });
+      const laneId = result.snapshot?.room.activeLaneId;
+      if (result.success && result.snapshot && laneId) {
+        setSnapshot(result.snapshot);
+        setNewSessionDraftState({ id: '', value: '' });
+        onSessionCreated(laneId);
+      } else {
+        setError(result.error ?? i18nService.t('codingSessionCreateFailed'));
+      }
+      return;
+    }
+    if (!activeLane) return;
     if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
     const result = await window.electron.codingAgent.prompt({
       workspaceRoot,
@@ -328,63 +426,6 @@ export const CodingWorkbenchView = () => {
       laneId: activeLane.id,
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
-  };
-  const addCollaborator = async (profileId: string) => {
-    if (!activeLane) return;
-    const result = await window.electron.codingAgent.addLane({
-      workspaceRoot,
-      missionId: activeLane.missionId,
-      profileId,
-    });
-    if (result.success && result.snapshot) setSnapshot(result.snapshot);
-    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-  };
-  const openCollaborationPreset = () => {
-    const fallbackProfileId = readyProfiles[0]?.id ?? null;
-    setReviewerProfileId(fallbackProfileId);
-    setVerifierProfileId(fallbackProfileId);
-    setPresetDialogOpen(true);
-  };
-  const createCollaborationPreset = async () => {
-    if (!activeLane || !reviewerProfileId || !verifierProfileId) return;
-    const result = await window.electron.codingAgent.createCollaborationPreset({
-      workspaceRoot,
-      missionId: activeLane.missionId,
-      reviewerProfileId,
-      verifierProfileId,
-    });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      setPresetDialogOpen(false);
-    } else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-  };
-  const handoff = async (targetLaneId: string): Promise<boolean> => {
-    if (!activeLane) return false;
-    const result = await window.electron.codingAgent.handoff({
-      workspaceRoot,
-      sourceLaneId: activeLane.id,
-      targetLaneId,
-    });
-    if (result.success && result.snapshot) {
-      setSnapshot(result.snapshot);
-      return true;
-    }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    return false;
-  };
-  const previewHandoff = async (targetLaneId: string) => {
-    if (!activeLane) return;
-    const result = await window.electron.codingAgent.previewHandoff({
-      workspaceRoot,
-      sourceLaneId: activeLane.id,
-      targetLaneId,
-    });
-    if (result.success && result.content) {
-      setHandoffPreview(result.content);
-      setHandoffTargetLaneId(targetLaneId);
-      return;
-    }
-    setError(result.error ?? i18nService.t('codingAgentActionFailed'));
   };
   const setLaneConfigOption = async (configId: string, value: string | boolean) => {
     if (!activeLane) return;
@@ -429,7 +470,7 @@ export const CodingWorkbenchView = () => {
     const result = await window.electron.codingAgent.selectLane({ workspaceRoot, laneId });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
     else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
-    setTaskSheetOpen(false);
+    if (result.success) onLaneSelected(laneId);
   };
 
   if (!workspaceRoot)
@@ -446,22 +487,12 @@ export const CodingWorkbenchView = () => {
     );
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[220px_minmax(0,1fr)_260px] bg-background max-lg:grid-cols-[220px_minmax(0,1fr)] max-md:grid-cols-1">
-      <aside className="flex min-h-0 flex-col border-r border-border p-3 max-md:hidden">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold">{i18nService.t('codingAgentTasks')}</h2>
-          <CodingAgentPicker
-            profiles={snapshot.profiles}
-            onSelect={profileId => void createMission(profileId)}
-            onProbe={profileId => void probeAgent(profileId)}
-            onAddProfile={addProfile}
-            onTrust={trustProfile}
-            onAuthenticate={authenticateProfile}
-            onTerminalAuthenticate={startTerminalAuthentication}
-          />
-        </div>
-        <CodingTaskList snapshot={snapshot} onSelect={laneId => void selectLane(laneId)} />
-      </aside>
+    <div
+      className={cn(
+        'grid h-full min-h-0 bg-background',
+        desktopSidePanelOpen ? 'grid-cols-[minmax(0,1fr)_360px] max-lg:grid-cols-1' : 'grid-cols-1',
+      )}
+    >
       <main className="flex min-h-0 flex-col">
         <CodingAuthAndPermissionDialogs
           authTerminal={authTerminal}
@@ -471,9 +502,18 @@ export const CodingWorkbenchView = () => {
           onAuthTerminalInputChange={setAuthTerminalInput}
           onCancelAuthTerminal={id => void window.electron.codingAgent.cancelAuthTerminal(id)}
           onSubmitAuthTerminalInput={submitAuthTerminalInput}
-          onRespondToPermission={(outcome, optionId) =>
-            void respondToPermission(outcome, optionId)
-          }
+          onRespondToPermission={(outcome, optionId) => void respondToPermission(outcome, optionId)}
+        />
+        <CodingAgentManager
+          open={agentManagerOpen}
+          onOpenChange={setAgentManagerOpen}
+          profiles={snapshot.profiles.filter(profile => !profile.isBuiltin)}
+          onDiscover={discoverAgents}
+          onProbe={probeAgent}
+          onAddProfile={addProfile}
+          onTrust={trustProfile}
+          onAuthenticate={authenticateProfile}
+          onTerminalAuthenticate={startTerminalAuthentication}
         />
         {recoveryLane && (
           <Dialog open>
@@ -497,110 +537,6 @@ export const CodingWorkbenchView = () => {
                 </Button>
                 <Button type="button" onClick={() => void confirmSessionRecovery(true)}>
                   {i18nService.t('codingAgentRecoverySendSummary')}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-        <Dialog open={presetDialogOpen} onOpenChange={setPresetDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{i18nService.t('codingAgentPresetTitle')}</DialogTitle>
-              <DialogDescription>{i18nService.t('codingAgentPresetDescription')}</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <Label>{i18nService.t('codingAgentPresetReviewer')}</Label>
-              <Select value={reviewerProfileId} onValueChange={setReviewerProfileId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {readyProfiles.map(profile => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Label>{i18nService.t('codingAgentPresetVerifier')}</Label>
-              <Select value={verifierProfileId} onValueChange={setVerifierProfileId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {readyProfiles.map(profile => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setPresetDialogOpen(false)}>
-                {i18nService.t('codingAgentHandoffCancel')}
-              </Button>
-              <Button
-                type="button"
-                disabled={!reviewerProfileId || !verifierProfileId}
-                onClick={createCollaborationPreset}
-              >
-                {i18nService.t('codingAgentPresetCreate')}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        {handoffTargetLane && handoffTargetProfile && activeLane && handoffPreview && (
-          <Dialog
-            open
-            onOpenChange={open => {
-              if (!open) {
-                setHandoffTargetLaneId(null);
-                setHandoffPreview(null);
-              }
-            }}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{i18nService.t('codingAgentHandoffConfirmTitle')}</DialogTitle>
-                <DialogDescription>
-                  {i18nService.t('codingAgentHandoffConfirmDescription')}
-                </DialogDescription>
-              </DialogHeader>
-              <p className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
-                {activeProfile?.name} → {handoffTargetProfile.name}
-              </p>
-              <div>
-                <p className="mb-2 text-sm font-medium">
-                  {i18nService.t('codingAgentHandoffPreview')}
-                </p>
-                <pre className="max-h-52 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-xs whitespace-pre-wrap break-words">
-                  {JSON.stringify(handoffPreview, null, 2)}
-                </pre>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setHandoffTargetLaneId(null);
-                    setHandoffPreview(null);
-                  }}
-                >
-                  {i18nService.t('codingAgentHandoffCancel')}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    void handoff(handoffTargetLane.id).then(completed => {
-                      if (completed) {
-                        setHandoffTargetLaneId(null);
-                        setHandoffPreview(null);
-                      }
-                    });
-                  }}
-                >
-                  {i18nService.t('codingAgentHandoffConfirm')}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -658,84 +594,72 @@ export const CodingWorkbenchView = () => {
             </DialogContent>
           </Dialog>
         )}
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Sheet open={taskSheetOpen} onOpenChange={setTaskSheetOpen}>
-              <SheetTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="md:hidden"
-                    aria-label={i18nService.t('codingAgentTasks')}
-                  >
-                    <List />
-                  </Button>
-                }
-              />
-              <SheetContent side="left" className="w-3/4 max-w-sm p-3">
-                <SheetHeader className="flex-row items-center justify-between p-0 pb-3">
-                  <SheetTitle>{i18nService.t('codingAgentTasks')}</SheetTitle>
-                  <CodingAgentPicker
-                    profiles={snapshot.profiles}
-                    onSelect={profileId => void createMission(profileId)}
-                    onProbe={profileId => void probeAgent(profileId)}
-                    onAddProfile={addProfile}
-                    onTrust={trustProfile}
-                    onAuthenticate={authenticateProfile}
-                    onTerminalAuthenticate={startTerminalAuthentication}
-                  />
-                </SheetHeader>
-                <CodingTaskList snapshot={snapshot} onSelect={laneId => void selectLane(laneId)} />
-              </SheetContent>
-            </Sheet>
-            <Bot className="size-4 text-primary" />
-            <span className="text-sm font-medium">
-              {activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
-            </span>
-            {activeProfile && (
-              <Badge variant="secondary">{profileStatusText(activeProfile.status)}</Badge>
+        <header className="flex min-h-14 items-center justify-between gap-3 border-b border-border px-4 py-2">
+          <div
+            className={cn(
+              'flex min-w-0 items-center gap-2',
+              isSidebarCollapsed && isMac && 'pl-[68px]',
             )}
-            {activeLane?.configOptions.map(option =>
-              option.type === 'select' ? (
-                <Select
-                  key={option.id}
-                  value={typeof option.currentValue === 'string' ? option.currentValue : null}
-                  onValueChange={value => {
-                    if (value) void setLaneConfigOption(option.id, value);
-                  }}
-                >
-                  <SelectTrigger size="sm" aria-label={option.name}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {option.options?.map(value => (
-                      <SelectItem key={value.value} value={value.value}>
-                        {value.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Switch
-                  key={option.id}
-                  size="sm"
-                  checked={option.currentValue === true}
-                  aria-label={option.name}
-                  onCheckedChange={value => void setLaneConfigOption(option.id, value)}
-                />
-              ),
+          >
+            {isSidebarCollapsed && onToggleSidebar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={onToggleSidebar}
+                aria-label={i18nService.t('expand')}
+              >
+                <PanelLeftOpen />
+              </Button>
+            ) : null}
+            <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+              <FolderGit2 className="size-4 shrink-0" />
+              <span className="truncate">{snapshot.room.name}</span>
+            </span>
+            <CodingParticipants
+              activeLaneId={activeLane?.id ?? null}
+              lanes={activeMissionLanes}
+              profiles={snapshot.profiles}
+              onSelect={laneId => void selectLane(laneId)}
+            />
+            {activeProfile && (
+              <Badge variant="secondary" className="shrink-0">
+                {profileStatusText(activeProfile.status)}
+              </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {activeLane && activeLane.executionRoot !== workspaceRoot && (
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={i18nService.t('codingAgentManageAgents')}
+              onClick={() => setAgentManagerOpen(true)}
+            >
+              <Settings2 />
+            </Button>
+            {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
               <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
                 <FileDiff className="mr-1 size-4" />
                 {i18nService.t('codingAgentReviewChanges')}
               </Button>
             )}
-            <Sheet open={inspectorSheetOpen} onOpenChange={setInspectorSheetOpen}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="max-lg:hidden"
+              aria-label={i18nService.t('codingGitPanel')}
+              aria-pressed={sidePanelView === CodingSidePanelView.Git}
+              onClick={() =>
+                setSidePanelView(current =>
+                  current === CodingSidePanelView.Git ? null : CodingSidePanelView.Git,
+                )
+              }
+            >
+              <GitBranch />
+            </Button>
+            <Sheet open={gitSheetOpen} onOpenChange={setGitSheetOpen}>
               <SheetTrigger
                 render={
                   <Button
@@ -743,98 +667,135 @@ export const CodingWorkbenchView = () => {
                     variant="ghost"
                     size="icon"
                     className="lg:hidden"
-                    aria-label={i18nService.t('codingAgentInspector')}
-                  >
-                    <PanelRight />
-                  </Button>
+                    aria-label={i18nService.t('codingGitPanel')}
+                  />
                 }
-              />
-              <SheetContent side="bottom" className="h-[70dvh] p-0">
-                <SheetHeader>
-                  <SheetTitle>{i18nService.t('codingAgentInspector')}</SheetTitle>
+              >
+                <GitBranch />
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-[80dvh] p-0">
+                <SheetHeader className="sr-only">
+                  <SheetTitle>{i18nService.t('codingGitPanel')}</SheetTitle>
                 </SheetHeader>
-                <div className="min-h-0 flex-1">
-                  <CodingInspector events={activeEvents} />
-                </div>
+                <CodingGitPanel
+                  workspaceRoot={workspaceRoot}
+                  laneId={activeLane?.id ?? null}
+                  sourceRoot={gitSourceRoot}
+                  refreshKey={gitRefreshKey}
+                />
               </SheetContent>
             </Sheet>
-            {activeLane && (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  nativeButton
-                  render={
-                    <Button size="sm" variant="outline">
-                      <UsersRound className="mr-1 size-4" />
-                      {i18nService.t('codingAgentCollaborate')}
-                    </Button>
-                  }
-                />
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={openCollaborationPreset}>
-                    {i18nService.t('codingAgentPresetTitle')}
-                  </DropdownMenuItem>
-                  {snapshot.profiles
-                    .filter(profile => profile.status === CodingAgentProfileStatus.Ready)
-                    .map(profile => (
-                      <DropdownMenuItem
-                        key={profile.id}
-                        onSelect={() => void addCollaborator(profile.id)}
-                      >
-                        {i18nService.t('codingAgentAddCollaborator')} {profile.name}
-                      </DropdownMenuItem>
-                    ))}
-                  {snapshot.lanes
-                    .filter(
-                      lane => lane.missionId === activeLane.missionId && lane.id !== activeLane.id,
+            {hasInspectorContent && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="max-lg:hidden"
+                  aria-label={i18nService.t('codingAgentInspector')}
+                  aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
+                  onClick={() =>
+                    setSidePanelView(current =>
+                      current === CodingSidePanelView.Inspector
+                        ? null
+                        : CodingSidePanelView.Inspector,
                     )
-                    .map(lane => (
-                      <DropdownMenuItem key={lane.id} onSelect={() => void previewHandoff(lane.id)}>
-                        {i18nService.t('codingAgentHandoffTo')}{' '}
-                        {snapshot.profiles.find(profile => profile.id === lane.profileId)?.name}
-                      </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {activeLane?.status === CodingLaneStatus.Running && (
-              <Button size="sm" variant="outline" onClick={cancel}>
-                <CircleStop className="mr-1 size-4" />
-                {i18nService.t('codingAgentStop')}
-              </Button>
+                  }
+                >
+                  <PanelRight />
+                </Button>
+                <Sheet open={inspectorSheetOpen} onOpenChange={setInspectorSheetOpen}>
+                  <SheetTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="lg:hidden"
+                        aria-label={i18nService.t('codingAgentInspector')}
+                      >
+                        <PanelRight />
+                      </Button>
+                    }
+                  />
+                  <SheetContent side="bottom" className="h-[70dvh] p-0">
+                    <SheetHeader>
+                      <SheetTitle>{i18nService.t('codingAgentInspector')}</SheetTitle>
+                    </SheetHeader>
+                    <div className="min-h-0 flex-1">
+                      <CodingInspector events={activeEvents} />
+                    </div>
+                  </SheetContent>
+                </Sheet>
+              </>
             )}
           </div>
         </header>
         <CodingEventStream
           events={activeEvents}
+          isStreaming={activeLane?.status === CodingLaneStatus.Running}
+          emptyDescription={
+            draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
+          }
           scrollAreaRef={eventStreamRef}
           onScrollPositionChange={scrollPosition => {
             if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
           }}
         />
         <CodingComposer
+          availableCommands={activeLane?.availableCommands ?? []}
+          configOptions={activeLane?.configOptions ?? []}
           disabled={
-            !activeLane ||
-            activeLane.status === CodingLaneStatus.Running ||
-            activeLane.status === CodingLaneStatus.WaitingApproval
+            draftSession
+              ? !draftSession.profileId || !draftSession.sourceRoot
+              : !activeLane || activeLane.status === CodingLaneStatus.WaitingApproval
           }
+          isRunning={activeLane?.status === CodingLaneStatus.Running}
           prompt={prompt}
           recipientName={activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
+          showRecipient={!draftSession}
+          leadingTools={
+            draftSession ? (
+              <CodingDraftControls
+                draft={draftSession}
+                profiles={snapshot.profiles}
+                sources={draftSession.sources}
+                onChange={onDraftSessionChange}
+              />
+            ) : undefined
+          }
           onChange={next => {
-            if (activeLane) {
+            if (draftSession) {
+              setNewSessionDraftState({ id: draftSession.id, value: next });
+            } else if (activeLane) {
               setDraftState({ laneId: activeLane.id, value: next });
               saveDraft(activeLane.id, next);
             }
           }}
+          onConfigOptionChange={(optionId, value) => void setLaneConfigOption(optionId, value)}
           onSend={() => void sendPrompt()}
+          onStop={() => void cancel()}
         />
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
-      <aside className="min-h-0 border-l border-border max-lg:hidden">
-        <CodingInspector events={activeEvents} />
-      </aside>
+      {desktopSidePanelOpen && (
+        <aside className="min-h-0 border-l border-border max-lg:hidden">
+          {sidePanelView === CodingSidePanelView.Git ? (
+            <CodingGitPanel
+              workspaceRoot={workspaceRoot}
+              laneId={activeLane?.id ?? null}
+              sourceRoot={gitSourceRoot}
+              refreshKey={gitRefreshKey}
+              onClose={() => setSidePanelView(null)}
+            />
+          ) : (
+            <CodingInspector events={activeEvents} />
+          )}
+        </aside>
+      )}
     </div>
   );
 };
 
 const thisScrollPosition = (root: HTMLDivElement | null): number =>
-  root?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]')?.scrollTop ?? 0;
+  root?.querySelector<HTMLElement>('.coding-conversation-scroll')?.scrollTop ?? 0;
