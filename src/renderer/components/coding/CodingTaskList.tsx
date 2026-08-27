@@ -1,3 +1,4 @@
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 
@@ -12,18 +13,29 @@ export const CodingTaskList = ({ snapshot, onSelect }: CodingTaskListProps) => (
   <ScrollArea className="min-h-0 flex-1">
     <div className="flex flex-col gap-1">
       {snapshot.missions.map(mission => {
-        const lane = snapshot.lanes.find(candidate => candidate.missionId === mission.id);
+        const missionLanes = snapshot.lanes.filter(candidate => candidate.missionId === mission.id);
+        const lane =
+          missionLanes.find(candidate => candidate.id === snapshot.room.activeLaneId) ??
+          missionLanes[0];
         const profile = snapshot.profiles.find(candidate => candidate.id === lane?.profileId);
+        const isActive = snapshot.room.activeMissionId === mission.id;
         return (
           <Button
             key={mission.id}
             type="button"
-            variant="ghost"
+            variant={isActive ? 'secondary' : 'ghost'}
             disabled={!lane}
             onClick={() => lane && onSelect(lane.id)}
             className="h-auto w-full flex-col items-start px-2 py-2 text-left"
           >
-            <span className="truncate text-sm">{mission.title}</span>
+            <span className="flex w-full min-w-0 items-center justify-between gap-2">
+              <span className="truncate text-sm">{mission.title}</span>
+              {missionLanes.length > 1 && (
+                <Badge variant="secondary" className="shrink-0">
+                  {missionLanes.length}
+                </Badge>
+              )}
+            </span>
             <span className="mt-1 text-xs text-muted-foreground">{profile?.name ?? ''}</span>
           </Button>
         );

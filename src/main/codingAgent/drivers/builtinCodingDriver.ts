@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import {
+  type CodingAgentAvailableCommand,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
   type CodingEvent,
@@ -45,10 +46,20 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     workspaceRoot: string;
     localSessionId?: string;
   }): Promise<CodingAgentSession> {
-    return { id: input.localSessionId ?? randomUUID(), remoteSessionId: null, configOptions: [] };
+    return {
+      id: input.localSessionId ?? randomUUID(),
+      remoteSessionId: null,
+      configOptions: [],
+      availableCommands: [],
+    };
   }
   async loadSession(input: { remoteSessionId: string }): Promise<CodingAgentSession> {
-    return { id: input.remoteSessionId, remoteSessionId: null, configOptions: [] };
+    return {
+      id: input.remoteSessionId,
+      remoteSessionId: null,
+      configOptions: [],
+      availableCommands: [],
+    };
   }
   async *prompt(input: {
     sessionId: string;
@@ -76,6 +87,17 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
   }
   getSessionConfigOptions(_sessionId: string): CodingAgentConfigOption[] {
     return [];
+  }
+  getSessionAvailableCommands(_sessionId: string): CodingAgentAvailableCommand[] {
+    return [];
+  }
+  onAvailableCommandsChanged(
+    _listener: (sessionId: string, commands: CodingAgentAvailableCommand[]) => void,
+  ): () => void {
+    return () => undefined;
+  }
+  onSessionTitleChanged(_listener: (sessionId: string, title: string) => void): () => void {
+    return () => undefined;
   }
   async disposeSession(sessionId: string): Promise<void> {
     void sessionId;

@@ -1,7 +1,11 @@
 import Database from 'better-sqlite3';
 import { afterEach, expect, test } from 'vitest';
 
-import { CodingEventKind, CodingStreamUpdateMode } from '../../shared/codingAgent';
+import {
+  CodingAgentProfileId,
+  CodingEventKind,
+  CodingStreamUpdateMode,
+} from '../../shared/codingAgent';
 import { initializeCodingAgentSchema } from './schema';
 import { CodingRoomRepository } from './codingRoomRepository';
 
@@ -31,10 +35,18 @@ test('persists independent mission lanes and append-only events', () => {
   expect([first.sequence, second.sequence]).toEqual([1, 2]);
   expect(repository.listEvents([lane.id])).toHaveLength(2);
   repository.updateLaneViewState(lane.id, 'Continue after review', 42);
+  repository.updateLaneAvailableCommands(lane.id, [
+    { name: 'mcp', description: 'List configured MCP tools.' },
+    { name: '$project-skill', description: 'Run the project skill.' },
+  ]);
   expect(repository.listLanes([mission.id])[0]).toEqual(
     expect.objectContaining({
       draft: 'Continue after review',
       scrollPosition: 42,
+      availableCommands: [
+        { name: 'mcp', description: 'List configured MCP tools.' },
+        { name: '$project-skill', description: 'Run the project skill.' },
+      ],
     }),
   );
 });
@@ -47,13 +59,39 @@ test('writer lease is mutually exclusive and handoffs are immutable records', ()
   const mission = repository.createMission(room.id, 'Review');
   const first = repository.createLane(mission.id, 'first', '/workspace/project');
   const second = repository.createLane(mission.id, 'second', '/workspace/project');
-  repository.acquireWriterLease(room.id, first.id);
-  expect(() => repository.acquireWriterLease(room.id, second.id)).toThrow('writer lease');
-  repository.releaseWriterLease(room.id, first.id);
-  repository.acquireWriterLease(room.id, second.id);
+  repository.acquireWriterLease(room.id, '/workspace/project', first.id);
+  expect(() => repository.acquireWriterLease(room.id, '/workspace/project', second.id)).toThrow(
+    'writer lease',
+  );
+  repository.acquireWriterLease(room.id, '/workspace/other', second.id);
+  repository.releaseWriterLease(room.id, '/workspace/project', first.id);
+  repository.acquireWriterLease(room.id, '/workspace/project', second.id);
   expect(repository.createHandoff(mission.id, first.id, second.id, { summary: 'done' })).toEqual(
     expect.any(String),
   );
+});
+
+test('persists logical coding workspaces separately from source folders', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+
+  const room = repository.createWorkspace(
+    'Product app',
+    ['/workspace/product', '/workspace/shared'],
+    CodingAgentProfileId.Builtin,
+  );
+
+  expect(room).toMatchObject({
+    name: 'Product app',
+    workspaceRoot: '/workspace/product',
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  expect(repository.listWorkspaceSources(room.id)).toEqual([
+    expect.objectContaining({ path: '/workspace/product', isPrimary: true }),
+    expect.objectContaining({ path: '/workspace/shared', isPrimary: false }),
+  ]);
+  expect(repository.findWorkspaceIdBySource('/workspace/shared')).toBe(room.id);
 });
 
 test('coalesces streamed chunks with the same message ID into one durable event', () => {

@@ -39,6 +39,22 @@ export const AcpMethod = {
   TerminalRelease: methods.client.terminal.release,
 } as const;
 
+export const AcpSessionUpdateKind = {
+  AgentMessageChunk: 'agent_message_chunk',
+  UserMessageChunk: 'user_message_chunk',
+  AgentThoughtChunk: 'agent_thought_chunk',
+  Plan: 'plan',
+  PlanUpdate: 'plan_update',
+  PlanRemoved: 'plan_removed',
+  ToolCall: 'tool_call',
+  ToolCallUpdate: 'tool_call_update',
+  UsageUpdate: 'usage_update',
+  ConfigOptionUpdate: 'config_option_update',
+  AvailableCommandsUpdate: 'available_commands_update',
+  SessionInfoUpdate: 'session_info_update',
+} as const;
+export type AcpSessionUpdateKind = (typeof AcpSessionUpdateKind)[keyof typeof AcpSessionUpdateKind];
+
 export class AcpProtocolIncompatibleError extends Error {
   constructor(actualVersion: unknown) {
     super(`ACP protocol version ${String(actualVersion)} is not supported.`);

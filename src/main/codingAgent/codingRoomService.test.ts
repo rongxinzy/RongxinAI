@@ -1,10 +1,14 @@
 import Database from 'better-sqlite3';
+import { mkdirSync, mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import path from 'path';
 import { execPath } from 'process';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import {
   CodingAgentDriverKind,
   CodingAgentProfileStatus,
+  CodingAgentProfileId,
   CodingAssignmentStatus,
   CodingEventKind,
   CodingLaneStatus,
@@ -15,12 +19,165 @@ import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
 import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
+import { AcpSessionUpdateKind } from './acp/protocol';
 
 let db: Database.Database | undefined;
+const tempDirectories: string[] = [];
 
 afterEach(() => {
   db?.close();
   db = undefined;
+  for (const directory of tempDirectories.splice(0)) {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('creates workspace-scoped sessions with immutable agent and source bindings', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-workspace-'));
+  const primaryRoot = path.join(root, 'app');
+  const sharedRoot = path.join(root, 'shared');
+  mkdirSync(primaryRoot);
+  mkdirSync(sharedRoot);
+  tempDirectories.push(root);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [primaryRoot, sharedRoot],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: sharedRoot,
+    profileId: 'builtin-zhiyuan-coding',
+    title: 'Fix shared package',
+  });
+
+  expect(snapshot.room).toMatchObject({ id: workspace.id, name: 'Product' });
+  expect(workspace.defaultProfileId).toBe(CodingAgentProfileId.Builtin);
+  expect(snapshot.lanes[0]).toMatchObject({
+    profileId: 'builtin-zhiyuan-coding',
+    sourceRoot: sharedRoot,
+    executionRoot: sharedRoot,
+  });
+  expect(service.listWorkspaces()[0].sessions[0]).toMatchObject({
+    title: 'Fix shared package',
+    profileId: 'builtin-zhiyuan-coding',
+    sourceRoot: sharedRoot,
+  });
+  expect(() =>
+    service.updateWorkspace({
+      workspaceId: workspace.id,
+      name: 'Renamed product',
+      sourceFolders: [primaryRoot],
+      defaultProfileId: CodingAgentProfileId.Builtin,
+    }),
+  ).toThrow('cannot be removed');
+});
+
+test('does not persist a draft session when its default agent model is unavailable', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-unavailable-'));
+  tempDirectories.push(root);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+    validateBuiltinModel: async () => {
+      throw new Error('Configured model is unavailable.');
+    },
+  });
+  const [workspace] = service.createWorkspace({
+    name: 'Unavailable model',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+
+  await expect(
+    service.startSession({
+      workspaceId: workspace.id,
+      sourceRoot: root,
+      profileId: workspace.defaultProfileId,
+      prompt: 'Implement the first task.',
+    }),
+  ).rejects.toThrow('model is unavailable');
+
+  expect(service.listWorkspaces()[0].sessions).toEqual([]);
+  expect(service.bootstrap(root).missions).toEqual([]);
+});
+
+test('does not persist a session before an external ACP session is established', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-acp-failure-'));
+  tempDirectories.push(root);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'Unavailable ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: [
+      '-e',
+      [
+        "let buffer='';",
+        "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+        "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+        "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, error: { message: 'Agent model is unavailable.' } }) + '\\n');",
+        '} });',
+      ].join(''),
+    ],
+  });
+  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  const [workspace] = service.createWorkspace({
+    name: 'Unavailable external agent',
+    sourceFolders: [root],
+    defaultProfileId: profile.id,
+  });
+
+  await expect(
+    service.startSession({
+      workspaceId: workspace.id,
+      sourceRoot: root,
+      profileId: profile.id,
+      prompt: 'Implement the first task.',
+    }),
+  ).rejects.toThrow('Agent model is unavailable');
+
+  expect(service.listWorkspaces()[0].sessions).toEqual([]);
+  expect(service.bootstrap(root).missions).toEqual([]);
+  await service.dispose();
 });
 
 test('routes a builtin lane through its driver and projects runtime completion', async () => {
@@ -87,6 +244,30 @@ test('does not create a mission when the selected agent needs model configuratio
   ).rejects.toThrow('not ready');
 });
 
+test('rediscovers external agents on demand and returns the refreshed room snapshot', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const registry = new CodingAgentRegistry();
+  const discoverExternalAgents = vi
+    .spyOn(registry, 'discoverExternalAgents')
+    .mockResolvedValue(undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const snapshot = await service.discoverAgents('/workspace/project');
+
+  expect(discoverExternalAgents).toHaveBeenCalledOnce();
+  expect(snapshot.room.workspaceRoot).toBe('/workspace/project');
+  expect(snapshot.profiles).toEqual([
+    expect.objectContaining({ id: 'builtin-zhiyuan-coding', isBuiltin: true }),
+  ]);
+});
+
 test('projects builtin permission requests into the coding room status', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
@@ -98,7 +279,10 @@ test('projects builtin permission requests into the coding room status', async (
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const snapshot = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const snapshot = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   const lane = snapshot.lanes[0];
   service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.Permission, {
     requestId: 'approval',
@@ -123,7 +307,10 @@ test('responds to builtin coding permissions through the in-process runtime', as
     respondBuiltinPermission,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   const lane = created.lanes[0];
   service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.Permission, {
     requestId: 'approval',
@@ -138,7 +325,10 @@ test('responds to builtin coding permissions through the in-process runtime', as
   expect(result.lanes[0].status).toBe(CodingLaneStatus.Running);
   expect(result.events.at(-1)).toMatchObject({
     kind: CodingEventKind.ToolCall,
-    payload: { permissionRequestId: 'approval', permissionOutcome: CodingPermissionOutcome.Selected },
+    payload: {
+      permissionRequestId: 'approval',
+      permissionOutcome: CodingPermissionOutcome.Selected,
+    },
   });
 });
 
@@ -156,7 +346,10 @@ test('cancels only the active turn and retains the mission and lane', async () =
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   const lane = created.lanes[0];
   const updated = await service.cancel(workspaceRoot, lane.id);
 
@@ -178,7 +371,10 @@ test('recovers stale running lanes after an application restart without losing t
     completeExternalWorkbenchRun: () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   await service.prompt(workspaceRoot, {
     laneId: created.lanes[0].id,
     prompt: 'Implement the change.',
@@ -252,12 +448,69 @@ test('requires explicit confirmation before sending a recovery summary to a repl
   );
 });
 
+test('prepares a new ACP lane and projects its dynamic commands before the first prompt', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const registry = new CodingAgentRegistry();
+  const updateKind = JSON.stringify(AcpSessionUpdateKind.AvailableCommandsUpdate);
+  registry.registerExternal({
+    name: 'Command-aware ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: [
+      '-e',
+      [
+        "let buffer='';",
+        "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+        "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+        `if (request.method === 'session/new') { process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'command-session', update: { sessionUpdate: ${updateKind}, availableCommands: [{ name: 'mcp', description: 'List MCP tools.' }, { name: 'skills', description: 'List skills.' }] } } }) + '\\n'); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'command-session' } }) + '\\n'); }`,
+        '} });',
+      ].join(''),
+    ],
+  });
+  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = process.cwd();
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  const created = await service.createMission({ workspaceRoot, profileId: profile.id });
+
+  const prepared = await service.prepareLane(workspaceRoot, created.lanes[0].id);
+
+  expect(prepared.lanes[0]).toMatchObject({
+    remoteSessionId: 'command-session',
+    availableCommands: [
+      { name: 'mcp', description: 'List MCP tools.' },
+      { name: 'skills', description: 'List skills.' },
+    ],
+  });
+  await service.dispose();
+});
+
 test('creates collaborator lanes in isolated workspaces and runs them independently', async () => {
   db = new Database(':memory:');
   initializeCodingAgentSchema(db);
   const startBuiltinSession = vi.fn(async () => undefined);
-  const createIsolatedWorkspace = vi.fn(async ({ laneId }: { laneId: string }) =>
-    `/isolated/${laneId}`,
+  const createIsolatedWorkspace = vi.fn(
+    async ({ laneId }: { laneId: string }) => `/isolated/${laneId}`,
   );
   const getWorkspaceBaseline = vi.fn(async () => 'base-commit');
   const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
@@ -270,7 +523,10 @@ test('creates collaborator lanes in isolated workspaces and runs them independen
     getWorkspaceBaseline,
   });
   const workspaceRoot = '/workspace/project';
-  const initial = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const initial = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   const collaborator = await service.addLane(
     workspaceRoot,
     initial.missions[0].id,
@@ -311,7 +567,10 @@ test('previews and persists an immutable handoff with the source Git baseline', 
       workspaceRoot === '/workspace/project' ? 'diff --git a/file b/file' : null,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   const source = created.lanes[0];
   const withCollaborator = await service.addLane(
     workspaceRoot,
@@ -364,7 +623,10 @@ test('requires an isolated lane and an idle primary writer before applying colla
     applyIsolatedWorkspaceDiff,
   });
   const workspaceRoot = '/workspace/project';
-  const created = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
   const primaryLane = created.lanes[0];
   const withCollaborator = await service.addLane(
     workspaceRoot,
@@ -409,7 +671,10 @@ test('creates deterministic isolated review and verification assignments for a c
     applyWorkspacePatch: async () => undefined,
   });
   const workspaceRoot = '/workspace/project';
-  const initial = await service.createMission({ workspaceRoot, profileId: 'builtin-zhiyuan-coding' });
+  const initial = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
 
   const result = await service.createImplementationReviewVerificationPreset({
     workspaceRoot,

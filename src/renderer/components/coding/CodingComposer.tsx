@@ -1,43 +1,190 @@
-import { Button } from '@shared/components/ui/button';
-import { Textarea } from '@shared/components/ui/textarea';
-import { Send } from 'lucide-react';
+import {
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputTools,
+} from '@shared/components/ai-elements/prompt-input';
+import { Bot } from 'lucide-react';
+import { type ReactNode, useRef, useState } from 'react';
 
+import type {
+  CodingAgentAvailableCommand,
+  CodingAgentConfigOption,
+} from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import { CodingComposerConfigControls } from './CodingComposerConfigControls';
+import { CodingSlashCommandMenu } from './CodingSlashCommandMenu';
+import { filterSlashCommands, slashCommandPrompt, slashCommandQuery } from './codingSlashCommands';
+import { CodingComposerStatus } from './constants';
 
 interface CodingComposerProps {
+  availableCommands: CodingAgentAvailableCommand[];
+  configOptions: CodingAgentConfigOption[];
   disabled: boolean;
+  isRunning: boolean;
   prompt: string;
   recipientName: string;
+  showRecipient?: boolean;
+  leadingTools?: ReactNode;
   onChange: (value: string) => void;
+  onConfigOptionChange: (optionId: string, value: string | boolean) => void;
   onSend: () => void;
+  onStop: () => void;
 }
 
 export const CodingComposer = ({
+  availableCommands,
+  configOptions,
   disabled,
+  isRunning,
   prompt,
   recipientName,
+  showRecipient = true,
+  leadingTools,
   onChange,
+  onConfigOptionChange,
   onSend,
-}: CodingComposerProps) => (
-  <div className="border-t border-border p-3">
-    <p className="mb-2 text-xs text-muted-foreground">
-      {i18nService.t('codingAgentSendTo')} {recipientName}
-    </p>
-    <div className="flex gap-2">
-      <Textarea
-        value={prompt}
-        onChange={event => onChange(event.target.value)}
-        placeholder={i18nService.t('codingAgentPromptPlaceholder')}
-        disabled={disabled}
-      />
-      <Button
-        type="button"
-        onClick={onSend}
-        disabled={disabled || !prompt.trim()}
-        aria-label={i18nService.t('codingAgentSend')}
-      >
-        <Send className="size-4" />
-      </Button>
+  onStop,
+}: CodingComposerProps) => {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [commandSelection, setCommandSelection] = useState<{
+    query: string | null;
+    name: string;
+  }>({ query: null, name: '' });
+  const [dismissedPrompt, setDismissedPrompt] = useState<string | null>(null);
+  const query = slashCommandQuery(prompt);
+  const matchingCommands = query === null ? [] : filterSlashCommands(availableCommands, query);
+  const selectedCommandName = commandSelection.query === query ? commandSelection.name : '';
+  const selectedCommand =
+    matchingCommands.find(command => command.name === selectedCommandName) ?? matchingCommands[0];
+  const commandMenuOpen =
+    !disabled &&
+    !isRunning &&
+    query !== null &&
+    availableCommands.length > 0 &&
+    dismissedPrompt !== prompt;
+
+  const selectCommand = (command: CodingAgentAvailableCommand) => {
+    const nextPrompt = slashCommandPrompt(command);
+    setDismissedPrompt(nextPrompt);
+    onChange(nextPrompt);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextPrompt.length, nextPrompt.length);
+    });
+  };
+
+  const insertNewlineAtCursor = () => {
+    const textarea = textareaRef.current;
+    const selectionStart = textarea?.selectionStart ?? prompt.length;
+    const selectionEnd = textarea?.selectionEnd ?? selectionStart;
+    const nextPrompt = `${prompt.slice(0, selectionStart)}\n${prompt.slice(selectionEnd)}`;
+    onChange(nextPrompt);
+    requestAnimationFrame(() => {
+      const nextCursorPosition = selectionStart + 1;
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCursorPosition, nextCursorPosition);
+    });
+  };
+
+  return (
+    <div className="px-4 pt-2 pb-4">
+      <div className="relative mx-auto max-w-5xl">
+        {commandMenuOpen ? (
+          <CodingSlashCommandMenu
+            commands={matchingCommands}
+            selectedName={selectedCommand?.name ?? ''}
+            onSelectedNameChange={name => setCommandSelection({ query, name })}
+            onSelect={selectCommand}
+          />
+        ) : null}
+        <PromptInput
+          className="rounded-3xl shadow-elevated transition-shadow **:data-[slot=input-group]:rounded-3xl"
+          onSubmit={(_message, event) => {
+            event.preventDefault();
+            if (!disabled && !isRunning && prompt.trim()) onSend();
+          }}
+        >
+          <PromptInputBody>
+            <PromptInputTextarea
+              ref={textareaRef}
+              value={prompt}
+              onChange={event => onChange(event.target.value)}
+              onKeyDown={event => {
+                if (event.nativeEvent.isComposing) return;
+                if (event.key === 'Enter' && event.ctrlKey) {
+                  event.preventDefault();
+                  insertNewlineAtCursor();
+                  return;
+                }
+                if (!commandMenuOpen) return;
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setDismissedPrompt(prompt);
+                  return;
+                }
+                if (!selectedCommand) return;
+                const selectedIndex = matchingCommands.indexOf(selectedCommand);
+                if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  const offset = event.key === 'ArrowDown' ? 1 : -1;
+                  const nextIndex =
+                    (selectedIndex + offset + matchingCommands.length) % matchingCommands.length;
+                  setCommandSelection({ query, name: matchingCommands[nextIndex].name });
+                  return;
+                }
+                if (event.key === 'Tab') {
+                  event.preventDefault();
+                  selectCommand(selectedCommand);
+                  return;
+                }
+                if (event.key === 'Enter') {
+                  const commandPrompt = slashCommandPrompt(selectedCommand);
+                  if (!selectedCommand.input?.hint && prompt === commandPrompt) {
+                    setDismissedPrompt(prompt);
+                    return;
+                  }
+                  event.preventDefault();
+                  selectCommand(selectedCommand);
+                }
+              }}
+              placeholder={i18nService.t('codingAgentPromptPlaceholder')}
+              aria-label={i18nService.t('codingAgentPromptPlaceholder')}
+              aria-autocomplete="list"
+              aria-controls={commandMenuOpen ? 'coding-agent-command-menu' : undefined}
+              aria-expanded={commandMenuOpen}
+              disabled={disabled || isRunning}
+              className="max-h-48 min-h-20"
+            />
+          </PromptInputBody>
+          <PromptInputFooter className="flex-wrap">
+            <PromptInputTools className="flex-1 flex-wrap">
+              {leadingTools}
+              {showRecipient ? (
+                <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                  <Bot className="size-3.5 shrink-0" />
+                  <span className="shrink-0">{i18nService.t('codingAgentSendTo')}</span>
+                  <span className="truncate font-medium text-foreground">{recipientName}</span>
+                </div>
+              ) : null}
+              <CodingComposerConfigControls
+                options={configOptions}
+                onChange={onConfigOptionChange}
+              />
+            </PromptInputTools>
+            <PromptInputSubmit
+              status={isRunning ? CodingComposerStatus.Streaming : undefined}
+              onStop={onStop}
+              disabled={disabled || (!isRunning && !prompt.trim())}
+              aria-label={
+                isRunning ? i18nService.t('codingAgentStop') : i18nService.t('codingAgentSend')
+              }
+            />
+          </PromptInputFooter>
+        </PromptInput>
+      </div>
     </div>
-  </div>
-);
+  );
+};

@@ -2,6 +2,11 @@ import { chmod, mkdir, realpath, rm, writeFile } from 'fs/promises';
 import path from 'path';
 import { expect, test } from 'vitest';
 
+import {
+  CodingAgentEnvironmentKey,
+  CodingAgentManagedAdapterId,
+  CodingAgentProfileStatus,
+} from '../../../shared/codingAgent';
 import { AcpDiscoveryService, discoveryDirectories } from './discoveryService';
 
 test('discovers only PATH and known user-level installation directories', () => {
@@ -45,31 +50,88 @@ test('covers Windows user-level npm, pnpm, and Bun locations without scanning di
   expect(directories).toContain(path.join('C:\\Users\\agent', '.bun', 'bin'));
 });
 
-test('records a resolved absolute executable when PATH contains a relative directory', async () => {
+test('uses bundled ACP bridges for locally installed Codex and Claude Code', async () => {
   const root = path.join(process.cwd(), `.coding-agent-discovery-${Date.now()}`);
   const directory = path.join(root, 'bin');
-  const executable = path.join(directory, 'codex-acp');
-  const packageManifest = path.join(root, 'node_modules', '@agentclientprotocol', 'codex-acp', 'package.json');
-  const originalPath = process.env.PATH;
+  const codexExecutable = path.join(directory, 'codex');
+  const claudeExecutable = path.join(directory, 'claude');
   try {
     await mkdir(directory, { recursive: true });
-    await writeFile(executable, '#!/bin/sh\nexit 0\n');
-    await chmod(executable, 0o755);
-    await mkdir(path.dirname(packageManifest), { recursive: true });
-    await writeFile(packageManifest, JSON.stringify({ bin: { 'codex-acp': 'index.js' } }));
-    process.env.PATH = path.relative(process.cwd(), directory);
+    await writeFile(codexExecutable, '#!/bin/sh\nexit 0\n');
+    await writeFile(claudeExecutable, '#!/bin/sh\nexit 0\n');
+    await chmod(codexExecutable, 0o755);
+    await chmod(claudeExecutable, 0o755);
 
-    const profiles = await new AcpDiscoveryService().discover();
+    const profiles = await new AcpDiscoveryService(undefined, {
+      environment: { PATH: path.relative(process.cwd(), directory) },
+      home: root,
+      adapterRoot: process.cwd(),
+      adapterHostExecutable: '/Applications/ZhiYuan',
+    }).discover();
     expect(profiles).toContainEqual(
       expect.objectContaining({
         name: 'Codex',
-        command: await realpath(executable),
-        args: [],
-        status: 'detected',
+        command: '/Applications/ZhiYuan',
+        args: [
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@agentclientprotocol',
+            'codex-acp',
+            'dist',
+            'index.js',
+          ),
+        ],
+        status: CodingAgentProfileStatus.Detected,
+        environment: expect.objectContaining({
+          [CodingAgentEnvironmentKey.ElectronRunAsNode]: '1',
+          [CodingAgentEnvironmentKey.ManagedAdapterId]: CodingAgentManagedAdapterId.Codex,
+          [CodingAgentEnvironmentKey.CodexPath]: await realpath(codexExecutable),
+        }),
       }),
     );
+    expect(profiles).toContainEqual(
+      expect.objectContaining({
+        name: 'Claude Code',
+        command: '/Applications/ZhiYuan',
+        args: [
+          path.join(
+            process.cwd(),
+            'node_modules',
+            '@agentclientprotocol',
+            'claude-agent-acp',
+            'dist',
+            'index.js',
+          ),
+        ],
+        status: CodingAgentProfileStatus.Detected,
+        environment: expect.objectContaining({
+          [CodingAgentEnvironmentKey.ElectronRunAsNode]: '1',
+          [CodingAgentEnvironmentKey.ManagedAdapterId]: CodingAgentManagedAdapterId.ClaudeCode,
+          [CodingAgentEnvironmentKey.ClaudeCodeExecutable]: await realpath(claudeExecutable),
+        }),
+      }),
+    );
+    expect(profiles.filter(profile => profile.name === 'Codex')).toHaveLength(1);
+    expect(profiles.filter(profile => profile.name === 'Claude Code')).toHaveLength(1);
   } finally {
-    process.env.PATH = originalPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('does not expose bundled bridges when their corresponding agents are not installed', async () => {
+  const root = path.join(process.cwd(), `.coding-agent-discovery-empty-${Date.now()}`);
+  const directory = path.join(root, 'bin');
+  try {
+    await mkdir(directory, { recursive: true });
+    const profiles = await new AcpDiscoveryService(undefined, {
+      environment: { PATH: directory },
+      home: root,
+      adapterRoot: process.cwd(),
+    }).discover();
+    expect(profiles.some(profile => profile.name === 'Codex')).toBe(false);
+    expect(profiles.some(profile => profile.name === 'Claude Code')).toBe(false);
+  } finally {
     await rm(root, { recursive: true, force: true });
   }
 });

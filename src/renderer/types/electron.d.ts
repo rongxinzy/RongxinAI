@@ -89,6 +89,26 @@ interface CodingLaneChangePreviewResult {
   preview?: import('../../shared/codingAgent').CodingLaneChangePreview;
   error?: string;
 }
+interface CodingGitStatusResult {
+  success: boolean;
+  status?: import('../../shared/codingAgent').CodingGitStatus;
+  error?: string;
+}
+interface CodingGitDiffResult {
+  success: boolean;
+  diff?: string;
+  error?: string;
+}
+interface CodingWorkspaceActionResult {
+  success: boolean;
+  workspaces?: import('../../shared/codingAgent').CodingWorkspaceSummary[];
+  error?: string;
+}
+interface CodingAgentProfilesResult {
+  success: boolean;
+  profiles?: import('../../shared/codingAgent').CodingAgentProfile[];
+  error?: string;
+}
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -919,7 +939,26 @@ interface IElectronAPI {
     onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) => () => void;
   };
   codingAgent: {
+    listProfiles: () => Promise<CodingAgentProfilesResult>;
+    listWorkspaces: () => Promise<CodingWorkspaceActionResult>;
+    createWorkspace: (
+      input: import('../../shared/codingAgent').CreateCodingWorkspaceInput,
+    ) => Promise<CodingWorkspaceActionResult>;
+    updateWorkspace: (
+      input: import('../../shared/codingAgent').UpdateCodingWorkspaceInput,
+    ) => Promise<CodingWorkspaceActionResult>;
+    deleteWorkspace: (workspaceId: string) => Promise<CodingWorkspaceActionResult>;
+    createSession: (
+      input: import('../../shared/codingAgent').CreateCodingSessionInput,
+    ) => Promise<CodingAgentActionResult>;
+    startSession: (
+      input: import('../../shared/codingAgent').StartCodingSessionInput,
+    ) => Promise<CodingAgentActionResult>;
     bootstrap: (workspaceRoot: string) => Promise<CodingAgentActionResult>;
+    prepareLane: (input: {
+      workspaceRoot: string;
+      laneId: string;
+    }) => Promise<CodingAgentActionResult>;
     createMission: (
       input: import('../../shared/codingAgent').CreateCodingMissionInput,
     ) => Promise<CodingAgentActionResult>;
@@ -971,6 +1010,25 @@ interface IElectronAPI {
       workspaceRoot: string;
       laneId: string;
     }) => Promise<CodingAgentActionResult>;
+    getGitStatus: (
+      input: import('../../shared/codingAgent').CodingGitTargetInput,
+    ) => Promise<CodingGitStatusResult>;
+    getGitDiff: (
+      input: import('../../shared/codingAgent').CodingGitDiffInput,
+    ) => Promise<CodingGitDiffResult>;
+    stageGitPaths: (
+      input: import('../../shared/codingAgent').CodingGitPathActionInput,
+    ) => Promise<CodingGitStatusResult>;
+    unstageGitPaths: (
+      input: import('../../shared/codingAgent').CodingGitPathActionInput,
+    ) => Promise<CodingGitStatusResult>;
+    commitGitChanges: (
+      input: import('../../shared/codingAgent').CodingGitCommitInput,
+    ) => Promise<CodingGitStatusResult>;
+    pushGitBranch: (
+      input: import('../../shared/codingAgent').CodingGitTargetInput,
+    ) => Promise<CodingGitStatusResult>;
+    discoverAgents: (input: { workspaceRoot: string }) => Promise<CodingAgentActionResult>;
     probeAgent: (input: {
       workspaceRoot: string;
       profileId: string;

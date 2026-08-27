@@ -4,11 +4,14 @@ import path from 'path';
 
 import {
   CodingAgentDriverKind,
+  CodingAgentEnvironmentKey,
+  CodingAgentProfileId,
   CodingAgentProfileStatus,
   type CodingAgentCapabilities,
   type CodingAgentProfile,
 } from '../../shared/codingAgent';
-import { AcpDiscoveryService } from './acp/discoveryService';
+import { AcpDiscoveryService, type AcpDiscoveryOptions } from './acp/discoveryService';
+import { BUNDLED_ACP_ADAPTERS, bundledAdapterDefinition } from './acp/bundledAdapters';
 import { AcpProbeService } from './acp/probeService';
 import { AcpProtocolIncompatibleError } from './acp/protocol';
 import type { CodingAgentProfileRepository } from './codingAgentProfileRepository';
@@ -25,8 +28,6 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
   supportsElicitation: true,
 };
 
-const BUILTIN_PROFILE_ID = 'builtin-zhiyuan-coding';
-
 export class CodingAgentRegistry extends EventEmitter {
   private readonly profiles = new Map<string, CodingAgentProfile>();
 
@@ -34,10 +35,12 @@ export class CodingAgentRegistry extends EventEmitter {
     private readonly repository?: CodingAgentProfileRepository,
     private readonly isBuiltinReady: () => boolean = () => true,
     private readonly acpRegistryPath?: string,
+    private readonly acpAdapterRoot = process.cwd(),
+    private readonly acpDiscoveryOptions: Omit<AcpDiscoveryOptions, 'adapterRoot'> = {},
   ) {
     super();
-    this.profiles.set(BUILTIN_PROFILE_ID, {
-      id: BUILTIN_PROFILE_ID,
+    this.profiles.set(CodingAgentProfileId.Builtin, {
+      id: CodingAgentProfileId.Builtin,
       name: '知远编程 Agent',
       description: '无需安装外部 Agent',
       driverKind: CodingAgentDriverKind.Builtin,
@@ -58,7 +61,7 @@ export class CodingAgentRegistry extends EventEmitter {
     return this.profiles.get(id);
   }
   refreshBuiltinReadiness(): CodingAgentProfile {
-    const profile = this.profiles.get(BUILTIN_PROFILE_ID);
+    const profile = this.profiles.get(CodingAgentProfileId.Builtin);
     if (!profile) throw new Error('The built-in coding agent profile was not found.');
     const status = this.isBuiltinReady()
       ? CodingAgentProfileStatus.Ready
@@ -75,7 +78,12 @@ export class CodingAgentRegistry extends EventEmitter {
     this.emit('changed');
   }
   registerExternal(profile: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>): CodingAgentProfile {
-    const registered = { ...profile, environment: profile.environment ?? {}, id: randomUUID(), isBuiltin: false };
+    const registered = {
+      ...profile,
+      environment: profile.environment ?? {},
+      id: randomUUID(),
+      isBuiltin: false,
+    };
     this.profiles.set(registered.id, registered);
     this.repository?.save(registered);
     this.emit('changed');
@@ -194,11 +202,89 @@ export class CodingAgentRegistry extends EventEmitter {
   }
 
   async discoverExternalAgents(): Promise<void> {
-    const discovered = await new AcpDiscoveryService(this.acpRegistryPath).discover();
+    const discovered = await new AcpDiscoveryService(this.acpRegistryPath, {
+      ...this.acpDiscoveryOptions,
+      adapterRoot: this.acpAdapterRoot,
+    }).discover();
+    const availableManagedAdapters = new Set<string>();
     for (const profile of discovered) {
-      if (this.list().some(existing => existing.command === profile.command)) continue;
-      this.registerExternal(profile);
+      const managedAdapterId = profile.environment[CodingAgentEnvironmentKey.ManagedAdapterId];
+      if (managedAdapterId) availableManagedAdapters.add(managedAdapterId);
+      const existing = this.findDiscoveredProfile(profile);
+      if (!existing) {
+        this.registerExternal(profile);
+        continue;
+      }
+      const launchUnchanged = this.launchConfigurationMatches(existing, profile);
+      this.replaceExternal({
+        ...existing,
+        ...profile,
+        status: launchUnchanged ? existing.status : CodingAgentProfileStatus.Detected,
+        capabilities: launchUnchanged ? existing.capabilities : profile.capabilities,
+        authMethods: launchUnchanged ? existing.authMethods : profile.authMethods,
+        id: existing.id,
+        isBuiltin: false,
+      });
     }
+    for (const existing of this.list().filter(profile => !profile.isBuiltin)) {
+      const adapter = bundledAdapterDefinition(existing);
+      if (!adapter || availableManagedAdapters.has(adapter.id)) continue;
+      this.replaceExternal({
+        ...existing,
+        description: `${adapter.profileName} is not currently installed on this device.`,
+        status: CodingAgentProfileStatus.Unavailable,
+        command: null,
+        args: [],
+        environment: {
+          [CodingAgentEnvironmentKey.ManagedAdapterId]: adapter.id,
+        },
+      });
+    }
+  }
+
+  private findDiscoveredProfile(
+    discovered: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>,
+  ): CodingAgentProfile | undefined {
+    const managedAdapterId = discovered.environment[CodingAgentEnvironmentKey.ManagedAdapterId];
+    if (managedAdapterId) {
+      const adapter = BUNDLED_ACP_ADAPTERS.find(candidate => candidate.id === managedAdapterId);
+      return this.list().find(
+        existing =>
+          !existing.isBuiltin &&
+          (existing.environment[CodingAgentEnvironmentKey.ManagedAdapterId] === managedAdapterId ||
+            (adapter?.legacyProfileNames.includes(existing.name) &&
+              existing.status !== CodingAgentProfileStatus.Untrusted)),
+      );
+    }
+    return this.list().find(
+      existing =>
+        !existing.isBuiltin &&
+        existing.command === discovered.command &&
+        this.argumentsMatch(existing.args, discovered.args),
+    );
+  }
+
+  private launchConfigurationMatches(
+    existing: CodingAgentProfile,
+    discovered: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>,
+  ): boolean {
+    return (
+      existing.command === discovered.command &&
+      this.argumentsMatch(existing.args, discovered.args) &&
+      JSON.stringify(existing.environment) === JSON.stringify(discovered.environment)
+    );
+  }
+
+  private argumentsMatch(left: string[], right: string[]): boolean {
+    return (
+      left.length === right.length && left.every((argument, index) => argument === right[index])
+    );
+  }
+
+  private replaceExternal(profile: CodingAgentProfile): void {
+    this.profiles.set(profile.id, profile);
+    this.repository?.save(profile);
+    this.emit('changed');
   }
 
   private allowedEnvironment(): Record<string, string | undefined> {

@@ -3,9 +3,15 @@ import type Database from 'better-sqlite3';
 export function initializeCodingAgentSchema(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS coding_rooms (
-      id TEXT PRIMARY KEY, workspace_root TEXT NOT NULL UNIQUE,
+      id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', workspace_root TEXT NOT NULL UNIQUE,
+      default_profile_id TEXT NOT NULL DEFAULT 'builtin-zhiyuan-coding',
       active_mission_id TEXT, active_lane_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS coding_workspace_sources (
+      id TEXT PRIMARY KEY, room_id TEXT NOT NULL, path TEXT NOT NULL, is_primary INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL, UNIQUE(room_id, path)
+    );
+    CREATE INDEX IF NOT EXISTS idx_coding_workspace_sources_room ON coding_workspace_sources(room_id, is_primary DESC, created_at);
     CREATE TABLE IF NOT EXISTS coding_missions (
       id TEXT PRIMARY KEY, room_id TEXT NOT NULL, title TEXT NOT NULL, goal TEXT NOT NULL,
       git_baseline TEXT, status TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -19,7 +25,7 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_coding_agent_profiles_command ON coding_agent_profiles(command);
     CREATE TABLE IF NOT EXISTS coding_agent_lanes (
-      id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, profile_id TEXT NOT NULL, execution_root TEXT NOT NULL DEFAULT '', config_options_json TEXT NOT NULL DEFAULT '[]', local_session_id TEXT NOT NULL,
+      id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, profile_id TEXT NOT NULL, source_root TEXT NOT NULL DEFAULT '', execution_root TEXT NOT NULL DEFAULT '', config_options_json TEXT NOT NULL DEFAULT '[]', available_commands_json TEXT NOT NULL DEFAULT '[]', local_session_id TEXT NOT NULL,
       remote_session_id TEXT, status TEXT NOT NULL, draft TEXT NOT NULL DEFAULT '', scroll_position INTEGER NOT NULL DEFAULT 0,
       pending_recovery_prompt TEXT, pending_recovery_context TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -40,21 +46,44 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS coding_workspace_leases (
       room_id TEXT PRIMARY KEY, lane_id TEXT, acquired_at INTEGER
     );
+    CREATE TABLE IF NOT EXISTS coding_source_writer_leases (
+      room_id TEXT NOT NULL, source_root TEXT NOT NULL, lane_id TEXT, acquired_at INTEGER,
+      PRIMARY KEY(room_id, source_root)
+    );
     CREATE TABLE IF NOT EXISTS coding_handoffs (
       id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, source_lane_id TEXT NOT NULL,
       target_lane_id TEXT NOT NULL, content_json TEXT NOT NULL, created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_coding_handoffs_mission ON coding_handoffs(mission_id, created_at);
   `);
+  const roomColumns = db.prepare('PRAGMA table_info(coding_rooms)').all() as Array<{
+    name: string;
+  }>;
+  if (!roomColumns.some(column => column.name === 'name')) {
+    db.exec("ALTER TABLE coding_rooms ADD COLUMN name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!roomColumns.some(column => column.name === 'default_profile_id')) {
+    db.exec(
+      "ALTER TABLE coding_rooms ADD COLUMN default_profile_id TEXT NOT NULL DEFAULT 'builtin-zhiyuan-coding'",
+    );
+  }
   const laneColumns = db.prepare('PRAGMA table_info(coding_agent_lanes)').all() as Array<{
     name: string;
   }>;
   if (!laneColumns.some(column => column.name === 'execution_root')) {
     db.exec("ALTER TABLE coding_agent_lanes ADD COLUMN execution_root TEXT NOT NULL DEFAULT ''");
   }
+  if (!laneColumns.some(column => column.name === 'source_root')) {
+    db.exec("ALTER TABLE coding_agent_lanes ADD COLUMN source_root TEXT NOT NULL DEFAULT ''");
+  }
   if (!laneColumns.some(column => column.name === 'config_options_json')) {
     db.exec(
       "ALTER TABLE coding_agent_lanes ADD COLUMN config_options_json TEXT NOT NULL DEFAULT '[]'",
+    );
+  }
+  if (!laneColumns.some(column => column.name === 'available_commands_json')) {
+    db.exec(
+      "ALTER TABLE coding_agent_lanes ADD COLUMN available_commands_json TEXT NOT NULL DEFAULT '[]'",
     );
   }
   if (!laneColumns.some(column => column.name === 'pending_recovery_prompt')) {
@@ -78,7 +107,9 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     );
   }
   if (!profileColumns.some(column => column.name === 'environment_json')) {
-    db.exec("ALTER TABLE coding_agent_profiles ADD COLUMN environment_json TEXT NOT NULL DEFAULT '{}'");
+    db.exec(
+      "ALTER TABLE coding_agent_profiles ADD COLUMN environment_json TEXT NOT NULL DEFAULT '{}'",
+    );
   }
   const assignmentColumns = db.prepare('PRAGMA table_info(coding_assignments)').all() as Array<{
     name: string;
@@ -89,4 +120,20 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
   if (!assignmentColumns.some(column => column.name === 'previous_assignment_id')) {
     db.exec('ALTER TABLE coding_assignments ADD COLUMN previous_assignment_id TEXT');
   }
+  db.exec(`
+    DELETE FROM coding_workspace_sources
+      WHERE room_id IN (SELECT id FROM coding_rooms WHERE trim(workspace_root) = '');
+    DELETE FROM coding_rooms WHERE trim(workspace_root) = '';
+    UPDATE coding_rooms SET name = workspace_root WHERE name = '';
+    INSERT OR IGNORE INTO coding_workspace_sources (id, room_id, path, is_primary, created_at)
+      SELECT lower(hex(randomblob(16))), id, workspace_root, 1, created_at FROM coding_rooms;
+    UPDATE coding_agent_lanes
+      SET source_root = COALESCE(
+        (SELECT coding_rooms.workspace_root FROM coding_missions
+          JOIN coding_rooms ON coding_rooms.id = coding_missions.room_id
+          WHERE coding_missions.id = coding_agent_lanes.mission_id),
+        execution_root
+      )
+      WHERE source_root = '';
+  `);
 }
