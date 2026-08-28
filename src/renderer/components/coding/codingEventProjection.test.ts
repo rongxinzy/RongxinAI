@@ -44,6 +44,22 @@ describe('projectCodingEvents', () => {
     expect(turns[0].status).toBe(CodingConversationTurnStatus.Complete);
   });
 
+  test('replaces cumulative built-in reasoning snapshots', () => {
+    const turns = projectCodingEvents([
+      event(1, CodingEventKind.Message, { role: 'user', content: '分析问题' }),
+      event(2, CodingEventKind.Reasoning, {
+        content: '先检查',
+        streamUpdateMode: CodingStreamUpdateMode.Replace,
+      }),
+      event(3, CodingEventKind.Reasoning, {
+        content: '先检查认证流程。',
+        streamUpdateMode: CodingStreamUpdateMode.Replace,
+      }),
+    ]);
+
+    expect(turns[0].reasoning?.content).toBe('先检查认证流程。');
+  });
+
   test('keeps tool activity but leaves file and terminal events to the inspector', () => {
     const turns = projectCodingEvents([
       event(1, CodingEventKind.Message, { role: 'user', content: '运行测试' }),
