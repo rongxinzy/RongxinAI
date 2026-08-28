@@ -29,7 +29,12 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
 export class BuiltinCodingDriver implements CodingAgentDriver {
   constructor(
     private readonly runtime: {
-      start(sessionId: string, workspaceRoot: string, prompt: string): Promise<void>;
+      start(
+        sessionId: string,
+        workspaceRoot: string,
+        prompt: string,
+        modelOverride?: string | null,
+      ): Promise<void>;
       cancel(sessionId: string): Promise<void>;
     },
   ) {}
@@ -65,8 +70,14 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    modelOverride?: string | null;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>> {
-    await this.runtime.start(input.sessionId, input.workspaceRoot, input.prompt);
+    await this.runtime.start(
+      input.sessionId,
+      input.workspaceRoot,
+      input.prompt,
+      input.modelOverride,
+    );
     // The in-process runtime emits streaming events after start() returns. The
     // CodingRoomService subscribes to that runtime directly, which avoids
     // snapshotting a race-prone event buffer and writing every event twice.

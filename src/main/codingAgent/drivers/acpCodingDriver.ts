@@ -286,6 +286,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    modelOverride?: string | null;
   }): AsyncIterable<DriverEvent> {
     await this.ensureConnected(input.workspaceRoot);
     this.fallbackMessageIds.delete(this.messageFallbackKey(input.sessionId, 'assistant'));
