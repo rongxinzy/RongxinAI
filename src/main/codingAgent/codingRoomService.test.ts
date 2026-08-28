@@ -20,6 +20,7 @@ import { CodingRoomRepository } from './codingRoomRepository';
 import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
 import { AcpSessionUpdateKind } from './acp/protocol';
+import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
 
 let db: Database.Database | undefined;
 const tempDirectories: string[] = [];
@@ -329,6 +330,44 @@ test('responds to builtin coding permissions through the in-process runtime', as
       permissionRequestId: 'approval',
       permissionOutcome: CodingPermissionOutcome.Selected,
     },
+  });
+});
+
+test('pauses a builtin lane when its runtime reports a recoverable interruption', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const workspaceRoot = '/workspace/project';
+  const created = await service.createMission({
+    workspaceRoot,
+    profileId: 'builtin-zhiyuan-coding',
+  });
+  const lane = created.lanes[0];
+  service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.Permission, {
+    requestId: 'approval',
+  });
+
+  service.recordBuiltinInterruption({
+    sessionId: lane.localSessionId,
+    interruptionId: 'interruption-1',
+    cause: CoworkInterruptionCause.ApprovalDenied,
+    taskId: 'task',
+    recoverable: true,
+  });
+
+  const updated = service.bootstrap(workspaceRoot);
+  expect(updated.lanes[0].status).toBe(CodingLaneStatus.Idle);
+  expect(updated.missions[0].status).toBe(CodingMissionStatus.NeedsReview);
+  expect(updated.assignments[0].status).toBe(CodingAssignmentStatus.Planned);
+  expect(updated.events.at(-1)).toMatchObject({
+    kind: CodingEventKind.TurnCancelled,
+    payload: { reason: CoworkInterruptionCause.ApprovalDenied },
   });
 });
 

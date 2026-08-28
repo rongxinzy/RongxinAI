@@ -104,6 +104,13 @@ export const CodingStreamUpdateMode = {
 export type CodingStreamUpdateMode =
   (typeof CodingStreamUpdateMode)[keyof typeof CodingStreamUpdateMode];
 
+export const CodingToolCallStatus = {
+  Pending: 'pending',
+  Completed: 'completed',
+  Failed: 'failed',
+} as const;
+export type CodingToolCallStatus = (typeof CodingToolCallStatus)[keyof typeof CodingToolCallStatus];
+
 export const CodingPermissionOutcome = {
   Selected: 'selected',
   Cancelled: 'cancelled',
