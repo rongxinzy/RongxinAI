@@ -883,7 +883,7 @@ const getCodingRoomService = (): CodingRoomService => {
         app.getAppPath(),
       ),
       {
-        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt }) => {
+        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt, modelOverride }) => {
           const coworkStoreInstance = getCoworkStore();
           if (!coworkStoreInstance.getSession(sessionId)) {
             coworkStoreInstance.createSession(
@@ -904,6 +904,7 @@ const getCodingRoomService = (): CodingRoomService => {
             workspaceRoot,
             sessionMode: 'work',
             confirmationMode: 'modal',
+            ...(modelOverride ? { modelOverride } : {}),
           });
         },
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),

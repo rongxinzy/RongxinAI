@@ -25,7 +25,7 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_coding_agent_profiles_command ON coding_agent_profiles(command);
     CREATE TABLE IF NOT EXISTS coding_agent_lanes (
-      id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, profile_id TEXT NOT NULL, source_root TEXT NOT NULL DEFAULT '', execution_root TEXT NOT NULL DEFAULT '', config_options_json TEXT NOT NULL DEFAULT '[]', available_commands_json TEXT NOT NULL DEFAULT '[]', local_session_id TEXT NOT NULL,
+      id TEXT PRIMARY KEY, mission_id TEXT NOT NULL, profile_id TEXT NOT NULL, model_override TEXT, source_root TEXT NOT NULL DEFAULT '', execution_root TEXT NOT NULL DEFAULT '', config_options_json TEXT NOT NULL DEFAULT '[]', available_commands_json TEXT NOT NULL DEFAULT '[]', local_session_id TEXT NOT NULL,
       remote_session_id TEXT, status TEXT NOT NULL, draft TEXT NOT NULL DEFAULT '', scroll_position INTEGER NOT NULL DEFAULT 0,
       pending_recovery_prompt TEXT, pending_recovery_context TEXT,
       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
@@ -72,6 +72,9 @@ export function initializeCodingAgentSchema(db: Database.Database): void {
   }>;
   if (!laneColumns.some(column => column.name === 'execution_root')) {
     db.exec("ALTER TABLE coding_agent_lanes ADD COLUMN execution_root TEXT NOT NULL DEFAULT ''");
+  }
+  if (!laneColumns.some(column => column.name === 'model_override')) {
+    db.exec('ALTER TABLE coding_agent_lanes ADD COLUMN model_override TEXT');
   }
   if (!laneColumns.some(column => column.name === 'source_root')) {
     db.exec("ALTER TABLE coding_agent_lanes ADD COLUMN source_root TEXT NOT NULL DEFAULT ''");

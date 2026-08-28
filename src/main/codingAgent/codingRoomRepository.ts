@@ -46,6 +46,7 @@ const rowLane = (row: Record<string, unknown>): CodingAgentLane => ({
   id: String(row.id),
   missionId: String(row.mission_id),
   profileId: String(row.profile_id),
+  modelOverride: (row.model_override as string | null) ?? null,
   sourceRoot: String(row.source_root || row.execution_root || ''),
   executionRoot: String(row.execution_root ?? ''),
   configOptions: JSON.parse(String(row.config_options_json ?? '[]')) as CodingAgentConfigOption[],
@@ -345,12 +346,14 @@ export class CodingRoomRepository {
     executionRoot = sourceRoot,
     id: string = randomUUID(),
     localSessionId: string = randomUUID(),
+    modelOverride: string | null = null,
   ): CodingAgentLane {
     const now = Date.now();
     const lane: CodingAgentLane = {
       id,
       missionId,
       profileId,
+      modelOverride,
       sourceRoot,
       executionRoot,
       configOptions: [],
@@ -365,12 +368,13 @@ export class CodingRoomRepository {
     };
     this.db
       .prepare(
-        'INSERT INTO coding_agent_lanes (id, mission_id, profile_id, source_root, execution_root, config_options_json, available_commands_json, local_session_id, remote_session_id, status, draft, scroll_position, pending_recovery_prompt, pending_recovery_context, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?)',
+        'INSERT INTO coding_agent_lanes (id, mission_id, profile_id, model_override, source_root, execution_root, config_options_json, available_commands_json, local_session_id, remote_session_id, status, draft, scroll_position, pending_recovery_prompt, pending_recovery_context, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?)',
       )
       .run(
         lane.id,
         missionId,
         profileId,
+        modelOverride,
         lane.sourceRoot,
         lane.executionRoot,
         JSON.stringify(lane.configOptions),
