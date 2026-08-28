@@ -16,6 +16,20 @@ const packageJson = JSON.parse(
 ) as Record<string, unknown>;
 const electronDevelopmentExternalRoots = new Set(extractExternalDeps(packageJson, true));
 const electronReadyPath = path.resolve(__dirname, 'dist-electron/.electron-ready');
+const rendererWatchDirectories = new Set(['public', 'src']);
+const rendererWatchFiles = new Set([
+  'index.html',
+  'office-preview.html',
+  'package.json',
+  'vite.config.ts',
+]);
+
+function ignoreOutsideRendererSources(filePath: string): boolean {
+  const relative = path.relative(__dirname, filePath).replaceAll('\\', '/');
+  if (!relative || relative.startsWith('../')) return false;
+  if (rendererWatchFiles.has(relative)) return false;
+  return !rendererWatchDirectories.has(relative.split('/')[0]);
+}
 
 function packageRoot(specifier: string): string {
   return specifier.startsWith('@')
@@ -24,7 +38,15 @@ function packageRoot(specifier: string): string {
 }
 
 function isElectronDevelopmentExternal(id: string): boolean {
-  return electronDevelopmentExternalRoots.has(packageRoot(id));
+  if (electronDevelopmentExternalRoots.has(packageRoot(id))) {
+    return true;
+  }
+
+  if (id.startsWith('\0') || id.startsWith('.') || path.isAbsolute(id)) {
+    return false;
+  }
+
+  return !id.startsWith('@shared/') && !id.startsWith('@/');
 }
 
 const copyPhotonWasmPlugin = () => ({
@@ -79,6 +101,21 @@ export default defineConfig(async ({ command }) => {
         : [
             electron([
               {
+                // Build preload once before starting the main-process watcher.
+                // Concurrent Rolldown watchers writing the same output directory
+                // can stall the main bundle on Vite 8.
+                entry: 'src/main/preload.ts',
+                vite: {
+                  build: {
+                    watch: null,
+                    sourcemap: electronSourceMap,
+                    outDir: 'dist-electron',
+                    minify: false,
+                  },
+                },
+                onstart() {},
+              },
+              {
                 // 主进程入口文件
                 entry: 'src/main/main.ts',
                 vite: {
@@ -87,14 +124,14 @@ export default defineConfig(async ({ command }) => {
                     sourcemap: electronSourceMap,
                     outDir: 'dist-electron',
                     minify: false,
-                    rollupOptions: {
+                    rolldownOptions: {
                       external:
                         command === 'serve'
                           ? isElectronDevelopmentExternal
                           : id => ELECTRON_MAIN_EXTERNALS.includes(id),
                       output: {
                         // Keep CJS format (default), but load via ESM loader.mjs
-                        inlineDynamicImports: true,
+                        codeSplitting: false,
                       },
                     },
                   },
@@ -114,21 +151,9 @@ export default defineConfig(async ({ command }) => {
                   }
                 },
               },
-              {
-                // 预加载脚本入口文件
-                entry: 'src/main/preload.ts',
-                vite: {
-                  build: {
-                    sourcemap: electronSourceMap,
-                    outDir: 'dist-electron',
-                    minify: false,
-                  },
-                },
-                onstart() {},
-              },
             ]),
           ]),
-      renderer(),
+      ...(process.env.VITE_SKIP_ELECTRON ? [] : [renderer()]),
     ],
     base: process.env.NODE_ENV === 'development' ? '/' : './',
     resolve: {
@@ -145,7 +170,7 @@ export default defineConfig(async ({ command }) => {
       // diagnostics builds only.
       sourcemap: process.env.VITE_RENDERER_SOURCEMAP === '1',
       minify: 'esbuild',
-      rollupOptions: {
+      rolldownOptions: {
         input: {
           main: path.resolve(__dirname, 'index.html'),
           officePreview: path.resolve(__dirname, 'office-preview.html'),
@@ -163,15 +188,28 @@ export default defineConfig(async ({ command }) => {
       },
       watch: {
         usePolling: false,
+        ignored: ignoreOutsideRendererSources,
       },
     },
     optimizeDeps: {
+      entries: ['src/renderer/main.tsx'],
+      include: [
+        '@wecom/wecom-aibot-sdk',
+        'ansi-to-react',
+        'cronstrue/i18n',
+        'jszip',
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react-redux',
+        'react/jsx-dev-runtime',
+        'react/jsx-runtime',
+        'use-sync-external-store/shim',
+        'use-sync-external-store/shim/with-selector',
+        'use-sync-external-store/with-selector',
+        'use-sync-external-store/with-selector.js',
+      ],
       exclude: ['electron'],
-      esbuildOptions: {
-        define: {
-          __VERSION__: JSON.stringify(katexVersion),
-        },
-      },
     },
     clearScreen: false,
   };

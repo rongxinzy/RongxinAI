@@ -183,6 +183,18 @@ export function isAllowedProxyHost(req: http.IncomingMessage): boolean {
 
   return ALLOWED_PROXY_HOSTS.has(hostName);
 }
+
+function resolveProxyRequestToken(headers: http.IncomingHttpHeaders): string {
+  const authHeader = headers.authorization || '';
+  if (authHeader.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim();
+  }
+
+  const apiKeyHeader = headers['x-api-key'];
+  const apiKey = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
+  return apiKey?.trim() || '';
+}
+
 /**
  * Per-provider token refreshers.  When the proxy receives a 401/403 from an
  * upstream, it looks up the refresher for the current provider and retries once
@@ -2255,11 +2267,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     return;
   }
 
-  // Token authentication: all endpoints except /healthz require a valid Bearer token
+  // Token authentication: support both OpenAI and Anthropic client auth headers.
   if (proxyAuthToken) {
-    const authHeader = req.headers.authorization || '';
-    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-    if (bearerToken !== proxyAuthToken) {
+    const requestToken = resolveProxyRequestToken(req.headers);
+    if (requestToken !== proxyAuthToken) {
       writeJSON(
         res,
         401,
@@ -2858,6 +2869,7 @@ export const __openAICompatProxyTestUtils = {
   convertChatCompletionsRequestToResponsesRequest,
   filterOpenAIToolsForProvider,
   isGeminiProvider,
+  resolveProxyRequestToken,
 };
 
 export async function startCoworkOpenAICompatProxy(): Promise<void> {
