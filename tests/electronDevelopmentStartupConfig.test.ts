@@ -32,6 +32,7 @@ test('development startup waits for Vite readiness before launching Electron', (
   assert.ok(preloadEntryIndex >= 0 && preloadEntryIndex < mainEntryIndex);
   assert.match(viteConfig, /entry: 'src\/main\/preload\.ts'[\s\S]*watch: null/);
   assert.match(developmentScript, /wait-on[^\n]*-d 20000/);
+  assert.match(developmentScript, /concurrently --kill-others --kill-signal SIGKILL/);
   assert.doesNotMatch(developmentScript, /compile:electron/);
   assert.match(developmentScript, /build:electron:dev/);
   assert.match(developmentScript, /VITE_SKIP_ELECTRON=1/);
