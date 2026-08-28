@@ -6,7 +6,7 @@ import { test } from 'vitest';
 
 const root = path.resolve(__dirname, '..');
 
-test('development startup externalizes package subpaths without redundant delays or compilation', () => {
+test('development startup waits for Vite readiness before launching Electron', () => {
   const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
   const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
     scripts?: Record<string, string>;
@@ -31,7 +31,7 @@ test('development startup externalizes package subpaths without redundant delays
   assert.doesNotMatch(viteConfig, /esbuildOptions/);
   assert.ok(preloadEntryIndex >= 0 && preloadEntryIndex < mainEntryIndex);
   assert.match(viteConfig, /entry: 'src\/main\/preload\.ts'[\s\S]*watch: null/);
-  assert.doesNotMatch(developmentScript, /-d 20000/);
+  assert.match(developmentScript, /wait-on[^\n]*-d 20000/);
   assert.doesNotMatch(developmentScript, /compile:electron/);
   assert.match(developmentScript, /build:electron:dev/);
   assert.match(developmentScript, /VITE_SKIP_ELECTRON=1/);
