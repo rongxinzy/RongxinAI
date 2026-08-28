@@ -320,8 +320,12 @@ export class CodingGitService {
       .stdout;
     const parsed = parsePorcelainStatus(statusOutput);
     const [stagedOutput, unstagedOutput] = await Promise.all([
-      runGit(targetRoot, ['diff', '--cached', '--numstat', '-z']).then(result => result.stdout),
-      runGit(targetRoot, ['diff', '--numstat', '-z']).then(result => result.stdout),
+      runGit(targetRoot, ['diff', '--no-ext-diff', '--cached', '--numstat', '-z']).then(
+        result => result.stdout,
+      ),
+      runGit(targetRoot, ['diff', '--no-ext-diff', '--numstat', '-z']).then(
+        result => result.stdout,
+      ),
     ]);
     const numStats = parseNumStat(stagedOutput);
     mergeNumStats(numStats, parseNumStat(unstagedOutput));
@@ -366,13 +370,13 @@ export class CodingGitService {
     let args: string[];
     switch (input.scope) {
       case CodingGitDiffScope.Staged:
-        args = ['diff', '--cached', '--binary', '--', filePath];
+        args = ['diff', '--no-ext-diff', '--cached', '--binary', '--', filePath];
         break;
       case CodingGitDiffScope.Untracked:
-        args = ['diff', '--no-index', '--binary', '--', '/dev/null', filePath];
+        args = ['diff', '--no-ext-diff', '--no-index', '--binary', '--', '/dev/null', filePath];
         break;
       default:
-        args = ['diff', '--binary', '--', filePath];
+        args = ['diff', '--no-ext-diff', '--binary', '--', filePath];
     }
     const result = await runGit(input.targetRoot, args, {
       acceptedExitCodes: input.scope === CodingGitDiffScope.Untracked ? [0, 1] : [0],
