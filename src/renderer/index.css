@@ -3,9 +3,11 @@
 @import './theme/css/base.css';
 @import './theme/css/shadcn-token-bridge.css';
 
-@import 'tailwindcss';
+@import 'tailwindcss' source(none);
 @import 'tw-animate-css';
 
+@source ".";
+@source "../shared";
 /* cowork/ is an ignored runtime-output directory name, so opt it into Tailwind scanning. */
 @source "./components/cowork";
 
@@ -539,7 +541,8 @@ select::-ms-expand {
   background-color: transparent;
 }
 
-[data-active-view]:not([data-active-view='cowork']) .sidebar-session-row.sidebar-interactive-surface-active {
+[data-active-view]:not([data-active-view='cowork'])
+  .sidebar-session-row.sidebar-interactive-surface-active {
   background-color: transparent;
   color: var(--zy-text-secondary);
 }
@@ -761,7 +764,9 @@ select::-ms-expand {
   border-color: var(--local-inference-delete-color);
   color: var(--zy-destructive-foreground);
 }
-[data-slot='button'][data-local-inference-delete-confirm-action-button='true']:hover:not(:disabled) {
+[data-slot='button'][data-local-inference-delete-confirm-action-button='true']:hover:not(
+  :disabled
+) {
   box-shadow: none;
 }
 [data-slot='button'][data-local-inference-delete-confirm-action-button='true']:not(
@@ -899,7 +904,6 @@ select::-ms-expand {
   border-radius: 9999px;
   background-clip: padding-box;
 }
-
 
 /* Local inference log viewer theme adapter */
 [data-local-inference-log-viewer] .react-lazylog {

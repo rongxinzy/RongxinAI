@@ -4,6 +4,7 @@ vi.mock('./coworkOpenAICompatProxy', () => ({
   configureCoworkOpenAICompatProxy: vi.fn(),
   getCoworkOpenAICompatProxyBaseURL: () => 'http://127.0.0.1:3456/v1',
   getCoworkOpenAICompatProxyStatus: () => ({ running: true }),
+  getCoworkOpenAICompatProxyToken: () => 'proxy-auth-token',
 }));
 
 import {
@@ -398,7 +399,7 @@ test('resolveCurrentApiConfig still resolves a running llama.cpp model even when
 
   const result = resolveCurrentApiConfig();
   expect(result.config).toEqual({
-    apiKey: 'zhiyuan-openai-compat',
+    apiKey: 'proxy-auth-token',
     baseURL: expect.stringContaining('/v1'),
     model: 'qwen-small-runtime',
     apiType: 'openai',

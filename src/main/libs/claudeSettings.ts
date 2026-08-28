@@ -20,6 +20,7 @@ import {
   configureCoworkOpenAICompatProxy,
   getCoworkOpenAICompatProxyBaseURL,
   getCoworkOpenAICompatProxyStatus,
+  getCoworkOpenAICompatProxyToken,
   type OpenAICompatProxyTarget,
 } from './coworkOpenAICompatProxy';
 import type { LlamaCppAgentEligibility } from './llamacppAgentBinding';
@@ -761,6 +762,14 @@ export function resolveCurrentApiConfig(
     };
   }
 
+  const proxyToken = getCoworkOpenAICompatProxyToken();
+  if (!proxyToken) {
+    return {
+      config: null,
+      error: 'OpenAI compatibility proxy token is unavailable.',
+    };
+  }
+
   return {
     endpoint: resolveModelEndpoint(matched.providerName, matched.modelId, {
       providerConfig: matched.providerConfig,
@@ -771,7 +780,7 @@ export function resolveCurrentApiConfig(
       runtime: getMatchedRuntimeSnapshot(matched),
     }),
     config: {
-      apiKey: resolvedApiKey || 'zhiyuan-openai-compat',
+      apiKey: proxyToken,
       baseURL: proxyBaseURL,
       model: matched.modelId,
       apiType: 'openai',
