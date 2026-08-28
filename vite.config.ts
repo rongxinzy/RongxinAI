@@ -16,6 +16,20 @@ const packageJson = JSON.parse(
 ) as Record<string, unknown>;
 const electronDevelopmentExternalRoots = new Set(extractExternalDeps(packageJson, true));
 const electronReadyPath = path.resolve(__dirname, 'dist-electron/.electron-ready');
+const rendererWatchDirectories = new Set(['public', 'src']);
+const rendererWatchFiles = new Set([
+  'index.html',
+  'office-preview.html',
+  'package.json',
+  'vite.config.ts',
+]);
+
+function ignoreOutsideRendererSources(filePath: string): boolean {
+  const relative = path.relative(__dirname, filePath).replaceAll('\\', '/');
+  if (!relative || relative.startsWith('../')) return false;
+  if (rendererWatchFiles.has(relative)) return false;
+  return !rendererWatchDirectories.has(relative.split('/')[0]);
+}
 
 function packageRoot(specifier: string): string {
   return specifier.startsWith('@')
@@ -139,7 +153,7 @@ export default defineConfig(async ({ command }) => {
               },
             ]),
           ]),
-      renderer(),
+      ...(process.env.VITE_SKIP_ELECTRON ? [] : [renderer()]),
     ],
     base: process.env.NODE_ENV === 'development' ? '/' : './',
     resolve: {
@@ -174,9 +188,27 @@ export default defineConfig(async ({ command }) => {
       },
       watch: {
         usePolling: false,
+        ignored: ignoreOutsideRendererSources,
       },
     },
     optimizeDeps: {
+      entries: ['src/renderer/main.tsx'],
+      include: [
+        '@wecom/wecom-aibot-sdk',
+        'ansi-to-react',
+        'cronstrue/i18n',
+        'jszip',
+        'react',
+        'react-dom',
+        'react-dom/client',
+        'react-redux',
+        'react/jsx-dev-runtime',
+        'react/jsx-runtime',
+        'use-sync-external-store/shim',
+        'use-sync-external-store/shim/with-selector',
+        'use-sync-external-store/with-selector',
+        'use-sync-external-store/with-selector.js',
+      ],
       exclude: ['electron'],
     },
     clearScreen: false,
