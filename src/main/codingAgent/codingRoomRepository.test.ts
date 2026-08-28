@@ -5,6 +5,7 @@ import {
   CodingAgentProfileId,
   CodingEventKind,
   CodingStreamUpdateMode,
+  CodingToolCallStatus,
 } from '../../shared/codingAgent';
 import { initializeCodingAgentSchema } from './schema';
 import { CodingRoomRepository } from './codingRoomRepository';
@@ -135,4 +136,31 @@ test('replaces an in-process streaming snapshot instead of appending it', () => 
     });
   }
   expect(repository.listEvents([lane.id])[0].payload.content).toBe('Hello world');
+});
+
+test('coalesces streamed tool call snapshots with the same tool call ID', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingRoomRepository(db);
+  const room = repository.getOrCreateRoom('/workspace/project');
+  const mission = repository.createMission(room.id, 'Tool');
+  const lane = repository.createLane(mission.id, 'agent', '/workspace/project');
+
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.ToolCall, {
+    toolCallId: 'call-1',
+    toolName: 'bash',
+    toolInput: { command: 'pwd' },
+    status: CodingToolCallStatus.Pending,
+  });
+  repository.appendOrMergeStreamEvent(lane.id, CodingEventKind.ToolCall, {
+    toolCallId: 'call-1',
+    status: CodingToolCallStatus.Completed,
+  });
+
+  expect(repository.listEvents([lane.id])).toHaveLength(1);
+  expect(repository.listEvents([lane.id])[0].payload).toMatchObject({
+    toolCallId: 'call-1',
+    toolName: 'bash',
+    status: CodingToolCallStatus.Completed,
+  });
 });
