@@ -1,9 +1,33 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
 const MAX_STDOUT_LINE_BYTES = 1_048_576;
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_DELAY_MS = 250;
+
+const terminateProcessTree = async (child: ChildProcessWithoutNullStreams): Promise<void> => {
+  const pid = child.pid;
+  if (!pid) return;
+
+  if (process.platform === 'win32') {
+    await new Promise<void>(resolve => {
+      execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () =>
+        resolve(),
+      );
+    });
+    return;
+  }
+
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch {
+    try {
+      child.kill('SIGTERM');
+    } catch {
+      // The process may have exited between the PID check and the signal.
+    }
+  }
+};
 
 export interface AcpConnectionLaunchOptions {
   executable: string;
@@ -61,12 +85,20 @@ export class AcpConnectionSupervisor {
 
   async start(options: AcpConnectionLaunchOptions): Promise<void> {
     this.disposed = false;
-    this.launchOptions = { ...options, args: [...options.args], environment: { ...options.environment } };
+    this.launchOptions = {
+      ...options,
+      args: [...options.args],
+      environment: { ...options.environment },
+    };
     if (this.restartTimer) {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
     }
-    if (this.child?.exitCode !== null) this.child = null;
+    if (this.child && this.child.exitCode !== null) {
+      const exitedChild = this.child;
+      this.child = null;
+      await terminateProcessTree(exitedChild);
+    }
     if (this.child) return;
     this.restartAttempts = 0;
     await this.startProcess(this.launchOptions);
@@ -84,10 +116,11 @@ export class AcpConnectionSupervisor {
       isWindowsBatch ? process.env.ComSpec || 'cmd.exe' : options.executable,
       isWindowsBatch ? ['/d', '/s', '/c', options.executable, ...options.args] : options.args,
       {
-      cwd: options.cwd,
-      env,
-      shell: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: options.cwd,
+        env,
+        shell: false,
+        detached: true,
+        stdio: ['pipe', 'pipe', 'pipe'],
       },
     );
     this.child = child;
@@ -99,13 +132,13 @@ export class AcpConnectionSupervisor {
       if (this.child !== child) return;
       this.child = null;
       this.failAll(new Error(`ACP agent exited (${code ?? signal ?? 'unknown'}).`));
-      this.scheduleRestart();
+      void terminateProcessTree(child).finally(() => this.scheduleRestart());
     });
     child.once('error', error => {
       if (this.child !== child) return;
       this.child = null;
       this.failAll(error);
-      this.scheduleRestart();
+      void terminateProcessTree(child).finally(() => this.scheduleRestart());
     });
   }
 
@@ -117,7 +150,8 @@ export class AcpConnectionSupervisor {
     if (!this.child?.stdin.writable) throw new Error('ACP agent connection is not running.');
     const id = ++this.requestId;
     const response = new Promise<T>((resolve, reject) => {
-      const timeoutMs = options.timeoutMs === undefined ? ACP_REQUEST_TIMEOUT_MS : options.timeoutMs;
+      const timeoutMs =
+        options.timeoutMs === undefined ? ACP_REQUEST_TIMEOUT_MS : options.timeoutMs;
       const timeout =
         timeoutMs === null
           ? null
@@ -125,7 +159,11 @@ export class AcpConnectionSupervisor {
               this.pending.delete(id);
               reject(new Error(`ACP request timed out: ${method}.`));
             }, timeoutMs);
-      this.pending.set(id, { resolve: value => resolve(value as T), reject, timeout });
+      this.pending.set(id, {
+        resolve: value => resolve(value as T),
+        reject,
+        timeout,
+      });
     });
     this.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
     return await response;
@@ -146,8 +184,8 @@ export class AcpConnectionSupervisor {
     const child = this.child;
     this.child = null;
     this.failAll(new Error('ACP agent connection was disposed.'));
-    if (!child || child.killed) return;
-    child.kill();
+    if (!child) return;
+    await terminateProcessTree(child);
   }
 
   private consumeStdout(chunk: string): void {
@@ -210,7 +248,10 @@ export class AcpConnectionSupervisor {
       this.writeMessage({
         jsonrpc: '2.0',
         id,
-        error: { code: -32601, message: error instanceof Error ? error.message : String(error) },
+        error: {
+          code: -32601,
+          message: error instanceof Error ? error.message : String(error),
+        },
       });
     }
   }
