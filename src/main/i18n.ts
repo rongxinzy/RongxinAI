@@ -27,6 +27,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkDefaultSessionTitle: '新对话',
     codingAgentDefaultMissionTitle: '新建编程任务',
     codingAgentSessionRecovery: '上一个 Agent 会话无法恢复，已将交接摘要发送到新会话。',
+    codingAgentNoAssistantResponse:
+      '外部 Agent 未返回助手内容，请检查 Agent 的登录状态、模型配置和网络连接。',
     cronSessionPrefix: '定时',
     channelPrefixFeishu: '飞书',
     channelPrefixDingtalk: '钉钉',
@@ -318,6 +320,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentDefaultMissionTitle: 'New coding task',
     codingAgentSessionRecovery:
       'The previous agent session could not be restored. A handoff summary was sent to a new session.',
+    codingAgentNoAssistantResponse:
+      'The external agent returned no assistant content. Check its sign-in state, model configuration, and network connection.',
     cronSessionPrefix: 'Cron',
     channelPrefixFeishu: 'Feishu',
     channelPrefixDingtalk: 'DingTalk',
