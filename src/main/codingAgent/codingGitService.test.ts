@@ -9,7 +9,11 @@ import { CodingGitService } from './codingGitService';
 
 const git = async (cwd: string, args: string[]): Promise<string> =>
   await new Promise<string>((resolve, reject) => {
-    const child = spawn('git', args, { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('git', args, {
+      cwd,
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
     let stdout = '';
     let stderr = '';
     child.stdout.setEncoding('utf8');
@@ -45,7 +49,10 @@ test('reports structured staged, unstaged, and untracked Git state', async () =>
   await writeFile(path.join(root, 'untracked.txt'), 'one\ntwo\n');
 
   const service = new CodingGitService();
-  const status = await service.getStatus(root, { isIsolated: false, isBusy: false });
+  const status = await service.getStatus(root, {
+    isIsolated: false,
+    isBusy: false,
+  });
 
   expect(status.isRepository).toBe(true);
   expect(status.branch).toBe('main');
@@ -77,6 +84,17 @@ test('reports structured staged, unstaged, and untracked Git state', async () =>
 test('loads file diffs and stages or unstages only explicit paths', async () => {
   const root = await createRepository();
   const service = new CodingGitService();
+  await git(root, ['config', 'diff.external', 'missing-external-diff-command']);
+  await writeFile(path.join(root, 'tracked.txt'), 'changed\n');
+  const trackedDiff = await service.getDiff({
+    workspaceRoot: root,
+    sourceRoot: root,
+    targetRoot: root,
+    path: 'tracked.txt',
+    scope: CodingGitDiffScope.Unstaged,
+  });
+  expect(trackedDiff).toContain('+changed');
+
   await writeFile(path.join(root, 'untracked file.txt'), 'new file\n');
 
   const diff = await service.getDiff({
