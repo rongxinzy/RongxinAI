@@ -29,6 +29,7 @@ export interface CodingSessionDraft {
   workspaceId: string;
   sourceRoot: string;
   profileId: string;
+  modelOverride: string | null;
   sources: CodingWorkspaceSummary['sources'];
 }
 
@@ -152,6 +153,7 @@ export const CodingWorkspaceSidebar = ({
         workspaceId: workspace.id,
         sourceRoot: workspace.sources[0]?.path ?? workspace.primaryRoot,
         profileId: workspace.defaultProfileId || CodingAgentProfileId.Builtin,
+        modelOverride: null,
         sources: workspace.sources,
       },
     });
