@@ -8,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 
 test('development startup waits for Vite readiness before launching Electron', () => {
   const viteConfig = readFileSync(path.join(root, 'vite.config.ts'), 'utf8');
+  const rendererStyles = readFileSync(path.join(root, 'src', 'renderer', 'index.css'), 'utf8');
   const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
     scripts?: Record<string, string>;
   };
@@ -29,9 +30,26 @@ test('development startup waits for Vite readiness before launching Electron', (
   assert.doesNotMatch(viteConfig, /inlineDynamicImports/);
   assert.doesNotMatch(viteConfig, /rollupOptions/);
   assert.doesNotMatch(viteConfig, /esbuildOptions/);
+  assert.match(viteConfig, /optimizeDeps:[\s\S]*entries: \['src\/renderer\/main\.tsx'\]/);
+  assert.doesNotMatch(viteConfig, /noDiscovery: true/);
+  assert.match(viteConfig, /include:[\s\S]*'react-dom\/client'/);
+  assert.match(viteConfig, /include:[\s\S]*'react-redux'/);
+  assert.match(viteConfig, /include:[\s\S]*'use-sync-external-store\/shim\/with-selector'/);
+  assert.match(viteConfig, /include:[\s\S]*'use-sync-external-store\/with-selector'/);
+  assert.match(viteConfig, /include:[\s\S]*'use-sync-external-store\/with-selector\.js'/);
+  assert.match(viteConfig, /ignored: ignoreOutsideRendererSources/);
+  assert.match(viteConfig, /rendererWatchDirectories = new Set\(\['public', 'src'\]\)/);
+  assert.match(viteConfig, /VITE_SKIP_ELECTRON \? \[\] : \[renderer\(\)\]/);
+  assert.match(rendererStyles, /@import 'tailwindcss' source\(none\)/);
+  assert.match(rendererStyles, /@source "\."/);
+  assert.match(rendererStyles, /@source "\.\.\/shared"/);
   assert.ok(preloadEntryIndex >= 0 && preloadEntryIndex < mainEntryIndex);
   assert.match(viteConfig, /entry: 'src\/main\/preload\.ts'[\s\S]*watch: null/);
-  assert.match(developmentScript, /wait-on[^\n]*-d 20000/);
+  assert.match(
+    developmentScript,
+    /wait-on -l -t 120000 -i 1000 -s 1 http-get:\/\/localhost:5175\/src\/renderer\/main\.tsx http-get:\/\/localhost:5175\/src\/renderer\/index\.css/,
+  );
+  assert.doesNotMatch(developmentScript, /-d 20000/);
   assert.match(developmentScript, /concurrently --kill-others --kill-signal SIGKILL/);
   assert.doesNotMatch(developmentScript, /compile:electron/);
   assert.match(developmentScript, /build:electron:dev/);
