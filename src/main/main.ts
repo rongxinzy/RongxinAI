@@ -883,7 +883,7 @@ const getCodingRoomService = (): CodingRoomService => {
         app.getAppPath(),
       ),
       {
-        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt }) => {
+        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt, modelOverride }) => {
           const coworkStoreInstance = getCoworkStore();
           if (!coworkStoreInstance.getSession(sessionId)) {
             coworkStoreInstance.createSession(
@@ -904,6 +904,7 @@ const getCodingRoomService = (): CodingRoomService => {
             workspaceRoot,
             sessionMode: 'work',
             confirmationMode: 'modal',
+            ...(modelOverride ? { modelOverride } : {}),
           });
         },
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
@@ -988,15 +989,40 @@ const getCodingRoomService = (): CodingRoomService => {
     );
     codingRoomService.registry.hydrate();
     runtime.on('message', (sessionId: string, message: unknown) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Message, { message });
+      const metadata =
+        message && typeof message === 'object' && 'metadata' in message
+          ? (message as { metadata?: unknown }).metadata
+          : null;
+      const isThinking =
+        metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+          ? (metadata as { isThinking?: unknown }).isThinking === true
+          : false;
+      codingRoomService?.recordBuiltinEvent(
+        sessionId,
+        isThinking ? CodingEventKind.Reasoning : CodingEventKind.Message,
+        { message, ...(isThinking ? { streamUpdateMode: CodingStreamUpdateMode.Replace } : {}) },
+      );
     });
-    runtime.on('messageUpdate', (sessionId: string, messageId: string, content: string) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.MessageDelta, {
-        content,
-        messageId,
-        streamUpdateMode: CodingStreamUpdateMode.Replace,
-      });
-    });
+    runtime.on(
+      'messageUpdate',
+      (
+        sessionId: string,
+        messageId: string,
+        content: string,
+        metadata?: Record<string, unknown>,
+      ) => {
+        const isThinking = metadata?.isThinking === true;
+        codingRoomService?.recordBuiltinEvent(
+          sessionId,
+          isThinking ? CodingEventKind.Reasoning : CodingEventKind.MessageDelta,
+          {
+            content,
+            messageId,
+            streamUpdateMode: CodingStreamUpdateMode.Replace,
+          },
+        );
+      },
+    );
     runtime.on('toolActivity', (sessionId: string, event: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.ToolCall, { event });
     });

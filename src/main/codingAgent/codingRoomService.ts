@@ -53,6 +53,7 @@ export interface CodingRoomRuntime {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    modelOverride?: string | null;
   }): Promise<void>;
   cancelBuiltinSession(sessionId: string): Promise<void>;
   getBuiltinWorkbenchLink(sessionId: string): { taskId: string; runId: string } | null;
@@ -123,8 +124,13 @@ export class CodingRoomService extends EventEmitter {
     this.git = new CodingGitController(repository);
     this.driverFactory = new CodingDriverFactory(
       {
-        start: (sessionId, workspaceRoot, prompt) =>
-          this.runtime.startBuiltinSession({ sessionId, workspaceRoot, prompt }),
+        start: (sessionId, workspaceRoot, prompt, modelOverride) =>
+          this.runtime.startBuiltinSession({
+            sessionId,
+            workspaceRoot,
+            prompt,
+            ...(modelOverride ? { modelOverride } : {}),
+          }),
         cancel: sessionId => this.runtime.cancelBuiltinSession(sessionId),
       },
       Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]])),
@@ -1125,6 +1131,7 @@ export class CodingRoomService extends EventEmitter {
         sessionId,
         workspaceRoot: executionRoot,
         prompt,
+        modelOverride: lane.modelOverride,
       })) {
         this.repository.appendOrMergeStreamEvent(lane.id, event.kind, event.payload);
         this.repository.updateLaneConfigOptions(lane.id, driver.getSessionConfigOptions(sessionId));

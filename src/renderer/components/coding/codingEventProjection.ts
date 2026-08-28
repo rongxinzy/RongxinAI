@@ -190,7 +190,9 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
       const content = getCodingEventText(event);
       if (!content) continue;
       const turn = ensureTurn(event);
-      if (turn.reasoning) turn.reasoning.content += content;
+      if (turn.reasoning && event.payload.streamUpdateMode === CodingStreamUpdateMode.Replace) {
+        turn.reasoning.content = content;
+      } else if (turn.reasoning) turn.reasoning.content += content;
       else turn.reasoning = { id: event.id, content, createdAt: event.createdAt };
       continue;
     }

@@ -25,6 +25,7 @@ import {
   Settings2,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
 
 import type { CodingRoomSnapshot } from '../../../shared/codingAgent';
 import {
@@ -35,6 +36,8 @@ import {
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import type { RootState } from '../../store';
+import { toAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
 import { CodingAuthAndPermissionDialogs } from './CodingAuthAndPermissionDialogs';
 import { CodingComposer } from './CodingComposer';
@@ -90,6 +93,7 @@ export const CodingWorkbenchView = ({
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
   const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
@@ -382,6 +386,11 @@ export const CodingWorkbenchView = ({
         workspaceId: draftSession.workspaceId,
         sourceRoot: draftSession.sourceRoot,
         profileId: draftSession.profileId,
+        modelOverride:
+          draftSession.modelOverride ??
+          (activeProfile?.isBuiltin && defaultSelectedModel
+            ? toAgentModelRef(defaultSelectedModel)
+            : undefined),
         prompt,
       });
       const laneId = result.snapshot?.room.activeLaneId;
