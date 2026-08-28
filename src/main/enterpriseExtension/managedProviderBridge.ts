@@ -5,7 +5,12 @@ import {
   type ManagedProviderCatalogModel,
   type ManagedProviderSnapshot,
 } from '../../shared/managedProviders';
-import { normalizeProviderModelPiRuntimeConfig, type ProviderConfig } from '../../shared/providers';
+import {
+  isProviderEnabled,
+  normalizeProviderModelPiRuntimeConfig,
+  type ProviderConfig,
+  ProviderName,
+} from '../../shared/providers';
 import {
   ZHIYUAN_MANAGED_PROVIDER_CAPABILITY_API_VERSION,
   type ZhiyuanManagedProviderHostCapability,
@@ -15,6 +20,7 @@ import {
   registerPiOpenAICompatTokenRefresher,
   type PiOpenAICompatTokenRefresher,
 } from '../libs/agentEngine/piOpenAICompatProxy';
+import { EnterpriseExtensionStoreKey, LegacyManagedProviderKey } from './constants';
 
 const MANAGED_PROVIDER_KEY_PATTERN = /^custom_[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const MAX_MODELS = 256;
@@ -23,6 +29,7 @@ const MAX_TEXT_LENGTH = 16_384;
 interface ConfigStore {
   get<T>(key: string): T | undefined;
   set(key: string, value: unknown): void;
+  delete(key: string): void;
 }
 
 interface StoredAppConfig {
@@ -33,6 +40,12 @@ interface StoredAppConfig {
   };
   readonly providers?: Record<string, ProviderConfig>;
   readonly [key: string]: unknown;
+}
+
+interface StoredManagedProviderProjection {
+  readonly providerKey: string;
+  readonly previousDefaultModel?: string;
+  readonly previousDefaultModelProvider?: string;
 }
 
 type PiOpenAICompatTokenRefresherRegistrar = (
@@ -89,6 +102,7 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
 
   attachStore(store: ConfigStore): void {
     this.#store = store;
+    if (!this.#source) this.#clearOrphanedProjection();
     void this.refresh();
   }
 
@@ -166,7 +180,6 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
     if (source !== this.#source) {
       throw new Error('Zhiyuan managed provider source changed during refresh.');
     }
-    this.#removeStoredProvider(this.#snapshot?.providerKey);
     this.#snapshot = snapshot;
     this.#writeSnapshot(snapshot);
     return snapshot;
@@ -175,10 +188,24 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
   #writeSnapshot(snapshot: ManagedProviderSnapshot): void {
     const store = this.#store;
     if (!store) return;
-    const current = store.get<StoredAppConfig>('app_config') ?? {};
+    const current = store.get<StoredAppConfig>(EnterpriseExtensionStoreKey.AppConfig) ?? {};
     const firstModel = snapshot.config.models?.[0];
     const currentModel = current.model ?? {};
-    store.set('app_config', {
+    const projection = store.get<StoredManagedProviderProjection>(
+      EnterpriseExtensionStoreKey.ManagedProviderProjection,
+    );
+    if (projection?.providerKey !== snapshot.providerKey) {
+      store.set(EnterpriseExtensionStoreKey.ManagedProviderProjection, {
+        providerKey: snapshot.providerKey,
+        ...(snapshot.exclusive
+          ? {
+              previousDefaultModel: currentModel.defaultModel,
+              previousDefaultModelProvider: currentModel.defaultModelProvider,
+            }
+          : {}),
+      } satisfies StoredManagedProviderProjection);
+    }
+    store.set(EnterpriseExtensionStoreKey.AppConfig, {
       ...current,
       providers: { ...current.providers, [snapshot.providerKey]: snapshot.config },
       ...(snapshot.exclusive && firstModel
@@ -194,20 +221,49 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
   }
 
   #clearSnapshot(): void {
-    const providerKey = this.#snapshot?.providerKey;
+    const projection = this.#store?.get<StoredManagedProviderProjection>(
+      EnterpriseExtensionStoreKey.ManagedProviderProjection,
+    );
+    const providerKey =
+      this.#snapshot?.providerKey ?? this.#source?.providerKey ?? projection?.providerKey;
     this.#snapshot = null;
-    this.#removeStoredProvider(providerKey);
+    this.#removeStoredProjection(providerKey, projection);
     this.#emitChanged();
   }
 
-  #removeStoredProvider(providerKey: string | undefined): void {
+  #clearOrphanedProjection(): void {
+    const store = this.#store;
+    if (!store) return;
+    const projection = store.get<StoredManagedProviderProjection>(
+      EnterpriseExtensionStoreKey.ManagedProviderProjection,
+    );
+    if (projection) {
+      this.#removeStoredProjection(projection.providerKey, projection);
+      return;
+    }
+
+    const current = store.get<StoredAppConfig>(EnterpriseExtensionStoreKey.AppConfig);
+    if (current?.providers?.[LegacyManagedProviderKey.Enterprise]) {
+      this.#removeStoredProjection(LegacyManagedProviderKey.Enterprise);
+    }
+  }
+
+  #removeStoredProjection(
+    providerKey: string | undefined,
+    projection?: StoredManagedProviderProjection,
+  ): void {
     const store = this.#store;
     if (!store || !providerKey) return;
-    const current = store.get<StoredAppConfig>('app_config');
-    if (!current?.providers?.[providerKey]) return;
+    const current = store.get<StoredAppConfig>(EnterpriseExtensionStoreKey.AppConfig);
+    if (!current) return;
     const providers = { ...current.providers };
     delete providers[providerKey];
-    store.set('app_config', { ...current, providers });
+    const model =
+      current.model?.defaultModelProvider === providerKey
+        ? restoreDefaultModel(current.model, providers, projection)
+        : current.model;
+    store.set(EnterpriseExtensionStoreKey.AppConfig, { ...current, providers, model });
+    store.delete(EnterpriseExtensionStoreKey.ManagedProviderProjection);
   }
 
   #emitChanged(): void {
@@ -219,6 +275,61 @@ export class ZhiyuanManagedProviderBridge implements ZhiyuanManagedProviderHostC
       }
     }
   }
+}
+
+function restoreDefaultModel(
+  currentModel: NonNullable<StoredAppConfig['model']>,
+  providers: Record<string, ProviderConfig>,
+  projection?: StoredManagedProviderProjection,
+): StoredAppConfig['model'] {
+  const previousProvider = projection?.previousDefaultModelProvider;
+  const previousModel = projection?.previousDefaultModel;
+  if (
+    previousProvider &&
+    previousModel &&
+    providerContainsModel(previousProvider, previousModel, providers)
+  ) {
+    return {
+      ...currentModel,
+      defaultModel: previousModel,
+      defaultModelProvider: previousProvider,
+    };
+  }
+
+  const fallback = selectFallbackModel(providers);
+  if (fallback) {
+    return {
+      ...currentModel,
+      defaultModel: fallback.model,
+      defaultModelProvider: fallback.provider,
+    };
+  }
+
+  return { ...currentModel, defaultModel: '', defaultModelProvider: undefined };
+}
+
+function selectFallbackModel(
+  providers: Record<string, ProviderConfig>,
+): { provider: string; model: string } | null {
+  const candidates = Object.entries(providers).filter(
+    ([providerName, config]) => isProviderEnabled(providerName, config) && config.models?.[0]?.id,
+  );
+  const selected =
+    candidates.find(([providerName]) => providerName === ProviderName.DeepSeek) ?? candidates[0];
+  if (!selected?.[1].models?.[0]?.id) return null;
+  return { provider: selected[0], model: selected[1].models[0].id };
+}
+
+function providerContainsModel(
+  providerName: string,
+  model: string,
+  providers: Record<string, ProviderConfig>,
+): boolean {
+  const config = providers[providerName];
+  return (
+    isProviderEnabled(providerName, config) &&
+    config.models?.some(candidate => candidate.id === model)
+  );
 }
 
 function validateSource(source: ZhiyuanManagedProviderSource): void {
