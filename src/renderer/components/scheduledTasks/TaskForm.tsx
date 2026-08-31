@@ -17,13 +17,21 @@ import { CircleAlert, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
+import {
+  ManagedSessionKeyPrefix,
+  SessionBindingStrategy,
+  SessionTarget,
+  type SessionBindingStrategy as SessionBindingStrategyType,
+} from '../../../scheduledTask/constants';
 import type {
   ScheduledTask,
   ScheduledTaskChannelOption,
   ScheduledTaskConversationOption,
   ScheduledTaskInput,
 } from '../../../scheduledTask/types';
+import { CoworkSessionSource } from '../../../shared/cowork/constants';
 import { i18nService } from '../../services/i18n';
+import { coworkService } from '../../services/cowork';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
 import { toAgentModelRef } from '../../utils/agentModelRef';
@@ -97,6 +105,8 @@ interface FormState {
   notifyAccountId: string | undefined;
   workspaceId: string;
   modelId: string;
+  sessionBinding: SessionBindingStrategyType;
+  boundSessionId: string;
 }
 
 function nowDefaults() {
@@ -130,6 +140,8 @@ const DEFAULT_FORM_STATE: FormState = {
   notifyAccountId: undefined,
   workspaceId: '',
   modelId: '',
+  sessionBinding: SessionBindingStrategy.PerRun,
+  boundSessionId: '',
 };
 
 // Cron quick-pick examples: [label key, expr]
@@ -202,6 +214,18 @@ function createFormState(task?: ScheduledTask, prefill?: TaskTemplateValues): Fo
     notifyAccountId: task.delivery.accountId,
     workspaceId: task.workspaceId || '',
     modelId: task.payload.kind === 'agentTurn' ? (task.payload.model ?? '') : '',
+    sessionBinding:
+      task.sessionTarget === SessionTarget.Task
+        ? SessionBindingStrategy.Task
+        : task.sessionTarget === SessionTarget.Main &&
+            Boolean(task.sessionKey?.startsWith(ManagedSessionKeyPrefix.Zhiyuan))
+          ? SessionBindingStrategy.Existing
+          : SessionBindingStrategy.PerRun,
+    boundSessionId:
+      task.sessionTarget === SessionTarget.Main &&
+      task.sessionKey?.startsWith(ManagedSessionKeyPrefix.Zhiyuan)
+        ? task.sessionKey.slice(ManagedSessionKeyPrefix.Zhiyuan.length)
+        : '',
   };
 }
 
@@ -296,6 +320,8 @@ const TaskForm: React.FC<TaskFormProps> = ({
   });
   const [conversations, setConversations] = useState<ScheduledTaskConversationOption[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [sessionOptions, setSessionOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [sessionOptionsLoading, setSessionOptionsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [cronPreview, setCronPreview] = useState<
@@ -384,6 +410,36 @@ const TaskForm: React.FC<TaskFormProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.notifyChannel, form.notifyAccountId, channelOptions]);
 
+  useEffect(() => {
+    if (form.sessionBinding !== SessionBindingStrategy.Existing || !form.workspaceId) {
+      setSessionOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setSessionOptionsLoading(true);
+    void coworkService
+      .listSessionsForWorkspacePreview(form.workspaceId, 100, 0, [
+        CoworkSessionSource.Manual,
+        CoworkSessionSource.Im,
+      ])
+      .then(result => {
+        if (cancelled) return;
+        setSessionOptions(
+          (result.sessions ?? []).map(session => ({ value: session.id, label: session.title })),
+        );
+        setSessionOptionsLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSessionOptions([]);
+          setSessionOptionsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [form.sessionBinding, form.workspaceId]);
+
   // Live cron preview
   useEffect(() => {
     if (!isCron) {
@@ -409,6 +465,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
     }
     if (!form.workspaceId) {
       nextErrors.workspaceId = i18nService.t('scheduledTasksFormValidationWorkspaceRequired');
+    }
+    if (form.sessionBinding === SessionBindingStrategy.Existing && !form.boundSessionId) {
+      nextErrors.boundSessionId = i18nService.t('scheduledTasksFormValidationSessionRequired');
     }
     if (!form.payloadText.trim()) {
       nextErrors.payloadText = i18nService.t('scheduledTasksFormValidationPromptRequired');
@@ -484,7 +543,16 @@ const TaskForm: React.FC<TaskFormProps> = ({
         description: '',
         enabled: true,
         schedule,
-        sessionTarget: 'isolated',
+        sessionTarget:
+          form.sessionBinding === SessionBindingStrategy.Task
+            ? SessionTarget.Task
+            : form.sessionBinding === SessionBindingStrategy.Existing
+              ? SessionTarget.Main
+              : SessionTarget.Isolated,
+        sessionKey:
+          form.sessionBinding === SessionBindingStrategy.Existing && form.boundSessionId
+            ? `${ManagedSessionKeyPrefix.Zhiyuan}${form.boundSessionId}`
+            : null,
         wakeMode: 'now',
         workspaceId: form.workspaceId,
         payload: {
@@ -1140,11 +1208,29 @@ const TaskForm: React.FC<TaskFormProps> = ({
           workspaceOptions={workspaces
             .filter(workspace => !workspace.isHidden)
             .map(workspace => ({ value: workspace.id, label: workspace.name }))}
+          sessionBinding={form.sessionBinding}
+          boundSessionId={form.boundSessionId}
+          sessionOptions={sessionOptions}
+          sessionOptionsLoading={sessionOptionsLoading}
           scheduleControl={renderScheduleRow()}
           notificationControl={renderNotifyRow()}
           onNameChange={name => updateForm({ name: name.slice(0, TASK_NAME_MAX_LENGTH) })}
           onModelChange={modelId => updateForm({ modelId })}
-          onWorkspaceChange={workspaceId => updateForm({ workspaceId })}
+          onWorkspaceChange={workspaceId =>
+            updateForm({
+              workspaceId,
+              boundSessionId:
+                form.sessionBinding === SessionBindingStrategy.Existing ? '' : form.boundSessionId,
+            })
+          }
+          onSessionBindingChange={sessionBinding =>
+            updateForm({
+              sessionBinding,
+              boundSessionId:
+                sessionBinding === SessionBindingStrategy.Existing ? form.boundSessionId : '',
+            })
+          }
+          onBoundSessionChange={boundSessionId => updateForm({ boundSessionId })}
           onPayloadTextChange={payloadText => updateForm({ payloadText })}
         />
       </div>
