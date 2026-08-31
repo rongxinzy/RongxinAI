@@ -88,6 +88,47 @@ test("unpacks AnyDoc native bindings from the application archive", () => {
   );
 });
 
+test("unpacks ACP adapters without bundling external agent binaries", () => {
+  const config = JSON.parse(
+    readFileSync(path.join(root, "electron-builder.json"), "utf8"),
+  ) as {
+    files?: string[];
+    asarUnpack?: string[];
+  };
+
+  assert.ok(
+    config.asarUnpack?.includes(
+      "node_modules/@agentclientprotocol/codex-acp/**",
+    ),
+  );
+  assert.ok(
+    config.asarUnpack?.includes(
+      "node_modules/@agentclientprotocol/claude-agent-acp/**",
+    ),
+  );
+  assert.ok(
+    config.asarUnpack?.includes(
+      "node_modules/@anthropic-ai/claude-agent-sdk/**",
+    ),
+  );
+  assert.ok(config.asarUnpack?.includes("node_modules/zod/**"));
+  assert.ok(!config.asarUnpack?.includes("node_modules/@anthropic-ai/**"));
+  assert.ok(!config.asarUnpack?.includes("node_modules/@agentclientprotocol/**"));
+  assert.ok(!config.asarUnpack?.includes("node_modules/@openai/**"));
+  assert.ok(config.files?.includes("!node_modules/zod/src/**"));
+
+  for (const platform of ["darwin", "linux", "win32"]) {
+    assert.ok(
+      config.files?.includes(
+        `!node_modules/@anthropic-ai/claude-agent-sdk-${platform}-*/**`,
+      ),
+    );
+    assert.ok(
+      config.files?.includes(`!node_modules/@openai/codex-${platform}-*/**`),
+    );
+  }
+});
+
 test("stable release metadata does not inherit the build prerelease channel", () => {
   const config = JSON.parse(
     readFileSync(path.join(root, "electron-builder.json"), "utf8"),

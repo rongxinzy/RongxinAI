@@ -8,6 +8,24 @@ import {
   CodingAgentProfileStatus,
 } from '../../../shared/codingAgent';
 import { AcpDiscoveryService, discoveryDirectories } from './discoveryService';
+import { resolveAcpAdapterRoot } from './adapterRoot';
+
+test('uses unpacked resources for packaged ACP adapter entrypoints', () => {
+  expect(
+    resolveAcpAdapterRoot({
+      isPackaged: true,
+      resourcesPath: '/Applications/ZhiYuan.app/Contents/Resources',
+      appPath: '/Applications/ZhiYuan.app/Contents/Resources/app.asar',
+    }),
+  ).toBe(path.join('/Applications/ZhiYuan.app/Contents/Resources', 'app.asar.unpacked'));
+  expect(
+    resolveAcpAdapterRoot({
+      isPackaged: false,
+      resourcesPath: '/tmp/resources',
+      appPath: '/workspace/application',
+    }),
+  ).toBe('/workspace/application');
+});
 
 test('discovers only PATH and known user-level installation directories', () => {
   const directories = discoveryDirectories(
@@ -24,14 +42,14 @@ test('discovers only PATH and known user-level installation directories', () => 
   expect(directories).toEqual([
     '/usr/bin',
     '/custom/bin',
-    '/packages/npm/bin',
-    '/packages/bun/bin',
-    '/packages/volta/bin',
-    '/home/agent/.local/bin',
-    '/home/agent/.npm-global/bin',
-    '/home/agent/.bun/bin',
-    '/home/agent/.local/share/pnpm',
-    '/home/agent/Library/pnpm',
+    path.join('/packages/npm', 'bin'),
+    path.join('/packages/bun', 'bin'),
+    path.join('/packages/volta', 'bin'),
+    path.join('/home/agent', '.local', 'bin'),
+    path.join('/home/agent', '.npm-global', 'bin'),
+    path.join('/home/agent', '.bun', 'bin'),
+    path.join('/home/agent', '.local', 'share', 'pnpm'),
+    path.join('/home/agent', 'Library', 'pnpm'),
   ]);
 });
 
