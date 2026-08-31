@@ -73,10 +73,6 @@ const ArtifactPanelFrame = lazy(() =>
   import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
 );
 
-// The coding workbench has no resizable content row like the cowork view, so
-// the artifact panel width is clamped against a fixed generous bound.
-const MAX_ARTIFACT_PANEL_WIDTH = 960;
-
 interface CodingWorkbenchViewProps {
   workspaceRoot: string;
   selectedLaneId: string | null;
@@ -216,6 +212,28 @@ export const CodingWorkbenchView = ({
   useEffect(() => {
     dispatch(activateSessionArtifactView(artifactSessionKey));
   }, [artifactSessionKey, dispatch]);
+  const artifactRowRef = useRef<HTMLDivElement | null>(null);
+  const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
+    typeof window === 'undefined'
+      ? MIN_PANEL_WIDTH
+      : Math.max(MIN_PANEL_WIDTH, window.innerWidth),
+  );
+  const updateArtifactPanelMaxWidth = useCallback(() => {
+    const contentWidth = artifactRowRef.current?.clientWidth ?? 0;
+    if (contentWidth <= 0) return;
+    const nextMaxWidth = Math.max(MIN_PANEL_WIDTH, contentWidth);
+    setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
+  }, []);
+  // ResizeObserver must run in useEffect, not useLayoutEffect: a layout-effect
+  // setState triggered by our own resize feedback loops into React's nested
+  // update limit.
+  useEffect(() => {
+    updateArtifactPanelMaxWidth();
+    const container = artifactRowRef.current;
+    const resizeObserver = new ResizeObserver(updateArtifactPanelMaxWidth);
+    if (container) resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [activeLaneId, updateArtifactPanelMaxWidth]);
   const activeDriverKind = activeProfile?.driverKind ?? null;
   const activeConfigOptionCount = activeLane?.configOptions.length ?? 0;
   const [draftConfigOptions, setDraftConfigOptions] = useState<CodingAgentConfigOption[]>([]);
@@ -856,7 +874,7 @@ export const CodingWorkbenchView = ({
             <WindowTitleBar inline />
           </div>
         </header>
-        <div className="flex min-h-0 flex-1">
+        <div ref={artifactRowRef} className="flex min-h-0 flex-1">
           <CodingEventStream
             events={activeEvents}
             isStreaming={activeLane?.status === CodingLaneStatus.Running}
@@ -881,7 +899,7 @@ export const CodingWorkbenchView = ({
                   isTransitioning={false}
                   layoutMode={artifactLayoutMode}
                   minPanelWidth={MIN_PANEL_WIDTH}
-                  maxPanelWidth={MAX_ARTIFACT_PANEL_WIDTH}
+                  maxPanelWidth={artifactPanelMaxWidth}
                 />
               </Suspense>
             </ArtifactPanelErrorBoundary>
