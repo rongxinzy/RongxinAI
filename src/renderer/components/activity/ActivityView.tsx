@@ -95,7 +95,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       {/* Header chrome — same shell as the other feature views. */}
-      <div className="flex shrink-0 items-center justify-between pl-4">
+      <div className="draggable flex shrink-0 items-center justify-between pl-4">
         <div className="flex items-center gap-3 h-8">
           {isSidebarCollapsed && (
             <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
