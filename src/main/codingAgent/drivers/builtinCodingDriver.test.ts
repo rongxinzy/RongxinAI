@@ -17,11 +17,6 @@ const createRuntime = (
   start: vi.fn().mockResolvedValue(undefined),
   cancel: vi.fn().mockResolvedValue(undefined),
   patchSession: vi.fn().mockResolvedValue(undefined),
-  listModelOptions: () => [
-    { value: 'openai/gpt-5', name: 'GPT-5' },
-    { value: 'anthropic/claude-opus', name: 'Claude Opus' },
-  ],
-  getCurrentModelRef: () => 'openai/gpt-5',
   ...overrides,
 });
 
@@ -52,24 +47,36 @@ test('starts the in-process runtime while the room owns streamed event projectio
   expect(calls).toEqual([session.id, `cancel:${session.id}`]);
 });
 
+test('forwards the lane model override to the in-process runtime', async () => {
+  const runtime = createRuntime();
+  const driver = new BuiltinCodingDriver(runtime);
+  const session = await driver.createSession({ workspaceRoot: '/workspace' });
+
+  for await (const _event of driver.prompt({
+    sessionId: session.id,
+    workspaceRoot: '/workspace',
+    prompt: 'work',
+    modelOverride: 'deepseek/deepseek-v4-pro',
+  })) {
+    // The built-in runtime owns the stream projection.
+  }
+
+  expect(runtime.start).toHaveBeenCalledWith(
+    session.id,
+    '/workspace',
+    'work',
+    expect.objectContaining({ modelOverride: 'deepseek/deepseek-v4-pro' }),
+  );
+});
+
 test('advertises config option support', async () => {
   const driver = new BuiltinCodingDriver(createRuntime());
   await expect(driver.getCapabilities()).resolves.toMatchObject({ supportsConfigOptions: true });
 });
 
-test('createSession exposes model and thinking-level options with defaults', async () => {
+test('createSession exposes the thinking-level option with a medium default', async () => {
   const driver = new BuiltinCodingDriver(createRuntime());
   const session = await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
-
-  const model = findOption(session.configOptions, BuiltinCodingConfigId.Model);
-  expect(model).toMatchObject({
-    type: 'select',
-    currentValue: 'openai/gpt-5',
-  });
-  expect(model?.options?.map(candidate => candidate.value)).toEqual([
-    'openai/gpt-5',
-    'anthropic/claude-opus',
-  ]);
 
   const thinking = findOption(session.configOptions, BuiltinCodingConfigId.ThinkingLevel);
   expect(thinking).toMatchObject({ type: 'select', currentValue: PiThinkingLevel.Medium });
@@ -78,37 +85,12 @@ test('createSession exposes model and thinking-level options with defaults', asy
   );
 });
 
-test('omits the model option when no model is selectable', async () => {
-  const driver = new BuiltinCodingDriver(
-    createRuntime({ listModelOptions: () => [], getCurrentModelRef: () => null }),
-  );
-  const session = await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
-  expect(findOption(session.configOptions, BuiltinCodingConfigId.Model)).toBeUndefined();
-  expect(findOption(session.configOptions, BuiltinCodingConfigId.ThinkingLevel)).toBeDefined();
-});
-
-test('keeps an unlisted current model selectable', async () => {
-  const driver = new BuiltinCodingDriver(
-    createRuntime({ getCurrentModelRef: () => 'llamacpp/qwen-local' }),
-  );
-  const session = await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
-  const model = findOption(session.configOptions, BuiltinCodingConfigId.Model);
-  expect(model?.currentValue).toBe('llamacpp/qwen-local');
-  expect(model?.options?.some(candidate => candidate.value === 'llamacpp/qwen-local')).toBe(true);
-});
-
-test('restores persisted selections from existing config options', async () => {
+test('restores a persisted thinking level and rejects invalid persisted values', async () => {
   const driver = new BuiltinCodingDriver(createRuntime());
-  const session = await driver.createSession({
+  const restored = await driver.createSession({
     workspaceRoot: '/ws',
     localSessionId: 's1',
     existingConfigOptions: [
-      {
-        id: BuiltinCodingConfigId.Model,
-        name: 'Model',
-        type: 'select',
-        currentValue: 'anthropic/claude-opus',
-      },
       {
         id: BuiltinCodingConfigId.ThinkingLevel,
         name: 'Thinking',
@@ -117,19 +99,13 @@ test('restores persisted selections from existing config options', async () => {
       },
     ],
   });
-  expect(findOption(session.configOptions, BuiltinCodingConfigId.Model)?.currentValue).toBe(
-    'anthropic/claude-opus',
-  );
   expect(
-    findOption(session.configOptions, BuiltinCodingConfigId.ThinkingLevel)?.currentValue,
+    findOption(restored.configOptions, BuiltinCodingConfigId.ThinkingLevel)?.currentValue,
   ).toBe('high');
-});
 
-test('falls back to medium for an invalid persisted thinking level', async () => {
-  const driver = new BuiltinCodingDriver(createRuntime());
-  const session = await driver.createSession({
+  const invalid = await driver.createSession({
     workspaceRoot: '/ws',
-    localSessionId: 's1',
+    localSessionId: 's2',
     existingConfigOptions: [
       {
         id: BuiltinCodingConfigId.ThinkingLevel,
@@ -140,7 +116,7 @@ test('falls back to medium for an invalid persisted thinking level', async () =>
     ],
   });
   expect(
-    findOption(session.configOptions, BuiltinCodingConfigId.ThinkingLevel)?.currentValue,
+    findOption(invalid.configOptions, BuiltinCodingConfigId.ThinkingLevel)?.currentValue,
   ).toBe(PiThinkingLevel.Medium);
 });
 
@@ -149,23 +125,10 @@ test('setConfigOption updates the selection and patches the live session', async
   const driver = new BuiltinCodingDriver(runtime);
   await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
 
-  const afterModel = await driver.setConfigOption(
-    's1',
-    BuiltinCodingConfigId.Model,
-    'anthropic/claude-opus',
-  );
-  expect(runtime.patchSession).toHaveBeenCalledWith('s1', { model: 'anthropic/claude-opus' });
-  expect(findOption(afterModel, BuiltinCodingConfigId.Model)?.currentValue).toBe(
-    'anthropic/claude-opus',
-  );
+  const updated = await driver.setConfigOption('s1', BuiltinCodingConfigId.ThinkingLevel, 'high');
 
-  const afterThinking = await driver.setConfigOption(
-    's1',
-    BuiltinCodingConfigId.ThinkingLevel,
-    'high',
-  );
   expect(runtime.patchSession).toHaveBeenCalledWith('s1', { thinkingLevel: 'high' });
-  expect(findOption(afterThinking, BuiltinCodingConfigId.ThinkingLevel)?.currentValue).toBe('high');
+  expect(findOption(updated, BuiltinCodingConfigId.ThinkingLevel)?.currentValue).toBe('high');
 });
 
 test('setConfigOption rejects unknown options and values', async () => {
@@ -177,11 +140,10 @@ test('setConfigOption rejects unknown options and values', async () => {
   ).rejects.toThrow();
 });
 
-test('prompt forwards the selected model and thinking level to the runtime', async () => {
+test('prompt forwards the selected thinking level to the runtime', async () => {
   const runtime = createRuntime();
   const driver = new BuiltinCodingDriver(runtime);
   await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
-  await driver.setConfigOption('s1', BuiltinCodingConfigId.Model, 'anthropic/claude-opus');
   await driver.setConfigOption('s1', BuiltinCodingConfigId.ThinkingLevel, 'high');
 
   for await (const _event of driver.prompt({
@@ -192,10 +154,20 @@ test('prompt forwards the selected model and thinking level to the runtime', asy
     // The built-in driver never yields events; draining starts the runtime.
   }
 
-  expect(runtime.start).toHaveBeenCalledWith('s1', '/ws', 'hi', {
-    modelOverride: 'anthropic/claude-opus',
-    thinkingLevel: 'high',
-  });
+  expect(runtime.start).toHaveBeenCalledWith('s1', '/ws', 'hi', { thinkingLevel: 'high' });
+});
+
+test('getDefaultConfigOptions builds options without binding them to a session', async () => {
+  const driver = new BuiltinCodingDriver(createRuntime());
+  const options = driver.getDefaultConfigOptions();
+  expect(options).toEqual([
+    expect.objectContaining({
+      id: BuiltinCodingConfigId.ThinkingLevel,
+      currentValue: PiThinkingLevel.Medium,
+    }),
+  ]);
+  // Defaults are not bound to any session yet.
+  expect(driver.getSessionConfigOptions('anything')).toEqual([]);
 });
 
 test('disposeSession drops stored config options', async () => {

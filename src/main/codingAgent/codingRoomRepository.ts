@@ -46,6 +46,7 @@ const rowLane = (row: Record<string, unknown>): CodingAgentLane => ({
   id: String(row.id),
   missionId: String(row.mission_id),
   profileId: String(row.profile_id),
+  modelOverride: (row.model_override as string | null) ?? null,
   sourceRoot: String(row.source_root || row.execution_root || ''),
   executionRoot: String(row.execution_root ?? ''),
   configOptions: JSON.parse(String(row.config_options_json ?? '[]')) as CodingAgentConfigOption[],
@@ -361,12 +362,14 @@ export class CodingRoomRepository {
     executionRoot = sourceRoot,
     id: string = randomUUID(),
     localSessionId: string = randomUUID(),
+    modelOverride: string | null = null,
   ): CodingAgentLane {
     const now = Date.now();
     const lane: CodingAgentLane = {
       id,
       missionId,
       profileId,
+      modelOverride,
       sourceRoot,
       executionRoot,
       configOptions: [],
@@ -381,12 +384,13 @@ export class CodingRoomRepository {
     };
     this.db
       .prepare(
-        'INSERT INTO coding_agent_lanes (id, mission_id, profile_id, source_root, execution_root, config_options_json, available_commands_json, local_session_id, remote_session_id, status, draft, scroll_position, pending_recovery_prompt, pending_recovery_context, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?)',
+        'INSERT INTO coding_agent_lanes (id, mission_id, profile_id, model_override, source_root, execution_root, config_options_json, available_commands_json, local_session_id, remote_session_id, status, draft, scroll_position, pending_recovery_prompt, pending_recovery_context, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, NULL, ?, ?)',
       )
       .run(
         lane.id,
         missionId,
         profileId,
+        modelOverride,
         lane.sourceRoot,
         lane.executionRoot,
         JSON.stringify(lane.configOptions),
@@ -503,17 +507,39 @@ export class CodingRoomRepository {
     kind: CodingEvent['kind'],
     payload: Record<string, unknown>,
   ): CodingEvent {
-    const messageId = typeof payload.messageId === 'string' ? payload.messageId : null;
-    if (kind !== CodingEventKind.MessageDelta || !messageId) {
+    const streamId =
+      kind === CodingEventKind.MessageDelta
+        ? typeof payload.messageId === 'string'
+          ? payload.messageId
+          : null
+        : kind === CodingEventKind.ToolCall && typeof payload.toolCallId === 'string'
+          ? payload.toolCallId
+          : null;
+    if (!streamId || (kind !== CodingEventKind.MessageDelta && kind !== CodingEventKind.ToolCall)) {
       return this.appendEvent(laneId, kind, payload);
     }
+    const payloadIdPath = kind === CodingEventKind.MessageDelta ? '$.messageId' : '$.toolCallId';
     const previous = this.db
       .prepare(
-        "SELECT * FROM coding_events WHERE lane_id = ? AND kind = ? AND json_extract(payload_json, '$.messageId') = ? ORDER BY sequence DESC LIMIT 1",
+        `SELECT * FROM coding_events WHERE lane_id = ? AND kind = ? AND json_extract(payload_json, '${payloadIdPath}') = ? ORDER BY sequence DESC LIMIT 1`,
       )
-      .get(laneId, kind, messageId) as Record<string, unknown> | undefined;
+      .get(laneId, kind, streamId) as Record<string, unknown> | undefined;
     if (!previous) return this.appendEvent(laneId, kind, payload);
     const previousPayload = JSON.parse(String(previous.payload_json)) as Record<string, unknown>;
+    if (kind === CodingEventKind.ToolCall) {
+      const event = {
+        id: String(previous.id),
+        laneId,
+        sequence: Number(previous.sequence),
+        kind,
+        payload: { ...previousPayload, ...payload },
+        createdAt: Number(previous.created_at),
+      } satisfies CodingEvent;
+      this.db
+        .prepare('UPDATE coding_events SET payload_json = ? WHERE id = ?')
+        .run(JSON.stringify(event.payload), event.id);
+      return event;
+    }
     const content =
       payload.streamUpdateMode === CodingStreamUpdateMode.Replace
         ? payload.content

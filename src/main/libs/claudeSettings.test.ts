@@ -4,6 +4,7 @@ vi.mock('./coworkOpenAICompatProxy', () => ({
   configureCoworkOpenAICompatProxy: vi.fn(),
   getCoworkOpenAICompatProxyBaseURL: () => 'http://127.0.0.1:3456/v1',
   getCoworkOpenAICompatProxyStatus: () => ({ running: true }),
+  getCoworkOpenAICompatProxyToken: () => 'proxy-auth-token',
 }));
 
 import {
@@ -13,7 +14,6 @@ import {
   ProviderName,
 } from '../../shared/providers';
 import {
-  listSelectableProviderModels,
   resolveAllEnabledProviderConfigs,
   resolveCurrentApiConfig,
   resolveRawApiConfig,
@@ -399,7 +399,7 @@ test('resolveCurrentApiConfig still resolves a running llama.cpp model even when
 
   const result = resolveCurrentApiConfig();
   expect(result.config).toEqual({
-    apiKey: 'zhiyuan-openai-compat',
+    apiKey: 'proxy-auth-token',
     baseURL: expect.stringContaining('/v1'),
     model: 'qwen-small-runtime',
     apiType: 'openai',
@@ -562,53 +562,4 @@ test('resolveRawApiConfigForModelRef forwards custom model Pi runtime metadata',
       },
     }),
   );
-});
-
-test('listSelectableProviderModels enumerates models of enabled providers only', () => {
-  setStoreGetter(
-    () =>
-      ({
-        get: (key: string) =>
-          key === 'app_config'
-            ? {
-                providers: {
-                  openai: {
-                    enabled: true,
-                    apiKey: 'sk-test',
-                    baseUrl: 'https://api.openai.com/v1',
-                    models: [
-                      { id: 'gpt-5', name: 'GPT-5' },
-                      { id: 'gpt-5-mini', name: '' },
-                    ],
-                  },
-                  anthropic: {
-                    enabled: false,
-                    apiKey: '',
-                    baseUrl: '',
-                    models: [{ id: 'claude-opus', name: 'Claude Opus' }],
-                  },
-                  [ProviderName.LlamaCpp]: {
-                    enabled: true,
-                    userEnabled: false,
-                    apiKey: '',
-                    baseUrl: '',
-                    models: [{ id: 'qwen-local', name: 'Qwen Local' }],
-                  },
-                },
-              }
-            : undefined,
-      }) as never,
-  );
-
-  expect(listSelectableProviderModels()).toEqual([
-    { ref: 'openai/gpt-5', name: 'GPT-5', providerName: 'openai' },
-    { ref: 'openai/gpt-5-mini', name: 'gpt-5-mini', providerName: 'openai' },
-  ]);
-});
-
-test('listSelectableProviderModels returns an empty list without a store or config', () => {
-  setStoreGetter(() => null);
-  expect(listSelectableProviderModels()).toEqual([]);
-  setStoreGetter(() => ({ get: () => undefined }) as never);
-  expect(listSelectableProviderModels()).toEqual([]);
 });

@@ -4,7 +4,6 @@ import {
   type CodingAgentAvailableCommand,
   type CodingAgentCapabilities,
   type CodingAgentConfigOption,
-  type CodingAgentConfigOptionValue,
   type CodingEvent,
   type CodingPermissionResponse,
 } from '../../../shared/codingAgent';
@@ -18,14 +17,13 @@ import type {
 } from './codingAgentDriver';
 
 export const BuiltinCodingConfigId = {
-  Model: 'model',
   ThinkingLevel: 'thinking-level',
 } as const;
 export type BuiltinCodingConfigId =
   (typeof BuiltinCodingConfigId)[keyof typeof BuiltinCodingConfigId];
 
 export interface BuiltinCodingSessionStartOptions {
-  modelOverride?: string;
+  modelOverride?: string | null;
   thinkingLevel?: string;
 }
 
@@ -37,15 +35,11 @@ export interface BuiltinCodingRuntime {
     options?: BuiltinCodingSessionStartOptions,
   ): Promise<void>;
   cancel(sessionId: string): Promise<void>;
-  /** Applies model/thinking-level changes to a live Pi session. */
+  /** Applies thinking-level changes to a live Pi session. */
   patchSession?(
     sessionId: string,
     patch: { model?: string | null; thinkingLevel?: string | null },
   ): Promise<void>;
-  /** Selectable model refs (`provider/model`) with display names. */
-  listModelOptions?(): CodingAgentConfigOptionValue[];
-  /** Model ref of the current global default selection, if any. */
-  getCurrentModelRef?(): string | null;
 }
 
 const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
@@ -60,9 +54,10 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
   supportsElicitation: true,
 };
 
-const THINKING_LEVEL_OPTIONS: CodingAgentConfigOptionValue[] = Object.values(PiThinkingLevel).map(
-  level => ({ value: level, name: level }),
-);
+const THINKING_LEVEL_OPTIONS = Object.values(PiThinkingLevel).map(level => ({
+  value: level,
+  name: level,
+}));
 
 const isValidThinkingLevel = (value: string): value is PiThinkingLevel =>
   (Object.values(PiThinkingLevel) as string[]).includes(value);
@@ -114,15 +109,11 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    modelOverride?: string | null;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>> {
-    const configOptions = this.sessionConfigOptions.get(input.sessionId) ?? [];
-    const model = this.currentStringValue(configOptions, BuiltinCodingConfigId.Model);
-    const thinkingLevel = this.currentStringValue(
-      configOptions,
-      BuiltinCodingConfigId.ThinkingLevel,
-    );
+    const thinkingLevel = this.currentThinkingLevel(input.sessionId);
     await this.runtime.start(input.sessionId, input.workspaceRoot, input.prompt, {
-      ...(model ? { modelOverride: model } : {}),
+      ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
     });
     // The in-process runtime emits streaming events after start() returns. The
@@ -141,16 +132,18 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     configId: string,
     value: string | boolean,
   ): Promise<CodingAgentConfigOption[]> {
-    const options = this.sessionConfigOptions.get(sessionId) ?? this.buildConfigOptions(sessionId);
+    const options = this.sessionConfigOptions.get(sessionId) ?? this.buildOptions();
+    this.sessionConfigOptions.set(sessionId, options);
     const option = options.find(candidate => candidate.id === configId);
     if (!option) throw new Error('The built-in coding agent configuration option was not found.');
-    if (typeof value !== 'string' || !option.options?.some(candidate => candidate.value === value)) {
+    if (
+      typeof value !== 'string' ||
+      !option.options?.some(candidate => candidate.value === value)
+    ) {
       throw new Error('The selected built-in coding agent configuration value is invalid.');
     }
     option.currentValue = value;
-    if (configId === BuiltinCodingConfigId.Model) {
-      await this.runtime.patchSession?.(sessionId, { model: value });
-    } else if (configId === BuiltinCodingConfigId.ThinkingLevel) {
+    if (configId === BuiltinCodingConfigId.ThinkingLevel) {
       await this.runtime.patchSession?.(sessionId, { thinkingLevel: value });
     }
     return options;
@@ -176,69 +169,28 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     this.sessionConfigOptions.clear();
   }
 
-  private buildConfigOptions(
-    sessionId: string,
-    existing?: CodingAgentConfigOption[],
-  ): CodingAgentConfigOption[] {
-    const options = this.buildOptions(existing);
-    this.sessionConfigOptions.set(sessionId, options);
-    return options;
-  }
-
   private buildOptions(existing?: CodingAgentConfigOption[]): CodingAgentConfigOption[] {
-    const persistedModel = this.persistedStringValue(existing, BuiltinCodingConfigId.Model);
-    const persistedThinking = this.persistedStringValue(
-      existing,
-      BuiltinCodingConfigId.ThinkingLevel,
-    );
-    const options: CodingAgentConfigOption[] = [];
-    const modelOption = this.buildModelOption(persistedModel);
-    if (modelOption) options.push(modelOption);
-    options.push({
-      id: BuiltinCodingConfigId.ThinkingLevel,
-      name: t('codingAgentConfigThinkingLevel'),
-      type: 'select',
-      currentValue:
-        persistedThinking && isValidThinkingLevel(persistedThinking)
-          ? persistedThinking
-          : PiThinkingLevel.Medium,
-      options: THINKING_LEVEL_OPTIONS,
-    });
-    return options;
+    const persistedThinking = existing?.find(
+      candidate => candidate.id === BuiltinCodingConfigId.ThinkingLevel,
+    )?.currentValue;
+    return [
+      {
+        id: BuiltinCodingConfigId.ThinkingLevel,
+        name: t('codingAgentConfigThinkingLevel'),
+        type: 'select',
+        currentValue:
+          typeof persistedThinking === 'string' && isValidThinkingLevel(persistedThinking)
+            ? persistedThinking
+            : PiThinkingLevel.Medium,
+        options: THINKING_LEVEL_OPTIONS,
+      },
+    ];
   }
 
-  private buildModelOption(preferred?: string): CodingAgentConfigOption | null {
-    const listed = this.runtime.listModelOptions?.() ?? [];
-    const current = preferred ?? this.runtime.getCurrentModelRef?.() ?? null;
-    if (!current && listed.length === 0) return null;
-    const options = [...listed];
-    if (current && !options.some(candidate => candidate.value === current)) {
-      options.unshift({ value: current, name: current });
-    }
-    return {
-      id: BuiltinCodingConfigId.Model,
-      name: t('codingAgentConfigModel'),
-      type: 'select',
-      currentValue: current ?? options[0]?.value ?? '',
-      options,
-    };
-  }
-
-  private currentStringValue(
-    options: CodingAgentConfigOption[],
-    id: string,
-  ): string | undefined {
-    const option = options.find(candidate => candidate.id === id);
-    return typeof option?.currentValue === 'string' && option.currentValue
-      ? option.currentValue
-      : undefined;
-  }
-
-  private persistedStringValue(
-    existing: CodingAgentConfigOption[] | undefined,
-    id: string,
-  ): string | undefined {
-    const option = existing?.find(candidate => candidate.id === id);
+  private currentThinkingLevel(sessionId: string): string | undefined {
+    const option = this.sessionConfigOptions
+      .get(sessionId)
+      ?.find(candidate => candidate.id === BuiltinCodingConfigId.ThinkingLevel);
     return typeof option?.currentValue === 'string' && option.currentValue
       ? option.currentValue
       : undefined;
