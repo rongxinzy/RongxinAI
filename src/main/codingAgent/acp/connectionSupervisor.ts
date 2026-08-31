@@ -1,9 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
-const MAX_STDOUT_LINE_BYTES = 1_048_576;
+const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_DELAY_MS = 250;
+/** Grace window for a killed agent process to exit before dispose() returns. */
+const DISPOSE_EXIT_TIMEOUT_MS = 2_000;
 
 export interface AcpConnectionLaunchOptions {
   executable: string;
@@ -66,7 +68,20 @@ export class AcpConnectionSupervisor {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
     }
-    if (this.child?.exitCode !== null) this.child = null;
+    if (this.child && this.child.exitCode === null && this.child.signalCode === null) {
+      // A just-exited child's 'exit' event may still be queued; give the event
+      // loop a turn before deciding the process is alive.
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    if (
+      this.child &&
+      (this.child.exitCode !== null ||
+        this.child.signalCode !== null ||
+        this.child.killed ||
+        !this.child.stdin.writable)
+    ) {
+      this.child = null;
+    }
     if (this.child) return;
     this.restartAttempts = 0;
     await this.startProcess(this.launchOptions);
@@ -146,8 +161,17 @@ export class AcpConnectionSupervisor {
     const child = this.child;
     this.child = null;
     this.failAll(new Error('ACP agent connection was disposed.'));
-    if (!child || child.killed) return;
-    child.kill();
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    // Wait for the process to actually exit: on Windows the agent keeps its
+    // cwd (the workspace root) locked until it is gone.
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(resolve, DISPOSE_EXIT_TIMEOUT_MS);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+      if (!child.killed) child.kill();
+    });
   }
 
   private consumeStdout(chunk: string): void {

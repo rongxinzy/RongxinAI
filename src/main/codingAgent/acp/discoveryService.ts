@@ -243,6 +243,9 @@ export class AcpDiscoveryService {
     const manifests = [
       path.join(this.adapterRoot, 'node_modules', packageName, 'package.json'),
       ...directories.flatMap(directory => [
+        // Windows npm global: %APPDATA%\npm\node_modules\<pkg>
+        path.join(directory, 'node_modules', packageName, 'package.json'),
+        // Unix-style: <prefix>/lib/node_modules/<pkg> (nvm, fnm, etc.)
         path.resolve(directory, '..', 'node_modules', packageName, 'package.json'),
         path.resolve(directory, '..', 'lib', 'node_modules', packageName, 'package.json'),
       ]),

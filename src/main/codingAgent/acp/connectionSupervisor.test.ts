@@ -35,7 +35,8 @@ test('allows a later start after the agent process exits', async () => {
     cwd: process.cwd(),
     environment: process.env as Record<string, string>,
   });
-  await new Promise(resolve => setTimeout(resolve, 200));
+  // Wait until the exit has actually been observed instead of assuming 200 ms is enough.
+  await expect.poll(() => supervisor.isRunning(), { timeout: 5_000 }).toBe(false);
   const script =
     "process.stdin.on('data', chunk => { const request = JSON.parse(String(chunk)); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { restarted: true } }) + '\\n'); });";
   await supervisor.start({
@@ -83,10 +84,11 @@ test('limits background recovery to a finite number of restart attempts', async 
     environment: process.env as Record<string, string>,
   });
 
-  await new Promise(resolve => setTimeout(resolve, 850));
-
-  expect(supervisor.generation).toBe(3);
-  expect(supervisor.isRunning()).toBe(false);
+  // Restarts happen on a 250 ms timer; poll instead of assuming all restart
+  // attempts complete within a fixed 850 ms window on a loaded machine.
+  await expect.poll(() => supervisor.generation, { timeout: 5_000 }).toBe(3);
+  // Generation 3 is reached when the final process starts; wait for it to exit.
+  await expect.poll(() => supervisor.isRunning(), { timeout: 5_000 }).toBe(false);
   await supervisor.dispose();
 });
 
