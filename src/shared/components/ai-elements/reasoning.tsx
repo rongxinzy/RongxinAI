@@ -210,10 +210,19 @@ const basePlugins = { cjk };
 const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4,}|\t+)\S/;
 
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
-  const { showConnector } = useReasoning();
+  const { isStreaming, showConnector } = useReasoning();
 
   const base = <Streamdown plugins={basePlugins}>{children}</Streamdown>;
   const text = typeof children === 'string' ? children : '';
+  const content = isStreaming ? (
+    <div className="whitespace-pre-wrap wrap-break-word">{children}</div>
+  ) : RICH_CONTENT_PATTERN.test(text) ? (
+    <React.Suspense fallback={base}>
+      <RichMessageResponse>{children}</RichMessageResponse>
+    </React.Suspense>
+  ) : (
+    base
+  );
 
   return (
     <CollapsibleContent
@@ -225,13 +234,7 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
       )}
       {...props}
     >
-      {RICH_CONTENT_PATTERN.test(text) ? (
-        <React.Suspense fallback={base}>
-          <RichMessageResponse>{children}</RichMessageResponse>
-        </React.Suspense>
-      ) : (
-        base
-      )}
+      {content}
     </CollapsibleContent>
   );
 });
