@@ -97,7 +97,14 @@ test("unpacks ACP adapters without bundling external agent binaries", () => {
   };
 
   assert.ok(
-    config.asarUnpack?.includes("node_modules/@agentclientprotocol/**"),
+    config.asarUnpack?.includes(
+      "node_modules/@agentclientprotocol/codex-acp/**",
+    ),
+  );
+  assert.ok(
+    config.asarUnpack?.includes(
+      "node_modules/@agentclientprotocol/claude-agent-acp/**",
+    ),
   );
   assert.ok(
     config.asarUnpack?.includes(
@@ -106,7 +113,9 @@ test("unpacks ACP adapters without bundling external agent binaries", () => {
   );
   assert.ok(config.asarUnpack?.includes("node_modules/zod/**"));
   assert.ok(!config.asarUnpack?.includes("node_modules/@anthropic-ai/**"));
+  assert.ok(!config.asarUnpack?.includes("node_modules/@agentclientprotocol/**"));
   assert.ok(!config.asarUnpack?.includes("node_modules/@openai/**"));
+  assert.ok(config.files?.includes("!node_modules/zod/src/**"));
 
   for (const platform of ["darwin", "linux", "win32"]) {
     assert.ok(
