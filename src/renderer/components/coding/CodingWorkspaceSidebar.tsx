@@ -1,9 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@shared/components/ui/collapsible';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   DropdownMenu,
@@ -12,8 +7,9 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { cn } from '@shared/lib/utils';
-import { Bot, ChevronRight, Folder, MoreHorizontal, Plus, Settings2, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ellipsis, Folder, Plus, Settings2, Trash2 } from 'lucide-react';
+import { useReducedMotion } from 'motion/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   CodingAgentProfileId,
@@ -23,6 +19,14 @@ import {
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import {
+  AnimatedFolderOpenIcon,
+  type AnimatedFolderOpenIconHandle,
+} from '../icons/AnimatedFolderOpenIcon';
+import {
+  SidebarAnimatedMessageCirclePlusIcon,
+  type SidebarAnimatedMessageCirclePlusIconHandle,
+} from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { CodingWorkspaceDialog } from './CodingWorkspaceDialog';
 
 export interface CodingSessionDraft {
@@ -56,6 +60,8 @@ const statusClassName: Record<CodingLaneStatus, string> = {
   [CodingLaneStatus.Completed]: 'bg-success',
   [CodingLaneStatus.Failed]: 'bg-destructive',
 };
+
+const SESSIONS_TRANSITION_MS = 200;
 
 export const CodingWorkspaceSidebar = ({
   selection,
@@ -224,8 +230,8 @@ export const CodingWorkspaceSidebar = ({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-9 items-center justify-between px-1.5">
-        <h2 className="truncate text-[14px] font-normal text-foreground opacity-[0.46]">
+      <div className="flex h-10 shrink-0 items-center justify-between px-1.5">
+        <h2 className="min-w-0 truncate text-[14px] font-normal text-foreground opacity-[0.28]">
           {i18nService.t('codingWorkspaceSection')}
         </h2>
         <div className="flex items-center">
@@ -234,6 +240,7 @@ export const CodingWorkspaceSidebar = ({
               type="button"
               variant="ghost"
               size="icon-sm"
+              className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
               aria-label={i18nService.t('codingAgentManageAgents')}
               onClick={() => onManageAgents(selectedWorkspace.primaryRoot)}
             >
@@ -244,6 +251,7 @@ export const CodingWorkspaceSidebar = ({
             type="button"
             variant="ghost"
             size="icon-sm"
+            className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
             aria-label={i18nService.t('codingWorkspaceAdd')}
             onClick={() => {
               setError(null);
@@ -255,184 +263,45 @@ export const CodingWorkspaceSidebar = ({
           </Button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pb-8">
+      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto pb-8">
         {workspaces.length === 0 ? (
           <button
             type="button"
-            className="w-full rounded-lg px-2 py-8 text-center text-sm text-muted-foreground hover:bg-muted/50"
+            className="sidebar-interactive-surface w-full rounded-md px-2 py-8 text-center text-sm text-muted-foreground"
             onClick={() => setWorkspaceDialogOpen(true)}
           >
             <Folder className="mx-auto mb-2 size-8 opacity-50" />
             {i18nService.t('codingWorkspaceEmpty')}
           </button>
         ) : (
-          <div className="space-y-1">
-            {workspaces.map(workspace => {
-              const expanded = expandedIds.has(workspace.id);
-              const rootSessions = workspace.sessions.filter(session => !session.parentSessionId);
-              return (
-                <Collapsible
-                  key={workspace.id}
-                  open={expanded}
-                  onOpenChange={open =>
-                    setExpandedIds(current => {
-                      const next = new Set(current);
-                      if (open) next.add(workspace.id);
-                      else next.delete(workspace.id);
-                      return next;
-                    })
-                  }
-                >
-                  <div className="group flex items-center gap-0.5 rounded-lg hover:bg-muted/60">
-                    <CollapsibleTrigger
-                      onClick={() =>
-                        onSelectionChange({
-                          workspaceId: workspace.id,
-                          workspaceRoot: workspace.primaryRoot,
-                          laneId: workspace.activeSessionId,
-                          draft: null,
-                        })
-                      }
-                      render={
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="h-8 min-w-0 flex-1 justify-start px-1.5 font-normal"
-                        />
-                      }
-                    >
-                      <ChevronRight
-                        className={cn('transition-transform', expanded && 'rotate-90')}
-                      />
-                      <Folder />
-                      <span className="truncate">{workspace.name}</span>
-                    </CollapsibleTrigger>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className="opacity-0 group-hover:opacity-100"
-                      aria-label={i18nService.t('codingSessionCreate')}
-                      onClick={() => openSessionDraft(workspace)}
-                    >
-                      <Plus />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        nativeButton
-                        render={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            className="opacity-0 group-hover:opacity-100"
-                            aria-label={i18nService.t('codingWorkspaceEdit')}
-                          >
-                            <MoreHorizontal />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditingWorkspace(workspace);
-                            setWorkspaceDialogOpen(true);
-                          }}
-                        >
-                          {i18nService.t('codingWorkspaceEdit')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant="destructive"
-                          onClick={() => setRemovingWorkspace(workspace)}
-                        >
-                          <Trash2 />
-                          {i18nService.t('codingWorkspaceRemove')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <CollapsibleContent>
-                    {selection.draft?.workspaceId === workspace.id ? (
-                      <SessionRow
-                        active
-                        name={i18nService.t('codingSessionDraft')}
-                        agentName={
-                          profiles.find(profile => profile.id === selection.draft?.profileId)?.name
-                        }
-                        status={CodingLaneStatus.Idle}
-                        nested={false}
-                        onClick={() => undefined}
-                      />
-                    ) : null}
-                    {rootSessions.length === 0 && selection.draft?.workspaceId !== workspace.id ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="ml-5 h-8 w-[calc(100%-1.25rem)] justify-start text-muted-foreground"
-                        onClick={() => openSessionDraft(workspace)}
-                      >
-                        <Plus />
-                        {i18nService.t('codingSessionNew')}
-                      </Button>
-                    ) : (
-                      rootSessions.map(session => {
-                        const profile = profiles.find(
-                          candidate => candidate.id === session.profileId,
-                        );
-                        const collaborators = workspace.sessions.filter(
-                          candidate => candidate.parentSessionId === session.id,
-                        );
-                        return (
-                          <div key={session.id}>
-                            <SessionRow
-                              active={selection.laneId === session.id}
-                              name={session.title}
-                              agentName={profile?.name}
-                              status={session.status}
-                              nested={false}
-                              onClick={() =>
-                                onSelectionChange({
-                                  workspaceId: workspace.id,
-                                  workspaceRoot: workspace.primaryRoot,
-                                  laneId: session.id,
-                                  draft: null,
-                                })
-                              }
-                              onDelete={() => setRemovingSession({ workspace, session })}
-                            />
-                            {collaborators.map(collaborator => (
-                              <SessionRow
-                                key={collaborator.id}
-                                active={selection.laneId === collaborator.id}
-                                name={
-                                  profiles.find(
-                                    candidate => candidate.id === collaborator.profileId,
-                                  )?.name ?? i18nService.t('codingSessionCollaborator')
-                                }
-                                agentName={i18nService.t('codingSessionCollaborator')}
-                                status={collaborator.status}
-                                nested
-                                onClick={() =>
-                                  onSelectionChange({
-                                    workspaceId: workspace.id,
-                                    workspaceRoot: workspace.primaryRoot,
-                                    laneId: collaborator.id,
-                                    draft: null,
-                                  })
-                                }
-                                onDelete={() =>
-                                  setRemovingSession({ workspace, session: collaborator })
-                                }
-                              />
-                            ))}
-                          </div>
-                        );
-                      })
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
+          <div className="space-y-0.5">
+            {workspaces.map(workspace => (
+              <WorkspaceNode
+                key={workspace.id}
+                workspace={workspace}
+                profiles={profiles}
+                selection={selection}
+                expanded={expandedIds.has(workspace.id)}
+                onToggleExpanded={(workspaceId, open) =>
+                  setExpandedIds(current => {
+                    const next = new Set(current);
+                    if (open) next.add(workspaceId);
+                    else next.delete(workspaceId);
+                    return next;
+                  })
+                }
+                onSelectionChange={onSelectionChange}
+                onCreateSession={openSessionDraft}
+                onEditWorkspace={target => {
+                  setEditingWorkspace(target);
+                  setWorkspaceDialogOpen(true);
+                }}
+                onRemoveWorkspace={setRemovingWorkspace}
+                onRemoveSession={(target, session) =>
+                  setRemovingSession({ workspace: target, session })
+                }
+              />
+            ))}
           </div>
         )}
         {error ? <p className="px-2 pt-2 text-xs text-destructive">{error}</p> : null}
@@ -473,6 +342,253 @@ export const CodingWorkspaceSidebar = ({
   );
 };
 
+interface WorkspaceNodeProps {
+  workspace: CodingWorkspaceSummary;
+  profiles: CodingAgentProfile[];
+  selection: CodingSidebarSelection;
+  expanded: boolean;
+  onToggleExpanded: (workspaceId: string, open: boolean) => void;
+  onSelectionChange: (selection: CodingSidebarSelection) => void;
+  onCreateSession: (workspace: CodingWorkspaceSummary) => void;
+  onEditWorkspace: (workspace: CodingWorkspaceSummary) => void;
+  onRemoveWorkspace: (workspace: CodingWorkspaceSummary) => void;
+  onRemoveSession: (workspace: CodingWorkspaceSummary, session: CodingSessionSummary) => void;
+}
+
+const WorkspaceNode = ({
+  workspace,
+  profiles,
+  selection,
+  expanded,
+  onToggleExpanded,
+  onSelectionChange,
+  onCreateSession,
+  onEditWorkspace,
+  onRemoveWorkspace,
+  onRemoveSession,
+}: WorkspaceNodeProps) => {
+  const [shouldRenderSessions, setShouldRenderSessions] = useState(expanded);
+  const [isSessionGroupVisible, setIsSessionGroupVisible] = useState(expanded);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const folderIconRef = useRef<AnimatedFolderOpenIconHandle>(null);
+  const createSessionIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
+  const prefersReducedMotion = useReducedMotion();
+  const previousExpandedRef = useRef(expanded);
+
+  useEffect(() => {
+    const wasExpanded = previousExpandedRef.current;
+    previousExpandedRef.current = expanded;
+    if (wasExpanded === expanded) return;
+    if (prefersReducedMotion) {
+      setShouldRenderSessions(expanded);
+      setIsSessionGroupVisible(expanded);
+      return;
+    }
+    let frame = 0;
+    let timeout = 0;
+    if (expanded) {
+      setShouldRenderSessions(true);
+      setIsSessionGroupVisible(false);
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(() => setIsSessionGroupVisible(true));
+      });
+    } else {
+      setIsSessionGroupVisible(false);
+      timeout = window.setTimeout(
+        () => setShouldRenderSessions(false),
+        SESSIONS_TRANSITION_MS,
+      );
+    }
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      if (timeout) window.clearTimeout(timeout);
+    };
+  }, [expanded, prefersReducedMotion]);
+
+  const rootSessions = workspace.sessions.filter(session => !session.parentSessionId);
+  const draft = selection.draft?.workspaceId === workspace.id ? selection.draft : null;
+
+  return (
+    <div className="space-y-0.5">
+      <div
+        data-slot="workspace-tree-row"
+        className="sidebar-interactive-surface group sticky top-0 z-20 ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center rounded-md transition-colors hover:shadow-subtle"
+      >
+        <Button
+          variant="ghost"
+          className="h-full min-w-0 flex-1 justify-start gap-2 rounded-md py-0 pl-3 pr-2 text-left text-sm font-normal text-foreground hover:bg-transparent"
+          onClick={() => {
+            onToggleExpanded(workspace.id, !expanded);
+            onSelectionChange({
+              workspaceId: workspace.id,
+              workspaceRoot: workspace.primaryRoot,
+              laneId: workspace.activeSessionId,
+              draft: null,
+            });
+          }}
+          onMouseEnter={() => {
+            if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
+          }}
+          onMouseLeave={() => folderIconRef.current?.stopAnimation()}
+          role="treeitem"
+          aria-level={1}
+          aria-expanded={expanded}
+        >
+          <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+            <AnimatedFolderOpenIcon ref={folderIconRef} />
+          </span>
+          <span
+            className="min-w-0 flex-1 truncate text-muted-foreground"
+            title={workspace.primaryRoot}
+          >
+            {workspace.name}
+          </span>
+        </Button>
+        <div className="flex h-7 shrink-0 items-center gap-0.5 pr-1.5">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => onCreateSession(workspace)}
+            onMouseEnter={() => {
+              if (!prefersReducedMotion) createSessionIconRef.current?.startAnimation();
+            }}
+            onMouseLeave={() => createSessionIconRef.current?.stopAnimation()}
+            className="text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
+            aria-label={i18nService.t('codingSessionCreate')}
+          >
+            <SidebarAnimatedMessageCirclePlusIcon
+              ref={createSessionIconRef}
+              size={14}
+              className="size-3.5"
+            />
+          </Button>
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className={cn(
+                    'pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]',
+                    menuOpen && 'pointer-events-auto opacity-[0.46]',
+                  )}
+                  aria-label={i18nService.t('codingWorkspaceEdit')}
+                >
+                  <Ellipsis />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end" className="min-w-[124px]">
+              <DropdownMenuItem onClick={() => onEditWorkspace(workspace)}>
+                {i18nService.t('codingWorkspaceEdit')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={() => onRemoveWorkspace(workspace)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {i18nService.t('codingWorkspaceRemove')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {shouldRenderSessions && (
+        <div
+          className={cn(
+            'grid w-full min-w-0 max-w-full transition-all duration-200 ease-out',
+            isSessionGroupVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
+          )}
+        >
+          <div
+            className={cn(
+              'min-h-0 min-w-0 max-w-full',
+              !isSessionGroupVisible && 'pointer-events-none overflow-hidden',
+            )}
+            role="group"
+            aria-hidden={!expanded}
+          >
+            <div className="min-w-0 max-w-full space-y-0.5">
+              {draft ? (
+                <SessionRow
+                  active
+                  name={i18nService.t('codingSessionDraft')}
+                  agentName={
+                    profiles.find(profile => profile.id === draft.profileId)?.name
+                  }
+                  status={CodingLaneStatus.Idle}
+                  nested={false}
+                  onClick={() => undefined}
+                />
+              ) : null}
+              {rootSessions.length === 0 && !draft ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="sidebar-interactive-surface ml-[-6px] h-8 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[14px] font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  onClick={() => onCreateSession(workspace)}
+                >
+                  {i18nService.t('codingSessionNew')}
+                </Button>
+              ) : (
+                rootSessions.map(session => {
+                  const profile = profiles.find(candidate => candidate.id === session.profileId);
+                  const collaborators = workspace.sessions.filter(
+                    candidate => candidate.parentSessionId === session.id,
+                  );
+                  return (
+                    <div key={session.id}>
+                      <SessionRow
+                        active={selection.laneId === session.id}
+                        name={session.title}
+                        agentName={profile?.name}
+                        status={session.status}
+                        nested={false}
+                        onClick={() =>
+                          onSelectionChange({
+                            workspaceId: workspace.id,
+                            workspaceRoot: workspace.primaryRoot,
+                            laneId: session.id,
+                            draft: null,
+                          })
+                        }
+                        onDelete={() => onRemoveSession(workspace, session)}
+                      />
+                      {collaborators.map(collaborator => (
+                        <SessionRow
+                          key={collaborator.id}
+                          active={selection.laneId === collaborator.id}
+                          name={
+                            profiles.find(candidate => candidate.id === collaborator.profileId)
+                              ?.name ?? i18nService.t('codingSessionCollaborator')
+                          }
+                          agentName={i18nService.t('codingSessionCollaborator')}
+                          status={collaborator.status}
+                          nested
+                          onClick={() =>
+                            onSelectionChange({
+                              workspaceId: workspace.id,
+                              workspaceRoot: workspace.primaryRoot,
+                              laneId: collaborator.id,
+                              draft: null,
+                            })
+                          }
+                          onDelete={() => onRemoveSession(workspace, collaborator)}
+                        />
+                      ))}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const SessionRow = ({
   active,
   name,
@@ -495,34 +611,43 @@ const SessionRow = ({
       type="button"
       variant="ghost"
       className={cn(
-        'h-auto w-full min-w-0 justify-start gap-2 px-2 py-1.5 text-left font-normal',
-        nested ? 'pl-10' : 'pl-7',
-        onDelete ? 'pr-8' : undefined,
-        active &&
-          'bg-[color-mix(in_oklch,var(--zy-primary),transparent_90%)] text-foreground hover:bg-[color-mix(in_oklch,var(--zy-primary),transparent_85%)]',
+        'ml-[-6px] h-8 w-[calc(100%+12px)] min-w-0 justify-start gap-2 rounded-md py-0 pr-2.5 text-left text-[14px] font-normal transition-colors hover:bg-transparent',
+        nested ? 'pl-[46px]' : 'pl-[38px]',
+        active
+          ? 'sidebar-interactive-surface-active text-foreground'
+          : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground',
       )}
       onClick={onClick}
+      role="treeitem"
+      aria-level={nested ? 3 : 2}
+      aria-selected={active}
     >
-      <Bot className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm">{name}</span>
-        {agentName ? (
-          <span className="block truncate text-xs text-muted-foreground">{agentName}</span>
-        ) : null}
-      </span>
+      <span className="min-w-0 flex-1 truncate">{name}</span>
       <span className={cn('size-1.5 shrink-0 rounded-full', statusClassName[status])} />
+      {agentName ? (
+        <span
+          className={cn(
+            'shrink-0 truncate text-[12px] font-normal text-foreground opacity-[0.28] transition-opacity',
+            onDelete && 'group-hover:pointer-events-none group-hover:opacity-0',
+          )}
+        >
+          {agentName}
+        </span>
+      ) : null}
     </Button>
     {onDelete ? (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2 opacity-0 group-hover:pointer-events-auto group-hover:opacity-100"
-        aria-label={i18nService.t('codingSessionRemove')}
-        onClick={onDelete}
-      >
-        <Trash2 />
-      </Button>
+      <div className="pointer-events-none absolute inset-y-0 right-1 flex items-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          className="opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]"
+          aria-label={i18nService.t('codingSessionRemove')}
+          onClick={onDelete}
+        >
+          <Trash2 />
+        </Button>
+      </div>
     ) : null}
   </div>
 );
