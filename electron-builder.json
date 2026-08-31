@@ -51,6 +51,7 @@
     "!node_modules/@openai/codex-darwin-*/**",
     "!node_modules/@openai/codex-linux-*/**",
     "!node_modules/@openai/codex-win32-*/**",
+    "!node_modules/zod/src/**",
     "!node_modules/better-sqlite3/src/**",
     "!node_modules/better-sqlite3/deps/**",
     "!node_modules/node-pty/src/**",
@@ -339,7 +340,8 @@
   "detectUpdateChannel": false,
   "generateUpdatesFilesForAllChannels": false,
   "asarUnpack": [
-    "node_modules/@agentclientprotocol/**",
+    "node_modules/@agentclientprotocol/codex-acp/**",
+    "node_modules/@agentclientprotocol/claude-agent-acp/**",
     "node_modules/@anthropic-ai/claude-agent-sdk/**",
     "node_modules/zod/**",
     "node_modules/@img/**",
