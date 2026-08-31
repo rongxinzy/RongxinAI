@@ -1,4 +1,4 @@
-﻿import { Button } from '@shared/components/ui/button';
+import { Button } from '@shared/components/ui/button';
 import { Checkbox } from '@shared/components/ui/checkbox';
 import { Input } from '@shared/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@shared/components/ui/radio-group';
@@ -5197,7 +5197,7 @@ const Settings: React.FC<SettingsProps> = ({
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
-        <div className="w-[180px] sm:w-[220px] shrink-0 flex flex-col bg-surface-raised border-r border-border rounded-l-2xl overflow-y-auto">
+        <div className="w-[180px] sm:w-[220px] shrink-0 flex flex-col bg-surface-raised border-r border-border-subtle rounded-l-2xl overflow-y-auto">
           <div className="px-5 pt-5 pb-3">
             <h2 className="text-lg font-semibold text-foreground">{i18nService.t('settings')}</h2>
           </div>
