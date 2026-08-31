@@ -1,7 +1,10 @@
-import { expect, test } from 'vitest';
+import { mkdtemp, readFile, rm } from 'fs/promises';
+import { expect, test, vi } from 'vitest';
 import { execPath } from 'process';
+import { tmpdir } from 'os';
+import path from 'path';
 
-import { AcpConnectionSupervisor } from './connectionSupervisor';
+import { AcpConnectionSupervisor, terminateProcessTree } from './connectionSupervisor';
 import { AcpMethod } from './protocol';
 
 test('handles fragmented responses and session update notifications', async () => {
@@ -83,10 +86,11 @@ test('limits background recovery to a finite number of restart attempts', async 
     environment: process.env as Record<string, string>,
   });
 
-  await new Promise(resolve => setTimeout(resolve, 850));
-
-  expect(supervisor.generation).toBe(3);
-  expect(supervisor.isRunning()).toBe(false);
+  await expect
+    .poll(() => ({ generation: supervisor.generation, running: supervisor.isRunning() }), {
+      timeout: 5_000,
+    })
+    .toEqual({ generation: 3, running: false });
   await supervisor.dispose();
 });
 
@@ -122,4 +126,72 @@ test('responds to agent requests that use a string JSON-RPC ID', async () => {
   });
   await expect.poll(() => supervisor.isRunning(), { timeout: 1_000 }).toBe(false);
   await supervisor.dispose();
+});
+
+test('falls back to terminating the child when Windows tree termination fails', async () => {
+  const kill = vi.fn(() => true);
+  await terminateProcessTree(
+    { pid: 42, kill },
+    {
+      platform: 'win32',
+      terminateWindowsTree: async pid => {
+        expect(pid).toBe(42);
+        throw new Error('taskkill failed');
+      },
+    },
+  );
+  expect(kill).toHaveBeenCalledWith('SIGTERM');
+});
+
+test('terminates descendants with the ACP process tree', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'acp-process-tree-'));
+  const pidFile = path.join(root, 'child.pid');
+  const script = [
+    "const { spawn } = require('child_process');",
+    "const fs = require('fs');",
+    "const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+    'fs.writeFileSync(process.argv[1], String(child.pid));',
+    'setInterval(() => {}, 1000);',
+  ].join('');
+  const supervisor = new AcpConnectionSupervisor();
+  try {
+    await supervisor.start({
+      executable: execPath,
+      args: ['-e', script, pidFile],
+      cwd: process.cwd(),
+      environment: process.env as Record<string, string>,
+    });
+    await expect
+      .poll(
+        async () => {
+          try {
+            return (await readFile(pidFile, 'utf8')).trim();
+          } catch {
+            return '';
+          }
+        },
+        { timeout: 1_000 },
+      )
+      .not.toBe('');
+    const pid = Number((await readFile(pidFile, 'utf8')).trim());
+    expect(pid).toBeGreaterThan(0);
+
+    await supervisor.dispose();
+    await expect
+      .poll(
+        () => {
+          try {
+            process.kill(pid, 0);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 1_000 },
+      )
+      .toBe(false);
+  } finally {
+    await supervisor.dispose();
+    await rm(root, { recursive: true, force: true });
+  }
 });

@@ -166,6 +166,7 @@ import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerCodingAgentIpcHandlers } from './ipcHandlers/codingAgent';
 import { CodingRoomRepository } from './codingAgent/codingRoomRepository';
 import { CodingRoomService } from './codingAgent/codingRoomService';
+import { resolveAcpAdapterRoot } from './codingAgent/acp/adapterRoot';
 import { CodingAgentRegistry } from './codingAgent/codingAgentRegistry';
 import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRepository';
 import { GitWorktreeService } from './codingAgent/gitWorktreeService';
@@ -883,7 +884,11 @@ const getCodingRoomService = (): CodingRoomService => {
         app.isPackaged
           ? path.join(process.resourcesPath, 'acp', 'registry.json')
           : path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
-        app.getAppPath(),
+        resolveAcpAdapterRoot({
+          isPackaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          appPath: app.getAppPath(),
+        }),
       ),
       {
         startBuiltinSession: async ({ sessionId, workspaceRoot, prompt, modelOverride }) => {
