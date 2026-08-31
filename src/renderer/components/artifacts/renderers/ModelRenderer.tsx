@@ -136,6 +136,10 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
         renderer.domElement.style.width = '100%';
         renderer.domElement.style.height = '100%';
         renderer.domElement.style.display = 'block';
+        // During live resizes the drawing buffer lags the container by a
+        // debounce; object-fit keeps that stale frame letterboxed instead of
+        // non-uniformly stretched, so the model never distorts mid-drag.
+        renderer.domElement.style.objectFit = 'contain';
         container.appendChild(renderer.domElement);
 
         const scene = new THREE.Scene();
