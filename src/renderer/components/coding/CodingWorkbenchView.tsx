@@ -24,8 +24,8 @@ import {
   PanelRight,
   Settings2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
 import type { CodingAgentConfigOption, CodingRoomSnapshot } from '../../../shared/codingAgent';
 import {
@@ -36,7 +36,17 @@ import {
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import {
+  activateSessionArtifactView,
+  closePanel,
+  EMPTY_ARTIFACTS,
+  MIN_PANEL_WIDTH,
+  selectIsSessionArtifactPanelOpen,
+  selectSessionArtifactLayoutMode,
+  selectSessionArtifacts,
+} from '../../store/slices/artifactSlice';
 import WindowTitleBar from '../window/WindowTitleBar';
+import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
@@ -56,6 +66,14 @@ const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
 
 const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
+
+const ArtifactPanelFrame = lazy(() =>
+  import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
+);
+
+// The coding workbench has no resizable content row like the cowork view, so
+// the artifact panel width is clamped against a fixed generous bound.
+const MAX_ARTIFACT_PANEL_WIDTH = 960;
 
 interface CodingWorkbenchViewProps {
   workspaceRoot: string;
@@ -180,6 +198,22 @@ export const CodingWorkbenchView = ({
   );
   const activeLaneId = activeLane?.id ?? null;
   const activeRemoteSessionId = activeLane?.remoteSessionId ?? null;
+  const dispatch = useDispatch();
+  const artifactSessionKey = activeLaneId;
+  const laneArtifacts = useSelector((state: RootState) =>
+    artifactSessionKey ? selectSessionArtifacts(state, artifactSessionKey) : EMPTY_ARTIFACTS,
+  );
+  const isArtifactPanelOpen = useSelector((state: RootState) =>
+    selectIsSessionArtifactPanelOpen(state, artifactSessionKey ?? undefined),
+  );
+  const artifactLayoutMode = useSelector((state: RootState) =>
+    selectSessionArtifactLayoutMode(state, artifactSessionKey ?? undefined),
+  );
+  // Artifacts detected in coding conversations share the cowork artifact store,
+  // keyed by lane id; activate the lane's view whenever the selection changes.
+  useEffect(() => {
+    dispatch(activateSessionArtifactView(artifactSessionKey));
+  }, [artifactSessionKey, dispatch]);
   const activeDriverKind = activeProfile?.driverKind ?? null;
   const activeConfigOptionCount = activeLane?.configOptions.length ?? 0;
   const [draftConfigOptions, setDraftConfigOptions] = useState<CodingAgentConfigOption[]>([]);
@@ -806,17 +840,36 @@ export const CodingWorkbenchView = ({
             <WindowTitleBar inline />
           </div>
         </header>
-        <CodingEventStream
-          events={activeEvents}
-          isStreaming={activeLane?.status === CodingLaneStatus.Running}
-          emptyDescription={
-            draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
-          }
-          scrollAreaRef={eventStreamRef}
-          onScrollPositionChange={scrollPosition => {
-            if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
-          }}
-        />
+        <div className="flex min-h-0 flex-1">
+          <CodingEventStream
+            events={activeEvents}
+            isStreaming={activeLane?.status === CodingLaneStatus.Running}
+            emptyDescription={
+              draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
+            }
+            scrollAreaRef={eventStreamRef}
+            artifactSessionKey={artifactSessionKey}
+            onScrollPositionChange={scrollPosition => {
+              if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
+            }}
+          />
+          {artifactSessionKey && isArtifactPanelOpen && (
+            <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
+              <Suspense fallback={null}>
+                <ArtifactPanelFrame
+                  sessionId={artifactSessionKey}
+                  artifacts={laneArtifacts}
+                  isOpen={isArtifactPanelOpen}
+                  isVisible
+                  isTransitioning={false}
+                  layoutMode={artifactLayoutMode}
+                  minPanelWidth={MIN_PANEL_WIDTH}
+                  maxPanelWidth={MAX_ARTIFACT_PANEL_WIDTH}
+                />
+              </Suspense>
+            </ArtifactPanelErrorBoundary>
+          )}
+        </div>
         <CodingComposer
           availableCommands={activeLane?.availableCommands ?? []}
           configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}

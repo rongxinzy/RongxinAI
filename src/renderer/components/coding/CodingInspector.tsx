@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import { CodingEventKind, type CodingEvent } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
 import { CodingInspectorTab, type CodingInspectorTab as CodingInspectorTabType } from './constants';
+import { CodingDiffView } from './CodingDiffView';
 import { getCodingEventText } from './codingEventProjection';
 
 interface CodingInspectorProps {
@@ -60,20 +61,35 @@ export const CodingInspector = ({ events }: CodingInspectorProps) => {
       <TabsContent value={CodingInspectorTab.Changes} className="min-h-0">
         <ScrollArea className="h-full px-4 pb-4">
           <div className="flex flex-col gap-2">
-            {changes.map(event => (
-              <div key={event.id} className="rounded-lg border border-border p-3">
-                <span className="block truncate font-mono text-xs font-medium">
-                  {typeof event.payload.path === 'string'
-                    ? event.payload.path
-                    : i18nService.t('codingAgentChanges')}
-                </span>
-                {eventText(event) && (
-                  <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
-                    {eventText(event)}
-                  </pre>
-                )}
-              </div>
-            ))}
+            {changes.map(event => {
+              const isDiff =
+                event.payload.type === 'diff' && typeof event.payload.newText === 'string';
+              return (
+                <div key={event.id} className="rounded-lg border border-border p-3">
+                  <span className="block truncate font-mono text-xs font-medium">
+                    {typeof event.payload.path === 'string'
+                      ? event.payload.path
+                      : i18nService.t('codingAgentChanges')}
+                  </span>
+                  {isDiff ? (
+                    <div className="mt-2">
+                      <CodingDiffView
+                        oldText={
+                          typeof event.payload.oldText === 'string' ? event.payload.oldText : ''
+                        }
+                        newText={event.payload.newText as string}
+                      />
+                    </div>
+                  ) : (
+                    eventText(event) && (
+                      <pre className="mt-2 whitespace-pre-wrap break-words font-mono text-xs text-muted-foreground">
+                        {eventText(event)}
+                      </pre>
+                    )
+                  )}
+                </div>
+              );
+            })}
           </div>
         </ScrollArea>
       </TabsContent>
