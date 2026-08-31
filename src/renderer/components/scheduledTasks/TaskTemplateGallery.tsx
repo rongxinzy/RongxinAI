@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@shared/components/ui/card';
-import { cn } from '@shared/lib/utils';
 import {
   CalendarClock,
   CloudSun,
@@ -34,7 +33,6 @@ interface TaskTemplate {
   descKey: string;
   scheduleLabelKey: string;
   promptTextKey: string;
-  colorClass: string;
   schedule: { kind: 'cron'; expr: string };
 }
 
@@ -46,7 +44,6 @@ const TEMPLATES: TaskTemplate[] = [
     descKey: 'taskTemplateFinanceNewsDesc',
     scheduleLabelKey: 'taskTemplateFinanceNewsSchedule',
     promptTextKey: 'taskTemplateFinanceNewsPrompt',
-    colorClass: 'text-emerald-500 bg-emerald-500/10',
     schedule: { kind: 'cron', expr: '0 9 * * *' },
   },
   {
@@ -56,7 +53,6 @@ const TEMPLATES: TaskTemplate[] = [
     descKey: 'taskTemplateWeatherDesc',
     scheduleLabelKey: 'taskTemplateWeatherSchedule',
     promptTextKey: 'taskTemplateWeatherPrompt',
-    colorClass: 'text-sky-500 bg-sky-500/10',
     schedule: { kind: 'cron', expr: '0 7 * * *' },
   },
   {
@@ -66,7 +62,6 @@ const TEMPLATES: TaskTemplate[] = [
     descKey: 'taskTemplateNewsBriefingDesc',
     scheduleLabelKey: 'taskTemplateNewsBriefingSchedule',
     promptTextKey: 'taskTemplateNewsBriefingPrompt',
-    colorClass: 'text-blue-500 bg-blue-500/10',
     schedule: { kind: 'cron', expr: '0 8 * * *' },
   },
   {
@@ -76,7 +71,6 @@ const TEMPLATES: TaskTemplate[] = [
     descKey: 'taskTemplateKnowledgePushDesc',
     scheduleLabelKey: 'taskTemplateKnowledgePushSchedule',
     promptTextKey: 'taskTemplateKnowledgePushPrompt',
-    colorClass: 'text-amber-500 bg-amber-500/10',
     schedule: { kind: 'cron', expr: '0 12 * * *' },
   },
 ];
@@ -117,12 +111,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
             }
           >
             <CardHeader>
-              <div
-                className={cn(
-                  'size-9 rounded-lg flex items-center justify-center mb-1',
-                  tpl.colorClass,
-                )}
-              >
+              <div className="size-9 rounded-lg flex items-center justify-center mb-1 bg-surface-raised text-muted-foreground">
                 <tpl.icon className="size-4.5" />
               </div>
               <CardTitle>

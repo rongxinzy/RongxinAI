@@ -57,6 +57,8 @@ export function MarketplaceDownloadSidebar({
   const [containerWidth, setContainerWidth] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
   const [isResizing, setIsResizing] = useState(false);
+  const resizeFrameRef = useRef(0);
+  const pendingResizeWidthRef = useRef(0);
 
   useEffect(() => {
     const container = sidebarRef.current?.parentElement;
@@ -85,6 +87,7 @@ export function MarketplaceDownloadSidebar({
 
     const startX = event.clientX;
     const startWidth = sidebarWidth;
+    pendingResizeWidthRef.current = startWidth;
     const originalCursor = document.body.style.cursor;
     const originalUserSelect = document.body.style.userSelect;
     setIsResizing(true);
@@ -92,10 +95,23 @@ export function MarketplaceDownloadSidebar({
     document.body.style.userSelect = 'none';
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      const nextWidth = startWidth + startX - moveEvent.clientX;
-      setSidebarWidth(clampSidebarWidth(nextWidth, getMaxSidebarWidth(containerWidth)));
+      // Coalesce pointermove bursts into one state update per animation frame.
+      pendingResizeWidthRef.current = clampSidebarWidth(
+        startWidth + startX - moveEvent.clientX,
+        getMaxSidebarWidth(containerWidth),
+      );
+      if (resizeFrameRef.current) return;
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = 0;
+        setSidebarWidth(pendingResizeWidthRef.current);
+      });
     };
     const handlePointerEnd = () => {
+      if (resizeFrameRef.current) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = 0;
+      }
+      setSidebarWidth(pendingResizeWidthRef.current);
       setIsResizing(false);
       document.body.style.cursor = originalCursor;
       document.body.style.userSelect = originalUserSelect;

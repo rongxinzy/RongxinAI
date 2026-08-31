@@ -137,14 +137,22 @@ export function LocalInferenceAccessSettingsDialog({
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <div className="mb-1.5 text-xs font-medium text-foreground">
-              {i18nService.t('localInferenceAccessRequestExample')}
+          <div className="flex flex-col gap-2 rounded-xl border border-border bg-muted/20 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="shrink-0 text-xs font-medium text-foreground">
+                {i18nService.t('localInferenceAccessRequestExample')}
+              </div>
+              <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+                {endpointBase}
+              </span>
             </div>
-            <pre className="overflow-x-auto rounded-md bg-background px-2.5 py-2 font-sans text-xs leading-5 text-foreground">
+            <pre className="overflow-x-auto whitespace-pre rounded-lg border border-border-subtle bg-background px-3 py-2 font-mono text-xs leading-5 text-foreground">
               {`POST ${endpointBase}/chat/completions
 model: "${modelName}"`}
             </pre>
+            <p className="text-xs leading-4 text-muted-foreground">
+              {i18nService.t('localInferenceAccessRequestExampleHint')}
+            </p>
           </div>
         </div>
 

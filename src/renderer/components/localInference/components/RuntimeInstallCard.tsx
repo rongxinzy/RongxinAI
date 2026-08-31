@@ -270,7 +270,7 @@ export function RuntimeInstallCard({
             {i18nService.t('localInferenceRuntimeCardTitle')}
           </CardTitle>
         </div>
-        <div className="-mx-4 w-auto px-1.5">
+        <div>
           <Select
             value={selectedKey}
             onValueChange={value => setSelectedKey(value ?? '')}
@@ -378,7 +378,7 @@ export function RuntimeInstallCard({
               type="button"
               variant="primary"
               size="sm"
-              className="h-8 min-w-16 translate-x-1.5 px-3 leading-tight"
+              className="h-8 min-w-16 px-3 leading-tight"
               onClick={() => void cancelInstall()}
             >
               <X data-icon="inline-start" />
@@ -401,7 +401,7 @@ export function RuntimeInstallCard({
                 type="button"
                 variant="primary"
                 size="sm"
-                className="h-8 min-w-16 translate-x-1.5 px-3"
+                className="h-8 min-w-16 px-3"
                 disabled={selectedInstalled}
                 onClick={() => void startInstall()}
               >

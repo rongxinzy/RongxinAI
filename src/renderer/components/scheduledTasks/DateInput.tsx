@@ -1,7 +1,8 @@
 import { Button } from '@shared/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
+import { cn } from '@shared/lib/utils';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 
@@ -22,9 +23,6 @@ const WEEKDAY_KEYS = [
   'scheduledTasksFormWeekShortFri',
   'scheduledTasksFormWeekShortSat',
 ] as const;
-
-const PANEL_HEIGHT_ESTIMATE = 280;
-const PANEL_WIDTH = 240;
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -48,16 +46,8 @@ function firstDayOfWeek(year: number, month: number): number {
   return new Date(year, month - 1, 1).getDay();
 }
 
-interface PanelPos {
-  top: number;
-  left: number;
-}
-
 const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeholder }) => {
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<PanelPos>({ top: 0, left: 0 });
 
   // Calendar view state: the month currently displayed
   const today = new Date();
@@ -75,55 +65,6 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
       }
     }
   }, [value]);
-
-  // Calculate panel position from trigger bounding rect
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    const openAbove = spaceBelow < PANEL_HEIGHT_ESTIMATE && rect.top > spaceBelow;
-
-    // Horizontal: prefer left-aligned, but shift left if it overflows the viewport
-    let left = rect.left;
-    if (left + PANEL_WIDTH > window.innerWidth - 8) {
-      left = rect.right - PANEL_WIDTH;
-    }
-    // Ensure it doesn't go off the left edge either
-    if (left < 8) left = 8;
-
-    setPos({
-      top: openAbove ? rect.top - PANEL_HEIGHT_ESTIMATE : rect.bottom + 4,
-      left,
-    });
-  }, [open]);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        triggerRef.current &&
-        !triggerRef.current.contains(target) &&
-        panelRef.current &&
-        !panelRef.current.contains(target)
-      ) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open]);
 
   const goPrev = useCallback(() => {
     setViewMonth(m => {
@@ -171,118 +112,113 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
   const displayText = parsed ? `${parsed.y}/${pad(parsed.m)}/${pad(parsed.d)}` : '';
 
   return (
-    <>
-      {/* Trigger */}
-      <Button
-        ref={triggerRef}
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => setOpen(o => !o)}
-        className={`flex items-center gap-1.5 text-xs rounded-md border border-border-subtle px-2 py-1 h-auto transition-colors ${
-          open
-            ? 'border-primary bg-surface text-foreground'
-            : value
-              ? 'bg-surface text-foreground hover:border-primary/50'
-              : 'bg-surface text-muted-foreground hover:border-primary/50'
-        }`}
-      >
-        <Calendar className="h-3 w-3 shrink-0 opacity-60" />
-        <span className={value ? '' : 'opacity-50'}>
-          {displayText || placeholder || '----/--/--'}
-        </span>
-        {value && (
-          <span
-            onClick={handleClear}
-            className="ml-0.5 opacity-40 hover:opacity-100 transition-opacity"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        nativeButton={false}
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              'flex h-auto items-center gap-1.5 rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs transition-colors',
+              open
+                ? 'border-primary text-foreground'
+                : cn(
+                    'hover:border-primary/50',
+                    value ? 'text-foreground' : 'text-muted-foreground',
+                  ),
+            )}
           >
-            ×
-          </span>
-        )}
-      </Button>
-
-      {/* Calendar dropdown — rendered via portal to avoid overflow clipping */}
-      {open &&
-        createPortal(
-          <div
-            ref={panelRef}
-            className="fixed z-9999 rounded-lg shadow-lg bg-surface border border-border p-3 select-none"
-            style={{ top: pos.top, left: pos.left, minWidth: 240 }}
-          >
-            {/* Month/Year nav */}
-            <div className="flex items-center justify-between mb-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                onClick={goPrev}
-                className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
+            <Calendar className="h-3 w-3 shrink-0 opacity-60" />
+            <span className={value ? '' : 'opacity-50'}>
+              {displayText || placeholder || '----/--/--'}
+            </span>
+            {value && (
+              <span
+                onClick={handleClear}
+                className="ml-0.5 opacity-40 hover:opacity-100 transition-opacity"
               >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </Button>
-              <span className="text-xs font-medium text-foreground">
-                {viewYear} / {pad(viewMonth)}
+                ×
               </span>
+            )}
+          </Button>
+        }
+      />
+      <PopoverContent align="start" className="w-auto min-w-60 select-none p-3">
+        {/* Month/Year nav */}
+        <div className="flex items-center justify-between mb-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={goPrev}
+            className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </Button>
+          <span className="text-xs font-medium text-foreground">
+            {viewYear} / {pad(viewMonth)}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={goNext}
+            className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+
+        {/* Weekday headers */}
+        <div className="grid grid-cols-7 gap-0.5 mb-1">
+          {WEEKDAY_KEYS.map(key => (
+            <div key={key} className="text-center text-[10px] text-muted-foreground py-0.5">
+              {i18nService.t(key)}
+            </div>
+          ))}
+        </div>
+
+        {/* Day grid */}
+        <div className="grid grid-cols-7 gap-0.5">
+          {/* Empty cells before the first day */}
+          {Array.from({ length: startDay }, (_, i) => (
+            <div key={`e-${i}`} />
+          ))}
+          {/* Day cells */}
+          {Array.from({ length: totalDays }, (_, i) => {
+            const day = i + 1;
+            const dateStr = toYMD(viewYear, viewMonth, day);
+            const isSelected = dateStr === value;
+            const isToday = dateStr === todayStr;
+            const disabled = isDisabled(day);
+            return (
               <Button
+                key={day}
                 type="button"
                 variant="ghost"
                 size="icon-xs"
-                onClick={goNext}
-                className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
+                disabled={disabled}
+                onClick={() => handleSelect(day)}
+                className={cn(
+                  'w-7 h-7 rounded text-xs transition-colors p-0',
+                  isSelected
+                    ? 'bg-primary text-primary-foreground font-medium'
+                    : disabled
+                      ? 'text-muted-foreground/30 cursor-not-allowed'
+                      : isToday
+                        ? 'text-primary font-medium hover:bg-surface-raised'
+                        : 'text-foreground hover:bg-surface-raised',
+                )}
               >
-                <ChevronRight className="h-3.5 w-3.5" />
+                {day}
               </Button>
-            </div>
-
-            {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-0.5 mb-1">
-              {WEEKDAY_KEYS.map(key => (
-                <div key={key} className="text-center text-[10px] text-muted-foreground py-0.5">
-                  {i18nService.t(key)}
-                </div>
-              ))}
-            </div>
-
-            {/* Day grid */}
-            <div className="grid grid-cols-7 gap-0.5">
-              {/* Empty cells before the first day */}
-              {Array.from({ length: startDay }, (_, i) => (
-                <div key={`e-${i}`} />
-              ))}
-              {/* Day cells */}
-              {Array.from({ length: totalDays }, (_, i) => {
-                const day = i + 1;
-                const dateStr = toYMD(viewYear, viewMonth, day);
-                const isSelected = dateStr === value;
-                const isToday = dateStr === todayStr;
-                const disabled = isDisabled(day);
-                return (
-                  <Button
-                    key={day}
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    disabled={disabled}
-                    onClick={() => handleSelect(day)}
-                    className={`w-7 h-7 rounded text-xs transition-colors p-0 ${
-                      isSelected
-                        ? 'bg-primary text-white font-medium'
-                        : disabled
-                          ? 'text-muted-foreground/30 cursor-not-allowed'
-                          : isToday
-                            ? 'text-primary font-medium hover:bg-surface-raised'
-                            : 'text-foreground hover:bg-surface-raised'
-                    }`}
-                  >
-                    {day}
-                  </Button>
-                );
-              })}
-            </div>
-          </div>,
-          document.body,
-        )}
-    </>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 
