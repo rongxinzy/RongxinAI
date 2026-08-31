@@ -5,27 +5,49 @@ const MAX_STDOUT_LINE_BYTES = 1_048_576;
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_DELAY_MS = 250;
 
-const terminateProcessTree = async (child: ChildProcessWithoutNullStreams): Promise<void> => {
+type ProcessTreeChild = Pick<ChildProcessWithoutNullStreams, 'pid' | 'kill'>;
+
+interface ProcessTreeTerminationOptions {
+  platform?: NodeJS.Platform;
+  terminateWindowsTree?: (pid: number) => Promise<void>;
+}
+
+const terminateWindowsTree = async (pid: number): Promise<void> => {
+  await new Promise<void>((resolve, reject) => {
+    execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, error =>
+      error ? reject(error) : resolve(),
+    );
+  });
+};
+
+const terminateChild = (child: ProcessTreeChild): void => {
+  try {
+    child.kill('SIGTERM');
+  } catch {
+    // The process may have exited between the PID check and the signal.
+  }
+};
+
+export const terminateProcessTree = async (
+  child: ProcessTreeChild,
+  options: ProcessTreeTerminationOptions = {},
+): Promise<void> => {
   const pid = child.pid;
   if (!pid) return;
 
-  if (process.platform === 'win32') {
-    await new Promise<void>(resolve => {
-      execFile('taskkill.exe', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () =>
-        resolve(),
-      );
-    });
+  if ((options.platform ?? process.platform) === 'win32') {
+    try {
+      await (options.terminateWindowsTree ?? terminateWindowsTree)(pid);
+    } catch {
+      terminateChild(child);
+    }
     return;
   }
 
   try {
     process.kill(-pid, 'SIGTERM');
   } catch {
-    try {
-      child.kill('SIGTERM');
-    } catch {
-      // The process may have exited between the PID check and the signal.
-    }
+    terminateChild(child);
   }
 };
 
