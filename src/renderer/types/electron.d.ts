@@ -1012,6 +1012,11 @@ interface IElectronAPI {
       workspaceRoot: string;
       option: import('../../shared/codingAgent').CodingLaneConfigOptionInput;
     }) => Promise<CodingAgentActionResult>;
+    setLaneModelOverride: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      modelOverride: string | null;
+    }) => Promise<CodingAgentActionResult>;
     previewLaneChanges: (input: {
       workspaceRoot: string;
       laneId: string;
