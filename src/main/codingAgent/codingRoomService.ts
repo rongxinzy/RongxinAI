@@ -39,6 +39,7 @@ import { AuthTerminalService } from './authTerminalService';
 import { CollaborationService } from './collaborationService';
 import { CodingGitController } from './codingGitController';
 import { CodingRoomRepository } from './codingRoomRepository';
+import { isAssistantResponseEvent } from './codingTurnResponse';
 import {
   persistCodingSessionRecord,
   prepareCodingSession,
@@ -47,6 +48,7 @@ import {
 import { t } from '../i18n';
 import type { CodingAgentDriver } from './drivers/codingAgentDriver';
 import { CodingDriverFactory } from './drivers/driverFactory';
+import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 
 export interface CodingRoomRuntime {
   startBuiltinSession(input: {
@@ -934,9 +936,11 @@ export class CodingRoomService extends EventEmitter {
         response.requestId,
         response.outcome === CodingPermissionOutcome.Selected,
       );
-      this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
-      this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.Running);
-      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Running);
+      if (response.outcome === CodingPermissionOutcome.Selected) {
+        this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
+        this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.Running);
+        this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Running);
+      }
       this.repository.appendEvent(lane.id, CodingEventKind.ToolCall, {
         permissionRequestId: response.requestId,
         permissionOutcome: response.outcome,
@@ -984,6 +988,25 @@ export class CodingRoomService extends EventEmitter {
           lane,
           CodingLaneStatus.Failed,
         );
+      this.publish(workspaceRoot);
+      return;
+    }
+  }
+
+  recordBuiltinInterruption(interruption: CoworkSessionInterruption): void {
+    for (const workspaceRoot of this.knownRooms()) {
+      const snapshot = this.bootstrap(workspaceRoot);
+      const lane = snapshot.lanes.find(
+        candidate => candidate.localSessionId === interruption.sessionId,
+      );
+      if (!lane) continue;
+      this.repository.appendEvent(lane.id, CodingEventKind.TurnCancelled, {
+        reason: interruption.cause,
+        interruption,
+      });
+      this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Idle);
+      this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.NeedsReview);
+      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.Planned);
       this.publish(workspaceRoot);
       return;
     }
@@ -1127,12 +1150,14 @@ export class CodingRoomService extends EventEmitter {
     prompt: string,
   ): Promise<void> {
     try {
+      let receivedAssistantResponse = false;
       for await (const event of driver.prompt({
         sessionId,
         workspaceRoot: executionRoot,
         prompt,
         modelOverride: lane.modelOverride,
       })) {
+        if (isAssistantResponseEvent(event)) receivedAssistantResponse = true;
         this.repository.appendOrMergeStreamEvent(lane.id, event.kind, event.payload);
         this.repository.updateLaneConfigOptions(lane.id, driver.getSessionConfigOptions(sessionId));
         this.repository.updateLaneAvailableCommands(
@@ -1153,6 +1178,9 @@ export class CodingRoomService extends EventEmitter {
         this.publish(roomWorkspaceRoot);
       }
       if (this.cancelledLanes.delete(lane.id)) return;
+      if (driverKind !== CodingAgentDriverKind.Builtin && !receivedAssistantResponse) {
+        throw new Error(t('codingAgentNoAssistantResponse'));
+      }
       if (driverKind === CodingAgentDriverKind.Builtin) {
         const workbench = this.runtime.getBuiltinWorkbenchLink(lane.localSessionId);
         const assignment = this.repository.getLatestAssignmentForLane(lane.id);
