@@ -44,7 +44,7 @@ export const classicLight: ThemeDefinition = {
     'text-muted-foreground': 'oklch(0.553 0.013 58.071)',
     'text-muted': 'oklch(0.553 0.013 58.071)',
     border: 'oklch(0.923 0.003 48.717)',
-    'border-subtle': 'oklch(0.923 0.003 48.717)',
+    'border-subtle': 'oklch(0.952 0.002 48.717)',
     'input-border': 'oklch(0.923 0.003 48.717)',
     'scroll-thumb': 'oklch(0.709 0.01 56.259)',
     'scroll-thumb-hover': 'oklch(0.553 0.013 58.071)',
