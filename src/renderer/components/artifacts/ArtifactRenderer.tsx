@@ -13,6 +13,7 @@ const HtmlRenderer = React.lazy(() => import('./renderers/HtmlRenderer'));
 const ImageRenderer = React.lazy(() => import('./renderers/ImageRenderer'));
 const MarkdownRenderer = React.lazy(() => import('./renderers/MarkdownRenderer'));
 const MermaidRenderer = React.lazy(() => import('./renderers/MermaidRenderer'));
+const ModelRenderer = React.lazy(() => import('./renderers/ModelRenderer'));
 const SvgRenderer = React.lazy(() => import('./renderers/SvgRenderer'));
 const TextRenderer = React.lazy(() => import('./renderers/TextRenderer'));
 const UnsupportedRenderer = React.lazy(() => import('./renderers/UnsupportedRenderer'));
@@ -56,6 +57,9 @@ const ArtifactRenderer: React.FC<ArtifactRendererProps> = ({ artifact }) => {
       break;
     case 'document':
       renderer = <DocumentRenderer artifact={artifact} />;
+      break;
+    case 'model':
+      renderer = <ModelRenderer artifact={artifact} />;
       break;
     case 'code':
       renderer = <CodeRenderer artifact={artifact} />;
