@@ -27,9 +27,12 @@ test('lets the conversation fill the pane behind the floating composer', () => {
   expect(source).toContain('style={{ bottom: `calc(${COWORK_COMPOSER_INSET_VALUE} + 1rem)` }}');
   expect(inputArea).toBeGreaterThanOrEqual(0);
   expect(overlay).toBeGreaterThan(inputArea);
+  // The floating composer dodges the artifact panel: its right inset follows
+  // the panel width while a split panel is visible.
   expect(source.slice(overlay, promptInput)).toContain(
-    'className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"',
+    'className="pointer-events-none absolute bottom-0 z-20 px-4 transition-[right] duration-200 ease-out motion-reduce:transition-none"',
   );
+  expect(source.slice(overlay, promptInput)).toContain('right: composerPanelInset');
   expect(source.slice(overlay, promptInput)).toContain(
     'className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4"',
   );
