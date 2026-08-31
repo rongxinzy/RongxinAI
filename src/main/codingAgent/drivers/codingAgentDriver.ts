@@ -45,6 +45,7 @@ export interface CodingAgentDriver {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    modelOverride?: string | null;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>>;
   cancel(sessionId: string): Promise<void>;
   respondToPermission(response: CodingPermissionResponse): Promise<void>;

@@ -20,6 +20,7 @@ import {
   configureCoworkOpenAICompatProxy,
   getCoworkOpenAICompatProxyBaseURL,
   getCoworkOpenAICompatProxyStatus,
+  getCoworkOpenAICompatProxyToken,
   type OpenAICompatProxyTarget,
 } from './coworkOpenAICompatProxy';
 import type { LlamaCppAgentEligibility } from './llamacppAgentBinding';
@@ -761,6 +762,14 @@ export function resolveCurrentApiConfig(
     };
   }
 
+  const proxyToken = getCoworkOpenAICompatProxyToken();
+  if (!proxyToken) {
+    return {
+      config: null,
+      error: 'OpenAI compatibility proxy token is unavailable.',
+    };
+  }
+
   return {
     endpoint: resolveModelEndpoint(matched.providerName, matched.modelId, {
       providerConfig: matched.providerConfig,
@@ -771,7 +780,7 @@ export function resolveCurrentApiConfig(
       runtime: getMatchedRuntimeSnapshot(matched),
     }),
     config: {
-      apiKey: resolvedApiKey || 'zhiyuan-openai-compat',
+      apiKey: proxyToken,
       baseURL: proxyBaseURL,
       model: matched.modelId,
       apiType: 'openai',
@@ -898,37 +907,6 @@ export function resolveRawApiConfigForModelRef(modelRef: string): ApiConfigResol
     return { config: null, error };
   }
   return buildRawApiResolutionFromMatched(matched);
-}
-
-export interface SelectableProviderModel {
-  /** Model ref in the `providerName/modelId` form accepted by resolveRawApiConfigForModelRef. */
-  ref: string;
-  name: string;
-  providerName: string;
-}
-
-/**
- * Enumerate the models of every enabled provider as selectable model refs.
- * Used by the built-in coding agent to offer in-session model switching.
- */
-export function listSelectableProviderModels(): SelectableProviderModel[] {
-  const sqliteStore = getStore();
-  if (!sqliteStore) return [];
-  const appConfig = sqliteStore.get<AppConfig>('app_config');
-  if (!appConfig?.providers) return [];
-  const models: SelectableProviderModel[] = [];
-  for (const [providerName, providerConfig] of Object.entries(appConfig.providers)) {
-    if (!isProviderEnabled(providerName, providerConfig)) continue;
-    for (const model of providerConfig.models ?? []) {
-      if (!model?.id) continue;
-      models.push({
-        ref: `${providerName}/${model.id}`,
-        name: model.name?.trim() || model.id,
-        providerName,
-      });
-    }
-  }
-  return models;
 }
 
 /**

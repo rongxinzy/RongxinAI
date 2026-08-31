@@ -68,6 +68,7 @@ export const persistCodingSessionRecord = async (input: {
   title: string;
   laneId?: string;
   localSessionId?: string;
+  modelOverride?: string | null;
   getWorkspaceBaseline: (sourceRoot: string) => Promise<string | null>;
 }): Promise<CodingAgentLane> => {
   const { repository, target } = input;
@@ -84,6 +85,7 @@ export const persistCodingSessionRecord = async (input: {
       target.sourceRoot,
       input.laneId,
       input.localSessionId,
+      input.modelOverride ?? null,
     );
     repository.createAssignment({
       missionId: mission.id,
@@ -128,7 +130,7 @@ export const prepareCodingSession = async (input: {
   getWorkspaceBaseline: (sourceRoot: string) => Promise<string | null>;
 }): Promise<PreparedCodingSession> => {
   const target = resolveSessionTarget(input.repository, input.registry, input.request);
-  if (target.profile.driverKind === CodingAgentDriverKind.Builtin) {
+  if (target.profile.driverKind === CodingAgentDriverKind.Builtin && !input.request.modelOverride) {
     await input.validateBuiltinModel?.();
   }
 
@@ -185,6 +187,7 @@ export const prepareCodingSession = async (input: {
         buildSessionTitleFromInput(input.prompt, t('codingAgentDefaultMissionTitle')),
       laneId,
       localSessionId,
+      modelOverride: input.request.modelOverride,
       getWorkspaceBaseline: input.getWorkspaceBaseline,
     });
     input.repository.updateLaneRemoteSession(lane.id, driverSession.remoteSessionId);

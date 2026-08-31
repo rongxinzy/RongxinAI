@@ -166,10 +166,14 @@ import { registerTriageIpcHandlers } from './ipcHandlers/triage';
 import { registerCodingAgentIpcHandlers } from './ipcHandlers/codingAgent';
 import { CodingRoomRepository } from './codingAgent/codingRoomRepository';
 import { CodingRoomService } from './codingAgent/codingRoomService';
+import { resolveAcpAdapterRoot } from './codingAgent/acp/adapterRoot';
 import { CodingAgentRegistry } from './codingAgent/codingAgentRegistry';
 import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRepository';
 import { GitWorktreeService } from './codingAgent/gitWorktreeService';
 import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
+import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
+import { CoworkInterruptionCause } from '../shared/cowork/interruption';
+import { normalizePiMessage, normalizePiToolActivity } from './codingAgent/piCodingEventAdapter';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
@@ -179,7 +183,6 @@ import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCata
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
   getCurrentApiConfig,
-  listSelectableProviderModels,
   resolveAllEnabledProviderConfigs,
   resolveAllProviderApiKeys,
   resolveCurrentApiConfig,
@@ -882,7 +885,11 @@ const getCodingRoomService = (): CodingRoomService => {
         app.isPackaged
           ? path.join(process.resourcesPath, 'acp', 'registry.json')
           : path.join(process.cwd(), 'resources', 'acp', 'registry.json'),
-        app.getAppPath(),
+        resolveAcpAdapterRoot({
+          isPackaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          appPath: app.getAppPath(),
+        }),
       ),
       {
         startBuiltinSession: async ({
@@ -923,18 +930,6 @@ const getCodingRoomService = (): CodingRoomService => {
             model: patch.model,
             thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
           }),
-        listBuiltinModelOptions: () =>
-          listSelectableProviderModels().map(model => ({
-            value: model.ref,
-            name: model.name,
-            description: model.providerName,
-          })),
-        getBuiltinCurrentModelRef: () => {
-          const resolution = resolveRawApiConfig();
-          return resolution.config && resolution.providerMetadata
-            ? `${resolution.providerMetadata.providerName}/${resolution.config.model}`
-            : null;
-        },
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
         getBuiltinWorkbenchLink: sessionId => {
           const detail = getWorkbenchTaskService().getCurrent(sessionId);
@@ -1017,17 +1012,49 @@ const getCodingRoomService = (): CodingRoomService => {
     );
     codingRoomService.registry.hydrate();
     runtime.on('message', (sessionId: string, message: unknown) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Message, { message });
+      const metadata =
+        message && typeof message === 'object' && 'metadata' in message
+          ? (message as { metadata?: unknown }).metadata
+          : null;
+      const isThinking =
+        metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+          ? (metadata as { isThinking?: unknown }).isThinking === true
+          : false;
+      if (isThinking) {
+        codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Reasoning, {
+          message,
+          streamUpdateMode: CodingStreamUpdateMode.Replace,
+        });
+        return;
+      }
+      const normalized = normalizePiMessage(message);
+      if (normalized)
+        codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
     });
-    runtime.on('messageUpdate', (sessionId: string, messageId: string, content: string) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.MessageDelta, {
-        content,
-        messageId,
-        streamUpdateMode: CodingStreamUpdateMode.Replace,
-      });
-    });
-    runtime.on('toolActivity', (sessionId: string, event: unknown) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.ToolCall, { event });
+    runtime.on(
+      'messageUpdate',
+      (
+        sessionId: string,
+        messageId: string,
+        content: string,
+        metadata?: Record<string, unknown>,
+      ) => {
+        const isThinking = metadata?.isThinking === true;
+        codingRoomService?.recordBuiltinEvent(
+          sessionId,
+          isThinking ? CodingEventKind.Reasoning : CodingEventKind.MessageDelta,
+          {
+            content,
+            messageId,
+            streamUpdateMode: CodingStreamUpdateMode.Replace,
+          },
+        );
+      },
+    );
+    runtime.on('toolActivity', (sessionId: string, event: CoworkToolActivityEvent) => {
+      const normalized = normalizePiToolActivity(event);
+      if (normalized)
+        codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
     });
     runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
       const requestId =
@@ -1046,6 +1073,11 @@ const getCodingRoomService = (): CodingRoomService => {
     });
     runtime.on('error', (sessionId: string, error: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
+    });
+    runtime.on('sessionInterrupted', interruption => {
+      if (interruption.cause !== CoworkInterruptionCause.UserStop) {
+        codingRoomService?.recordBuiltinInterruption(interruption);
+      }
     });
   }
   return codingRoomService;

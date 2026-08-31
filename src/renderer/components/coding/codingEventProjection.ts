@@ -1,8 +1,10 @@
 import {
   CodingEventKind,
   CodingStreamUpdateMode,
+  CodingToolCallStatus,
   type CodingEvent,
 } from '../../../shared/codingAgent';
+import { CoworkToolActivityEventType } from '../../../shared/cowork/toolActivity';
 import {
   CodingConversationActivityKind,
   CodingConversationRole,
@@ -81,6 +83,12 @@ const getMessageRole = (event: CodingEvent): CodingConversationRoleType => {
     : CodingConversationRole.Assistant;
 };
 
+const getMessageType = (event: CodingEvent): string | null => {
+  const nestedMessage = asRecord(event.payload.message);
+  const type = nestedMessage?.type;
+  return typeof type === 'string' ? type : null;
+};
+
 const getMessageId = (event: CodingEvent): string => {
   if (typeof event.payload.messageId === 'string') return event.payload.messageId;
   const nestedMessage = asRecord(event.payload.message);
@@ -132,9 +140,13 @@ const getActivityId = (
   event: CodingEvent,
   kind: CodingConversationActivityKindType,
 ): string => {
+  const nestedEvent = asRecord(event.payload.event);
+  const nestedActivity = asRecord(nestedEvent?.activity);
   for (const value of [
     event.payload.toolCallId,
     event.payload.tool_call_id,
+    nestedActivity?.toolCallId,
+    nestedEvent?.toolCallId,
     event.payload.permissionRequestId,
     event.payload.requestId,
     event.payload.planId,
@@ -142,6 +154,35 @@ const getActivityId = (
     if (typeof value === 'string' && value) return `${kind}:${value}`;
   }
   return kind === CodingConversationActivityKind.Plan ? `${turn.id}:plan` : event.id;
+};
+
+const normalizeToolActivityEvent = (event: CodingEvent): CodingEvent => {
+  if (event.kind !== CodingEventKind.ToolCall) return event;
+  const nestedEvent = asRecord(event.payload.event);
+  if (!nestedEvent) return event;
+  const nestedActivity = asRecord(nestedEvent.activity);
+  if (nestedEvent.type === CoworkToolActivityEventType.Upsert && nestedActivity) {
+    return {
+      ...event,
+      payload: {
+        ...nestedActivity,
+        status: CodingToolCallStatus.Pending,
+      },
+    };
+  }
+  if (
+    nestedEvent.type === CoworkToolActivityEventType.Remove &&
+    typeof nestedEvent.toolCallId === 'string'
+  ) {
+    return {
+      ...event,
+      payload: {
+        toolCallId: nestedEvent.toolCallId,
+        status: CodingToolCallStatus.Completed,
+      },
+    };
+  }
+  return event;
 };
 
 export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTurn[] => {
@@ -158,6 +199,10 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
 
   for (const event of events.toSorted((left, right) => left.sequence - right.sequence)) {
     if (event.kind === CodingEventKind.Message || event.kind === CodingEventKind.MessageDelta) {
+      if (event.kind === CodingEventKind.Message) {
+        const messageType = getMessageType(event);
+        if (messageType === 'tool_use' || messageType === 'tool_result') continue;
+      }
       const content = getCodingEventText(event);
       if (!content) continue;
       const role = getMessageRole(event);
@@ -190,7 +235,9 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
       const content = getCodingEventText(event);
       if (!content) continue;
       const turn = ensureTurn(event);
-      if (turn.reasoning) turn.reasoning.content += content;
+      if (turn.reasoning && event.payload.streamUpdateMode === CodingStreamUpdateMode.Replace) {
+        turn.reasoning.content = content;
+      } else if (turn.reasoning) turn.reasoning.content += content;
       else turn.reasoning = { id: event.id, content, createdAt: event.createdAt };
       continue;
     }
@@ -199,11 +246,20 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
     if (projectedActivityKind) {
       const turn = ensureTurn(event);
       const id = getActivityId(turn, event, projectedActivityKind);
+      const normalizedEvent = normalizeToolActivityEvent(event);
       const existing = turn.activities.find(
         activity => activity.id === id && activity.kind === projectedActivityKind,
       );
-      if (existing) existing.event = event;
-      else turn.activities.push({ id, kind: projectedActivityKind, event });
+      if (existing) {
+        existing.event =
+          normalizedEvent.payload.status === CodingToolCallStatus.Completed &&
+          existing.event.kind === CodingEventKind.ToolCall
+            ? {
+                ...normalizedEvent,
+                payload: { ...existing.event.payload, ...normalizedEvent.payload },
+              }
+            : normalizedEvent;
+      } else turn.activities.push({ id, kind: projectedActivityKind, event: normalizedEvent });
       continue;
     }
 

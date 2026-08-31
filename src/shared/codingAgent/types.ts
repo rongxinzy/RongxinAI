@@ -100,6 +100,8 @@ export interface CodingAgentLane {
   id: string;
   missionId: string;
   profileId: string;
+  /** Explicit provider/model reference for the built-in agent, when selected. */
+  modelOverride: string | null;
   /** Immutable source folder selected when this Agent session was created. */
   sourceRoot: string;
   /** Actual cwd. Collaborators use an isolated worktree derived from sourceRoot. */
@@ -215,6 +217,7 @@ export interface CreateCodingSessionInput {
   profileId: string;
   sourceRoot: string;
   title?: string;
+  modelOverride?: string;
 }
 
 export interface StartCodingSessionInput extends CreateCodingSessionInput {

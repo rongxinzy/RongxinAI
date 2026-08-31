@@ -6,9 +6,18 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Bot, Folder } from 'lucide-react';
+import { useState } from 'react';
+import { useSelector } from 'react-redux';
 
-import type { CodingAgentProfile, CodingWorkspaceSource } from '../../../shared/codingAgent';
+import {
+  CodingAgentDriverKind,
+  type CodingAgentProfile,
+  type CodingWorkspaceSource,
+} from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import { resolveAgentModelRef, toAgentModelRef } from '../../utils/agentModelRef';
+import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
+import type { RootState } from '../../store';
 import type { CodingSessionDraft } from './CodingWorkspaceSidebar';
 import { CodingAgentStatusI18nKey } from './constants';
 
@@ -26,11 +35,31 @@ export const CodingDraftControls = ({
   onChange,
 }: CodingDraftControlsProps) => {
   const activeProfile = profiles.find(profile => profile.id === draft.profileId);
+  const modelState = useSelector((state: RootState) => state.model);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const isBuiltin = activeProfile?.driverKind === CodingAgentDriverKind.Builtin;
+  const selectedModel =
+    (draft.modelOverride
+      ? resolveAgentModelRef(draft.modelOverride, modelState.availableModels)
+      : null) ??
+    modelState.defaultSelectedModel ??
+    null;
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5">
       <Select
         value={draft.profileId}
-        onValueChange={profileId => profileId && onChange({ ...draft, profileId })}
+        onValueChange={profileId => {
+          if (!profileId) return;
+          const nextProfile = profiles.find(profile => profile.id === profileId);
+          onChange({
+            ...draft,
+            profileId,
+            modelOverride:
+              nextProfile?.driverKind === CodingAgentDriverKind.Builtin
+                ? draft.modelOverride
+                : null,
+          });
+        }}
       >
         <SelectTrigger
           size="sm"
@@ -55,6 +84,15 @@ export const CodingDraftControls = ({
           ))}
         </SelectContent>
       </Select>
+      {isBuiltin ? (
+        <CoworkModelPicker
+          models={modelState.availableModels}
+          selectedModel={selectedModel}
+          open={modelPickerOpen}
+          onOpenChange={setModelPickerOpen}
+          onSelect={model => onChange({ ...draft, modelOverride: toAgentModelRef(model) })}
+        />
+      ) : null}
       {sources.length > 1 ? (
         <Select
           value={draft.sourceRoot}
