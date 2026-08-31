@@ -409,6 +409,11 @@ export class CodingRoomRepository {
       .prepare('UPDATE coding_agent_lanes SET config_options_json = ?, updated_at = ? WHERE id = ?')
       .run(JSON.stringify(configOptions), Date.now(), laneId);
   }
+  updateLaneModelOverride(laneId: string, modelOverride: string | null): void {
+    this.db
+      .prepare('UPDATE coding_agent_lanes SET model_override = ?, updated_at = ? WHERE id = ?')
+      .run(modelOverride, Date.now(), laneId);
+  }
   updateLaneAvailableCommands(
     laneId: string,
     availableCommands: CodingAgentAvailableCommand[],

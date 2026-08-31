@@ -36,8 +36,9 @@ import {
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import WindowTitleBar from '../window/WindowTitleBar';
 import type { RootState } from '../../store';
-import { toAgentModelRef } from '../../utils/agentModelRef';
+import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
 import { CodingAuthAndPermissionDialogs } from './CodingAuthAndPermissionDialogs';
 import { CodingComposer } from './CodingComposer';
@@ -49,6 +50,7 @@ import { CodingParticipants } from './CodingParticipants';
 import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
 import type { CodingSidePanelView as CodingSidePanelViewType } from './constants';
 import type { CodingSessionDraft } from './CodingWorkspaceSidebar';
+import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
@@ -93,7 +95,9 @@ export const CodingWorkbenchView = ({
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
   const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
+  const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
@@ -160,8 +164,12 @@ export const CodingWorkbenchView = ({
     () =>
       draftSession
         ? null
-        : (snapshot?.lanes.find(lane => lane.id === snapshot.room.activeLaneId) ?? null),
-    [draftSession, snapshot],
+        : // Optimistic selection: show the clicked lane immediately instead of
+          // waiting for the selectLane IPC round-trip to update activeLaneId.
+          (snapshot?.lanes.find(lane => lane.id === selectedLaneId) ??
+          snapshot?.lanes.find(lane => lane.id === snapshot.room.activeLaneId) ??
+          null),
+    [draftSession, selectedLaneId, snapshot],
   );
   const activeProfile = useMemo(
     () =>
@@ -477,6 +485,16 @@ export const CodingWorkbenchView = ({
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
     else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
   };
+  const setLaneModel = async (modelRef: string) => {
+    if (!activeLane) return;
+    const result = await window.electron.codingAgent.setLaneModelOverride({
+      workspaceRoot,
+      laneId: activeLane.id,
+      modelOverride: modelRef,
+    });
+    if (result.success && result.snapshot) setSnapshot(result.snapshot);
+    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+  };
   const changeConfigOption = async (configId: string, value: string | boolean) => {
     if (draftSession) {
       // No lane exists yet; track the choice locally and send it as an
@@ -650,10 +668,10 @@ export const CodingWorkbenchView = ({
             </DialogContent>
           </Dialog>
         )}
-        <header className="flex min-h-14 items-center justify-between gap-3 border-b border-border px-4 py-2">
+        <header className="draggable flex min-h-14 items-center justify-between gap-3 border-b border-border px-4 py-2">
           <div
             className={cn(
-              'flex min-w-0 items-center gap-2',
+              'non-draggable flex min-w-0 items-center gap-2',
               isSidebarCollapsed && isMac && 'pl-[68px]',
             )}
           >
@@ -684,7 +702,7 @@ export const CodingWorkbenchView = ({
               </Badge>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="non-draggable flex shrink-0 items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -785,6 +803,7 @@ export const CodingWorkbenchView = ({
                 </Sheet>
               </>
             )}
+            <WindowTitleBar inline />
           </div>
         </header>
         <CodingEventStream
@@ -817,6 +836,20 @@ export const CodingWorkbenchView = ({
                 profiles={snapshot.profiles}
                 sources={draftSession.sources}
                 onChange={onDraftSessionChange}
+              />
+            ) : activeProfile?.driverKind === CodingAgentDriverKind.Builtin && activeLane ? (
+              <CoworkModelPicker
+                models={availableModels}
+                selectedModel={
+                  (activeLane.modelOverride
+                    ? resolveAgentModelRef(activeLane.modelOverride, availableModels)
+                    : null) ??
+                  defaultSelectedModel ??
+                  null
+                }
+                open={modelPickerOpen}
+                onOpenChange={setModelPickerOpen}
+                onSelect={model => void setLaneModel(toAgentModelRef(model))}
               />
             ) : undefined
           }

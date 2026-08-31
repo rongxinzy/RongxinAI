@@ -854,6 +854,26 @@ export class CodingRoomService extends EventEmitter {
     return this.publish(workspaceRoot);
   }
 
+  /** Switch the model of a built-in lane; applies live when the session is running. */
+  async setLaneModelOverride(
+    workspaceRoot: string,
+    laneId: string,
+    modelOverride: string | null,
+  ): Promise<CodingRoomSnapshot> {
+    const snapshot = this.bootstrap(workspaceRoot);
+    const lane = this.requireLane(snapshot.lanes, laneId);
+    const profile = this.registry.get(lane.profileId);
+    if (profile?.driverKind !== CodingAgentDriverKind.Builtin) {
+      throw new Error('Only the built-in coding agent supports switching models here.');
+    }
+    const normalized = modelOverride?.trim() || null;
+    this.repository.updateLaneModelOverride(lane.id, normalized);
+    if (normalized) {
+      await this.runtime.patchBuiltinSession?.(lane.localSessionId, { model: normalized });
+    }
+    return this.publish(workspaceRoot);
+  }
+
   async previewLaneChanges(
     workspaceRoot: string,
     laneId: string,

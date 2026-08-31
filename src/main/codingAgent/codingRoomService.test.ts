@@ -1006,3 +1006,95 @@ test('getProfileConfigOptions returns defaults for the builtin profile only', ()
   );
   expect(service.getProfileConfigOptions('unknown-profile')).toEqual([]);
 });
+
+test('setLaneModelOverride persists the model and patches the live builtin session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-model-'));
+  tempDirectories.push(root);
+  const patchBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    patchBuiltinSession,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const lane = snapshot.lanes[0];
+
+  const next = await service.setLaneModelOverride(root, lane.id, 'openai/gpt-5');
+
+  expect(next.lanes[0].modelOverride).toBe('openai/gpt-5');
+  expect(patchBuiltinSession).toHaveBeenCalledWith(lane.localSessionId, {
+    model: 'openai/gpt-5',
+  });
+  await expect(service.setLaneModelOverride(root, 'missing-lane', 'x')).rejects.toThrow(
+    /not found/i,
+  );
+});
+
+test('setLaneModelOverride rejects non-builtin lanes', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-model-'));
+  tempDirectories.push(root);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'External agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: ['-e', ''],
+  });
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: profile.id,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: profile.id,
+    title: 'External task',
+  });
+
+  await expect(
+    service.setLaneModelOverride(root, snapshot.lanes[0].id, 'openai/gpt-5'),
+  ).rejects.toThrow(/built-in/);
+});

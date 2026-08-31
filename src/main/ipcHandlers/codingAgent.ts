@@ -346,6 +346,26 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
     },
   );
   ipcMain.handle(
+    CodingAgentIpc.SetLaneModelOverride,
+    async (
+      _event,
+      input: { workspaceRoot: string; laneId: string; modelOverride: string | null },
+    ) => {
+      try {
+        return {
+          success: true,
+          snapshot: await service.setLaneModelOverride(
+            input.workspaceRoot,
+            input.laneId,
+            input.modelOverride,
+          ),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+  ipcMain.handle(
     CodingAgentIpc.DiscoverAgents,
     async (_event, input: { workspaceRoot: string }) => {
       try {

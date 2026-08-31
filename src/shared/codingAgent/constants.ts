@@ -160,6 +160,7 @@ export const CodingAgentIpc = {
   CreateCollaborationPreset: 'codingAgent:createCollaborationPreset',
   SaveLaneView: 'codingAgent:saveLaneView',
   SetLaneConfigOption: 'codingAgent:setLaneConfigOption',
+  SetLaneModelOverride: 'codingAgent:setLaneModelOverride',
   PreviewLaneChanges: 'codingAgent:previewLaneChanges',
   ApplyLaneChanges: 'codingAgent:applyLaneChanges',
   GetGitStatus: 'codingAgent:getGitStatus',

@@ -655,6 +655,11 @@ contextBridge.exposeInMainWorld('electron', {
       workspaceRoot: string;
       option: import('../shared/codingAgent').CodingLaneConfigOptionInput;
     }) => ipcRenderer.invoke(CodingAgentIpc.SetLaneConfigOption, input),
+    setLaneModelOverride: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      modelOverride: string | null;
+    }) => ipcRenderer.invoke(CodingAgentIpc.SetLaneModelOverride, input),
     previewLaneChanges: (input: { workspaceRoot: string; laneId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.PreviewLaneChanges, input),
     applyLaneChanges: (input: { workspaceRoot: string; laneId: string }) =>
