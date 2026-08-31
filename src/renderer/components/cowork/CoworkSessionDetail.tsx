@@ -39,15 +39,11 @@ import {
   selectArtifact,
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
-  selectPanelWidth,
   selectSessionArtifacts,
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
-import {
-  clampArtifactPanelWidth,
-  resolveArtifactPanelMaxWidth,
-} from '../artifacts/artifactPanelResize';
+import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
@@ -277,12 +273,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       ? DEFAULT_PANEL_WIDTH
       : resolveArtifactPanelMaxWidth(Math.max(MIN_PANEL_WIDTH, window.innerWidth), MIN_PANEL_WIDTH),
   );
-  const storedPanelWidth = useSelector(selectPanelWidth);
-  const composerAvoidsPanel =
-    isArtifactPanelVisible && !isArtifactWorkspace && shouldRenderArtifactPanel;
-  const composerPanelInset = composerAvoidsPanel
-    ? clampArtifactPanelWidth(storedPanelWidth, MIN_PANEL_WIDTH, artifactPanelMaxWidth)
-    : 0;
   const previousArtifactPanelOpenRef = useRef(isPanelOpen);
   const previousArtifactSessionIdRef = useRef(sessionId);
   const skipArtifactPanelTransitionRef = useRef(false);
@@ -1498,8 +1488,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           {/* Input Area */}
           <div
             ref={composerOverlayRef}
-            className="pointer-events-none absolute bottom-0 z-20 px-4 transition-[right] duration-200 ease-out motion-reduce:transition-none"
-            style={{ left: 0, right: composerPanelInset }}
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
           >
             <div className="mx-auto grid w-full max-w-5xl min-w-[320px] pl-4">
               <div className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4">
