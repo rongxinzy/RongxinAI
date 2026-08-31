@@ -109,6 +109,11 @@ interface CodingAgentProfilesResult {
   profiles?: import('../../shared/codingAgent').CodingAgentProfile[];
   error?: string;
 }
+interface CodingAgentConfigOptionsResult {
+  success: boolean;
+  configOptions?: import('../../shared/codingAgent').CodingAgentConfigOption[];
+  error?: string;
+}
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -948,6 +953,11 @@ interface IElectronAPI {
       input: import('../../shared/codingAgent').UpdateCodingWorkspaceInput,
     ) => Promise<CodingWorkspaceActionResult>;
     deleteWorkspace: (workspaceId: string) => Promise<CodingWorkspaceActionResult>;
+    deleteSession: (input: {
+      workspaceRoot: string;
+      laneId: string;
+    }) => Promise<CodingWorkspaceActionResult>;
+    getProfileConfigOptions: (profileId: string) => Promise<CodingAgentConfigOptionsResult>;
     createSession: (
       input: import('../../shared/codingAgent').CreateCodingSessionInput,
     ) => Promise<CodingAgentActionResult>;
@@ -1001,6 +1011,11 @@ interface IElectronAPI {
     setLaneConfigOption: (input: {
       workspaceRoot: string;
       option: import('../../shared/codingAgent').CodingLaneConfigOptionInput;
+    }) => Promise<CodingAgentActionResult>;
+    setLaneModelOverride: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      modelOverride: string | null;
     }) => Promise<CodingAgentActionResult>;
     previewLaneChanges: (input: {
       workspaceRoot: string;

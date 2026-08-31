@@ -178,6 +178,7 @@ import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
+import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
@@ -891,7 +892,13 @@ const getCodingRoomService = (): CodingRoomService => {
         }),
       ),
       {
-        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt, modelOverride }) => {
+        startBuiltinSession: async ({
+          sessionId,
+          workspaceRoot,
+          prompt,
+          modelOverride,
+          thinkingLevel,
+        }) => {
           const coworkStoreInstance = getCoworkStore();
           if (!coworkStoreInstance.getSession(sessionId)) {
             coworkStoreInstance.createSession(
@@ -913,8 +920,16 @@ const getCodingRoomService = (): CodingRoomService => {
             sessionMode: 'work',
             confirmationMode: 'modal',
             ...(modelOverride ? { modelOverride } : {}),
+            ...(thinkingLevel
+              ? { thinkingLevel: thinkingLevel as PiThinkingLevel }
+              : {}),
           });
         },
+        patchBuiltinSession: (sessionId, patch) =>
+          runtime.patchSession(sessionId, {
+            model: patch.model,
+            thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
+          }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
         getBuiltinWorkbenchLink: sessionId => {
           const detail = getWorkbenchTaskService().getCurrent(sessionId);

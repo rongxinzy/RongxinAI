@@ -34,6 +34,8 @@ export interface CodingAgentDriver {
   createSession(input: {
     workspaceRoot: string;
     localSessionId?: string;
+    /** Persisted lane options used to restore selections (built-in driver only). */
+    existingConfigOptions?: CodingAgentConfigOption[];
   }): Promise<CodingAgentSession>;
   loadSession(input: {
     remoteSessionId: string;
@@ -47,6 +49,8 @@ export interface CodingAgentDriver {
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>>;
   cancel(sessionId: string): Promise<void>;
   respondToPermission(response: CodingPermissionResponse): Promise<void>;
+  /** Options a session of this driver would start with (built-in driver only). */
+  getDefaultConfigOptions?(): CodingAgentConfigOption[];
   setConfigOption(
     sessionId: string,
     configId: string,

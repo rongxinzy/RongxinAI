@@ -20,14 +20,15 @@ import {
   FileDiff,
   FolderGit2,
   GitBranch,
+  Layers,
   PanelLeftOpen,
   PanelRight,
   Settings2,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 
-import type { CodingRoomSnapshot } from '../../../shared/codingAgent';
+import type { CodingAgentConfigOption, CodingRoomSnapshot } from '../../../shared/codingAgent';
 import {
   CodingAgentDriverKind,
   CodingAgentProfileStatus,
@@ -36,8 +37,20 @@ import {
   CodingPermissionOutcome,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import {
+  activateSessionArtifactView,
+  closePanel,
+  EMPTY_ARTIFACTS,
+  MIN_PANEL_WIDTH,
+  selectIsSessionArtifactPanelOpen,
+  selectSessionArtifactLayoutMode,
+  selectSessionArtifacts,
+  togglePanel,
+} from '../../store/slices/artifactSlice';
+import WindowTitleBar from '../window/WindowTitleBar';
+import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
 import type { RootState } from '../../store';
-import { toAgentModelRef } from '../../utils/agentModelRef';
+import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
 import { CodingAuthAndPermissionDialogs } from './CodingAuthAndPermissionDialogs';
 import { CodingComposer } from './CodingComposer';
@@ -49,11 +62,16 @@ import { CodingParticipants } from './CodingParticipants';
 import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
 import type { CodingSidePanelView as CodingSidePanelViewType } from './constants';
 import type { CodingSessionDraft } from './CodingWorkspaceSidebar';
+import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
 
 const EMPTY_SNAPSHOT: CodingRoomSnapshot | null = null;
+
+const ArtifactPanelFrame = lazy(() =>
+  import('../artifacts').then(module => ({ default: module.ArtifactPanelFrame })),
+);
 
 interface CodingWorkbenchViewProps {
   workspaceRoot: string;
@@ -93,7 +111,9 @@ export const CodingWorkbenchView = ({
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
   const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
+  const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
@@ -160,8 +180,12 @@ export const CodingWorkbenchView = ({
     () =>
       draftSession
         ? null
-        : (snapshot?.lanes.find(lane => lane.id === snapshot.room.activeLaneId) ?? null),
-    [draftSession, snapshot],
+        : // Optimistic selection: show the clicked lane immediately instead of
+          // waiting for the selectLane IPC round-trip to update activeLaneId.
+          (snapshot?.lanes.find(lane => lane.id === selectedLaneId) ??
+          snapshot?.lanes.find(lane => lane.id === snapshot.room.activeLaneId) ??
+          null),
+    [draftSession, selectedLaneId, snapshot],
   );
   const activeProfile = useMemo(
     () =>
@@ -172,9 +196,56 @@ export const CodingWorkbenchView = ({
   );
   const activeLaneId = activeLane?.id ?? null;
   const activeRemoteSessionId = activeLane?.remoteSessionId ?? null;
-  const activeDriverKind = activeProfile?.driverKind ?? null;
+  const dispatch = useDispatch();
+  const artifactSessionKey = activeLaneId;
+  const laneArtifacts = useSelector((state: RootState) =>
+    artifactSessionKey ? selectSessionArtifacts(state, artifactSessionKey) : EMPTY_ARTIFACTS,
+  );
+  const isArtifactPanelOpen = useSelector((state: RootState) =>
+    selectIsSessionArtifactPanelOpen(state, artifactSessionKey ?? undefined),
+  );
+  const artifactLayoutMode = useSelector((state: RootState) =>
+    selectSessionArtifactLayoutMode(state, artifactSessionKey ?? undefined),
+  );
+  // Artifacts detected in coding conversations share the cowork artifact store,
+  // keyed by lane id; activate the lane's view whenever the selection changes.
   useEffect(() => {
-    if (!activeLaneId || activeRemoteSessionId || activeDriverKind !== CodingAgentDriverKind.Acp) {
+    dispatch(activateSessionArtifactView(artifactSessionKey));
+  }, [artifactSessionKey, dispatch]);
+  const artifactRowRef = useRef<HTMLDivElement | null>(null);
+  const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
+    typeof window === 'undefined'
+      ? MIN_PANEL_WIDTH
+      : Math.max(MIN_PANEL_WIDTH, window.innerWidth),
+  );
+  const updateArtifactPanelMaxWidth = useCallback(() => {
+    const contentWidth = artifactRowRef.current?.clientWidth ?? 0;
+    if (contentWidth <= 0) return;
+    const nextMaxWidth = Math.max(MIN_PANEL_WIDTH, contentWidth);
+    setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
+  }, []);
+  // ResizeObserver must run in useEffect, not useLayoutEffect: a layout-effect
+  // setState triggered by our own resize feedback loops into React's nested
+  // update limit.
+  useEffect(() => {
+    updateArtifactPanelMaxWidth();
+    const container = artifactRowRef.current;
+    const resizeObserver = new ResizeObserver(updateArtifactPanelMaxWidth);
+    if (container) resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, [activeLaneId, updateArtifactPanelMaxWidth]);
+  const activeDriverKind = activeProfile?.driverKind ?? null;
+  const activeConfigOptionCount = activeLane?.configOptions.length ?? 0;
+  const [draftConfigOptions, setDraftConfigOptions] = useState<CodingAgentConfigOption[]>([]);
+  const [draftConfigOverrides, setDraftConfigOverrides] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const needsPrepare =
+      activeDriverKind === CodingAgentDriverKind.Acp
+        ? !activeRemoteSessionId
+        : // Built-in lanes created before config options existed need one
+          // prepare pass to populate them.
+          activeDriverKind === CodingAgentDriverKind.Builtin && activeConfigOptionCount === 0;
+    if (!activeLaneId || !needsPrepare) {
       return;
     }
     let cancelled = false;
@@ -191,7 +262,27 @@ export const CodingWorkbenchView = ({
     return () => {
       cancelled = true;
     };
-  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, workspaceRoot]);
+  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, activeConfigOptionCount, workspaceRoot]);
+  // A draft has no lane yet, so fetch the default config options of its
+  // profile to show model/thinking controls before the session exists.
+  const draftProfileId = draftSession?.profileId ?? null;
+  useEffect(() => {
+    setDraftConfigOverrides({});
+    if (!draftProfileId || activeDriverKind !== CodingAgentDriverKind.Builtin) {
+      setDraftConfigOptions([]);
+      return;
+    }
+    let cancelled = false;
+    void window.electron.codingAgent
+      .getProfileConfigOptions(draftProfileId)
+      .then(result => {
+        if (!cancelled && result.success) setDraftConfigOptions(result.configOptions ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [draftSession?.id, draftProfileId, activeDriverKind]);
   const activeEvents = useMemo(
     () =>
       activeLane ? (snapshot?.events.filter(event => event.laneId === activeLane.id) ?? []) : [],
@@ -392,6 +483,9 @@ export const CodingWorkbenchView = ({
             ? toAgentModelRef(defaultSelectedModel)
             : undefined),
         prompt,
+        ...(Object.keys(draftConfigOverrides).length > 0
+          ? { configOptionOverrides: draftConfigOverrides }
+          : {}),
       });
       const laneId = result.snapshot?.room.activeLaneId;
       if (result.success && result.snapshot && laneId) {
@@ -444,6 +538,31 @@ export const CodingWorkbenchView = ({
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
     else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+  };
+  const setLaneModel = async (modelRef: string) => {
+    if (!activeLane) return;
+    const result = await window.electron.codingAgent.setLaneModelOverride({
+      workspaceRoot,
+      laneId: activeLane.id,
+      modelOverride: modelRef,
+    });
+    if (result.success && result.snapshot) setSnapshot(result.snapshot);
+    else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+  };
+  const changeConfigOption = async (configId: string, value: string | boolean) => {
+    if (draftSession) {
+      // No lane exists yet; track the choice locally and send it as an
+      // override when the session is created.
+      if (typeof value !== 'string') return;
+      setDraftConfigOverrides(current => ({ ...current, [configId]: value }));
+      setDraftConfigOptions(current =>
+        current.map(option =>
+          option.id === configId ? { ...option, currentValue: value } : option,
+        ),
+      );
+      return;
+    }
+    await setLaneConfigOption(configId, value);
   };
   const previewLaneChanges = async () => {
     if (!activeLane) return;
@@ -603,10 +722,10 @@ export const CodingWorkbenchView = ({
             </DialogContent>
           </Dialog>
         )}
-        <header className="flex min-h-14 items-center justify-between gap-3 border-b border-border px-4 py-2">
+        <header className="draggable flex min-h-14 items-center justify-between gap-3 border-b border-border px-4 py-2">
           <div
             className={cn(
-              'flex min-w-0 items-center gap-2',
+              'non-draggable flex min-w-0 items-center gap-2',
               isSidebarCollapsed && isMac && 'pl-[68px]',
             )}
           >
@@ -637,7 +756,7 @@ export const CodingWorkbenchView = ({
               </Badge>
             )}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="non-draggable flex shrink-0 items-center gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -647,6 +766,20 @@ export const CodingWorkbenchView = ({
             >
               <Settings2 />
             </Button>
+            {artifactSessionKey && laneArtifacts.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label={i18nService.t('codingAgentArtifacts')}
+                aria-pressed={isArtifactPanelOpen}
+                onClick={() => dispatch(togglePanel())}
+              >
+                <Layers className="mr-1 size-4" />
+                {i18nService.t('codingAgentArtifacts')}
+                <Badge variant="secondary">{laneArtifacts.length}</Badge>
+              </Button>
+            )}
             {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
               <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
                 <FileDiff className="mr-1 size-4" />
@@ -738,22 +871,43 @@ export const CodingWorkbenchView = ({
                 </Sheet>
               </>
             )}
+            <WindowTitleBar inline />
           </div>
         </header>
-        <CodingEventStream
-          events={activeEvents}
-          isStreaming={activeLane?.status === CodingLaneStatus.Running}
-          emptyDescription={
-            draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
-          }
-          scrollAreaRef={eventStreamRef}
-          onScrollPositionChange={scrollPosition => {
-            if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
-          }}
-        />
+        <div ref={artifactRowRef} className="flex min-h-0 flex-1">
+          <CodingEventStream
+            events={activeEvents}
+            isStreaming={activeLane?.status === CodingLaneStatus.Running}
+            emptyDescription={
+              draftSession ? i18nService.t('codingSessionDraftDescription') : undefined
+            }
+            scrollAreaRef={eventStreamRef}
+            artifactSessionKey={artifactSessionKey}
+            artifactBaseDir={activeLane?.executionRoot ?? null}
+            onScrollPositionChange={scrollPosition => {
+              if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
+            }}
+          />
+          {artifactSessionKey && isArtifactPanelOpen && (
+            <ArtifactPanelErrorBoundary onClose={() => dispatch(closePanel())}>
+              <Suspense fallback={null}>
+                <ArtifactPanelFrame
+                  sessionId={artifactSessionKey}
+                  artifacts={laneArtifacts}
+                  isOpen={isArtifactPanelOpen}
+                  isVisible
+                  isTransitioning={false}
+                  layoutMode={artifactLayoutMode}
+                  minPanelWidth={MIN_PANEL_WIDTH}
+                  maxPanelWidth={artifactPanelMaxWidth}
+                />
+              </Suspense>
+            </ArtifactPanelErrorBoundary>
+          )}
+        </div>
         <CodingComposer
           availableCommands={activeLane?.availableCommands ?? []}
-          configOptions={activeLane?.configOptions ?? []}
+          configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}
           disabled={
             draftSession
               ? !draftSession.profileId || !draftSession.sourceRoot
@@ -771,6 +925,20 @@ export const CodingWorkbenchView = ({
                 sources={draftSession.sources}
                 onChange={onDraftSessionChange}
               />
+            ) : activeProfile?.driverKind === CodingAgentDriverKind.Builtin && activeLane ? (
+              <CoworkModelPicker
+                models={availableModels}
+                selectedModel={
+                  (activeLane.modelOverride
+                    ? resolveAgentModelRef(activeLane.modelOverride, availableModels)
+                    : null) ??
+                  defaultSelectedModel ??
+                  null
+                }
+                open={modelPickerOpen}
+                onOpenChange={setModelPickerOpen}
+                onSelect={model => void setLaneModel(toAgentModelRef(model))}
+              />
             ) : undefined
           }
           onChange={next => {
@@ -781,7 +949,7 @@ export const CodingWorkbenchView = ({
               saveDraft(activeLane.id, next);
             }
           }}
-          onConfigOptionChange={(optionId, value) => void setLaneConfigOption(optionId, value)}
+          onConfigOptionChange={(optionId, value) => void changeConfigOption(optionId, value)}
           onSend={() => void sendPrompt()}
           onStop={() => void cancel()}
         />

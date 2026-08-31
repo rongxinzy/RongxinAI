@@ -73,6 +73,26 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle(
+    CodingAgentIpc.DeleteSession,
+    (_event, input: { workspaceRoot: string; laneId: string }) => {
+      try {
+        return {
+          success: true,
+          workspaces: service.deleteSession(input.workspaceRoot, input.laneId),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+  ipcMain.handle(CodingAgentIpc.GetProfileConfigOptions, (_event, profileId: string) => {
+    try {
+      return { success: true, configOptions: service.getProfileConfigOptions(profileId) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle(CodingAgentIpc.CreateSession, async (_event, input: CreateCodingSessionInput) => {
     try {
       return { success: true, snapshot: await service.createSession(input) };
@@ -319,6 +339,26 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
         return {
           success: true,
           snapshot: await service.setLaneConfigOption(input.workspaceRoot, input.option),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+  ipcMain.handle(
+    CodingAgentIpc.SetLaneModelOverride,
+    async (
+      _event,
+      input: { workspaceRoot: string; laneId: string; modelOverride: string | null },
+    ) => {
+      try {
+        return {
+          success: true,
+          snapshot: await service.setLaneModelOverride(
+            input.workspaceRoot,
+            input.laneId,
+            input.modelOverride,
+          ),
         };
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };

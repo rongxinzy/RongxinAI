@@ -194,3 +194,37 @@ describe('projectCodingEvents', () => {
     expect(turns[0].assistantMessages[0].content).toBe('收到');
   });
 });
+
+describe('ACP tool_call_update merging', () => {
+  test('merges intermediate updates into the initial tool call payload', () => {
+    const turns = projectCodingEvents([
+      event(1, CodingEventKind.Message, { role: 'user', content: '改文件' }),
+      event(2, CodingEventKind.ToolCall, {
+        toolCallId: 'call-1',
+        title: 'Edit src/app.ts',
+        kind: 'edit',
+        status: 'pending',
+        locations: [{ path: 'src/app.ts', line: 3 }],
+      }),
+      event(3, CodingEventKind.ToolCall, {
+        toolCallId: 'call-1',
+        status: 'in_progress',
+      }),
+      event(4, CodingEventKind.ToolCall, {
+        toolCallId: 'call-1',
+        status: 'completed',
+        rawOutput: 'done',
+      }),
+    ]);
+
+    expect(turns[0].activities).toHaveLength(1);
+    expect(turns[0].activities[0].event.payload).toEqual({
+      toolCallId: 'call-1',
+      title: 'Edit src/app.ts',
+      kind: 'edit',
+      status: 'completed',
+      locations: [{ path: 'src/app.ts', line: 3 }],
+      rawOutput: 'done',
+    });
+  });
+});

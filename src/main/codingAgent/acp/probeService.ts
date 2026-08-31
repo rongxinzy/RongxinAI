@@ -7,7 +7,7 @@ import {
   AcpProtocolIncompatibleError,
 } from './protocol';
 
-const PROBE_TIMEOUT_MS = 5_000;
+const PROBE_TIMEOUT_MS = 30_000;
 const EMPTY_CAPABILITIES: CodingAgentCapabilities = {
   supportsLoadSession: false,
   supportsResumeSession: false,

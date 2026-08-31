@@ -339,6 +339,22 @@ export class CodingRoomRepository {
     });
     remove();
   }
+  deleteLane(roomId: string, laneId: string): void {
+    const remove = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM coding_events WHERE lane_id = ?').run(laneId);
+      this.db.prepare('DELETE FROM coding_assignments WHERE lane_id = ?').run(laneId);
+      this.db
+        .prepare('DELETE FROM coding_handoffs WHERE source_lane_id = ? OR target_lane_id = ?')
+        .run(laneId, laneId);
+      this.db.prepare('DELETE FROM coding_agent_lanes WHERE id = ?').run(laneId);
+      this.db
+        .prepare(
+          'UPDATE coding_rooms SET active_lane_id = NULL, updated_at = ? WHERE id = ? AND active_lane_id = ?',
+        )
+        .run(Date.now(), roomId, laneId);
+    });
+    remove();
+  }
   createLane(
     missionId: string,
     profileId: string,
@@ -392,6 +408,11 @@ export class CodingRoomRepository {
     this.db
       .prepare('UPDATE coding_agent_lanes SET config_options_json = ?, updated_at = ? WHERE id = ?')
       .run(JSON.stringify(configOptions), Date.now(), laneId);
+  }
+  updateLaneModelOverride(laneId: string, modelOverride: string | null): void {
+    this.db
+      .prepare('UPDATE coding_agent_lanes SET model_override = ?, updated_at = ? WHERE id = ?')
+      .run(modelOverride, Date.now(), laneId);
   }
   updateLaneAvailableCommands(
     laneId: string,

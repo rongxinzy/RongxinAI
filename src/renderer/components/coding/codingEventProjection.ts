@@ -251,9 +251,11 @@ export const projectCodingEvents = (events: CodingEvent[]): CodingConversationTu
         activity => activity.id === id && activity.kind === projectedActivityKind,
       );
       if (existing) {
+        // ACP tool_call_update only carries the fields that changed, so merge
+        // it into the initial tool_call payload to keep title/kind/locations.
         existing.event =
-          normalizedEvent.payload.status === CodingToolCallStatus.Completed &&
-          existing.event.kind === CodingEventKind.ToolCall
+          existing.event.kind === CodingEventKind.ToolCall &&
+          normalizedEvent.kind === CodingEventKind.ToolCall
             ? {
                 ...normalizedEvent,
                 payload: { ...existing.event.payload, ...normalizedEvent.payload },

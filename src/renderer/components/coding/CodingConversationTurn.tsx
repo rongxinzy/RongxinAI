@@ -5,92 +5,24 @@ import {
   ReasoningTrigger,
 } from '@shared/components/ai-elements/reasoning';
 import { Shimmer } from '@shared/components/ai-elements/shimmer';
-import { Tool, ToolContent, ToolHeader } from '@shared/components/ai-elements/tool';
 import { CheckCircle2, CircleStop, TriangleAlert } from 'lucide-react';
 import { memo } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import {
-  CodingConversationActivityKind,
-  CodingConversationTurnStatus,
-  CodingExternalActivityStatus,
-  CodingToolPartState,
-  type CodingToolPartState as CodingToolPartStateType,
-} from './constants';
-import {
-  getCodingEventText,
-  type CodingConversationActivity,
-  type CodingConversationTurn as CodingConversationTurnModel,
-} from './codingEventProjection';
+import type { Artifact } from '../../types/artifact';
+import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
+import { CodingActivity } from './CodingActivityView';
+import { CodingConversationTurnStatus } from './constants';
+import { type CodingConversationTurn as CodingConversationTurnModel } from './codingEventProjection';
 
 interface CodingConversationTurnProps {
   isStreaming: boolean;
   turn: CodingConversationTurnModel;
+  /** Artifacts detected in this lane, keyed by the assistant message id. */
+  artifactsByMessageId?: ReadonlyMap<string, Artifact[]>;
+  /** File artifacts keyed by the tool call that produced them. */
+  artifactsByToolCallId?: ReadonlyMap<string, Artifact[]>;
 }
-
-const activityTitle = (activity: CodingConversationActivity): string => {
-  const payload = activity.event.payload;
-  for (const value of [payload.title, payload.name, payload.toolName]) {
-    if (typeof value === 'string' && value.trim()) return value;
-  }
-  const keys = {
-    [CodingConversationActivityKind.Plan]: 'codingAgentPlan',
-    [CodingConversationActivityKind.Tool]: 'codingAgentTool',
-    [CodingConversationActivityKind.Permission]: 'codingAgentPermissionEvent',
-  } as const;
-  return i18nService.t(keys[activity.kind]);
-};
-
-const activityState = (activity: CodingConversationActivity): CodingToolPartStateType => {
-  if (activity.kind === CodingConversationActivityKind.Permission) {
-    return CodingToolPartState.ApprovalRequested;
-  }
-  const status = activity.event.payload.status;
-  if (status === CodingExternalActivityStatus.Failed) return CodingToolPartState.OutputError;
-  if (status === CodingExternalActivityStatus.Completed) return CodingToolPartState.OutputAvailable;
-  if (status === CodingExternalActivityStatus.Pending) return CodingToolPartState.InputStreaming;
-  return CodingToolPartState.InputAvailable;
-};
-
-const activityDetails = (activity: CodingConversationActivity): string => {
-  const content = getCodingEventText(activity.event);
-  if (content) return content;
-  return Object.keys(activity.event.payload).length > 0
-    ? JSON.stringify(activity.event.payload, null, 2)
-    : '';
-};
-
-const activityStatusLabel = (state: CodingToolPartStateType): string => {
-  const keys = {
-    [CodingToolPartState.ApprovalRequested]: 'codingAgentPermissionEvent',
-    [CodingToolPartState.InputAvailable]: 'codingAgentToolRunning',
-    [CodingToolPartState.InputStreaming]: 'codingAgentToolPending',
-    [CodingToolPartState.OutputAvailable]: 'codingAgentToolCompleted',
-    [CodingToolPartState.OutputError]: 'codingAgentToolFailed',
-  } as const;
-  return i18nService.t(keys[state]);
-};
-
-const CodingActivity = ({ activity }: { activity: CodingConversationActivity }) => {
-  const details = activityDetails(activity);
-  const state = activityState(activity);
-  return (
-    <Tool defaultOpen={activity.kind === CodingConversationActivityKind.Permission}>
-      <ToolHeader
-        type="dynamic-tool"
-        toolName="coding-agent"
-        state={state}
-        statusLabel={activityStatusLabel(state)}
-        title={activityTitle(activity)}
-      />
-      {details && (
-        <ToolContent>
-          <pre className="whitespace-pre-wrap break-words font-mono text-xs">{details}</pre>
-        </ToolContent>
-      )}
-    </Tool>
-  );
-};
 
 const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
   if (turn.status === null) return null;
@@ -118,7 +50,12 @@ const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
   );
 };
 
-const CodingConversationTurnComponent = ({ isStreaming, turn }: CodingConversationTurnProps) => (
+const CodingConversationTurnComponent = ({
+  isStreaming,
+  turn,
+  artifactsByMessageId,
+  artifactsByToolCallId,
+}: CodingConversationTurnProps) => (
   <section
     className="flex flex-col gap-3"
     aria-label={i18nService.t('codingAgentConversationTurn')}
@@ -147,17 +84,37 @@ const CodingConversationTurnComponent = ({ isStreaming, turn }: CodingConversati
         </Reasoning>
       )}
 
-      {turn.activities.map(activity => (
-        <CodingActivity key={activity.id} activity={activity} />
-      ))}
+      {turn.activities.map(activity => {
+        const toolCallId =
+          typeof activity.event.payload.toolCallId === 'string'
+            ? activity.event.payload.toolCallId
+            : null;
+        return (
+          <CodingActivity
+            key={activity.id}
+            activity={activity}
+            artifacts={toolCallId ? artifactsByToolCallId?.get(toolCallId) : undefined}
+          />
+        );
+      })}
 
-      {turn.assistantMessages.map(message => (
-        <Message key={message.id} from="assistant" className="animate-message-in">
-          <MessageContent>
-            <MessageResponse isAnimating={isStreaming}>{message.content}</MessageResponse>
-          </MessageContent>
-        </Message>
-      ))}
+      {turn.assistantMessages.map(message => {
+        const artifacts = artifactsByMessageId?.get(message.id) ?? [];
+        return (
+          <Message key={message.id} from="assistant" className="animate-message-in">
+            <MessageContent>
+              <MessageResponse isAnimating={isStreaming}>{message.content}</MessageResponse>
+              {artifacts.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2">
+                  {artifacts.map(artifact => (
+                    <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+                  ))}
+                </div>
+              )}
+            </MessageContent>
+          </Message>
+        );
+      })}
 
       <TurnStatus turn={turn} />
     </div>
