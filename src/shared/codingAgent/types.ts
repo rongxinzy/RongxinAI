@@ -219,6 +219,8 @@ export interface CreateCodingSessionInput {
 
 export interface StartCodingSessionInput extends CreateCodingSessionInput {
   prompt: string;
+  /** Config option values chosen in the draft composer, applied at creation. */
+  configOptionOverrides?: Record<string, string>;
 }
 
 export interface CreateCodingMissionInput {

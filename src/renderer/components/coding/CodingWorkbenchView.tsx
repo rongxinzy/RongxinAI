@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { CodingRoomSnapshot } from '../../../shared/codingAgent';
+import type { CodingAgentConfigOption, CodingRoomSnapshot } from '../../../shared/codingAgent';
 import {
   CodingAgentDriverKind,
   CodingAgentProfileStatus,
@@ -169,8 +169,17 @@ export const CodingWorkbenchView = ({
   const activeLaneId = activeLane?.id ?? null;
   const activeRemoteSessionId = activeLane?.remoteSessionId ?? null;
   const activeDriverKind = activeProfile?.driverKind ?? null;
+  const activeConfigOptionCount = activeLane?.configOptions.length ?? 0;
+  const [draftConfigOptions, setDraftConfigOptions] = useState<CodingAgentConfigOption[]>([]);
+  const [draftConfigOverrides, setDraftConfigOverrides] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (!activeLaneId || activeRemoteSessionId || activeDriverKind !== CodingAgentDriverKind.Acp) {
+    const needsPrepare =
+      activeDriverKind === CodingAgentDriverKind.Acp
+        ? !activeRemoteSessionId
+        : // Built-in lanes created before config options existed need one
+          // prepare pass to populate them.
+          activeDriverKind === CodingAgentDriverKind.Builtin && activeConfigOptionCount === 0;
+    if (!activeLaneId || !needsPrepare) {
       return;
     }
     let cancelled = false;
@@ -187,7 +196,27 @@ export const CodingWorkbenchView = ({
     return () => {
       cancelled = true;
     };
-  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, workspaceRoot]);
+  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, activeConfigOptionCount, workspaceRoot]);
+  // A draft has no lane yet, so fetch the default config options of its
+  // profile to show model/thinking controls before the session exists.
+  const draftProfileId = draftSession?.profileId ?? null;
+  useEffect(() => {
+    setDraftConfigOverrides({});
+    if (!draftProfileId || activeDriverKind !== CodingAgentDriverKind.Builtin) {
+      setDraftConfigOptions([]);
+      return;
+    }
+    let cancelled = false;
+    void window.electron.codingAgent
+      .getProfileConfigOptions(draftProfileId)
+      .then(result => {
+        if (!cancelled && result.success) setDraftConfigOptions(result.configOptions ?? []);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [draftSession?.id, draftProfileId, activeDriverKind]);
   const activeEvents = useMemo(
     () =>
       activeLane ? (snapshot?.events.filter(event => event.laneId === activeLane.id) ?? []) : [],
@@ -383,6 +412,9 @@ export const CodingWorkbenchView = ({
         sourceRoot: draftSession.sourceRoot,
         profileId: draftSession.profileId,
         prompt,
+        ...(Object.keys(draftConfigOverrides).length > 0
+          ? { configOptionOverrides: draftConfigOverrides }
+          : {}),
       });
       const laneId = result.snapshot?.room.activeLaneId;
       if (result.success && result.snapshot && laneId) {
@@ -435,6 +467,21 @@ export const CodingWorkbenchView = ({
     });
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
     else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+  };
+  const changeConfigOption = async (configId: string, value: string | boolean) => {
+    if (draftSession) {
+      // No lane exists yet; track the choice locally and send it as an
+      // override when the session is created.
+      if (typeof value !== 'string') return;
+      setDraftConfigOverrides(current => ({ ...current, [configId]: value }));
+      setDraftConfigOptions(current =>
+        current.map(option =>
+          option.id === configId ? { ...option, currentValue: value } : option,
+        ),
+      );
+      return;
+    }
+    await setLaneConfigOption(configId, value);
   };
   const previewLaneChanges = async () => {
     if (!activeLane) return;
@@ -744,7 +791,7 @@ export const CodingWorkbenchView = ({
         />
         <CodingComposer
           availableCommands={activeLane?.availableCommands ?? []}
-          configOptions={activeLane?.configOptions ?? []}
+          configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}
           disabled={
             draftSession
               ? !draftSession.profileId || !draftSession.sourceRoot
@@ -772,7 +819,7 @@ export const CodingWorkbenchView = ({
               saveDraft(activeLane.id, next);
             }
           }}
-          onConfigOptionChange={(optionId, value) => void setLaneConfigOption(optionId, value)}
+          onConfigOptionChange={(optionId, value) => void changeConfigOption(optionId, value)}
           onSend={() => void sendPrompt()}
           onStop={() => void cancel()}
         />

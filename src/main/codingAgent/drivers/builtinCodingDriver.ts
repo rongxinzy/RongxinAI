@@ -87,20 +87,28 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     existingConfigOptions?: CodingAgentConfigOption[];
   }): Promise<CodingAgentSession> {
     const id = input.localSessionId ?? randomUUID();
+    const configOptions = this.buildOptions(input.existingConfigOptions);
+    this.sessionConfigOptions.set(id, configOptions);
     return {
       id,
       remoteSessionId: null,
-      configOptions: this.buildConfigOptions(id, input.existingConfigOptions),
+      configOptions,
       availableCommands: [],
     };
   }
   async loadSession(input: { remoteSessionId: string }): Promise<CodingAgentSession> {
+    const configOptions = this.buildOptions();
+    this.sessionConfigOptions.set(input.remoteSessionId, configOptions);
     return {
       id: input.remoteSessionId,
       remoteSessionId: null,
-      configOptions: this.buildConfigOptions(input.remoteSessionId),
+      configOptions,
       availableCommands: [],
     };
+  }
+  /** Options a new session would start with, without binding them to a session. */
+  getDefaultConfigOptions(): CodingAgentConfigOption[] {
+    return this.buildOptions();
   }
   async *prompt(input: {
     sessionId: string;
@@ -172,6 +180,12 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     sessionId: string,
     existing?: CodingAgentConfigOption[],
   ): CodingAgentConfigOption[] {
+    const options = this.buildOptions(existing);
+    this.sessionConfigOptions.set(sessionId, options);
+    return options;
+  }
+
+  private buildOptions(existing?: CodingAgentConfigOption[]): CodingAgentConfigOption[] {
     const persistedModel = this.persistedStringValue(existing, BuiltinCodingConfigId.Model);
     const persistedThinking = this.persistedStringValue(
       existing,
@@ -190,7 +204,6 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
           : PiThinkingLevel.Medium,
       options: THINKING_LEVEL_OPTIONS,
     });
-    this.sessionConfigOptions.set(sessionId, options);
     return options;
   }
 

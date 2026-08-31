@@ -145,6 +145,19 @@ export const prepareCodingSession = async (input: {
       workspaceRoot: target.sourceRoot,
       localSessionId,
     });
+    const overrides = input.request.configOptionOverrides;
+    if (overrides) {
+      for (const [configId, value] of Object.entries(overrides)) {
+        try {
+          driverSession = {
+            ...driverSession,
+            configOptions: await driver.setConfigOption(driverSession.id, configId, value),
+          };
+        } catch (error) {
+          console.warn('[CodingSession] Ignoring invalid config option override:', error);
+        }
+      }
+    }
   } catch (error) {
     await disposeUnboundDriver(driver, null);
     // When the agent rejects session creation because authentication is
