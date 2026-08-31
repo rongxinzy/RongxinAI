@@ -136,6 +136,7 @@ export const CodingAgentIpc = {
   CreateWorkspace: 'codingAgent:createWorkspace',
   UpdateWorkspace: 'codingAgent:updateWorkspace',
   DeleteWorkspace: 'codingAgent:deleteWorkspace',
+  DeleteSession: 'codingAgent:deleteSession',
   CreateSession: 'codingAgent:createSession',
   StartSession: 'codingAgent:startSession',
   Bootstrap: 'codingAgent:bootstrap',

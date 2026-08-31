@@ -174,10 +174,12 @@ import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
+import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
 import { PiModelCatalogRefreshCoordinator } from './libs/agentEngine/piModelCatalogRefresh';
 import { AppUpdateCoordinator } from './libs/appUpdateCoordinator';
 import {
   getCurrentApiConfig,
+  listSelectableProviderModels,
   resolveAllEnabledProviderConfigs,
   resolveAllProviderApiKeys,
   resolveCurrentApiConfig,
@@ -883,7 +885,13 @@ const getCodingRoomService = (): CodingRoomService => {
         app.getAppPath(),
       ),
       {
-        startBuiltinSession: async ({ sessionId, workspaceRoot, prompt }) => {
+        startBuiltinSession: async ({
+          sessionId,
+          workspaceRoot,
+          prompt,
+          modelOverride,
+          thinkingLevel,
+        }) => {
           const coworkStoreInstance = getCoworkStore();
           if (!coworkStoreInstance.getSession(sessionId)) {
             coworkStoreInstance.createSession(
@@ -904,7 +912,28 @@ const getCodingRoomService = (): CodingRoomService => {
             workspaceRoot,
             sessionMode: 'work',
             confirmationMode: 'modal',
+            ...(modelOverride ? { modelOverride } : {}),
+            ...(thinkingLevel
+              ? { thinkingLevel: thinkingLevel as PiThinkingLevel }
+              : {}),
           });
+        },
+        patchBuiltinSession: (sessionId, patch) =>
+          runtime.patchSession(sessionId, {
+            model: patch.model,
+            thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
+          }),
+        listBuiltinModelOptions: () =>
+          listSelectableProviderModels().map(model => ({
+            value: model.ref,
+            name: model.name,
+            description: model.providerName,
+          })),
+        getBuiltinCurrentModelRef: () => {
+          const resolution = resolveRawApiConfig();
+          return resolution.config && resolution.providerMetadata
+            ? `${resolution.providerMetadata.providerName}/${resolution.config.model}`
+            : null;
         },
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
         getBuiltinWorkbenchLink: sessionId => {

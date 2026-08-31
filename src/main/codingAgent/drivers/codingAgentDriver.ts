@@ -34,6 +34,8 @@ export interface CodingAgentDriver {
   createSession(input: {
     workspaceRoot: string;
     localSessionId?: string;
+    /** Persisted lane options used to restore selections (built-in driver only). */
+    existingConfigOptions?: CodingAgentConfigOption[];
   }): Promise<CodingAgentSession>;
   loadSession(input: {
     remoteSessionId: string;

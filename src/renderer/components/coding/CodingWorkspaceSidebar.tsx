@@ -19,6 +19,7 @@ import {
   CodingAgentProfileId,
   CodingLaneStatus,
   type CodingAgentProfile,
+  type CodingSessionSummary,
   type CodingWorkspaceSummary,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
@@ -66,6 +67,10 @@ export const CodingWorkspaceSidebar = ({
   const [workspaceDialogOpen, setWorkspaceDialogOpen] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<CodingWorkspaceSummary | null>(null);
   const [removingWorkspace, setRemovingWorkspace] = useState<CodingWorkspaceSummary | null>(null);
+  const [removingSession, setRemovingSession] = useState<{
+    workspace: CodingWorkspaceSummary;
+    session: CodingSessionSummary;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const applyWorkspaces = useCallback(
@@ -198,6 +203,20 @@ export const CodingWorkspaceSidebar = ({
       return;
     }
     setRemovingWorkspace(null);
+    applyWorkspaces(result.workspaces);
+  };
+
+  const removeSession = async () => {
+    if (!removingSession) return;
+    const result = await window.electron.codingAgent.deleteSession({
+      workspaceRoot: removingSession.workspace.primaryRoot,
+      laneId: removingSession.session.id,
+    });
+    if (!result.success || !result.workspaces) {
+      setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      return;
+    }
+    setRemovingSession(null);
     applyWorkspaces(result.workspaces);
   };
 
@@ -377,6 +396,7 @@ export const CodingWorkspaceSidebar = ({
                                   draft: null,
                                 })
                               }
+                              onDelete={() => setRemovingSession({ workspace, session })}
                             />
                             {collaborators.map(collaborator => (
                               <SessionRow
@@ -397,6 +417,9 @@ export const CodingWorkspaceSidebar = ({
                                     laneId: collaborator.id,
                                     draft: null,
                                   })
+                                }
+                                onDelete={() =>
+                                  setRemovingSession({ workspace, session: collaborator })
                                 }
                               />
                             ))}
@@ -435,6 +458,15 @@ export const CodingWorkspaceSidebar = ({
         onCancel={() => setRemovingWorkspace(null)}
         onConfirm={() => void removeWorkspace()}
       />
+      <DestructiveConfirmDialog
+        open={Boolean(removingSession)}
+        title={i18nService.t('codingSessionRemove')}
+        description={i18nService.t('codingSessionRemoveConfirm')}
+        cancelLabel={i18nService.t('codingWorkspaceCancel')}
+        confirmLabel={i18nService.t('codingSessionRemove')}
+        onCancel={() => setRemovingSession(null)}
+        onConfirm={() => void removeSession()}
+      />
     </div>
   );
 };
@@ -446,6 +478,7 @@ const SessionRow = ({
   status,
   nested,
   onClick,
+  onDelete,
 }: {
   active: boolean;
   name: string;
@@ -453,23 +486,41 @@ const SessionRow = ({
   status: CodingLaneStatus;
   nested: boolean;
   onClick: () => void;
+  onDelete?: () => void;
 }) => (
-  <Button
-    type="button"
-    variant={active ? 'secondary' : 'ghost'}
-    className={cn(
-      'h-auto w-full min-w-0 justify-start gap-2 px-2 py-1.5 text-left font-normal',
-      nested ? 'pl-10' : 'pl-7',
-    )}
-    onClick={onClick}
-  >
-    <Bot className="size-4 shrink-0" />
-    <span className="min-w-0 flex-1">
-      <span className="block truncate text-sm">{name}</span>
-      {agentName ? (
-        <span className="block truncate text-xs text-muted-foreground">{agentName}</span>
-      ) : null}
-    </span>
-    <span className={cn('size-1.5 shrink-0 rounded-full', statusClassName[status])} />
-  </Button>
+  <div className="group relative">
+    <Button
+      type="button"
+      variant="ghost"
+      className={cn(
+        'h-auto w-full min-w-0 justify-start gap-2 px-2 py-1.5 text-left font-normal',
+        nested ? 'pl-10' : 'pl-7',
+        onDelete ? 'pr-8' : undefined,
+        active &&
+          'bg-[color-mix(in_oklch,var(--zy-primary),transparent_90%)] text-foreground hover:bg-[color-mix(in_oklch,var(--zy-primary),transparent_85%)]',
+      )}
+      onClick={onClick}
+    >
+      <Bot className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm">{name}</span>
+        {agentName ? (
+          <span className="block truncate text-xs text-muted-foreground">{agentName}</span>
+        ) : null}
+      </span>
+      <span className={cn('size-1.5 shrink-0 rounded-full', statusClassName[status])} />
+    </Button>
+    {onDelete ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 group-hover:opacity-100"
+        aria-label={i18nService.t('codingSessionRemove')}
+        onClick={onDelete}
+      >
+        <Trash2 />
+      </Button>
+    ) : null}
+  </div>
 );

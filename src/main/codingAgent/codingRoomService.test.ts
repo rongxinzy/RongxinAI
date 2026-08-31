@@ -20,6 +20,7 @@ import { CodingRoomRepository } from './codingRoomRepository';
 import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
 import { AcpSessionUpdateKind } from './acp/protocol';
+import { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
 
 let db: Database.Database | undefined;
 const tempDirectories: string[] = [];
@@ -28,7 +29,8 @@ afterEach(() => {
   db?.close();
   db = undefined;
   for (const directory of tempDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+    // Windows: a spawned fake-agent process can still hold the temp dir at teardown.
+    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -208,6 +210,7 @@ test('routes a builtin lane through its driver and projects runtime completion',
     sessionId: lane.localSessionId,
     workspaceRoot,
     prompt: 'Investigate the failure.',
+    thinkingLevel: PiThinkingLevel.Medium,
   });
   service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.TurnComplete, {});
 
@@ -547,6 +550,7 @@ test('creates collaborator lanes in isolated workspaces and runs them independen
     sessionId: lane.localSessionId,
     workspaceRoot: lane.executionRoot,
     prompt: 'Review the implementation.',
+    thinkingLevel: PiThinkingLevel.Medium,
   });
 });
 
@@ -717,3 +721,117 @@ test('creates deterministic isolated review and verification assignments for a c
     expect.objectContaining({ sessionId: result.lanes[2].localSessionId }),
   );
 });
+
+test('deleteSession removes a collaborator lane but keeps the primary session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const primaryLane = snapshot.lanes[0];
+  const collaborator = repository.createLane(
+    primaryLane.missionId,
+    CodingAgentProfileId.Builtin,
+    root,
+    root,
+  );
+  repository.appendEvent(collaborator.id, CodingEventKind.Message, {
+    role: 'user',
+    content: 'collaborator note',
+  });
+  expect(service.listWorkspaces()[0].sessions).toHaveLength(2);
+
+  const workspaces = service.deleteSession(root, collaborator.id);
+
+  expect(workspaces[0].sessions.map(session => session.id)).toEqual([primaryLane.id]);
+  expect(repository.listEvents([collaborator.id])).toHaveLength(0);
+  expect(service.bootstrap(root).lanes.map(lane => lane.id)).toEqual([primaryLane.id]);
+});
+
+test('deleteSession of the primary session removes the whole mission', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const primaryLane = snapshot.lanes[0];
+  repository.createLane(primaryLane.missionId, CodingAgentProfileId.Builtin, root, root);
+  expect(service.listWorkspaces()[0].sessions).toHaveLength(2);
+
+  const workspaces = service.deleteSession(root, primaryLane.id);
+
+  expect(workspaces[0].sessions).toHaveLength(0);
+  expect(service.bootstrap(root).missions).toHaveLength(0);
+  expect(service.bootstrap(root).lanes).toHaveLength(0);
+});
+
+test('deleteSession refuses a running session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const lane = snapshot.lanes[0];
+  repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
+
+  expect(() => service.deleteSession(root, lane.id)).toThrow(/Stop the running coding session/);
+  expect(service.listWorkspaces()[0].sessions).toHaveLength(1);
+});
+

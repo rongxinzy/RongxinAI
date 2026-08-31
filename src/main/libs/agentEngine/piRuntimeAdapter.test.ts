@@ -39,6 +39,7 @@ const hoisted = vi.hoisted(() => {
     abortBash: vi.fn(),
     reload: vi.fn().mockResolvedValue(undefined),
     setModel: vi.fn().mockResolvedValue(undefined),
+    setThinkingLevel: vi.fn().mockResolvedValue(undefined),
     subscribe: vi.fn().mockReturnValue(() => {}),
   };
 
@@ -1886,6 +1887,22 @@ describe('PiRuntimeAdapter', () => {
       await adapter.startSession('test', 'Hello');
       await adapter.patchSession('test', {});
       expect(mockSession.setModel).not.toHaveBeenCalled();
+    });
+
+    it('should update the thinking level without touching the model', async () => {
+      await adapter.startSession('test', 'Hello');
+      await adapter.patchSession('test', { thinkingLevel: 'high' });
+      expect(mockSession.setThinkingLevel).toHaveBeenCalledWith('high');
+      expect(mockSession.setModel).not.toHaveBeenCalled();
+    });
+
+    it('should pass the thinking level when creating the Pi session', async () => {
+      await adapter.startSession('test-thinking', 'Hello', { thinkingLevel: 'low' });
+      const sessionOptions = mockCreateAgentSession.mock.calls.at(-1)?.[0] as Record<
+        string,
+        unknown
+      >;
+      expect(sessionOptions.thinkingLevel).toBe('low');
     });
 
     it('should be a no-op for unknown session', async () => {
