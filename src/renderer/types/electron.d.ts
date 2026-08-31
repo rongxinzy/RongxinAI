@@ -109,6 +109,11 @@ interface CodingAgentProfilesResult {
   profiles?: import('../../shared/codingAgent').CodingAgentProfile[];
   error?: string;
 }
+interface CodingAgentConfigOptionsResult {
+  success: boolean;
+  configOptions?: import('../../shared/codingAgent').CodingAgentConfigOption[];
+  error?: string;
+}
 interface ApiResponse {
   ok: boolean;
   status: number;
@@ -952,6 +957,7 @@ interface IElectronAPI {
       workspaceRoot: string;
       laneId: string;
     }) => Promise<CodingWorkspaceActionResult>;
+    getProfileConfigOptions: (profileId: string) => Promise<CodingAgentConfigOptionsResult>;
     createSession: (
       input: import('../../shared/codingAgent').CreateCodingSessionInput,
     ) => Promise<CodingAgentActionResult>;

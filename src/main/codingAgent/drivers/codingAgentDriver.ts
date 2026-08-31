@@ -48,6 +48,8 @@ export interface CodingAgentDriver {
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>>;
   cancel(sessionId: string): Promise<void>;
   respondToPermission(response: CodingPermissionResponse): Promise<void>;
+  /** Options a session of this driver would start with (built-in driver only). */
+  getDefaultConfigOptions?(): CodingAgentConfigOption[];
   setConfigOption(
     sessionId: string,
     configId: string,

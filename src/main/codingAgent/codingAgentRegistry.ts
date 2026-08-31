@@ -23,7 +23,7 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
   supportsPermissions: true,
   supportsFilesystem: true,
   supportsTerminal: true,
-  supportsConfigOptions: false,
+  supportsConfigOptions: true,
   supportsUsage: true,
   supportsElicitation: true,
 };

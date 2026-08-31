@@ -21,6 +21,7 @@ import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
 import { AcpSessionUpdateKind } from './acp/protocol';
 import { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
+import { BuiltinCodingConfigId } from './drivers/builtinCodingDriver';
 
 let db: Database.Database | undefined;
 const tempDirectories: string[] = [];
@@ -834,4 +835,135 @@ test('deleteSession refuses a running session', async () => {
   expect(() => service.deleteSession(root, lane.id)).toThrow(/Stop the running coding session/);
   expect(service.listWorkspaces()[0].sessions).toHaveLength(1);
 });
-
+
+test('applies draft config option overrides when starting a builtin session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-overrides-'));
+  tempDirectories.push(root);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Fix the bug.',
+    configOptionOverrides: { [BuiltinCodingConfigId.ThinkingLevel]: PiThinkingLevel.High },
+  });
+
+  const lane = snapshot.lanes[0];
+  expect(lane.configOptions).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: BuiltinCodingConfigId.ThinkingLevel,
+        currentValue: PiThinkingLevel.High,
+      }),
+    ]),
+  );
+  await Promise.resolve();
+  expect(startBuiltinSession).toHaveBeenCalledWith(
+    expect.objectContaining({ thinkingLevel: PiThinkingLevel.High }),
+  );
+});
+
+test('ignores invalid draft config option overrides instead of failing the session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-overrides-'));
+  tempDirectories.push(root);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Fix the bug.',
+    configOptionOverrides: { [BuiltinCodingConfigId.ThinkingLevel]: 'ludicrous' },
+  });
+
+  expect(snapshot.lanes[0].configOptions).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: BuiltinCodingConfigId.ThinkingLevel,
+        currentValue: PiThinkingLevel.Medium,
+      }),
+    ]),
+  );
+});
+
+test('prepareLane populates config options for legacy builtin lanes', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-prepare-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const created = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Legacy task',
+  });
+  const lane = created.lanes[0];
+  // Simulate a lane persisted before config option support existed.
+  repository.updateLaneConfigOptions(lane.id, []);
+
+  const snapshot = await service.prepareLane(root, lane.id);
+
+  expect(snapshot.lanes[0].configOptions).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: BuiltinCodingConfigId.ThinkingLevel })]),
+  );
+});
+
+test('getProfileConfigOptions returns defaults for the builtin profile only', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const options = service.getProfileConfigOptions(CodingAgentProfileId.Builtin);
+  expect(options).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: BuiltinCodingConfigId.ThinkingLevel })]),
+  );
+  expect(service.getProfileConfigOptions('unknown-profile')).toEqual([]);
+});

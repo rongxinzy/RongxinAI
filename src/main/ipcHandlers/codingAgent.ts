@@ -86,6 +86,13 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       }
     },
   );
+  ipcMain.handle(CodingAgentIpc.GetProfileConfigOptions, (_event, profileId: string) => {
+    try {
+      return { success: true, configOptions: service.getProfileConfigOptions(profileId) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   ipcMain.handle(CodingAgentIpc.CreateSession, async (_event, input: CreateCodingSessionInput) => {
     try {
       return { success: true, snapshot: await service.createSession(input) };

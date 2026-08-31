@@ -14,6 +14,7 @@ import {
   CodingAgentProfileStatus,
   type CodingAgentLane,
   type CodingAgentProfile,
+  type CodingAgentConfigOption,
   type CodingAgentConfigOptionValue,
   type AddCodingAgentProfileInput,
   type CodingLaneConfigOptionInput,
@@ -454,13 +455,25 @@ export class CodingRoomService extends EventEmitter {
       lane.remoteSessionId ||
       !profile ||
       profile.status !== CodingAgentProfileStatus.Ready ||
-      profile.driverKind !== CodingAgentDriverKind.Acp
+      (profile.driverKind !== CodingAgentDriverKind.Acp &&
+        profile.driverKind !== CodingAgentDriverKind.Builtin) ||
+      // Built-in lanes only need preparing when their config options were
+      // persisted before config option support existed.
+      (profile.driverKind === CodingAgentDriverKind.Builtin && lane.configOptions.length > 0)
     ) {
       return snapshot;
     }
     const driver = this.getDriver(lane);
     await this.ensureDriverSession(driver, lane, this.executionRoot(lane, workspaceRoot));
     return this.publish(workspaceRoot);
+  }
+
+  /** Default config options a new session of this profile would start with. */
+  getProfileConfigOptions(profileId: string): CodingAgentConfigOption[] {
+    const profile = this.registry.get(profileId);
+    if (!profile || profile.driverKind !== CodingAgentDriverKind.Builtin) return [];
+    const driver = this.driverFactory.create(profile);
+    return driver.getDefaultConfigOptions?.() ?? [];
   }
 
   selectLane(workspaceRoot: string, laneId: string): CodingRoomSnapshot {

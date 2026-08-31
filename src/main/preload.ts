@@ -610,6 +610,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.DeleteWorkspace, workspaceId),
     deleteSession: (input: { workspaceRoot: string; laneId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.DeleteSession, input),
+    getProfileConfigOptions: (profileId: string) =>
+      ipcRenderer.invoke(CodingAgentIpc.GetProfileConfigOptions, profileId),
     createSession: (input: import('../shared/codingAgent').CreateCodingSessionInput) =>
       ipcRenderer.invoke(CodingAgentIpc.CreateSession, input),
     startSession: (input: import('../shared/codingAgent').StartCodingSessionInput) =>
