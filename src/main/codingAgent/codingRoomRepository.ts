@@ -338,6 +338,22 @@ export class CodingRoomRepository {
     });
     remove();
   }
+  deleteLane(roomId: string, laneId: string): void {
+    const remove = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM coding_events WHERE lane_id = ?').run(laneId);
+      this.db.prepare('DELETE FROM coding_assignments WHERE lane_id = ?').run(laneId);
+      this.db
+        .prepare('DELETE FROM coding_handoffs WHERE source_lane_id = ? OR target_lane_id = ?')
+        .run(laneId, laneId);
+      this.db.prepare('DELETE FROM coding_agent_lanes WHERE id = ?').run(laneId);
+      this.db
+        .prepare(
+          'UPDATE coding_rooms SET active_lane_id = NULL, updated_at = ? WHERE id = ? AND active_lane_id = ?',
+        )
+        .run(Date.now(), roomId, laneId);
+    });
+    remove();
+  }
   createLane(
     missionId: string,
     profileId: string,

@@ -948,6 +948,10 @@ interface IElectronAPI {
       input: import('../../shared/codingAgent').UpdateCodingWorkspaceInput,
     ) => Promise<CodingWorkspaceActionResult>;
     deleteWorkspace: (workspaceId: string) => Promise<CodingWorkspaceActionResult>;
+    deleteSession: (input: {
+      workspaceRoot: string;
+      laneId: string;
+    }) => Promise<CodingWorkspaceActionResult>;
     createSession: (
       input: import('../../shared/codingAgent').CreateCodingSessionInput,
     ) => Promise<CodingAgentActionResult>;

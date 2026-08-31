@@ -943,6 +943,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
       '当前只是空白草稿。首条消息发送成功后才会创建 Session，并永久绑定所选 Agent 与工作目录。',
     codingSessionCreateFailed: 'Agent 或模型当前不可用，Session 未创建。',
     codingSessionCollaborator: '协作者',
+    codingSessionRemove: '删除 Session',
+    codingSessionRemoveConfirm:
+      '删除该 Session 的全部编程记录（主 Session 会连同协作者一起删除），不会删除磁盘文件。',
     codingAgentReady: '可用',
     codingAgentStop: '停止',
     codingAgentEmptyTitle: '准备开始编程',
@@ -4136,6 +4139,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'This is only a blank draft. The session is created after the first message succeeds, then its agent and working directory are locked.',
     codingSessionCreateFailed: 'The agent or model is unavailable. No session was created.',
     codingSessionCollaborator: 'Collaborator',
+    codingSessionRemove: 'Delete session',
+    codingSessionRemoveConfirm:
+      'This deletes all coding records of the session (a primary session takes its collaborators with it). Files on disk are never deleted.',
     codingAgentReady: 'Ready',
     codingAgentStop: 'Stop',
     codingAgentEmptyTitle: 'Ready to code',

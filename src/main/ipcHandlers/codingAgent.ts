@@ -73,6 +73,19 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+  ipcMain.handle(
+    CodingAgentIpc.DeleteSession,
+    (_event, input: { workspaceRoot: string; laneId: string }) => {
+      try {
+        return {
+          success: true,
+          workspaces: service.deleteSession(input.workspaceRoot, input.laneId),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
   ipcMain.handle(CodingAgentIpc.CreateSession, async (_event, input: CreateCodingSessionInput) => {
     try {
       return { success: true, snapshot: await service.createSession(input) };

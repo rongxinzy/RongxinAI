@@ -168,6 +168,7 @@ interface PiSession {
   abortBash(): void;
   reload(): Promise<void>;
   setModel(model: unknown): Promise<void>;
+  setThinkingLevel?(level: string): unknown;
   getContextUsage?():
     | {
         tokens: number | null;
@@ -784,6 +785,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       }
       resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
       sessionOptions.model = resolvedModel.model;
+      if (options.thinkingLevel) {
+        // Pi clamps the level to what the resolved model actually supports.
+        sessionOptions.thinkingLevel = options.thinkingLevel;
+      }
       if (resolvedModel.modelRuntime) {
         sessionOptions.modelRuntime = resolvedModel.modelRuntime;
       }
@@ -1479,7 +1484,18 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
   async patchSession(sessionId: string, patch: PiSessionPatch): Promise<void> {
     const active = this.activeSessions.get(sessionId);
-    if (!active || !patch.model) return;
+    if (!active) return;
+
+    if (patch.thinkingLevel) {
+      try {
+        await active.piSession.setThinkingLevel?.(patch.thinkingLevel);
+        console.log('[PiRuntime] Thinking level updated via patchSession:', patch.thinkingLevel);
+      } catch (err) {
+        console.warn('[PiRuntime] Failed to update thinking level via patchSession:', err);
+      }
+    }
+
+    if (!patch.model) return;
 
     try {
       const pi = await getPiModules();

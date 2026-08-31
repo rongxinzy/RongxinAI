@@ -14,6 +14,7 @@ import {
   CodingAgentProfileStatus,
   type CodingAgentLane,
   type CodingAgentProfile,
+  type CodingAgentConfigOptionValue,
   type AddCodingAgentProfileInput,
   type CodingLaneConfigOptionInput,
   type CodingLaneChangePreview,
@@ -53,8 +54,19 @@ export interface CodingRoomRuntime {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    modelOverride?: string;
+    thinkingLevel?: string;
   }): Promise<void>;
   cancelBuiltinSession(sessionId: string): Promise<void>;
+  /** Applies model/thinking-level changes to a live built-in session. */
+  patchBuiltinSession?(
+    sessionId: string,
+    patch: { model?: string | null; thinkingLevel?: string | null },
+  ): Promise<void>;
+  /** Selectable model refs (`provider/model`) offered by the built-in agent. */
+  listBuiltinModelOptions?(): CodingAgentConfigOptionValue[];
+  /** Model ref of the current global default selection, if any. */
+  getBuiltinCurrentModelRef?(): string | null;
   getBuiltinWorkbenchLink(sessionId: string): { taskId: string; runId: string } | null;
   beginExternalWorkbenchRun(input: { sessionId: string; goal: string; workspaceRoot: string }): {
     taskId: string;
@@ -97,6 +109,17 @@ const ACP_ENVIRONMENT_KEYS = [
   'TMP',
   'LANG',
   'LC_ALL',
+  // Windows-specific variables needed for npm global resolution, shell
+  // helpers, and credential stores used by ACP agents (e.g. Kimi Code CLI).
+  'APPDATA',
+  'LOCALAPPDATA',
+  'COMSPEC',
+  'PATHEXT',
+  'SystemRoot',
+  'USERPROFILE',
+  'USERNAME',
+  'ProgramFiles',
+  'ProgramFiles(x86)',
 ] as const;
 
 export class CodingRoomService extends EventEmitter {
@@ -113,6 +136,11 @@ export class CodingRoomService extends EventEmitter {
   private readonly git: CodingGitController;
   private readonly cancelledLanes = new Set<string>();
   private readonly stagedLaneIds = new Set<string>();
+  /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
+  private readonly builtinSessionLaneMap = new Map<string, string>();
+  /** Throttle timer for publishing builtin event batches. */
+  private builtinPublishTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly BUILTIN_PUBLISH_THROTTLE_MS = 100;
 
   constructor(
     private readonly repository: CodingRoomRepository,
@@ -121,11 +149,21 @@ export class CodingRoomService extends EventEmitter {
   ) {
     super();
     this.git = new CodingGitController(repository);
+    const patchBuiltinSession = this.runtime.patchBuiltinSession?.bind(this.runtime);
     this.driverFactory = new CodingDriverFactory(
       {
-        start: (sessionId, workspaceRoot, prompt) =>
-          this.runtime.startBuiltinSession({ sessionId, workspaceRoot, prompt }),
+        start: (sessionId, workspaceRoot, prompt, options) =>
+          this.runtime.startBuiltinSession({
+            sessionId,
+            workspaceRoot,
+            prompt,
+            ...(options?.modelOverride ? { modelOverride: options.modelOverride } : {}),
+            ...(options?.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
+          }),
         cancel: sessionId => this.runtime.cancelBuiltinSession(sessionId),
+        patchSession: patchBuiltinSession,
+        listModelOptions: () => this.runtime.listBuiltinModelOptions?.() ?? [],
+        getCurrentModelRef: () => this.runtime.getBuiltinCurrentModelRef?.() ?? null,
       },
       Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]])),
     );
@@ -270,8 +308,49 @@ export class CodingRoomService extends EventEmitter {
       this.driverProfileIds.delete(lane.id);
       this.driverSessionIds.delete(lane.id);
       this.driverSessionPromises.delete(lane.id);
+      this.builtinSessionLaneMap.delete(lane.localSessionId);
     }
     this.repository.deleteWorkspace(room.id);
+    return this.listWorkspaces();
+  }
+
+  deleteSession(workspaceRoot: string, laneId: string): CodingWorkspaceSummary[] {
+    const room =
+      this.repository.getRoomByRoot(workspaceRoot) ??
+      this.repository.getRoomByRoot(path.resolve(workspaceRoot));
+    if (!room) throw new Error('Coding workspace was not found.');
+    const missions = this.repository.listMissions(room.id);
+    const lanes = this.repository.listLanes(missions.map(mission => mission.id));
+    const lane = lanes.find(candidate => candidate.id === laneId);
+    if (!lane) throw new Error('The coding session was not found.');
+    if (
+      lane.status === CodingLaneStatus.Running ||
+      lane.status === CodingLaneStatus.WaitingApproval
+    ) {
+      throw new Error('Stop the running coding session before deleting it.');
+    }
+    const missionLanes = lanes.filter(candidate => candidate.missionId === lane.missionId);
+    const implementationLaneId = this.repository
+      .listAssignments([lane.missionId])
+      .find(assignment => assignment.workflowStage === CodingWorkflowStage.Implementation)?.laneId;
+    const isPrimaryLane = lane.id === (implementationLaneId ?? missionLanes[0]?.id);
+    // Deleting the primary session removes the whole mission (collaborators
+    // included); deleting a collaborator removes only that lane.
+    const removedLanes = isPrimaryLane ? missionLanes : [lane];
+    for (const removed of removedLanes) {
+      void this.drivers.get(removed.id)?.dispose();
+      this.drivers.delete(removed.id);
+      this.driverProfileIds.delete(removed.id);
+      this.driverSessionIds.delete(removed.id);
+      this.driverSessionPromises.delete(removed.id);
+      this.builtinSessionLaneMap.delete(removed.localSessionId);
+    }
+    if (isPrimaryLane) {
+      this.repository.deleteMission(room.id, lane.missionId);
+    } else {
+      this.repository.deleteLane(room.id, lane.id);
+    }
+    this.publish(room.workspaceRoot);
     return this.listWorkspaces();
   }
 
@@ -309,6 +388,11 @@ export class CodingRoomService extends EventEmitter {
     });
     const { room, profile, lane, driver, driverSession } = prepared;
     this.stagedLaneIds.add(lane.id);
+    // Register builtin session → lane mapping so recordBuiltinEvent can find
+    // the lane without scanning every room.
+    if (profile.driverKind === CodingAgentDriverKind.Builtin) {
+      this.builtinSessionLaneMap.set(lane.localSessionId, lane.id);
+    }
     try {
       this.registerDriver(lane, profile, driver);
       this.driverSessionIds.set(lane.id, {
@@ -954,42 +1038,86 @@ export class CodingRoomService extends EventEmitter {
     kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],
     payload: Record<string, unknown>,
   ): void {
+    const laneId = this.builtinSessionLaneMap.get(sessionId);
+    if (!laneId) {
+      // Cache miss: scan rooms once to find the lane, then cache the mapping.
+      for (const workspaceRoot of this.knownRooms()) {
+        const snapshot = this.bootstrap(workspaceRoot);
+        const lane = snapshot.lanes.find(candidate => candidate.localSessionId === sessionId);
+        if (!lane) continue;
+        this.builtinSessionLaneMap.set(sessionId, lane.id);
+        this.applyBuiltinEvent(workspaceRoot, snapshot, lane, kind, payload);
+        return;
+      }
+      return;
+    }
+    // Fast path: use cached lane mapping without re-scanning rooms.
     for (const workspaceRoot of this.knownRooms()) {
       const snapshot = this.bootstrap(workspaceRoot);
-      const lane = snapshot.lanes.find(candidate => candidate.localSessionId === sessionId);
+      const lane = snapshot.lanes.find(candidate => candidate.id === laneId);
       if (!lane) continue;
-      this.repository.appendOrMergeStreamEvent(lane.id, kind, payload);
-      if (kind === CodingEventKind.Permission) {
-        this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
-        this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
-        this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.WaitingApproval);
-      }
-      if (kind === CodingEventKind.TurnComplete)
-        this.finishTurn(
-          snapshot.room.id,
-          snapshot.room.workspaceRoot,
-          lane,
-          CodingLaneStatus.Completed,
-        );
-      if (kind === CodingEventKind.TurnFailed)
-        this.finishTurn(
-          snapshot.room.id,
-          snapshot.room.workspaceRoot,
-          lane,
-          CodingLaneStatus.Failed,
-        );
-      this.publish(workspaceRoot);
+      this.applyBuiltinEvent(workspaceRoot, snapshot, lane, kind, payload);
       return;
     }
   }
 
+  private applyBuiltinEvent(
+    workspaceRoot: string,
+    snapshot: CodingRoomSnapshot,
+    lane: CodingAgentLane,
+    kind: (typeof CodingEventKind)[keyof typeof CodingEventKind],
+    payload: Record<string, unknown>,
+  ): void {
+    this.repository.appendOrMergeStreamEvent(lane.id, kind, payload);
+    if (kind === CodingEventKind.Permission) {
+      this.repository.updateLaneStatus(lane.id, CodingLaneStatus.WaitingApproval);
+      this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.WaitingApproval);
+      this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.WaitingApproval);
+    }
+    if (kind === CodingEventKind.TurnComplete) {
+      this.finishTurn(snapshot.room.id, snapshot.room.workspaceRoot, lane, CodingLaneStatus.Completed);
+      this.publish(workspaceRoot);
+      return;
+    }
+    if (kind === CodingEventKind.TurnFailed) {
+      this.finishTurn(snapshot.room.id, snapshot.room.workspaceRoot, lane, CodingLaneStatus.Failed);
+      this.publish(workspaceRoot);
+      return;
+    }
+    // Throttle streaming events to avoid flooding the renderer with publishes.
+    this.scheduleBuiltinPublish(workspaceRoot);
+  }
+
+  private scheduleBuiltinPublish(workspaceRoot: string): void {
+    if (this.builtinPublishTimer || this.isDisposed) return;
+    this.builtinPublishTimer = setTimeout(() => {
+      this.builtinPublishTimer = null;
+      if (!this.isDisposed) {
+        try {
+          this.publish(workspaceRoot);
+        } catch (error) {
+          // The database may have been closed during test teardown.
+          console.debug('[CodingRoom] Skipped publish because the service is disposed:', error);
+        }
+      }
+    }, this.BUILTIN_PUBLISH_THROTTLE_MS);
+  }
+
+  private isDisposed = false;
+
   async dispose(): Promise<void> {
+    this.isDisposed = true;
     await Promise.all([...this.drivers.values()].map(driver => driver.dispose()));
     this.drivers.clear();
     this.driverProfileIds.clear();
     this.driverSessionIds.clear();
     this.driverSessionPromises.clear();
     this.authTerminals.dispose();
+    this.builtinSessionLaneMap.clear();
+    if (this.builtinPublishTimer) {
+      clearTimeout(this.builtinPublishTimer);
+      this.builtinPublishTimer = null;
+    }
   }
 
   private getDriver(lane: CodingAgentLane): CodingAgentDriver {
@@ -1040,6 +1168,7 @@ export class CodingRoomService extends EventEmitter {
     this.driverProfileIds.delete(lane.id);
     this.driverSessionIds.delete(lane.id);
     this.driverSessionPromises.delete(lane.id);
+    this.builtinSessionLaneMap.delete(lane.localSessionId);
     this.repository.deleteMission(roomId, lane.missionId);
   }
 
@@ -1093,10 +1222,15 @@ export class CodingRoomService extends EventEmitter {
         session = await driver.createSession({
           workspaceRoot,
           localSessionId: lane.localSessionId,
+          existingConfigOptions: lane.configOptions,
         });
       }
     } else {
-      session = await driver.createSession({ workspaceRoot, localSessionId: lane.localSessionId });
+      session = await driver.createSession({
+        workspaceRoot,
+        localSessionId: lane.localSessionId,
+        existingConfigOptions: lane.configOptions,
+      });
     }
     this.driverSessionIds.set(lane.id, {
       id: session.id,
