@@ -228,14 +228,13 @@ export class AcpCodingDriver implements CodingAgentDriver {
     workspaceRoot: string;
     localSessionId?: string;
   }): Promise<CodingAgentSession> {
-    await this.ensureConnected(input.workspaceRoot);
-    const response = await this.supervisor.request<AcpSessionResult>(
+    const response = await this.requestSessionLifecycle<AcpSessionResult>(
+      input.workspaceRoot,
       AcpMethod.SessionNew,
       {
         cwd: input.workspaceRoot,
         mcpServers: [],
       },
-      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
     );
     if (typeof response.sessionId !== 'string')
       throw new Error('ACP agent did not return a session ID.');
@@ -260,14 +259,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (!this.capabilities.supportsLoadSession && !this.capabilities.supportsResumeSession) {
       throw new Error('The ACP agent does not support loading sessions.');
     }
-    const response = await this.supervisor.request<AcpSessionResult>(
+    const response = await this.requestSessionLifecycle<AcpSessionResult>(
+      input.workspaceRoot,
       this.capabilities.supportsResumeSession ? AcpMethod.SessionResume : AcpMethod.SessionLoad,
       {
         sessionId: input.remoteSessionId,
         cwd: input.workspaceRoot,
         mcpServers: [],
       },
-      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
     );
     const configOptions = normalizeConfigOptions(response.configOptions);
     if (configOptions.length > 0) {
@@ -299,7 +298,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
           sessionId: input.sessionId,
           prompt: [{ type: 'text', text: input.prompt }],
         },
-        { timeoutMs: null },
+        // A hung agent must not leave the lane running forever. 5 minutes is
+        // generous for a single turn; the watchdog can be cancelled by the
+        // agent finishing normally or by the user cancelling.
+        { timeoutMs: 5 * 60 * 1000 },
       )
       .then(() => this.finishStream(input.sessionId))
       .catch(error => this.finishStream(input.sessionId, error));
@@ -398,6 +400,30 @@ export class AcpCodingDriver implements CodingAgentDriver {
     await this.supervisor.dispose();
   }
 
+  /**
+   * Session lifecycle requests race with agent crashes: the process can die
+   * between the liveness check and the request. If the connection turns out to
+   * be down, reconnect once and retry before giving up.
+   */
+  private async requestSessionLifecycle<T>(
+    workspaceRoot: string,
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<T> {
+    await this.ensureConnected(workspaceRoot);
+    try {
+      return await this.supervisor.request<T>(method, params, {
+        timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS,
+      });
+    } catch (error) {
+      if (this.supervisor.isRunning()) throw error;
+      await this.ensureConnected(workspaceRoot);
+      return await this.supervisor.request<T>(method, params, {
+        timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS,
+      });
+    }
+  }
+
   private async ensureConnected(workspaceRoot: string): Promise<void> {
     this.workspaceRoot = workspaceRoot;
     this.workspaceBroker = new WorkspaceBroker(workspaceRoot);
@@ -419,10 +445,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.authMethods.clear();
     this.capabilities = DEFAULT_CAPABILITIES;
     this.supportsSessionClose = false;
-    const response = await this.supervisor.request<AcpInitializeResult>(AcpMethod.Initialize, {
-      protocolVersion: ACP_PROTOCOL_VERSION,
-      clientCapabilities: ACP_CLIENT_CAPABILITIES,
-    });
+    const response = await this.supervisor.request<AcpInitializeResult>(
+      AcpMethod.Initialize,
+      {
+        protocolVersion: ACP_PROTOCOL_VERSION,
+        clientCapabilities: ACP_CLIENT_CAPABILITIES,
+      },
+      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
+    );
     if (response.protocolVersion !== ACP_PROTOCOL_VERSION) {
       throw new AcpProtocolIncompatibleError(response.protocolVersion);
     }
