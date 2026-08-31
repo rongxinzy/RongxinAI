@@ -9,13 +9,13 @@ import {
   resolveInitialAppWindowState,
 } from './windowState';
 
-test('resolveInitialAppWindowState uses the image-like default size on large displays', () => {
+test('resolveInitialAppWindowState uses the 16:10 default size on large displays', () => {
   const state = resolveInitialAppWindowState(undefined, [
     { x: 0, y: 0, width: 2560, height: 1440 },
   ]);
 
   expect(state).toEqual({
-    x: 680,
+    x: 640,
     y: 320,
     width: DEFAULT_APP_WINDOW_WIDTH,
     height: DEFAULT_APP_WINDOW_HEIGHT,
