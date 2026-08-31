@@ -9,29 +9,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
-import { Download } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { cn } from '@shared/lib/utils';
+import { ChevronRight, Download } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 
-import type {
-  WorkbenchApprovalResponseInput,
-  WorkbenchTask,
-  WorkbenchTaskDetail,
+import {
+  WorkbenchTaskStatus,
+  type WorkbenchApprovalResponseInput,
+  type WorkbenchTask,
+  type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
-import { ApprovalAuditTab } from './ApprovalAuditTab';
-import { ArtifactAuditTab } from './ArtifactAuditTab';
 import { AuditJsonDisclosure } from './AuditJsonDisclosure';
-import { WorkbenchTaskRunFilter } from './constants';
-import { EventAuditTab } from './EventAuditTab';
-import { RunAuditTab } from './RunAuditTab';
-import {
-  contractLabel,
-  filterTaskDetailByRun,
-  formatTimestamp,
-  statusBadgeVariant,
-  statusLabel,
-} from './utils';
+import { WorkbenchTimeline } from './timeline/WorkbenchTimeline';
+import { contractLabel, formatTimestamp, statusBadgeVariant, statusLabel } from './utils';
 
 interface WorkbenchTaskAuditViewProps {
   detail: WorkbenchTaskDetail;
@@ -53,17 +46,7 @@ export function WorkbenchTaskAuditView({
   onRespondToApproval,
 }: WorkbenchTaskAuditViewProps) {
   const task = detail.task;
-  const [runFilter, setRunFilter] = useState<string>(WorkbenchTaskRunFilter.All);
   const [exporting, setExporting] = useState(false);
-
-  useEffect(() => {
-    setRunFilter(WorkbenchTaskRunFilter.All);
-  }, [task.id]);
-
-  const filteredDetail = useMemo(
-    () => filterTaskDetailByRun(detail, runFilter),
-    [detail, runFilter],
-  );
 
   const exportAudit = async () => {
     setExporting(true);
@@ -91,62 +74,107 @@ export function WorkbenchTaskAuditView({
 
   return (
     <ScrollArea className="h-full">
-      <div className="flex w-full flex-col gap-4 p-4">
-        <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-foreground">
-              {i18nService.t('workbenchTaskDetails')}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {i18nService.t('workbenchTaskDetailsDescription')}
-            </p>
+      <div className="mx-auto w-full max-w-3xl px-6">
+        <header className="flex flex-col gap-3 pt-8 pb-6">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex min-w-0 items-center gap-2">
+              {task.status === WorkbenchTaskStatus.Running && <RunningDot />}
+              <Badge variant={statusBadgeVariant(task.status)}>{statusLabel(task.status)}</Badge>
+            </span>
+            <div className="flex shrink-0 items-center gap-1">
+              {toolbarActions}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={exporting}
+                onClick={() => void exportAudit()}
+              >
+                <Download data-icon="inline-start" />
+                {i18nService.t('workbenchTaskExport')}
+              </Button>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
-            {toolbarActions}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={exporting}
-              onClick={() => void exportAudit()}
-            >
-              <Download data-icon="inline-start" />
-              {i18nService.t('workbenchTaskExport')}
-            </Button>
+          <h2 className="line-clamp-2 text-xl font-semibold tracking-tight text-foreground">
+            {task.goal}
+          </h2>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span>{contractLabel(task.contract.kind)}</span>
+            <span>{formatTimestamp(task.createdAt)}</span>
+            <span>
+              {i18nService
+                .t('workbenchTimelineAttempts')
+                .replace('{count}', String(detail.runs.length))}
+            </span>
           </div>
+          {tasks.length > 1 && (
+            <Select value={task.id} onValueChange={value => value && onSelectTask(value)}>
+              <SelectTrigger size="sm" className="w-full max-w-sm" disabled={loading}>
+                <SelectValue>
+                  <TaskHistorySummary task={task} />
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent align="start">
+                <SelectGroup>
+                  {tasks.map(historyTask => (
+                    <SelectItem key={historyTask.id} value={historyTask.id}>
+                      <TaskHistorySummary task={historyTask} />
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
+          <TaskDetailsDisclosure task={task} />
         </header>
 
-        <section
-          className="flex shrink-0 flex-col gap-3 rounded-lg border border-border bg-muted p-4"
-          aria-label={i18nService.t('workbenchTaskSummary')}
-        >
-          {tasks.length > 1 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">
-                {i18nService.t('workbenchTaskHistory')}
-              </span>
-              <Select value={task.id} onValueChange={value => value && onSelectTask(value)}>
-                <SelectTrigger className="w-full" disabled={loading}>
-                  <SelectValue>
-                    <TaskHistorySummary task={task} />
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent align="start">
-                  <SelectGroup>
-                    {tasks.map(historyTask => (
-                      <SelectItem key={historyTask.id} value={historyTask.id}>
-                        <TaskHistorySummary task={historyTask} />
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
+        <WorkbenchTimeline
+          detail={detail}
+          busy={busy}
+          onRespondToApproval={onRespondToApproval}
+        />
+      </div>
+    </ScrollArea>
+  );
+}
+
+function RunningDot() {
+  const reducedMotion = useReducedMotion();
+  return (
+    <span className="relative flex size-1.5">
+      {!reducedMotion && (
+        <motion.span
+          aria-hidden="true"
+          className="absolute inline-flex size-full rounded-full bg-primary"
+          animate={{ scale: [1, 2.2], opacity: [0.7, 0] }}
+          transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: 'easeOut' }}
+        />
+      )}
+      <span className="relative inline-flex size-1.5 rounded-full bg-primary" />
+    </span>
+  );
+}
+
+function TaskDetailsDisclosure({ task }: { task: WorkbenchTask }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+        className="flex w-fit items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+      >
+        <ChevronRight
+          className={cn(
+            'size-3 transition-transform motion-reduce:transition-none',
+            open && 'rotate-90',
           )}
-          <div className="flex flex-wrap items-start gap-2">
-            <Badge variant={statusBadgeVariant(task.status)}>{statusLabel(task.status)}</Badge>
-            <p className="min-w-0 flex-1 text-sm font-medium text-foreground">{task.goal}</p>
-          </div>
+        />
+        {i18nService.t('workbenchTimelineTaskDetails')}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted p-4">
           <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-4">
             <TaskMetadata
               label={i18nService.t('workbenchTaskContract')}
@@ -181,98 +209,9 @@ export function WorkbenchTaskAuditView({
               value={task.contract.metadata}
             />
           )}
-        </section>
-
-        {detail.runs.length > 1 && (
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-xs text-muted-foreground">
-              {i18nService.t('workbenchTaskRunFilter')}
-            </span>
-            <Select value={runFilter} onValueChange={value => value && setRunFilter(value)}>
-              <SelectTrigger size="sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent align="start">
-                <SelectGroup>
-                  <SelectItem value={WorkbenchTaskRunFilter.All}>
-                    {i18nService.t('workbenchTaskAllRuns')}
-                  </SelectItem>
-                  {detail.runs.map(run => (
-                    <SelectItem key={run.id} value={run.id}>
-                      {i18nService
-                        .t('workbenchTaskRunAttempt')
-                        .replace('{attempt}', String(run.attempt))}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-          <div className="flex min-w-0 flex-col gap-4">
-            <WorkbenchTaskAuditSection
-              title={i18nService.t('workbenchTaskRuns')}
-              count={filteredDetail.runs.length}
-            >
-              <RunAuditTab runs={filteredDetail.runs} activeRunId={task.activeRunId} />
-            </WorkbenchTaskAuditSection>
-            <WorkbenchTaskAuditSection
-              title={i18nService.t('workbenchTaskArtifacts')}
-              count={filteredDetail.artifacts.length}
-            >
-              <ArtifactAuditTab artifacts={filteredDetail.artifacts} runs={detail.runs} />
-            </WorkbenchTaskAuditSection>
-          </div>
-          <div className="flex min-w-0 flex-col gap-4">
-            <WorkbenchTaskAuditSection
-              title={i18nService.t('workbenchTaskEvents')}
-              count={filteredDetail.events.length}
-            >
-              <EventAuditTab events={filteredDetail.events} runs={detail.runs} />
-            </WorkbenchTaskAuditSection>
-            <WorkbenchTaskAuditSection
-              title={i18nService.t('workbenchTaskApprovals')}
-              count={filteredDetail.approvals.length}
-            >
-              <ApprovalAuditTab
-                approvals={filteredDetail.approvals}
-                runs={detail.runs}
-                busy={busy}
-                onRespond={onRespondToApproval}
-              />
-            </WorkbenchTaskAuditSection>
-          </div>
         </div>
-      </div>
-    </ScrollArea>
-  );
-}
-
-function WorkbenchTaskAuditSection({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count: number;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className="min-w-0 overflow-hidden rounded-lg border border-border bg-background"
-      aria-label={`${title} (${count})`}
-    >
-      <div className="flex h-10 items-center border-b border-border bg-muted px-4">
-        <h3 className="text-sm font-semibold text-foreground">
-          {title} <span className="font-normal text-muted-foreground">({count})</span>
-        </h3>
-      </div>
-      <ScrollArea className="max-h-80 [&_[data-slot=scroll-area-viewport]]:max-h-80">
-        <div className="p-3">{children}</div>
-      </ScrollArea>
-    </section>
+      )}
+    </div>
   );
 }
 
@@ -284,6 +223,7 @@ function TaskMetadata({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
 function TaskHistorySummary({ task }: { task: WorkbenchTask }) {
   return (
     <span className="flex min-w-0 flex-1 items-center gap-2">
