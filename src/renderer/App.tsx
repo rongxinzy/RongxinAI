@@ -19,6 +19,7 @@ import type { CodingSidebarSelection } from './components/coding/CodingWorkspace
 import type { McpRegistryId } from './components/mcp/constants';
 import type { SettingsOpenOptions } from './components/Settings';
 import { prefetchFeatureView } from './components/featureViewPrefetch';
+import { ParticleBootScreen } from './components/boot/ParticleBootScreen';
 import { LazyChunkErrorBoundary } from './components/LazyChunkErrorBoundary';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
@@ -122,6 +123,7 @@ const App: React.FC = () => {
   const [hasMountedLocalInference, setHasMountedLocalInference] = useState(false);
   const [localInferenceInstallRequestId, setLocalInferenceInstallRequestId] = useState<string>();
   const [isInitialized, setIsInitialized] = useState(false);
+  const [bootScreenVisible, setBootScreenVisible] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastError, setIsToastError] = useState(false);
@@ -806,21 +808,14 @@ const App: React.FC = () => {
     </div>
   ) : null;
 
-  if (!isInitialized) {
+  if (bootScreenVisible) {
     return (
       <div className="h-screen overflow-hidden flex flex-col">
         {windowsStandaloneTitleBar}
-        <div className="flex-1 flex items-center justify-center bg-background">
-          <div className="flex flex-col items-center space-y-4">
-            <div className="w-16 h-16 rounded-full bg-linear-to-br from-primary to-primary-hover flex items-center justify-center shadow-glow-accent animate-pulse">
-              <MessageCircle className="h-8 w-8 text-white" />
-            </div>
-            <div className="w-24 h-1 rounded-full bg-primary/20 overflow-hidden">
-              <div className="h-full w-1/2 rounded-full bg-primary animate-shimmer" />
-            </div>
-            <div className="text-foreground text-xl font-medium">{i18nService.t('loading')}</div>
-          </div>
-        </div>
+        <ParticleBootScreen
+          exiting={isInitialized}
+          onExitComplete={() => setBootScreenVisible(false)}
+        />
       </div>
     );
   }
