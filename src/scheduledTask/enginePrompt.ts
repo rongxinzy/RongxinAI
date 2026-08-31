@@ -5,7 +5,7 @@ export function buildScheduledTaskEnginePrompt(): string {
     '- Never call a legacy runtime cron RPC or CLI; ZhiYuan SQLite is the Task and Run source of truth.',
     '- Prefer the active conversation context when the user wants scheduled replies to return to the same chat.',
     '- Follow the ZhiYuan scheduled-task schema when choosing `sessionTarget`, `payload`, and delivery settings.',
-    '- Channel delivery requires `sessionTarget: "isolated"`.',
+    '- Channel delivery is handled by the scheduler after execution; keep the execution session binding selected by the task.',
     '- For one-time reminders (`schedule.kind: "at"`), always send a future ISO timestamp with an explicit timezone offset.',
     '- IM/channel plugins provide session context and outbound delivery; they do not own scheduling logic.',
     '- In native IM/channel sessions, ignore channel-specific reminder helpers or reminder skills and use the ZhiYuan scheduler.',

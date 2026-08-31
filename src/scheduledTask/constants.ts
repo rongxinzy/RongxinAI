@@ -43,8 +43,21 @@ export const DeliveryChannel = {
 export const SessionTarget = {
   Main: 'main',
   Isolated: 'isolated',
+  Task: 'task',
 } as const;
 export type SessionTarget = (typeof SessionTarget)[keyof typeof SessionTarget];
+
+export const SessionBindingStrategy = {
+  PerRun: 'per-run',
+  Task: 'task',
+  Existing: 'existing',
+} as const;
+export type SessionBindingStrategy =
+  (typeof SessionBindingStrategy)[keyof typeof SessionBindingStrategy];
+
+export const ManagedSessionKeyPrefix = {
+  Zhiyuan: 'zhiyuan:',
+} as const;
 
 // ─── Wake Mode ──────────────────────────────────────────────────────────────
 export const WakeMode = {
