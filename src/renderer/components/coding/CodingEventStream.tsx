@@ -11,7 +11,7 @@ import {
   EmptyTitle,
 } from '@shared/components/ui/empty';
 import { Code2 } from 'lucide-react';
-import { useEffect, useMemo, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import type { CodingEvent } from '../../../shared/codingAgent';
@@ -19,10 +19,17 @@ import { detectArtifactsFromMessages } from '../../services/artifactParser';
 import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import { addArtifact, selectSessionArtifacts } from '../../store/slices/artifactSlice';
-import type { Artifact } from '../../types/artifact';
+import { isBinaryArtifactFile, type Artifact } from '../../types/artifact';
 import type { CoworkMessage } from '../../types/cowork';
 import { CodingConversationTurn } from './CodingConversationTurn';
-import { projectCodingEvents, type CodingConversationTurn as TurnModel } from './codingEventProjection';
+import {
+  collectCodingFileArtifacts,
+  resolveArtifactFilePath,
+} from './codingArtifacts';
+import {
+  projectCodingEvents,
+  type CodingConversationTurn as TurnModel,
+} from './codingEventProjection';
 
 interface CodingEventStreamProps {
   events: CodingEvent[];
@@ -36,6 +43,8 @@ interface CodingEventStreamProps {
    * cards that open the artifact panel.
    */
   artifactSessionKey?: string | null;
+  /** Base directory used to resolve relative artifact paths for disk reads. */
+  artifactBaseDir?: string | null;
 }
 
 const toDetectableMessages = (turns: TurnModel[]): CoworkMessage[] =>
@@ -61,6 +70,31 @@ const groupArtifactsByMessage = (artifacts: Artifact[]): Map<string, Artifact[]>
   return grouped;
 };
 
+const loadCodingArtifactContent = async (
+  artifact: Artifact,
+  baseDir: string | null | undefined,
+): Promise<Artifact | null> => {
+  if (!artifact.filePath) return null;
+  const absPath = resolveArtifactFilePath(artifact.filePath, baseDir);
+  try {
+    const result = await window.electron.dialog.readFileAsDataUrl(absPath);
+    if (!result?.success || !result.dataUrl) return null;
+    let content = result.dataUrl;
+    if (!isBinaryArtifactFile(absPath)) {
+      try {
+        const base64 = result.dataUrl.split(',')[1] || '';
+        const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        content = new TextDecoder('utf-8').decode(bytes);
+      } catch {
+        content = result.dataUrl;
+      }
+    }
+    return { ...artifact, content, filePath: absPath };
+  } catch {
+    return null;
+  }
+};
+
 export const CodingEventStream = ({
   events,
   isStreaming,
@@ -68,25 +102,42 @@ export const CodingEventStream = ({
   onScrollPositionChange,
   emptyDescription,
   artifactSessionKey = null,
+  artifactBaseDir = null,
 }: CodingEventStreamProps) => {
   const dispatch = useDispatch();
   const turns = useMemo(() => projectCodingEvents(events), [events]);
   const artifacts = useSelector((state: RootState) =>
     artifactSessionKey ? selectSessionArtifacts(state, artifactSessionKey) : undefined,
   );
+  // Tracks the latest loaded write per artifact so a file is re-read from disk
+  // after a rewrite, but not on every render.
+  const loadedFileVersionsRef = useRef<Map<string, string>>(new Map());
 
   // Artifact detection runs on the settled transcript only — scanning on every
   // streamed chunk would redo the whole parse per token.
   const detectableMessages = useMemo(() => toDetectableMessages(turns), [turns]);
   useEffect(() => {
-    if (!artifactSessionKey || isStreaming || detectableMessages.length === 0) return;
+    if (!artifactSessionKey || isStreaming) return;
     for (const { artifact } of detectArtifactsFromMessages(
       detectableMessages,
       artifactSessionKey,
     )) {
       dispatch(addArtifact({ sessionId: artifactSessionKey, artifact }));
     }
-  }, [artifactSessionKey, isStreaming, detectableMessages, dispatch]);
+    for (const { artifact, needsFileLoad, version } of collectCodingFileArtifacts(
+      events,
+      artifactSessionKey,
+    )) {
+      dispatch(addArtifact({ sessionId: artifactSessionKey, artifact }));
+      if (!needsFileLoad) continue;
+      const loadKey = `${artifactSessionKey}:${artifact.id}`;
+      if (loadedFileVersionsRef.current.get(loadKey) === version) continue;
+      loadedFileVersionsRef.current.set(loadKey, version);
+      void loadCodingArtifactContent(artifact, artifactBaseDir).then(loaded => {
+        if (loaded) dispatch(addArtifact({ sessionId: artifactSessionKey, artifact: loaded }));
+      });
+    }
+  }, [artifactSessionKey, artifactBaseDir, isStreaming, detectableMessages, events, dispatch]);
 
   const artifactsByMessageId = useMemo(
     () => groupArtifactsByMessage(artifacts ?? []),

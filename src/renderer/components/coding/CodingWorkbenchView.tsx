@@ -20,6 +20,7 @@ import {
   FileDiff,
   FolderGit2,
   GitBranch,
+  Layers,
   PanelLeftOpen,
   PanelRight,
   Settings2,
@@ -44,6 +45,7 @@ import {
   selectIsSessionArtifactPanelOpen,
   selectSessionArtifactLayoutMode,
   selectSessionArtifacts,
+  togglePanel,
 } from '../../store/slices/artifactSlice';
 import WindowTitleBar from '../window/WindowTitleBar';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
@@ -746,6 +748,20 @@ export const CodingWorkbenchView = ({
             >
               <Settings2 />
             </Button>
+            {artifactSessionKey && laneArtifacts.length > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label={i18nService.t('codingAgentArtifacts')}
+                aria-pressed={isArtifactPanelOpen}
+                onClick={() => dispatch(togglePanel())}
+              >
+                <Layers className="mr-1 size-4" />
+                {i18nService.t('codingAgentArtifacts')}
+                <Badge variant="secondary">{laneArtifacts.length}</Badge>
+              </Button>
+            )}
             {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
               <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
                 <FileDiff className="mr-1 size-4" />
@@ -849,6 +865,7 @@ export const CodingWorkbenchView = ({
             }
             scrollAreaRef={eventStreamRef}
             artifactSessionKey={artifactSessionKey}
+            artifactBaseDir={activeLane?.executionRoot ?? null}
             onScrollPositionChange={scrollPosition => {
               if (activeLane) saveScrollPosition(activeLane.id, scrollPosition);
             }}
