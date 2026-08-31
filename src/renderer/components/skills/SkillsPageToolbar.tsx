@@ -15,7 +15,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from '@shared/components/ui/input-group';
-import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
 import {
   ExternalLink,
   FolderOpen,
@@ -29,7 +29,7 @@ import {
 
 import { i18nService } from '../../services/i18n';
 import { PlusMenuSkillsIcon } from '../cowork/plusMenuIcons';
-import { isSkillTab, SkillTab } from './constants';
+import { SkillTab } from './constants';
 
 interface SkillsPageToolbarProps {
   activeTab: SkillTab;
@@ -70,10 +70,9 @@ export function SkillsPageToolbar({
         <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
           <PlusMenuSkillsIcon className="size-6 text-primary" />
         </div>
-        <div className="min-w-0">
-          <h2 className="text-xxl font-semibold text-foreground">{i18nService.t('skills')}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{i18nService.t('skillsDescription')}</p>
-        </div>
+        <p className="min-w-0 text-sm text-muted-foreground">
+          {i18nService.t('skillsDescription')}
+        </p>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -138,23 +137,21 @@ export function SkillsPageToolbar({
       </div>
 
       <div className="border-b border-border">
-        <Tabs
+        <PageTabs
           value={activeTab}
-          onValueChange={value => {
-            if (isSkillTab(value)) onTabChange(value);
-          }}
-          className="-mb-px self-start"
-        >
-          <TabsList variant="line">
-            <TabsTrigger value={SkillTab.Installed} className="after:bottom-[-1px] after:h-1">
-              {i18nService.t('skillInstalled')}
-              {installedCount > 0 ? <Badge variant="secondary">{installedCount}</Badge> : null}
-            </TabsTrigger>
-            <TabsTrigger value={SkillTab.Marketplace} className="after:bottom-[-1px] after:h-1">
-              {i18nService.t('skillMarketplace')}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+          onValueChange={onTabChange}
+          items={[
+            {
+              value: SkillTab.Installed,
+              label: i18nService.t('skillInstalled'),
+              badge:
+                installedCount > 0 ? (
+                  <Badge variant="secondary">{installedCount}</Badge>
+                ) : undefined,
+            },
+            { value: SkillTab.Marketplace, label: i18nService.t('skillMarketplace') },
+          ]}
+        />
       </div>
     </header>
   );

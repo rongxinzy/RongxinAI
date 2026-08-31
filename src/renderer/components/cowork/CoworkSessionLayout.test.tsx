@@ -45,6 +45,8 @@ function StatefulConversation() {
 
 beforeEach(() => {
   i18nService.setLanguage('zh', { persist: false });
+  // PageHeader reads the platform for macOS traffic-light padding.
+  (window as unknown as { electron: unknown }).electron = { platform: 'darwin' };
 });
 
 test('renders the title above tabs and preserves conversation state across tab switches', async () => {
@@ -55,7 +57,6 @@ test('renders the title above tabs and preserves conversation state across tab s
       title="布局调整会话"
       sessionId="session-1"
       isSessionSwitching={false}
-      isMac={false}
       isArtifactPanelOpen={false}
       onToggleArtifactPanel={vi.fn()}
     >

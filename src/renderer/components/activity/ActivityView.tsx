@@ -1,6 +1,5 @@
-import { Button } from '@shared/components/ui/button';
-import { ButtonGroup } from '@shared/components/ui/button-group';
-import { Activity, PanelLeftOpen } from 'lucide-react';
+import { PageTabs } from '@shared/components/ui/page-tabs';
+import { Activity } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -8,8 +7,7 @@ import { i18nService } from '../../services/i18n';
 import type { RootState } from '../../store';
 import { selectActivityRuns } from '../../store/selectors/activitySelectors';
 import type { ActivityRun } from '../../../shared/activity/types';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
-import WindowTitleBar from '../window/WindowTitleBar';
+import PageHeader from '../PageHeader';
 import ActivityRunRow from './ActivityRunRow';
 import { ActivityStatusFilter, ActivityTriggerFilter } from './constants';
 import { formatActivityDayLabel } from './utils';
@@ -30,7 +28,6 @@ const ActivityView: React.FC<ActivityViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const isMac = window.electron.platform === 'darwin';
   const runs = useSelector((state: RootState) => selectActivityRuns(state));
   const [language, setLanguage] = useState(i18nService.getLanguage());
   const [triggerFilter, setTriggerFilter] = useState<ActivityTriggerFilter>(
@@ -94,23 +91,13 @@ const ActivityView: React.FC<ActivityViewProps> = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
-      {/* Header chrome — same shell as the other feature views. */}
-      <div className="draggable flex shrink-0 items-center justify-between pl-4">
-        <div className="flex items-center gap-3 h-8">
-          {isSidebarCollapsed && (
-            <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeftOpen />
-              </Button>
-              <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
-                <SidebarAnimatedMessageCirclePlusIcon />
-              </Button>
-              {updateBadge}
-            </div>
-          )}
-        </div>
-        <WindowTitleBar inline />
-      </div>
+      <PageHeader
+        title={i18nService.t('activityTitle')}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
+        onNewChat={onNewChat}
+        updateBadge={updateBadge}
+      />
 
       <div className="mx-auto flex min-h-0 w-full max-w-2xl flex-1 flex-col px-8">
         {/* Hero */}
@@ -119,59 +106,33 @@ const ActivityView: React.FC<ActivityViewProps> = ({
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
               <Activity className="size-6 text-primary" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xxl font-semibold text-foreground">
-                {i18nService.t('activityTitle')}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {i18nService.t('activityHeroDesc')}
-              </p>
-            </div>
+            <p className="min-w-0 text-sm text-muted-foreground">
+              {i18nService.t('activityHeroDesc')}
+            </p>
           </div>
         </section>
 
-        {/* Filters: trigger on the left, status toggles on the right. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 pb-4">
-          <ButtonGroup>
-            {triggerOptions.map(option => (
-              <Button
-                key={option.value}
-                variant="outline"
-                size="sm"
-                className={
-                  triggerFilter === option.value
-                    ? 'bg-secondary text-foreground'
-                    : 'bg-card text-muted-foreground'
-                }
-                aria-pressed={triggerFilter === option.value}
-                onClick={() => setTriggerFilter(option.value)}
-              >
-                {i18nService.t(option.labelKey)}
-              </Button>
-            ))}
-          </ButtonGroup>
-          <ButtonGroup>
-            {statusOptions.map(option => (
-              <Button
-                key={option.value}
-                variant="outline"
-                size="sm"
-                className={
-                  statusFilter === option.value
-                    ? 'bg-secondary text-foreground'
-                    : 'bg-card text-muted-foreground'
-                }
-                aria-pressed={statusFilter === option.value}
-                onClick={() =>
-                  setStatusFilter(current =>
-                    current === option.value ? ActivityStatusFilter.All : option.value,
-                  )
-                }
-              >
-                {i18nService.t(option.labelKey)}
-              </Button>
-            ))}
-          </ButtonGroup>
+        {/* Filters: trigger on the left, status on the right. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 pb-4">
+          <PageTabs
+            value={triggerFilter}
+            onValueChange={setTriggerFilter}
+            items={triggerOptions.map(option => ({
+              value: option.value,
+              label: i18nService.t(option.labelKey),
+            }))}
+          />
+          <PageTabs
+            value={statusFilter}
+            onValueChange={setStatusFilter}
+            onItemClick={value => {
+              if (value === statusFilter) setStatusFilter(ActivityStatusFilter.All);
+            }}
+            items={statusOptions.map(option => ({
+              value: option.value,
+              label: i18nService.t(option.labelKey),
+            }))}
+          />
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto scrollbar-gutter-stable">

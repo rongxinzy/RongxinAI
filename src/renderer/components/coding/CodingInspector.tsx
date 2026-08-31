@@ -1,7 +1,8 @@
 import { Terminal } from '@shared/components/ai-elements/terminal';
 import { Badge } from '@shared/components/ui/badge';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { Tabs, TabsContent } from '@shared/components/ui/tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
 import { FileDiff, Terminal as TerminalIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -46,18 +47,41 @@ export const CodingInspector = ({ events }: CodingInspectorProps) => {
       }}
       className="h-full min-h-0"
     >
-      <TabsList variant="line" className="mx-4 mt-3">
-        <TabsTrigger value={CodingInspectorTab.Changes} disabled={changes.length === 0}>
-          <FileDiff data-icon="inline-start" />
-          {i18nService.t('codingAgentChanges')}
-          {changes.length > 0 && <Badge variant="secondary">{changes.length}</Badge>}
-        </TabsTrigger>
-        <TabsTrigger value={CodingInspectorTab.Terminal} disabled={terminals.length === 0}>
-          <TerminalIcon data-icon="inline-start" />
-          {i18nService.t('codingAgentTerminal')}
-          {terminals.length > 0 && <Badge variant="secondary">{terminals.length}</Badge>}
-        </TabsTrigger>
-      </TabsList>
+      <PageTabs
+        bare
+        value={activeTab}
+        className="mx-4 mt-3"
+        items={[
+          {
+            value: CodingInspectorTab.Changes,
+            label: (
+              <>
+                <FileDiff data-icon="inline-start" />
+                {i18nService.t('codingAgentChanges')}
+              </>
+            ),
+            badge:
+              changes.length > 0 ? (
+                <Badge variant="secondary">{changes.length}</Badge>
+              ) : undefined,
+            disabled: changes.length === 0,
+          },
+          {
+            value: CodingInspectorTab.Terminal,
+            label: (
+              <>
+                <TerminalIcon data-icon="inline-start" />
+                {i18nService.t('codingAgentTerminal')}
+              </>
+            ),
+            badge:
+              terminals.length > 0 ? (
+                <Badge variant="secondary">{terminals.length}</Badge>
+              ) : undefined,
+            disabled: terminals.length === 0,
+          },
+        ]}
+      />
       <TabsContent value={CodingInspectorTab.Changes} className="min-h-0">
         <ScrollArea className="h-full px-4 pb-4">
           <div className="flex flex-col gap-2">
