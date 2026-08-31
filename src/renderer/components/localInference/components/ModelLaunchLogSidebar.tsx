@@ -2,8 +2,8 @@ import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import { LocalInferenceLogViewer } from './LocalInferenceLogViewer';
 import { cn } from '@shared/lib/utils';
-import { Download, X } from 'lucide-react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, TransitionEvent as ReactTransitionEvent } from 'react';
+import { Download, Maximize2, Minimize2, X } from 'lucide-react';
+import type { PointerEvent as ReactPointerEvent, TransitionEvent as ReactTransitionEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
 
 import type { LlamaCppModelLaunchLogEvent } from '../../../../shared/llamacpp';
@@ -11,7 +11,6 @@ import {
   LlamaCppModelLaunchLogLevel,
   LlamaCppModelLaunchLogPhase,
 } from '../../../../shared/llamacpp';
-import fullscreenIconUrl from '../../../assets/localInference/model-launch-log-fullscreen.svg';
 import { i18nService } from '../../../services/i18n';
 import { LOCAL_INFERENCE_MODEL_LAUNCH_LOG_TRANSITION_MS } from '../constants';
 import type { ModelLaunchLogPanelState } from '../hooks/useModelLaunchLogs';
@@ -55,6 +54,8 @@ export function ModelLaunchLogSidebar({
   const sidebarRef = useRef<HTMLElement | null>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState(() => getMaxSidebarWidth());
+  const resizeFrameRef = useRef(0);
+  const pendingResizeWidthRef = useRef(0);
 
   useEffect(() => {
     const container = sidebarRef.current?.parentElement;
@@ -174,6 +175,7 @@ export function ModelLaunchLogSidebar({
     event.preventDefault();
     const startX = event.clientX;
     const startWidth = sidebarWidth;
+    pendingResizeWidthRef.current = startWidth;
     const originalCursor = document.body.style.cursor;
     const originalUserSelect = document.body.style.userSelect;
 
@@ -182,11 +184,24 @@ export function ModelLaunchLogSidebar({
     document.body.style.userSelect = 'none';
 
     const handlePointerMove = (moveEvent: PointerEvent) => {
-      const nextWidth = startWidth + startX - moveEvent.clientX;
-      setSidebarWidth(clampSidebarWidth(nextWidth, getMaxSidebarWidth(containerWidth)));
+      // Coalesce pointermove bursts into one state update per animation frame.
+      pendingResizeWidthRef.current = clampSidebarWidth(
+        startWidth + startX - moveEvent.clientX,
+        getMaxSidebarWidth(containerWidth),
+      );
+      if (resizeFrameRef.current) return;
+      resizeFrameRef.current = window.requestAnimationFrame(() => {
+        resizeFrameRef.current = 0;
+        setSidebarWidth(pendingResizeWidthRef.current);
+      });
     };
 
     const handlePointerEnd = () => {
+      if (resizeFrameRef.current) {
+        window.cancelAnimationFrame(resizeFrameRef.current);
+        resizeFrameRef.current = 0;
+      }
+      setSidebarWidth(pendingResizeWidthRef.current);
       setIsResizing(false);
       document.body.style.cursor = originalCursor;
       document.body.style.userSelect = originalUserSelect;
@@ -361,7 +376,7 @@ function ModelLaunchLogSidebarToolbar({
           )}
           onClick={onToggleFullscreen}
         >
-          <FullscreenButtonIcon />
+          {isFullscreen ? <Minimize2 /> : <Maximize2 />}
         </Button>
         <Button
           type="button"
@@ -375,28 +390,6 @@ function ModelLaunchLogSidebarToolbar({
         </Button>
       </div>
     </header>
-  );
-}
-function FullscreenButtonIcon() {
-  const maskStyle: CSSProperties = {
-    WebkitMaskImage: `url("${fullscreenIconUrl}")`,
-    WebkitMaskPosition: 'center',
-    WebkitMaskRepeat: 'no-repeat',
-    WebkitMaskSize: 'contain',
-    backgroundColor: 'currentColor',
-    maskImage: `url("${fullscreenIconUrl}")`,
-    maskPosition: 'center',
-    maskRepeat: 'no-repeat',
-    maskSize: 'contain',
-  };
-
-  return (
-    <span
-      aria-hidden="true"
-      data-icon="inline-start"
-      className="inline-block size-4 shrink-0 bg-current"
-      style={maskStyle}
-    />
   );
 }
 function clampSidebarWidth(width: number, maxWidth = getMaxSidebarWidth()): number {

@@ -452,11 +452,14 @@ export function getTaskPromptText(task: ScheduledTask): string {
   return task.payload.kind === 'systemEvent' ? task.payload.text : task.payload.message;
 }
 
-export function getStatusTone(status: TaskLastStatus): string {
-  if (status === 'success') return 'text-green-500';
-  if (status === 'error') return 'text-red-500';
-  if (status === 'skipped') return 'text-yellow-500';
-  if (status === 'running') return 'text-blue-500';
+/**
+ * Semantic text color for a run/task status. Single source of truth shared by
+ * the task list and the run history so both render identical status tones.
+ */
+export function getStatusTextClass(status: TaskLastStatus | string | null | undefined): string {
+  if (status === 'success') return 'text-success';
+  if (status === 'error') return 'text-destructive';
+  if (status === 'running') return 'text-primary';
   return 'text-muted-foreground';
 }
 

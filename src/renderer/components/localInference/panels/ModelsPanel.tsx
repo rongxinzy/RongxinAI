@@ -20,11 +20,12 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@shared/component
 import { Spinner } from '@shared/components/ui/spinner';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import { cn } from '@shared/lib/utils';
-import { ArrowRight, Box, Clock3, Ellipsis, Settings2, Trash2 } from 'lucide-react';
+import { ArrowRight, Box, Clock3, Ellipsis, ScrollText, Settings2, Trash2 } from 'lucide-react';
 import {
   type ComponentType,
-  type CSSProperties,
   type DragEvent,
+  memo,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -38,7 +39,6 @@ import type {
   LlamaCppRunningModel,
 } from '../../../../shared/llamacpp';
 import { ProviderName } from '../../../../shared/providers';
-import logIconUrl from '../../../assets/localInference/log.svg';
 import { i18nService } from '../../../services/i18n';
 import { BreathingDot } from '../components/BreathingDot';
 import {
@@ -90,12 +90,19 @@ const MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG = 1;
 const MODEL_CARD_MIN_WIDTH = 280;
 const MODEL_GRID_COLUMN_GAP = 12;
 const MODEL_GRID_TWO_COLUMN_MIN_WIDTH = MODEL_CARD_MIN_WIDTH * 2 + MODEL_GRID_COLUMN_GAP;
-const modelCardActionClassName = 'relative z-20';
 type ModelCardTag = {
   label: string;
 };
 
 const modelCardTagBaseClassName = 'h-6 rounded-md px-2 py-0 text-xs font-normal shadow-none';
+
+function preventModelCardDragOver(event: DragEvent<HTMLDivElement>) {
+  event.preventDefault();
+}
+
+function noopOpenLaunchLog() {
+  // Launch log panel is optional; some hosts do not provide one.
+}
 
 type ModelsPanelProps = {
   loading: boolean;
@@ -129,17 +136,20 @@ type ModelCardProps = {
   loadingModel: boolean;
   cancellingModelLoad: boolean;
   unloading: boolean;
-  onLoadModel: () => void;
-  onCancelModelLoad: () => void;
-  onConfigureContext: () => void;
-  onUnload: () => void;
-  onDelete: () => void;
+  onLoadModel: (model: LlamaCppModel) => void;
+  onCancelModelLoad: (modelName: string) => void;
+  onConfigureContext: (model: LlamaCppModel) => void;
+  onUnload: (modelName: string) => void;
+  onDelete: (model: LlamaCppModel) => void;
   dragging: boolean;
-  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>, modelName: string) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
-  onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  onDrop: (event: DragEvent<HTMLDivElement>, modelName: string) => void;
   onDragEnd: () => void;
-  renderLoadButton?: (props: { disabled: boolean; onClick: () => void }) => React.ReactNode;
+  renderLoadButton?: (
+    model: LlamaCppModel,
+    props: { disabled: boolean; onClick: () => void },
+  ) => React.ReactNode;
   onOpenLaunchLog: (modelName: string) => void;
 };
 
@@ -203,11 +213,10 @@ export function ModelsPanel({
     : MODEL_PAGE_SIZE_WITHOUT_LOG;
   const totalModelPages = Math.max(1, Math.ceil(modelCards.length / modelsPerPage));
   const currentModelPage = Math.min(modelPage, totalModelPages);
-  const modelGridClassName = logPanelLayoutVisible
-    ? logPanelGridColumns === MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG
+  const modelGridClassName =
+    logPanelLayoutVisible && logPanelGridColumns === MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG
       ? 'grid-cols-1 mx-auto w-full max-w-5xl'
-      : 'grid-cols-2 mx-auto w-full max-w-5xl'
-    : 'grid-cols-2 mx-auto w-full max-w-5xl';
+      : 'grid-cols-2 mx-auto w-full max-w-5xl';
   const visibleModelCards = modelCards.slice(
     (currentModelPage - 1) * modelsPerPage,
     currentModelPage * modelsPerPage,
@@ -289,29 +298,39 @@ export function ModelsPanel({
     onDelete(modelName);
   };
 
-  const handleCardDragStart = (event: DragEvent<HTMLDivElement>, modelName: string) => {
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', modelName);
-    setDraggedModelName(modelName);
-  };
+  const handleCardDragStart = useCallback(
+    (event: DragEvent<HTMLDivElement>, modelName: string) => {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', modelName);
+      setDraggedModelName(modelName);
+    },
+    [],
+  );
 
-  const handleCardDrop = (event: DragEvent<HTMLDivElement>, targetModelName: string) => {
-    event.preventDefault();
-    const sourceModelName = event.dataTransfer.getData('text/plain') || draggedModelName;
-    if (sourceModelName) {
-      setModelOrder(currentOrder => {
-        const currentVisibleOrder = reconcileLocalModelOrder(availableModelNames, currentOrder);
-        const nextOrder = reorderLocalModelOrder(
-          currentVisibleOrder,
-          sourceModelName,
-          targetModelName,
-        );
-        writeLocalModelOrder(nextOrder);
-        return nextOrder;
-      });
-    }
+  const handleCardDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>, targetModelName: string) => {
+      event.preventDefault();
+      const sourceModelName = event.dataTransfer.getData('text/plain') || draggedModelName;
+      if (sourceModelName) {
+        setModelOrder(currentOrder => {
+          const currentVisibleOrder = reconcileLocalModelOrder(availableModelNames, currentOrder);
+          const nextOrder = reorderLocalModelOrder(
+            currentVisibleOrder,
+            sourceModelName,
+            targetModelName,
+          );
+          writeLocalModelOrder(nextOrder);
+          return nextOrder;
+        });
+      }
+      setDraggedModelName(null);
+    },
+    [availableModelNames, draggedModelName],
+  );
+
+  const handleCardDragEnd = useCallback(() => {
     setDraggedModelName(null);
-  };
+  }, []);
 
   return (
     <div className="flex flex-col gap-6">
@@ -337,20 +356,18 @@ export function ModelsPanel({
                   loadingModel={loadingModelName === model.name}
                   cancellingModelLoad={cancellingModelLoad}
                   unloading={unloadingModelName === model.name}
-                  onLoadModel={() => onLoadModel(model)}
-                  onCancelModelLoad={() => onCancelModelLoad(model.name)}
-                  onConfigureContext={() => onConfigureContext(model)}
-                  onUnload={() => onUnload(model.name)}
-                  onDelete={() => setPendingDeleteModel(model)}
+                  onLoadModel={onLoadModel}
+                  onCancelModelLoad={onCancelModelLoad}
+                  onConfigureContext={onConfigureContext}
+                  onUnload={onUnload}
+                  onDelete={setPendingDeleteModel}
                   dragging={draggedModelName === model.name}
-                  onDragStart={event => handleCardDragStart(event, model.name)}
-                  onDragOver={event => event.preventDefault()}
-                  onDrop={event => handleCardDrop(event, model.name)}
-                  onDragEnd={() => setDraggedModelName(null)}
-                  renderLoadButton={
-                    renderLoadButton ? props => renderLoadButton(model, props) : undefined
-                  }
-                  onOpenLaunchLog={onOpenLaunchLog ?? (() => undefined)}
+                  onDragStart={handleCardDragStart}
+                  onDragOver={preventModelCardDragOver}
+                  onDrop={handleCardDrop}
+                  onDragEnd={handleCardDragEnd}
+                  renderLoadButton={renderLoadButton}
+                  onOpenLaunchLog={onOpenLaunchLog ?? noopOpenLaunchLog}
                 />
               ))}
             </div>
@@ -416,7 +433,7 @@ function getResponsiveLogPanelGridColumns(width: number): number {
     : MODEL_PAGE_GRID_COLUMNS_WITH_SINGLE_COLUMN_LOG;
 }
 
-function ModelCard({
+const ModelCard = memo(function ModelCard({
   model,
   runningModel,
   preference,
@@ -451,6 +468,7 @@ function ModelCard({
     hasDetailsTag ? MODEL_CARD_MAX_VISIBLE_TAGS - 1 : MODEL_CARD_MAX_VISIBLE_TAGS,
   );
   const modifiedDate = model.modified_at ? formatModelCardDate(model.modified_at) : null;
+  const handleLoadModel = () => onLoadModel(model);
   const handleOpenLaunchLog = () => {
     onOpenLaunchLog(model.name);
   };
@@ -463,9 +481,9 @@ function ModelCard({
       <Card
         size="sm"
         draggable={!loadingModel && !unloading}
-        onDragStart={onDragStart}
+        onDragStart={event => onDragStart(event, model.name)}
         onDragOver={onDragOver}
-        onDrop={onDrop}
+        onDrop={event => onDrop(event, model.name)}
         onDragEnd={onDragEnd}
         className={cn(
           'relative h-full w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-[background-color,border-color,box-shadow] duration-200 active:cursor-grabbing',
@@ -474,19 +492,8 @@ function ModelCard({
           dragging && 'opacity-50',
         )}
       >
-        <div className={cn('absolute inset-x-0 top-0 h-0.5 bg-transparent')} />
-        {isRunning ? (
-          <span className="absolute right-3 top-3">
-            <BreathingDot
-              color="var(--zy-success)"
-              duration={2}
-              label={i18nService.t('localInferenceStatus_running')}
-              size={8}
-            />
-          </span>
-        ) : null}
         {loadingModel || unloading ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-[color:color-mix(in_srgb,var(--zy-background)_84%,transparent)] backdrop-blur-[1px]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-background/80 backdrop-blur-[1px]">
             <Button21st
               type="button"
               isDisabled
@@ -514,14 +521,14 @@ function ModelCard({
                 variant="primary"
                 onClick={handleOpenLaunchLog}
               >
-                <LogButtonIcon />
+                <ScrollText data-icon="inline-start" />
                 {i18nService.t('localInferenceModelLaunchLogAction')}
               </Button21st>
             ) : null}
           </div>
         ) : null}
 
-        <CardHeader className="relative grid grid-cols-1 grid-rows-[auto_auto_auto] gap-y-1 p-4">
+        <CardHeader className="flex flex-col gap-2 p-4">
           <div className="flex min-w-0 items-center gap-2">
             <span
               aria-hidden="true"
@@ -529,10 +536,71 @@ function ModelCard({
             >
               <ProviderIcon className="size-5" />
             </span>
-            <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
-              {displayName}
-            </CardTitle>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
+                  {displayName}
+                </CardTitle>
+                {isRunning ? (
+                  <BreathingDot
+                    color="var(--zy-success)"
+                    duration={2}
+                    label={i18nService.t('localInferenceStatus_running')}
+                    size={8}
+                  />
+                ) : null}
+              </div>
+              {modifiedDate ? (
+                <div className="flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
+                  <Clock3 aria-hidden="true" className="size-3.5 shrink-0" />
+                  <span>{modifiedDate}</span>
+                </div>
+              ) : null}
+            </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
+              {loadingModel ? (
+                <Button21st
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  className="h-8 min-w-16 px-3"
+                  isDisabled={cancellingModelLoad}
+                  data-local-inference-cancel-load-button="true"
+                  onClick={() => onCancelModelLoad(model.name)}
+                >
+                  {i18nService.t(
+                    cancellingModelLoad
+                      ? 'localInferenceModelCancelling'
+                      : 'localInferenceCancelModelLoad',
+                  )}
+                </Button21st>
+              ) : isRunning ? (
+                <Button21st
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  className="h-8 min-w-16 px-3"
+                  isDisabled={buttonsDisabled}
+                  data-local-inference-model-action-button="true"
+                  data-local-inference-unload-button="true"
+                  onClick={() => onUnload(model.name)}
+                >
+                  {i18nService.t('close')}
+                </Button21st>
+              ) : renderLoadButton ? (
+                renderLoadButton(model, { disabled: buttonsDisabled, onClick: handleLoadModel })
+              ) : (
+                <Button21st
+                  type="button"
+                  size="sm"
+                  className="h-8 min-w-16 px-3"
+                  isDisabled={buttonsDisabled}
+                  data-local-inference-model-action-button="true"
+                  onClick={handleLoadModel}
+                >
+                  {i18nService.t('start')}
+                </Button21st>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={
@@ -551,14 +619,14 @@ function ModelCard({
                   }
                 />
                 <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onClick={onConfigureContext}>
+                  <DropdownMenuItem onClick={() => onConfigureContext(model)}>
                     <Settings2 className="size-4" />
                     {i18nService.t('localInferenceConfigureContext')}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
                     data-local-inference-delete-button="true"
-                    onClick={onDelete}
+                    onClick={() => onDelete(model)}
                   >
                     <Trash2 className="size-4" />
                     {i18nService.t('delete')}
@@ -568,16 +636,7 @@ function ModelCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {modifiedDate ? (
-              <div className="flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
-                <Clock3 aria-hidden="true" className="size-3.5 shrink-0" />
-                <span>{modifiedDate}</span>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="flex min-w-0 flex-nowrap items-center gap-1.5 whitespace-nowrap">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {hasDetailsTag ? (
               <HoverCard>
                 <HoverCardTrigger
@@ -611,85 +670,11 @@ function ModelCard({
               </Badge>
             ))}
           </div>
-
-          <div
-            className={cn(
-              modelCardActionClassName,
-              'absolute bottom-4 right-4',
-            )}
-          >
-            {loadingModel ? (
-              <Button21st
-                type="button"
-                variant="danger"
-                size="sm"
-                className="h-8 min-w-16 px-3"
-                isDisabled={cancellingModelLoad}
-              data-local-inference-cancel-load-button="true"
-              onClick={onCancelModelLoad}
-            >
-                {i18nService.t(
-                  cancellingModelLoad
-                    ? 'localInferenceModelCancelling'
-                    : 'localInferenceCancelModelLoad',
-                )}
-              </Button21st>
-            ) : isRunning ? (
-              <Button21st
-                type="button"
-                variant="danger"
-                size="sm"
-                className="h-8 min-w-16 px-3"
-                isDisabled={buttonsDisabled}
-                data-local-inference-model-action-button="true"
-                data-local-inference-unload-button="true"
-                onClick={onUnload}
-              >
-                {i18nService.t('close')}
-              </Button21st>
-            ) : renderLoadButton ? (
-              renderLoadButton({ disabled: buttonsDisabled, onClick: onLoadModel })
-            ) : (
-              <Button21st
-                type="button"
-                size="sm"
-                className="h-8 min-w-16 px-3"
-                isDisabled={buttonsDisabled}
-                data-local-inference-model-action-button="true"
-                onClick={onLoadModel}
-              >
-                {i18nService.t('start')}
-              </Button21st>
-            )}
-          </div>
         </CardHeader>
       </Card>
     </div>
   );
-}
-
-function LogButtonIcon() {
-  const maskStyle: CSSProperties = {
-    WebkitMaskImage: `url("${logIconUrl}")`,
-    WebkitMaskPosition: 'center',
-    WebkitMaskRepeat: 'no-repeat',
-    WebkitMaskSize: 'contain',
-    backgroundColor: 'currentColor',
-    maskImage: `url("${logIconUrl}")`,
-    maskPosition: 'center',
-    maskRepeat: 'no-repeat',
-    maskSize: 'contain',
-  };
-
-  return (
-    <span
-      aria-hidden="true"
-      data-icon="inline-start"
-      className="inline-block size-3.5 shrink-0 bg-current"
-      style={maskStyle}
-    />
-  );
-}
+});
 
 function MetadataRow({ label, value }: { label: string; value: string }) {
   return (

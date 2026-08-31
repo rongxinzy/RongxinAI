@@ -3,6 +3,7 @@ import { Button21st } from '@shared/components/ui/button-21st';
 import {
   Card,
   CardContent,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@shared/components/ui/card';
@@ -27,7 +28,7 @@ import {
   ThumbsUp,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 
 import type { MarketplaceModel } from '../../../../shared/marketplace';
 import { ProviderName } from '../../../../shared/providers';
@@ -80,7 +81,7 @@ const marketplaceModelIcons = {
   [ProviderName.Zhipu]: ZhipuIcon,
 } satisfies Record<LocalModelProvider, ComponentType<{ className?: string }>>;
 
-export function MarketplaceModelCard({
+export const MarketplaceModelCard = memo(function MarketplaceModelCard({
   model,
   loading,
   isDownloadActive,
@@ -130,207 +131,195 @@ export function MarketplaceModelCard({
       : i18nService.t('marketplaceRuntimePending');
 
   return (
-    <div data-marketplace-model-card="true" className="group relative z-0 h-full w-full rounded-xl transition-[box-shadow,z-index] duration-200 hover:z-20 hover:shadow-xl hover:shadow-foreground/20 focus-within:z-20">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0 rounded-xl border border-border/70 bg-card ring-1 ring-border"
-      >
-      </div>
-      <Card
-        size="sm"
-        className="relative z-10 h-full w-full gap-0 overflow-visible rounded-xl bg-transparent p-0 ring-0"
-      >
-        <div>
-          <CardHeader className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 px-5 pt-3 pb-0">
-            <span
-              aria-hidden="true"
-              className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-muted-foreground"
-            >
-              <ModelIcon className="relative size-7" />
-            </span>
+    <Card
+      size="sm"
+      data-marketplace-model-card="true"
+      className="h-full w-full gap-0 overflow-visible rounded-xl border border-border/70 bg-card p-0 shadow-sm ring-0 transition-shadow duration-200 hover:shadow-md"
+    >
+      <CardHeader className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-4 gap-y-2 px-5 pt-3 pb-0">
+        <span
+          aria-hidden="true"
+          className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-muted-foreground"
+        >
+          <ModelIcon className="relative size-7" />
+        </span>
 
-            <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2">
-                <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
-                  {model.detailUrl ? (
-                    <a
-                      href={model.detailUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="cursor-pointer hover:underline"
-                      onClick={event => {
-                        event.preventDefault();
-                        void openExternalUrl(model.detailUrl!);
-                      }}
-                    >
-                      {displayName}
-                    </a>
-                  ) : (
-                    displayName
-                  )}
-                </CardTitle>
-                {model.metadataStatus === 'verified' ? (
-                  <BadgeCheck className="size-5 shrink-0 text-success" aria-hidden="true" />
-                ) : null}
-              </div>
-              <div className="inline-flex items-center gap-1 text-sm font-semibold text-warning">
-                <Star className="size-3.5 fill-current" aria-hidden="true" />
-                <span>{formatMarketplaceScore(model.score?.stars, model.score?.confidence)}</span>
-              </div>
-            </div>
-
-            <div className="flex min-w-0 flex-col items-end gap-2 text-right">
-              {publisher ? (
-                <div className={cn('max-w-40 truncate text-sm leading-5', localInferenceMutedTextClass)}>
-                  {i18nService.t('marketplacePublisherLabel')}
-                  {publisher}
-                </div>
-              ) : null}
-              <MarketplaceFitStatusBadge status={model.fit?.status} />
-            </div>
-          </CardHeader>
-
-          <CardContent className="flex flex-col gap-3 px-5 pb-3">
-            <div className="-mt-2 flex min-w-0 flex-wrap items-center gap-2">
-              <HoverCard>
-                <HoverCardTrigger
-                  delay={200}
-                  closeDelay={100}
-                  render={
-                    <Badge
-                      variant="secondary"
-                      className={cn(marketplaceCardTagBaseClassName, 'shrink-0 cursor-default')}
-                    >
-                      {i18nService.t('marketplaceDetails')}
-                    </Badge>
-                  }
-                />
-                <HoverCardContent
-                  side="top"
-                  align="start"
-                  className="w-96 rounded-lg border border-border bg-popover p-4 text-sm text-popover-foreground shadow-2xl"
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
+              {model.detailUrl ? (
+                <a
+                  href={model.detailUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="cursor-pointer hover:underline"
+                  onClick={event => {
+                    event.preventDefault();
+                    void openExternalUrl(model.detailUrl!);
+                  }}
                 >
-                  <div className="flex flex-col gap-3">
-                    <div className="border-b border-border-subtle pb-2 text-sm font-semibold text-foreground">
-                      {i18nService.t('marketplaceDetails')}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      {details.map(item => (
-                        <MetadataRow
-                          key={item.label}
-                          label={item.label}
-                          value={item.value ?? i18nService.t('marketplaceMetadataUnavailable')}
-                        />
-                      ))}
-                      <MetadataRow label={i18nService.t('marketplaceRuntimeLabel')} value={runtimeLabel} />
-                      <MetadataRow label={i18nService.t('marketplaceScoreLabel')} value={formatMarketplaceScore(model.score?.stars, model.score?.confidence)} />
-                      <MetadataRow label={i18nService.t('marketplaceFitLabel')} value={marketplaceFitLabel(model.fit?.status)} />
-                      {scoreReasons.length ? (
-                        <div className="border-t border-border-subtle pt-3">
-                          <div className="mb-2 text-xs font-medium text-muted-foreground">
-                            {i18nService.t('marketplaceScoreReasons')}
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            {scoreReasons.map(reason => (
-                              <div key={reason} className="flex items-center gap-2 text-xs leading-5 text-muted-foreground">
-                                <Info className="size-3.5 shrink-0" aria-hidden="true" />
-                                <span className="min-w-0 break-words">{reason}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-                      {formatDownloadCount(model.downloads) ? <MetadataRow label={i18nService.t('marketplaceDownloadsLabel')} value={formatDownloadCount(model.downloads)} /> : null}
-                    </div>
-                  </div>
-                </HoverCardContent>
-              </HoverCard>
-              <Badge variant="outline" className={marketplaceCardTagBaseClassName}>
-                {MARKETPLACE_GGUF_FORMAT}
-              </Badge>
-              {capabilities.map(capability => (
-                <Badge key={capability} variant="outline" className={marketplaceCardTagBaseClassName}>
-                  {capabilityLabel(capability)}
-                </Badge>
-              ))}
-            </div>
-
-
-          </CardContent>
-
+                  {displayName}
+                </a>
+              ) : (
+                displayName
+              )}
+            </CardTitle>
+            {model.metadataStatus === 'verified' ? (
+              <BadgeCheck className="size-5 shrink-0 text-success" aria-hidden="true" />
+            ) : null}
+          </div>
+          <div className="inline-flex items-center gap-1 text-sm font-semibold text-warning">
+            <Star className="size-3.5 fill-current" aria-hidden="true" />
+            <span>{formatMarketplaceScore(model.score?.stars, model.score?.confidence)}</span>
+          </div>
         </div>
 
-          <div className="flex min-w-0 items-center gap-3 px-5 pb-3">
-            <div className="min-w-0 flex-1">
-              {variants.length > 0 ? (
-                <Select
-                  value={selectedVariant?.id ?? ''}
-                  onValueChange={value => { if (value) setSelectedVariantId(value); }}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    aria-label={i18nService.t('marketplaceSelectQuantization')}
-                    className="h-8 min-h-8 max-h-8 w-full py-0 pl-2 text-left text-sm"
-                  >
-                    <SelectValue>
-                      {selectedVariant
-                        ? `${selectedVariant.quantization ?? MARKETPLACE_GGUF_FORMAT} · ${formatBytes(selectedVariant.totalSizeBytes)}${selectedVariant.isSplit ? ` · ${selectedVariant.files.length}${i18nService.t('marketplaceVariantParts')}` : ''}`
-                        : MARKETPLACE_GGUF_FORMAT}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    side="bottom"
-                    sideOffset={4}
-                    alignItemWithTrigger={false}
-                    data-marketplace-model-select="true"
-                    className={cn(
-                      '!max-h-[140px]',
-                      variants.length > 5 ? 'overflow-y-auto' : 'overflow-hidden',
-                    )}
-                  >
-                    {variants.map(variant => (
-                      <SelectItem key={variant.id} value={variant.id}>
-                        {variant.quantization ?? MARKETPLACE_GGUF_FORMAT} · {formatBytes(variant.totalSizeBytes)}
-                        {variant.isSplit ? ` · ${variant.files.length}${i18nService.t('marketplaceVariantParts')}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : null}
+        <div className="flex min-w-0 flex-col items-end gap-2 text-right">
+          {publisher ? (
+            <div className={cn('max-w-40 truncate text-sm leading-5', localInferenceMutedTextClass)}>
+              {i18nService.t('marketplacePublisherLabel')}
+              {publisher}
             </div>
+          ) : null}
+          <MarketplaceFitStatusBadge status={model.fit?.status} />
+        </div>
+      </CardHeader>
 
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              {isDownloadActive ? (
-                <Button21st
-                  type="button"
+      <CardContent className="flex flex-col px-5 pt-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <HoverCard>
+            <HoverCardTrigger
+              delay={200}
+              closeDelay={100}
+              render={
+                <Badge
                   variant="secondary"
-                  size="sm"
-                  className="h-8 min-w-16 px-3"
-                  onClick={onOpenDownload}
+                  className={cn(marketplaceCardTagBaseClassName, 'shrink-0 cursor-default')}
                 >
-                  <Download data-icon="inline-start" />
-                  {i18nService.t('marketplaceDownloadInProgress')}
-                </Button21st>
-              ) : (
-                <Button21st
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  className="h-8 min-w-16 px-3"
-                  isDisabled={loading}
-                  onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}
-                >
-                  <Download data-icon="inline-start" />
-                  {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceVerifyAndInstall')}
-                </Button21st>
-              )}
-            </div>
-          </div>
+                  {i18nService.t('marketplaceDetails')}
+                </Badge>
+              }
+            />
+            <HoverCardContent
+              side="top"
+              align="start"
+              className="w-96 rounded-lg border border-border bg-popover p-4 text-sm text-popover-foreground shadow-2xl"
+            >
+              <div className="flex flex-col gap-3">
+                <div className="border-b border-border-subtle pb-2 text-sm font-semibold text-foreground">
+                  {i18nService.t('marketplaceDetails')}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {details.map(item => (
+                    <MetadataRow
+                      key={item.label}
+                      label={item.label}
+                      value={item.value ?? i18nService.t('marketplaceMetadataUnavailable')}
+                    />
+                  ))}
+                  <MetadataRow label={i18nService.t('marketplaceRuntimeLabel')} value={runtimeLabel} />
+                  <MetadataRow label={i18nService.t('marketplaceScoreLabel')} value={formatMarketplaceScore(model.score?.stars, model.score?.confidence)} />
+                  <MetadataRow label={i18nService.t('marketplaceFitLabel')} value={marketplaceFitLabel(model.fit?.status)} />
+                  {scoreReasons.length ? (
+                    <div className="border-t border-border-subtle pt-3">
+                      <div className="mb-2 text-xs font-medium text-muted-foreground">
+                        {i18nService.t('marketplaceScoreReasons')}
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        {scoreReasons.map(reason => (
+                          <div key={reason} className="flex items-center gap-2 text-xs leading-5 text-muted-foreground">
+                            <Info className="size-3.5 shrink-0" aria-hidden="true" />
+                            <span className="min-w-0 break-words">{reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {formatDownloadCount(model.downloads) ? <MetadataRow label={i18nService.t('marketplaceDownloadsLabel')} value={formatDownloadCount(model.downloads)} /> : null}
+                </div>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
+          <Badge variant="outline" className={marketplaceCardTagBaseClassName}>
+            {MARKETPLACE_GGUF_FORMAT}
+          </Badge>
+          {capabilities.map(capability => (
+            <Badge key={capability} variant="outline" className={marketplaceCardTagBaseClassName}>
+              {capabilityLabel(capability)}
+            </Badge>
+          ))}
+        </div>
+      </CardContent>
 
-      </Card>
-    </div>
+      <CardFooter className="mt-auto flex min-w-0 items-center gap-3 border-0 bg-transparent px-5 pb-3 pt-3">
+        <div className="min-w-0 flex-1">
+          {variants.length > 0 ? (
+            <Select
+              value={selectedVariant?.id ?? ''}
+              onValueChange={value => { if (value) setSelectedVariantId(value); }}
+            >
+              <SelectTrigger
+                size="sm"
+                aria-label={i18nService.t('marketplaceSelectQuantization')}
+                className="h-8 min-h-8 max-h-8 w-full py-0 pl-2 text-left text-sm"
+              >
+                <SelectValue>
+                  {selectedVariant
+                    ? `${selectedVariant.quantization ?? MARKETPLACE_GGUF_FORMAT} · ${formatBytes(selectedVariant.totalSizeBytes)}${selectedVariant.isSplit ? ` · ${selectedVariant.files.length}${i18nService.t('marketplaceVariantParts')}` : ''}`
+                    : MARKETPLACE_GGUF_FORMAT}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                side="bottom"
+                sideOffset={4}
+                alignItemWithTrigger={false}
+                data-marketplace-model-select="true"
+                className={cn(
+                  '!max-h-[140px]',
+                  variants.length > 5 ? 'overflow-y-auto' : 'overflow-hidden',
+                )}
+              >
+                {variants.map(variant => (
+                  <SelectItem key={variant.id} value={variant.id}>
+                    {variant.quantization ?? MARKETPLACE_GGUF_FORMAT} · {formatBytes(variant.totalSizeBytes)}
+                    {variant.isSplit ? ` · ${variant.files.length}${i18nService.t('marketplaceVariantParts')}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+        </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {isDownloadActive ? (
+            <Button21st
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-8 min-w-16 px-3"
+              onClick={onOpenDownload}
+            >
+              <Download data-icon="inline-start" />
+              {i18nService.t('marketplaceDownloadInProgress')}
+            </Button21st>
+          ) : (
+            <Button21st
+              type="button"
+              variant="primary"
+              size="sm"
+              className="h-8 min-w-16 px-3"
+              isDisabled={loading}
+              onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}
+            >
+              <Download data-icon="inline-start" />
+              {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceVerifyAndInstall')}
+            </Button21st>
+          )}
+        </div>
+      </CardFooter>
+    </Card>
   );
-}
+});
 
 type MarketplaceFitStatus = NonNullable<MarketplaceModel['fit']>['status'];
 
@@ -338,7 +327,7 @@ function MarketplaceFitStatusBadge({ status }: { status?: MarketplaceFitStatus }
   const normalizedStatus = status ?? 'unknown';
   const statusPresentation = {
     excellent: { icon: CheckCircle2, className: 'border-success/35 bg-success/10 text-success' },
-    good: { icon: ThumbsUp, className: 'border-blue-500/35 bg-blue-500/10 text-blue-600 dark:text-blue-400' },
+    good: { icon: ThumbsUp, className: 'border-primary/35 bg-primary/10 text-primary' },
     limited: { icon: Gauge, className: 'border-warning/35 bg-warning/10 text-warning' },
     unsupported: { icon: Ban, className: 'border-destructive/35 bg-destructive/10 text-destructive' },
     unknown: { icon: CircleHelp, className: 'border-muted-foreground/30 bg-muted/40 text-muted-foreground' },
