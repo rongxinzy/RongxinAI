@@ -20,6 +20,8 @@ interface CodingConversationTurnProps {
   turn: CodingConversationTurnModel;
   /** Artifacts detected in this lane, keyed by the assistant message id. */
   artifactsByMessageId?: ReadonlyMap<string, Artifact[]>;
+  /** File artifacts keyed by the tool call that produced them. */
+  artifactsByToolCallId?: ReadonlyMap<string, Artifact[]>;
 }
 
 const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
@@ -52,6 +54,7 @@ const CodingConversationTurnComponent = ({
   isStreaming,
   turn,
   artifactsByMessageId,
+  artifactsByToolCallId,
 }: CodingConversationTurnProps) => (
   <section
     className="flex flex-col gap-3"
@@ -81,9 +84,19 @@ const CodingConversationTurnComponent = ({
         </Reasoning>
       )}
 
-      {turn.activities.map(activity => (
-        <CodingActivity key={activity.id} activity={activity} />
-      ))}
+      {turn.activities.map(activity => {
+        const toolCallId =
+          typeof activity.event.payload.toolCallId === 'string'
+            ? activity.event.payload.toolCallId
+            : null;
+        return (
+          <CodingActivity
+            key={activity.id}
+            activity={activity}
+            artifacts={toolCallId ? artifactsByToolCallId?.get(toolCallId) : undefined}
+          />
+        );
+      })}
 
       {turn.assistantMessages.map(message => {
         const artifacts = artifactsByMessageId?.get(message.id) ?? [];
