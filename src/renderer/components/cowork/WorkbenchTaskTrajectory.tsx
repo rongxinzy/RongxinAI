@@ -297,24 +297,28 @@ export function WorkbenchTaskTrajectory({
 
 function WorkbenchTaskTrajectorySkeleton() {
   return (
-    <div className="flex h-full w-full flex-col gap-4 overflow-y-auto p-4">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-5 w-40" />
-          <Skeleton className="h-4 w-64" />
-        </div>
-        <Skeleton className="h-8 w-24" />
-      </div>
-      <div className="rounded-lg border border-border bg-muted p-4">
-        <Skeleton className="h-20 w-full" />
-      </div>
-      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2">
-        {[0, 1, 2, 3].map(index => (
-          <div key={index} className="rounded-lg border border-border p-3">
-            <Skeleton className="mb-3 h-5 w-24" />
-            <Skeleton className="h-48 w-full" />
+    <div className="h-full w-full overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-3xl flex-col px-6">
+        <div className="flex flex-col gap-3 pt-8 pb-6">
+          <div className="flex items-center justify-between gap-3">
+            <Skeleton className="h-5 w-20" />
+            <Skeleton className="h-8 w-24" />
           </div>
-        ))}
+          <Skeleton className="h-7 w-3/4" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="relative flex flex-col gap-6">
+          <span aria-hidden="true" className="absolute inset-y-0 left-3.5 w-px bg-border" />
+          {[0, 1, 2, 3, 4].map(index => (
+            <div key={index} className="relative pl-10">
+              <Skeleton className="absolute top-0 left-0 size-7 rounded-full" />
+              <div className="flex flex-col gap-2 pt-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
