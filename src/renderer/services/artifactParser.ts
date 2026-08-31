@@ -182,13 +182,13 @@ function generateTitle(type: ArtifactType, language: string, content: string): s
   }
 }
 
-const WRITE_TOOL_NAMES = new Set(['write', 'writefile', 'write_file']);
+export const WRITE_TOOL_NAMES = new Set(['write', 'writefile', 'write_file']);
 
-function normalizeToolName(name: string): string {
+export function normalizeToolName(name: string): string {
   return name.toLowerCase().replace(/[_\s]/g, '');
 }
 
-function extractFilePath(toolInput: Record<string, unknown>): string | null {
+export function extractFilePath(toolInput: Record<string, unknown>): string | null {
   for (const key of ['file_path', 'path', 'filePath', 'target_file', 'targetFile']) {
     const val = toolInput[key];
     if (typeof val === 'string' && val.length > 0) {
@@ -198,13 +198,13 @@ function extractFilePath(toolInput: Record<string, unknown>): string | null {
   return null;
 }
 
-function getFileExtension(filePath: string): string {
+export function getFileExtension(filePath: string): string {
   const lastDot = filePath.lastIndexOf('.');
   if (lastDot === -1) return '';
   return filePath.slice(lastDot).toLowerCase();
 }
 
-function getFileName(filePath: string): string {
+export function getFileName(filePath: string): string {
   const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
   return lastSlash === -1 ? filePath : filePath.slice(lastSlash + 1);
 }
