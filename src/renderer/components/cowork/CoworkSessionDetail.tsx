@@ -208,7 +208,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onCancelTaskResume,
 }) => {
   const dispatch = useDispatch();
-  const isMac = window.electron.platform === 'darwin';
   const currentSession = useSelector(selectCurrentSession);
   const isStreaming = useSelector(selectIsStreaming);
   const toolActivities = useSelector(selectCurrentToolActivities);
@@ -1116,7 +1115,6 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       sessionId={sessionId}
       isSessionSwitching={isSessionSwitching}
       isSidebarCollapsed={isSidebarCollapsed}
-      isMac={isMac}
       isArtifactPanelOpen={isPanelOpen}
       onToggleSidebar={onToggleSidebar}
       onNewChat={onNewChat}

@@ -26,7 +26,8 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@shared/compone
 import { Input } from '@shared/components/ui/input';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
+import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { Textarea } from '@shared/components/ui/textarea';
 import { Bot, ChevronDown, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
@@ -149,14 +150,21 @@ export const CodingAgentManager = ({
           onValueChange={value => setActiveTab(value as CodingAgentManagerTabValue)}
           className="min-h-0 flex-1 gap-0"
         >
-          <TabsList variant="line" className="mx-6 mt-2 h-10 shrink-0">
-            <TabsTrigger value={CodingAgentManagerTab.Local}>
-              {i18nService.t('codingAgentLocalAgents')} ({profiles.length})
-            </TabsTrigger>
-            <TabsTrigger value={CodingAgentManagerTab.Custom}>
-              {i18nService.t('codingAgentCustomAgent')}
-            </TabsTrigger>
-          </TabsList>
+          <PageTabs
+            bare
+            value={activeTab}
+            className="mx-6 mt-2 shrink-0"
+            items={[
+              {
+                value: CodingAgentManagerTab.Local,
+                label: `${i18nService.t('codingAgentLocalAgents')} (${profiles.length})`,
+              },
+              {
+                value: CodingAgentManagerTab.Custom,
+                label: i18nService.t('codingAgentCustomAgent'),
+              },
+            ]}
+          />
 
           <TabsContent value={CodingAgentManagerTab.Local} className="min-h-0">
             <ScrollArea className="h-full">

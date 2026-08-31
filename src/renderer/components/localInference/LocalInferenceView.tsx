@@ -15,7 +15,6 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { PanelLeftOpen } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -37,17 +36,16 @@ import { notifyLlamaCppRunningModelsChanged } from '../../services/availableMode
 import { i18nService } from '../../services/i18n';
 import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
 import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import {
   GalleryThumbnailsIcon,
 } from '../icons/GalleryThumbnailsIcon';
 import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
 import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
-import WindowTitleBar from '../window/WindowTitleBar';
+import PageHeader from '../PageHeader';
+import { PageTabs } from '@shared/components/ui/page-tabs';
 import { LocalInferenceToastView } from './components/Common';
 import { LocalInferenceAccessSettingsDialog } from './components/LocalInferenceAccessSettingsDialog';
 import { LocalInferenceMemorySettingsDialog } from './components/LocalInferenceMemorySettingsDialog';
-import { LocalInferenceTabSelector } from './components/LocalInferenceTabSelector';
 import { ModelContextSettingsModal } from './components/ModelContextSettingsModal';
 import { MarketplaceDownloadSidebar } from './components/MarketplaceDownloadSidebar';
 import { ModelLibrarySettingsModal } from './components/ModelLibrarySettingsModal';
@@ -175,7 +173,6 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     },
     [],
   );
-  const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<LocalInferenceTab>(
     restoredSession?.activeTab ?? 'models',
   );
@@ -1071,42 +1068,26 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         onValueChange={handleTabChange}
         className="flex h-full min-h-0 flex-1 flex-col gap-0"
       >
-        <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
-          <div className="flex items-center space-x-3 h-8">
-            {isSidebarCollapsed && (
-              <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={onToggleSidebar}
-                  aria-label={i18nService.t('expand')}
-                  title={i18nService.t('expand')}
-                  className="text-foreground/70 hover:text-foreground"
-                >
-                  <PanelLeftOpen />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={onNewChat}
-                  aria-label={i18nService.t('newChat')}
-                  title={i18nService.t('newChat')}
-                  className="text-foreground/70 hover:text-foreground"
-                >
-                  <SidebarAnimatedMessageCirclePlusIcon />
-                </Button>
-                {updateBadge}
-              </div>
-            )}
-            <h1 className="text-lg font-semibold text-foreground">
-              {i18nService.t('localInferenceTitle')}
-            </h1>
-          </div>
-          <WindowTitleBar inline />
-        </div>
-        <LocalInferenceTabSelector activeTab={activeTab} isVisible={isVisible} />
+        <PageHeader
+          title={i18nService.t('localInferenceTitle')}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={onToggleSidebar}
+          onNewChat={onNewChat}
+          updateBadge={updateBadge}
+          tabs={
+            <PageTabs
+              bare
+              value={activeTab}
+              items={[
+                { value: 'models' as const, label: i18nService.t('localInferenceTabModels') },
+                {
+                  value: 'marketplace' as const,
+                  label: i18nService.t('localInferenceTabMarketplace'),
+                },
+              ]}
+            />
+          }
+        />
         {toast && (
           <div className="pointer-events-none absolute right-4 top-16 z-30 flex w-[min(24rem,calc(100%-2rem))] justify-end">
             <LocalInferenceToastView toast={toast} onClose={dismissToast} />
