@@ -14,7 +14,12 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { DeliveryMode, IpcChannel, PayloadKind } from '../../../scheduledTask/constants';
+import {
+  DeliveryMode,
+  IpcChannel,
+  PayloadKind,
+  SessionTarget,
+} from '../../../scheduledTask/constants';
 import { getCcConnectScopedConversationId } from '../../im/ccConnectConversationId';
 import { t } from '../../i18n';
 import { registerScheduledTaskHandlers } from './handlers';
@@ -105,6 +110,31 @@ test('create restores and validates scoped conversation ownership', async () => 
       },
     ),
   ).resolves.toMatchObject({ success: false, error: t('scheduledTaskDeliveryAccountMismatch') });
+});
+
+test('create preserves the selected execution binding when announce delivery is configured', async () => {
+  const addJob = vi.fn(async input => ({ id: 'task-1', ...input }));
+  registerScheduledTaskHandlers({
+    getCronJobService: () => ({ addJob }) as unknown as ScheduledTaskService,
+    getIMGatewayManager: () => null,
+  });
+
+  await electronMocks.handlers.get(IpcChannel.Create)?.(
+    {},
+    {
+      sessionTarget: SessionTarget.Task,
+      payload: { kind: PayloadKind.AgentTurn, message: 'Run' },
+      delivery: {
+        mode: DeliveryMode.Announce,
+        channel: 'dingtalk-connector',
+        to: 'group-1',
+      },
+    },
+  );
+
+  expect(addJob).toHaveBeenCalledWith(
+    expect.objectContaining({ sessionTarget: SessionTarget.Task }),
+  );
 });
 
 test('partial update does not inject a missing delivery field', async () => {

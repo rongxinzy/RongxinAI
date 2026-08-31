@@ -4,7 +4,6 @@ import {
   DeliveryMode as STDeliveryMode,
   IpcChannel as ScheduledTaskIpc,
   PayloadKind as STPayloadKind,
-  SessionTarget as STSessionTarget,
 } from '../../../scheduledTask/constants';
 import type { ScheduledTaskService } from '../../../scheduledTask/scheduledTaskService';
 import { PlatformRegistry } from '../../../shared/platform';
@@ -41,8 +40,9 @@ export interface ScheduledTaskHandlerDeps {
 
 /**
  * Normalizes an announce-mode delivery payload for local channel delivery.
- * Mutates `normalizedInput` in place: sets sessionTarget, converts SystemEvent
- * payloads to AgentTurn, and restores native pi-connect conversation IDs.
+ * Mutates `normalizedInput` in place: converts SystemEvent payloads to AgentTurn
+ * and restores native pi-connect conversation IDs. Execution binding stays
+ * independent from the delivery route.
  */
 async function applyAnnounceDeliveryNormalization(
   normalizedInput: Record<string, any>,
@@ -54,7 +54,6 @@ async function applyAnnounceDeliveryNormalization(
   const platform = PlatformRegistry.platformOfChannel(delivery.channel);
   if (!platform) return;
 
-  normalizedInput.sessionTarget = STSessionTarget.Isolated;
   if (normalizedInput.payload?.kind === STPayloadKind.SystemEvent) {
     normalizedInput.payload = {
       kind: STPayloadKind.AgentTurn,

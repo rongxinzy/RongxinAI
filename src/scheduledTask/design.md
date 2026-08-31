@@ -23,7 +23,17 @@ flowchart LR
 | `SqliteScheduledTaskStore` | Task、Run、去重 claim、崩溃恢复 | 时钟、Agent 执行 |
 | `CcConnectSchedulerRuntime` | SQLite 与 trigger 投影的协调 | 持久化任务、解释 payload |
 | `cc-connect` sidecar | `at` / `every` / `cron` 到点 trigger | shell/exec、Agent、任务状态、投递内容 |
-| `PiScheduledTaskExecutor` | 创建/恢复 Pi 会话并执行 | 触发判定、任务持久化 |
+| `PiScheduledTaskExecutor` | 创建/恢复 Pi 会话并执行 | 触发判定、任务持久化 |  
+
+## 会话绑定策略
+
+任务执行支持三种绑定方式：
+
+1. `per-run`：每次触发创建新的 `Scheduled` 会话，适合互相独立的报告和提醒。
+2. `task`：按任务 ID 创建一个稳定的专属会话，后续 Run 继续该会话；同一任务的执行在执行器内串行化。
+3. `existing`：通过 `Main + zhiyuan:<sessionId>` 绑定已有 UI/IM 会话，运行结果追加到该会话。
+
+三种方式都保留独立的 canonical Run 记录；会话是否复用不影响 Run 级审计、状态和投递记录。
 
 ## Trigger 契约
 

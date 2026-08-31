@@ -160,6 +160,109 @@ test('reuses the workspace session referenced by a managed session key', async (
   );
 });
 
+test('reuses one stable dedicated session for every run of a task-bound task', async () => {
+  const startSession = vi.fn(async (id: string) => {
+    runtimeActive = true;
+    queueMicrotask(() => runtime.emit('complete', id, null));
+  });
+  let runtimeActive = false;
+  const runtime = Object.assign(new EventEmitter(), {
+    isSessionActive: () => runtimeActive,
+    startSession,
+    continueSession: vi.fn(async (id: string) => {
+      queueMicrotask(() => runtime.emit('complete', id, null));
+    }),
+    stopSession: () => undefined,
+  });
+  const { session, store } = createCoworkStore();
+  const taskBoundTask = { ...task, sessionTarget: SessionTarget.Task };
+  let dedicatedExists = false;
+  store.createSession.mockImplementation((...args) => {
+    dedicatedExists = true;
+    return { ...session, id: args[8] ?? `scheduled-task:${task.id}` };
+  });
+  store.getSession = (id: string) =>
+    id === `scheduled-task:${task.id}` && dedicatedExists
+      ? {
+          ...session,
+          id,
+          messages: [{ id: 'answer', type: 'assistant', content: 'done', timestamp: 1 }],
+        }
+      : null;
+
+  await new PiScheduledTaskExecutor(runtime as never, store as never).execute(taskBoundTask, run);
+  expect(store.createSession).toHaveBeenCalledWith(
+    'Scheduled: task',
+    session.cwd,
+    'Default prompt',
+    'local',
+    [],
+    'main',
+    '',
+    'work',
+    `scheduled-task:${task.id}`,
+    task.workspaceId,
+    [],
+    CoworkSessionSource.Scheduled,
+  );
+  expect(startSession).toHaveBeenCalledWith(`scheduled-task:${task.id}`, 'run', expect.anything());
+
+  await new PiScheduledTaskExecutor(runtime as never, store as never).execute(taskBoundTask, run);
+  expect(store.createSession).toHaveBeenCalledTimes(1);
+  expect(runtime.continueSession).toHaveBeenCalledWith(
+    `scheduled-task:${task.id}`,
+    'run',
+    expect.anything(),
+  );
+});
+
+test('serializes overlapping runs for a task-bound session', async () => {
+  let runtimeActive = false;
+  let dedicatedExists = false;
+  let releaseFirst: (() => void) | null = null;
+  const startSession = vi.fn(async (id: string) => {
+    runtimeActive = true;
+    await new Promise<void>(resolve => {
+      releaseFirst = resolve;
+    });
+    queueMicrotask(() => runtime.emit('complete', id, null));
+  });
+  const runtime = Object.assign(new EventEmitter(), {
+    isSessionActive: () => runtimeActive,
+    startSession,
+    continueSession: vi.fn(async (id: string) => {
+      queueMicrotask(() => runtime.emit('complete', id, null));
+    }),
+    stopSession: () => undefined,
+  });
+  const { session, store } = createCoworkStore();
+  const taskBoundTask = { ...task, sessionTarget: SessionTarget.Task };
+  store.createSession.mockImplementation((...args) => {
+    dedicatedExists = true;
+    return { ...session, id: args[8] ?? `scheduled-task:${task.id}` };
+  });
+  store.getSession = (id: string) =>
+    id === `scheduled-task:${task.id}` && dedicatedExists ? { ...session, id, messages: [] } : null;
+
+  const executor = new PiScheduledTaskExecutor(runtime as never, store as never);
+  const first = executor.execute(taskBoundTask, run);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const second = executor.execute(taskBoundTask, { ...run, id: 'run-2' });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  expect(startSession).toHaveBeenCalledTimes(1);
+  expect(runtime.continueSession).not.toHaveBeenCalled();
+
+  releaseFirst?.();
+  await first;
+  await second;
+  expect(runtime.continueSession).toHaveBeenCalledWith(
+    `scheduled-task:${task.id}`,
+    'run',
+    expect.anything(),
+  );
+});
+
 test('rejects immediately and removes listeners when Pi stops before completion', async () => {
   const runtime = Object.assign(new EventEmitter(), {
     isSessionActive: () => false,
