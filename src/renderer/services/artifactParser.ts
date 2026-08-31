@@ -39,6 +39,11 @@ const LANGUAGE_TO_ARTIFACT_TYPE: Record<string, ArtifactType> = {
   text: 'text',
   txt: 'text',
   plaintext: 'text',
+  model: 'model',
+  stl: 'model',
+  obj: 'model',
+  step: 'model',
+  iges: 'model',
 };
 
 const IMAGE_EXTENSIONS = new Set(['.png', '.bmp', '.ico', '.jpg', '.jpeg', '.gif', '.webp']);
@@ -177,6 +182,8 @@ function generateTitle(type: ArtifactType, language: string, content: string): s
       return 'Document';
     case 'unsupported':
       return 'Unsupported File';
+    case 'model':
+      return '3D Model';
     case 'code':
       return `${language.charAt(0).toUpperCase() + language.slice(1)} Code`;
   }

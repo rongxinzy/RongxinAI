@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  ARTIFACT_PANEL_CHAT_RESERVE,
   clampArtifactPanelWidth,
-  isArtifactPanelAtMaximum,
   resolveArtifactPanelKeyboardWidth,
+  resolveArtifactPanelMaxWidth,
   resolveArtifactPanelPointerWidth,
 } from './artifactPanelResize';
 
@@ -24,7 +25,14 @@ describe('artifact panel resize', () => {
 
   test('uses the live container maximum instead of a fixed pixel ceiling', () => {
     expect(clampArtifactPanelWidth(1536, 180, 1720)).toBe(1536);
-    expect(isArtifactPanelAtMaximum(1719.75, 1720)).toBe(true);
-    expect(isArtifactPanelAtMaximum(1719, 1720)).toBe(false);
+  });
+
+  test('caps the drag maximum so the conversation column keeps its space', () => {
+    const contentWidth = 2031;
+    expect(resolveArtifactPanelMaxWidth(contentWidth, 180)).toBe(
+      contentWidth - ARTIFACT_PANEL_CHAT_RESERVE,
+    );
+    // Never below the panel minimum, whatever the row width is.
+    expect(resolveArtifactPanelMaxWidth(320, 180)).toBe(180);
   });
 });
