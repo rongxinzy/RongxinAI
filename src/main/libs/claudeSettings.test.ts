@@ -450,6 +450,41 @@ test('resolveRawApiConfigForModelRef resolves an explicit llama.cpp model ref', 
   });
 });
 
+test('resolveRawApiConfigForModelRef accepts the runtime provider ID for Zhipu', () => {
+  setStoreGetter(
+    () =>
+      ({
+        get: (key: string) =>
+          key === 'app_config'
+            ? {
+                model: {
+                  defaultModel: 'glm-5.2',
+                  defaultModelProvider: ProviderName.Zhipu,
+                },
+                providers: {
+                  [ProviderName.Zhipu]: {
+                    enabled: true,
+                    apiKey: 'sk-zhipu',
+                    baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+                    apiFormat: 'anthropic' as const,
+                    models: [{ id: 'glm-5.2', name: 'GLM 5.2' }],
+                  },
+                },
+              }
+            : undefined,
+      }) as never,
+  );
+
+  const result = resolveRawApiConfigForModelRef('zai/glm-5.2');
+  expect(result.config).toEqual({
+    apiKey: 'sk-zhipu',
+    baseURL: 'https://open.bigmodel.cn/api/anthropic',
+    model: 'glm-5.2',
+    apiType: 'anthropic',
+  });
+  expect(result.providerMetadata?.providerName).toBe(ProviderName.Zhipu);
+});
+
 test('resolveRawApiConfigForModelRef resolves explicit llama.cpp model when provider is disabled', () => {
   const runningModel = buildLlamaCppRunningModelBinding({
     name: 'qwen-explicit-disabled',

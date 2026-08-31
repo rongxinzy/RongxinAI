@@ -27,3 +27,11 @@ test('creates at most one canonical message for a synchronous continue failure',
   );
   expect(continueSource).not.toContain("i18nService.t('coworkErrorSessionContinueFailed')");
 });
+
+test('does not reload a stale database snapshot after continue is accepted', () => {
+  const continueStart = source.indexOf('async continueSession(options: CoworkContinueOptions)');
+  const continueEnd = source.indexOf('async stopSession(sessionId: string)');
+  const continueSource = source.slice(continueStart, continueEnd);
+
+  expect(continueSource).not.toContain('this.loadSession(options.sessionId)');
+});
