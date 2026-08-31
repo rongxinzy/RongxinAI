@@ -102,7 +102,31 @@ describe('collectCodingFileArtifacts', () => {
     const artifacts = collectCodingFileArtifacts(events, 'lane-1');
     expect(artifacts).toHaveLength(1);
     expect(artifacts[0].version).toBe(events[1].id);
-    expect(artifacts[0].needsFileLoad).toBe(true);
+    // The inline diff content survives the later content-less broker write.
+    expect(artifacts[0].artifact.content).toBe('<html>v1</html>');
+    expect(artifacts[0].needsFileLoad).toBe(false);
+  });
+
+  test('merges a relative tool input with the absolute broker write', () => {
+    const events = [
+      event(CodingEventKind.ToolCall, {
+        toolCallId: 'call-1',
+        title: 'Writing tmp/hello.html',
+        kind: 'edit',
+        status: 'completed',
+        rawInput: { path: 'tmp/hello.html', content: '<!DOCTYPE html>' },
+      }),
+      event(CodingEventKind.FileChange, {
+        action: 'write',
+        path: 'C:\\work\\tmp\\hello.html',
+      }),
+    ];
+    const artifacts = collectCodingFileArtifacts(events, 'lane-1', 'C:/work');
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].artifact.filePath).toBe('C:\\work\\tmp\\hello.html');
+    expect(artifacts[0].artifact.content).toBe('<!DOCTYPE html>');
+    expect(artifacts[0].toolCallId).toBe('call-1');
+    expect(artifacts[0].version).toBe(events[1].id);
   });
 });
 

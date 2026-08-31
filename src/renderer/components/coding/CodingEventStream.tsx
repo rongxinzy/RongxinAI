@@ -116,6 +116,13 @@ export const CodingEventStream = ({
   // Artifact detection runs on the settled transcript only — scanning on every
   // streamed chunk would redo the whole parse per token.
   const detectableMessages = useMemo(() => toDetectableMessages(turns), [turns]);
+  const fileArtifacts = useMemo(
+    () =>
+      artifactSessionKey
+        ? collectCodingFileArtifacts(events, artifactSessionKey, artifactBaseDir)
+        : [],
+    [events, artifactSessionKey, artifactBaseDir],
+  );
   useEffect(() => {
     if (!artifactSessionKey || isStreaming) return;
     for (const { artifact } of detectArtifactsFromMessages(
@@ -124,10 +131,7 @@ export const CodingEventStream = ({
     )) {
       dispatch(addArtifact({ sessionId: artifactSessionKey, artifact }));
     }
-    for (const { artifact, needsFileLoad, version } of collectCodingFileArtifacts(
-      events,
-      artifactSessionKey,
-    )) {
+    for (const { artifact, needsFileLoad, version } of fileArtifacts) {
       dispatch(addArtifact({ sessionId: artifactSessionKey, artifact }));
       if (!needsFileLoad) continue;
       const loadKey = `${artifactSessionKey}:${artifact.id}`;
@@ -137,7 +141,21 @@ export const CodingEventStream = ({
         if (loaded) dispatch(addArtifact({ sessionId: artifactSessionKey, artifact: loaded }));
       });
     }
-  }, [artifactSessionKey, artifactBaseDir, isStreaming, detectableMessages, events, dispatch]);
+  }, [artifactSessionKey, artifactBaseDir, isStreaming, detectableMessages, fileArtifacts, dispatch]);
+
+  // Anchor preview cards to the tool call that wrote the file. Store artifacts
+  // win over collector output because they may carry disk-loaded content.
+  const artifactsByToolCallId = useMemo(() => {
+    const grouped = new Map<string, Artifact[]>();
+    const storedById = new Map((artifacts ?? []).map(artifact => [artifact.id, artifact]));
+    for (const { artifact, toolCallId } of fileArtifacts) {
+      if (!toolCallId) continue;
+      const list = grouped.get(toolCallId) ?? [];
+      list.push(storedById.get(artifact.id) ?? artifact);
+      grouped.set(toolCallId, list);
+    }
+    return grouped;
+  }, [fileArtifacts, artifacts]);
 
   const artifactsByMessageId = useMemo(
     () => groupArtifactsByMessage(artifacts ?? []),
@@ -181,6 +199,7 @@ export const CodingEventStream = ({
                 turn={turn}
                 isStreaming={isStreaming && index === turns.length - 1}
                 artifactsByMessageId={artifactsByMessageId}
+                artifactsByToolCallId={artifactsByToolCallId}
               />
             ))
           )}

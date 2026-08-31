@@ -20,6 +20,8 @@ import {
 import { memo, type ReactNode } from 'react';
 
 import { i18nService } from '../../services/i18n';
+import type { Artifact } from '../../types/artifact';
+import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
 import { CodingDiffView } from './CodingDiffView';
 import { getCodingEventText, type CodingConversationActivity } from './codingEventProjection';
 import {
@@ -231,33 +233,49 @@ const activityTitle = (activity: CodingConversationActivity): string => {
   return view.title ?? toolKindLabel(view.kind) ?? i18nService.t('codingAgentTool');
 };
 
-const CodingActivityComponent = ({ activity }: { activity: CodingConversationActivity }) => {
+const CodingActivityComponent = ({
+  activity,
+  artifacts,
+}: {
+  activity: CodingConversationActivity;
+  /** File artifacts produced by this tool call, shown as preview cards. */
+  artifacts?: Artifact[];
+}) => {
   const state = activityState(activity);
   const isPlan = activity.kind === CodingConversationActivityKind.Plan;
   const isTool = activity.kind === CodingConversationActivityKind.Tool;
   return (
-    <Tool defaultOpen={activity.kind === CodingConversationActivityKind.Permission}>
-      <ToolHeader
-        type="dynamic-tool"
-        toolName="coding-agent"
-        state={state}
-        statusLabel={activityStatusLabel(state)}
-        title={activityTitle(activity)}
-        icon={isTool ? toolKindIcon(parseToolCallView(activity.event.payload).kind) : undefined}
-      />
-      <ToolContent>
-        {isPlan ? (
-          <PlanActivityBody activity={activity} />
-        ) : isTool ? (
-          <ToolActivityBody activity={activity} />
-        ) : (
-          <pre className="whitespace-pre-wrap break-words font-mono text-xs">
-            {getCodingEventText(activity.event) ||
-              JSON.stringify(activity.event.payload, null, 2)}
-          </pre>
-        )}
-      </ToolContent>
-    </Tool>
+    <div className="flex flex-col gap-2">
+      <Tool defaultOpen={activity.kind === CodingConversationActivityKind.Permission}>
+        <ToolHeader
+          type="dynamic-tool"
+          toolName="coding-agent"
+          state={state}
+          statusLabel={activityStatusLabel(state)}
+          title={activityTitle(activity)}
+          icon={isTool ? toolKindIcon(parseToolCallView(activity.event.payload).kind) : undefined}
+        />
+        <ToolContent>
+          {isPlan ? (
+            <PlanActivityBody activity={activity} />
+          ) : isTool ? (
+            <ToolActivityBody activity={activity} />
+          ) : (
+            <pre className="whitespace-pre-wrap break-words font-mono text-xs">
+              {getCodingEventText(activity.event) ||
+                JSON.stringify(activity.event.payload, null, 2)}
+            </pre>
+          )}
+        </ToolContent>
+      </Tool>
+      {artifacts && artifacts.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {artifacts.map(artifact => (
+            <ArtifactPreviewCard key={artifact.id} artifact={artifact} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
