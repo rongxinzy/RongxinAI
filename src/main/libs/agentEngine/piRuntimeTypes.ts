@@ -52,6 +52,18 @@ export interface PiRuntimeEvents {
   queueUpdated: (sessionId: string, items: CoworkPendingMessage[]) => void;
 }
 
+/** Thinking levels supported by the Pi runtime (pi-agent-core ThinkingLevel). */
+export const PiThinkingLevel = {
+  Off: 'off',
+  Minimal: 'minimal',
+  Low: 'low',
+  Medium: 'medium',
+  High: 'high',
+  XHigh: 'xhigh',
+  Max: 'max',
+} as const;
+export type PiThinkingLevel = (typeof PiThinkingLevel)[keyof typeof PiThinkingLevel];
+
 export type PiImageAttachment = {
   name: string;
   mimeType: string;
@@ -78,6 +90,8 @@ export type PiStartOptions = {
   agentId?: string;
   expertIds?: string[];
   modelOverride?: string;
+  /** Pi thinking level applied when the session is (re)created. */
+  thinkingLevel?: PiThinkingLevel;
   /** Previous conversation to restore (user/assistant pairs), injected into PI session state */
   conversationHistory?: PiConversationHistoryMessage[];
   /** Internal: override prompt text sent to PI, while UI shows original prompt */
@@ -102,6 +116,8 @@ export type PiContinueOptions = {
   expertIds?: string[];
   modelOverride?: string;
   /** Forwarded to startSession when the runtime has to recreate the session. */
+  thinkingLevel?: PiThinkingLevel;
+  /** Forwarded to startSession when the runtime has to recreate the session. */
   autoApprove?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
@@ -115,9 +131,10 @@ export type PiContinueOptions = {
   _streamingBehavior?: 'steer' | 'followUp';
 };
 
-/** Workbench session patch; Pi only supports switching the model. */
+/** Workbench session patch; Pi supports switching the model and thinking level. */
 export type PiSessionPatch = {
   model?: string | null;
+  thinkingLevel?: PiThinkingLevel | null;
 };
 
 export interface PiRuntime {

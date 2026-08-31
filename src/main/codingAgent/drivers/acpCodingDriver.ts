@@ -74,10 +74,71 @@ const ACP_SESSION_LIFECYCLE_TIMEOUT_MS = 60_000;
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
-const readText = (value: unknown): string | null => {
+// Base64 media payloads above this size are replaced with a placeholder so a
+// single screenshot cannot blow up the event stream, persistence, and the
+// markdown renderer.
+const MAX_INLINE_DATA_LENGTH = 200_000;
+
+const contentBlockToMarkdown = (block: Record<string, unknown>): string | null => {
+  switch (block.type) {
+    case 'text':
+      return typeof block.text === 'string' ? block.text : null;
+    case 'image': {
+      const uri = typeof block.uri === 'string' && block.uri ? block.uri : null;
+      if (uri) return `![${uri}](${uri})`;
+      if (typeof block.data === 'string' && typeof block.mimeType === 'string') {
+        return block.data.length <= MAX_INLINE_DATA_LENGTH
+          ? `![image](data:${block.mimeType};base64,${block.data})`
+          : `[image: ${block.mimeType}]`;
+      }
+      return null;
+    }
+    case 'audio': {
+      const uri = typeof block.uri === 'string' && block.uri ? block.uri : null;
+      const mimeType = typeof block.mimeType === 'string' ? block.mimeType : 'audio';
+      return uri ? `[audio (${mimeType})](${uri})` : `[audio: ${mimeType}]`;
+    }
+    case 'resource_link': {
+      const uri = typeof block.uri === 'string' && block.uri ? block.uri : null;
+      const label =
+        (typeof block.title === 'string' && block.title.trim()) ||
+        (typeof block.name === 'string' && block.name.trim()) ||
+        uri;
+      if (!label) return null;
+      return uri ? `[${label}](${uri})` : label;
+    }
+    case 'resource': {
+      const resource = asRecord(block.resource);
+      if (typeof resource.text === 'string') return resource.text;
+      const uri = typeof resource.uri === 'string' && resource.uri ? resource.uri : null;
+      return uri ? `[${uri}](${uri})` : null;
+    }
+    default:
+      return null;
+  }
+};
+
+/**
+ * Flattens ACP content blocks (text, image, audio, resource_link, resource)
+ * into markdown so no block type is silently dropped from the transcript.
+ * Adjacent text blocks join directly; non-text blocks are separated by a
+ * blank line so they render as distinct markdown elements.
+ */
+const readContentText = (value: unknown): string | null => {
   if (typeof value === 'string') return value;
-  const content = asRecord(value);
-  return content.type === 'text' && typeof content.text === 'string' ? content.text : null;
+  if (!Array.isArray(value)) return contentBlockToMarkdown(asRecord(value));
+  let text = '';
+  let previousWasText = true;
+  for (const item of value) {
+    const block = asRecord(item);
+    const markdown = contentBlockToMarkdown(block);
+    if (markdown === null) continue;
+    const isTextBlock = block.type === 'text';
+    if (text && (!isTextBlock || !previousWasText)) text += '\n\n';
+    text += markdown;
+    previousWasText = isTextBlock;
+  }
+  return text || null;
 };
 
 const normalizeCapabilities = (result: AcpInitializeResult): CodingAgentCapabilities => {
@@ -228,14 +289,13 @@ export class AcpCodingDriver implements CodingAgentDriver {
     workspaceRoot: string;
     localSessionId?: string;
   }): Promise<CodingAgentSession> {
-    await this.ensureConnected(input.workspaceRoot);
-    const response = await this.supervisor.request<AcpSessionResult>(
+    const response = await this.requestSessionLifecycle<AcpSessionResult>(
+      input.workspaceRoot,
       AcpMethod.SessionNew,
       {
         cwd: input.workspaceRoot,
         mcpServers: [],
       },
-      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
     );
     if (typeof response.sessionId !== 'string')
       throw new Error('ACP agent did not return a session ID.');
@@ -260,14 +320,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     if (!this.capabilities.supportsLoadSession && !this.capabilities.supportsResumeSession) {
       throw new Error('The ACP agent does not support loading sessions.');
     }
-    const response = await this.supervisor.request<AcpSessionResult>(
+    const response = await this.requestSessionLifecycle<AcpSessionResult>(
+      input.workspaceRoot,
       this.capabilities.supportsResumeSession ? AcpMethod.SessionResume : AcpMethod.SessionLoad,
       {
         sessionId: input.remoteSessionId,
         cwd: input.workspaceRoot,
         mcpServers: [],
       },
-      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
     );
     const configOptions = normalizeConfigOptions(response.configOptions);
     if (configOptions.length > 0) {
@@ -300,7 +360,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
           sessionId: input.sessionId,
           prompt: [{ type: 'text', text: input.prompt }],
         },
-        { timeoutMs: null },
+        // A hung agent must not leave the lane running forever. 5 minutes is
+        // generous for a single turn; the watchdog can be cancelled by the
+        // agent finishing normally or by the user cancelling.
+        { timeoutMs: 5 * 60 * 1000 },
       )
       .then(() => this.finishStream(input.sessionId))
       .catch(error => this.finishStream(input.sessionId, error));
@@ -399,6 +462,30 @@ export class AcpCodingDriver implements CodingAgentDriver {
     await this.supervisor.dispose();
   }
 
+  /**
+   * Session lifecycle requests race with agent crashes: the process can die
+   * between the liveness check and the request. If the connection turns out to
+   * be down, reconnect once and retry before giving up.
+   */
+  private async requestSessionLifecycle<T>(
+    workspaceRoot: string,
+    method: string,
+    params: Record<string, unknown>,
+  ): Promise<T> {
+    await this.ensureConnected(workspaceRoot);
+    try {
+      return await this.supervisor.request<T>(method, params, {
+        timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS,
+      });
+    } catch (error) {
+      if (this.supervisor.isRunning()) throw error;
+      await this.ensureConnected(workspaceRoot);
+      return await this.supervisor.request<T>(method, params, {
+        timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS,
+      });
+    }
+  }
+
   private async ensureConnected(workspaceRoot: string): Promise<void> {
     this.workspaceRoot = workspaceRoot;
     this.workspaceBroker = new WorkspaceBroker(workspaceRoot);
@@ -420,10 +507,14 @@ export class AcpCodingDriver implements CodingAgentDriver {
     this.authMethods.clear();
     this.capabilities = DEFAULT_CAPABILITIES;
     this.supportsSessionClose = false;
-    const response = await this.supervisor.request<AcpInitializeResult>(AcpMethod.Initialize, {
-      protocolVersion: ACP_PROTOCOL_VERSION,
-      clientCapabilities: ACP_CLIENT_CAPABILITIES,
-    });
+    const response = await this.supervisor.request<AcpInitializeResult>(
+      AcpMethod.Initialize,
+      {
+        protocolVersion: ACP_PROTOCOL_VERSION,
+        clientCapabilities: ACP_CLIENT_CAPABILITIES,
+      },
+      { timeoutMs: ACP_SESSION_LIFECYCLE_TIMEOUT_MS },
+    );
     if (response.protocolVersion !== ACP_PROTOCOL_VERSION) {
       throw new AcpProtocolIncompatibleError(response.protocolVersion);
     }
@@ -655,7 +746,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
       kind === AcpSessionUpdateKind.AgentMessageChunk ||
       kind === AcpSessionUpdateKind.UserMessageChunk
     ) {
-      const text = readText(update.content);
+      const text = readContentText(update.content);
       return text === null
         ? []
         : [
@@ -677,7 +768,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
           ];
     }
     if (kind === AcpSessionUpdateKind.AgentThoughtChunk) {
-      const text = readText(update.content);
+      const text = readContentText(update.content);
       return text === null ? [] : [{ kind: CodingEventKind.Reasoning, payload: { content: text } }];
     }
     if (

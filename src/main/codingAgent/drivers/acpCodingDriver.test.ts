@@ -367,3 +367,61 @@ test('brokers ACP filesystem and terminal requests inside the lane workspace', a
     await rm(workspaceRoot, { recursive: true, force: true });
   }
 });
+
+test('flattens ACP content blocks into markdown instead of dropping them', async () => {
+  const script = [
+    "let buffer='';",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n');",
+    "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n');",
+    "if (request.method === 'session/prompt') {",
+    "const blocks = [",
+    "{ type: 'text', text: 'First part.' },",
+    "{ type: 'text', text: ' second part.' },",
+    "{ type: 'resource_link', name: 'spec.md', title: 'Spec', uri: 'file:///workspace/spec.md' },",
+    "{ type: 'image', uri: 'file:///workspace/shot.png', data: 'a'.repeat(300000), mimeType: 'image/png' },",
+    "{ type: 'resource', resource: { uri: 'file:///workspace/notes.txt', text: 'embedded notes' } },",
+    "];",
+    "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: 'agent_message_chunk', content: blocks } } }) + '\\n');",
+    "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'image', data: 'YWJj', mimeType: 'image/png' } } } }) + '\\n');",
+    "process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n'); }",
+    '} });',
+  ].join('');
+  const driver = new AcpCodingDriver({
+    executable: execPath,
+    args: ['-e', script],
+    environment: process.env as Record<string, string>,
+  });
+
+  const session = await driver.createSession({ workspaceRoot: process.cwd() });
+  const events = [];
+  for await (const event of driver.prompt({
+    sessionId: session.id,
+    workspaceRoot: process.cwd(),
+    prompt: 'Show mixed content.',
+  }))
+    events.push(event);
+
+  expect(events).toEqual([
+    {
+      kind: CodingEventKind.MessageDelta,
+      payload: {
+        content:
+          'First part. second part.\n\n[Spec](file:///workspace/spec.md)\n\n![file:///workspace/shot.png](file:///workspace/shot.png)\n\nembedded notes',
+        messageId: expect.any(String),
+        role: 'assistant',
+        streamUpdateMode: CodingStreamUpdateMode.Append,
+      },
+    },
+    {
+      kind: CodingEventKind.MessageDelta,
+      payload: {
+        content: '![image](data:image/png;base64,YWJj)',
+        messageId: expect.any(String),
+        role: 'assistant',
+        streamUpdateMode: CodingStreamUpdateMode.Append,
+      },
+    },
+  ]);
+  await driver.dispose();
+});

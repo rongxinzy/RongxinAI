@@ -23,7 +23,7 @@ const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
   supportsPermissions: true,
   supportsFilesystem: true,
   supportsTerminal: true,
-  supportsConfigOptions: false,
+  supportsConfigOptions: true,
   supportsUsage: true,
   supportsElicitation: true,
 };
@@ -164,8 +164,12 @@ export class CodingAgentRegistry extends EventEmitter {
       !profile ||
       profile.isBuiltin ||
       !profile.command ||
+      // NeedsAuth is probeable too: a successful probe means the agent is
+      // reachable again, and if it still needs login the next session
+      // creation will mark it NeedsAuth once more.
       (profile.status !== CodingAgentProfileStatus.Detected &&
-        profile.status !== CodingAgentProfileStatus.Unavailable)
+        profile.status !== CodingAgentProfileStatus.Unavailable &&
+        profile.status !== CodingAgentProfileStatus.NeedsAuth)
     ) {
       throw new Error('The coding agent profile cannot be probed.');
     }

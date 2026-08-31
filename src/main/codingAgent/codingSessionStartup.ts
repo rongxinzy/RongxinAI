@@ -4,6 +4,7 @@ import path from 'path';
 import { buildSessionTitleFromInput } from '../../common/sessionTitle';
 import {
   CodingAgentDriverKind,
+  CodingAgentProfileId,
   CodingAgentProfileStatus,
   CodingWorkflowStage,
   type CodingAgentLane,
@@ -13,6 +14,7 @@ import {
   type StartCodingSessionInput,
 } from '../../shared/codingAgent';
 import { t } from '../i18n';
+import { resolveCurrentApiConfig } from '../libs/claudeSettings';
 import { CodingAgentRegistry } from './codingAgentRegistry';
 import { CodingRoomRepository } from './codingRoomRepository';
 import type { CodingAgentDriver, CodingAgentSession } from './drivers/codingAgentDriver';
@@ -43,6 +45,14 @@ export const resolveSessionTarget = (
   const profile = registry.get(input.profileId);
   if (!profile) throw new Error('Coding agent profile was not found.');
   if (profile.status !== CodingAgentProfileStatus.Ready) {
+    if (profile.id === CodingAgentProfileId.Builtin) {
+      const { error } = resolveCurrentApiConfig();
+      throw new Error(
+        error
+          ? `The selected coding agent is not ready to run: ${error}`
+          : 'The selected coding agent is not ready to run.',
+      );
+    }
     throw new Error('The selected coding agent is not ready to run.');
   }
   const sourceRoot = path.resolve(input.sourceRoot);
@@ -137,8 +147,31 @@ export const prepareCodingSession = async (input: {
       workspaceRoot: target.sourceRoot,
       localSessionId,
     });
+    const overrides = input.request.configOptionOverrides;
+    if (overrides) {
+      for (const [configId, value] of Object.entries(overrides)) {
+        try {
+          driverSession = {
+            ...driverSession,
+            configOptions: await driver.setConfigOption(driverSession.id, configId, value),
+          };
+        } catch (error) {
+          console.warn('[CodingSession] Ignoring invalid config option override:', error);
+        }
+      }
+    }
   } catch (error) {
     await disposeUnboundDriver(driver, null);
+    // When the agent rejects session creation because authentication is
+    // required (e.g. Kimi Code CLI "Authentication required"), surface that
+    // state immediately instead of leaving the profile stuck at Ready.
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      target.profile.driverKind === CodingAgentDriverKind.Acp &&
+      /auth_required|authentication(?:\s+is)?\s+required|login required/i.test(message)
+    ) {
+      input.registry.markNeedsAuth(target.profile.id);
+    }
     throw error;
   } finally {
     removeTitleListener();

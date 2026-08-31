@@ -1,9 +1,11 @@
 import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 
 const ACP_REQUEST_TIMEOUT_MS = 5_000;
-const MAX_STDOUT_LINE_BYTES = 1_048_576;
+const MAX_STDOUT_LINE_BYTES = 10 * 1024 * 1024; // 10 MB — session load replays can exceed 1 MB
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_DELAY_MS = 250;
+/** Grace window for a killed agent process to exit before dispose() returns. */
+const DISPOSE_EXIT_TIMEOUT_MS = 2_000;
 
 type ProcessTreeChild = Pick<ChildProcessWithoutNullStreams, 'pid' | 'kill'>;
 
@@ -116,10 +118,21 @@ export class AcpConnectionSupervisor {
       clearTimeout(this.restartTimer);
       this.restartTimer = null;
     }
-    if (this.child && this.child.exitCode !== null) {
-      const exitedChild = this.child;
+    if (this.child && this.child.exitCode === null && this.child.signalCode === null) {
+      // A just-exited child's 'exit' event may still be queued; give the event
+      // loop a turn before deciding the process is alive.
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    if (
+      this.child &&
+      (this.child.exitCode !== null ||
+        this.child.signalCode !== null ||
+        this.child.killed ||
+        !this.child.stdin.writable)
+    ) {
+      const staleChild = this.child;
       this.child = null;
-      await terminateProcessTree(exitedChild);
+      await terminateProcessTree(staleChild);
     }
     if (this.child) return;
     this.restartAttempts = 0;
@@ -208,6 +221,16 @@ export class AcpConnectionSupervisor {
     this.failAll(new Error('ACP agent connection was disposed.'));
     if (!child) return;
     await terminateProcessTree(child);
+    if (child.exitCode !== null || child.signalCode !== null) return;
+    // Wait for the process to actually exit: on Windows the agent keeps its
+    // cwd (the workspace root) locked until it is gone.
+    await new Promise<void>(resolve => {
+      const timer = setTimeout(resolve, DISPOSE_EXIT_TIMEOUT_MS);
+      child.once('exit', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
   }
 
   private consumeStdout(chunk: string): void {

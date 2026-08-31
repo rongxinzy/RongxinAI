@@ -608,6 +608,10 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.UpdateWorkspace, input),
     deleteWorkspace: (workspaceId: string) =>
       ipcRenderer.invoke(CodingAgentIpc.DeleteWorkspace, workspaceId),
+    deleteSession: (input: { workspaceRoot: string; laneId: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.DeleteSession, input),
+    getProfileConfigOptions: (profileId: string) =>
+      ipcRenderer.invoke(CodingAgentIpc.GetProfileConfigOptions, profileId),
     createSession: (input: import('../shared/codingAgent').CreateCodingSessionInput) =>
       ipcRenderer.invoke(CodingAgentIpc.CreateSession, input),
     startSession: (input: import('../shared/codingAgent').StartCodingSessionInput) =>
@@ -651,6 +655,11 @@ contextBridge.exposeInMainWorld('electron', {
       workspaceRoot: string;
       option: import('../shared/codingAgent').CodingLaneConfigOptionInput;
     }) => ipcRenderer.invoke(CodingAgentIpc.SetLaneConfigOption, input),
+    setLaneModelOverride: (input: {
+      workspaceRoot: string;
+      laneId: string;
+      modelOverride: string | null;
+    }) => ipcRenderer.invoke(CodingAgentIpc.SetLaneModelOverride, input),
     previewLaneChanges: (input: { workspaceRoot: string; laneId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.PreviewLaneChanges, input),
     applyLaneChanges: (input: { workspaceRoot: string; laneId: string }) =>

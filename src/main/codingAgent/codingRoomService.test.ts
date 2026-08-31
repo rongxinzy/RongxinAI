@@ -20,6 +20,8 @@ import { CodingRoomRepository } from './codingRoomRepository';
 import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
 import { AcpSessionUpdateKind } from './acp/protocol';
+import { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
+import { BuiltinCodingConfigId } from './drivers/builtinCodingDriver';
 import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
 
 let db: Database.Database | undefined;
@@ -29,7 +31,8 @@ afterEach(() => {
   db?.close();
   db = undefined;
   for (const directory of tempDirectories.splice(0)) {
-    rmSync(directory, { recursive: true, force: true });
+    // Windows: a spawned fake-agent process can still hold the temp dir at teardown.
+    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
   }
 });
 
@@ -209,6 +212,7 @@ test('routes a builtin lane through its driver and projects runtime completion',
     sessionId: lane.localSessionId,
     workspaceRoot,
     prompt: 'Investigate the failure.',
+    thinkingLevel: PiThinkingLevel.Medium,
   });
   service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.TurnComplete, {});
 
@@ -586,6 +590,7 @@ test('creates collaborator lanes in isolated workspaces and runs them independen
     sessionId: lane.localSessionId,
     workspaceRoot: lane.executionRoot,
     prompt: 'Review the implementation.',
+    thinkingLevel: PiThinkingLevel.Medium,
   });
 });
 
@@ -755,4 +760,388 @@ test('creates deterministic isolated review and verification assignments for a c
   expect(startBuiltinSession).toHaveBeenLastCalledWith(
     expect.objectContaining({ sessionId: result.lanes[2].localSessionId }),
   );
+});
+
+test('deleteSession removes a collaborator lane but keeps the primary session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const primaryLane = snapshot.lanes[0];
+  const collaborator = repository.createLane(
+    primaryLane.missionId,
+    CodingAgentProfileId.Builtin,
+    root,
+    root,
+  );
+  repository.appendEvent(collaborator.id, CodingEventKind.Message, {
+    role: 'user',
+    content: 'collaborator note',
+  });
+  expect(service.listWorkspaces()[0].sessions).toHaveLength(2);
+
+  const workspaces = service.deleteSession(root, collaborator.id);
+
+  expect(workspaces[0].sessions.map(session => session.id)).toEqual([primaryLane.id]);
+  expect(repository.listEvents([collaborator.id])).toHaveLength(0);
+  expect(service.bootstrap(root).lanes.map(lane => lane.id)).toEqual([primaryLane.id]);
+});
+
+test('deleteSession of the primary session removes the whole mission', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const primaryLane = snapshot.lanes[0];
+  repository.createLane(primaryLane.missionId, CodingAgentProfileId.Builtin, root, root);
+  expect(service.listWorkspaces()[0].sessions).toHaveLength(2);
+
+  const workspaces = service.deleteSession(root, primaryLane.id);
+
+  expect(workspaces[0].sessions).toHaveLength(0);
+  expect(service.bootstrap(root).missions).toHaveLength(0);
+  expect(service.bootstrap(root).lanes).toHaveLength(0);
+});
+
+test('deleteSession refuses a running session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-delete-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const lane = snapshot.lanes[0];
+  repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
+
+  expect(() => service.deleteSession(root, lane.id)).toThrow(/Stop the running coding session/);
+  expect(service.listWorkspaces()[0].sessions).toHaveLength(1);
+});
+
+test('applies draft config option overrides when starting a builtin session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-overrides-'));
+  tempDirectories.push(root);
+  const startBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Fix the bug.',
+    configOptionOverrides: { [BuiltinCodingConfigId.ThinkingLevel]: PiThinkingLevel.High },
+  });
+
+  const lane = snapshot.lanes[0];
+  expect(lane.configOptions).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: BuiltinCodingConfigId.ThinkingLevel,
+        currentValue: PiThinkingLevel.High,
+      }),
+    ]),
+  );
+  await Promise.resolve();
+  expect(startBuiltinSession).toHaveBeenCalledWith(
+    expect.objectContaining({ thinkingLevel: PiThinkingLevel.High }),
+  );
+});
+
+test('ignores invalid draft config option overrides instead of failing the session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-overrides-'));
+  tempDirectories.push(root);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.startSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    prompt: 'Fix the bug.',
+    configOptionOverrides: { [BuiltinCodingConfigId.ThinkingLevel]: 'ludicrous' },
+  });
+
+  expect(snapshot.lanes[0].configOptions).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: BuiltinCodingConfigId.ThinkingLevel,
+        currentValue: PiThinkingLevel.Medium,
+      }),
+    ]),
+  );
+});
+
+test('prepareLane populates config options for legacy builtin lanes', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-prepare-'));
+  tempDirectories.push(root);
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const created = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Legacy task',
+  });
+  const lane = created.lanes[0];
+  // Simulate a lane persisted before config option support existed.
+  repository.updateLaneConfigOptions(lane.id, []);
+
+  const snapshot = await service.prepareLane(root, lane.id);
+
+  expect(snapshot.lanes[0].configOptions).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: BuiltinCodingConfigId.ThinkingLevel })]),
+  );
+});
+
+test('getProfileConfigOptions returns defaults for the builtin profile only', () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const options = service.getProfileConfigOptions(CodingAgentProfileId.Builtin);
+  expect(options).toEqual(
+    expect.arrayContaining([expect.objectContaining({ id: BuiltinCodingConfigId.ThinkingLevel })]),
+  );
+  expect(service.getProfileConfigOptions('unknown-profile')).toEqual([]);
+});
+
+test('setLaneModelOverride persists the model and patches the live builtin session', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-model-'));
+  tempDirectories.push(root);
+  const patchBuiltinSession = vi.fn(async () => undefined);
+  const service = new CodingRoomService(new CodingRoomRepository(db), new CodingAgentRegistry(), {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    patchBuiltinSession,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: CodingAgentProfileId.Builtin,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: CodingAgentProfileId.Builtin,
+    title: 'Main task',
+  });
+  const lane = snapshot.lanes[0];
+
+  const next = await service.setLaneModelOverride(root, lane.id, 'openai/gpt-5');
+
+  expect(next.lanes[0].modelOverride).toBe('openai/gpt-5');
+  expect(patchBuiltinSession).toHaveBeenCalledWith(lane.localSessionId, {
+    model: 'openai/gpt-5',
+  });
+  await expect(service.setLaneModelOverride(root, 'missing-lane', 'x')).rejects.toThrow(
+    /not found/i,
+  );
+});
+
+test('setLaneModelOverride rejects non-builtin lanes', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-model-'));
+  tempDirectories.push(root);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'External agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: ['-e', ''],
+  });
+  const repository = new CodingRoomRepository(db);
+  const service = new CodingRoomService(repository, registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  const [workspace] = service.createWorkspace({
+    name: 'Product',
+    sourceFolders: [root],
+    defaultProfileId: profile.id,
+  });
+  const snapshot = await service.createSession({
+    workspaceId: workspace.id,
+    sourceRoot: root,
+    profileId: profile.id,
+    title: 'External task',
+  });
+
+  await expect(
+    service.setLaneModelOverride(root, snapshot.lanes[0].id, 'openai/gpt-5'),
+  ).rejects.toThrow(/built-in/);
+});
+
+test('probeAgent revives a needs_auth profile when the agent responds', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-reprobe-'));
+  tempDirectories.push(root);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'Recoverable ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: [
+      '-e',
+      "process.stdin.on('data', chunk => { const line = String(chunk).split('\\n')[0]; const request = JSON.parse(line); if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); });",
+    ],
+  });
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  registry.markNeedsAuth(profile.id);
+
+  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const snapshot = await service.probeAgent(root, profile.id);
+
+  expect(snapshot.profiles.find(candidate => candidate.id === profile.id)?.status).toBe(
+    CodingAgentProfileStatus.Ready,
+  );
+  await service.dispose();
 });

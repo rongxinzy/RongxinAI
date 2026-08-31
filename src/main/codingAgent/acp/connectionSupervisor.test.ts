@@ -38,7 +38,8 @@ test('allows a later start after the agent process exits', async () => {
     cwd: process.cwd(),
     environment: process.env as Record<string, string>,
   });
-  await new Promise(resolve => setTimeout(resolve, 200));
+  // Wait until the exit has actually been observed instead of assuming 200 ms is enough.
+  await expect.poll(() => supervisor.isRunning(), { timeout: 5_000 }).toBe(false);
   const script =
     "process.stdin.on('data', chunk => { const request = JSON.parse(String(chunk)); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { restarted: true } }) + '\\n'); });";
   await supervisor.start({
