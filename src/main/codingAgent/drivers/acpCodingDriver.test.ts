@@ -308,7 +308,7 @@ test('reinitializes a crashed ACP process before creating another session', asyn
   });
 
   await driver.createSession({ workspaceRoot: process.cwd() });
-  await new Promise(resolve => setTimeout(resolve, 30));
+  await expect.poll(() => driver.getConnectionGeneration(), { timeout: 3_000 }).toBe(2);
   await expect(driver.createSession({ workspaceRoot: process.cwd() })).resolves.toMatchObject({
     id: 'remote-session',
   });

@@ -171,6 +171,9 @@ import { CodingAgentRegistry } from './codingAgent/codingAgentRegistry';
 import { CodingAgentProfileRepository } from './codingAgent/codingAgentProfileRepository';
 import { GitWorktreeService } from './codingAgent/gitWorktreeService';
 import { CodingEventKind, CodingStreamUpdateMode } from '../shared/codingAgent';
+import type { CoworkToolActivityEvent } from '../shared/cowork/toolActivity';
+import { CoworkInterruptionCause } from '../shared/cowork/interruption';
+import { normalizePiMessage, normalizePiToolActivity } from './codingAgent/piCodingEventAdapter';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
@@ -1002,11 +1005,16 @@ const getCodingRoomService = (): CodingRoomService => {
         metadata && typeof metadata === 'object' && !Array.isArray(metadata)
           ? (metadata as { isThinking?: unknown }).isThinking === true
           : false;
-      codingRoomService?.recordBuiltinEvent(
-        sessionId,
-        isThinking ? CodingEventKind.Reasoning : CodingEventKind.Message,
-        { message, ...(isThinking ? { streamUpdateMode: CodingStreamUpdateMode.Replace } : {}) },
-      );
+      if (isThinking) {
+        codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.Reasoning, {
+          message,
+          streamUpdateMode: CodingStreamUpdateMode.Replace,
+        });
+        return;
+      }
+      const normalized = normalizePiMessage(message);
+      if (normalized)
+        codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
     });
     runtime.on(
       'messageUpdate',
@@ -1028,8 +1036,10 @@ const getCodingRoomService = (): CodingRoomService => {
         );
       },
     );
-    runtime.on('toolActivity', (sessionId: string, event: unknown) => {
-      codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.ToolCall, { event });
+    runtime.on('toolActivity', (sessionId: string, event: CoworkToolActivityEvent) => {
+      const normalized = normalizePiToolActivity(event);
+      if (normalized)
+        codingRoomService?.recordBuiltinEvent(sessionId, normalized.kind, normalized.payload);
     });
     runtime.on('permissionRequest', (sessionId: string, request: unknown) => {
       const requestId =
@@ -1048,6 +1058,11 @@ const getCodingRoomService = (): CodingRoomService => {
     });
     runtime.on('error', (sessionId: string, error: unknown) => {
       codingRoomService?.recordBuiltinEvent(sessionId, CodingEventKind.TurnFailed, { error });
+    });
+    runtime.on('sessionInterrupted', interruption => {
+      if (interruption.cause !== CoworkInterruptionCause.UserStop) {
+        codingRoomService?.recordBuiltinInterruption(interruption);
+      }
     });
   }
   return codingRoomService;
