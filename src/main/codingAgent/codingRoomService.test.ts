@@ -1098,3 +1098,50 @@ test('setLaneModelOverride rejects non-builtin lanes', async () => {
     service.setLaneModelOverride(root, snapshot.lanes[0].id, 'openai/gpt-5'),
   ).rejects.toThrow(/built-in/);
 });
+
+test('probeAgent revives a needs_auth profile when the agent responds', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const root = mkdtempSync(path.join(tmpdir(), 'zhiyuan-coding-reprobe-'));
+  tempDirectories.push(root);
+  const registry = new CodingAgentRegistry();
+  registry.registerExternal({
+    name: 'Recoverable ACP agent',
+    description: 'Test',
+    driverKind: CodingAgentDriverKind.Acp,
+    status: CodingAgentProfileStatus.Ready,
+    capabilities: {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    },
+    authMethods: [],
+    command: execPath,
+    args: [
+      '-e',
+      "process.stdin.on('data', chunk => { const line = String(chunk).split('\\n')[0]; const request = JSON.parse(line); if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: {} } }) + '\\n'); });",
+    ],
+  });
+  const profile = registry.list().find(candidate => !candidate.isBuiltin)!;
+  registry.markNeedsAuth(profile.id);
+
+  const service = new CodingRoomService(new CodingRoomRepository(db), registry, {
+    startBuiltinSession: async () => undefined,
+    cancelBuiltinSession: async () => undefined,
+    getBuiltinWorkbenchLink: () => null,
+    beginExternalWorkbenchRun: () => ({ taskId: 'task', runId: 'run' }),
+    completeExternalWorkbenchRun: () => undefined,
+  });
+  const snapshot = await service.probeAgent(root, profile.id);
+
+  expect(snapshot.profiles.find(candidate => candidate.id === profile.id)?.status).toBe(
+    CodingAgentProfileStatus.Ready,
+  );
+  await service.dispose();
+});

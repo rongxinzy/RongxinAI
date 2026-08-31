@@ -396,9 +396,24 @@ const AgentRowAction = ({
       </Button>
     );
   }
-  if (profile.status === CodingAgentProfileStatus.NeedsAuth && profile.authMethods.length > 0) {
-    if (profile.authMethods.length === 1) {
-      return (
+  if (profile.status === CodingAgentProfileStatus.NeedsAuth) {
+    // A stale NeedsAuth flag can survive an agent upgrade or a completed
+    // terminal login, so always offer re-probing as a self-healing path.
+    const probeButton = profile.command ? (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={pending}
+        onClick={() => void run(() => onProbe(profile.id))}
+      >
+        {pending && <Spinner data-icon="inline-start" />}
+        {i18nService.t('codingAgentProbeAgent')}
+      </Button>
+    ) : null;
+    if (profile.authMethods.length === 0) return probeButton;
+    const authControl =
+      profile.authMethods.length === 1 ? (
         <Button
           type="button"
           size="sm"
@@ -409,28 +424,35 @@ const AgentRowAction = ({
           {pending && <Spinner data-icon="inline-start" />}
           {i18nService.t('codingAgentAuthenticate')}
         </Button>
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            nativeButton
+            render={
+              <Button type="button" size="sm" variant="outline" disabled={pending}>
+                {pending ? <Spinner data-icon="inline-start" /> : null}
+                {i18nService.t('codingAgentAuthenticate')}
+                <ChevronDown data-icon="inline-end" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            {profile.authMethods.map(method => (
+              <DropdownMenuItem
+                key={method.id}
+                onClick={() => void run(() => authenticate(method))}
+              >
+                {method.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       );
-    }
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          nativeButton
-          render={
-            <Button type="button" size="sm" variant="outline" disabled={pending}>
-              {pending ? <Spinner data-icon="inline-start" /> : null}
-              {i18nService.t('codingAgentAuthenticate')}
-              <ChevronDown data-icon="inline-end" />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end">
-          {profile.authMethods.map(method => (
-            <DropdownMenuItem key={method.id} onClick={() => void run(() => authenticate(method))}>
-              {method.name}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-1.5">
+        {probeButton}
+        {authControl}
+      </div>
     );
   }
   return null;
