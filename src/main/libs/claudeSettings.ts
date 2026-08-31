@@ -506,25 +506,38 @@ function resolveMatchedProviderForModelRef(
     return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
   }
 
-  const providerName = normalizedRef.slice(0, slashIndex);
+  const requestedProviderName = normalizedRef.slice(0, slashIndex);
   const modelId = normalizedRef.slice(slashIndex + 1).trim();
   if (!modelId) {
     return { matched: null, error: `Invalid model ref: ${normalizedRef}` };
   }
 
-  if (providerName === ProviderName.LlamaCpp) {
+  const configuredProviderName = appConfig.providers?.[requestedProviderName]
+    ? requestedProviderName
+    : (ProviderRegistry.getProviderNameByAgentProviderId(requestedProviderName) ??
+      requestedProviderName);
+
+  if (configuredProviderName === ProviderName.LlamaCpp) {
     const runningProviderConfig = buildLlamaCppRunningProviderConfig(appConfig, modelId);
     if (runningProviderConfig) {
-      return resolveMatchedProviderFromSelection(providerName, runningProviderConfig, modelId);
+      return resolveMatchedProviderFromSelection(
+        configuredProviderName,
+        runningProviderConfig,
+        modelId,
+      );
     }
   }
 
-  const storedProviderConfig = appConfig.providers?.[providerName];
-  if (!storedProviderConfig || !isProviderEnabled(providerName, storedProviderConfig)) {
-    return { matched: null, error: `Provider ${providerName} is not enabled.` };
+  const storedProviderConfig = appConfig.providers?.[configuredProviderName];
+  if (!storedProviderConfig || !isProviderEnabled(configuredProviderName, storedProviderConfig)) {
+    return { matched: null, error: `Provider ${requestedProviderName} is not enabled.` };
   }
 
-  return resolveMatchedProviderFromSelection(providerName, storedProviderConfig, modelId);
+  return resolveMatchedProviderFromSelection(
+    configuredProviderName,
+    storedProviderConfig,
+    modelId,
+  );
 }
 
 function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigResolution {

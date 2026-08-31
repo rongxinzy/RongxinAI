@@ -472,7 +472,6 @@ class CoworkService {
       workspaceService.promoteWorkspace(result.session.workspaceId);
     }
     await workspaceService.refreshWorkspaces();
-    void this.loadSession(options.sessionId);
     return true;
   }
 
