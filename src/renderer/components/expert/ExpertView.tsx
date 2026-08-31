@@ -1,18 +1,13 @@
-import { Button } from '@shared/components/ui/button';
-import {
-  LayeredTabsContent,
-  LayeredTabsList,
-  LayeredTabsSeparatorEdge,
-} from '@shared/components/ui/layered-tabs';
+import { LayeredTabsContent } from '@shared/components/ui/layered-tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Tabs } from '@shared/components/ui/tabs';
-import { PanelLeftOpen, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import McpManager from '../mcp/McpManager';
+import PageHeader from '../PageHeader';
 import SkillsManager from '../skills/SkillsManager';
-import WindowTitleBar from '../window/WindowTitleBar';
 import PresetExpertList from './PresetExpertList';
 
 interface ExpertViewProps {
@@ -51,7 +46,6 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   onUseMcp,
   initialTab,
 }) => {
-  const isMac = window.electron.platform === 'darwin';
   const [activeTab, setActiveTab] = useState<ExpertTab>(initialTab ?? EXPERT_TAB.Experts);
   const [tabDirection, setTabDirection] = useState(1);
   const expertTabs = [
@@ -71,36 +65,18 @@ const ExpertView: React.FC<ExpertViewProps> = ({
 
   return (
     <div className="flex-1 flex flex-col bg-background h-full">
-      {/* Header */}
-      <div className="draggable flex h-12 shrink-0 items-center justify-between px-4">
-        <div className="flex h-8 items-center gap-3">
-          {isSidebarCollapsed && (
-            <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeftOpen className="h-4 w-4" />
-              </Button>
-              <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
-                <SidebarAnimatedMessageCirclePlusIcon />
-              </Button>
-              {updateBadge}
-            </div>
-          )}
-          <h1 className="text-lg font-semibold text-foreground">{i18nService.t('expert')}</h1>
-        </div>
-        <WindowTitleBar inline />
-      </div>
-
-      {/* Tabs */}
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
         className="min-h-0 flex-1 flex-col gap-0"
       >
-        <LayeredTabsList
-          value={activeTab}
-          items={expertTabs}
-          separatorEdge={LayeredTabsSeparatorEdge.Top}
-          className="pb-4"
+        <PageHeader
+          title={i18nService.t('expert')}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={onToggleSidebar}
+          onNewChat={onNewChat}
+          updateBadge={updateBadge}
+          tabs={<PageTabs bare value={activeTab} items={expertTabs} />}
         />
 
         <LayeredTabsContent
@@ -115,14 +91,9 @@ const ExpertView: React.FC<ExpertViewProps> = ({
               <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
                 <Users className="size-6 text-primary" aria-hidden="true" />
               </div>
-              <div className="min-w-0">
-                <h2 className="text-xxl font-semibold text-foreground">
-                  {i18nService.t('expert')}
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {i18nService.t('expertsDescription')}
-                </p>
-              </div>
+              <p className="min-w-0 text-sm text-muted-foreground">
+                {i18nService.t('expertsDescription')}
+              </p>
             </header>
             <PresetExpertList onChatWithExpert={onChatWithExpert} />
           </div>

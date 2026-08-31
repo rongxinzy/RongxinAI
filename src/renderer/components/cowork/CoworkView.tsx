@@ -1,6 +1,4 @@
-import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { PanelLeftOpen } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
@@ -24,7 +22,6 @@ import {
   resolveChatSkillShortcutPermissionMode,
   resolveSkillPlaceholderKey,
 } from '../chat/constants';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
 import { DirectChatTurnState } from '../../services/directChatTurnState';
@@ -64,7 +61,7 @@ import { toAgentModelRef } from '../../utils/agentModelRef';
 import { isScratchWorkspacePath } from '../../utils/path';
 import { PromptPanel, QuickActionBar } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
-import WindowTitleBar from '../window/WindowTitleBar';
+import PageHeader from '../PageHeader';
 import { useAgentSelectedModel } from './agentModelSelection';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionViewport from './CoworkSessionViewport';
@@ -190,7 +187,6 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   const contentBatcher = contentBatcherRef.current;
 
   useEffect(() => () => contentBatcher.dispose(), [contentBatcher]);
-  const isMac = window.electron.platform === 'darwin';
   const [isInitialized, setIsInitialized] = useState(false);
   // Track in-flight direct-chat operations per session so switching to another
   // chat window does not block submission on a global boolean ref.
@@ -1504,9 +1500,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   if (!isInitialized) {
     return (
       <div className="flex-1 h-full flex flex-col bg-background">
-        <div className="draggable flex h-12 items-center justify-end px-4 border-b border-border shrink-0">
-          <WindowTitleBar inline />
-        </div>
+        <PageHeader />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-muted-foreground">{i18nService.t('loading')}</div>
         </div>
@@ -1515,35 +1509,13 @@ const CoworkView: React.FC<CoworkViewProps> = ({
   }
 
   const homeHeader = (
-    <div className="draggable flex h-12 items-center justify-between px-4 border-b border-border shrink-0">
-      <div className="non-draggable h-8 flex items-center">
-        {isSidebarCollapsed && (
-          <div className={`flex items-center gap-2 ${isMac ? 'pl-[68px]' : ''}`}>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleSidebar}
-              className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
-            >
-              <PanelLeftOpen className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onNewChat}
-              className="text-muted-foreground hover:bg-surface-raised hover:text-foreground"
-            >
-              <SidebarAnimatedMessageCirclePlusIcon />
-            </Button>
-            {updateBadge}
-          </div>
-        )}
-      </div>
-      <div className="non-draggable flex items-center">
-        <SecurityStatusIndicator />
-        <WindowTitleBar inline />
-      </div>
-    </div>
+    <PageHeader
+      isSidebarCollapsed={isSidebarCollapsed}
+      onToggleSidebar={onToggleSidebar}
+      onNewChat={onNewChat}
+      updateBadge={updateBadge}
+      actions={<SecurityStatusIndicator />}
+    />
   );
 
   if (displayedSessionId) {
