@@ -4,10 +4,11 @@
 [data-theme='classic-light'] {
   color-scheme: light;
   /* ── Mapped to shadcn bridge ── */
-  --zy-primary: oklch(0.366 0.008 253);
+  --zy-primary: oklch(0.564 0.218 259.8);
   --zy-primary-foreground: oklch(0.985 0.001 106.423);
-  --zy-primary-hover: oklch(0.147 0.004 49.25);
-  --zy-primary-muted: oklch(0.97 0.001 106.424);
+  --zy-primary-hover: oklch(0.514 0.207 260.5);
+  --zy-primary-muted: oklch(0.95 0.025 258);
+  --zy-primary-strong: oklch(0.564 0.218 259.8);
   --zy-switch-track-checked: var(--zy-primary);
   --zy-switch-track-checked-hover: var(--zy-primary-hover);
   --zy-accent: oklch(0.97 0.001 106.424);
@@ -23,11 +24,11 @@
   --zy-text-secondary: oklch(0.553 0.013 58.071);
   --zy-text-muted: oklch(0.553 0.013 58.071);
   --zy-border: oklch(0.923 0.003 48.717);
-  --zy-border-subtle: oklch(0.923 0.003 48.717);
+  --zy-border-subtle: oklch(0.952 0.002 48.717);
   --zy-input-border: oklch(0.923 0.003 48.717);
   --zy-destructive: oklch(0.577 0.245 27.325);
   --zy-destructive-foreground: oklch(0.985 0.001 106.423);
-  --zy-ring: oklch(0.709 0.01 56.259);
+  --zy-ring: oklch(0.564 0.218 259.8);
   /* ── Theme-specific (no shadcn equivalent) ── */
   --zy-chat-user: oklch(0.97 0.001 106.424);
   --zy-chat-user-foreground: oklch(0.147 0.004 49.25);
@@ -68,12 +69,13 @@
 [data-theme='classic-dark'] {
   color-scheme: dark;
   /* ── Mapped to shadcn bridge ── */
-  --zy-primary: oklch(0.923 0.003 48.717);
-  --zy-primary-foreground: oklch(0.216 0.006 56.043);
-  --zy-primary-hover: oklch(1 0 0);
-  --zy-primary-muted: oklch(0.268 0.007 34.298);
-  --zy-switch-track-checked: var(--zy-gray-5);
-  --zy-switch-track-checked-hover: var(--zy-gray-6);
+  --zy-primary: oklch(0.68 0.18 259);
+  --zy-primary-foreground: oklch(0.985 0.001 106.423);
+  --zy-primary-hover: oklch(0.74 0.14 259);
+  --zy-primary-muted: oklch(0.3 0.05 259);
+  --zy-primary-strong: oklch(0.564 0.218 259.8);
+  --zy-switch-track-checked: var(--zy-primary);
+  --zy-switch-track-checked-hover: var(--zy-primary-hover);
   --zy-accent: oklch(0.268 0.007 34.298);
   --zy-accent-foreground: oklch(0.985 0.001 106.423);
   --zy-background: oklch(0.147 0.004 49.25);
@@ -91,7 +93,7 @@
   --zy-input-border: oklch(1 0 0 / 15%);
   --zy-destructive: oklch(0.704 0.191 22.216);
   --zy-destructive-foreground: oklch(0.985 0.001 106.423);
-  --zy-ring: oklch(0.553 0.013 58.071);
+  --zy-ring: oklch(0.68 0.18 259);
   /* ── Theme-specific (no shadcn equivalent) ── */
   --zy-chat-user: oklch(0.268 0.007 34.298);
   --zy-chat-user-foreground: oklch(0.985 0.001 106.423);

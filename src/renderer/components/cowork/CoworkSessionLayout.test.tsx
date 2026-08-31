@@ -85,13 +85,9 @@ test('renders the title above tabs and preserves conversation state across tab s
   expect(screen.getByRole('textbox', { name: 'conversation draft' })).toHaveValue('保留草稿');
 });
 
-test('renders every task audit module in one natural-height full-width view', () => {
-  expect(taskAuditSource).not.toContain('max-w-5xl');
-  expect(taskAuditSource).not.toContain('<Tabs');
-  expect(taskAuditSource).toContain('md:grid-cols-2');
-  expect(taskAuditSource).toContain('gap-4 p-4');
-  expect(taskAuditSource).toContain('rounded-lg border border-border');
-  expect(taskAuditSource.match(/<WorkbenchTaskAuditSection/g)).toHaveLength(4);
-  expect(taskAuditSource).toContain('max-h-80');
-  expect(taskAuditSource).not.toContain('grid-rows-2');
+test('renders the task audit as a single-column timeline view', () => {
+  expect(taskAuditSource).not.toContain('md:grid-cols-2');
+  expect(taskAuditSource).not.toContain('<WorkbenchTaskAuditSection');
+  expect(taskAuditSource).toContain('max-w-3xl');
+  expect(taskAuditSource).toContain('WorkbenchTimeline');
 });

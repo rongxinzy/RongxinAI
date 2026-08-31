@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
-import { ApiFormat, ModelCapabilityStatus, ProviderName, ProviderRegistry } from './constants';
+import {
+  AgentProviderId,
+  ApiFormat,
+  ModelCapabilityStatus,
+  ProviderName,
+  ProviderRegistry,
+} from './constants';
 
 describe('ProviderName constants', () => {
   test('contains expected provider keys', () => {
@@ -25,6 +31,16 @@ describe('ProviderRegistry', () => {
     expect(def!.id).toBe(ProviderName.OpenAI);
     expect(def!.defaultApiFormat).toBe(ApiFormat.OpenAI);
     expect(def!.region).toBe('global');
+  });
+
+  test('resolves runtime provider IDs back to configuration keys', () => {
+    expect(ProviderRegistry.getProviderNameByAgentProviderId(AgentProviderId.Zai)).toBe(
+      ProviderName.Zhipu,
+    );
+    expect(ProviderRegistry.getProviderNameByAgentProviderId(AgentProviderId.Google)).toBe(
+      ProviderName.Gemini,
+    );
+    expect(ProviderRegistry.getProviderNameByAgentProviderId('unknown')).toBeUndefined();
   });
 
   test('stores official model capacity metadata', () => {

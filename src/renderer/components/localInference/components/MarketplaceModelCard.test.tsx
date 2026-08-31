@@ -88,13 +88,12 @@ describe('MarketplaceModelCard', () => {
     const { container } = renderCard();
     const card = container.querySelector('[data-marketplace-model-card="true"]');
 
-    expect(card).toHaveClass('hover:shadow-xl');
-    expect(card).not.toHaveClass('hover:shadow-md');
+    expect(card).toHaveClass('hover:shadow-md');
   });
 
   test.each([
     ['excellent', '推荐运行', 'text-success'],
-    ['good', '适合运行', 'text-blue-600'],
+    ['good', '适合运行', 'text-primary'],
     ['limited', '性能受限', 'text-warning'],
     ['unsupported', '暂不适配', 'text-destructive'],
     ['unknown', '待检测', 'text-muted-foreground'],

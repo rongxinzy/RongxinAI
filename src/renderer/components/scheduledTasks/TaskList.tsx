@@ -19,16 +19,12 @@ import type { ScheduledTask } from '../../../scheduledTask/types';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import { formatNextRunRelative, formatScheduleLabel, getStatusLabelKey } from './utils';
-
-// ── Status to text color mapping ──
-
-const statusTextClass: Record<string, string> = {
-  success: 'text-(--zy-success)',
-  error: 'text-destructive',
-  running: 'text-primary',
-  skipped: 'text-muted-foreground',
-};
+import {
+  formatNextRunRelative,
+  formatScheduleLabel,
+  getStatusLabelKey,
+  getStatusTextClass,
+} from './utils';
 
 // ── TaskListItem ──
 
@@ -64,14 +60,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
           {nextRunLabel && <span className="text-xs text-muted-foreground/60">{nextRunLabel}</span>}
         </div>
 
-        <Badge
-          className={
-            displayStatus
-              ? statusTextClass[displayStatus] || 'text-muted-foreground'
-              : 'text-muted-foreground'
-          }
-          variant="outline"
-        >
+        <Badge className={getStatusTextClass(displayStatus)} variant="outline">
           {statusLabel}
         </Badge>
 

@@ -5,8 +5,21 @@ import { createElement } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import {
+  WorkbenchApprovalDecision,
+  WorkbenchApprovalEffectStatus,
+  WorkbenchApprovalRiskLevel,
+  WorkbenchArtifactKind,
+  WorkbenchArtifactProvenance,
+  WorkbenchArtifactVerificationStatus,
   WorkbenchContractKind,
+  WorkbenchRunEventType,
+  WorkbenchRunStatus,
+  WorkbenchRunTrigger,
   WorkbenchTaskStatus,
+  type WorkbenchApproval,
+  type WorkbenchArtifact,
+  type WorkbenchRun,
+  type WorkbenchRunEvent,
   type WorkbenchTask,
   type WorkbenchTaskDetail,
 } from '../../../../shared/workbenchTask';
@@ -32,6 +45,72 @@ const createTask = (
   createdAt,
   updatedAt: createdAt,
   completedAt: status === WorkbenchTaskStatus.Completed ? createdAt : null,
+});
+
+const createRun = (
+  id: string,
+  attempt: number,
+  status: WorkbenchRun['status'],
+): WorkbenchRun => ({
+  id,
+  taskId: 'task-1',
+  attempt,
+  status,
+  trigger: WorkbenchRunTrigger.Message,
+  startedAt: Date.UTC(2026, 7, 20, 8, 0, 0),
+  endedAt: status === WorkbenchRunStatus.WaitingApproval ? null : Date.UTC(2026, 7, 20, 8, 2, 3),
+  context: null,
+  verificationResult: null,
+  failure: null,
+  createdAt: Date.UTC(2026, 7, 20, 8, 0, 0),
+  updatedAt: Date.UTC(2026, 7, 20, 8, 2, 3),
+});
+
+const createEvent = (
+  id: string,
+  runId: string,
+  type: WorkbenchRunEventType,
+  sequence: number,
+): WorkbenchRunEvent => ({
+  id,
+  runId,
+  sequence,
+  type,
+  payload: {},
+  createdAt: Date.UTC(2026, 7, 20, 8, 0, sequence),
+});
+
+const createPendingApproval = (id: string, runId: string): WorkbenchApproval => ({
+  id,
+  taskId: 'task-1',
+  runId,
+  toolCallId: `call-${id}`,
+  toolName: 'write',
+  riskLevel: WorkbenchApprovalRiskLevel.Reversible,
+  decision: WorkbenchApprovalDecision.Pending,
+  decisionSource: null,
+  effectStatus: WorkbenchApprovalEffectStatus.NotStarted,
+  idempotencyKey: `key-${id}`,
+  request: { path: 'output/report.txt' },
+  result: null,
+  createdAt: Date.UTC(2026, 7, 20, 8, 1, 0),
+  updatedAt: Date.UTC(2026, 7, 20, 8, 1, 0),
+  decidedAt: null,
+});
+
+const createArtifact = (id: string, runId: string, reference: string): WorkbenchArtifact => ({
+  id,
+  taskId: 'task-1',
+  runId,
+  kind: WorkbenchArtifactKind.File,
+  mimeType: 'text/plain',
+  reference,
+  contentHash: `hash-${id}`,
+  provenance: WorkbenchArtifactProvenance.Workspace,
+  verificationStatus: WorkbenchArtifactVerificationStatus.Verified,
+  metadata: {},
+  createdAt: Date.UTC(2026, 7, 20, 8, 1, 30),
+  updatedAt: Date.UTC(2026, 7, 20, 8, 1, 30),
 });
 
 beforeEach(() => {
@@ -77,19 +156,29 @@ test('renders the selected task summary instead of its id in the history trigger
   expect(historyTrigger).not.toHaveTextContent(currentTask.id);
 });
 
-test('stacks audit sections in independent desktop columns', () => {
-  const task = createTask(
-    'task-layout-id',
-    'Inspect the audit layout',
-    WorkbenchTaskStatus.Completed,
-    Date.UTC(2026, 7, 20, 8, 30, 0),
-  );
+test('renders runs, events, approvals, and artifacts as a single timeline', () => {
+  const task = {
+    ...createTask(
+      'task-timeline-id',
+      'Inspect the timeline layout',
+      WorkbenchTaskStatus.Running,
+      Date.UTC(2026, 7, 20, 8, 0, 0),
+    ),
+    activeRunId: 'run-2',
+  };
+  const firstRun = createRun('run-1', 1, WorkbenchRunStatus.Failed);
+  const activeRun = createRun('run-2', 2, WorkbenchRunStatus.WaitingApproval);
   const detail: WorkbenchTaskDetail = {
     task,
-    runs: [],
-    events: [],
-    artifacts: [],
-    approvals: [],
+    runs: [activeRun, firstRun],
+    events: [
+      createEvent('event-started', activeRun.id, WorkbenchRunEventType.RunStarted, 1),
+      createEvent('event-read-1', activeRun.id, WorkbenchRunEventType.ToolRead, 2),
+      createEvent('event-read-2', activeRun.id, WorkbenchRunEventType.ToolRead, 3),
+      createEvent('event-read-3', activeRun.id, WorkbenchRunEventType.ToolRead, 4),
+    ],
+    artifacts: [createArtifact('artifact-1', activeRun.id, 'output/report.txt')],
+    approvals: [createPendingApproval('approval-1', activeRun.id)],
   };
 
   render(
@@ -103,23 +192,21 @@ test('stacks audit sections in independent desktop columns', () => {
     }),
   );
 
-  const runsSection = screen.getByRole('region', {
-    name: `${i18nService.t('workbenchTaskRuns')} (0)`,
-  });
-  const eventsSection = screen.getByRole('region', {
-    name: `${i18nService.t('workbenchTaskEvents')} (0)`,
-  });
-  const artifactsSection = screen.getByRole('region', {
-    name: `${i18nService.t('workbenchTaskArtifacts')} (0)`,
-  });
-  const approvalsSection = screen.getByRole('region', {
-    name: `${i18nService.t('workbenchTaskApprovals')} (0)`,
-  });
+  // Both chapters render their attempt labels; the first stays collapsed.
+  expect(
+    screen.getByText(i18nService.t('workbenchTaskRunAttempt').replace('{attempt}', '1')),
+  ).toBeTruthy();
+  expect(
+    screen.getByText(i18nService.t('workbenchTaskRunAttempt').replace('{attempt}', '2')),
+  ).toBeTruthy();
 
-  expect(runsSection.parentElement).toBe(artifactsSection.parentElement);
-  expect(eventsSection.parentElement).toBe(approvalsSection.parentElement);
-  expect(runsSection.parentElement).not.toBe(eventsSection.parentElement);
-  expect(runsSection.parentElement).toHaveClass('flex', 'flex-col', 'gap-4');
-  expect(eventsSection.parentElement).toHaveClass('flex', 'flex-col', 'gap-4');
-  expect(runsSection.parentElement?.parentElement).toHaveClass('grid', 'md:grid-cols-2');
+  // The active run chapter is expanded: events, the read cluster, the pending
+  // approval card, and the artifact row are all visible.
+  expect(screen.getByText(i18nService.t('workbenchTaskEventRunStarted'))).toBeTruthy();
+  expect(screen.getByText('×3')).toBeTruthy();
+  expect(
+    screen.getByRole('button', { name: i18nService.t('workbenchTaskApprove') }),
+  ).toBeTruthy();
+  expect(screen.getByRole('button', { name: i18nService.t('workbenchTaskDeny') })).toBeTruthy();
+  expect(screen.getByText('output/report.txt')).toBeTruthy();
 });

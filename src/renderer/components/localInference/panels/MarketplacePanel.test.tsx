@@ -2,7 +2,6 @@
 import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { MARKETPLACE_PAGE_SIZE } from '../constants';
@@ -77,7 +76,6 @@ function renderPanel(overrides: Partial<Parameters<typeof MarketplacePanel>[0]> 
     marketplaceLoading: false,
     marketplaceError: null,
     hasNextPage: false,
-    query: '',
     installedModelPathMap: new Map(),
     hardwareSummary: undefined,
     hardwareSummaryReady: false,
@@ -124,13 +122,13 @@ describe('MarketplacePanel result grid', () => {
     const { container } = renderPanel({
       hasSearched: true,
       models: [makeModel('alpha')],
-      totalCount: 2,
+      totalCount: MARKETPLACE_PAGE_SIZE * 2,
       hasNextPage: true,
     });
     const viewport = container.querySelector('.overflow-y-auto');
-    const pagination = screen.getByText(/1\s*\/\s*1/);
+    const pagination = screen.getByText(/1\s*\/\s*2/);
 
-    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable', 'px-4');
+    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable');
     expect(viewport).not.toContainElement(pagination);
   });
 
@@ -138,7 +136,7 @@ describe('MarketplacePanel result grid', () => {
     const { container } = renderPanel({ hasSearched: true, marketplaceLoading: true });
     const viewport = container.querySelector('.overflow-y-auto');
 
-    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable', 'px-4');
+    expect(viewport).toHaveClass('overflow-x-hidden', 'scrollbar-gutter-stable');
   });
 
   test('does not render the server result count in the header', () => {
@@ -253,28 +251,8 @@ describe('MarketplacePanel search and filters', () => {
   test('submitting a query triggers a search from page 1', async () => {
     const user = userEvent.setup();
     const onSearch = vi.fn();
-    // A controlled wrapper so typing actually updates the query prop.
-    const ControlledPanel = () => {
-      const [query, setQuery] = React.useState('');
-      return (
-        <MarketplacePanel
-          loading={false}
-          models={[]}
-          hasSearched
-          marketplaceLoading={false}
-          marketplaceError={null}
-          hasNextPage={false}
-          query={query}
-          installedModelPathMap={new Map()}
-          hardwareSummaryReady={false}
-          onQueryChange={setQuery}
-          onSearch={onSearch}
-          onInstall={vi.fn()}
-          onOpenDownloadPanel={vi.fn()}
-        />
-      );
-    };
-    render(<ControlledPanel />);
+    // The panel owns the draft query state, so no controlled wrapper is needed.
+    renderPanel({ hasSearched: true, onSearch });
 
     await user.type(screen.getByPlaceholderText('搜索模型，如 qwen3、deepseek-r1...'), 'qwen3');
     await user.click(screen.getByRole('button', { name: '搜索' }));
