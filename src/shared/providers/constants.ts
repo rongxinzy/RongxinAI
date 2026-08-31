@@ -1415,6 +1415,11 @@ class ProviderRegistryImpl {
     );
   }
 
+  /** Resolve a runtime provider ID back to its application configuration key. */
+  getProviderNameByAgentProviderId(agentProviderId: string): string | undefined {
+    return this.defs.find(def => def.agentProviderId === agentProviderId)?.id;
+  }
+
   getProviderModelSupportsImage(providerName: string, modelId: string): boolean | undefined {
     const model = this.getModel(providerName, modelId);
     return model?.supportsImage;
