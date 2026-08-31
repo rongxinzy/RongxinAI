@@ -28,6 +28,7 @@
   --color-primary-foreground: var(--zy-primary-foreground);
   --color-primary-hover: var(--zy-primary-hover);
   --color-primary-muted: var(--zy-primary-muted);
+  --color-primary-strong: var(--zy-primary-strong);
   --color-primary-dark: var(--zy-primary-hover);
   --color-accent: var(--zy-accent);
   --color-accent-foreground: var(--zy-accent-foreground);
@@ -279,6 +280,49 @@
   body {
     background-color: var(--zy-background);
     color: var(--zy-foreground);
+  }
+
+  /* Cursor policy: hand for actions, I-beam for text entry, arrow elsewhere.
+     Tailwind v4 preflight no longer sets cursor:pointer on buttons, so the
+     defaults live here in the base layer; per-component utility classes
+     (cursor-default / cursor-not-allowed / ...) still override them. */
+  :is(
+      button,
+      [role='button'],
+      [role='link'],
+      [role='treeitem'],
+      [role='tab'],
+      [role='menuitem'],
+      [role='menuitemcheckbox'],
+      [role='menuitemradio'],
+      [role='option'],
+      [role='switch'],
+      [role='checkbox'],
+      [role='radio'],
+      a[href],
+      summary,
+      select,
+      input[type='checkbox'],
+      input[type='radio'],
+      input[type='range'],
+      input[type='file']
+    ):not(:disabled):not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+  :is(
+      input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not(
+          [type='submit']
+        ):not([type='file']):not([type='color']):not([type='hidden']),
+      textarea,
+      [contenteditable]:not([contenteditable='false'])
+    ):not(:disabled) {
+    cursor: text;
+  }
+  :is(button, [role='button'], input, select, textarea):is(
+      :disabled,
+      [aria-disabled='true']
+    ) {
+    cursor: not-allowed;
   }
 }
 

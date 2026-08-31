@@ -41,7 +41,7 @@
 颜色只允许通过语义 token 使用。当前存在**两层变量，值同步**：
 
 1. **shadcn 语义层** —— `src/renderer/theme/css/shadcn-token-bridge.css`
-   `:root` / `.dark`（并挂 `[data-theme]` 别名）直写 oklch。这是与标准 shadcn 语义表逐值一致的真源，含 `--sidebar-primary` 暗色蓝、`--chart-1..5`、`--radius: 0.625rem`。
+   `:root` / `.dark`（并挂 `[data-theme]` 别名）直写 oklch。这是与标准 shadcn 语义表逐值一致的真源，含 `--sidebar-primary` 品牌蓝、`--chart-1..5`、`--radius: 0.625rem`。
 2. **项目兼容层** —— `src/renderer/theme/css/themes.css` 的 `--zy-*`（oklch）
    供仍使用 `var(--zy-*)` / `bg-surface` 等的存量组件消费；`tokens/contract.ts`、`themes/classic-light.ts`、`themes/classic-dark.ts` 与之同步。
 
@@ -67,7 +67,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 次文本   | `text-secondary` / `text-muted-foreground`    | 辅助说明、时间戳、占位符、搜索无匹配结果及紧凑空态     |
 | 弱文本   | `text-muted`                                  | 禁用态、最次要信息                                     |
 | 边框     | `border` / `border-subtle`                    | 分隔线、控件描边                                       |
-| 强调     | `primary` / `primary-hover` / `primary-muted` | 唯一的品牌强调色，用于主按钮、激活态、链接、focus ring |
+| 强调     | `primary` / `primary-hover` / `primary-muted` / `primary-strong` | 唯一的品牌强调色（品牌蓝），用于主按钮、激活态、链接、focus ring；`primary-strong` 为按钮实色档，深色主题下保证白字 AA 对比度 |
 | 状态     | `destructive` / `success` / `warning`         | 仅用于语义状态，不作装饰                               |
 | 技能着色 | `skill-blue`（`--zy-skill-blue-foreground/background`） | 已挂载技能胶囊（ActiveSkillBadge）的文字与 hover 底色；唯一的功能性蓝色例外，不推广到其他元素 |
 
@@ -75,14 +75,19 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 | Token | oklch | 等效 RGB |
 |-------|-------|----------|
-| `--zy-primary` / `--zy-foreground` / `--zy-text-primary` | `oklch(0.366 0.008 253)` | `rgb(60, 63, 67)` |
+| `--zy-primary` / `--zy-primary-strong` | `oklch(0.564 0.218 259.8)` | ≈ `#0F6BF2` |
+| `--zy-primary-hover` | `oklch(0.514 0.207 260.5)` | ≈ `#0A5CDB` |
+| `--zy-primary-muted` | `oklch(0.95 0.025 258)` | ≈ `#E8F0FD` |
+| `--zy-foreground` / `--zy-text-primary` | `oklch(0.366 0.008 253)` | `rgb(60, 63, 67)` |
 | `--zy-text-secondary` / `--zy-text-muted` | `oklch(0.553 0.013 58.071)` | ≈ `rgb(128, 125, 119)` |
 | `--zy-background` | `oklch(1 0 0)` | `#ffffff` |
 | `--zy-surface-raised` | `oklch(0.97 0.001 106.424)` | ≈ `#f5f5f4` |
 | `--zy-border` | `oklch(0.923 0.003 48.717)` | ≈ `#e7e5e4` |
 | `--zy-destructive` | `oklch(0.577 0.245 27.325)` | ≈ `#ef4444` |
 
-> `primary`、`foreground`、`text-primary` 三者同值（`rgb(60,63,67)`，冷灰偏蓝），是 2026-07-28 验收后确定的统一主色。
+> 品牌蓝取自 logo 圆点采样值 `#1376FE`，为满足白字 WCAG AA（4.5:1）微调明度至 `#0F6BF2`。深色主题中 `primary` 提亮为 `oklch(0.68 0.18 259)` 保证文字/图标可读性，实色按钮仍用 `primary-strong`（明暗同值）。
+>
+> `foreground`、`text-primary` 同值（`rgb(60,63,67)`，冷灰偏蓝），是 2026-07-28 验收后确定的统一文本主色。
 
 ### 删除确认操作
 
@@ -311,6 +316,17 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 - **active/pressed**：可省略，由 hover 延续。
 - **focus-visible**：统一 focus ring（`.focus-ring` 或组件库默认），颜色取 `primary`，不得移除焦点样式而不提供替代。
 - **disabled**：`opacity-50` + 禁止指针事件，不改变配色结构。
+
+### 鼠标指针分配
+
+指针形状是状态信号，全局策略统一定义在 `index.css` 的 `@layer base`（Tailwind v4 的 preflight 不再给 `button` 默认 `cursor: pointer`），组件不再各自补 `cursor-pointer`：
+
+- **手型 `pointer`**：一切动作元素，按钮、链接、树/标签/菜单/选项角色、`summary`、`select`、勾选与滑块类 input。
+- **I 型 `text`**：文本输入区，文本类 input、`textarea`、`contenteditable`。
+- **箭头 `default`**：其余一切，包括纯展示文本、卡片非点击区、标题栏拖拽区。
+- **禁用 `not-allowed`**：`:disabled` / `aria-disabled` 元素。
+
+组件级的刻意例外（如菜单项用箭头）用 utility class（`cursor-default` 等）覆盖，utilities 层优先于 base 层；新增例外必须能在交互语义上自洽。
 
 ## 落地检查清单
 
