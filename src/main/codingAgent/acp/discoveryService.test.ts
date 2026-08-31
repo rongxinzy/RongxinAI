@@ -22,9 +22,9 @@ test('uses unpacked resources for packaged ACP adapter entrypoints', () => {
     resolveAcpAdapterRoot({
       isPackaged: false,
       resourcesPath: '/tmp/resources',
-      appPath: '/workspace/RongxinAI',
+      appPath: '/workspace/application',
     }),
-  ).toBe('/workspace/RongxinAI');
+  ).toBe('/workspace/application');
 });
 
 test('discovers only PATH and known user-level installation directories', () => {
