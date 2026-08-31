@@ -9,7 +9,6 @@ import {
 import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { CalendarClock } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -38,8 +37,6 @@ const AUTO_TAB = {
 
 type AutoTab = (typeof AUTO_TAB)[keyof typeof AUTO_TAB];
 
-const AUTO_TAB_ORDER: AutoTab[] = [AUTO_TAB.Tasks, AUTO_TAB.Create, AUTO_TAB.History];
-
 const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   isSidebarCollapsed,
   onToggleSidebar,
@@ -51,21 +48,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
   const [activeTab, setActiveTab] = useState<AutoTab>(AUTO_TAB.Tasks);
   const [deleteTaskInfo, setDeleteTaskInfo] = useState<{ id: string; name: string } | null>(null);
-
-  // Directional pane slide: track previous tab to know which way to slide.
-  // The first reveal fades in (direction-neutral) so entry never slides "backward";
-  // every later switch slides from the side you are heading (left / right).
-  const prevTabIndexRef = useRef(AUTO_TAB_ORDER.indexOf(AUTO_TAB.Tasks));
-  const [mounted, setMounted] = useState(false);
-  const tabDir: 'left' | 'right' | null = mounted
-    ? AUTO_TAB_ORDER.indexOf(activeTab) >= prevTabIndexRef.current
-      ? 'right'
-      : 'left'
-    : null;
-  prevTabIndexRef.current = AUTO_TAB_ORDER.indexOf(activeTab);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const activePaneScrollRef = useRef<HTMLDivElement>(null);
 
@@ -163,9 +145,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
                 value: AUTO_TAB.Tasks,
                 label: i18nService.t('scheduledTasksTabTasks'),
                 badge:
-                  tasks.length > 0 ? (
-                    <Badge variant="secondary">{tasks.length}</Badge>
-                  ) : undefined,
+                  tasks.length > 0 ? <Badge variant="secondary">{tasks.length}</Badge> : undefined,
               },
               { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
               { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
@@ -175,30 +155,29 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       />
 
       <div className="mx-auto w-full max-w-2xl shrink-0 px-8">
-        {/* ── Hero ── */}
-        <section className="animate-fade-in-up shrink-0 pt-8 pb-6">
-          <div className="flex items-center gap-4">
-            <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
-              <CalendarClock className="size-6 text-primary" />
-            </div>
-            <p className="min-w-0 text-sm text-muted-foreground">
-              {i18nService.t('scheduledTasksHeroDesc')}
-            </p>
-          </div>
-        </section>
+        <p className="pt-4 text-sm text-muted-foreground">
+          {i18nService.t('scheduledTasksHeroDesc')}
+        </p>
       </div>
 
-      <div ref={activePaneScrollRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="mx-auto w-full max-w-2xl px-8">
+      <div
+        ref={activePaneScrollRef}
+        className={cn(
+          'min-h-0 flex-1 overflow-x-hidden',
+          activeTab === AUTO_TAB.History ? 'flex flex-col overflow-y-hidden' : 'overflow-y-auto',
+        )}
+      >
+        <div
+          className={cn(
+            'mx-auto w-full max-w-2xl px-8',
+            activeTab === AUTO_TAB.History && 'flex min-h-0 flex-1 flex-col',
+          )}
+        >
           <div
-            key={`${activeTab}-${tabDir ?? 'init'}`}
+            key={activeTab}
             className={cn(
-              'min-h-full pt-6 pb-10',
-              tabDir === 'right'
-                ? 'animate-slide-in-right'
-                : tabDir === 'left'
-                  ? 'animate-slide-in-left'
-                  : 'animate-fade-in',
+              'animate-fade-in pt-6 pb-10',
+              activeTab === AUTO_TAB.History ? 'flex min-h-0 flex-1 flex-col' : 'min-h-full',
             )}
           >
             {activeTab === AUTO_TAB.Create && (
@@ -246,7 +225,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           }
         }}
       >
-        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
+        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{editingTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
             <DialogDescription>{editingTask?.name ?? ''}</DialogDescription>

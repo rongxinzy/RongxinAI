@@ -29,26 +29,28 @@ function padTimeUnit(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-const TimeColumn: React.FC<TimeColumnProps> = ({ label, values, selectedValue, onSelect }) => (
-  <div className="min-w-0">
-    <p className="mb-1 text-xs text-muted-foreground">{label}</p>
-    <ScrollArea className="h-48">
-      <div className="flex flex-col gap-1 pr-2">
-        {values.map(value => (
-          <Button
-            key={value}
-            type="button"
-            variant={selectedValue === value ? 'secondary' : 'ghost'}
-            size="xs"
-            className="w-full justify-center"
-            onClick={() => onSelect(value)}
-          >
-            {padTimeUnit(value)}
-          </Button>
-        ))}
-      </div>
-    </ScrollArea>
-  </div>
+const TimeColumn: React.FC<TimeColumnProps> = React.memo(
+  ({ label, values, selectedValue, onSelect }) => (
+    <div className="min-w-0">
+      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
+      <ScrollArea className="h-48">
+        <div className="flex flex-col gap-1 pr-2">
+          {values.map(value => (
+            <Button
+              key={value}
+              type="button"
+              variant={selectedValue === value ? 'secondary' : 'ghost'}
+              size="xs"
+              className="w-full justify-center"
+              onClick={() => onSelect(value)}
+            >
+              {padTimeUnit(value)}
+            </Button>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  ),
 );
 
 const TaskTimePicker: React.FC<TaskTimePickerProps> = ({ hour, minute, second, onChange }) => {
@@ -103,4 +105,4 @@ const TaskTimePicker: React.FC<TaskTimePickerProps> = ({ hour, minute, second, o
   );
 };
 
-export default TaskTimePicker;
+export default React.memo(TaskTimePicker);

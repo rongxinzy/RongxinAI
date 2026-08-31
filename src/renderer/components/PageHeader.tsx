@@ -49,7 +49,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
       <div
         className={cn(
           'draggable flex h-12 items-center justify-between gap-3 px-4',
-          !tabs && 'border-b border-border',
+          !tabs && 'border-b border-border-subtle',
         )}
       >
         <div className="flex h-8 min-w-0 items-center gap-3">
@@ -94,7 +94,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
           <WindowTitleBar inline />
         </div>
       </div>
-      {tabs ? <div className="non-draggable border-b border-border px-4">{tabs}</div> : null}
+      {tabs ? <div className="non-draggable border-b border-border-subtle px-4">{tabs}</div> : null}
     </header>
   );
 };

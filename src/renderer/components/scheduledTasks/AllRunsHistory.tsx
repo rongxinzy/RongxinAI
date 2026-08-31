@@ -24,11 +24,11 @@ import type {
 import { cn } from '@shared/lib/utils';
 import { i18nService } from '../../services/i18n';
 import { scheduledTaskService } from '../../services/scheduledTask';
-import { RootState } from '../../store';
+import { RootState, store } from '../../store';
 import DateInput from './DateInput';
 import FailureDetailModal from './FailureDetailModal';
 import RunSessionModal from './RunSessionModal';
-import { formatDateTime, formatDuration } from './utils';
+import { formatDateTime, formatDuration, getStatusTextClass } from './utils';
 
 const statusLabelKeys: Record<string, string> = {
   success: 'scheduledTasksStatusSuccess',
@@ -112,8 +112,14 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
 
   useEffect(() => {
     setFilter(EMPTY_FILTER);
-    loadInitial(EMPTY_FILTER);
-  }, [loadInitial]);
+    // Cache-aware: switching tabs remounts this panel; skip the refetch when
+    // the store already holds runs so tab switches stay instant.
+    const state = store.getState().scheduledTask;
+    const hasCached = taskId ? (state.runs[taskId]?.length ?? 0) > 0 : state.allRuns.length > 0;
+    if (!hasCached) {
+      loadInitial(EMPTY_FILTER);
+    }
+  }, [loadInitial, taskId]);
 
   const handleFilterChange = (newFilter: RunFilter) => {
     setFilter(newFilter);
@@ -143,7 +149,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
   const isEmpty = displayedRuns.length === 0;
 
   return (
-    <ScrollArea className="h-[500px] rounded-lg border border-border bg-card p-4">
+    <ScrollArea className="min-h-0 flex-1 rounded-lg border border-border bg-card p-4">
       <div>
         {/* Filter area */}
         <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -151,25 +157,25 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
             {(['success', 'error', 'skipped', 'running'] as const)
               .filter(s => showRunning || s !== 'running')
               .map(s => (
-              <Button
-                key={s}
-                variant="outline"
-                size="sm"
-                className={
-                  filter.status === s
-                    ? 'bg-secondary text-foreground'
-                    : 'bg-card text-muted-foreground'
-                }
-                onClick={() =>
-                  handleFilterChange({
-                    ...filter,
-                    status: filter.status === s ? undefined : s,
-                  })
-                }
-              >
-                {i18nService.t(statusLabelKeys[s])}
-              </Button>
-            ))}
+                <Button
+                  key={s}
+                  variant="outline"
+                  size="sm"
+                  className={
+                    filter.status === s
+                      ? 'bg-secondary text-foreground'
+                      : 'bg-card text-muted-foreground'
+                  }
+                  onClick={() =>
+                    handleFilterChange({
+                      ...filter,
+                      status: filter.status === s ? undefined : s,
+                    })
+                  }
+                >
+                  {i18nService.t(statusLabelKeys[s])}
+                </Button>
+              ))}
           </ButtonGroup>
 
           <div className="flex items-center gap-1.5 ml-auto">
@@ -245,7 +251,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm text-foreground truncate">{run.taskName}</span>
                         {showRunning && run.status === 'running' && (
-                          <Spinner className="size-3 text-blue-500" />
+                          <Spinner className="size-3 text-primary" />
                         )}
                       </div>
                     </TableCell>
@@ -262,16 +268,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
                     <TableCell className="w-1/3 text-right">
                       <Badge
                         variant="outline"
-                        className={cn(
-                          'w-14 justify-center',
-                          run.status === 'success'
-                            ? 'text-(--zy-success)'
-                            : run.status === 'error'
-                              ? 'text-destructive'
-                              : run.status === 'running'
-                                ? 'text-primary'
-                                : 'text-muted-foreground',
-                        )}
+                        className={cn('w-14 justify-center', getStatusTextClass(run.status))}
                       >
                         {i18nService.t(statusLabelKeys[run.status] || '')}
                       </Badge>

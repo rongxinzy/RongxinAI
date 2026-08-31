@@ -10,6 +10,8 @@ import type { ScheduledTask, ScheduledTaskRun } from './types';
 
 /** Executes one canonical task through the embedded Pi runtime only. */
 export class PiScheduledTaskExecutor {
+  private readonly taskLocks = new Map<string, Promise<void>>();
+
   constructor(
     private readonly runtime: PiRuntime,
     private readonly coworkStore: CoworkStore,
@@ -18,6 +20,25 @@ export class PiScheduledTaskExecutor {
   async execute(
     task: ScheduledTask,
     _run: ScheduledTaskRun,
+  ): Promise<{ sessionId: string; output: string | null }> {
+    const previous = this.taskLocks.get(task.id) ?? Promise.resolve();
+    let release!: () => void;
+    const current = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const queued = previous.then(() => current);
+    this.taskLocks.set(task.id, queued);
+    await previous;
+    try {
+      return await this.executeUnlocked(task);
+    } finally {
+      release();
+      if (this.taskLocks.get(task.id) === queued) this.taskLocks.delete(task.id);
+    }
+  }
+
+  private async executeUnlocked(
+    task: ScheduledTask,
   ): Promise<{ sessionId: string; output: string | null }> {
     const prompt =
       task.payload.kind === PayloadKind.SystemEvent ? task.payload.text : task.payload.message;
@@ -52,11 +73,21 @@ export class PiScheduledTaskExecutor {
   }
 
   private resolveSession(task: ScheduledTask) {
+    if (task.sessionTarget === SessionTarget.Task) {
+      const taskSessionId = `scheduled-task:${task.id}`;
+      const existing = this.coworkStore.getSession(taskSessionId);
+      if (existing) return existing;
+      return this.createScheduledSession(task, taskSessionId);
+    }
     if (task.sessionTarget === SessionTarget.Main && task.sessionKey) {
       const sessionId = parseManagedSessionKey(task.sessionKey)?.sessionId ?? task.sessionKey;
       const existing = this.coworkStore.getSession(sessionId);
       if (existing) return existing;
     }
+    return this.createScheduledSession(task);
+  }
+
+  private createScheduledSession(task: ScheduledTask, id?: string) {
     const config = this.coworkStore.getConfig();
     const workspace = task.workspaceId ? this.coworkStore.getWorkspace(task.workspaceId) : null;
     return this.coworkStore.createSession(
@@ -68,7 +99,7 @@ export class PiScheduledTaskExecutor {
       'main',
       task.payload.kind === PayloadKind.AgentTurn ? (task.payload.model ?? '') : '',
       'work',
-      undefined,
+      id,
       workspace?.id,
       [],
       CoworkSessionSource.Scheduled,

@@ -943,7 +943,7 @@ export const CodingWorkbenchView = ({
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
       {desktopSidePanelOpen && (
-        <aside className="min-h-0 border-l border-border max-lg:hidden">
+        <aside className="min-h-0 border-l border-border-subtle max-lg:hidden">
           {sidePanelView === CodingSidePanelView.Git ? (
             <CodingGitPanel
               workspaceRoot={workspaceRoot}

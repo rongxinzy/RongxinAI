@@ -5,7 +5,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from '@shared/components/ui/input-group';
-import { ChevronLeft, ChevronRight, Monitor, RefreshCw, Search } from 'lucide-react';
+import { Monitor, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Skeleton } from '@shared/components/ui/skeleton';
@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
+import { ListPagination } from '../../common/ListPagination';
 import {
   localInferenceCompactButtonClass,
   MARKETPLACE_PAGE_SIZE,
@@ -45,7 +46,7 @@ export function MarketplacePanel({
   marketplaceError,
   totalCount,
   hasNextPage,
-  query,
+  initialQuery = '',
   installedModelPathMap,
   hardwareSummary,
   activeDownloadModelId,
@@ -62,7 +63,9 @@ export function MarketplacePanel({
   marketplaceError: string | null;
   totalCount?: number;
   hasNextPage: boolean;
-  query: string;
+  // Mount-time value only; the panel owns the query state afterwards so typing
+  // does not re-render the whole view. onQueryChange still notifies the parent.
+  initialQuery?: string;
   installedModelPathMap: Map<string, string>;
   onQueryChange: (v: string) => void;
   onSearch: (params?: MarketplaceSearchParams) => void;
@@ -72,6 +75,7 @@ export function MarketplacePanel({
   activeDownloadModelId?: string;
   onOpenDownloadPanel: () => void;
 }) {
+  const [query, setQuery] = useState(initialQuery);
   const [taskFilter, setTaskFilter] = useState<MarketplaceTaskFilter>('all');
   const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('all');
   const [submittedQuery, setSubmittedQuery] = useState('');
@@ -118,8 +122,9 @@ export function MarketplacePanel({
     }
   }, [page, pageCount]);
 
-  const handleInstall = async (model: MarketplaceModel) => {
-    await onInstall(model);
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    onQueryChange(value);
   };
 
   const fitFilterLabel = {
@@ -187,6 +192,7 @@ export function MarketplacePanel({
 
   const handleResetFilters = useCallback(() => {
     appliedFilterSignatureRef.current = 'all:all';
+    setQuery('');
     onQueryChange('');
     setSubmittedQuery('');
     setTaskFilter('all');
@@ -204,107 +210,100 @@ export function MarketplacePanel({
   }, [onQueryChange, onSearch]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2">
-      <div className="flex flex-col gap-3">
-        <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-6">
-          <form
-            className="min-w-0 flex-1"
-            onSubmit={event => {
-              event.preventDefault();
-              if (marketplaceLoading) return;
-              submitSearch();
-            }}
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3">
+      <form
+        className="w-full"
+        onSubmit={event => {
+          event.preventDefault();
+          if (marketplaceLoading) return;
+          submitSearch();
+        }}
+      >
+        <div className="flex gap-2">
+          <InputGroup className="h-9 min-w-0 flex-1">
+            <InputGroupAddon>
+              <Search />
+            </InputGroupAddon>
+            <InputGroupInput
+              value={query}
+              onChange={event => handleQueryChange(event.target.value)}
+              placeholder={i18nService.t('marketplaceSearchPlaceholder')}
+              className="text-xs"
+            />
+          </InputGroup>
+          <Button
+            type="submit"
+            aria-disabled={marketplaceLoading}
+            className={`${localInferenceCompactButtonClass} self-center`}
+            variant="outline"
           >
-            <div className="flex gap-2">
-              <InputGroup className="h-9 min-w-0 flex-1">
-                <InputGroupAddon>
-                  <Search />
-                </InputGroupAddon>
-                <InputGroupInput
-                  value={query}
-                  onChange={event => onQueryChange(event.target.value)}
-                  placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-                  className="text-xs"
-                />
-              </InputGroup>
-              <Button
-                type="submit"
-                aria-disabled={marketplaceLoading}
-                className={`${localInferenceCompactButtonClass} self-center`}
-                variant="outline"
-              >
-                <RefreshCw
-                  data-icon="inline-start"
-                />
-                {i18nService.t('marketplaceSearch')}
-              </Button>
-            </div>
-          </form>
+            <RefreshCw
+              data-icon="inline-start"
+            />
+            {i18nService.t('marketplaceSearch')}
+          </Button>
         </div>
-      </div>
+      </form>
 
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-2 rounded-lg bg-background p-1">
-      <div className="flex w-full shrink-0 flex-col gap-3 px-5 pt-1 pb-1">
-        <div className="flex w-full flex-wrap items-stretch justify-between gap-x-4 gap-y-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
-            <div className="shrink-0">
-              <FluidTabs
-                className="w-fit max-w-full"
-                inactiveTabClassName="hover:opacity-100"
-                listClassName="border border-border-subtle"
-                showInactiveHoverIndicator
-                size={FluidTabsSize.Default}
-                aria-label={i18nService.t('marketplaceFilterTask')}
-                value={taskFilter}
-                onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
-                items={[
-                  { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
-                  { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
-                  { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
-                  { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
-                  { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
-                ]}
-              />
-            </div>
-            <div className="inline-flex h-10 items-center gap-1 rounded-lg border border-border-subtle bg-muted/80 px-1 py-0.5">
-                <span className="px-2 text-sm leading-5 font-normal text-muted-foreground">
-                  {i18nService.t('marketplaceFilterFit')}
-                </span>
-                <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-                  <SelectTrigger size="default" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32 border-border-subtle bg-surface">
-                    <SelectValue className="font-medium text-foreground">{fitFilterLabel}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent
-                    side="bottom"
-                    sideOffset={4}
-                    alignItemWithTrigger={false}
-                    collisionAvoidance={{ side: 'none', align: 'shift', fallbackAxisSide: 'none' }}
-                  >
-                    <SelectGroup>
-                      <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
-                      <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
-                      <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-            </div>
+      <div className="flex w-full shrink-0 flex-wrap items-stretch justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="shrink-0">
+            <FluidTabs
+              className="w-fit max-w-full"
+              inactiveTabClassName="hover:opacity-100"
+              listClassName="border border-border-subtle"
+              showInactiveHoverIndicator
+              size={FluidTabsSize.Default}
+              aria-label={i18nService.t('marketplaceFilterTask')}
+              value={taskFilter}
+              onValueChange={value => setTaskFilter(value as MarketplaceTaskFilter)}
+              items={[
+                { value: 'all', label: i18nService.t('marketplaceFilterTaskAll') },
+                { value: 'chat', label: i18nService.t('marketplaceFilterTaskChat') },
+                { value: 'reasoning', label: i18nService.t('marketplaceFilterTaskReasoning') },
+                { value: 'code', label: i18nService.t('marketplaceFilterTaskCode') },
+                { value: 'vision', label: i18nService.t('marketplaceFilterTaskVision') },
+              ]}
+            />
           </div>
-          <div className="inline-flex h-10 w-fit min-w-0 max-w-full items-center gap-2 rounded-lg border border-success/25 bg-success/10 px-4 text-sm leading-5 text-success">
-            <Monitor className="size-5 shrink-0" aria-hidden="true" />
-            {hardwareSummaryReady ? (
-              <span className="inline-flex min-w-0 max-w-full items-center gap-2">
-                <span className="min-w-0 truncate">
-                  {i18nService.t('marketplaceHardwareGpuLabel')} {hardwareGpuValue}
-                </span>
-                <Separator orientation="vertical" className="h-6 w-px bg-success/60" aria-hidden="true" />
-                <span className="shrink-0 whitespace-nowrap">
-                  {i18nService.t('marketplaceHardwareMemoryLabel')} {hardwareMemoryValue}
-                </span>
+          <div className="inline-flex h-10 items-center gap-1 rounded-lg border border-border-subtle bg-muted/80 px-1 py-0.5">
+              <span className="px-2 text-sm leading-5 font-normal text-muted-foreground">
+                {i18nService.t('marketplaceFilterFit')}
               </span>
-            ) : (
-              <span>{i18nService.t('marketplaceHardwareDetecting')}</span>
-            )}
+              <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
+                <SelectTrigger size="default" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32 border-border-subtle bg-surface">
+                  <SelectValue className="font-medium text-foreground">{fitFilterLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  side="bottom"
+                  sideOffset={4}
+                  alignItemWithTrigger={false}
+                  collisionAvoidance={{ side: 'none', align: 'shift', fallbackAxisSide: 'none' }}
+                  >
+                  <SelectGroup>
+                    <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
+                    <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
+                    <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
           </div>
+        </div>
+        <div className="inline-flex min-w-0 max-w-full items-center gap-2 self-center text-sm text-muted-foreground">
+          <Monitor className="size-4 shrink-0" aria-hidden="true" />
+          {hardwareSummaryReady ? (
+            <span className="inline-flex min-w-0 max-w-full items-center gap-2">
+              <span className="min-w-0 truncate">
+                {i18nService.t('marketplaceHardwareGpuLabel')} {hardwareGpuValue}
+              </span>
+              <Separator orientation="vertical" className="h-4 w-px" aria-hidden="true" />
+              <span className="shrink-0 whitespace-nowrap">
+                {i18nService.t('marketplaceHardwareMemoryLabel')} {hardwareMemoryValue}
+              </span>
+            </span>
+          ) : (
+            <span>{i18nService.t('marketplaceHardwareDetecting')}</span>
+          )}
         </div>
       </div>
 
@@ -320,87 +319,58 @@ export function MarketplacePanel({
       ) : null}
 
       {marketplaceLoading && models.length === 0 ? (
-        <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface px-4 py-1">
+        <div ref={marketplaceGridViewportRef} className="relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
           <MarketplaceGridSkeleton columnCount={gridColumnCount} pageSize={MARKETPLACE_PAGE_SIZE} />
         </div>
       ) : !hasSearched ? null : visibleModels.length === 0 ? (
-        <div className="mx-auto flex min-h-[620px] w-full max-w-6xl flex-col gap-4 rounded-lg bg-surface p-1">
-          <EmptyState
-            title={i18nService.t('marketplaceNoModels')}
-            action={
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {fitFilter !== 'all' ? (
-                  <Button type="button" size="sm" onClick={() => setFitFilter('all')}>
-                    {i18nService.t('marketplaceEmptyShowAll')}
-                  </Button>
-                ) : null}
-                <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
-                  {i18nService.t('marketplaceFilterClear')}
+        <EmptyState
+          className="flex-1"
+          title={i18nService.t('marketplaceNoModels')}
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {fitFilter !== 'all' ? (
+                <Button type="button" size="sm" onClick={() => setFitFilter('all')}>
+                  {i18nService.t('marketplaceEmptyShowAll')}
                 </Button>
-              </div>
-            }
-          />
-        </div>
+              ) : null}
+              <Button type="button" size="sm" variant="outline" onClick={handleResetFilters}>
+                {i18nService.t('marketplaceFilterClear')}
+              </Button>
+            </div>
+          }
+        />
       ) : (
-        <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col rounded-lg bg-surface p-1">
-          <div ref={marketplaceGridViewportRef} className="relative mx-auto min-h-0 w-full max-w-6xl flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable rounded-lg bg-surface px-4 py-1">
-            <div
-              className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
-              style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
-            >
-              {visibleModels.map(model => {
-                return (
-                  <MarketplaceModelCard
-                    key={model.repoId || model.id}
-                    model={model}
-                    loading={loading}
-                    isDownloadActive={model.repoId === activeDownloadModelId}
-                    onInstall={handleInstall}
-                    onOpenDownload={onOpenDownloadPanel}
-                  />
-                );
-              })}
-            </div>
+        <div ref={marketplaceGridViewportRef} className="relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
+          <div
+            className="grid w-full auto-rows-min content-start gap-4"
+            style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
+          >
+            {visibleModels.map(model => {
+              return (
+                <MarketplaceModelCard
+                  key={model.repoId || model.id}
+                  model={model}
+                  loading={loading}
+                  isDownloadActive={model.repoId === activeDownloadModelId}
+                  onInstall={onInstall}
+                  onOpenDownload={onOpenDownloadPanel}
+                />
+              );
+            })}
           </div>
-
         </div>
       )}
-      </div>
 
-      {hasSearched && visibleModels.length > 0 && (
-            <div
-              className="mx-auto mt-auto flex w-full max-w-6xl items-center justify-center gap-5 bg-background px-3 py-3"
-            >
-              <Button
-                type="button"
-                onClick={() => handlePageChange(currentPage - 1)}
-                disabled={marketplaceLoading || currentPage <= 1}
-                variant="ghost"
-                size="icon-sm"
-                aria-label={i18nService.t('skillMarketplacePrevPage')}
-                title={i18nService.t('skillMarketplacePrevPage')}
-              >
-                <ChevronLeft />
-              </Button>
-              <span className="inline-flex h-7 items-center justify-center text-sm text-foreground">
-                {i18nService
-                  .t('marketplacePageSummary')
-                  .replace('{page}', String(currentPage))
-                  .replace('{total}', String(pageCount))}
-              </span>
-              <Button
-                type="button"
-                onClick={() => handlePageChange(currentPage + 1)}
-                disabled={marketplaceLoading || !hasNextPage || currentPage >= pageCount}
-                variant="ghost"
-                size="icon-sm"
-                aria-label={i18nService.t('skillMarketplaceNextPage')}
-                title={i18nService.t('skillMarketplaceNextPage')}
-              >
-                <ChevronRight />
-              </Button>
-            </div>
-      )}
+      {hasSearched && visibleModels.length > 0 ? (
+        <ListPagination
+          page={currentPage}
+          totalPages={pageCount}
+          hasNext={hasNextPage}
+          disabled={marketplaceLoading}
+          onPageChange={handlePageChange}
+          className="mt-auto shrink-0 py-1"
+        />
+      ) : null}
     </div>
   );
 }
@@ -412,33 +382,38 @@ function MarketplaceGridSkeleton({ columnCount, pageSize }: { columnCount: numbe
   return (
     <div
       aria-hidden="true"
-      className="mx-auto grid w-full max-w-6xl auto-rows-min content-start gap-4"
+      className="grid w-full auto-rows-min content-start gap-4"
       style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
     >
       {Array.from({ length: pageSize }, (_, index) => (
-        <div
-          key={index}
-          className="flex h-full flex-col gap-3 rounded-lg border border-border/70 bg-card p-4 shadow-sm"
-        >
-          <div className="flex items-center gap-2">
-            <Skeleton className="size-8 rounded-lg" />
-            <Skeleton className="h-5 w-2/3" />
-          </div>
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-3 w-12" />
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Skeleton className="h-6 w-14 rounded-md" />
-            <Skeleton className="h-6 w-10 rounded-md" />
-            <Skeleton className="h-6 w-12 rounded-md" />
-          </div>
-          <div className="mt-auto flex items-center justify-between border-t border-border/50 pt-3">
-            <Skeleton className="h-5 w-16 rounded-md" />
-            <Skeleton className="h-8 w-20 rounded-md" />
-          </div>
-        </div>
+        <MarketplaceModelCardSkeleton key={index} />
       ))}
+    </div>
+  );
+}
+
+// Mirrors MarketplaceModelCard geometry (header row, tag row, footer actions)
+// so the skeleton and the loaded grid share the same silhouette.
+function MarketplaceModelCardSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-3 rounded-xl border border-border/70 bg-card pb-3 shadow-sm">
+      <div className="flex items-start gap-4 px-5 pt-3">
+        <Skeleton className="size-12 shrink-0 rounded-xl" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-4 w-16" />
+        </div>
+        <Skeleton className="h-8 w-20 rounded-md" />
+      </div>
+      <div className="flex items-center gap-1.5 px-5">
+        <Skeleton className="h-6 w-14 rounded-md" />
+        <Skeleton className="h-6 w-10 rounded-md" />
+        <Skeleton className="h-6 w-12 rounded-md" />
+      </div>
+      <div className="mt-auto flex items-center gap-3 px-5 pt-3">
+        <Skeleton className="h-8 min-w-0 flex-1 rounded-md" />
+        <Skeleton className="h-8 w-20 shrink-0 rounded-md" />
+      </div>
     </div>
   );
 }
