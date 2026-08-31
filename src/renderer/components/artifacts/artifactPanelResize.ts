@@ -1,7 +1,20 @@
 export const ARTIFACT_PANEL_KEYBOARD_RESIZE_STEP = 32;
 
+/** Minimum width the conversation column keeps when the artifact panel is at
+ * its drag maximum — the panel must never swallow the chat area. */
+export const ARTIFACT_PANEL_CHAT_RESERVE = 360;
+
 export function clampArtifactPanelWidth(value: number, minWidth: number, maxWidth: number): number {
   return Math.min(Math.max(value, minWidth), Math.max(minWidth, maxWidth));
+}
+
+/** Panel drag maximum: the content row minus the chat column's reserved
+ * minimum, so a fully-dragged panel still leaves a usable conversation. */
+export function resolveArtifactPanelMaxWidth(
+  contentWidth: number,
+  minPanelWidth: number,
+): number {
+  return Math.max(minPanelWidth, contentWidth - ARTIFACT_PANEL_CHAT_RESERVE);
 }
 
 export function resolveArtifactPanelPointerWidth(
@@ -40,8 +53,4 @@ export function resolveArtifactPanelKeyboardWidth(
     default:
       return null;
   }
-}
-
-export function isArtifactPanelAtMaximum(width: number, maxWidth: number): boolean {
-  return width >= maxWidth - 0.5;
 }

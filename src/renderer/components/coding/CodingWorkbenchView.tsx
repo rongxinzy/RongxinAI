@@ -48,6 +48,7 @@ import {
 } from '../../store/slices/artifactSlice';
 import PageHeader from '../PageHeader';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
+import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
 import { CodingAgentManager } from './CodingAgentManager';
@@ -214,12 +215,12 @@ export const CodingWorkbenchView = ({
   const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
     typeof window === 'undefined'
       ? MIN_PANEL_WIDTH
-      : Math.max(MIN_PANEL_WIDTH, window.innerWidth),
+      : resolveArtifactPanelMaxWidth(Math.max(MIN_PANEL_WIDTH, window.innerWidth), MIN_PANEL_WIDTH),
   );
   const updateArtifactPanelMaxWidth = useCallback(() => {
     const contentWidth = artifactRowRef.current?.clientWidth ?? 0;
     if (contentWidth <= 0) return;
-    const nextMaxWidth = Math.max(MIN_PANEL_WIDTH, contentWidth);
+    const nextMaxWidth = resolveArtifactPanelMaxWidth(contentWidth, MIN_PANEL_WIDTH);
     setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
   }, []);
   // ResizeObserver must run in useEffect, not useLayoutEffect: a layout-effect

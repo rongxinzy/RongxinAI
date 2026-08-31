@@ -43,6 +43,7 @@ import {
   togglePanel,
 } from '../../store/slices/artifactSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
+import { resolveArtifactPanelMaxWidth } from '../artifacts/artifactPanelResize';
 import { PREVIEWABLE_ARTIFACT_TYPES } from '../../types/artifact';
 import type {
   CoworkImageAttachment,
@@ -270,7 +271,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const [artifactPanelMaxWidth, setArtifactPanelMaxWidth] = useState(() =>
     typeof window === 'undefined'
       ? DEFAULT_PANEL_WIDTH
-      : Math.max(MIN_PANEL_WIDTH, window.innerWidth),
+      : resolveArtifactPanelMaxWidth(Math.max(MIN_PANEL_WIDTH, window.innerWidth), MIN_PANEL_WIDTH),
   );
   const previousArtifactPanelOpenRef = useRef(isPanelOpen);
   const previousArtifactSessionIdRef = useRef(sessionId);
@@ -365,7 +366,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const updateArtifactPanelMaxWidth = useCallback(() => {
     const contentWidth = contentRowRef.current?.clientWidth ?? 0;
     if (contentWidth <= 0) return;
-    const nextMaxWidth = Math.max(MIN_PANEL_WIDTH, contentWidth);
+    const nextMaxWidth = resolveArtifactPanelMaxWidth(contentWidth, MIN_PANEL_WIDTH);
     setArtifactPanelMaxWidth(prev => (prev === nextMaxWidth ? prev : nextMaxWidth));
   }, []);
 
