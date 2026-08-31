@@ -1,13 +1,12 @@
 import { Button } from '@shared/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
+import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { cn } from '@shared/lib/utils';
-import { PanelLeftOpen } from 'lucide-react';
 import React, { useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
 import { ArtifactPanelAnimatedToggleIcon } from '../icons/ArtifactPanelAnimatedToggleIcon';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
-import WindowTitleBar from '../window/WindowTitleBar';
+import PageHeader from '../PageHeader';
 import {
   CoworkSessionView,
   isCoworkSessionView,
@@ -21,7 +20,6 @@ interface CoworkSessionLayoutProps {
   sessionId?: string;
   isSessionSwitching: boolean;
   isSidebarCollapsed?: boolean;
-  isMac: boolean;
   isArtifactPanelOpen: boolean;
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
@@ -44,7 +42,6 @@ export function CoworkSessionLayout({
   sessionId,
   isSessionSwitching,
   isSidebarCollapsed,
-  isMac,
   isArtifactPanelOpen,
   onToggleSidebar,
   onNewChat,
@@ -65,75 +62,46 @@ export function CoworkSessionLayout({
       }}
       className="h-full min-h-0 flex-1 gap-0 overflow-hidden bg-background"
     >
-      <header className="shrink-0 bg-background">
-        <div className="draggable flex h-10 items-center justify-between px-4">
-          <div className="flex h-full min-w-0 items-center gap-2">
-            {isSidebarCollapsed && (
-              <div className={cn('non-draggable flex items-center gap-2', isMac && 'pl-[68px]')}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onToggleSidebar}
-                  aria-label={i18nService.t('coworkShowSidebar')}
-                >
-                  <PanelLeftOpen />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onNewChat}
-                  aria-label={i18nService.t('newChat')}
-                >
-                  <SidebarAnimatedMessageCirclePlusIcon />
-                </Button>
-                {updateBadge}
-              </div>
-            )}
-            {isSessionSwitching ? (
-              <CoworkSessionTitleLoadingSkeleton />
-            ) : (
-              <h1 className="max-w-md truncate text-sm font-medium leading-none text-foreground">
-                {title}
-              </h1>
-            )}
-          </div>
-
-          <div className="non-draggable flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleArtifactPanel}
-              aria-label={i18nService.t('artifactPanelToggle')}
-              aria-hidden={!isConversationView}
-              tabIndex={isConversationView ? 0 : -1}
-              disabled={isSessionSwitching || !isConversationView}
-              className={cn(!isConversationView && 'invisible')}
-            >
-              <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isArtifactPanelOpen} />
-            </Button>
-            <WindowTitleBar inline className="ml-1" />
-          </div>
-        </div>
-
-        <div className="non-draggable border-b border-border px-4">
-          <TabsList variant="line" className="h-8">
-            <TabsTrigger
-              value={CoworkSessionView.Conversation}
-              disabled={isSessionSwitching}
-              className="after:bottom-[-1px]"
-            >
-              {i18nService.t('coworkConversationTab')}
-            </TabsTrigger>
-            <TabsTrigger
-              value={CoworkSessionView.Trace}
-              disabled={isSessionSwitching}
-              className="after:bottom-[-1px]"
-            >
-              {i18nService.t('coworkTraceTab')}
-            </TabsTrigger>
-          </TabsList>
-        </div>
-      </header>
+      <PageHeader
+        title={isSessionSwitching ? undefined : title}
+        leftContent={isSessionSwitching ? <CoworkSessionTitleLoadingSkeleton /> : undefined}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
+        onNewChat={onNewChat}
+        updateBadge={updateBadge}
+        actions={
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleArtifactPanel}
+            aria-label={i18nService.t('artifactPanelToggle')}
+            aria-hidden={!isConversationView}
+            tabIndex={isConversationView ? 0 : -1}
+            disabled={isSessionSwitching || !isConversationView}
+            className={cn(!isConversationView && 'invisible')}
+          >
+            <ArtifactPanelAnimatedToggleIcon open={!isSessionSwitching && isArtifactPanelOpen} />
+          </Button>
+        }
+        tabs={
+          <PageTabs
+            bare
+            value={activeView}
+            items={[
+              {
+                value: CoworkSessionView.Conversation,
+                label: i18nService.t('coworkConversationTab'),
+                disabled: isSessionSwitching,
+              },
+              {
+                value: CoworkSessionView.Trace,
+                label: i18nService.t('coworkTraceTab'),
+                disabled: isSessionSwitching,
+              },
+            ]}
+          />
+        }
+      />
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <TabsContent

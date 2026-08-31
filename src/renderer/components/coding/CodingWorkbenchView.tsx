@@ -21,7 +21,6 @@ import {
   FolderGit2,
   GitBranch,
   Layers,
-  PanelLeftOpen,
   PanelRight,
   Settings2,
 } from 'lucide-react';
@@ -47,7 +46,7 @@ import {
   selectSessionArtifacts,
   togglePanel,
 } from '../../store/slices/artifactSlice';
-import WindowTitleBar from '../window/WindowTitleBar';
+import PageHeader from '../PageHeader';
 import { ArtifactPanelErrorBoundary } from '../artifacts/ArtifactPanelErrorBoundary';
 import type { RootState } from '../../store';
 import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef';
@@ -94,7 +93,6 @@ export const CodingWorkbenchView = ({
   isSidebarCollapsed = false,
   onToggleSidebar,
 }: CodingWorkbenchViewProps) => {
-  const isMac = window.electron.platform === 'darwin';
   const [snapshot, setSnapshot] = useState<CodingRoomSnapshot | null>(EMPTY_SNAPSHOT);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
@@ -722,24 +720,11 @@ export const CodingWorkbenchView = ({
             </DialogContent>
           </Dialog>
         )}
-        <header className="draggable flex min-h-14 items-center justify-between gap-3 border-b border-border px-4 py-2">
-          <div
-            className={cn(
-              'non-draggable flex min-w-0 items-center gap-2',
-              isSidebarCollapsed && isMac && 'pl-[68px]',
-            )}
-          >
-            {isSidebarCollapsed && onToggleSidebar ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={onToggleSidebar}
-                aria-label={i18nService.t('expand')}
-              >
-                <PanelLeftOpen />
-              </Button>
-            ) : null}
+        <PageHeader
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebar={onToggleSidebar}
+          leftContent={
+            <>
             <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
               <FolderGit2 className="size-4 shrink-0" />
               <span className="truncate">{snapshot.room.name}</span>
@@ -755,8 +740,10 @@ export const CodingWorkbenchView = ({
                 {profileStatusText(activeProfile.status)}
               </Badge>
             )}
-          </div>
-          <div className="non-draggable flex shrink-0 items-center gap-2">
+            </>
+          }
+          actions={
+            <>
             <Button
               type="button"
               variant="ghost"
@@ -871,9 +858,9 @@ export const CodingWorkbenchView = ({
                 </Sheet>
               </>
             )}
-            <WindowTitleBar inline />
-          </div>
-        </header>
+            </>
+          }
+        />
         <div ref={artifactRowRef} className="flex min-h-0 flex-1">
           <CodingEventStream
             events={activeEvents}

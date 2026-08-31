@@ -50,7 +50,8 @@ import {
 } from '@shared/components/ui/select';
 import { Separator } from '@shared/components/ui/separator';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
+import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import {
   MemoryDeliveryStatus,
   MemoryKind,
@@ -161,16 +162,23 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
         onValueChange={value => setView(value as ManagedMemoryViewValue)}
         className="min-h-0 flex-1 gap-3"
       >
-        <TabsList variant="line" className="w-full shrink-0 justify-start">
-          <TabsTrigger value={ManagedMemoryView.LongTerm}>
-            {i18nService.t('managedMemoryTabLongTerm')}
-            <Badge variant="secondary">{counts.longTerm}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value={ManagedMemoryView.Session}>
-            {i18nService.t('managedMemoryTabSessions')}
-            <Badge variant="secondary">{counts.session}</Badge>
-          </TabsTrigger>
-        </TabsList>
+        <PageTabs
+          bare
+          value={view}
+          className="w-full shrink-0"
+          items={[
+            {
+              value: ManagedMemoryView.LongTerm,
+              label: i18nService.t('managedMemoryTabLongTerm'),
+              badge: <Badge variant="secondary">{counts.longTerm}</Badge>,
+            },
+            {
+              value: ManagedMemoryView.Session,
+              label: i18nService.t('managedMemoryTabSessions'),
+              badge: <Badge variant="secondary">{counts.session}</Badge>,
+            },
+          ]}
+        />
 
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
           <InputGroup className="sm:flex-1">

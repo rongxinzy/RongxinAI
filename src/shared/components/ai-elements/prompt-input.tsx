@@ -34,7 +34,7 @@ import { Spinner } from '@shared/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import type { ChatStatus, FileUIPart, SourceDocumentUIPart } from 'ai';
-import { CornerDownLeftIcon, ImageIcon, Monitor, PlusIcon, SquareIcon, XIcon } from 'lucide-react';
+import { ArrowUpIcon, ImageIcon, Monitor, PlusIcon, SquareIcon, XIcon } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import type {
   ChangeEvent,
@@ -1120,7 +1120,12 @@ export const PromptInputSubmit = ({
 }: PromptInputSubmitProps) => {
   const isGenerating = status === 'submitted' || status === 'streaming';
 
-  let Icon = <CornerDownLeftIcon className="size-4" />;
+  // Circular send button: arrow nudges up on hover, the disc scales down on
+  // press. Transform/opacity only, so the interaction stays on the compositor
+  // and never triggers layout or React re-renders.
+  let Icon = (
+    <ArrowUpIcon className="size-4 transition-transform duration-150 ease-out group-hover/button:-translate-y-0.5 group-active/button:translate-y-0 motion-reduce:transform-none motion-reduce:transition-none" />
+  );
 
   if (status === 'submitted') {
     Icon = <Spinner />;
@@ -1145,7 +1150,10 @@ export const PromptInputSubmit = ({
   return (
     <InputGroupButton
       aria-label={isGenerating ? 'Stop' : 'Submit'}
-      className={cn(className)}
+      className={cn(
+        'rounded-full transition-transform duration-150 ease-out hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none',
+        className,
+      )}
       onClick={handleClick}
       size={size}
       type={isGenerating && onStop ? 'button' : 'submit'}

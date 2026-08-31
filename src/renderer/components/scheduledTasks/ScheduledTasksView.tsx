@@ -1,5 +1,4 @@
 import { Badge } from '@shared/components/ui/badge';
-import { Button } from '@shared/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -7,17 +6,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@shared/components/ui/dialog';
+import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Spinner } from '@shared/components/ui/spinner';
 import { cn } from '@shared/lib/utils';
-import { CalendarClock, PanelLeftOpen } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
-import { SidebarAnimatedMessageCirclePlusIcon } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
-import WindowTitleBar from '../window/WindowTitleBar';
+import PageHeader from '../PageHeader';
 import AllRunsHistory from './AllRunsHistory';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import TaskForm from './TaskForm';
@@ -47,7 +46,6 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
   onNewChat,
   updateBadge,
 }) => {
-  const isMac = window.electron.platform === 'darwin';
   const tasks = useSelector((state: RootState) => state.scheduledTask.tasks);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
 
@@ -69,44 +67,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     setMounted(true);
   }, []);
 
-  // Sliding underline indicator: measure the active tab button and translate a single bar.
-  // The view can mount while a route ancestor is still hidden / mid-transform, so the first
-  // measurement may read 0 — poll with rAF until the button has a real width (with a safety
-  // timeout) so the bar never stays invisible. A ResizeObserver covers later width changes
-  // (e.g. the count badge appearing/disappearing).
-  const tabRefs = useRef<Record<string, HTMLElement | null>>({});
-  const tabRowRef = useRef<HTMLDivElement>(null);
   const activePaneScrollRef = useRef<HTMLDivElement>(null);
-  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
-  useLayoutEffect(() => {
-    let raf = 0;
-    let timeout = 0;
-    const measure = () => {
-      const el = tabRefs.current[activeTab];
-      if (el && el.offsetWidth > 0) {
-        setIndicator({ left: el.offsetLeft, width: el.offsetWidth });
-        return true;
-      }
-      return false;
-    };
-    const poll = () => {
-      if (measure()) return;
-      raf = requestAnimationFrame(poll);
-    };
-    if (!measure()) {
-      raf = requestAnimationFrame(poll);
-      timeout = window.setTimeout(measure, 600);
-    }
-    const ro = new ResizeObserver(() => measure());
-    if (tabRowRef.current) ro.observe(tabRowRef.current);
-    window.addEventListener('resize', measure);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timeout);
-      ro.disconnect();
-      window.removeEventListener('resize', measure);
-    };
-  }, [activeTab, tasks.length]);
 
   useLayoutEffect(() => {
     activePaneScrollRef.current?.scrollTo({ top: 0 });
@@ -166,25 +127,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
     setCreateOpen(true);
   }, []);
 
-  // WAI-ARIA tablist keyboard nav: ←/→ (and Home/End) move focus + activate with wrap,
-  // so the sliding underline follows the keyboard as well as the pointer.
-  const handleTabKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLButtonElement>, value: AutoTab) => {
-      const idx = AUTO_TAB_ORDER.indexOf(value);
-      let next = -1;
-      if (e.key === 'ArrowRight') next = (idx + 1) % AUTO_TAB_ORDER.length;
-      else if (e.key === 'ArrowLeft')
-        next = (idx - 1 + AUTO_TAB_ORDER.length) % AUTO_TAB_ORDER.length;
-      else if (e.key === 'Home') next = 0;
-      else if (e.key === 'End') next = AUTO_TAB_ORDER.length - 1;
-      if (next < 0) return;
-      e.preventDefault();
-      const target = AUTO_TAB_ORDER[next];
-      setActiveTab(target);
-      tabRefs.current[target]?.focus();
-    },
-    [],
-  );
+  // base-ui Tabs handles arrow-key/Home/End tablist navigation natively.
 
   const handleCreateSaved = useCallback(() => {
     setCreateOpen(false);
@@ -205,23 +148,31 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="draggable flex h-12 shrink-0 items-center justify-between px-4">
-        <div className="flex items-center gap-3 h-8">
-          {isSidebarCollapsed && (
-            <div className={`non-draggable flex items-center gap-1 ${isMac ? 'pl-[68px]' : ''}`}>
-              <Button type="button" variant="ghost" size="icon" onClick={onToggleSidebar}>
-                <PanelLeftOpen />
-              </Button>
-              <Button type="button" variant="ghost" size="icon" onClick={onNewChat}>
-                <SidebarAnimatedMessageCirclePlusIcon />
-              </Button>
-              {updateBadge}
-            </div>
-          )}
-        </div>
-        <WindowTitleBar inline />
-      </div>
+      <PageHeader
+        title={i18nService.t('scheduledTasksTitle')}
+        isSidebarCollapsed={isSidebarCollapsed}
+        onToggleSidebar={onToggleSidebar}
+        onNewChat={onNewChat}
+        updateBadge={updateBadge}
+        tabs={
+          <PageTabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            items={[
+              {
+                value: AUTO_TAB.Tasks,
+                label: i18nService.t('scheduledTasksTabTasks'),
+                badge:
+                  tasks.length > 0 ? (
+                    <Badge variant="secondary">{tasks.length}</Badge>
+                  ) : undefined,
+              },
+              { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
+              { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
+            ]}
+          />
+        }
+      />
 
       <div className="mx-auto w-full max-w-2xl shrink-0 px-8">
         {/* ── Hero ── */}
@@ -230,64 +181,11 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
               <CalendarClock className="size-6 text-primary" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-xxl font-semibold text-foreground">
-                {i18nService.t('scheduledTasksTitle')}
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {i18nService.t('scheduledTasksHeroDesc')}
-              </p>
-            </div>
+            <p className="min-w-0 text-sm text-muted-foreground">
+              {i18nService.t('scheduledTasksHeroDesc')}
+            </p>
           </div>
         </section>
-
-        {/* ── Tab list on the divider line, with a sliding underline ── */}
-        <div className="relative shrink-0 border-b border-border">
-          <div ref={tabRowRef} role="tablist" className="flex items-center gap-6">
-            {(
-              [
-                { value: AUTO_TAB.Tasks, label: i18nService.t('scheduledTasksTabTasks') },
-                { value: AUTO_TAB.Create, label: i18nService.t('scheduledTasksNewTab') },
-                { value: AUTO_TAB.History, label: i18nService.t('scheduledTasksTabHistory') },
-              ] as const
-            ).map(tab => {
-              const active = activeTab === tab.value;
-              return (
-                <Button
-                  key={tab.value}
-                  variant="ghost"
-                  ref={el => {
-                    tabRefs.current[tab.value] = el;
-                  }}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  tabIndex={active ? 0 : -1}
-                  onClick={() => setActiveTab(tab.value)}
-                  onKeyDown={e => handleTabKeyDown(e, tab.value)}
-                  className={cn(
-                    'relative -mb-px h-auto gap-2 rounded-none border-b-2 border-transparent px-0 pb-2.5 hover:bg-transparent focus-visible:text-foreground active:translate-y-0 dark:hover:bg-transparent',
-                    active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
-                  )}
-                >
-                  {tab.label}
-                  {tab.value === AUTO_TAB.Tasks && tasks.length > 0 && (
-                    <Badge variant="secondary">{tasks.length}</Badge>
-                  )}
-                </Button>
-              );
-            })}
-          </div>
-          <span
-            aria-hidden
-            className="absolute bottom-0 h-0.5 rounded-full bg-primary transition-[left,width] duration-300 ease-smooth"
-            style={{
-              left: indicator?.left ?? 0,
-              width: indicator?.width ?? 0,
-              opacity: indicator ? 1 : 0,
-            }}
-          />
-        </div>
       </div>
 
       <div ref={activePaneScrollRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">

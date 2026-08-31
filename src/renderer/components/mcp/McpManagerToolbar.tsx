@@ -5,7 +5,7 @@ import {
   InputGroupInput,
   InputGroupText,
 } from '@shared/components/ui/input-group';
-import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
+import { PageTabs } from '@shared/components/ui/page-tabs';
 import { Cable, Search } from 'lucide-react';
 
 import { i18nService } from '../../services/i18n';
@@ -60,10 +60,9 @@ export function McpManagerToolbar({
         <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-muted">
           <Cable className="size-6 text-primary" aria-hidden="true" />
         </div>
-        <div className="min-w-0">
-          <h2 className="text-xxl font-semibold text-foreground">{i18nService.t('connectors')}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">{i18nService.t('connectorsDescription')}</p>
-        </div>
+        <p className="min-w-0 text-sm text-muted-foreground">
+          {i18nService.t('connectorsDescription')}
+        </p>
       </div>
 
       <InputGroup className="w-full">
@@ -81,28 +80,19 @@ export function McpManagerToolbar({
       </InputGroup>
 
       {showTabs ? (
-        <Tabs
+        <PageTabs
           value={activeTab}
-          onValueChange={value => onTabChange(value as McpTabType)}
-          className="-mb-px self-start"
-        >
-          <TabsList variant="line">
-            {MCP_TAB_ITEMS.map(tab => {
-              const count = getTabCount(tab.value, installedCount, marketplaceCount, customCount);
-
-              return (
-                <TabsTrigger
-                  key={tab.value}
-                  value={tab.value}
-                  className="after:bottom-[-1px] after:h-1"
-                >
-                  {i18nService.t(tab.labelKey)}
-                  {count > 0 ? <Badge variant="secondary">{count}</Badge> : null}
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
+          onValueChange={onTabChange}
+          className="-mb-px"
+          items={MCP_TAB_ITEMS.map(tab => {
+            const count = getTabCount(tab.value, installedCount, marketplaceCount, customCount);
+            return {
+              value: tab.value,
+              label: i18nService.t(tab.labelKey),
+              badge: count > 0 ? <Badge variant="secondary">{count}</Badge> : undefined,
+            };
+          })}
+        />
       ) : null}
     </header>
   );

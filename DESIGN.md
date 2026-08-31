@@ -248,7 +248,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 正误对照：
 
-- ✅ 首页三段 `fade-in-up` 错峰（120/200/300ms）；tab 指示器滑动（layered-tabs）；按钮 `active:translate-y-px`
+- ✅ 首页三段 `fade-in-up` 错峰（120/200/300ms）；tab 指示器滑动（PageTabs layoutId）；按钮 `active:translate-y-px`
 - ❌ 整屏内容无过渡瞬间出现；三层以上的错峰或总延迟 >400ms
 - ❌ 对含文字的卡片做 `scale` hover；对比度 <3% 的 hover 变色
 - ❌ 装饰性循环动画；一屏多处同时脉冲/流光
@@ -333,36 +333,30 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 - [ ] 亮色与暗色两种外观下都看过效果
 - [ ] 组件优先使用 shadcn/ui 与 ai-elements（见 AGENTS.md），未自造轮子
 
-## 可复用的分割线 Tabs
+## 可复用的页面 Tabs
 
-带重叠层级、阴影、尺寸和文字动效的 tabs 统一存放在：
+功能页内部标签页（专家、本地推理、自动化、活动等页面）统一使用：
 
 ```text
-src/shared/components/ui/layered-tabs/
-├── constants.ts
-├── layered-tabs.tsx
-├── layered-tabs.test.ts
-└── index.ts
+src/shared/components/ui/page-tabs.tsx
 ```
 
-组件导出 `LayeredTabsList`，它必须放在现有 shadcn `Tabs` 根节点内部，与 `TabsContent` 配合使用。页面只提供受控的 `value`、`items` 和文案，不把页面业务状态、脏表单拦截或内容切换逻辑放进组件。
+组件导出 `PageTabs`，是页面级标签页的**唯一实现**。它自带 base-ui `Tabs` 根（键盘导航、ARIA 齐备），激活指示器是通过 `layoutId` 在 trigger 间共享的单个元素，切换时以 transform-only 弹簧滑动，不触发布局计算；选中态只用文字颜色表达（`text-muted-foreground` → `text-foreground`），不使用色块。自动遵守 `prefers-reduced-motion`。
 
 ```tsx
-<Tabs value={activeTab} onValueChange={setActiveTab}>
-  <LayeredTabsList
-    value={activeTab}
-    items={tabs}
-    separatorEdge={LayeredTabsSeparatorEdge.Top}
-  />
-  <TabsContent value={activeTab}>{content}</TabsContent>
-</Tabs>
+<PageTabs
+  value={activeTab}
+  onValueChange={setActiveTab}
+  items={[
+    { value: 'tasks', label: t('tabTasks'), badge: <Badge variant="secondary">3</Badge> },
+    { value: 'history', label: t('tabHistory') },
+  ]}
+/>
 ```
 
-`separatorEdge` 有两个变体：
+规则：
 
-- `LayeredTabsSeparatorEdge.Top`：separator 位于 tab 顶部，tab 向下展开。
-- `LayeredTabsSeparatorEdge.Bottom`：separator 位于 tab 底部，tab 向上展开。
-
-`LayeredTabsList` 是 separator 的唯一拥有者。页面 header、TabsList 外层和其他父级不得再绘制同一位置的 `border` 或 `Separator`，否则 active tab 无法完整遮挡线段。页面需要调整宽度、外边距或内容间距时，使用组件的 `className`、`contentClassName` 和 `listClassName`，不要复制内部 trigger 和 surface 样式。
-
-组件使用 `motion` 处理 active 层级、背景表面和文字缩放，自动遵守 `prefers-reduced-motion`。新增 tab 数量或顺序时只需修改页面传入的 `items`，层级由组件统一计算；不要在页面中重新实现 z-index、三级尺寸或 separator 方向逻辑。
+1. **页面 tab 一律放在 `PageHeader` 的 `tabs` 槽位**，由该行统一绘制 `border-b` 分隔线；页面不得再在 tabs 外层画第二条分隔线。
+2. 一页可有多个 `PageTabs` 实例（如筛选行），组件内部用 `useId` 隔离指示器，不会互相串扰。
+3. 内容面板切换继续使用 `layered-tabs-content` 的退出-进入范式（`x:±28 + opacity`，0.22s），与 tab 指示器滑动配套。
+4. 页面只提供受控 `value`、`items` 和回调；不要在页面中重新实现指示器测量、滑动或 separator 逻辑。

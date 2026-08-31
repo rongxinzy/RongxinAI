@@ -295,6 +295,7 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 2. **禁止自造基础组件。** 不要自己写 button / dialog / select / tooltip / tabs / popover 等，shadcn/ui 已有。
 3. **图标用 lucide-react。** 禁止手写 SVG 图标组件（项目已删除 30+ 个自定义 icon，全部迁移到 lucide）。
 4. **对话 UI 用 ai-elements。** 聊天、消息、推理展示等场景必须用 ai-elements，不要自己拼。
+5. **页面顶栏用 PageHeader。** 侧边栏切换的功能页必须使用 `src/renderer/components/PageHeader.tsx`（统一 h-12 / px-4 / draggable / border-b / 折叠按钮组 / mac 留白 / WindowTitleBar），禁止手写页面顶栏。页面标题只在 PageHeader 出现一次，内容区 hero 不重复标题。
 
 ### 样式工具
 
