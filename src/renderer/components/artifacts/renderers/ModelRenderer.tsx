@@ -128,7 +128,11 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
         const height = container.clientHeight || 480;
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(width, height);
+        // updateStyle=false: the canvas is stretched by CSS (width/height
+        // 100%), so live resizes never reallocate the drawing buffer per
+        // pixel — that per-pixel reallocation is what blanks the GPU surface
+        // while the panel divider is dragged.
+        renderer.setSize(width, height, false);
         renderer.domElement.style.width = '100%';
         renderer.domElement.style.height = '100%';
         renderer.domElement.style.display = 'block';
@@ -172,14 +176,28 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
         });
         setStats({ triangles: Math.round(triangles) });
 
-        const resize = () => {
+        // The canvas is CSS-stretched, so the rendered image keeps tracking
+        // the container live during drags; the drawing buffer itself is
+        // re-allocated on a short debounce. Continuous re-allocation would
+        // blank the GPU surface every frame the panel divider moves.
+        const RESIZE_DEBOUNCE_MS = 120;
+        let resizeTimer: number | null = null;
+        const applyBufferSize = () => {
+          resizeTimer = null;
+          if (disposed) return;
           const w = container.clientWidth || width;
           const h = container.clientHeight || height;
+          if (!w || !h) return;
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
-          renderer.setSize(w, h);
+          renderer.setSize(w, h, false);
         };
-        const resizeObserver = new ResizeObserver(resize);
+        const scheduleBufferSize = () => {
+          if (disposed) return;
+          if (resizeTimer !== null) window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(applyBufferSize, RESIZE_DEBOUNCE_MS);
+        };
+        const resizeObserver = new ResizeObserver(scheduleBufferSize);
         resizeObserver.observe(container);
 
         const tick = () => {
@@ -190,7 +208,9 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
         tick();
 
         cleanup = () => {
+          disposed = true;
           cancelAnimationFrame(frameId);
+          if (resizeTimer !== null) window.clearTimeout(resizeTimer);
           resizeObserver.disconnect();
           controls.dispose();
           scene.traverse(node => {
