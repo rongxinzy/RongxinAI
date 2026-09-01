@@ -2,13 +2,18 @@ import {
   CoworkSessionMode,
   type CoworkSessionMode as CoworkSessionModeValue,
 } from '../../shared/cowork/constants';
-import type { ProductionLoopState } from '../../shared/productionLoop';
+import {
+  ProductionLoopMode,
+  type ProductionLoopMode as ProductionLoopModeValue,
+  type ProductionLoopState,
+} from '../../shared/productionLoop';
 import { WorkbenchContractKind } from '../../shared/workbenchTask';
 
 export interface ProductionWorkflowEntryInput {
   sessionMode?: CoworkSessionModeValue;
   prompt: string;
   goalMode?: boolean;
+  productionLoopMode?: ProductionLoopModeValue;
   inheritedProductionRequired?: boolean;
 }
 
@@ -20,7 +25,10 @@ export interface ProductionWorkflowEntryInput {
  */
 export const shouldExposeProductionControls = (input: ProductionWorkflowEntryInput): boolean => {
   if (input.sessionMode === CoworkSessionMode.Chat) return false;
-  return true;
+  // A persisted production task owns its workflow topology. A per-prompt
+  // "off" choice must not silently bypass the production gate on resume.
+  if (input.inheritedProductionRequired === true) return true;
+  return input.productionLoopMode !== ProductionLoopMode.Off;
 };
 
 export const shouldRequireProductionOnResume = (

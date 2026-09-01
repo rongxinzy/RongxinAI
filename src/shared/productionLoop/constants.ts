@@ -66,5 +66,12 @@ export type ProductionLoopAction = (typeof ProductionLoopAction)[keyof typeof Pr
 
 export const ProductionLoopToolName = 'production_loop';
 
+/** Per-prompt control for exposing the production workflow to the agent. */
+export const ProductionLoopMode = {
+  Auto: 'auto',
+  Off: 'off',
+} as const;
+export type ProductionLoopMode = (typeof ProductionLoopMode)[keyof typeof ProductionLoopMode];
+
 /** Stop automatic continuation after repeated turns make no production progress. */
 export const MAX_STALE_PRODUCTION_ITERATIONS = 3;

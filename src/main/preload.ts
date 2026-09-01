@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { CoworkError } from '../common/coworkError';
 import { IpcChannel as ScheduledTaskIpc } from '../scheduledTask/constants';
 import { MemoryIpcChannel } from '../shared/memory';
+import type { ProductionLoopMode } from '../shared/productionLoop';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import { AppUpdateIpc } from '../shared/appUpdate/constants';
 import { ActivityIpc } from '../shared/activity/constants';
@@ -449,6 +450,7 @@ contextBridge.exposeInMainWorld('electron', {
       title?: string;
       mode?: CoworkSessionMode;
       goalMode?: boolean;
+      productionLoopMode?: ProductionLoopMode;
       activeSkillIds?: string[];
       workspaceId?: string;
       agentId?: string;
@@ -465,6 +467,7 @@ contextBridge.exposeInMainWorld('electron', {
       systemPrompt?: string;
       activeSkillIds?: string[];
       goalMode?: boolean;
+      productionLoopMode?: ProductionLoopMode;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
@@ -479,6 +482,7 @@ contextBridge.exposeInMainWorld('electron', {
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       skillIds?: string[];
       skillPrompt?: string;
+      productionLoopMode?: import('../shared/productionLoop').ProductionLoopMode;
     }) => ipcRenderer.invoke(CoworkQueueIpc.Enqueue, options),
     updatePendingMessage: (options: { sessionId: string; itemId: string; text: string }) =>
       ipcRenderer.invoke(CoworkQueueIpc.Update, options),
