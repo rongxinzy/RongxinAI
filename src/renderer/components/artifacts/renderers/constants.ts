@@ -8,3 +8,6 @@ export const ModelFileExtension = {
 } as const;
 
 export type ModelFileExtension = (typeof ModelFileExtension)[keyof typeof ModelFileExtension];
+
+// OrbitControls rotates the camera, so a negative orbit makes the model appear clockwise.
+export const MODEL_AUTO_ROTATE_SPEED = -2;
