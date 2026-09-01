@@ -5,6 +5,7 @@ import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessage
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
 import type { ProductionLoopMode } from '../../../shared/productionLoop';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
+import type { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 
 /**
  * Pi-native workbench runtime types (issue #225).
@@ -80,7 +81,7 @@ export type PiStartOptions = {
   skipInitialUserMessage?: boolean;
   skillIds?: string[];
   systemPrompt?: string;
-  autoApprove?: boolean;
+  approvalMode?: WorkbenchApprovalMode;
   workspaceRoot?: string;
   confirmationMode?: 'modal' | 'text';
   /** UI session mode, used to apply Work-only execution controls. */
@@ -121,7 +122,7 @@ export type PiContinueOptions = {
   /** Forwarded to startSession when the runtime has to recreate the session. */
   thinkingLevel?: PiThinkingLevel;
   /** Forwarded to startSession when the runtime has to recreate the session. */
-  autoApprove?: boolean;
+  approvalMode?: WorkbenchApprovalMode;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
   /** Internal: the owning task already has a controlled production workflow. */

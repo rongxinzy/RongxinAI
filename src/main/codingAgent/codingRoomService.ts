@@ -50,6 +50,7 @@ import { t } from '../i18n';
 import type { CodingAgentDriver } from './drivers/codingAgentDriver';
 import { CodingDriverFactory } from './drivers/driverFactory';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
+import type { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 
 export interface CodingRoomRuntime {
   startBuiltinSession(input: {
@@ -58,7 +59,10 @@ export interface CodingRoomRuntime {
     prompt: string;
     modelOverride?: string | null;
     thinkingLevel?: string;
+    permissionMode?: WorkbenchApprovalMode;
   }): Promise<void>;
+  /** Applies approval-mode changes to a live built-in session. */
+  setBuiltinApprovalMode?(sessionId: string, mode: WorkbenchApprovalMode): void;
   cancelBuiltinSession(sessionId: string): Promise<void>;
   /** Applies model/thinking-level changes to a live built-in session. */
   patchBuiltinSession?(
@@ -157,9 +161,11 @@ export class CodingRoomService extends EventEmitter {
             prompt,
             ...(options?.modelOverride ? { modelOverride: options.modelOverride } : {}),
             ...(options?.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
+            ...(options?.permissionMode ? { permissionMode: options.permissionMode } : {}),
           }),
         cancel: sessionId => this.runtime.cancelBuiltinSession(sessionId),
         patchSession: patchBuiltinSession,
+        setApprovalMode: this.runtime.setBuiltinApprovalMode?.bind(this.runtime),
       },
       Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]])),
     );

@@ -23,6 +23,7 @@ import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { ProductionLoopAction } from '../../../shared/productionLoop';
 import {
+  WorkbenchApprovalMode,
   WorkbenchContractKind,
   WorkbenchRunTrigger,
   WorkbenchRunStatus,
@@ -1719,7 +1720,7 @@ describe('PiRuntimeAdapter', () => {
           toolCallId: 'write-call',
           toolName: 'write',
           toolInput: { path: 'slides.md', content: 'draft' },
-          autoApprove: false,
+          approvalMode: WorkbenchApprovalMode.Ask,
         });
         const approval = service.getDetail(first.task.id)?.approvals[0];
         service.respondToApproval({ approvalId: approval!.id, approved: false });
@@ -2000,7 +2001,7 @@ describe('PiRuntimeAdapter', () => {
           toolCallId: 'write-call',
           toolName: 'write',
           toolInput: { path: 'release.md', content: 'draft' },
-          autoApprove: false,
+          approvalMode: WorkbenchApprovalMode.Ask,
         });
         await vi.waitFor(() => expect(requests).toHaveLength(1));
 
@@ -3073,7 +3074,7 @@ describe('PiRuntimeAdapter', () => {
     it('preserves Allow All across internal follow-up continuations', async () => {
       await adapter.startSession('allow-all-session', 'Start work', {
         sessionMode: 'work',
-        autoApprove: true,
+        approvalMode: WorkbenchApprovalMode.AllowAll,
       });
 
       await adapter.continueSession('allow-all-session', 'Continue work', {
@@ -3082,10 +3083,12 @@ describe('PiRuntimeAdapter', () => {
 
       const activeSessions = (
         adapter as unknown as {
-          activeSessions: Map<string, { autoApprove: boolean }>;
+          activeSessions: Map<string, { approvalMode: WorkbenchApprovalMode }>;
         }
       ).activeSessions;
-      expect(activeSessions.get('allow-all-session')?.autoApprove).toBe(true);
+      expect(activeSessions.get('allow-all-session')?.approvalMode).toBe(
+        WorkbenchApprovalMode.AllowAll,
+      );
     });
 
     it('delivers queued follow-ups in order after Pi settles', async () => {

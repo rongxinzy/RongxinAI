@@ -48,6 +48,7 @@ import {
 } from '../../../shared/productionLoop';
 import {
   WorkbenchApprovalDecision,
+  WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
@@ -301,7 +302,7 @@ interface ActivePiSession {
   workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
   settingsManager: PiSettingsManager | null;
-  autoApprove: boolean;
+  approvalMode: WorkbenchApprovalMode;
   /** True while Pi is executing the current Work/Chat turn. */
   isRunning: boolean;
   /** True when the current turn settled with an unrecoverable Pi error. */
@@ -804,8 +805,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionId,
         getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
         settingsManager,
-        getAutoApprove: () =>
-          this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
+        getApprovalMode: () =>
+          this.activeSessions.get(sessionId)?.approvalMode ??
+          options.approvalMode ??
+          WorkbenchApprovalMode.Ask,
       });
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
@@ -980,8 +983,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             {
               sessionId,
               getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-              getAutoApprove: () =>
-                this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
+              getApprovalMode: () =>
+                this.activeSessions.get(sessionId)?.approvalMode ??
+                options.approvalMode ??
+                WorkbenchApprovalMode.Ask,
             },
             extensionFactories,
           ),
@@ -1114,7 +1119,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workbenchContract,
         workspaceRoot,
         settingsManager,
-        autoApprove: Boolean(options.autoApprove),
+        approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
         isRunning: true,
         turnFailed: false,
         queueFlushInFlight: false,
@@ -1287,8 +1292,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
     }
 
-    if (options.autoApprove !== undefined) {
-      active.autoApprove = Boolean(options.autoApprove);
+    if (options.approvalMode !== undefined) {
+      active.approvalMode = options.approvalMode;
     }
     active.isRunning = true;
     active.turnFailed = false;
@@ -1681,10 +1686,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
   }
 
-  /** Applies the global permission mode to sessions that are already running. */
-  setAutoApproveForSession(sessionId: string, autoApprove: boolean): void {
+  /** Applies the current approval mode to sessions that are already running. */
+  setApprovalModeForSession(sessionId: string, approvalMode: WorkbenchApprovalMode): void {
     const active = this.activeSessions.get(sessionId);
-    if (active) active.autoApprove = autoApprove;
+    if (active) active.approvalMode = approvalMode;
   }
 
   respondToPermission(requestId: string, result: PiPermissionResult): void {
@@ -1987,7 +1992,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionId: string;
       getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
-      getAutoApprove: () => boolean;
+      getApprovalMode: () => WorkbenchApprovalMode;
     },
     additionalExtensionFactories: PiExtensionFactory[] = [],
   ): Promise<PiResourceLoader> {
@@ -2051,7 +2056,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                     toolCallId: event.toolCallId,
                     toolName: event.toolName,
                     toolInput,
-                    autoApprove: approvalContext.getAutoApprove(),
+                    approvalMode: approvalContext.getApprovalMode(),
                   });
                   return authorization && !authorization.allow
                     ? {
