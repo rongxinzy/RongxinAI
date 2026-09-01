@@ -1,7 +1,10 @@
 import { expect, test } from 'vitest';
 
 import type { CoworkMessage } from '../../coworkStore';
-import { buildPiConversationPrompt } from './piConversationContext';
+import {
+  buildPiConversationPrompt,
+  calculatePiConversationHistoryCharLimit,
+} from './piConversationContext';
 
 const message = (
   id: string,
@@ -49,4 +52,16 @@ test('keeps the latest complete entries when recovery context exceeds its budget
   expect(prompt).not.toContain('User: 1:');
   expect(prompt).toContain('User: 9:');
   expect(prompt.length).toBeLessThan(61_000);
+});
+
+test('calculates a conservative history budget for the default 32K context', () => {
+  expect(calculatePiConversationHistoryCharLimit()).toBe(10_240);
+  expect(calculatePiConversationHistoryCharLimit(32_768, 8_192)).toBe(8_192);
+});
+
+test('scales history budget down for small and invalid model contexts', () => {
+  expect(calculatePiConversationHistoryCharLimit(16_384, 4_096)).toBe(2_048);
+  expect(calculatePiConversationHistoryCharLimit(8_192, 2_048)).toBe(2_000);
+  expect(calculatePiConversationHistoryCharLimit(0, 0)).toBe(10_240);
+  expect(calculatePiConversationHistoryCharLimit(Number.NaN, -1)).toBe(10_240);
 });

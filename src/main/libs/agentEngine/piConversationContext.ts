@@ -3,7 +3,33 @@ import type { CoworkMessage } from '../../coworkStore';
 const PiConversationContextLimit = {
   TotalChars: 60_000,
   EntryChars: 8_000,
+  DefaultContextWindowTokens: 32_768,
+  DefaultMaxOutputTokens: 4_096,
+  ReservedPromptTokens: 8_192,
+  CharsPerToken: 0.5,
 } as const;
+
+export const calculatePiConversationHistoryCharLimit = (
+  contextWindowTokens?: number,
+  maxOutputTokens?: number,
+): number => {
+  const contextWindow =
+    Number.isFinite(contextWindowTokens) && (contextWindowTokens ?? 0) > 0
+      ? contextWindowTokens!
+      : PiConversationContextLimit.DefaultContextWindowTokens;
+  const outputTokens =
+    Number.isFinite(maxOutputTokens) && (maxOutputTokens ?? 0) > 0
+      ? maxOutputTokens!
+      : PiConversationContextLimit.DefaultMaxOutputTokens;
+  const availableTokens = Math.max(
+    1,
+    contextWindow - outputTokens - PiConversationContextLimit.ReservedPromptTokens,
+  );
+  return Math.min(
+    PiConversationContextLimit.TotalChars,
+    Math.max(2_000, Math.floor(availableTokens * PiConversationContextLimit.CharsPerToken)),
+  );
+};
 
 const truncateEntry = (value: string): string => {
   const normalized = value.trim();
@@ -38,14 +64,19 @@ const formatHistoryMessage = (message: CoworkMessage): string | null => {
 export const buildPiConversationPrompt = (
   messages: CoworkMessage[],
   currentPrompt: string,
+  options: { maxChars?: number } = {},
 ): string => {
+  const totalChars = Math.min(
+    PiConversationContextLimit.TotalChars,
+    Math.max(2_000, Math.floor(options.maxChars ?? PiConversationContextLimit.TotalChars)),
+  );
   const entries = messages.map(formatHistoryMessage).filter((entry): entry is string => !!entry);
   const selected: string[] = [];
   let selectedChars = 0;
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index];
     const nextChars = selectedChars + entry.length + 2;
-    if (nextChars > PiConversationContextLimit.TotalChars) break;
+    if (nextChars > totalChars) break;
     selected.unshift(entry);
     selectedChars = nextChars;
   }
