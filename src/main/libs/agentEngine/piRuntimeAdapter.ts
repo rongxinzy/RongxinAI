@@ -2092,7 +2092,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                   resourceState.skillIds?.includes(skill.name || ''),
               ),
             },
-      systemPromptOverride: base => {
+      systemPromptOverride: (base: string | undefined): string | undefined => {
         const custom = resourceState.systemPrompt.trim();
         if (!custom) return base;
         if (!base?.trim()) return custom;
