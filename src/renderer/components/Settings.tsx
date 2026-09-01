@@ -48,13 +48,13 @@ import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../shared/appUpd
 import {
   type AppConfig,
   defaultConfig,
-  getCustomProviderDefaultName,
   getProviderDisplayName,
   getVisibleProviders,
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
 import {
+  MODEL_CAPABILITY_FIELDS,
   ModelCapabilitiesFields,
   type ModelCapabilityKey,
 } from './settings/ModelCapabilitiesFields';
@@ -198,6 +198,12 @@ type ProviderType = BuiltinProviderType | CustomProviderType;
 type ProvidersConfig = NonNullable<AppConfig['providers']>;
 type ProviderConfig = ProvidersConfig[string];
 type Model = NonNullable<ProviderConfig['models']>[number];
+
+const getCustomProviderLabel = (provider: string): string => {
+  const index = Number(provider.replace('custom_', '')) + 1;
+  const baseLabel = i18nService.t('customProviderDefaultName');
+  return index === 1 || !Number.isFinite(index) ? baseLabel : `${baseLabel} ${index}`;
+};
 type ProviderConnectionTestResult = {
   success: boolean;
   message: string;
@@ -239,6 +245,9 @@ const formatTokenK = (tokens?: number): string => {
   if (!tokens || !Number.isFinite(tokens) || tokens <= 0) return '';
   return String(Number((tokens / TOKENS_PER_K).toFixed(2)));
 };
+
+const formatDetectedTokenLimit = (tokens: number): string =>
+  tokens >= TOKENS_PER_K ? `${formatTokenK(tokens)}K` : String(tokens);
 
 const parseTokenK = (value: string): number | undefined => {
   const parsed = Number.parseFloat(value.trim());
@@ -297,8 +306,12 @@ const LOCAL_NO_KEY_PROVIDERS = new Set<ProviderType>([
   'github-copilot',
 ]);
 
-const providerRequiresApiKey = (provider: ProviderType) => !LOCAL_NO_KEY_PROVIDERS.has(provider);
+const providerRequiresApiKey = (provider: ProviderType) =>
+  !LOCAL_NO_KEY_PROVIDERS.has(provider) && !isCustomProvider(provider);
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
+  if (isCustomProvider(provider)) {
+    return config.baseUrl.trim().length > 0;
+  }
   if (provider === ProviderName.Ollama || provider === ProviderName.LlamaCpp) {
     return true;
   }
@@ -849,6 +862,7 @@ const Settings: React.FC<SettingsProps> = ({
 
   // Add state for providers configuration
   const [providers, setProviders] = useState<ProvidersConfig>(() => getDefaultProviders());
+  const [selectedModelId, setSelectedModelId] = useState('');
 
   // authType defaults to undefined on first open, which should behave as OAuth mode
   const minimaxIsOAuthMode = providers.minimax.authType !== 'apikey';
@@ -913,6 +927,13 @@ const Settings: React.FC<SettingsProps> = ({
   useEffect(() => {
     setShowApiKey(false);
   }, [activeProvider]);
+
+  useEffect(() => {
+    const models = providers[activeProvider]?.models ?? [];
+    setSelectedModelId(current =>
+      models.some(model => model.id === current) ? current : (models[0]?.id ?? ''),
+    );
+  }, [activeProvider, providers]);
 
   const handleExportLogs = useCallback(async () => {
     if (isExportingLogs) {
@@ -1439,6 +1460,7 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setModelFormError(null);
     setActiveProvider(provider);
+    setSelectedModelId('');
     // 切换 provider 时清除测试结果
     setIsTestResultModalOpen(false);
     setTestResult(null);
@@ -1806,7 +1828,11 @@ const Settings: React.FC<SettingsProps> = ({
     }
 
     if (isEnabling && !hasValidAuth) {
-      setError(i18nService.t('apiKeyRequired'));
+      setError(
+        isCustomProvider(provider)
+          ? i18nService.t('customProviderBaseUrlRequired')
+          : i18nService.t('apiKeyRequired'),
+      );
       return;
     }
 
@@ -2317,7 +2343,12 @@ const Settings: React.FC<SettingsProps> = ({
       return;
     }
 
-    let firstModel = providerConfig.models?.[0] ? { ...providerConfig.models[0] } : undefined;
+    const selectedModel = providerConfig.models?.find(model => model.id === selectedModelId);
+    let firstModel = selectedModel
+      ? { ...selectedModel }
+      : providerConfig.models?.[0]
+        ? { ...providerConfig.models[0] }
+        : undefined;
 
     if (testingProvider === ProviderName.LlamaCpp) {
       const runningModels = await window.electron.llamacpp.listRunningModels().catch(() => []);
@@ -2515,9 +2546,12 @@ const Settings: React.FC<SettingsProps> = ({
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
     // Only export providers that have an API key configured, regardless of enabled state.
     // Skip preset providers that were never configured to avoid exporting default models.
-    const configuredEntries = Object.entries(providers).filter(([, cfg]) =>
-      (cfg as ProviderConfig).apiKey?.trim(),
-    );
+    const configuredEntries = Object.entries(providers).filter(([providerKey, cfg]) => {
+      const providerConfig = cfg as ProviderConfig;
+      return isCustomProvider(providerKey)
+        ? Boolean(providerConfig.baseUrl?.trim() || providerConfig.apiKey?.trim())
+        : Boolean(providerConfig.apiKey?.trim());
+    });
     const entries = await Promise.all(
       configuredEntries.map(async ([providerKey, providerConfig]) => {
         const apiKey = await encryptWithPassword(providerConfig.apiKey, password);
@@ -3254,7 +3288,7 @@ const Settings: React.FC<SettingsProps> = ({
                   : providerEnabled;
                 const canToggleProvider = effectiveEnabled || hasValidAuth;
                 const displayLabel = isCustom
-                  ? (config as ProviderConfig).displayName || getCustomProviderDefaultName(provider)
+                  ? (config as ProviderConfig).displayName || getCustomProviderLabel(provider)
                   : (ProviderRegistry.get(providerKey)?.label ?? getProviderDisplayName(provider));
                 return (
                   <div
@@ -3334,19 +3368,24 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Provider Settings - Right Side */}
-            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable">
+            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable flex flex-col">
               {(() => {
                 const statusBadge = getProviderStatusBadge(
                   activeProvider,
                   providers[activeProvider],
                 );
                 return (
-                  <div className="flex items-center justify-between pb-2 border-b border-border">
+                  <div
+                    className={cn(
+                      'flex items-center justify-between pb-2 border-b border-border',
+                      isCustomProvider(activeProvider) && 'order-[-4]',
+                    )}
+                  >
                     <div className="flex items-center gap-1.5">
                       <h3 className="text-base font-medium text-foreground">
                         {isCustomProvider(activeProvider)
                           ? (providers[activeProvider] as ProviderConfig)?.displayName ||
-                            getCustomProviderDefaultName(activeProvider)
+                            getCustomProviderLabel(activeProvider)
                           : (ProviderRegistry.get(activeProvider)?.label ??
                             getProviderDisplayName(activeProvider))}{' '}
                         {i18nService.t('providerSettings')}
@@ -3853,21 +3892,47 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               )}
 
+              <div
+                className={
+                  isCustomProvider(activeProvider)
+                    ? 'order-[-3] flex flex-col space-y-4'
+                    : 'contents'
+                }
+              >
               {/* Standard API key section for non-MiniMax providers */}
-              {providerRequiresApiKey(activeProvider) &&
+              {(providerRequiresApiKey(activeProvider) || isCustomProvider(activeProvider)) &&
                 activeProvider !== 'minimax' &&
                 !(activeProvider === 'openai' && openaiIsOAuthMode) && (
-                  <div>
+                  <div className={isCustomProvider(activeProvider) ? 'order-[-2]' : undefined}>
                     {/* Standard API Key input for non-Qwen providers */}
                     {activeProvider !== 'qwen' && (
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label
                             htmlFor={`${activeProvider}-apiKey`}
+<<<<<<< HEAD
                             className="block text-xs font-medium text-foreground"
                           >
                             {i18nService.t('apiKey')}
                             <span className="text-destructive ml-0.5">*</span>
+=======
+                            className={cn(
+                              'block font-medium',
+                              isCustomProvider(activeProvider)
+                                ? 'text-sm text-foreground'
+                                : 'text-xs dark:text-claude-darkText text-claude-text',
+                            )}
+                          >
+                            {i18nService.t('apiKey')}
+                            {providerRequiresApiKey(activeProvider) && (
+                              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                            )}
+                            {isCustomProvider(activeProvider) && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                                {i18nService.t('customFieldOptional')}
+                              </span>
+                            )}
+>>>>>>> 9f33168e (feat(模型设置): 09-01-rebase前进行保存)
                           </label>
                           {ProviderRegistry.get(activeProvider)?.apiKeyUrl && (
                             <Button
@@ -3893,7 +3958,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onChange={e =>
                               handleProviderConfigChange(activeProvider, 'apiKey', e.target.value)
                             }
-                            className="pr-16 text-xs"
+                            className={cn('pr-16', isCustomProvider(activeProvider) ? 'text-sm' : 'text-xs')}
                             placeholder={i18nService.t('apiKeyPlaceholder')}
                           />
                           <div className="absolute right-2 inset-y-0 flex items-center gap-1">
@@ -3931,6 +3996,11 @@ const Settings: React.FC<SettingsProps> = ({
                             </Button>
                           </div>
                         </div>
+                        {isCustomProvider(activeProvider) && (
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {i18nService.t('customApiKeyHint')}
+                          </p>
+                        )}
                       </div>
                     )}
 
@@ -4145,12 +4215,19 @@ const Settings: React.FC<SettingsProps> = ({
               )}
 
               {isCustomProvider(activeProvider) && (
-                <div>
+                <div className="order-[-1]">
                   <label
                     htmlFor={`${activeProvider}-displayName`}
+<<<<<<< HEAD
                     className="block text-xs font-medium text-foreground mb-1"
+=======
+                    className="mb-1 block text-sm font-medium text-foreground"
+>>>>>>> 9f33168e (feat(模型设置): 09-01-rebase前进行保存)
                   >
                     {i18nService.t('customDisplayName')}
+                    <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                      {i18nService.t('customFieldOptional')}
+                    </span>
                   </label>
                   <Input
                     type="text"
@@ -4159,19 +4236,29 @@ const Settings: React.FC<SettingsProps> = ({
                     onChange={e =>
                       handleProviderConfigChange(activeProvider, 'displayName', e.target.value)
                     }
-                    className="text-xs"
+                    className="text-sm"
                     placeholder={i18nService.t('customDisplayNamePlaceholder')}
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {i18nService.t('customDisplayNameHint')}
+                  </p>
                 </div>
               )}
 
               {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                <div>
+                <div className={isCustomProvider(activeProvider) ? 'order-[-3]' : undefined}>
                   <label
                     htmlFor={`${activeProvider}-baseUrl`}
-                    className="block text-xs font-medium text-foreground mb-1"
+                    className="mb-1 block font-medium text-foreground"
                   >
-                    {i18nService.t('baseUrl')}
+                    <span className={isCustomProvider(activeProvider) ? 'text-sm' : 'text-xs'}>
+                      {i18nService.t('baseUrl')}
+                    </span>
+                    {isCustomProvider(activeProvider) && (
+                      <span className="ml-1.5 inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-xs font-normal text-destructive">
+                        {i18nService.t('customFieldRequired')}
+                      </span>
+                    )}
                   </label>
                   <div className="relative">
                     <Input
@@ -4197,7 +4284,11 @@ const Settings: React.FC<SettingsProps> = ({
                         handleProviderConfigChange(activeProvider, 'baseUrl', e.target.value)
                       }
                       disabled={isBaseUrlLocked}
-                      className={`pr-8 text-xs ${isBaseUrlLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={cn(
+                        'pr-8',
+                        isCustomProvider(activeProvider) ? 'text-sm' : 'text-xs',
+                        isBaseUrlLocked && 'cursor-not-allowed opacity-50',
+                      )}
                       placeholder={
                         activeProvider === 'qwen'
                           ? 'https://dashscope.aliyuncs.com/apps/anthropic'
@@ -4228,26 +4319,9 @@ const Settings: React.FC<SettingsProps> = ({
                     )}
                   </div>
                   {isCustomProvider(activeProvider) && (
-                    <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
-                      <p className="flex min-w-0 items-start gap-1">
-                        <span className="shrink-0 text-sm text-muted">•</span>
-                        <span className="shrink-0 whitespace-nowrap">
-                          {i18nService.t('baseUrlHint1')}
-                        </span>
-                        <code className="min-w-0 text-primary break-all">
-                          {i18nService.t('baseUrlHintExample1')}
-                        </code>
-                      </p>
-                      <p className="flex min-w-0 items-start gap-1">
-                        <span className="shrink-0 text-sm text-muted">•</span>
-                        <span className="shrink-0 whitespace-nowrap">
-                          {i18nService.t('baseUrlHint2')}
-                        </span>
-                        <code className="min-w-0 text-primary break-all">
-                          {i18nService.t('baseUrlHintExample2')}
-                        </code>
-                      </p>
-                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {i18nService.t('customBaseUrlHint')}
+                    </p>
                   )}
                   {/* GLM Coding Plan 提示 */}
                   {activeProvider === 'zhipu' && providers.zhipu.codingPlanEnabled && (
@@ -4313,7 +4387,7 @@ const Settings: React.FC<SettingsProps> = ({
                   <div>
                     <label
                       htmlFor={`${activeProvider}-apiFormat`}
-                      className="block text-xs font-medium text-foreground mb-1"
+                      className="mb-1 block text-sm font-medium text-foreground"
                     >
                       {i18nService.t('apiFormat')}
                     </label>
@@ -4339,7 +4413,7 @@ const Settings: React.FC<SettingsProps> = ({
                           />
                           <label
                             htmlFor={`${activeProvider}-apiFormat-anthropic`}
-                            className="text-xs text-foreground"
+                            className="text-sm text-foreground"
                           >
                             {i18nService.t('apiFormatNative')}
                           </label>
@@ -4351,7 +4425,7 @@ const Settings: React.FC<SettingsProps> = ({
                           />
                           <label
                             htmlFor={`${activeProvider}-apiFormat-openai`}
-                            className="text-xs text-foreground"
+                            className="text-sm text-foreground"
                           >
                             {i18nService.t('apiFormatOpenAI')}
                           </label>
@@ -4359,10 +4433,14 @@ const Settings: React.FC<SettingsProps> = ({
                       </RadioGroup>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {i18nService.t('apiFormatHint')}
+                      {i18nService.t(
+                        isCustomProvider(activeProvider) ? 'customApiFormatHint' : 'apiFormatHint',
+                      )}
                     </p>
                   </div>
                 )}
+
+              </div>
 
               {/* GLM Coding Plan 开关 (仅 Zhipu) */}
               {activeProvider === 'zhipu' && (
@@ -4532,35 +4610,23 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               )}
 
-              {/* 测试连接按钮 */}
-              {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                <div className="flex items-center space-x-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={
-                      isTesting ||
-                      (providerRequiresApiKey(activeProvider) && !providers[activeProvider].apiKey)
-                    }
-                    className="inline-flex items-center px-3 py-1.5 text-xs h-auto"
-                  >
-                    <Signal className="h-3.5 w-3.5 mr-1.5" />
-                    {isTesting ? i18nService.t('testing') : i18nService.t('testConnection')}
-                  </Button>
-                </div>
-              )}
-
               {
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h3 className="text-xs font-medium text-foreground">
-                      {i18nService.t('availableModels')}
-                    </h3>
+                <div
+                  className={cn(
+                    isCustomProvider(activeProvider) &&
+                      'space-y-4',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'mb-2 flex flex-wrap items-center gap-2',
+                      isCustomProvider(activeProvider) ? 'justify-center' : 'justify-between',
+                    )}
+                  >
                     {activeProvider !== ProviderName.LlamaCpp && (
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center justify-center gap-3">
                         <ProviderModelDiscoveryButton
+                          prominent={isCustomProvider(activeProvider)}
                           providerId={activeProvider}
                           provider={providers[activeProvider]}
                           baseUrl={resolveBaseUrl(
@@ -4579,7 +4645,10 @@ const Settings: React.FC<SettingsProps> = ({
                             providerRequiresApiKey(activeProvider) &&
                             providers[activeProvider].authType !== 'oauth'
                           }
-                          onModelsMerge={discoveredModels =>
+                          onModelsMerge={discoveredModels => {
+                            if (discoveredModels.length > 0) {
+                              setSelectedModelId(current => current || discoveredModels[0].id);
+                            }
                             setProviders(previous => {
                               const merged = mergeDiscoveredProviderModels(
                                 previous[activeProvider].models ?? [],
@@ -4593,15 +4662,19 @@ const Settings: React.FC<SettingsProps> = ({
                                   models: merged.models,
                                 },
                               };
-                            })
-                          }
+                            });
+                          }}
                         />
                         <Button
                           type="button"
-                          variant="link"
-                          size="xs"
+                          variant={isCustomProvider(activeProvider) ? 'outline' : 'link'}
+                          size={isCustomProvider(activeProvider) ? 'sm' : 'xs'}
                           onClick={handleAddModel}
-                          className="h-auto px-0 py-0 [&_svg]:size-3.5"
+                          className={cn(
+                            isCustomProvider(activeProvider)
+                              ? 'h-8 px-3 text-sm [&_svg]:size-3.5'
+                              : 'h-auto px-0 py-0 [&_svg]:size-3.5',
+                          )}
                         >
                           <PlusCircle data-icon="inline-start" />
                           {i18nService.t('addModel')}
@@ -4610,29 +4683,162 @@ const Settings: React.FC<SettingsProps> = ({
                     )}
                   </div>
 
-                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                  {isCustomProvider(activeProvider) && (
+                    <p className="mb-3 text-sm text-muted-foreground">
+                      {i18nService.t('customModelSectionHint')}
+                    </p>
+                  )}
+
+                  {!isCustomProvider(activeProvider) &&
+                    (providers[activeProvider].models ?? []).length > 0 && (
+                    <div className="mb-3">
+                      <label
+                        className={cn(
+                          'mb-1 block font-medium text-foreground',
+                          isCustomProvider(activeProvider) ? 'text-sm' : 'text-[11px]',
+                        )}
+                      >
+                        {i18nService.t('selectModel')}
+                      </label>
+                      <Select
+                        value={selectedModelId}
+                        onValueChange={value => setSelectedModelId(value ?? '')}
+                      >
+                        <SelectTrigger
+                          className={isCustomProvider(activeProvider) ? 'h-9 text-sm' : 'h-8 text-xs'}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(providers[activeProvider].models ?? []).map(model => (
+                            <SelectItem
+                              key={model.id}
+                              value={model.id}
+                              className={isCustomProvider(activeProvider) ? 'text-sm' : 'text-xs'}
+                            >
+                              {model.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    )}
+
+                  <div
+                    className={cn(
+                      'max-h-60 overflow-y-auto',
+                      isCustomProvider(activeProvider)
+                        ? 'overflow-hidden rounded-lg border border-border bg-surface'
+                        : 'space-y-1.5',
+                    )}
+                  >
                     {(providers[activeProvider].models ?? []).map(model => (
                       <div
                         key={model.id}
-                        className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
+                        className={cn(
+                          'group transition-colors',
+                          isCustomProvider(activeProvider)
+                            ? cn(
+                                'border-b border-border px-3 py-2.5 last:border-b-0 hover:bg-surface-raised',
+                                model.id === selectedModelId && 'bg-surface-raised',
+                              )
+                            : 'rounded-xl border border-border bg-surface p-2 hover:border-primary',
+                        )}
                       >
+<<<<<<< HEAD
                         <div className="flex items-center justify-between gap-2 min-w-0">
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
                             <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-success"></div>
+=======
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          <div
+                            className={cn(
+                              'flex min-w-0 flex-1 items-center gap-1.5',
+                              isCustomProvider(activeProvider) && 'cursor-pointer',
+                            )}
+                            role={isCustomProvider(activeProvider) ? 'button' : undefined}
+                            tabIndex={isCustomProvider(activeProvider) ? 0 : undefined}
+                            aria-pressed={
+                              isCustomProvider(activeProvider)
+                                ? model.id === selectedModelId
+                                : undefined
+                            }
+                            onClick={
+                              isCustomProvider(activeProvider)
+                                ? () => setSelectedModelId(model.id)
+                                : undefined
+                            }
+                            onKeyDown={
+                              isCustomProvider(activeProvider)
+                                ? event => {
+                                    if (event.key === 'Enter' || event.key === ' ') {
+                                      event.preventDefault();
+                                      setSelectedModelId(model.id);
+                                    }
+                                  }
+                                : undefined
+                            }
+                          >
+                            <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-green-400"></div>
+>>>>>>> 9f33168e (feat(模型设置): 09-01-rebase前进行保存)
                             <div className="min-w-0">
-                              <div className="text-foreground font-medium text-[11px] truncate">
+                              <div
+                                className={cn(
+                                  'truncate font-medium text-foreground',
+                                  isCustomProvider(activeProvider) ? 'text-sm' : 'text-[11px]',
+                                )}
+                              >
                                 {model.name}
                               </div>
                               {activeProvider !== ProviderName.LlamaCpp ? (
-                                <div className="text-[10px] text-muted-foreground truncate">
+                                <div
+                                  className={cn(
+                                    'truncate text-muted-foreground',
+                                    isCustomProvider(activeProvider) ? 'text-xs' : 'text-[10px]',
+                                  )}
+                                >
                                   {model.id}
                                 </div>
                               ) : null}
+                              {isCustomProvider(activeProvider) &&
+                                (model.contextWindow ||
+                                  model.maxTokens ||
+                                  Object.values(model.capabilities ?? {}).some(
+                                    status => status === ModelCapabilityStatus.Supported,
+                                  )) && (
+                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                    {model.contextWindow && (
+                                      <span>
+                                        {i18nService.t('modelContextWindowShort')}:{' '}
+                                        {formatDetectedTokenLimit(model.contextWindow)}
+                                      </span>
+                                    )}
+                                    {model.maxTokens && (
+                                      <span>
+                                        {i18nService.t('modelMaxOutputTokensShort')}:{' '}
+                                        {formatDetectedTokenLimit(model.maxTokens)}
+                                      </span>
+                                    )}
+                                    {MODEL_CAPABILITY_FIELDS.filter(
+                                      field =>
+                                        field.key !== 'imageInput' &&
+                                        model.capabilities?.[field.key] ===
+                                        ModelCapabilityStatus.Supported,
+                                    ).map(field => (
+                                      <span key={field.key}>{i18nService.t(field.labelKey)}</span>
+                                    ))}
+                                  </div>
+                                )}
                             </div>
                           </div>
                           <div className="flex items-center shrink-0 space-x-1">
                             {model.supportsImage && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                              <span
+                                className={cn(
+                                  'rounded-md bg-primary-muted px-1.5 py-0.5 text-primary',
+                                  isCustomProvider(activeProvider) ? 'text-xs' : 'text-[10px]',
+                                )}
+                              >
                                 {i18nService.t('imageInput')}
                               </span>
                             )}
@@ -4707,8 +4913,20 @@ const Settings: React.FC<SettingsProps> = ({
 
                     {(!providers[activeProvider].models ||
                       providers[activeProvider].models.length === 0) && (
-                      <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
-                        <p className="text-[11px] text-muted-foreground">
+                      <div
+                        className={cn(
+                          'text-center',
+                          isCustomProvider(activeProvider)
+                            ? 'p-3'
+                            : 'rounded-xl border border-border-subtle bg-surface p-2.5',
+                        )}
+                      >
+                        <p
+                          className={cn(
+                            'text-muted-foreground',
+                            isCustomProvider(activeProvider) ? 'text-sm' : 'text-[11px]',
+                          )}
+                        >
                           {i18nService.t('noModelsAvailable')}
                         </p>
                         {activeProvider !== ProviderName.LlamaCpp && (
@@ -4728,6 +4946,23 @@ const Settings: React.FC<SettingsProps> = ({
                   </div>
                 </div>
               }
+
+              {/* 测试连接按钮 */}
+              {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
+                <div className="flex items-center space-x-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={isTesting || !providers[activeProvider].baseUrl.trim()}
+                    className="inline-flex items-center px-3 py-1.5 text-xs h-auto"
+                  >
+                    <Signal className="h-3.5 w-3.5 mr-1.5" />
+                    {isTesting ? i18nService.t('testing') : i18nService.t('testConnection')}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         );

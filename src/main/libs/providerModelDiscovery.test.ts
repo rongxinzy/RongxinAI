@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { ApiFormat, ProviderModelDiscoveryErrorCode } from '../../shared/providers';
+import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../../shared/providers';
 import {
   buildProviderModelsUrlCandidates,
   discoverProviderModels,
@@ -57,6 +57,37 @@ describe('parseProviderModelsResponse', () => {
         models: [{ name: 'models/gemini-3-flash', displayName: 'Gemini 3 Flash' }],
       }),
     ).toEqual([{ id: 'gemini-3-flash', displayName: 'Gemini 3 Flash' }]);
+  });
+
+  test('reads explicit capacity and capability metadata without guessing missing fields', () => {
+    expect(
+      parseProviderModelsResponse({
+        data: [
+          {
+            id: 'model-with-metadata',
+            context_length: 32768,
+            max_output_tokens: 4096,
+            capabilities: {
+              tool_calling: true,
+              reasoning: 'supported',
+            },
+            modalities: ['text', 'image', 'audio'],
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: 'model-with-metadata',
+        contextWindow: 32768,
+        maxTokens: 4096,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          imageInput: ModelCapabilityStatus.Supported,
+          audioInput: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      },
+    ]);
   });
 
   test('rejects unsupported payloads', () => {

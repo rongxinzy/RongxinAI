@@ -1,4 +1,4 @@
-import type { ApiFormat } from './constants';
+import type { ApiFormat, ModelCapabilities } from './constants';
 
 export const ProviderModelDiscoveryErrorCode = {
   InvalidConfig: 'invalid_config',
@@ -23,6 +23,9 @@ export interface DiscoveredProviderModel {
   id: string;
   displayName?: string;
   ownedBy?: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  capabilities?: Partial<ModelCapabilities>;
 }
 
 export type ProviderModelDiscoveryResult =

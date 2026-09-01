@@ -20,6 +20,7 @@ interface ProviderModelDiscoveryButtonProps {
   baseUrl: string;
   apiFormat: ApiFormat;
   requiresApiKey: boolean;
+  prominent?: boolean;
   onModelsMerge: (models: readonly DiscoveredProviderModel[]) => void;
 }
 
@@ -40,6 +41,7 @@ export function ProviderModelDiscoveryButton({
   baseUrl,
   apiFormat,
   requiresApiKey,
+  prominent = false,
   onModelsMerge,
 }: ProviderModelDiscoveryButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
@@ -141,11 +143,13 @@ export function ProviderModelDiscoveryButton({
   return (
     <Button
       type="button"
-      variant="link"
-      size="xs"
+      variant={prominent ? 'outline' : 'link'}
+      size={prominent ? 'sm' : 'xs'}
       onClick={() => void handleFetchModels()}
       disabled={isLoading}
-      className="h-auto px-0 py-0 [&_svg]:size-3.5"
+      className={
+        prominent ? 'h-8 px-3 text-sm [&_svg]:size-3.5' : 'h-auto px-0 py-0 [&_svg]:size-3.5'
+      }
     >
       {isLoading ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
       {i18nService.t(isLoading ? 'fetchingModels' : 'fetchModels')}
