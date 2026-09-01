@@ -115,7 +115,10 @@ export const CodingEventStream = ({
 
   // Artifact detection runs on the settled transcript only — scanning on every
   // streamed chunk would redo the whole parse per token.
-  const detectableMessages = useMemo(() => toDetectableMessages(turns), [turns]);
+  const detectableMessages = useMemo(
+    () => (isStreaming ? [] : toDetectableMessages(turns)),
+    [turns, isStreaming],
+  );
   const fileArtifacts = useMemo(
     () =>
       artifactSessionKey

@@ -121,4 +121,68 @@ const CodingConversationTurnComponent = ({
   </section>
 );
 
-export const CodingConversationTurn = memo(CodingConversationTurnComponent);
+const messageContentsEqual = (
+  a:
+    | { id: string; content: string; createdAt: number; role: string }
+    | null,
+  b:
+    | { id: string; content: string; createdAt: number; role: string }
+    | null,
+): boolean =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.id === b.id &&
+    a.content === b.content &&
+    a.createdAt === b.createdAt &&
+    a.role === b.role);
+
+const reasoningContentsEqual = (
+  a: { id: string; content: string; createdAt: number } | null,
+  b: { id: string; content: string; createdAt: number } | null,
+): boolean =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.id === b.id &&
+    a.content === b.content &&
+    a.createdAt === b.createdAt);
+
+const turnContentsEqual = (a: CodingConversationTurnModel, b: CodingConversationTurnModel): boolean =>
+  a === b ||
+  (a.id === b.id &&
+    a.status === b.status &&
+    a.statusDetail === b.statusDetail &&
+    messageContentsEqual(a.userMessage, b.userMessage) &&
+    reasoningContentsEqual(a.reasoning, b.reasoning) &&
+    a.assistantMessages.length === b.assistantMessages.length &&
+    a.assistantMessages.every((message, index) =>
+      messageContentsEqual(message, b.assistantMessages[index]),
+    ) &&
+    a.activities.length === b.activities.length &&
+    a.activities.every(
+      (activity, index) =>
+        activity.id === b.activities[index].id &&
+        activity.kind === b.activities[index].kind &&
+        activity.event.kind === b.activities[index].event.kind &&
+        JSON.stringify(activity.event.payload) ===
+          JSON.stringify(b.activities[index].event.payload),
+    ));
+
+// CodingEventStream re-projects every event on each streamed chunk, which
+// re-creates all turn objects and defeats the default shallow memo. Comparing
+// the actual turn content lets unchanged completed turns skip re-rendering
+// while the streaming turn (and any turn whose content changed) still updates.
+const conversationTurnPropsEqual = (
+  prev: CodingConversationTurnProps,
+  next: CodingConversationTurnProps,
+): boolean =>
+  prev.isStreaming === next.isStreaming &&
+  prev.artifactsByMessageId === next.artifactsByMessageId &&
+  prev.artifactsByToolCallId === next.artifactsByToolCallId &&
+  turnContentsEqual(prev.turn, next.turn);
+
+export const CodingConversationTurn = memo(
+  CodingConversationTurnComponent,
+  conversationTurnPropsEqual,
+);
