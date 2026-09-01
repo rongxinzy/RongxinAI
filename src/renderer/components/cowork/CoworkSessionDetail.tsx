@@ -11,6 +11,7 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionMode, type CoworkPermissionMode } from '../../../shared/cowork/constants';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
+import type { ProductionLoopMode } from '../../../shared/productionLoop';
 
 import { ArtifactDetectionService } from '../../services/artifactDetectionService';
 import {
@@ -123,6 +124,8 @@ interface CoworkSessionDetailProps {
     imageAttachments?: CoworkImageAttachment[],
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
+    goalMode?: boolean,
+    productionLoopMode?: ProductionLoopMode,
   ) => boolean | void | Promise<boolean | void>;
   onStop: () => void;
   isSidebarCollapsed?: boolean;

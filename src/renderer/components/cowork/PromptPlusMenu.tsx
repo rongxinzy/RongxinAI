@@ -13,11 +13,15 @@ import {
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
 import { Switch } from '@shared/components/ui/switch';
-import { Cable, Plus, Target } from 'lucide-react';
+import { Cable, Plus, Repeat2, Target } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
+import {
+  ProductionLoopMode,
+  type ProductionLoopMode as ProductionLoopModeValue,
+} from '../../../shared/productionLoop';
 import { i18nService } from '../../services/i18n';
 import { mcpService, normalizeMcpErrorMessage } from '../../services/mcp';
 import { skillService } from '../../services/skill';
@@ -51,6 +55,8 @@ interface PromptPlusMenuProps {
   /** Work mode only: run the next prompt as a long-horizon Goal. */
   goalMode?: boolean;
   onGoalModeChange?: (enabled: boolean) => void;
+  productionLoopMode?: ProductionLoopModeValue;
+  onProductionLoopModeChange?: (mode: ProductionLoopModeValue) => void;
   disabled?: boolean;
 }
 
@@ -66,6 +72,8 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   experts,
   goalMode = false,
   onGoalModeChange,
+  productionLoopMode = ProductionLoopMode.Auto,
+  onProductionLoopModeChange,
   disabled = false,
 }) => {
   const dispatch = useDispatch();
@@ -243,6 +251,20 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
           >
             <Target className="size-4" />
             <span className="truncate">{i18nService.t('goalMode')}</span>
+          </DropdownMenuCheckboxItem>
+        )}
+
+        {experts && onProductionLoopModeChange && (
+          <DropdownMenuCheckboxItem
+            checked={productionLoopMode !== ProductionLoopMode.Off}
+            onCheckedChange={checked =>
+              onProductionLoopModeChange(
+                checked === true ? ProductionLoopMode.Auto : ProductionLoopMode.Off,
+              )
+            }
+          >
+            <Repeat2 className="size-4" />
+            <span className="truncate">{i18nService.t('productionLoopAuto')}</span>
           </DropdownMenuCheckboxItem>
         )}
 
