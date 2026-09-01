@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import { ModelFileExtension } from './constants';
-import { parseModelObject } from './ModelRenderer';
+import { MODEL_AUTO_ROTATE_SPEED, ModelFileExtension } from './constants';
+import { bindModelAutoRotation, parseModelObject } from './ModelRenderer';
 
 const GLB_MAGIC = 0x46546c67;
 const GLB_VERSION = 2;
@@ -25,6 +25,24 @@ function createGlb(json: object): ArrayBuffer {
   return buffer;
 }
 
+class FakeAutoRotationControls {
+  autoRotate = false;
+  autoRotateSpeed = 0;
+  private readonly startListeners = new Set<() => void>();
+
+  addEventListener(type: 'start', listener: () => void): void {
+    if (type === 'start') this.startListeners.add(listener);
+  }
+
+  removeEventListener(type: 'start', listener: () => void): void {
+    if (type === 'start') this.startListeners.delete(listener);
+  }
+
+  startInteraction(): void {
+    this.startListeners.forEach(listener => listener());
+  }
+}
+
 test('waits for a GLB scene to finish parsing', async () => {
   const buffer = createGlb({
     asset: { version: '2.0' },
@@ -41,4 +59,35 @@ test('waits for a GLB scene to finish parsing', async () => {
 
 test('propagates GLB parsing errors', async () => {
   await expect(parseModelObject(ModelFileExtension.Glb, new ArrayBuffer(0))).rejects.toThrow();
+});
+
+test('toggles clockwise model auto-rotation', () => {
+  const controls = new FakeAutoRotationControls();
+  const changes: boolean[] = [];
+  const binding = bindModelAutoRotation(controls, rotating => changes.push(rotating));
+
+  expect(controls.autoRotateSpeed).toBe(MODEL_AUTO_ROTATE_SPEED);
+  expect(controls.autoRotateSpeed).toBeLessThan(0);
+  expect(binding.toggle()).toBe(true);
+  expect(controls.autoRotate).toBe(true);
+  expect(binding.toggle()).toBe(false);
+  expect(controls.autoRotate).toBe(false);
+  expect(changes).toEqual([true, false]);
+});
+
+test('stops auto-rotation on interaction and removes the listener on cleanup', () => {
+  const controls = new FakeAutoRotationControls();
+  const changes: boolean[] = [];
+  const binding = bindModelAutoRotation(controls, rotating => changes.push(rotating));
+
+  binding.toggle();
+  controls.startInteraction();
+  expect(controls.autoRotate).toBe(false);
+  expect(changes).toEqual([true, false]);
+
+  binding.toggle();
+  binding.dispose();
+  controls.startInteraction();
+  expect(controls.autoRotate).toBe(true);
+  expect(changes).toEqual([true, false, true]);
 });
