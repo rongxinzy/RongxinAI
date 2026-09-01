@@ -1,0 +1,60 @@
+/**
+ * Unified registry for tool-usage system-prompt contributions.
+ *
+ * Pi drops every tool's `promptGuidelines` whenever a custom system prompt is
+ * supplied, and ZhiYuan always supplies one. Each tool module exports its own
+ * `*SystemPrompt` policy; this registry is the single place that collects them
+ * into the session's appendSystemPromptOverride. Adding a tool policy without
+ * registering it here means the model never sees it — piRuntimeAdapter and its
+ * tests read exclusively from this registry.
+ */
+import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
+import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
+
+export interface PiSystemPromptContext {
+  /** Whether file tools (read/write/edit/read_document) are active. */
+  fileToolsEnabled: boolean;
+  /** Current per-session output token budget, used by the large-write policy. */
+  maxOutputTokens: number;
+}
+
+export interface PiSystemPromptContribution {
+  /** Stable identifier, used by tests to reference a specific contribution. */
+  id: string;
+  /** Only included when the session has file tools enabled. */
+  requiresFileTools?: boolean;
+  /** Static text or a factory for context-dependent policies. */
+  prompt: string | ((context: PiSystemPromptContext) => string);
+}
+
+// Order matters: entries are appended to the system prompt in this sequence.
+export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
+  { id: 'ask-user-question', prompt: PiAskUserQuestionSystemPrompt },
+  {
+    id: 'document-reader',
+    requiresFileTools: true,
+    prompt: PiDocumentReaderSystemPrompt,
+  },
+  {
+    id: 'builtin-file-tools',
+    requiresFileTools: true,
+    prompt: PiBuiltinFileToolSystemPrompt,
+  },
+  {
+    id: 'large-file-write',
+    requiresFileTools: true,
+    prompt: context => createPiLargeFileWriteSystemPrompt(context.maxOutputTokens),
+  },
+  { id: 'declare-artifact', prompt: DeclareArtifactSystemPrompt },
+];
+
+export function collectPiSystemPromptContributions(context: PiSystemPromptContext): string[] {
+  return PiSystemPromptContributions.filter(
+    contribution => !contribution.requiresFileTools || context.fileToolsEnabled,
+  ).map(contribution =>
+    typeof contribution.prompt === 'function' ? contribution.prompt(context) : contribution.prompt,
+  );
+}

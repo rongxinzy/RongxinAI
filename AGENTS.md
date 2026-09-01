@@ -152,6 +152,13 @@ The Cowork feature provides AI-assisted coding sessions:
 
 **Agent Engine**: Pi is the only execution kernel. `cowork:stream:*` carries Work/Chat events, while Channel/Cron runs are exposed as their own read-only activity projection. cc-connect only transports Channel/Cron inputs and deliveries.
 
+**Managed Python runtimes**: two layers, both synced to `userData/runtimes/` on first run.
+
+- `resources/python-win|mac|linux` — bare portable CPython (uv-managed). On the agent shell PATH as the base interpreter; `UV_PYTHON` binds uv to it.
+- `resources/skill-python/layers/shared` — a single relocatable uv venv built on the base runtime, carrying the merged `requirements.txt` of every bundled Skill (pandas, numpy, openpyxl, ...). Its interpreter is prepended to the agent shell PATH (`prependSkillSharedPythonToEnv` in `src/main/libs/coworkUtil.ts`), so ad-hoc `python` scripts can `import pandas` directly. Skill script execution (`run_skill_script`) resolves it via `findSkillPythonExecutable`, which additionally enforces a per-Skill `requirementsSha256` manifest gate.
+
+SYSTEM_PROMPT.md declares this environment to the model (运行环境与工具链 section); keep that section in sync when the runtime layout changes.
+
 **Memory System**: File-based persistent memory stored in the application-owned agent workspace:
 
 - `MEMORY.md` - Durable facts, preferences, and decisions; loaded automatically at every session start.
