@@ -40,8 +40,8 @@ import { AssistantBubble } from './AssistantBubble';
 import { ExpertAvatar } from '../../expert/expertAvatars';
 import { ExecutionSummary } from './ExecutionSummary';
 import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
-import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
+import { WorkingIndicator } from './WorkingIndicator';
 
 const getInterruptionMessage = (interruption: CoworkSessionInterruption): string => {
   switch (interruption.cause) {
@@ -472,7 +472,7 @@ const TurnBlockComponent: React.FC<{
                 </ChainOfThoughtHeader>
               </ChainOfThought>
             )}
-            {showTypingIndicator && <TypingDots />}
+            {showTypingIndicator && <WorkingIndicator />}
             {artifacts?.some(
               artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
             ) && (
