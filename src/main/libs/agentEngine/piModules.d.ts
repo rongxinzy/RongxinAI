@@ -8,6 +8,10 @@
  */
 
 declare module '@earendil-works/pi-coding-agent' {
+  export class SessionManager {
+    static inMemory(cwd?: string): SessionManager;
+  }
+
   export class DefaultResourceLoader {
     constructor(options: {
       cwd: string;
@@ -21,7 +25,14 @@ declare module '@earendil-works/pi-coding-agent' {
   export class SettingsManager {
     static create(cwd: string, agentDir?: string): SettingsManager;
     static inMemory(): SettingsManager;
-    applyOverrides(overrides: { shellPath?: string }): void;
+    applyOverrides(overrides: {
+      shellPath?: string;
+      compaction?: {
+        enabled?: boolean;
+        reserveTokens?: number;
+        keepRecentTokens?: number;
+      };
+    }): void;
     getShellPath(): string | undefined;
   }
 
