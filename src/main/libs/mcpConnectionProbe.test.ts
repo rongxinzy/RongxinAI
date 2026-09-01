@@ -7,6 +7,7 @@ const {
   closeTransportMock,
   resolveStdioCommandMock,
   getEnhancedEnvMock,
+  stdioParametersMock,
 } = vi.hoisted(() => ({
   connectMock: vi.fn<(args: unknown) => Promise<void>>(),
   listToolsMock: vi.fn<() => Promise<{ tools: unknown[] }>>(),
@@ -17,6 +18,7 @@ const {
       () => Promise<{ command: string; args: string[]; env: Record<string, string> | undefined }>
     >(),
   getEnhancedEnvMock: vi.fn<() => Promise<Record<string, string>>>(),
+  stdioParametersMock: vi.fn(),
 }));
 
 vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
@@ -40,6 +42,10 @@ vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
     stderr = {
       on: vi.fn(),
     };
+
+    constructor(parameters: unknown) {
+      stdioParametersMock(parameters);
+    }
 
     async close() {
       return closeTransportMock();
@@ -84,7 +90,10 @@ vi.mock('@modelcontextprotocol/sdk/client/streamableHttp.js', () => ({
 vi.mock('./mcpServerManager', () => ({
   resolveStdioCommand: resolveStdioCommandMock,
   expandMcpTemplate: (value: string, env?: Record<string, string>) =>
-    value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (_match, key: string) => env?.[key] ?? `\${${key}}`),
+    value.replace(
+      /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g,
+      (_match, key: string) => env?.[key] ?? `\${${key}}`,
+    ),
   unresolvedMcpTemplateKeys: () => [],
 }));
 
@@ -146,4 +155,22 @@ test('probeMcpConnection passes headers to SSE transports', async () => {
       },
     },
   });
+});
+
+test('probeMcpConnection pipes stdio stderr for connection diagnostics', async () => {
+  await probeMcpConnection({
+    name: 'Local MCP',
+    description: '',
+    transportType: 'stdio',
+    command: 'node',
+    args: ['server.js'],
+  });
+
+  expect(stdioParametersMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      command: 'node',
+      args: ['server.js'],
+      stderr: 'pipe',
+    }),
+  );
 });
