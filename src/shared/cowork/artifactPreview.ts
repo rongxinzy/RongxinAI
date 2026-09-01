@@ -74,6 +74,12 @@ export const ArtifactTypeByExtension = {
   '.ppsx': 'document',
   '.ppsm': 'document',
   '.pdf': 'document',
+  '.stl': 'model',
+  '.obj': 'model',
+  '.gltf': 'model',
+  '.glb': 'model',
+  '.ply': 'model',
+  '.3mf': 'model',
 } as const satisfies Record<string, CoworkArtifactType>;
 
 const ARTIFACT_PREVIEW_MODE_BY_TYPE: Record<CoworkArtifactType, ArtifactPreviewMode> = {
@@ -85,6 +91,7 @@ const ARTIFACT_PREVIEW_MODE_BY_TYPE: Record<CoworkArtifactType, ArtifactPreviewM
   markdown: ArtifactPreviewMode.PreviewAndSource,
   text: ArtifactPreviewMode.Source,
   document: ArtifactPreviewMode.Preview,
+  model: ArtifactPreviewMode.Preview,
   unsupported: ArtifactPreviewMode.Unsupported,
 };
 
@@ -96,6 +103,15 @@ const BINARY_ARTIFACT_EXTENSIONS = new Set([
   '.jpeg',
   '.gif',
   '.webp',
+  // Model files always load through the file path (they can be tens of
+  // megabytes); even text-based ones (.obj/.gltf) are treated as binary so
+  // their content never lands in the message payload.
+  '.stl',
+  '.obj',
+  '.gltf',
+  '.glb',
+  '.ply',
+  '.3mf',
   '.xls',
   '.xlt',
   '.xltx',

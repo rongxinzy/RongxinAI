@@ -4,14 +4,13 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import {
   selectPanelWidth,
-  setArtifactLayoutMode,
   setPanelWidth,
   ArtifactLayoutMode,
 } from '@/store/slices/artifactSlice';
 import type { Artifact } from '@/types/artifact';
 
 import ArtifactPanel from './ArtifactPanel';
-import { clampArtifactPanelWidth, isArtifactPanelAtMaximum } from './artifactPanelResize';
+import { clampArtifactPanelWidth } from './artifactPanelResize';
 
 interface ArtifactPanelFrameProps {
   sessionId: string | null;
@@ -55,11 +54,9 @@ const ArtifactPanelFrame: React.FC<ArtifactPanelFrameProps> = ({
   const completeResize = useCallback(
     (width: number) => {
       const nextWidth = clampArtifactPanelWidth(width, minPanelWidth, maxPanelWidth);
-      if (isArtifactPanelAtMaximum(nextWidth, maxPanelWidth)) {
-        transientPanelWidthRef.current = null;
-        dispatch(setArtifactLayoutMode(ArtifactLayoutMode.Workspace));
-        return;
-      }
+      // Dragging never auto-enters the workspace layout: the conversation
+      // column must keep its space. Workspace stays available through its
+      // explicit toggle (and Escape to leave).
       dispatch(setPanelWidth(nextWidth));
       transientPanelWidthRef.current = null;
     },
