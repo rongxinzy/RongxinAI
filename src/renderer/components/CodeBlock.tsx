@@ -621,7 +621,7 @@ const baseTheme = EditorView.theme({
     transition: 'background 0.15s, color 0.15s',
   },
   '.cm-search-nav-btn:hover': {
-    background: 'var(--zy-surface-hover)',
+    background: 'var(--zy-surface-tertiary)',
     color: 'var(--zy-foreground)',
   },
   '.cm-search-sep': {
@@ -647,7 +647,7 @@ const baseTheme = EditorView.theme({
     whiteSpace: 'nowrap',
   },
   '.cm-search-opt:hover': {
-    background: 'var(--zy-surface-hover)',
+    background: 'var(--zy-surface-raised)',
     color: 'var(--zy-foreground)',
   },
   '.cm-search-opt input[type="checkbox"]': {
@@ -671,7 +671,7 @@ const baseTheme = EditorView.theme({
     transition: 'background 0.15s, color 0.15s',
   },
   '.cm-search-close-btn:hover': {
-    background: 'var(--zy-surface-hover)',
+    background: 'var(--zy-surface-raised)',
     color: 'var(--zy-foreground)',
   },
   '.cm-searchMatch': {
@@ -1423,7 +1423,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
         <div className="overflow-x-auto rounded-lg border border-border-subtle dark:bg-[#282c34] bg-[#f0f2f5] text-[13px] leading-6">
           <CodeBlockTooltip
             content={i18nService.t('copyToClipboard')}
-            className="absolute top-2 right-2 z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200"
+            className="absolute top-2 right-2 z-10 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-200"
           >
             <Button
               type="button"

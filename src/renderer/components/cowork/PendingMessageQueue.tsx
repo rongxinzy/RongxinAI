@@ -135,12 +135,20 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
           return (
             <div
               key={item.id}
+              role="button"
+              tabIndex={0}
               className={cn(
-                'flex min-w-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 transition-colors last:border-b-0',
+                'flex min-w-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-accent/40 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
                 selectedItemId === item.id && 'bg-accent/40',
                 isFailed && 'bg-destructive/5',
               )}
               onClick={() => setSelectedItemId(item.id)}
+              onKeyDown={event => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key !== 'Enter' && event.key !== ' ') return;
+                event.preventDefault();
+                setSelectedItemId(item.id);
+              }}
             >
               {isEditing ? (
                 <Input

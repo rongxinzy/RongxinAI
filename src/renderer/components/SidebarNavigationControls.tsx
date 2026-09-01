@@ -1,4 +1,4 @@
-﻿import { Button } from '@shared/components/ui/button';
+import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { Code2 } from 'lucide-react';
@@ -122,7 +122,7 @@ export const SidebarNavigationControls = ({
         />
         <span
           className={cn(
-            'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
+            'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-opacity duration-200',
             workMode === WorkMode.Work
               ? 'font-semibold text-foreground'
               : 'font-normal text-muted-foreground opacity-50',
@@ -133,7 +133,7 @@ export const SidebarNavigationControls = ({
         </span>
         <span
           className={cn(
-            'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-all duration-200',
+            'absolute top-1/2 flex items-center gap-1 pointer-events-none transition-opacity duration-200',
             workMode === WorkMode.Chat
               ? 'font-semibold text-foreground'
               : 'font-normal text-muted-foreground opacity-50',

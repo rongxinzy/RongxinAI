@@ -1276,7 +1276,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`mb-2 mr-[-5px] size-5 rounded-full text-muted-foreground active:translate-y-0 [&_svg]:size-3.5
+                  className={`mb-2 mr-[-5px] size-5 text-muted-foreground [&_svg]:size-3.5
                 ${
                   !isRailHovered
                     ? 'pointer-events-none opacity-0'
@@ -1400,13 +1400,15 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                             });
                           }}
                           onMouseLeave={() => setRailTooltip(null)}
-                          className="h-auto w-5 cursor-pointer justify-end rounded-none px-0 py-[5px] hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
+                          className="h-auto w-5 cursor-pointer justify-end px-0 py-[5px]"
                         >
                           <div
-                            className={`h-[2px] rounded-full transition-all ${
+                            className={`h-[2px] w-4 origin-right rounded-full transition-[transform,background-color] ${
                               isActive || isHovered ? 'bg-foreground' : 'bg-border'
                             }`}
-                            style={{ width: isActive || isHovered ? MAX_W : lineW }}
+                            style={{
+                              transform: `scaleX(${(isActive || isHovered ? MAX_W : lineW) / MAX_W})`,
+                            }}
                           />
                         </Button>
                       );
@@ -1433,7 +1435,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`mt-2 mr-[-5px] size-5 rounded-full text-muted-foreground active:translate-y-0 [&_svg]:size-3.5
+                  className={`mt-2 mr-[-5px] size-5 text-muted-foreground [&_svg]:size-3.5
                 ${
                   !isRailHovered
                     ? 'pointer-events-none opacity-0'

@@ -156,7 +156,7 @@ const TimelineEventItem = memo(function TimelineEventItem({ event }: { event: Wo
             aria-expanded={payloadOpen}
             aria-label={i18nService.t('workbenchTaskEventPayload')}
             onClick={() => setPayloadOpen(open => !open)}
-            className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronRight
               className={cn(
@@ -204,7 +204,7 @@ const TimelineEventClusterItem = memo(function TimelineEventClusterItem({
           .t('workbenchTimelineToggleCluster')
           .replace('{count}', String(events.length))}
         onClick={() => setOpen(current => !current)}
-        className="flex w-full items-center gap-2 py-1.5 text-left"
+        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px"
       >
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">{eventLabel(type)}</span>
@@ -244,7 +244,7 @@ function ClusterEventRow({ event, hasPayload }: { event: WorkbenchRunEvent; hasP
             aria-expanded={payloadOpen}
             aria-label={i18nService.t('workbenchTaskEventPayload')}
             onClick={() => setPayloadOpen(open => !open)}
-            className="flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            className="flex shrink-0 items-center gap-0.5 rounded-sm text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronRight
               className={cn(
@@ -402,7 +402,7 @@ const ResolvedApprovalEntry = memo(function ResolvedApprovalEntry({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(current => !current)}
-        className="flex w-full items-center gap-2 py-1.5 text-left"
+        className="flex w-full items-center gap-2 rounded-md py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px"
       >
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">

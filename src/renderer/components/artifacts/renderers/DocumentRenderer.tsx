@@ -389,7 +389,7 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
               variant={i === activeSheet ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setActiveSheet(i)}
-              className={`px-2 py-0.5 text-xs rounded whitespace-nowrap transition-colors h-auto ${
+              className={`px-2 py-0.5 text-xs whitespace-nowrap transition-colors h-auto ${
                 i === activeSheet
                   ? 'bg-accent text-accent-foreground font-medium hover:bg-accent hover:text-accent-foreground'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -1013,7 +1013,7 @@ const FileInfoFallback: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         <div className="text-xs text-muted-foreground mt-1">{ext.toUpperCase().slice(1)}</div>
       </div>
       {artifact.filePath && (
-        <Button onClick={handleOpenWithApp} className="px-3 py-1.5 text-xs rounded mt-2 h-auto">
+        <Button onClick={handleOpenWithApp} className="px-3 py-1.5 text-xs mt-2 h-auto">
           {t('artifactOpenWithApp')}
         </Button>
       )}

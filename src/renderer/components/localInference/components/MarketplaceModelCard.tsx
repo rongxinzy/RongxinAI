@@ -1,5 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
-import { Button21st } from '@shared/components/ui/button-21st';
+import { Button } from '@shared/components/ui/button';
 import {
   Card,
   CardContent,
@@ -292,28 +292,26 @@ export const MarketplaceModelCard = memo(function MarketplaceModelCard({
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
           {isDownloadActive ? (
-            <Button21st
+            <Button
               type="button"
               variant="secondary"
-              size="sm"
-              className="h-8 min-w-16 px-3"
+              className="min-w-16"
               onClick={onOpenDownload}
             >
               <Download data-icon="inline-start" />
               {i18nService.t('marketplaceDownloadInProgress')}
-            </Button21st>
+            </Button>
           ) : (
-            <Button21st
+            <Button
               type="button"
-              variant="primary"
-              size="sm"
-              className="h-8 min-w-16 px-3"
-              isDisabled={loading}
+              variant="outline"
+              className="min-w-16"
+              disabled={loading}
               onClick={() => void onInstall({ ...model, filePath: selectedVariant?.files[0]?.path ?? model.filePath })}
             >
               <Download data-icon="inline-start" />
               {installable ? i18nService.t('marketplaceInstall') : i18nService.t('marketplaceVerifyAndInstall')}
-            </Button21st>
+            </Button>
           )}
         </div>
       </CardFooter>

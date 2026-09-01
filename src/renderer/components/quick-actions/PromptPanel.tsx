@@ -45,7 +45,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
               onClick={() => handlePromptClick(prompt)}
               className={`
                 group relative flex flex-col items-start gap-1.5 px-3.5 py-3 rounded-lg
-                border text-left transition-all duration-200 h-auto
+                border text-left transition-colors duration-200 h-auto
                 ${
                   isPromptSelected
                     ? 'dark:bg-primary-muted bg-primary-muted border-[color-mix(in_srgb,var(--zy-primary)_50%,transparent)]'
@@ -62,7 +62,7 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
                 </span>
                 <ArrowRight
                   className={`
-                    w-3.5 h-3.5 transition-all duration-200
+                    w-3.5 h-3.5 transition-[transform,opacity,color] duration-200
                     ${
                       isPromptSelected
                         ? 'text-primary translate-x-0 opacity-100'

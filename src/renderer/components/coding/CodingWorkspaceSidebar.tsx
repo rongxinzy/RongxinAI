@@ -497,7 +497,7 @@ const WorkspaceNode = ({
       {shouldRenderSessions && (
         <div
           className={cn(
-            'grid w-full min-w-0 max-w-full transition-all duration-200 ease-out',
+            'grid w-full min-w-0 max-w-full transition-[grid-template-rows,opacity] duration-200 ease-out',
             isSessionGroupVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
           )}
         >

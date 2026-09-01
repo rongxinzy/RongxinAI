@@ -1,5 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Switch } from '@shared/components/ui/switch';
 import { Cable, LoaderCircle, MoreHorizontal, Pencil, Plus, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -753,21 +754,18 @@ const McpManager: React.FC<McpManagerProps> = ({
         />
 
         {activeTab === McpTabValue.Marketplace && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {dynamicCategories.map(cat => (
-              <Button
-                key={cat.id}
-                type="button"
-                variant={activeCategory === cat.id ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveCategory(cat.id)}
-                className="h-7 px-2.5 text-xs"
-              >
-                {(i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) ||
-                  i18nService.t(cat.key)}
-              </Button>
-            ))}
-          </div>
+          <FluidTabs
+            aria-label={i18nService.t('mcpMarketplace')}
+            className="max-w-full overflow-x-auto"
+            items={dynamicCategories.map(cat => ({
+              value: cat.id,
+              label:
+                (i18nService.getLanguage() === 'zh' ? cat.name_zh : cat.name_en) ||
+                i18nService.t(cat.key),
+            }))}
+            value={activeCategory}
+            onValueChange={setActiveCategory}
+          />
         )}
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-2">
@@ -1087,7 +1085,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRequestDelete(server)}
-                              className="h-7 w-7 text-muted-foreground hover:text-red-500 dark:hover:text-red-400"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
                               title={i18nService.t('deleteMcpServer')}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

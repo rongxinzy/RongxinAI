@@ -55,7 +55,7 @@ export function InstalledSkillGrid({
                 type="button"
                 variant="ghost"
                 aria-label={name}
-                className="absolute inset-0 z-0 h-auto w-auto rounded-[inherit] border-0 p-0 hover:bg-transparent active:translate-y-0 dark:hover:bg-transparent"
+                className="absolute inset-0 z-0 h-auto w-auto rounded-[inherit] border-0 p-0 hover:bg-transparent dark:hover:bg-transparent"
                 onClick={() => onSelect(skill)}
               />
             )}

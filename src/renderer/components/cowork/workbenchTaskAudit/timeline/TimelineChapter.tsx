@@ -121,7 +121,7 @@ export function TimelineChapter({
           .t('workbenchTimelineToggleChapter')
           .replace('{attempt}', String(run.attempt))}
         onClick={() => setOpen(current => !current)}
-        className="group flex min-h-7 w-full items-center gap-2 pl-10 text-left"
+        className="group flex min-h-7 w-full items-center gap-2 rounded-md pl-10 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px"
       >
         <span className="shrink-0 text-sm font-medium text-foreground">
           {i18nService.t('workbenchTaskRunAttempt').replace('{attempt}', String(run.attempt))}

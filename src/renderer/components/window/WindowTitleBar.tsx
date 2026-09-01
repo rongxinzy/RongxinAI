@@ -155,7 +155,7 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
         variant="ghost"
         size="icon"
         onClick={handleClose}
-        className="non-draggable h-8 w-8 rounded-lg text-foreground/60 hover:text-white hover:bg-red-500 dark:hover:bg-red-500"
+        className="non-draggable h-8 w-8 rounded-lg text-foreground/60 hover:bg-destructive hover:text-destructive-foreground"
         aria-label="Close"
         title="Close"
       >

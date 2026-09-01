@@ -1,5 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import { Button21st } from '@shared/components/ui/button-21st';
 import {
   Card,
   CardContent,
@@ -374,16 +373,15 @@ export function RuntimeInstallCard({
         <div className="flex shrink-0 items-center gap-2">
           {/* Preserve identical control metrics while the install action changes to cancellation. */}
           {active && cancellable ? (
-            <Button21st
+            <Button
               type="button"
-              variant="primary"
-              size="sm"
-              className="h-8 min-w-16 px-3 leading-tight"
+              variant="outline"
+              className="min-w-16"
               onClick={() => void cancelInstall()}
             >
               <X data-icon="inline-start" />
               {i18nService.t('cancel')}
-            </Button21st>
+            </Button>
           ) : active ? (
             <Button
               type="button"
@@ -397,11 +395,9 @@ export function RuntimeInstallCard({
           ) : (
             <>
               {/* Keep installation separate from selecting an already installed version. */}
-              <Button21st
+              <Button
                 type="button"
-                variant="primary"
-                size="sm"
-                className="h-8 min-w-16 px-3"
+                className="min-w-16"
                 disabled={selectedInstalled}
                 onClick={() => void startInstall()}
               >
@@ -413,7 +409,7 @@ export function RuntimeInstallCard({
                 {error && !selectedInstalled
                   ? i18nService.t('localInferenceRuntimeRetry')
                   : i18nService.t('localInferenceInstall')}
-              </Button21st>
+              </Button>
               {selectedInstalled && !selectedCurrent ? (
                 <Button type="button" variant="outline" size="sm" onClick={() => void startInstall()}>
                   <ArrowRightLeft data-icon="inline-start" />

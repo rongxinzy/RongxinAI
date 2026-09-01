@@ -113,60 +113,55 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        nativeButton={false}
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className={cn(
-              'flex h-auto items-center gap-1.5 rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs transition-colors',
-              open
-                ? 'border-primary text-foreground'
-                : cn(
-                    'hover:border-primary/50',
-                    value ? 'text-foreground' : 'text-muted-foreground',
-                  ),
-            )}
-          >
-            <Calendar className="h-3 w-3 shrink-0 opacity-60" />
-            <span className={value ? '' : 'opacity-50'}>
-              {displayText || placeholder || '----/--/--'}
-            </span>
-            {value && (
-              <span
-                onClick={handleClear}
-                className="ml-0.5 opacity-40 hover:opacity-100 transition-opacity"
-              >
-                ×
+      <div className="relative inline-flex">
+        <PopoverTrigger
+          nativeButton={false}
+          render={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn(
+                'flex h-auto items-center gap-1.5 rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs transition-colors',
+                value && 'pr-6',
+                open
+                  ? 'border-primary text-foreground'
+                  : cn(
+                      'hover:border-primary/50',
+                      value ? 'text-foreground' : 'text-muted-foreground',
+                    ),
+              )}
+            >
+              <Calendar className="h-3 w-3 shrink-0 opacity-60" />
+              <span className={value ? '' : 'opacity-50'}>
+                {displayText || placeholder || '----/--/--'}
               </span>
-            )}
-          </Button>
-        }
-      />
-      <PopoverContent align="start" className="w-auto min-w-60 select-none p-3">
-        {/* Month/Year nav */}
-        <div className="flex items-center justify-between mb-2">
+            </Button>
+          }
+        />
+        {value && (
           <Button
             type="button"
             variant="ghost"
             size="icon-xs"
-            onClick={goPrev}
-            className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
+            aria-label={i18nService.t('clear')}
+            onClick={handleClear}
+            className="absolute top-1/2 right-0.5 -translate-y-1/2"
           >
+            ×
+          </Button>
+        )}
+      </div>
+      <PopoverContent align="start" className="w-auto min-w-60 select-none p-3">
+        {/* Month/Year nav */}
+        <div className="flex items-center justify-between mb-2">
+          <Button type="button" variant="ghost" size="icon-xs" onClick={goPrev}>
             <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
           <span className="text-xs font-medium text-foreground">
             {viewYear} / {pad(viewMonth)}
           </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={goNext}
-            className="p-1 rounded text-muted-foreground hover:bg-surface-raised transition-colors"
-          >
+          <Button type="button" variant="ghost" size="icon-xs" onClick={goNext}>
             <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
@@ -202,7 +197,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                 disabled={disabled}
                 onClick={() => handleSelect(day)}
                 className={cn(
-                  'w-7 h-7 rounded text-xs transition-colors p-0',
+                  'w-7 h-7 text-xs transition-colors p-0',
                   isSelected
                     ? 'bg-primary text-primary-foreground font-medium'
                     : disabled

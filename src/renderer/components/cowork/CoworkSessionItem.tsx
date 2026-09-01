@@ -239,6 +239,8 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => {
         if (isRenaming) return;
         if (isBatchMode) {
@@ -247,7 +249,18 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         }
         onSelect();
       }}
-      className={`group relative p-3 rounded-lg cursor-pointer transition-all duration-150 ${
+      onKeyDown={e => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        if (isRenaming) return;
+        if (isBatchMode) {
+          onToggleSelection();
+          return;
+        }
+        onSelect();
+      }}
+      className={`group relative p-3 rounded-lg cursor-pointer transition-colors duration-150 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
         isSelected || isActive
           ? 'bg-black/4 dark:bg-white/5'
           : 'hover:bg-black/4 dark:hover:bg-white/5'

@@ -42,7 +42,7 @@ const ArtifactBadge: React.FC<ArtifactBadgeProps> = ({ artifact }) => {
         ${
           isSelected
             ? 'border-primary bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary'
-            : 'border-border bg-surface hover:bg-surface-hover text-foreground'
+            : 'border-border bg-surface hover:bg-surface-raised text-foreground'
         }`}
     >
       <span>{TYPE_ICONS[artifact.type] || '📄'}</span>

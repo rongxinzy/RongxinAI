@@ -20,15 +20,15 @@ export function LocalInferenceToastView({
     toast.kind === LocalInferenceToastKind.Error
       ? {
           Icon: TriangleAlert,
-          borderClass: 'border-red-500/30',
-          iconClass: 'bg-red-500/15 text-red-500',
-          messageClass: 'text-red-700 dark:text-red-200',
+          borderClass: 'border-destructive/30',
+          iconClass: 'bg-destructive/15 text-destructive',
+          messageClass: 'text-destructive',
         }
       : toast.kind === LocalInferenceToastKind.Success
         ? {
             Icon: CheckCircle,
-            borderClass: 'border-emerald-500/30',
-            iconClass: 'bg-emerald-500/15 text-emerald-500',
+            borderClass: 'border-success/30',
+            iconClass: 'bg-success/15 text-success',
             messageClass: 'text-foreground',
           }
         : {
@@ -56,7 +56,7 @@ export function LocalInferenceToastView({
           variant="ghost"
           size="icon-sm"
           onClick={onClose}
-          className="shrink-0 rounded-full text-foreground/70 hover:text-foreground"
+          className="shrink-0 text-foreground/70 hover:text-foreground"
           aria-label={i18nService.t('close')}
         >
           <X />

@@ -826,8 +826,8 @@ const App: React.FC = () => {
         {windowsStandaloneTitleBar}
         <div className="flex-1 flex flex-col items-center justify-center bg-background">
           <div className="flex flex-col items-center space-y-6 max-w-md px-6">
-            <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-lg">
-              <MessageCircle className="h-8 w-8 text-white" />
+            <div className="w-16 h-16 rounded-full bg-destructive flex items-center justify-center shadow-lg">
+              <MessageCircle className="h-8 w-8 text-destructive-foreground" />
             </div>
             <div className="text-foreground text-xl font-medium text-center">{initError}</div>
             <div className="flex items-center gap-3">
