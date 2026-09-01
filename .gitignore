@@ -95,6 +95,10 @@ ppt-assets/
 *.pptx
 documents.md
 reasonix.toml
+.reasonix/
+
+# Scratch/debug artifacts (theme capture scripts, ad-hoc HTML, screenshots)
+/tmp/
 
 # App runtime output (root-scoped so build tools can scan same-named source directories)
 /cowork/
