@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 
 import { CoworkSessionMode } from '../../shared/cowork/constants';
+import { ProductionLoopMode } from '../../shared/productionLoop';
 import { WorkbenchContractKind } from '../../shared/workbenchTask';
 import { shouldExposeProductionControls, shouldRequireProductionOnResume } from './entryPolicy';
 
@@ -24,6 +25,25 @@ test('keeps Chat mode outside the production workflow', () => {
       goalMode: true,
     }),
   ).toBe(false);
+});
+
+test('removes production controls when the per-prompt mode is off', () => {
+  expect(
+    shouldExposeProductionControls({
+      ...workRequest('Handle the request'),
+      productionLoopMode: ProductionLoopMode.Off,
+    }),
+  ).toBe(false);
+});
+
+test('keeps persisted production workflows available when the prompt mode is off', () => {
+  expect(
+    shouldExposeProductionControls({
+      ...workRequest('Continue the task'),
+      productionLoopMode: ProductionLoopMode.Off,
+      inheritedProductionRequired: true,
+    }),
+  ).toBe(true);
 });
 
 test('keeps controls available while carrying resume activation separately', () => {
