@@ -54,6 +54,7 @@ const hoisted = vi.hoisted(() => {
     applyOverrides: vi.fn(),
     getShellPath: vi.fn(),
   }));
+  const mockSessionManagerInMemory = vi.fn((cwd?: string) => ({ cwd }));
   const mockCompleteSimple = vi.fn().mockResolvedValue({
     content: [{ type: 'text', text: 'Hello from Pi' }],
     stopReason: 'stop',
@@ -63,6 +64,7 @@ const hoisted = vi.hoisted(() => {
     mockSession,
     mockSettingsManagerCreate,
     mockSettingsManagerInMemory,
+    mockSessionManagerInMemory,
     mockCreateAgentSession: vi.fn().mockResolvedValue({ session: mockSession }),
     mockDefaultResourceLoader: vi.fn(function (this: { reload: () => Promise<void> }) {
       this.reload = vi.fn().mockResolvedValue(undefined);
@@ -182,6 +184,7 @@ const mockCreateAgentSession = hoisted.mockCreateAgentSession;
 const mockDefaultResourceLoader = hoisted.mockDefaultResourceLoader;
 const mockSettingsManagerCreate = hoisted.mockSettingsManagerCreate;
 const mockSettingsManagerInMemory = hoisted.mockSettingsManagerInMemory;
+const mockSessionManagerInMemory = hoisted.mockSessionManagerInMemory;
 const mockGetModel = hoisted.mockGetModel;
 const mockModelRuntime = hoisted.mockModelRuntime;
 const mockModelRuntimeCreate = hoisted.mockModelRuntimeCreate;
@@ -193,6 +196,9 @@ const mockApplyApplicationRuntimeEnv = hoisted.mockApplyApplicationRuntimeEnv;
 vi.mock('@earendil-works/pi-coding-agent', () => ({
   createAgentSession: hoisted.mockCreateAgentSession,
   DefaultResourceLoader: hoisted.mockDefaultResourceLoader,
+  SessionManager: {
+    inMemory: hoisted.mockSessionManagerInMemory,
+  },
   SettingsManager: {
     create: hoisted.mockSettingsManagerCreate,
     inMemory: hoisted.mockSettingsManagerInMemory,
@@ -277,6 +283,17 @@ describe('PiRuntimeAdapter', () => {
       expect(mockApplyApplicationRuntimeEnv).toHaveBeenCalledWith(process.env);
       expect(mockSession.subscribe).toHaveBeenCalled();
       expect(mockSession.prompt).toHaveBeenCalledWith('Hello Pi');
+    });
+
+    it('uses an in-memory Pi session manager so SQLite remains the only restore source', async () => {
+      await adapter.startSession('memory-session', 'Hello Pi');
+
+      expect(mockSessionManagerInMemory).toHaveBeenCalledWith(process.cwd());
+      expect(mockCreateAgentSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionManager: { cwd: process.cwd() },
+        }),
+      );
     });
 
     it('rolls up session memory after a successful agent run', async () => {
@@ -996,7 +1013,7 @@ describe('PiRuntimeAdapter', () => {
         systemPromptOverride: (base: string | undefined) => string | undefined;
       };
       expect(loaderOptions.systemPromptOverride('Pi default prompt')).toBe(
-        'You are the selected expert.',
+        'Pi default prompt\n\nYou are the selected expert.',
       );
       expect(mockCreateAgentSession).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1018,6 +1035,13 @@ describe('PiRuntimeAdapter', () => {
       expect(mockCreateAgentSession.mock.calls[0]?.[0]).toEqual(
         expect.objectContaining({ settingsManager }),
       );
+      expect(settingsManager.applyOverrides).toHaveBeenCalledWith({
+        compaction: {
+          enabled: true,
+          reserveTokens: 8_192,
+          keepRecentTokens: 16_384,
+        },
+      });
     });
 
     it('should resolve the explicit model override for a new session', async () => {
@@ -2037,7 +2061,8 @@ describe('PiRuntimeAdapter', () => {
       const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
         appendSystemPromptOverride: () => string[];
       };
-      expect(loaderOptions.appendSystemPromptOverride()).toEqual([
+      expect(loaderOptions.appendSystemPromptOverride(['existing Pi append'])).toEqual([
+        'existing Pi append',
         PiAskUserQuestionSystemPrompt,
         expect.stringContaining('## Local document reading'),
         expect.stringContaining('## File tool usage'),

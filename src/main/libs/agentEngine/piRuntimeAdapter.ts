@@ -111,7 +111,10 @@ import {
   extractPiBackgroundCompletionText,
   type PiBackgroundCompletionResult,
 } from './piBackgroundCompletion';
-import { buildPiConversationPrompt } from './piConversationContext';
+import {
+  buildPiConversationPrompt,
+  calculatePiConversationHistoryCharLimit,
+} from './piConversationContext';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
@@ -317,6 +320,9 @@ interface ActivePiSession {
 interface PiModules {
   createAgentSession: (options: Record<string, unknown>) => Promise<{ session: PiSession }>;
   DefaultResourceLoader: new (options: Record<string, unknown>) => PiResourceLoader;
+  SessionManager?: {
+    inMemory(cwd?: string): unknown;
+  };
   SettingsManager?: {
     create(cwd: string, agentDir?: string): PiSettingsManager;
     inMemory?(): PiSettingsManager;
@@ -339,7 +345,14 @@ interface PiResourceLoader {
 }
 
 interface PiSettingsManager {
-  applyOverrides(overrides: { shellPath?: string }): void;
+  applyOverrides(overrides: {
+    shellPath?: string;
+    compaction?: {
+      enabled?: boolean;
+      reserveTokens?: number;
+      keepRecentTokens?: number;
+    };
+  }): void;
   getShellPath?(): string | undefined;
 }
 
@@ -448,6 +461,10 @@ async function getPiModules(): Promise<PiModules> {
         createAgentSession: codingAgent.createAgentSession as PiModules['createAgentSession'],
         DefaultResourceLoader:
           codingAgent.DefaultResourceLoader as PiModules['DefaultResourceLoader'],
+        SessionManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SessionManager')
+          ? ((codingAgent as typeof codingAgent & { SessionManager?: unknown })
+              .SessionManager as PiModules['SessionManager'])
+          : undefined,
         SettingsManager: Object.prototype.hasOwnProperty.call(codingAgent, 'SettingsManager')
           ? ((codingAgent as typeof codingAgent & { SettingsManager?: unknown })
               .SettingsManager as PiModules['SettingsManager'])
@@ -696,6 +713,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         hasAppliedApplicationRuntimeEnv = true;
       }
       const sessionOptions: Record<string, unknown> = { cwd: workspaceRoot };
+      // Cowork owns the canonical transcript in SQLite. Pi's default session
+      // manager persists its own transcript, which would be duplicated by the
+      // SQLite history prompt used when a session is recreated.
+      if (pi.SessionManager?.inMemory) {
+        sessionOptions.sessionManager = pi.SessionManager.inMemory(workspaceRoot);
+      }
 
       // System prompt — user config only. Skills are discovered and appended
       // by the resource loader (additionalSkillPaths), which renders them via
@@ -800,6 +823,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
 
       console.debug(`[PiRuntime] loading isolated resources for session ${sessionId}`);
       const settingsManager = this.createPiSettingsManager(pi, workspaceRoot);
+      const contextWindowTokens =
+        typeof resolvedModel.model.contextWindow === 'number'
+          ? resolvedModel.model.contextWindow
+          : undefined;
       const resourceLoader = await this.createPiResourceLoader(pi, workspaceRoot, resourceState, {
         sessionId,
         getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
@@ -807,6 +834,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         getAutoApprove: () =>
           this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
       });
+      this.applyPiCompactionOverrides(settingsManager, contextWindowTokens);
       if (!isCurrentInitialization()) return;
       sessionOptions.resourceLoader = resourceLoader;
       if (settingsManager) {
@@ -1212,7 +1240,9 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       );
       const storedSession = this.store?.getSession(sessionId);
       const history = storedSession?.messages ?? [];
-      const piPrompt = buildPiConversationPrompt(history, prompt);
+      const piPrompt = buildPiConversationPrompt(history, prompt, {
+        maxChars: calculatePiConversationHistoryCharLimit(),
+      });
       return this.startSession(sessionId, prompt, {
         ...options,
         skipInitialUserMessage: options._skipUserMessage,
@@ -1283,7 +1313,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
-        _piPromptOverride: buildPiConversationPrompt(history, prompt),
+        _piPromptOverride: buildPiConversationPrompt(history, prompt, {
+          maxChars: calculatePiConversationHistoryCharLimit(
+            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+            typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+          ),
+        }),
       });
     }
 
@@ -1306,7 +1341,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
-        _piPromptOverride: buildPiConversationPrompt(history, prompt),
+        _piPromptOverride: buildPiConversationPrompt(history, prompt, {
+          maxChars: calculatePiConversationHistoryCharLimit(
+            typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+            typeof active.model.maxTokens === 'number' ? active.model.maxTokens : undefined,
+          ),
+        }),
       });
     }
 
@@ -1324,6 +1364,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         // AgentSession.reload() reloads SettingsManager from disk, so restore
         // the per-process bundled PortableGit override after every reload.
         this.applyPiShellOverride(active.settingsManager);
+        this.applyPiCompactionOverrides(
+          active.settingsManager,
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+        );
         active.requestedSystemPrompt = nextSystemPrompt;
         active.requestedSkillIds = requestedSkillIds;
         console.debug('[PiRuntime] reloaded session resources after prompt change');
@@ -1543,6 +1587,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         active.resourceState.maxOutputTokens = resolvedModel.maxOutputTokens;
         await active.piSession.reload();
         this.applyPiShellOverride(active.settingsManager);
+        this.applyPiCompactionOverrides(
+          active.settingsManager,
+          typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
+        );
       }
       console.log('[PiRuntime] Model updated via patchSession:', patch.model);
     } catch (err) {
@@ -1971,6 +2019,32 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     return pi.SettingsManager.inMemory?.() ?? pi.SettingsManager.create(cwd, pi.getAgentDir());
   }
 
+  private applyPiCompactionOverrides(
+    settingsManager: PiSettingsManager | null,
+    contextWindowTokens?: number,
+  ): void {
+    if (!settingsManager) return;
+    const contextWindow =
+      Number.isFinite(contextWindowTokens) && (contextWindowTokens ?? 0) > 0
+        ? Math.floor(contextWindowTokens!)
+        : 32_768;
+    // Keep compaction's summary request and retained conversation inside the
+    // active model window. Pi's defaults (16K reserve, 20K recent) are tuned
+    // for large hosted models and can exceed a local 16K/32K model's budget.
+    const reserveTokens = Math.max(2_048, Math.min(16_384, Math.floor(contextWindow * 0.25)));
+    const keepRecentTokens = Math.max(
+      2_048,
+      Math.min(20_000, Math.floor(contextWindow * 0.5)),
+    );
+    settingsManager.applyOverrides({
+      compaction: {
+        enabled: true,
+        reserveTokens,
+        keepRecentTokens,
+      },
+    });
+  }
+
   private applyPiShellOverride(settingsManager: PiSettingsManager | null): void {
     if (!settingsManager || process.platform !== 'win32') return;
     const bashPath = resolveGitBashPathForPi();
@@ -2019,16 +2093,23 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                   resourceState.skillIds?.includes(skill.name || ''),
               ),
             },
-      systemPromptOverride: () => resourceState.systemPrompt,
+      systemPromptOverride: (base: string | undefined): string | undefined => {
+        const custom = resourceState.systemPrompt.trim();
+        if (!custom) return base;
+        if (!base?.trim()) return custom;
+        return `${base.trim()}\n\n${custom}`;
+      },
       // Pi bypasses tool promptGuidelines when systemPromptOverride is non-empty.
       // The registry is the single collection point for tool-usage policies.
-      appendSystemPromptOverride: (): string[] =>
-        collectPiSystemPromptContributions({
+      appendSystemPromptOverride: (base: string[] = []): string[] => [
+        ...base,
+        ...collectPiSystemPromptContributions({
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
           mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
           mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
         }),
+      ],
       extensionFactories: [
         ...(approvalContext?.getRunId()
           ? [
