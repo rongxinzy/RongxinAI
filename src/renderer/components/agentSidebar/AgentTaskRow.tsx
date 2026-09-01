@@ -116,15 +116,22 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         isNested ? 'ml-[-6px] w-[calc(100%+12px)]' : 'ml-0 w-full'
       } flex h-[30px] cursor-pointer items-center gap-2 rounded-md ${
         isBatchMode ? 'pl-4' : isNested ? 'pl-[38px]' : 'pl-3'
-      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} text-[14px] font-normal transition-colors ${
+      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} text-[14px] font-normal transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
         isSelected
           ? 'sidebar-interactive-surface-active text-foreground'
           : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground'
       }`}
       onClick={handleRowClick}
+      onKeyDown={e => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        handleRowClick();
+      }}
       role="treeitem"
       aria-level={2}
       aria-selected={isSelected}
+      tabIndex={0}
     >
       {isBatchMode && (
         <BatchSelectionCheckbox checked={isSelected} onToggleSelection={onToggleSelection} />

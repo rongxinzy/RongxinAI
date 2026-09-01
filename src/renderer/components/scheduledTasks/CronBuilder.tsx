@@ -1,4 +1,5 @@
 import { FieldDescription, FieldLabel } from '@shared/components/ui/field';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Input } from '@shared/components/ui/input';
 import {
   Select,
@@ -8,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@shared/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@shared/components/ui/tabs';
 import { ToggleGroup, ToggleGroupItem } from '@shared/components/ui/toggle-group';
 import React from 'react';
 
@@ -121,25 +121,26 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">{planSelect}</div>
 
-      <Tabs
+      <FluidTabs<CronMode>
+        aria-label={i18nService.t('scheduledTasksFormCronExpression')}
         value={cronMode}
         onValueChange={value => {
           if (value === 'builder') handleSwitchToBuilder();
           if (value === 'raw') handleSwitchToRaw();
         }}
-        className="gap-0"
-      >
-        <TabsList>
-          <TabsTrigger value="builder">
-            {i18nService.t(
+        items={[
+          {
+            value: 'builder',
+            label: i18nService.t(
               'scheduledTasksFormCronModeBuilder' as Parameters<typeof i18nService.t>[0],
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="raw">
-            {i18nService.t('scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0])}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
+            ),
+          },
+          {
+            value: 'raw',
+            label: i18nService.t('scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0]),
+          },
+        ]}
+      />
 
       {cronMode === 'builder' ? (
         <div className="rounded-lg border border-border bg-muted p-3 flex flex-col gap-2">

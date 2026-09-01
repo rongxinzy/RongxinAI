@@ -1055,7 +1055,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 type="button"
                 onClick={handleImportFromDialog}
                 disabled={isDownloadingSkill || !skillDownloadSource.trim()}
-                className="w-full py-2.5 rounded-xl text-white text-sm font-medium transition-colors disabled:opacity-50"
+                className="w-full py-2.5 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {isDownloadingSkill
                   ? i18nService.t('importingSkill')

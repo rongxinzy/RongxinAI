@@ -122,8 +122,15 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
                   </div>
                 )}
                 <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onSelect(artifact.id)}
-                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors
+                  onKeyDown={e => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    onSelect(artifact.id);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
                     ${artifact.id === selectedId ? 'bg-primary/10 text-primary' : 'hover:bg-surface text-foreground'}`}
                 >
                   {!compact && (

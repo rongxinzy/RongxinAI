@@ -1,6 +1,6 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { ButtonGroup } from '@shared/components/ui/button-group';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
 import { Spinner } from '@shared/components/ui/spinner';
 import {
@@ -153,30 +153,16 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
       <div>
         {/* Filter area */}
         <div className="pt-3 pb-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-          <ButtonGroup>
-            {(['success', 'error', 'skipped', 'running'] as const)
+          <FluidTabs
+            aria-label={i18nService.t('scheduledTasksFilterStatus')}
+            value={filter.status ?? ''}
+            onValueChange={status =>
+              handleFilterChange({ ...filter, status: status || undefined })
+            }
+            items={(['success', 'error', 'skipped', 'running'] as const)
               .filter(s => showRunning || s !== 'running')
-              .map(s => (
-                <Button
-                  key={s}
-                  variant="outline"
-                  size="sm"
-                  className={
-                    filter.status === s
-                      ? 'bg-secondary text-foreground'
-                      : 'bg-card text-muted-foreground'
-                  }
-                  onClick={() =>
-                    handleFilterChange({
-                      ...filter,
-                      status: filter.status === s ? undefined : s,
-                    })
-                  }
-                >
-                  {i18nService.t(statusLabelKeys[s])}
-                </Button>
-              ))}
-          </ButtonGroup>
+              .map(s => ({ value: s as string, label: i18nService.t(statusLabelKeys[s]) }))}
+          />
 
           <div className="flex items-center gap-1.5 ml-auto">
             <DateInput

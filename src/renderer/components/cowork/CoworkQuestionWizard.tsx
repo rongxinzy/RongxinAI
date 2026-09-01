@@ -258,11 +258,11 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
           </Button>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — scaleX-driven (width animation is banned by DESIGN.md) */}
         <div className="h-1 bg-surface-raised">
           <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
+            className="h-full w-full origin-left bg-primary transition-transform duration-200"
+            style={{ transform: `scaleX(${(currentStep + 1) / totalSteps})` }}
           />
         </div>
 
@@ -315,8 +315,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
                         aria-label={`${index + 1}. ${question.question}`}
                         onClick={() => setCurrentStep(index)}
                         className={cn(
-                          'rounded-full [&_svg]:size-3.5',
-                          isActive && 'shadow-md',
+                          '[&_svg]:size-3.5',
                           isAnswered &&
                             !isActive &&
                             'border-success bg-success/10 text-success hover:bg-success/20',

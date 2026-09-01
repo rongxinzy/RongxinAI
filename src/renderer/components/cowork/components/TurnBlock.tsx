@@ -172,7 +172,7 @@ const TurnBlockComponent: React.FC<{
       <div className="py-1">
         <div className="flex items-start gap-2">
           <span
-            className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`}
+            className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isToolError ? 'bg-destructive' : 'bg-surface-raised'}`}
           />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-muted-foreground">

@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@shared/components/ui/card';
+import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -286,35 +287,40 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
         onSave={() => void handleSaveEditor()}
       />
 
-      <Dialog open={forgetTarget !== null} onOpenChange={open => !open && setForgetTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{i18nService.t('managedMemoryForgetTitle')}</DialogTitle>
-            <DialogDescription>
-              {forgetTarget?.record.memoryId === null
-                ? i18nService.t('managedMemoryRejectDescription')
-                : i18nService.t('managedMemoryForgetDescription')}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setForgetTarget(null)}>
-              {i18nService.t('cancel')}
-            </Button>
-            {forgetTarget?.record.status !== MemoryLifecycleStatus.Deleted && (
-              <Button type="button" variant="destructive" onClick={() => void handleForget(false)}>
-                {forgetTarget?.record.memoryId === null
-                  ? i18nService.t('managedMemoryRejectCandidate')
-                  : i18nService.t('managedMemorySoftDelete')}
-              </Button>
-            )}
-            {forgetTarget?.record.memoryId !== null && (
-              <Button type="button" variant="destructive" onClick={() => void handleForget(true)}>
-                {i18nService.t('managedMemoryHardDelete')}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DestructiveConfirmDialog
+        open={forgetTarget !== null}
+        title={i18nService.t('managedMemoryForgetTitle')}
+        description={
+          forgetTarget?.record.memoryId === null
+            ? i18nService.t('managedMemoryRejectDescription')
+            : i18nService.t('managedMemoryForgetDescription')
+        }
+        cancelLabel={i18nService.t('cancel')}
+        confirmLabel={
+          forgetTarget &&
+          forgetTarget.record.status === MemoryLifecycleStatus.Deleted &&
+          forgetTarget.record.memoryId !== null
+            ? i18nService.t('managedMemoryHardDelete')
+            : forgetTarget?.record.memoryId === null
+              ? i18nService.t('managedMemoryRejectCandidate')
+              : i18nService.t('managedMemorySoftDelete')
+        }
+        onCancel={() => setForgetTarget(null)}
+        onConfirm={() =>
+          void handleForget(
+            forgetTarget?.record.status === MemoryLifecycleStatus.Deleted &&
+              forgetTarget.record.memoryId !== null,
+          )
+        }
+        secondaryConfirmLabel={
+          forgetTarget &&
+          forgetTarget.record.status !== MemoryLifecycleStatus.Deleted &&
+          forgetTarget.record.memoryId !== null
+            ? i18nService.t('managedMemoryHardDelete')
+            : undefined
+        }
+        onSecondaryConfirm={() => void handleForget(true)}
+      />
     </Card>
   );
 }

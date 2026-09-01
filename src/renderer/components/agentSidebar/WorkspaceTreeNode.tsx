@@ -202,7 +202,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
 
       {shouldRenderTasks && (
         <div
-          className={`grid w-full min-w-0 max-w-full transition-all duration-200 ease-out ${isTaskGroupVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
+          className={`grid w-full min-w-0 max-w-full transition-[grid-template-rows,opacity] duration-200 ease-out ${isTaskGroupVisible ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
         >
           <div
             className={`min-h-0 min-w-0 max-w-full ${isTaskGroupVisible ? '' : 'pointer-events-none overflow-hidden'}`}
@@ -214,7 +214,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 <Button
                   variant="ghost"
                   onClick={() => onRetryLoadTasks(workspace.id)}
-                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-red-500 hover:bg-red-500/10"
+                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-[13px] font-normal text-destructive hover:bg-destructive/10"
                 >
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>
