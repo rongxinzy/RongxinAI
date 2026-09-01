@@ -23,6 +23,11 @@ import React, {
 import { Streamdown } from 'streamdown';
 
 import { Shimmer } from './shimmer';
+import {
+  isPlainTextStreamingTail,
+  useAdaptiveTextReveal,
+  useStreamingTextSegments,
+} from './streamingText';
 
 // Same on-demand pipeline as MessageResponse: plain reasoning text never
 // pays for the Shiki/KaTeX/Mermaid runtimes (issue #141).
@@ -212,13 +217,22 @@ const RICH_CONTENT_PATTERN = /```|~~~|\$\$|\\\(|\\\[|\$[^$\n]+?\$|(?:^|\n)(?: {4
 export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => {
   const { isStreaming, showConnector } = useReasoning();
 
-  const base = <Streamdown plugins={basePlugins}>{children}</Streamdown>;
   const text = typeof children === 'string' ? children : '';
+  const { committed, tail } = useStreamingTextSegments(text, isStreaming);
+  const shouldAnimateTail = isStreaming && Boolean(tail) && isPlainTextStreamingTail(tail);
+  const revealedTail = useAdaptiveTextReveal(tail, shouldAnimateTail);
+  const base = <Streamdown plugins={basePlugins}>{text}</Streamdown>;
+  const streamingContent = (
+    <>
+      {committed && <Streamdown plugins={basePlugins}>{committed}</Streamdown>}
+      {revealedTail && <div className="whitespace-pre-wrap wrap-break-word">{revealedTail}</div>}
+    </>
+  );
   const content = isStreaming ? (
-    <div className="whitespace-pre-wrap wrap-break-word">{children}</div>
+    streamingContent
   ) : RICH_CONTENT_PATTERN.test(text) ? (
     <React.Suspense fallback={base}>
-      <RichMessageResponse>{children}</RichMessageResponse>
+      <RichMessageResponse>{text}</RichMessageResponse>
     </React.Suspense>
   ) : (
     base
@@ -234,7 +248,9 @@ export const ReasoningContent = memo(({ className, children, ...props }: Reasoni
       )}
       {...props}
     >
-      {content}
+      <div className="min-w-0 max-h-64 overflow-y-auto overscroll-contain scrollbar-gutter-stable [overflow-anchor:none]">
+        {content}
+      </div>
     </CollapsibleContent>
   );
 });
