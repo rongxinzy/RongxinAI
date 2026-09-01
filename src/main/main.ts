@@ -95,6 +95,7 @@ import {
 } from '../shared/ipc/schemas';
 import { WorkspaceIpc, WorkspaceStoreKey } from '../shared/workspace';
 import {
+  WorkbenchApprovalMode,
   WorkbenchContractKind,
   WorkbenchRunTrigger,
   type WorkbenchRun,
@@ -898,7 +899,13 @@ const getCodingRoomService = (): CodingRoomService => {
           prompt,
           modelOverride,
           thinkingLevel,
+          permissionMode,
         }) => {
+          const approvalMode =
+            permissionMode === WorkbenchApprovalMode.Auto ||
+            permissionMode === WorkbenchApprovalMode.AllowAll
+              ? permissionMode
+              : WorkbenchApprovalMode.Ask;
           const coworkStoreInstance = getCoworkStore();
           if (!coworkStoreInstance.getSession(sessionId)) {
             coworkStoreInstance.createSession(
@@ -919,12 +926,15 @@ const getCodingRoomService = (): CodingRoomService => {
             workspaceRoot,
             sessionMode: 'work',
             confirmationMode: 'modal',
+            approvalMode,
             ...(modelOverride ? { modelOverride } : {}),
             ...(thinkingLevel
               ? { thinkingLevel: thinkingLevel as PiThinkingLevel }
               : {}),
           });
         },
+        setBuiltinApprovalMode: (sessionId, mode) =>
+          runtime.setApprovalModeForSession(sessionId, mode),
         patchBuiltinSession: (sessionId, patch) =>
           runtime.patchSession(sessionId, {
             model: patch.model,
@@ -3940,7 +3950,10 @@ if (!gotTheLock) {
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
             productionLoopMode: options.productionLoopMode,
-            autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
+            approvalMode:
+              options.permissionMode === CoworkPermissionMode.AllowAll
+                ? WorkbenchApprovalMode.AllowAll
+                : WorkbenchApprovalMode.Ask,
             imageAttachments: options.imageAttachments,
             fileAttachments: options.fileAttachments,
             agentId: options.agentId,
@@ -4075,7 +4088,10 @@ if (!gotTheLock) {
           agentId: existingSession?.agentId,
           expertIds: existingSession?.experts.map(expert => expert.expertId),
           modelOverride: existingSession?.modelOverride,
-          autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
+          approvalMode:
+            options.permissionMode === CoworkPermissionMode.AllowAll
+              ? WorkbenchApprovalMode.AllowAll
+              : WorkbenchApprovalMode.Ask,
         })
         .catch(error => {
           console.error('[Cowork] continue error:', error);
@@ -4982,9 +4998,11 @@ if (!gotTheLock) {
             normalizedPermissionModeBySession,
             normalizedPermissionMode ?? previousConfig.permissionMode,
           )) {
-            getPiRuntimeAdapter().setAutoApproveForSession(
+            getPiRuntimeAdapter().setApprovalModeForSession(
               sessionId,
-              mode === CoworkPermissionMode.AllowAll,
+              mode === CoworkPermissionMode.AllowAll
+                ? WorkbenchApprovalMode.AllowAll
+                : WorkbenchApprovalMode.Ask,
             );
           }
         }
@@ -7062,7 +7080,10 @@ if (!gotTheLock) {
               ? session.experts.slice(0, 1).map(expert => expert.expertId)
               : normalizeSingleExpertIds(resumeInput.expertIds),
           modelOverride: session.modelOverride,
-          autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
+          approvalMode:
+            config.permissionMode === CoworkPermissionMode.AllowAll
+              ? WorkbenchApprovalMode.AllowAll
+              : WorkbenchApprovalMode.Ask,
           goalMode: resumeInput?.goalMode,
           productionLoopMode: resumeInput?.productionLoopMode,
           imageAttachments: resumeInput?.imageAttachments,

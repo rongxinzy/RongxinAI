@@ -8,6 +8,7 @@ import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalEffectStatus,
+  WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactProvenance,
@@ -626,7 +627,7 @@ test('supersedes a paused task instead of reusing its contract', async () => {
       toolCallId: 'write-call',
       toolName: 'write',
       toolInput: { path: 'slides.md', content: 'draft' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     });
     const approval = service.getDetail(first.task.id)?.approvals[0];
     service.respondToApproval({ approvalId: approval!.id, approved: false });
@@ -664,7 +665,7 @@ test('expires pending approvals when a new message supersedes the task', async (
       toolCallId: 'write-call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'draft' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     });
 
     service.beginRun({ sessionId: 'session', goal: 'new request', contract: chatContract });
@@ -723,7 +724,7 @@ test('successful side effects are not authorized twice', async () => {
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     };
     expect((await service.authorizeToolCall(input)).allow).toBe(true);
     service.recordToolResult(run.id, 'call', { ok: true }, false);
@@ -757,7 +758,7 @@ test('skip_workflow executes without creating a user approval', async () => {
           action: ProductionLoopAction.SkipWorkflow,
           reason: 'Simple information request',
         },
-        autoApprove: false,
+        approvalMode: WorkbenchApprovalMode.Ask,
       }),
     ).resolves.toEqual({ allow: true });
     expect(service.getDetail(task.id)?.approvals).toEqual([]);
@@ -783,7 +784,7 @@ test('pending, denied, and failed side effects cannot be authorized again', asyn
       toolCallId: 'pending-call',
       toolName: 'write',
       toolInput: { path: 'pending.txt', content: 'ok' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     };
     const pendingAuthorization = service.authorizeToolCall(pendingInput);
     expect((await service.authorizeToolCall(pendingInput)).allow).toBe(false);
@@ -804,7 +805,7 @@ test('pending, denied, and failed side effects cannot be authorized again', asyn
       ...pendingInput,
       runId: next.run.id,
       toolCallId: 'failed-call',
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     };
     expect((await service.authorizeToolCall(failedInput)).allow).toBe(true);
     service.recordToolResult(next.run.id, failedInput.toolCallId, new Error('failed'), true);
@@ -828,12 +829,55 @@ test('allow-all auto-approves irreversible effects', async () => {
       toolCallId: 'call',
       toolName: 'bash',
       toolInput: { command: 'git push origin main' },
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     });
     const approval = service.getDetail(task.id)?.approvals[0];
     expect(approval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Irreversible);
     expect(approval?.decision).toBe(WorkbenchApprovalDecision.Approved);
     expect((await authorization).allow).toBe(true);
+  } finally {
+    db.close();
+  }
+});
+
+test('auto mode approves reversible effects but still prompts for irreversible ones', async () => {
+  const { db, service } = createService();
+  try {
+    const { task, run } = service.beginRun({
+      sessionId: 'session',
+      goal: 'write then delete',
+      contract: chatContract,
+    });
+    const writeAuthorization = await service.authorizeToolCall({
+      sessionId: 'session',
+      runId: run.id,
+      toolCallId: 'write-call',
+      toolName: 'write',
+      toolInput: { path: 'result.txt', content: 'ok' },
+      approvalMode: WorkbenchApprovalMode.Auto,
+    });
+    const writeApproval = service
+      .getDetail(task.id)
+      ?.approvals.find(candidate => candidate.toolCallId === 'write-call');
+    expect(writeAuthorization.allow).toBe(true);
+    expect(writeApproval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Reversible);
+    expect(writeApproval?.decision).toBe(WorkbenchApprovalDecision.Approved);
+
+    const rmAuthorization = service.authorizeToolCall({
+      sessionId: 'session',
+      runId: run.id,
+      toolCallId: 'rm-call',
+      toolName: 'bash',
+      toolInput: { command: 'rm result.txt' },
+      approvalMode: WorkbenchApprovalMode.Auto,
+    });
+    const rmApproval = service
+      .getDetail(task.id)
+      ?.approvals.find(candidate => candidate.toolCallId === 'rm-call');
+    expect(rmApproval?.riskLevel).toBe(WorkbenchApprovalRiskLevel.Irreversible);
+    expect(rmApproval?.decision).toBe(WorkbenchApprovalDecision.Pending);
+    service.respondToApproval({ approvalId: rmApproval!.id, approved: false });
+    expect((await rmAuthorization).allow).toBe(false);
   } finally {
     db.close();
   }
@@ -866,7 +910,7 @@ test('rejects tool calls from another session or an inactive run', async () => {
         toolCallId: 'stale-call',
         toolName: 'write',
         toolInput: { path: 'stale.txt' },
-        autoApprove: true,
+        approvalMode: WorkbenchApprovalMode.AllowAll,
       }),
     ).resolves.toMatchObject({ allow: false, reason: expect.stringContaining('active run') });
     await expect(
@@ -876,7 +920,7 @@ test('rejects tool calls from another session or an inactive run', async () => {
         toolCallId: 'foreign-call',
         toolName: 'write',
         toolInput: { path: 'foreign.txt' },
-        autoApprove: true,
+        approvalMode: WorkbenchApprovalMode.AllowAll,
       }),
     ).resolves.toMatchObject({ allow: false, reason: expect.stringContaining('session') });
     expect(service.repository.listApprovalsForRun(first.run.id)).toHaveLength(0);
@@ -900,7 +944,7 @@ test('agent end does not verify a run paused by a denied approval', async () => 
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     });
     const approval = service.getDetail(task.id)?.approvals[0];
     service.respondToApproval({ approvalId: approval!.id, approved: false });
@@ -952,7 +996,7 @@ test('pausing a run expires and resolves its pending approval', async () => {
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     });
 
     service.pauseRun('session', 'The user stopped this run.');
@@ -985,7 +1029,7 @@ test('deleting a session resolves pending approvals before removing their record
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     });
 
     service.deleteSession('session');
@@ -1014,7 +1058,7 @@ test('startup recovery preserves pending approval projection until resume', asyn
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: false,
+      approvalMode: WorkbenchApprovalMode.Ask,
     });
 
     expect(service.recoverInterruptedState()).toBe(1);
@@ -1055,7 +1099,7 @@ test('tool results are persisted as bounded circular-safe JSON', async () => {
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     });
     const result: Record<string, unknown> = { payload: 'x'.repeat(100_000) };
     result.self = result;
@@ -1087,7 +1131,7 @@ test('startup recovery marks executing effects and their runs for review', async
       toolCallId: 'call',
       toolName: 'write',
       toolInput: { path: 'result.txt', content: 'ok' },
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     });
     expect(service.recoverInterruptedState()).toBe(1);
     const detail = service.getDetail(task.id);
@@ -1146,7 +1190,7 @@ test('keeps declared artifact identity scoped to its run after tool-effect colle
       toolCallId: 'write-call',
       toolName: 'write',
       toolInput: { path: filePath, content: '# result' },
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     });
     service.recordToolResult(first.run.id, 'write-call', { path: filePath }, false);
 

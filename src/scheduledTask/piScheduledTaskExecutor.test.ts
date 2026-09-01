@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { expect, test, vi } from 'vitest';
 
 import { CoworkSessionSource } from '../shared/cowork/constants';
+import { WorkbenchApprovalMode } from '../shared/workbenchTask';
 
 import {
   DeliveryMode,
@@ -124,7 +125,7 @@ test('runs a canonical task in its workspace and waits for complete', async () =
     session.id,
     'run',
     expect.objectContaining({
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
       skillIds: session.activeSkillIds,
       modelOverride: session.modelOverride,
     }),

@@ -64,6 +64,14 @@ export const WorkbenchApprovalRiskLevel = {
 export type WorkbenchApprovalRiskLevel =
   (typeof WorkbenchApprovalRiskLevel)[keyof typeof WorkbenchApprovalRiskLevel];
 
+export const WorkbenchApprovalMode = {
+  Ask: 'ask',
+  Auto: 'auto',
+  AllowAll: 'allowAll',
+} as const;
+export type WorkbenchApprovalMode =
+  (typeof WorkbenchApprovalMode)[keyof typeof WorkbenchApprovalMode];
+
 export const WorkbenchApprovalDecision = {
   Pending: 'pending',
   Approved: 'approved',

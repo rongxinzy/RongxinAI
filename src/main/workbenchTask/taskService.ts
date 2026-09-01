@@ -5,6 +5,7 @@ import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalDecisionSource,
   WorkbenchApprovalEffectStatus,
+  WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
   WorkbenchArtifactCandidateSource,
   WorkbenchArtifactVerificationStatus,
@@ -523,7 +524,7 @@ export class WorkbenchTaskService extends EventEmitter {
     toolCallId: string;
     toolName: string;
     toolInput: Record<string, unknown>;
-    autoApprove: boolean;
+    approvalMode: WorkbenchApprovalMode;
   }): Promise<WorkbenchToolAuthorizationResult> {
     const run = this.requireRun(input.runId);
     const task = this.requireTask(run.taskId);
@@ -558,9 +559,14 @@ export class WorkbenchTaskService extends EventEmitter {
       }
       return { allow: false, reason: this.getDuplicateApprovalReason(existing) };
     }
-    // "Allow all" means the user has explicitly disabled tool authorization
-    // prompts for this run, including irreversible effects.
-    const canAutoApprove = input.autoApprove;
+    // Ask prompts for every side effect; Auto auto-approves only reversible
+    // effects while irreversible/unknown ones still prompt; AllowAll means the
+    // user has explicitly disabled tool authorization prompts for this run,
+    // including irreversible effects.
+    const canAutoApprove =
+      input.approvalMode === WorkbenchApprovalMode.AllowAll ||
+      (input.approvalMode === WorkbenchApprovalMode.Auto &&
+        riskLevel === WorkbenchApprovalRiskLevel.Reversible);
     const approval = this.repository.transaction(() => {
       const created = this.repository.createApproval({
         taskId: task.id,

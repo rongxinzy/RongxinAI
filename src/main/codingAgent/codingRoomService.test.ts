@@ -21,6 +21,7 @@ import { CodingRoomService } from './codingRoomService';
 import { initializeCodingAgentSchema } from './schema';
 import { AcpSessionUpdateKind } from './acp/protocol';
 import { PiThinkingLevel } from '../libs/agentEngine/piRuntimeTypes';
+import { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 import { BuiltinCodingConfigId } from './drivers/builtinCodingDriver';
 import { CoworkInterruptionCause } from '../../shared/cowork/interruption';
 
@@ -213,6 +214,7 @@ test('routes a builtin lane through its driver and projects runtime completion',
     workspaceRoot,
     prompt: 'Investigate the failure.',
     thinkingLevel: PiThinkingLevel.Medium,
+    permissionMode: WorkbenchApprovalMode.Ask,
   });
   service.recordBuiltinEvent(lane.localSessionId, CodingEventKind.TurnComplete, {});
 
@@ -591,6 +593,7 @@ test('creates collaborator lanes in isolated workspaces and runs them independen
     workspaceRoot: lane.executionRoot,
     prompt: 'Review the implementation.',
     thinkingLevel: PiThinkingLevel.Medium,
+    permissionMode: WorkbenchApprovalMode.Ask,
   });
 });
 

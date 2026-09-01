@@ -1,6 +1,7 @@
 import { expect, test, vi } from 'vitest';
 
 import type { CodingAgentConfigOption } from '../../../shared/codingAgent';
+import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { PiThinkingLevel } from '../../libs/agentEngine/piRuntimeTypes';
 import {
   BuiltinCodingConfigId,
@@ -13,10 +14,12 @@ const createRuntime = (
 ): BuiltinCodingRuntime & {
   start: ReturnType<typeof vi.fn>;
   patchSession: ReturnType<typeof vi.fn>;
+  setApprovalMode: ReturnType<typeof vi.fn>;
 } => ({
   start: vi.fn().mockResolvedValue(undefined),
   cancel: vi.fn().mockResolvedValue(undefined),
   patchSession: vi.fn().mockResolvedValue(undefined),
+  setApprovalMode: vi.fn(),
   ...overrides,
 });
 
@@ -131,6 +134,84 @@ test('setConfigOption updates the selection and patches the live session', async
   expect(findOption(updated, BuiltinCodingConfigId.ThinkingLevel)?.currentValue).toBe('high');
 });
 
+test('setConfigOption applies the permission mode to the live session', async () => {
+  const runtime = createRuntime();
+  const driver = new BuiltinCodingDriver(runtime);
+  await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
+
+  const updated = await driver.setConfigOption(
+    's1',
+    BuiltinCodingConfigId.PermissionMode,
+    WorkbenchApprovalMode.AllowAll,
+  );
+
+  expect(runtime.setApprovalMode).toHaveBeenCalledWith('s1', WorkbenchApprovalMode.AllowAll);
+  expect(findOption(updated, BuiltinCodingConfigId.PermissionMode)?.currentValue).toBe(
+    WorkbenchApprovalMode.AllowAll,
+  );
+});
+
+test('prompt forwards the selected permission mode to the runtime', async () => {
+  const runtime = createRuntime();
+  const driver = new BuiltinCodingDriver(runtime);
+  await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
+  await driver.setConfigOption(
+    's1',
+    BuiltinCodingConfigId.PermissionMode,
+    WorkbenchApprovalMode.Auto,
+  );
+
+  for await (const _event of driver.prompt({
+    sessionId: 's1',
+    workspaceRoot: '/ws',
+    prompt: 'hi',
+  })) {
+    // The built-in driver never yields events; draining starts the runtime.
+  }
+
+  expect(runtime.start).toHaveBeenCalledWith(
+    's1',
+    '/ws',
+    'hi',
+    expect.objectContaining({ permissionMode: WorkbenchApprovalMode.Auto }),
+  );
+});
+
+test('createSession restores a persisted permission mode and rejects invalid values', async () => {
+  const driver = new BuiltinCodingDriver(createRuntime());
+  const restored = await driver.createSession({
+    workspaceRoot: '/ws',
+    localSessionId: 's1',
+    existingConfigOptions: [
+      {
+        id: BuiltinCodingConfigId.PermissionMode,
+        name: 'Permission mode',
+        type: 'select',
+        currentValue: WorkbenchApprovalMode.Auto,
+      },
+    ],
+  });
+  expect(
+    findOption(restored.configOptions, BuiltinCodingConfigId.PermissionMode)?.currentValue,
+  ).toBe(WorkbenchApprovalMode.Auto);
+
+  const invalid = await driver.createSession({
+    workspaceRoot: '/ws',
+    localSessionId: 's2',
+    existingConfigOptions: [
+      {
+        id: BuiltinCodingConfigId.PermissionMode,
+        name: 'Permission mode',
+        type: 'select',
+        currentValue: 'yolo',
+      },
+    ],
+  });
+  expect(
+    findOption(invalid.configOptions, BuiltinCodingConfigId.PermissionMode)?.currentValue,
+  ).toBe(WorkbenchApprovalMode.Ask);
+});
+
 test('setConfigOption rejects unknown options and values', async () => {
   const driver = new BuiltinCodingDriver(createRuntime());
   await driver.createSession({ workspaceRoot: '/ws', localSessionId: 's1' });
@@ -154,7 +235,10 @@ test('prompt forwards the selected thinking level to the runtime', async () => {
     // The built-in driver never yields events; draining starts the runtime.
   }
 
-  expect(runtime.start).toHaveBeenCalledWith('s1', '/ws', 'hi', { thinkingLevel: 'high' });
+  expect(runtime.start).toHaveBeenCalledWith('s1', '/ws', 'hi', {
+    thinkingLevel: 'high',
+    permissionMode: WorkbenchApprovalMode.Ask,
+  });
 });
 
 test('getDefaultConfigOptions builds options without binding them to a session', async () => {
@@ -164,6 +248,10 @@ test('getDefaultConfigOptions builds options without binding them to a session',
     expect.objectContaining({
       id: BuiltinCodingConfigId.ThinkingLevel,
       currentValue: PiThinkingLevel.Medium,
+    }),
+    expect.objectContaining({
+      id: BuiltinCodingConfigId.PermissionMode,
+      currentValue: WorkbenchApprovalMode.Ask,
     }),
   ]);
   // Defaults are not bound to any session yet.

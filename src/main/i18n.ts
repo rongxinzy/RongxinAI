@@ -29,6 +29,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentSessionRecovery: '上一个 Agent 会话无法恢复，已将交接摘要发送到新会话。',
     codingAgentConfigModel: '模型',
     codingAgentConfigThinkingLevel: '思考等级',
+    codingAgentConfigPermissionMode: '权限模式',
+    codingAgentPermissionModeAsk: '每次询问',
+    codingAgentPermissionModeAuto: '自动放行低风险',
+    codingAgentPermissionModeAllowAll: '全部允许',
     codingAgentNoAssistantResponse:
       '外部 Agent 未返回助手内容，请检查 Agent 的登录状态、模型配置和网络连接。',
     cronSessionPrefix: '定时',
@@ -324,6 +328,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
       'The previous agent session could not be restored. A handoff summary was sent to a new session.',
     codingAgentConfigModel: 'Model',
     codingAgentConfigThinkingLevel: 'Thinking level',
+    codingAgentConfigPermissionMode: 'Permission mode',
+    codingAgentPermissionModeAsk: 'Ask every time',
+    codingAgentPermissionModeAuto: 'Auto-approve low risk',
+    codingAgentPermissionModeAllowAll: 'Allow all',
     codingAgentNoAssistantResponse:
       'The external agent returned no assistant content. Check its sign-in state, model configuration, and network connection.',
     cronSessionPrefix: 'Cron',

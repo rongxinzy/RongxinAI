@@ -486,7 +486,7 @@ test('IM turns use workspace session configuration without disabling Pi tools', 
     'Use the workspace conversation context.',
   );
   expect(runtime.startCalls[0].options).not.toHaveProperty('confirmationMode');
-  expect(runtime.startCalls[0].options).not.toHaveProperty('autoApprove');
+  expect(runtime.startCalls[0].options).not.toHaveProperty('approvalMode');
 
   runtime.emit('message', 'session-1', {
     id: 'assistant-1',
