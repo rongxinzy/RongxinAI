@@ -113,6 +113,7 @@ import {
 } from './piBackgroundCompletion';
 import { buildPiConversationPrompt } from './piConversationContext';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
+import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
 import { buildPiResearchStateTool } from './piResearchStateTool';
 import {
@@ -2025,6 +2026,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         collectPiSystemPromptContributions({
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
+          mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
+          mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
         }),
       extensionFactories: [
         ...(approvalContext?.getRunId()
@@ -3092,29 +3095,35 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
     if (!this.mcpServerManager) return null;
-    if (this.mcpServerManager.toolManifest.length === 0) return null;
+    if (
+      this.mcpServerManager.toolManifest.length === 0 &&
+      this.mcpServerManager.serverStatuses.length === 0
+    ) {
+      return null;
+    }
 
     const mgr = this.mcpServerManager;
     const getManifest = () => mgr.toolManifest;
 
     const buildStatusLine = (): string => {
-      const servers = this.mcpServerManager?.toolManifest ?? [];
-      const serverNames = [...new Set(servers.map(t => t.server))];
-      const running = this.mcpServerManager?.isRunning ? 'running' : 'stopped';
-      return (
-        `MCP ${running} — ${serverNames.length} server(s), ${servers.length} tool(s):\n` +
-        serverNames
-          .map(s => {
-            const count = servers.filter(t => t.server === s).length;
-            return `  ${s}: ${count} tool(s)`;
-          })
-          .join('\n')
-      );
+      const manifest = this.mcpServerManager?.toolManifest ?? [];
+      const statuses = this.mcpServerManager?.serverStatuses ?? [];
+      const connectedCount = statuses.filter(status => status.connected).length;
+      const summary = `MCP — ${statuses.length} configured server(s), ${connectedCount} connected, ${manifest.length} tool(s)`;
+      if (statuses.length === 0) return summary;
+      return [
+        summary,
+        ...statuses.map(status => {
+          const state = status.connected ? 'connected' : 'unavailable';
+          const error = status.error ? ` — ${status.error}` : '';
+          return `  ${status.name}: ${state}, ${status.toolCount} tool(s)${error}`;
+        }),
+      ].join('\n');
     };
 
     return {
-      name: 'mcp',
-      label: 'MCP',
+      name: PiMcpTool.Name,
+      label: PiMcpTool.Label,
       description:
         'MCP gateway — call MCP tools, search, or describe. ' +
         'Use {tool, args} to invoke. Use {search} to find tools by name/description. ' +
