@@ -10,6 +10,8 @@ import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
 
 import type { Artifact } from '@/types/artifact';
 
+import { ModelFileExtension } from './constants';
+
 interface ModelRendererProps {
   artifact: Artifact;
 }
@@ -50,9 +52,12 @@ async function loadModelBuffer(artifact: Artifact): Promise<ArrayBuffer> {
   return dataUrlToArrayBuffer(result.dataUrl);
 }
 
-function parseModelObject(extension: string, buffer: ArrayBuffer): THREE.Object3D {
+export async function parseModelObject(
+  extension: string,
+  buffer: ArrayBuffer,
+): Promise<THREE.Object3D> {
   switch (extension) {
-    case '.stl': {
+    case ModelFileExtension.Stl: {
       const geometry = new STLLoader().parse(buffer);
       geometry.computeVertexNormals();
       return new THREE.Mesh(
@@ -60,7 +65,7 @@ function parseModelObject(extension: string, buffer: ArrayBuffer): THREE.Object3
         new THREE.MeshStandardMaterial({ color: 0x9aa4b2, metalness: 0.1, roughness: 0.65 }),
       );
     }
-    case '.ply': {
+    case ModelFileExtension.Ply: {
       const geometry = new PLYLoader().parse(buffer);
       geometry.computeVertexNormals();
       return new THREE.Mesh(
@@ -74,26 +79,18 @@ function parseModelObject(extension: string, buffer: ArrayBuffer): THREE.Object3
         }),
       );
     }
-    case '.obj':
+    case ModelFileExtension.Obj:
       return new OBJLoader().parse(new TextDecoder().decode(buffer));
-    case '.gltf':
-    case '.glb': {
+    case ModelFileExtension.Gltf:
+    case ModelFileExtension.Glb: {
       const loader = new GLTFLoader();
-      let object: THREE.Object3D | null = null;
-      // GLTFLoader.parse accepts a JSON string or an ArrayBuffer (GLB); the
-      // callback style keeps it synchronous for our mount flow.
-      loader.parse(
-        extension === '.glb' ? buffer : new TextDecoder().decode(buffer),
+      const gltf = await loader.parseAsync(
+        extension === ModelFileExtension.Glb ? buffer : new TextDecoder().decode(buffer),
         '',
-        gltf => {
-          object = gltf.scene;
-        },
-        undefined,
       );
-      if (!object) throw new Error('Failed to parse glTF scene.');
-      return object;
+      return gltf.scene;
     }
-    case '.3mf':
+    case ModelFileExtension.ThreeMf:
       return new ThreeMFLoader().parse(buffer);
     default:
       throw new Error(`Unsupported model format: ${extension}`);
@@ -122,7 +119,8 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
       try {
         const buffer = await loadModelBuffer(artifact);
         if (disposed) return;
-        const object = parseModelObject(extension, buffer);
+        const object = await parseModelObject(extension, buffer);
+        if (disposed) return;
 
         const width = container.clientWidth || 800;
         const height = container.clientHeight || 480;
@@ -175,7 +173,8 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
           const mesh = node as THREE.Mesh;
           if (mesh.isMesh && mesh.geometry) {
             const position = mesh.geometry.getAttribute('position');
-            if (position) triangles += mesh.geometry.index ? mesh.geometry.index.count / 3 : position.count / 3;
+            if (position)
+              triangles += mesh.geometry.index ? mesh.geometry.index.count / 3 : position.count / 3;
           }
         });
         setStats({ triangles: Math.round(triangles) });
