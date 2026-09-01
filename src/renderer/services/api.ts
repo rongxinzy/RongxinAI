@@ -362,7 +362,8 @@ class ApiService {
     return (
       provider !== ProviderName.Ollama &&
       provider !== ProviderName.LlamaCpp &&
-      provider !== ProviderName.Copilot
+      provider !== ProviderName.Copilot &&
+      !provider.startsWith('custom_')
     );
   }
 
