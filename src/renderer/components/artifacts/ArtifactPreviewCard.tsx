@@ -186,7 +186,7 @@ const ArtifactPreviewCard: React.FC<ArtifactPreviewCardProps> = ({ artifact }) =
       type="button"
       variant="outline"
       onClick={handleClick}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface-raised hover:bg-surface-hover transition-colors cursor-pointer max-w-sm w-full text-left h-auto"
+      className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border bg-surface-raised hover:bg-surface-tertiary transition-colors cursor-pointer max-w-sm w-full text-left h-auto"
     >
       <div className="shrink-0 w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
         <IconComponent className="w-5 h-5 text-primary" />

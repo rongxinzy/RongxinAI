@@ -4,8 +4,8 @@
  * Supports unified and split (side-by-side) view modes.
  */
 
-import { Button } from '@shared/components/ui/button';
 import { Card } from '@shared/components/ui/card';
+import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import React, { useMemo, useState } from 'react';
 
 type DiffLineType = 'added' | 'removed' | 'context';
@@ -244,22 +244,16 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
           </span>
         </div>
         {/* View mode toggle */}
-        <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 rounded-md p-0.5 shrink-0">
-          <Button
-            variant={viewMode === 'unified' ? 'secondary' : 'ghost'}
-            size="xs"
-            onClick={() => setViewMode('unified')}
-          >
-            Unified
-          </Button>
-          <Button
-            variant={viewMode === 'split' ? 'secondary' : 'ghost'}
-            size="xs"
-            onClick={() => setViewMode('split')}
-          >
-            Split
-          </Button>
-        </div>
+        <FluidTabs<ViewMode>
+          aria-label="Diff view mode"
+          className="shrink-0"
+          items={[
+            { value: 'unified', label: 'Unified' },
+            { value: 'split', label: 'Split' },
+          ]}
+          value={viewMode}
+          onValueChange={setViewMode}
+        />
       </div>
 
       {/* Diff content */}

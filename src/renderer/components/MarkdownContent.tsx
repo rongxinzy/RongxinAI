@@ -501,7 +501,7 @@ const createMarkdownComponents = (
               variant="ghost"
               size="icon"
               onClick={handleRevealInFolder}
-              className="inline-flex items-center justify-center rounded-md p-0.5 h-auto w-auto text-muted-foreground hover:text-primary hover:bg-surface-hover opacity-0 pointer-events-none transition-all group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+              className="inline-flex items-center justify-center rounded-md p-0.5 h-auto w-auto text-muted-foreground hover:text-primary hover:bg-surface-raised opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
               title={i18nService.t('showInFolder')}
               aria-label={i18nService.t('showInFolder')}
             >

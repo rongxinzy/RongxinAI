@@ -201,7 +201,6 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
           variant="outline"
           onClick={() => onAction('cancel')}
           disabled={isLoading}
-          className="rounded-xl active:scale-[0.98]"
         >
           {i18nService.t('cancel')}
         </Button>
@@ -210,7 +209,6 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
             type="button"
             onClick={() => onAction('installDisabled')}
             disabled={isLoading}
-            className="rounded-xl active:scale-[0.98]"
           >
             {i18nService.t('securityInstallDisabled')}
           </Button>
@@ -219,7 +217,6 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
             variant="destructive"
             onClick={() => onAction('install')}
             disabled={isLoading}
-            className="rounded-xl active:scale-[0.98]"
           >
             {i18nService.t('securityInstallAnyway')}
           </Button>

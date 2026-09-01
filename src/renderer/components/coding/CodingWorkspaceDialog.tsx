@@ -168,7 +168,7 @@ export const CodingWorkspaceDialog = ({
               <Button
                 type="button"
                 variant="ghost"
-                className="h-11 w-full justify-start rounded-none px-3"
+                className="w-full justify-start px-3"
                 onClick={() => void addFolder()}
               >
                 <FolderPlus />

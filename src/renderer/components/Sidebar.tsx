@@ -492,7 +492,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   setSearchQuery('');
                   searchInputRef.current?.focus();
                 }}
-                className="size-4 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground active:translate-y-0 dark:hover:bg-transparent [&_svg]:size-3.5"
+                className="size-4 shrink-0 text-muted-foreground hover:bg-transparent hover:text-foreground dark:hover:bg-transparent [&_svg]:size-3.5"
               >
                 <X />
               </Button>

@@ -369,10 +369,10 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
         {!inline && (
           <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
           <div
-            className={`p-2 rounded-full ${isQuestionTool && !isConfirmMode ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}
+            className={`p-2 rounded-full ${isQuestionTool && !isConfirmMode ? 'bg-primary-muted' : 'bg-warning/10'}`}
           >
             <TriangleAlert
-              className={`h-6 w-6 ${isQuestionTool && !isConfirmMode ? 'text-blue-600 dark:text-blue-500' : 'text-yellow-600 dark:text-yellow-500'}`}
+              className={`h-6 w-6 ${isQuestionTool && !isConfirmMode ? 'text-primary' : 'text-warning'}`}
             />
           </div>
           <div className="flex-1">

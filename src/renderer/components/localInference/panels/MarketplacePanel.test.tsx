@@ -292,7 +292,7 @@ describe('MarketplacePanel search and filters', () => {
     );
     expect(chatTab).toHaveClass(
       'h-8',
-      'font-medium',
+      'font-normal',
       'hover:opacity-100',
     );
     expect(chatTab.querySelector('[data-fluid-tabs-hover-indicator="true"]')).toHaveClass(

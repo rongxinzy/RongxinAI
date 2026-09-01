@@ -153,8 +153,8 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 | 圆角    | 类名                        | 用途                                                        |
 | ------- | --------------------------- | ----------------------------------------------------------- |
-| 8px     | `rounded-sm` / `rounded-md` | 按钮、输入框、下拉项、badge、行内代码块、小图标按钮         |
-| 10px    | `rounded-lg`                | **默认。** 卡片、面板、导航项、侧边栏分组                   |
+| 8px     | `rounded-sm` / `rounded-md` | 小号按钮（xs/sm）、输入框、下拉项、badge、行内代码块        |
+| 10px    | `rounded-lg`                | **默认。** 默认尺寸按钮、卡片、面板、导航项、侧边栏分组     |
 | 14px    | `rounded-xl`                | 对话框、大型弹层、代码块容器                                |
 | 全圆    | `rounded-full`              | 头像、分段控件滑块、胶囊形元素                              |
 
@@ -162,8 +162,9 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 1. 同一容器内，子元素圆角 ≤ 父元素圆角，视觉上保持同心。
 2. 禁止任意值圆角（`rounded-[7px]` 等）；刻度不满足时优先改设计，其次扩展刻度。
-3. 拼接控件（ButtonGroup 等）相邻边圆角归零，由统一的 CSS 规则处理（参考 `index.css` 中 button-group 段）。
+3. 拼接控件（ButtonGroup 等）相邻边圆角归零，由统一的 CSS 规则处理（参考 `index.css` 中 button-group 段），禁止用 `rounded-none` 手搓拼接。
 4. **唯一例外：主输入框（hero prompt input）容器允许 `rounded-3xl`。** 它是产品的中心舞台元素，更大的圆角是有意的识别特征；此例外不推广到其他容器。
+5. **按钮圆角以组件库为准**：Button 默认尺寸 `rounded-lg`（10px），xs/sm 档 8px。禁止在调用点用 className 改按钮圆角——`rounded-xl` 按钮、`rounded-full` 圆形按钮（非头像/滑块/胶囊本体）、4px `rounded` 均属违规。
 
 ## 阴影
 
@@ -183,7 +184,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 1. **边框优先，阴影殿后。** 浅色主题下能用一个 1px `border` 说清的层级，不用阴影。阴影只用于"真正浮在内容之上"的元素（弹层、对话框）。
 2. 暗色主题慎用阴影（深色上阴影不可见），层级用表面色明度差 + 边框表达。
-3. 普通按钮、输入框**不加阴影**。
+3. 普通按钮、输入框**不加阴影**——包括 hover 态。`hover:shadow-*` 式按钮反馈（`button-21st` 体系与 `localInferenceCompactButtonClass`）已废弃：新代码不得引入，存量调用点逐步清除。
 
 ## 间距与填充
 
@@ -219,6 +220,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 非激活的分段选项           | `opacity-50` + 激活时恢复（参见下方范例）                                                           |
 | 加载骨架闪烁               | `animate-shimmer` 内置                                                                              |
 | 模态遮罩                   | `bg-black/10`（`.modal-backdrop` 与共享 Dialog/Sheet overlay），只变暗、**不使用 backdrop-blur**     |
+| hover 背景反馈             | 只用 token 换档（`hover:bg-muted` / `hover:bg-surface-raised`）；透明度叠加仅保留 nav 悬浮的 `hover:bg-black/3 dark:hover:bg-white/4` 这一结构性例外。禁止 `hover:bg-primary/10`、`hover:bg-red-500/10` 等裸色叠加——需要的浅色反馈必须先定义为 token |
 | 其余一切"让颜色变浅"的需求 | **禁止用 opacity 实现**，改用对应的弱档 token（`text-secondary`、`border-subtle`、`primary-muted`） |
 
 原因：opacity 会让元素与背后的内容混色，在明暗两套主题下表现不一致；token 才能在两套主题中各自取到正确的值。
@@ -226,7 +228,8 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 ## 动效
 
 - 时长：普通交互 **100–250ms**；具备明确语义过程的动态图标 **400–600ms**，统一 `ease-out`（或 `transitionTimingFunction.smooth`）。超过 600ms 的动画需要理由。
-- 可动属性只有 `opacity` 和 `transform`；禁止动画化 width/height/top/left（布局抖动）。结构性位移（如侧边栏宽度）沿用已有的受控例外。
+- 可动属性只有 `opacity` 和 `transform`；禁止动画化 width/height/top/left（布局抖动）。结构性位移（如侧边栏宽度）沿用已有的受控例外，缓动同样统一 `ease-out`/`smooth`，不得用 `ease-in-out`。
+- **禁止 `transition-all`**：过渡必须限定属性（`transition-colors` / `transition-opacity` / `transition-transform`，或显式属性列表）。`transition-all` 会把布局属性卷进动画，是 width/height 被隐式动画化的主要来源。
 - 入场动画用 `index.css` `@theme` 中已有的：`animate-fade-in` / `fade-in-up` / `fade-in-down` / `scale-in` / `message-in`。不新增 keyframes，除非现有组合确实无法表达。
 - 必须遵守 `prefers-reduced-motion`（全局 CSS 已处理，新增自定义动画时验证）。
 
@@ -296,6 +299,15 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 这套语言推广到所有开关/切换类组件：中性的轨道、明确的滑动反馈、文字层级表达选中态、200ms 内的动效。
 
+### 分段控件的收口规则
+
+分段/筛选类多选一控件（非页面级 tab）**唯一实现是 `FluidTabs`**（`src/shared/components/ui/fluid-tabs.tsx`）；使用方不足时先改组件，不在调用点自造：
+
+1. FluidTabs 需先对齐本基准再推广：滑块改 `rounded-full`、选中侧 `font-semibold`、未选侧 `font-normal opacity-50`、滑动 ≤200ms。
+2. `TabsList` 的 default variant（灰轨道白块）与 `ToggleGroup` 的静态色块选中**不再用于新场景**；存量逐步迁移。
+3. **选择态表达优先级**：文字层级 > 中性边框/背景 > 强调色描边。禁止用 `primary` 填充色块表达选中（反面：MCP 分类 chips、MiniMax 区域条）；卡片式单选（主题、认证模式、IM 渠道）最多用 `border-primary` 描边，禁止 `bg-primary` / `bg-primary-muted` 填充。
+4. 自造 tab（`border-b-2` + `rounded-t-lg` 等）一律禁止：页面级走 PageTabs（见文末），弹窗内二级分组走 FluidTabs。
+
 ## 组件范式范例：工具栏触发按钮
 
 输入框工具栏上的选择器/触发按钮（参照实现：`PermissionModeMenu`、`CoworkModelPicker`）是**工具栏按钮的质感基准**，新做同类按钮（下拉选择器、菜单触发器、工具栏动作）时一律使用，不自造变体：
@@ -307,6 +319,14 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 5. **成对出现时必须同构**：同一工具栏里的多个选择器（如权限选择器与模型选择器）共享完全相同的尺寸、间距与状态样式。
 
 禁止：给工具栏触发按钮加 `border`（包括 `border-input`）、用 `rounded-full` 胶囊、用阴影作为 hover 反馈——这些是已被否决的变体。
+
+## Button 使用纪律
+
+1. **一切按钮走组件库**：`Button`（`src/shared/components/ui/button.tsx`）或工具栏场景的 `PromptInputButton`。原生 `<button>` 仅允许用于 Button 无法表达的复合内容（如缩略图选择卡），且必须自行补齐完整状态链（hover / focus-visible ring / active / disabled）。
+2. **className 覆写白名单**：只允许布局类——`w-full`、`justify-start`、`gap-*`、`mt-*` 等。**黑名单**：颜色（`bg-*`/`text-*`/`border-*`）、圆角、阴影、字重、字号、高度（`h-*`/`p-*` 尺寸重置）。需要新视觉时扩展 `buttonVariants` 的 variant，不在调用点覆写。`size="icon*"` 上再叠 `p-1` / `rounded-*` / `hover:bg-*` 属于"写了 Button 但没信任 Button"，直接删除。
+3. **行级/卡片级可点区域**（会话项、任务行、设置项、文件列表行）：优先 `Button variant="ghost"` + 布局类覆写；Button 确实无法表达时，必须满足统一范式——`role` + `tabIndex` + Enter/Space 键盘处理 + hover 背景换档 + `active:translate-y-px` + focus-visible ring。**禁止裸 `div onClick`**：无 role、无 tabIndex、无键盘处理的可点 div 视同 broken。
+4. **按压反馈不可连坐**：可点卡片保留 `active` 反馈；覆盖卡片内嵌图标按钮时不得用 `active:translate-y-0` 把整片卡片的按压手感一并关掉。
+5. **删除确认收口**：不可撤销删除的确认一律走 `DestructiveConfirmDialog`（确认钮 rgb(207,69,69) 填色、取消钮无边线 ghost），禁止手搓确认框或在确认框里用 `variant="destructive"` tint 按钮 + outline 取消钮。
 
 ## 交互状态
 
@@ -337,9 +357,13 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 - [ ] 字号在五档之内，字重在 400/500/600 之内
 - [ ] 圆角、阴影只用本文件定义的刻度，无任意值
 - [ ] 边框 1px，颜色用 token
-- [ ] 透明度只用于状态，配色变浅一律换 token
-- [ ] 普通交互动效 ≤250ms；语义动态图标 400–600ms；只动 opacity/transform，幅度符合「动效语言」规范
-- [ ] hover 反馈可感知（非 <3% 的假 hover）；含文字卡片未用 scale
+- [ ] 透明度只用于状态，配色变浅一律换 token；hover 背景为 token 换档，无裸色透明度叠加（`hover:bg-primary/10` 等）
+- [ ] 按钮无黑名单覆写（颜色/圆角/阴影/字重/字号/高度）；无 `hover:shadow-*` 按钮反馈
+- [ ] 行级/卡片级可点区域有 role + tabIndex + 键盘处理 + 完整状态链；无裸 `div onClick`
+- [ ] 分段/筛选控件走 FluidTabs，页面级 tab 走 PageTabs；无 primary 填充色块选中态，无自造 tab
+- [ ] 删除确认走 DestructiveConfirmDialog，未手搓确认框
+- [ ] 普通交互动效 ≤250ms；语义动态图标 400–600ms；只动 opacity/transform，幅度符合「动效语言」规范；无 `transition-all`
+- [ ] hover 反馈可感知（非 <3% 的假 hover，含引用不存在 token 的死 hover）；含文字卡片未用 scale
 - [ ] 入场错峰至多一组、≤4 层、总延迟 ≤400ms；循环动画只用于状态指示且一屏一处
 - [ ] 视图切换有退出-进入序列，无硬切；reduced-motion 下退化正常
 - [ ] 异步 id 替换不触发 key 变化和中途 remount

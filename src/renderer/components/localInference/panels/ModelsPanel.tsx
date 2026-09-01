@@ -1,6 +1,5 @@
 import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
-import { Button21st } from '@shared/components/ui/button-21st';
 import { Card, CardHeader, CardTitle } from '@shared/components/ui/card';
 import {
   DropdownMenu,
@@ -399,7 +398,7 @@ export function ModelsPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 min-w-28 cursor-pointer px-4 shadow-none transition-[background-color,border-color,box-shadow] duration-200 ease-out hover:shadow-lg hover:shadow-foreground/10 active:shadow-inset"
+                  className="h-9 min-w-28 cursor-pointer px-4 transition-[background-color,border-color] duration-200 ease-out"
                   onClick={onOpenMarketplace}
                 >
                   {i18nService.t('localInferenceLocalModelsEmptyAction')}
@@ -494,11 +493,11 @@ const ModelCard = memo(function ModelCard({
       >
         {loadingModel || unloading ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-background/80 backdrop-blur-[1px]">
-            <Button21st
+            <Button
               type="button"
-              isDisabled
-              size="default"
-              variant={unloading ? 'closing' : 'loading'}
+              disabled
+              size="lg"
+              variant={unloading ? 'destructive' : 'secondary'}
               data-local-inference-unload-button={unloading ? 'true' : undefined}
             >
               <Spinner
@@ -513,17 +512,17 @@ const ModelCard = memo(function ModelCard({
                   unloading ? 'localInferenceModelClosing' : 'localInferenceModelLoading',
                 )}
               </span>
-            </Button21st>
+            </Button>
             {loadingModel ? (
-              <Button21st
+              <Button
                 type="button"
-                size="default"
-                variant="primary"
+                size="lg"
+                variant="outline"
                 onClick={handleOpenLaunchLog}
               >
                 <ScrollText data-icon="inline-start" />
                 {i18nService.t('localInferenceModelLaunchLogAction')}
-              </Button21st>
+              </Button>
             ) : null}
           </div>
         ) : null}
@@ -559,12 +558,11 @@ const ModelCard = memo(function ModelCard({
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
               {loadingModel ? (
-                <Button21st
+                <Button
                   type="button"
-                  variant="danger"
-                  size="sm"
-                  className="h-8 min-w-16 px-3"
-                  isDisabled={cancellingModelLoad}
+                  variant="destructive"
+                  className="min-w-16"
+                  disabled={cancellingModelLoad}
                   data-local-inference-cancel-load-button="true"
                   onClick={() => onCancelModelLoad(model.name)}
                 >
@@ -573,33 +571,32 @@ const ModelCard = memo(function ModelCard({
                       ? 'localInferenceModelCancelling'
                       : 'localInferenceCancelModelLoad',
                   )}
-                </Button21st>
+                </Button>
               ) : isRunning ? (
-                <Button21st
+                <Button
                   type="button"
-                  variant="danger"
-                  size="sm"
-                  className="h-8 min-w-16 px-3"
-                  isDisabled={buttonsDisabled}
+                  variant="destructive"
+                  className="min-w-16"
+                  disabled={buttonsDisabled}
                   data-local-inference-model-action-button="true"
                   data-local-inference-unload-button="true"
                   onClick={() => onUnload(model.name)}
                 >
                   {i18nService.t('close')}
-                </Button21st>
+                </Button>
               ) : renderLoadButton ? (
                 renderLoadButton(model, { disabled: buttonsDisabled, onClick: handleLoadModel })
               ) : (
-                <Button21st
+                <Button
                   type="button"
-                  size="sm"
-                  className="h-8 min-w-16 px-3"
-                  isDisabled={buttonsDisabled}
+                  variant="outline"
+                  className="min-w-16"
+                  disabled={buttonsDisabled}
                   data-local-inference-model-action-button="true"
                   onClick={handleLoadModel}
                 >
                   {i18nService.t('start')}
-                </Button21st>
+                </Button>
               )}
               <DropdownMenu>
                 <DropdownMenuTrigger
