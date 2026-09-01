@@ -1,6 +1,9 @@
 import mermaid from 'mermaid';
-import React, { useEffect, useRef, useState } from 'react';
+import { Button } from '@shared/components/ui/button';
+import { Maximize2, Minimize2 } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import { i18nService } from '@/services/i18n';
 import type { Artifact } from '@/types/artifact';
 
 let mermaidInitialized = false;
@@ -14,12 +17,18 @@ function initMermaid(isDark: boolean) {
   mermaidInitialized = true;
 }
 
+const MIN_SCALE = 0.1;
+const MAX_SCALE = 4;
+const ZOOM_STEP = 0.001;
+
 interface MermaidRendererProps {
   artifact: Artifact;
 }
 
 const MermaidRenderer: React.FC<MermaidRendererProps> = ({ artifact }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [svg, setSvg] = useState<string>('');
 
@@ -51,6 +60,49 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ artifact }) => {
     };
   }, [artifact.content, artifact.id]);
 
+  // Reset zoom whenever a different diagram renders, so switching artifacts
+  // does not carry the previous scale over.
+  useEffect(() => {
+    setScale(1);
+  }, [artifact.id]);
+
+  useEffect(() => {
+    const el = fullscreenRef.current;
+    if (!el) return;
+    // Native listener with { passive: false } so preventDefault actually works
+    // (React's synthetic onWheel is passive, where preventDefault is a no-op).
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale(prev => Math.max(MIN_SCALE, Math.min(MAX_SCALE, prev - e.deltaY * ZOOM_STEP)));
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(document.fullscreenElement === fullscreenRef.current);
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  const resetZoom = useCallback(() => setScale(1), []);
+
+  const toggleFullscreen = useCallback(async () => {
+    if (document.fullscreenElement === fullscreenRef.current) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        console.warn('[MermaidRenderer] exiting fullscreen failed');
+      }
+      return;
+    }
+    try {
+      await fullscreenRef.current?.requestFullscreen();
+    } catch {
+      console.warn('[MermaidRenderer] entering fullscreen failed');
+    }
+  }, []);
+
   if (error) {
     return (
       <div className="p-4 text-sm text-red-500">
@@ -61,11 +113,39 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ artifact }) => {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full overflow-auto flex items-center justify-center p-4"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <div ref={fullscreenRef} className="relative h-full w-full overflow-auto bg-background">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div
+          style={{ transform: `scale(${scale})`, transformOrigin: 'center center' }}
+          className="min-w-0"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+      {scale !== 1 && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={resetZoom}
+          className="absolute bottom-3 right-3 z-10 px-2 py-1 text-xs"
+        >
+          {Math.round(scale * 100)}%
+        </Button>
+      )}
+      {document.fullscreenEnabled && (
+        <Button
+          variant="secondary"
+          size="icon"
+          onClick={() => void toggleFullscreen()}
+          className="absolute right-3 top-3 z-10"
+          title={i18nService.t(isFullscreen ? 'artifactExitFullscreen' : 'artifactEnterFullscreen')}
+          aria-label={i18nService.t(
+            isFullscreen ? 'artifactExitFullscreen' : 'artifactEnterFullscreen',
+          )}
+        >
+          {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+        </Button>
+      )}
+    </div>
   );
 };
 
