@@ -10,6 +10,7 @@ const MAX_SOURCE_MESSAGES = 12;
 const MAX_MESSAGE_CHARACTERS = 2_000;
 const MAX_SOURCE_CHARACTERS = 12_000;
 const MAX_MODEL_RESPONSE_CHARACTERS = 20_000;
+const MAX_EVIDENCE_MESSAGE_IDS = 4;
 
 export const SessionMemorySourceRole = {
   User: 'user',
@@ -36,10 +37,31 @@ export type SessionMemoryCompletion = (
   messages: readonly SessionMemoryCompletionMessage[],
 ) => Promise<string>;
 
+const SessionMemoryMessageIdSchema = z.string().trim().min(1).max(200);
+
+const SessionMemoryEvidenceCandidateSchema = z
+  .object({
+    text: z.string().trim().min(1).max(400),
+    evidenceMessageIds: z.array(SessionMemoryMessageIdSchema).min(1),
+  })
+  .strict();
+
 const SessionMemoryEvidenceSchema = z
   .object({
     text: z.string().trim().min(1).max(400),
-    evidenceMessageIds: z.array(z.string().trim().min(1).max(200)).min(1).max(4),
+    evidenceMessageIds: z.array(SessionMemoryMessageIdSchema).min(1).max(MAX_EVIDENCE_MESSAGE_IDS),
+  })
+  .strict();
+
+const SessionMemoryDigestCandidateSchema = z
+  .object({
+    shouldSave: z.boolean(),
+    goal: SessionMemoryEvidenceCandidateSchema.nullable(),
+    currentState: SessionMemoryEvidenceCandidateSchema.nullable(),
+    decisions: z.array(SessionMemoryEvidenceCandidateSchema).max(8),
+    artifacts: z.array(SessionMemoryEvidenceCandidateSchema).max(8),
+    unresolved: z.array(SessionMemoryEvidenceCandidateSchema).max(8),
+    nextSteps: z.array(SessionMemoryEvidenceCandidateSchema).max(8),
   })
   .strict();
 
@@ -99,6 +121,7 @@ Schema:
 
 Rules:
 - Use only message IDs present in the supplied conversation or previous digest.
+- Each evidenceMessageIds array must contain 1-4 distinct IDs. Keep only the strongest evidence when more is available.
 - Consolidate the previous digest with the new conversation. Retain still-relevant prior state unless new evidence supersedes it.
 - Claims retained from the previous digest may keep their existing evidence message IDs.
 - Paraphrase and consolidate; do not copy long spans of conversation.
@@ -177,17 +200,19 @@ export function parseSessionMemoryDigest(
   } catch (error) {
     throw new Error('Semantic session memory response is not valid JSON.', { cause: error });
   }
-  const result = SessionMemoryDigestSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new Error(`Semantic session memory response failed validation: ${result.error.message}`);
+  const candidateResult = SessionMemoryDigestCandidateSchema.safeParse(parsed);
+  if (!candidateResult.success) {
+    throw new Error(
+      `Semantic session memory response failed validation: ${candidateResult.error.message}`,
+    );
   }
   const evidenceItems = [
-    result.data.goal,
-    result.data.currentState,
-    ...result.data.decisions,
-    ...result.data.artifacts,
-    ...result.data.unresolved,
-    ...result.data.nextSteps,
+    candidateResult.data.goal,
+    candidateResult.data.currentState,
+    ...candidateResult.data.decisions,
+    ...candidateResult.data.artifacts,
+    ...candidateResult.data.unresolved,
+    ...candidateResult.data.nextSteps,
   ].filter(item => item !== null);
   for (const item of evidenceItems) {
     for (const messageId of item.evidenceMessageIds) {
@@ -196,7 +221,34 @@ export function parseSessionMemoryDigest(
       }
     }
   }
-  return result.data;
+  return SessionMemoryDigestSchema.parse({
+    ...candidateResult.data,
+    goal: normalizeEvidence(candidateResult.data.goal),
+    currentState: normalizeEvidence(candidateResult.data.currentState),
+    decisions: candidateResult.data.decisions.map(normalizeEvidence),
+    artifacts: candidateResult.data.artifacts.map(normalizeEvidence),
+    unresolved: candidateResult.data.unresolved.map(normalizeEvidence),
+    nextSteps: candidateResult.data.nextSteps.map(normalizeEvidence),
+  });
+}
+
+function normalizeEvidence<T extends z.infer<typeof SessionMemoryEvidenceCandidateSchema>>(
+  evidence: T,
+): T & { evidenceMessageIds: string[] };
+function normalizeEvidence(
+  evidence: z.infer<typeof SessionMemoryEvidenceCandidateSchema> | null,
+): z.infer<typeof SessionMemoryEvidenceSchema> | null;
+function normalizeEvidence(
+  evidence: z.infer<typeof SessionMemoryEvidenceCandidateSchema> | null,
+): z.infer<typeof SessionMemoryEvidenceSchema> | null {
+  if (!evidence) return null;
+  return {
+    ...evidence,
+    evidenceMessageIds: [...new Set(evidence.evidenceMessageIds)].slice(
+      0,
+      MAX_EVIDENCE_MESSAGE_IDS,
+    ),
+  };
 }
 
 export function renderSessionMemoryDigest(digest: SessionMemoryDigest): string {
