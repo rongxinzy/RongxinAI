@@ -50,5 +50,6 @@ export interface CoworkPendingMessage {
   skillIds?: string[];
   /** Immutable prompt snapshot used when a queued item is immediately steered. */
   skillPrompt?: string;
+  productionLoopMode?: import('../productionLoop').ProductionLoopMode;
   error?: string;
 }

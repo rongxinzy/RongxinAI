@@ -3939,6 +3939,7 @@ if (!gotTheLock) {
             confirmationMode: 'modal',
             sessionMode: options.mode ?? CoworkSessionMode.Work,
             goalMode: options.goalMode,
+            productionLoopMode: options.productionLoopMode,
             autoApprove: options.permissionMode === CoworkPermissionMode.AllowAll,
             imageAttachments: options.imageAttachments,
             fileAttachments: options.fileAttachments,
@@ -4067,6 +4068,7 @@ if (!gotTheLock) {
               ? CoworkSessionMode.Chat
               : CoworkSessionMode.Work,
           goalMode: options.goalMode,
+          productionLoopMode: options.productionLoopMode,
           imageAttachments: options.imageAttachments,
           fileAttachments: options.fileAttachments,
           workspaceRoot: existingSession?.cwd,
@@ -4129,6 +4131,7 @@ if (!gotTheLock) {
         input.fileAttachments,
         input.skillIds,
         input.skillPrompt,
+        input.productionLoopMode,
       );
     } catch (error) {
       return {
@@ -7061,6 +7064,7 @@ if (!gotTheLock) {
           modelOverride: session.modelOverride,
           autoApprove: config.permissionMode === CoworkPermissionMode.AllowAll,
           goalMode: resumeInput?.goalMode,
+          productionLoopMode: resumeInput?.productionLoopMode,
           imageAttachments: resumeInput?.imageAttachments,
           fileAttachments: resumeInput?.fileAttachments,
           _workbenchRunId: run.id,

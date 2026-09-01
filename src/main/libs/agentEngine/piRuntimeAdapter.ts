@@ -42,7 +42,10 @@ import {
   type HarnessActivationEvent,
   type HarnessModelProfileInput,
 } from '../../../shared/harness';
-import { MAX_STALE_PRODUCTION_ITERATIONS } from '../../../shared/productionLoop';
+import {
+  MAX_STALE_PRODUCTION_ITERATIONS,
+  ProductionLoopStatus,
+} from '../../../shared/productionLoop';
 import {
   WorkbenchApprovalDecision,
   WorkbenchApprovalRiskLevel,
@@ -713,6 +716,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionMode: options.sessionMode,
         prompt,
         goalMode: options.goalMode,
+        productionLoopMode: options.productionLoopMode,
         inheritedProductionRequired: options._productionWorkflowRequired,
       });
       const workbenchContract = this.createWorkbenchContract(
@@ -1237,11 +1241,25 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ? CoworkSessionMode.Chat
         : CoworkSessionMode.Work);
     const nextGoalMode = options.goalMode ?? active.goalMode;
+    let activeProductionSnapshot: Record<string, unknown> | undefined;
+    try {
+      activeProductionSnapshot = active.productionLoop?.getSnapshot();
+    } catch {
+      // A deleted or otherwise unavailable persisted run should not make a
+      // normal continuation fail; the next turn can rebuild its topology.
+      activeProductionSnapshot = undefined;
+    }
+    const inheritedProductionRequired =
+      options._productionWorkflowRequired === true ||
+      (activeProductionSnapshot?.productionActive === true &&
+        activeProductionSnapshot.skipped !== true &&
+        activeProductionSnapshot.status !== ProductionLoopStatus.Completed);
     const productionControlsAvailable = shouldExposeProductionControls({
       sessionMode: requestedSessionMode,
       prompt,
       goalMode: nextGoalMode,
-      inheritedProductionRequired: options._productionWorkflowRequired,
+      productionLoopMode: options.productionLoopMode,
+      inheritedProductionRequired,
     });
     const productionWorkflowTopologyChanged =
       productionControlsAvailable !== active.productionControlsAvailable;
@@ -1732,6 +1750,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     fileAttachments?: PiContinueOptions['fileAttachments'],
     skillIds?: string[],
     skillPrompt?: string,
+    productionLoopMode?: PiContinueOptions['productionLoopMode'],
   ): { success: boolean; item?: CoworkPendingMessage; error?: string } {
     const active = this.activeSessions.get(sessionId);
     if (!this.isWorkSession(sessionId, active)) {
@@ -1750,6 +1769,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       fileAttachments,
       skillIds,
       skillPrompt,
+      productionLoopMode,
     );
     this.emitQueueUpdated(sessionId);
     return { success: true, item };
@@ -1841,6 +1861,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         imageAttachments: item.imageAttachments,
         fileAttachments: item.fileAttachments,
         skillIds: item.skillIds,
+        productionLoopMode: item.productionLoopMode,
       });
       this.pendingMessageQueue.finishDelivery(item.id);
       return { success: true, item };
@@ -1870,6 +1891,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       metadata: {
         queueDelivery: delivery,
         ...(item.skillIds?.length ? { skillIds: item.skillIds } : {}),
+        ...(item.productionLoopMode ? { productionLoopMode: item.productionLoopMode } : {}),
         ...(item.imageAttachments?.length ? { imageAttachments: item.imageAttachments } : {}),
         ...(item.fileAttachments?.length ? { fileAttachments: item.fileAttachments } : {}),
       },
@@ -1903,6 +1925,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           imageAttachments: next.imageAttachments,
           fileAttachments: next.fileAttachments,
           skillIds: next.skillIds,
+          productionLoopMode: next.productionLoopMode,
         });
         this.pendingMessageQueue.finishDelivery(next.id);
       } catch (error) {

@@ -15,7 +15,7 @@ import type {
   WorkbenchVerificationCheckStatus,
   WorkbenchVerificationOutcome,
 } from './constants';
-import type { ProductionPlanItem } from '../productionLoop';
+import type { ProductionLoopMode, ProductionPlanItem } from '../productionLoop';
 
 export type WorkbenchJsonObject = Record<string, unknown>;
 
@@ -170,6 +170,7 @@ export interface WorkbenchTaskResumeInput {
   skillIds?: string[];
   expertIds?: string[];
   goalMode?: boolean;
+  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: Array<{
     name: string;
     mimeType: string;

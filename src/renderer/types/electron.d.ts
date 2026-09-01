@@ -9,6 +9,7 @@ import type {
   CoworkSessionSource,
 } from '../../shared/cowork/constants';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
+import type { ProductionLoopMode } from '../../shared/productionLoop';
 import type { CoworkToolActivityEvent } from '../../shared/cowork/toolActivity';
 import type {
   ProviderModelDiscoveryRequest,
@@ -753,6 +754,7 @@ interface IElectronAPI {
       title?: string;
       activeSkillIds?: string[];
       goalMode?: boolean;
+      productionLoopMode?: ProductionLoopMode;
       workspaceId?: string;
       agentId?: string;
       expertIds?: string[];
@@ -772,6 +774,7 @@ interface IElectronAPI {
       systemPrompt?: string;
       activeSkillIds?: string[];
       goalMode?: boolean;
+      productionLoopMode?: ProductionLoopMode;
       expertIds?: string[];
       permissionMode?: CoworkPermissionMode;
       imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>;
@@ -792,6 +795,7 @@ interface IElectronAPI {
       fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
       skillIds?: string[];
       skillPrompt?: string;
+      productionLoopMode?: ProductionLoopMode;
     }) => Promise<{ success: boolean; item?: CoworkPendingMessage; error?: string }>;
     updatePendingMessage: (options: {
       sessionId: string;

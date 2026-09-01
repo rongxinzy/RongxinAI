@@ -3,6 +3,7 @@ import type { CoworkToolActivityEvent } from '../../../shared/cowork/toolActivit
 import type { CoworkMessage } from '../../coworkStore';
 import type { CoworkPendingMessage } from '../../../shared/cowork/pendingMessageQueue';
 import type { CoworkQueueDelivery } from '../../../shared/cowork/pendingMessageQueue';
+import type { ProductionLoopMode } from '../../../shared/productionLoop';
 import type { CoworkSessionInterruption } from '../../../shared/cowork/interruption';
 
 /**
@@ -85,6 +86,7 @@ export type PiStartOptions = {
   /** UI session mode, used to apply Work-only execution controls. */
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
+  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: PiImageAttachment[];
   fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   agentId?: string;
@@ -108,6 +110,7 @@ export type PiContinueOptions = {
   /** UI session mode, preserved when a skill change recreates the Pi session. */
   sessionMode?: 'work' | 'chat';
   goalMode?: boolean;
+  productionLoopMode?: ProductionLoopMode;
   imageAttachments?: PiImageAttachment[];
   fileAttachments?: Array<{ name: string; path: string; extension: string; isImage?: boolean }>;
   /** Session snapshot used when the in-process runtime needs to recreate Pi state. */

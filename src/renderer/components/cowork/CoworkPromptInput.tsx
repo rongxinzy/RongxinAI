@@ -17,6 +17,10 @@ import { useDispatch, useSelector } from 'react-redux';
 
 import { CoworkSessionExpertSource } from '../../../shared/cowork/sessionExperts';
 import { CoworkPermissionMode, CoworkSessionMode } from '../../../shared/cowork/constants';
+import {
+  ProductionLoopMode,
+  type ProductionLoopMode as ProductionLoopModeValue,
+} from '../../../shared/productionLoop';
 import { agentService } from '../../services/agent';
 import { configService } from '../../services/config';
 import { coworkService } from '../../services/cowork';
@@ -164,6 +168,7 @@ interface CoworkPromptInputProps {
     fileAttachments?: CoworkFileAttachment[],
     expertIds?: string[],
     goalMode?: boolean,
+    productionLoopMode?: ProductionLoopModeValue,
   ) => boolean | void | Promise<boolean | void>;
   onStop?: () => void;
   isStreaming?: boolean;
@@ -275,6 +280,9 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     );
     const [value, setValue] = useState(draftPrompt);
     const [goalMode, setGoalMode] = useState(false);
+    const [productionLoopMode, setProductionLoopMode] = useState<ProductionLoopModeValue>(
+      ProductionLoopMode.Auto,
+    );
 
     // Keep a stable ref to the controller to avoid [controller] dep in the sync effect.
     // Without this, every controller reference change triggers a re-render cascade
@@ -649,6 +657,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         fileAtts.length > 0 ? fileAtts : undefined,
         selectedExpertIds,
         goalMode,
+        productionLoopMode,
       );
       if (result === false) {
         // Submission rejected — restore the prompt so the user can retry.
@@ -679,6 +688,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       modelSupportsImage,
       selectedExpertIds,
       goalMode,
+      productionLoopMode,
       canQueueWhileStreaming,
       resumeTaskActive,
     ]);
@@ -1233,6 +1243,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     }
                     goalMode={goalMode}
                     onGoalModeChange={setGoalMode}
+                    productionLoopMode={productionLoopMode}
+                    onProductionLoopModeChange={setProductionLoopMode}
                     disabled={disabled || isStreaming || isAddingFile}
                   />
                   {isWorkVariant && (
