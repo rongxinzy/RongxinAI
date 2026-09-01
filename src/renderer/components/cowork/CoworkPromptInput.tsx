@@ -1139,7 +1139,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         <PromptInput
           multiple
           className={cn(
-            'shadow-elevated rounded-3xl transition-shadow **:data-[slot=input-group]:rounded-3xl',
+            'input-aura shadow-elevated rounded-3xl transition-shadow **:data-[slot=input-group]:rounded-3xl',
             isDraggingFiles && 'ring-2 ring-primary',
           )}
           onDragEnter={handleDragEnter}

@@ -101,7 +101,7 @@ export const CodingComposer = ({
           />
         ) : null}
         <PromptInput
-          className="rounded-3xl shadow-elevated transition-shadow **:data-[slot=input-group]:rounded-3xl"
+          className="input-aura rounded-3xl shadow-elevated transition-shadow **:data-[slot=input-group]:rounded-3xl"
           onSubmit={(_message, event) => {
             event.preventDefault();
             if (!disabled && !isRunning && prompt.trim()) onSend();
