@@ -324,16 +324,27 @@ export const CodingWorkbenchView = ({
   const recoveryLane =
     activeLane?.pendingRecoveryPrompt && activeLane.pendingRecoveryContext ? activeLane : null;
 
+  // The activeLane object is re-created on every streamed snapshot update, so
+  // an effect keyed on it would re-assign viewport.scrollTop on each streamed
+  // event — overriding the stick-to-bottom auto-scroll and making the viewport
+  // jump away from the latest message. Restore the saved scroll position only
+  // when the lane id actually changes (lane switch or initial load).
+  const activeLaneSnapshotRef = useRef(activeLane);
+  activeLaneSnapshotRef.current = activeLane;
+  const restoredScrollLaneRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!activeLane) return;
+    const lane = activeLaneSnapshotRef.current;
+    if (!lane) return;
+    if (restoredScrollLaneRef.current === lane.id) return;
+    restoredScrollLaneRef.current = lane.id;
     const frame = requestAnimationFrame(() => {
       const viewport = eventStreamRef.current?.querySelector<HTMLElement>(
         '.coding-conversation-scroll',
       );
-      if (viewport) viewport.scrollTop = activeLane.scrollPosition;
+      if (viewport) viewport.scrollTop = lane.scrollPosition;
     });
     return () => cancelAnimationFrame(frame);
-  }, [activeLane]);
+  }, [activeLane?.id]);
 
   useEffect(() => {
     setSidePanelView(current => (current === CodingSidePanelView.Inspector ? null : current));
