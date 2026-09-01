@@ -100,3 +100,19 @@ export function findSkillPythonExecutable(
 export function getSkillPythonRuntimeRoot(): string | null {
   return candidateRoots()[0] || null;
 }
+
+/**
+ * Resolve the shared dependency layer's Python executable without per-Skill
+ * manifest gating. Used to put the managed environment (pandas, numpy, ...)
+ * on the agent's shell PATH for ad-hoc scripts. Skill script execution still
+ * goes through findSkillPythonExecutable with its compatibility gate.
+ */
+export function findSharedSkillPythonExecutable(): string | null {
+  for (const root of candidateRoots()) {
+    const executable = findPythonExecutable(
+      path.join(root, LAYERS_DIRECTORY_NAME, SHARED_ENVIRONMENT_NAME),
+    );
+    if (executable) return executable;
+  }
+  return null;
+}

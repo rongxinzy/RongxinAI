@@ -98,7 +98,6 @@ import { isRasterPreviewDecodable, renderOfficePreview } from '../officePreviewR
 import {
   createPiAskUserQuestionTool,
   PiAskUserQuestionToolName,
-  PiAskUserQuestionSystemPrompt,
   PiAskUserQuestionTimeoutMs,
   type PiAskUserQuestionInput,
   type PiAskUserQuestionResponse,
@@ -130,14 +129,15 @@ import { buildPiSubagentTool, PiSubagentToolName } from './piSubagentTool';
 import { buildPiSkillScriptTool } from './piSkillScriptTool';
 import { buildPiSkillRuntimeCapabilitiesTool } from './piSkillRuntimeCapabilitiesTool';
 import { resolvePiBuiltinProviderId } from './piProviderIds';
-import { buildPiDocumentReaderTool, PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
-import { buildDeclareArtifactTool, DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import { buildPiDocumentReaderTool } from './piDocumentReaderTool';
+import { buildDeclareArtifactTool } from '../../declareArtifact/tool';
 import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
 import { createPiWorkLoop } from './piWorkLoop';
-import { createPiLargeFileWriteSystemPrompt, PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
+import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
+import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
 import {
   getPiPreparingToolActivity,
   ToolActivityTracker,
@@ -1997,15 +1997,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             },
       systemPromptOverride: () => resourceState.systemPrompt,
       // Pi bypasses tool promptGuidelines when systemPromptOverride is non-empty.
-      // Append this policy so it remains present for both default and custom prompts.
-      appendSystemPromptOverride: (): string[] => [
-        PiAskUserQuestionSystemPrompt,
-        ...(resourceState.fileToolsEnabled ? [PiDocumentReaderSystemPrompt] : []),
-        ...(resourceState.fileToolsEnabled
-          ? [createPiLargeFileWriteSystemPrompt(resourceState.maxOutputTokens)]
-          : []),
-        DeclareArtifactSystemPrompt,
-      ],
+      // The registry is the single collection point for tool-usage policies.
+      appendSystemPromptOverride: (): string[] =>
+        collectPiSystemPromptContributions({
+          fileToolsEnabled: resourceState.fileToolsEnabled,
+          maxOutputTokens: resourceState.maxOutputTokens,
+        }),
       extensionFactories: [
         ...(approvalContext?.getRunId()
           ? [
