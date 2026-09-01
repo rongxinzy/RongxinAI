@@ -7,6 +7,7 @@ export type CoworkArtifactType =
   | 'markdown'
   | 'text'
   | 'document'
+  | 'model'
   | 'unsupported';
 
 export const CoworkArtifactSource = {

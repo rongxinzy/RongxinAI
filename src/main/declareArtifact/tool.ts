@@ -50,7 +50,7 @@ export function buildDeclareArtifactTool(
         kind: {
           type: 'string',
           description:
-            'Optional artifact kind hint. One of: html, svg, mermaid, code, markdown, document, image, text.',
+            'Optional artifact kind hint. One of: html, svg, mermaid, code, markdown, document, image, text, model.',
         },
         role: {
           type: 'string',
