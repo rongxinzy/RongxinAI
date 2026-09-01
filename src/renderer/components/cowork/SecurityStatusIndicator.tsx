@@ -34,6 +34,17 @@ const FADE_OUT_MS = 180;
 const prefersReducedMotion = (): boolean =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+/** Tracks document visibility so the typewriter loop pauses while hidden. */
+const useDocumentVisible = (): boolean => {
+  const [visible, setVisible] = useState(() => document.visibilityState !== 'hidden');
+  useEffect(() => {
+    const handleVisibilityChange = () => setVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+  return visible;
+};
+
 /**
  * Security status in the title bar: cycles through security-related phrases
  * with a typewriter effect (type in → hold → fade to next), so the indicator
@@ -43,35 +54,37 @@ const prefersReducedMotion = (): boolean =>
 const SecurityStatusIndicator: React.FC = () => {
   const phrases = useMemo(() => PHRASE_KEYS.map(key => i18nService.t(key)), []);
   const [reducedMotion] = useState(prefersReducedMotion);
+  const documentVisible = useDocumentVisible();
   const [phraseIndex, setPhraseIndex] = useState(0);
   const [typedLength, setTypedLength] = useState(0);
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   const currentPhrase = phrases[phraseIndex];
   const isTyping = typedLength < currentPhrase.length;
+  const paused = reducedMotion || !documentVisible;
 
   // Type the current phrase character by character, then hold.
   // typedLength must be a dependency so the effect re-runs after each tick.
   useEffect(() => {
-    if (reducedMotion) return;
+    if (paused) return;
     if (isTyping) {
       const timer = window.setTimeout(() => setTypedLength(len => len + 1), TYPE_INTERVAL_MS);
       return () => window.clearTimeout(timer);
     }
     const holdTimer = window.setTimeout(() => setIsFadingOut(true), HOLD_MS);
     return () => window.clearTimeout(holdTimer);
-  }, [isTyping, typedLength, reducedMotion]);
+  }, [isTyping, typedLength, paused]);
 
   // After the fade-out, advance to the next phrase and start typing again.
   useEffect(() => {
-    if (!isFadingOut) return;
+    if (!isFadingOut || !documentVisible) return;
     const timer = window.setTimeout(() => {
       setIsFadingOut(false);
       setTypedLength(0);
       setPhraseIndex(index => (index + 1) % phrases.length);
     }, FADE_OUT_MS);
     return () => window.clearTimeout(timer);
-  }, [isFadingOut, phrases.length]);
+  }, [isFadingOut, phrases.length, documentVisible]);
 
   // Reserve the width of the longest phrase so the header doesn't jitter.
   const minWidthEm = useMemo(

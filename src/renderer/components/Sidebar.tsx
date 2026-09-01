@@ -175,6 +175,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   const isResizingRef = useRef(false);
   const resizeStartXRef = useRef(0);
   const resizeStartWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
+  const pendingResizeWidthRef = useRef(DEFAULT_SIDEBAR_WIDTH);
+  const resizeRafRef = useRef<number | null>(null);
   const agentScrollContainerRef = useRef<HTMLDivElement>(null);
   // 保存侧边栏树中所有可见 session ID（跨所有 Agent 聚合），
   // 供批量模式"全选"使用，避免因 Redux sessions 被限定到单个 Agent 而导致全选范围错误
@@ -364,6 +366,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       setIsResizing(true);
       resizeStartXRef.current = event.clientX;
       resizeStartWidthRef.current = sidebarWidth;
+      pendingResizeWidthRef.current = sidebarWidth;
       document.body.classList.add('select-none');
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -378,10 +381,20 @@ const Sidebar: React.FC<SidebarProps> = ({
           onToggleCollapse();
           return;
         }
-        setSidebarWidth(Math.min(MAX_SIDEBAR_WIDTH, nextWidth));
+        pendingResizeWidthRef.current = Math.min(MAX_SIDEBAR_WIDTH, nextWidth);
+        if (resizeRafRef.current !== null) return;
+        resizeRafRef.current = requestAnimationFrame(() => {
+          resizeRafRef.current = null;
+          if (isResizingRef.current) setSidebarWidth(pendingResizeWidthRef.current);
+        });
       };
 
       const handleMouseUp = () => {
+        if (resizeRafRef.current !== null) {
+          cancelAnimationFrame(resizeRafRef.current);
+          resizeRafRef.current = null;
+        }
+        setSidebarWidth(pendingResizeWidthRef.current);
         isResizingRef.current = false;
         setIsResizing(false);
         document.body.classList.remove('select-none');
@@ -397,6 +410,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   useEffect(() => {
     return () => {
+      if (resizeRafRef.current !== null) cancelAnimationFrame(resizeRafRef.current);
       document.body.classList.remove('select-none');
     };
   }, []);

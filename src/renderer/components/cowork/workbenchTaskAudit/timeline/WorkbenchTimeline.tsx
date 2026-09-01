@@ -6,10 +6,9 @@ import type {
   WorkbenchTaskDetail,
 } from '../../../../../shared/workbenchTask';
 import { i18nService } from '../../../../services/i18n';
+import { TIMELINE_EASE } from '../constants';
 import { TimelineChapter } from './TimelineChapter';
 import { buildTimelineChapters } from './timelineModel';
-
-const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const chapterListVariants: Variants = {
   show: { transition: { staggerChildren: 0.06 } },
@@ -17,7 +16,7 @@ const chapterListVariants: Variants = {
 
 const chapterItemVariants: Variants = {
   hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: TIMELINE_EASE } },
 };
 
 interface WorkbenchTimelineProps {
@@ -53,7 +52,7 @@ export function WorkbenchTimeline({
           className="absolute inset-y-0 left-3.5 w-px origin-top bg-primary/40"
           initial={{ scaleY: 0 }}
           animate={{ scaleY: 1 }}
-          transition={{ duration: 0.8, ease: EASE }}
+          transition={{ duration: 0.8, ease: TIMELINE_EASE }}
         />
       )}
       <motion.ol

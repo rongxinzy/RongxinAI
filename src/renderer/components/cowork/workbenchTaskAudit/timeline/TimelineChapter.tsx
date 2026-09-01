@@ -24,6 +24,7 @@ import {
 } from '../../../../../shared/workbenchTask';
 import { i18nService } from '../../../../services/i18n';
 import { AuditJsonDisclosure } from '../AuditJsonDisclosure';
+import { TIMELINE_EASE } from '../constants';
 import {
   statusLabel,
   triggerLabel,
@@ -32,8 +33,6 @@ import {
 } from '../utils';
 import { TimelineEntryList } from './TimelineEntries';
 import { formatDuration, formatTimeOfDay, type TimelineChapter as TimelineChapterModel } from './timelineModel';
-
-const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 interface TimelineChapterProps {
   chapter: TimelineChapterModel;
@@ -152,7 +151,7 @@ export function TimelineChapter({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: EASE }}
+              transition={{ duration: 0.3, ease: TIMELINE_EASE }}
               className="overflow-hidden"
             >
               {expandedContent}
