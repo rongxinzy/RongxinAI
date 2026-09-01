@@ -32,6 +32,16 @@ npm run dist:linux      # Linux (.AppImage)
 
 **Requirements**: Node.js >=24 <25, Bun >=1.3 (package manager; `bun install` instead of `npm install`, lockfile is `bun.lock`). Windows builds require PortableGit (see README.md for setup).
 
+## 设计宪法：DESIGN.md
+
+`DESIGN.md` 是本仓库一切 UI 工作的**最高约束（宪法级）**，是色彩、字体、字号、圆角、阴影、间距、边框、透明度、动效、交互手感、组件范式的唯一事实来源。本文件中任何 UI 条目与 DESIGN.md 冲突时，以 DESIGN.md 为准。
+
+1. **先读再写。** 新增或修改任何 UI 代码之前，必须先读 DESIGN.md 的相关章节。凭记忆、凭组件库默认值、凭仓库现有代码写 UI，视同未读。
+2. **冲突时代码让路。** 既有代码、组件库默认样式、第三方示例与 DESIGN.md 冲突时，以 DESIGN.md 为准并修正代码。禁止引用旧先例为新违规辩护——"原来就是这么写的"不是理由。
+3. **评审可仅凭违反 DESIGN.md 打回。** 不需要证明存在 bug 或功能缺陷；违反标准本身即是缺陷。
+4. **标准只在一个地方改。** 需要新颜色、新圆角、新动效、新控件范式时，先改 DESIGN.md 和 token 契约，再写代码。禁止在调用点用任意值（`rounded-[7px]`、`shadow-[...]`、`text-[13px]`）绕过刻度。
+5. **用户明确要求偏离时**，先指出与 DESIGN.md 的冲突并确认，然后在 PR 描述中标注偏离点。
+
 ## Architecture Overview
 
 知远智能体 is an Electron + React desktop application for local-first AI Agent workflows. Its core areas are:
@@ -124,6 +134,12 @@ src/renderer/
 │   ├── skills/          # Skill management and marketplace UI
 │   ├── mcp/             # MCP server configuration UI
 │   └── artifacts/       # Artifact renderers
+
+src/shared/
+├── components/
+│   ├── ui/              # shadcn/ui 基础组件（button、fluid-tabs、page-tabs、dialog 等）
+│   └── ai-elements/     # AI 对话组件（message、prompt-input、conversation 等）
+└── lib/utils.ts         # cn() 等共享工具
 
 SKILLs/                  # Custom skill definitions for cowork sessions
 ├── skills.config.json   # Skill enable/order configuration
@@ -249,7 +265,7 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 
 项目使用两套 UI 组件库。**所有 UI 代码必须优先使用这些组件，禁止自造轮子。**
 
-**设计标准见 `DESIGN.md`**（色彩、字体、字号、字重、行高、圆角、阴影、间距、边框、透明度、动效、交互手感的项目级约束）。所有 UI 工作必须同时遵守 DESIGN.md；主题只保留浅色 / 深色 / 跟随系统。
+**设计标准见 `DESIGN.md`——它是宪法级约束（见本文顶部「设计宪法」）。** 主题只保留浅色 / 深色 / 跟随系统。
 
 ### shadcn/ui（基础组件）
 
@@ -264,7 +280,10 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 | `dialog`, `sheet`, `popover`, `hover-card` | 弹层       |
 | `tooltip`                                  | 提示       |
 | `dropdown-menu`, `command`                 | 菜单       |
-| `tabs`                                     | 标签页     |
+| `tabs`                                     | 标签页基元 |
+| `page-tabs`                                | 页面级标签页（唯一实现，见 DESIGN.md） |
+| `fluid-tabs`                               | 分段/筛选控件（唯一实现，见 DESIGN.md） |
+| `toggle`, `toggle-group`                   | 开关/多选 chips |
 | `card`                                     | 卡片       |
 | `sidebar`                                  | 侧边栏     |
 | `table`                                    | 表格       |
@@ -276,7 +295,9 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 | `collapsible`                              | 折叠面板   |
 | `breadcrumb`                               | 面包屑     |
 | `skeleton`, `spinner`                      | 加载态     |
+| `empty`                                    | 空状态     |
 | `sonner`                                   | Toast 通知 |
+| `destructive-confirm-dialog`               | 删除确认（唯一实现，见 DESIGN.md） |
 
 ### ai-elements（对话组件）
 
@@ -303,6 +324,8 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 3. **图标用 lucide-react。** 禁止手写 SVG 图标组件（项目已删除 30+ 个自定义 icon，全部迁移到 lucide）。
 4. **对话 UI 用 ai-elements。** 聊天、消息、推理展示等场景必须用 ai-elements，不要自己拼。
 5. **页面顶栏用 PageHeader。** 侧边栏切换的功能页必须使用 `src/renderer/components/PageHeader.tsx`（统一 h-12 / px-4 / draggable / border-b / 折叠按钮组 / mac 留白 / WindowTitleBar），禁止手写页面顶栏。页面标题只在 PageHeader 出现一次，内容区 hero 不重复标题。
+6. **三个唯一实现。** 页面级标签页用 `PageTabs`（放 PageHeader 的 tabs 槽位）、分段/筛选控件用 `FluidTabs`、删除确认用 `DestructiveConfirmDialog`。禁止手搓 tab、自造分段条、自写确认框——细则与选中态语言见 DESIGN.md 对应章节。
+7. **Button 覆写守纪律。** className 只许布局类（`w-full`、`justify-start`、`gap-*`）；颜色、圆角、阴影、字重、字号、高度一律走 variant/size 枚举。行级可点区域不得用裸 `div onClick`（完整范式见 DESIGN.md「Button 使用纪律」）。
 
 ### 样式工具
 
@@ -339,6 +362,37 @@ import { Settings, Plus, Trash } from 'lucide-react';
 - **单文件行数上限：** 单个文件最好不要超过 **800 行**，最多不能超过 **1000 行**。
 - **仅适用于新增文件：** 创建新文件时必须遵守此限制。拆分策略（子组件、按职责拆模块、提取类型到 `types.ts`）仅用于新建场景。
 - **已有超长文件：** 禁止给已有的超长文件继续追加逻辑。如需修改，将新增逻辑写入新文件，通过导入方式引用。**不要主动拆分已有超长文件**，除非用户明确要求重构。
+
+## 协作与沟通
+
+- 回答简洁直接，只写技术内容；commit、issue、PR 评论中不用 emoji、不写客套话。
+- 用户提问时先回答问题，再动手改代码或跑命令。
+- 回应用户反馈或方案评审时，先明确说同意或不同意，再说改了什么。
+- 解释非平凡设计按「问题 → 具体例子 → 方案 → 为什么必须这样做」的顺序，区分必要复杂度与可选复杂度。
+- 用户指令与本文件冲突时，先请求明确确认，再执行。
+
+## 代码质量红线
+
+- 大范围改动前完整读相关文件，不凭搜索片段做判断。
+- 禁止 `any`；确有必要时在旁注释理由。
+- 使用第三方库的 API/类型前，查 `node_modules` 里的实际声明，不凭记忆猜。
+- 禁止内联动态 import（`await import()`），一律顶层 import。
+- 删除看似有意为之的功能或代码前，先问用户。
+- 不做用户未要求的向后兼容（与焦土政策一致）。
+- 不通过降级或删除代码来绕过过期依赖的类型错误；升级依赖。
+- 临时脚本写到临时文件执行，用完删除；不在 bash 命令里嵌多行脚本。
+
+## 验证纪律
+
+- 代码改动（非文档）后运行 `npm run lint`，看完整输出，清零所有警告再提交。
+- 新建或修改测试文件后，必须运行该测试并迭代到通过。
+- 全量测试存在少量环境相关的存量失败（skill smoke、release manifest 等）。遇到失败先用 `git stash` 对照 HEAD 判断是否由你的改动引入：既不把存量失败算到自己头上，也不拿它为自己的回归开脱。
+
+## 依赖纪律
+
+- 依赖与 `bun.lock` 变更视同代码评审：只在确有必要时新增依赖，先确认仓库内没有现成能力。
+- 直添依赖锁定精确版本；安装用 `bun install`。
+- 含原生模块（better-sqlite3、node-pty）的依赖变更后，用 `npm run rebuild:electron-native` 重建。
 
 ## String Literal Constants
 
@@ -488,6 +542,17 @@ chore: bump version to 2026.3.18
 
 - PRs should include a concise description, linked issue if applicable, and screenshots for UI changes.
 - Call out any Electron-specific behavior changes (IPC, storage, windowing) in the PR description.
+- 关联 issue 的修复在提交信息或 PR 中用 `closes #N`；多个 issue 时每个编号前都要重复关键词（`closes #1, closes #2`，共享关键词只关闭第一个）。
+
+### Git 安全（多会话共处）
+
+本仓库可能同时有多个 agent 会话在工作，工作区改动相互混杂。遵守：
+
+- 只提交你在本会话改动的文件；`git add` 用显式路径，禁止 `git add -A` / `git add .`；提交前 `git status` 核对暂存区。
+- 禁止 `git reset --hard`、`git checkout .`、`git clean -fd`、`git commit --no-verify`、`git push --force`——这些会摧毁其他会话的工作或绕过检查。
+- `git stash` 谨慎使用：必须带 `-m` 说明，并在同一会话内尽快 pop。
+- rebase/merge 冲突只解决你改过的文件；冲突出现在你没碰过的文件时，中止并问用户。
+- 评审 PR 用 `gh pr view` / `gh pr diff` / `gh api`，不要仅为评审而 checkout 别人的分支。
 
 ## Agent-specific notes
 
@@ -501,33 +566,13 @@ When using Claude Code with this repository, it reads `CLAUDE.md` (which points 
 
 - `shadcn/ui` — shadcn/ui component usage and styling rules.
 - `vercel/ai-elements` — AI Elements chat components.
-- `zhiyuan-ui-adapter` — 知远智能体-specific constraints and Zhiyuan theme mapping.
+- `rongxinai-ui-adapter` — 项目适配层：`--zy-*` 主题映射、页面级组件选择矩阵、i18n 与常量约定（与 DESIGN.md「技能参考」一致）。
 
 These global skills complement, not replace, the conventions in this file.
 
-> **CRITICAL: Color Format Incompatibility**
+> **主题 token 架构（已更新，旧的 hex/HSL 不兼容问题不复存在）**
 >
-> shadcn/ui components expect HSL color values in CSS variables (e.g., `--primary: 217 91% 60%`), and Tailwind generates classes like `bg-primary` as `hsl(var(--primary))`. However, 知远智能体's Zhiyuan theme stores colors as **hex values** (`--zy-primary: #3B82F6`), and the bridge maps them one-to-one (`--primary: var(--zy-primary)`).
->
-> This means `hsl(var(--primary))` → `hsl(#3B82F6)` → **invalid CSS** — the browser silently drops the declaration. Any shadcn component using `bg-primary`, `bg-input`, `bg-secondary`, `text-primary`, etc. may appear to have no color at all.
->
-> **When debugging invisible component styles:**
->
-> 1. Open DevTools and check if the element has a `background-color` or `color` set to `hsl(...)` with a hex value inside — this is the root cause.
-> 2. Fix by writing a CSS rule that reads `var(--zy-*)` directly without the `hsl()` wrapper.
-> 3. Do NOT add className overrides on the component — `className` is for layout only per the shadcn skill. Always fix color issues in the global CSS file (`src/renderer/index.css`).
->
-> Example fix for Switch component:
->
-> ```css
-> /* index.css */
-> [data-slot='switch'][data-unchecked] {
->   background-color: var(--zy-surface-raised);
-> }
-> [data-slot='switch'][data-checked] {
->   background-color: var(--zy-primary);
-> }
-> ```
+> 颜色现在是双真源：`src/renderer/theme/css/shadcn-token-bridge.css` 的 `:root`/`.dark` **直写 oklch**（shadcn 语义层），`themes.css` 的 `--zy-*` 为兼容层。`bg-primary`、`bg-card`、`text-muted-foreground` 等 shadcn 语义 utility 可直接使用，不会再出现 `hsl(#hex)` 失效问题。以 DESIGN.md「色彩 → 事实来源」为准；新建组件优先使用 shadcn 语义 utility，减少新增 `--zy-*` 依赖。
 >
 > **CRITICAL: Tailwind v4 Variant Syntax**
 >
