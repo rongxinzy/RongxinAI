@@ -42,6 +42,12 @@ test('keeps terminal errors visible outside execution summaries', () => {
   );
 });
 
+test('renders the working indicator instead of the retired typing dots', () => {
+  expect(source).toContain('{showTypingIndicator && <WorkingIndicator />}');
+  expect(source).toContain("import { WorkingIndicator } from './WorkingIndicator';");
+  expect(source).not.toContain('TypingDots');
+});
+
 test('keeps active tool details in the total summary without adding a child row', () => {
   expect(source).toContain('key="transient-working-summary"');
   expect(source).toContain('<ChainOfThoughtHeader icon={isActiveTool ? Wrench : SparklesIcon}>');
