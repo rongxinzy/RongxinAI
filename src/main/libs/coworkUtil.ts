@@ -26,6 +26,7 @@ import {
 } from './coworkModelApi';
 import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
+import { findSharedSkillPythonExecutable } from './skillPythonRuntime';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 
@@ -54,6 +55,23 @@ function appendEnvPath(current: string | undefined, additions: string[]): string
   }
 
   return items.size > 0 ? Array.from(items).join(delimiter) : current;
+}
+
+/**
+ * Prepend the shared Skill dependency layer's Python to PATH so ad-hoc
+ * scripts executed via the bash tool resolve to the managed environment that
+ * already carries pandas/numpy/etc. The bare base runtime stays further down
+ * PATH as a fallback. No-op when the shared layer is not installed.
+ */
+function prependSkillSharedPythonToEnv(env: Record<string, string | undefined>): void {
+  if (!['win32', 'darwin', 'linux'].includes(process.platform)) return;
+  const executable = findSharedSkillPythonExecutable();
+  if (!executable) return;
+  const binDir = dirname(executable);
+  const entries = (env.PATH || '').split(delimiter).filter(Boolean);
+  if (entries.some(entry => entry.toLowerCase() === binDir.toLowerCase())) return;
+  env.PATH = [binDir, ...entries].join(delimiter);
+  coworkLog('INFO', 'applyPackagedEnvOverrides', `Prepended Skill shared Python to PATH: ${binDir}`);
 }
 
 function hasCommandInEnv(command: string, env: Record<string, string | undefined>): boolean {
@@ -1234,6 +1252,8 @@ export function applyApplicationRuntimeEnv(
     }
 
     appendPythonRuntimeToEnv(env);
+    // Prepend after the base runtime so the dependency-rich shared layer wins.
+    prependSkillSharedPythonToEnv(env);
     appendUvRuntimeToEnv(env);
     configureUvForManagedPython(env);
 
@@ -1389,10 +1409,18 @@ export function applyApplicationRuntimeEnv(
     env.NODE_PATH = appendEnvPath(env.NODE_PATH, nodePaths);
   }
 
+  // Managed Python for ad-hoc scripts: prefer the Skill shared layer (carries
+  // pandas/numpy/...), with the bare base runtime as fallback. Windows already
+  // applied both in the platform block above; re-running would re-prepend the
+  // base runtime ahead of the shared layer.
+  if (process.platform !== 'win32') {
+    appendPythonRuntimeToEnv(env);
+    prependSkillSharedPythonToEnv(env);
+  }
   appendUvRuntimeToEnv(env);
   configureUvForManagedPython(env);
 
-  // Verify node/npx resolution in the constructed environment
+  // Verify node/npx/npm resolution in the constructed environment
   verifyNodeEnvironment(env);
 }
 
