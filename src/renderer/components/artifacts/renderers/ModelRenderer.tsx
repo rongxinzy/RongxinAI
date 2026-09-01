@@ -1,4 +1,11 @@
 import { Button } from '@shared/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@shared/components/ui/tooltip';
+import { Pause, Rotate3D } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -9,11 +16,48 @@ import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
 
 import type { Artifact } from '@/types/artifact';
+import { i18nService } from '@/services/i18n';
 
-import { ModelFileExtension } from './constants';
+import { MODEL_AUTO_ROTATE_SPEED, ModelFileExtension } from './constants';
 
 interface ModelRendererProps {
   artifact: Artifact;
+}
+
+interface AutoRotationControls {
+  autoRotate: boolean;
+  autoRotateSpeed: number;
+  addEventListener(type: 'start', listener: () => void): void;
+  removeEventListener(type: 'start', listener: () => void): void;
+}
+
+interface ModelAutoRotationBinding {
+  toggle(): boolean;
+  dispose(): void;
+}
+
+export function bindModelAutoRotation(
+  controls: AutoRotationControls,
+  onChange: (isAutoRotating: boolean) => void,
+): ModelAutoRotationBinding {
+  controls.autoRotateSpeed = MODEL_AUTO_ROTATE_SPEED;
+
+  const stopOnInteraction = () => {
+    if (!controls.autoRotate) return;
+    controls.autoRotate = false;
+    onChange(false);
+  };
+
+  controls.addEventListener('start', stopOnInteraction);
+
+  return {
+    toggle: () => {
+      controls.autoRotate = !controls.autoRotate;
+      onChange(controls.autoRotate);
+      return controls.autoRotate;
+    },
+    dispose: () => controls.removeEventListener('start', stopOnInteraction),
+  };
 }
 
 function getExtension(filePath: string): string {
@@ -99,9 +143,11 @@ export async function parseModelObject(
 
 const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoRotationRef = useRef<ModelAutoRotationBinding | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{ triangles: number } | null>(null);
   const [resetKey, setResetKey] = useState(0);
+  const [isAutoRotating, setIsAutoRotating] = useState(false);
 
   const extension = getExtension(artifact.filePath || artifact.fileName || '');
 
@@ -114,6 +160,7 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
     let cleanup: (() => void) | null = null;
     setError(null);
     setStats(null);
+    setIsAutoRotating(false);
 
     const mount = async () => {
       try {
@@ -167,6 +214,8 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.target.set(0, 0, 0);
+        const autoRotation = bindModelAutoRotation(controls, setIsAutoRotating);
+        autoRotationRef.current = autoRotation;
 
         let triangles = 0;
         object.traverse(node => {
@@ -215,6 +264,8 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
           cancelAnimationFrame(frameId);
           if (resizeTimer !== null) window.clearTimeout(resizeTimer);
           resizeObserver.disconnect();
+          autoRotation.dispose();
+          if (autoRotationRef.current === autoRotation) autoRotationRef.current = null;
           controls.dispose();
           scene.traverse(node => {
             const mesh = node as THREE.Mesh;
@@ -242,6 +293,10 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
     };
   }, [artifact, extension, resetKey]);
 
+  const autoRotateLabel = i18nService.t(
+    isAutoRotating ? 'artifactModelAutoRotateStop' : 'artifactModelAutoRotateStart',
+  );
+
   return (
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full bg-background" />
@@ -251,21 +306,44 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
         </div>
       )}
       {!error && (
-        <div className="absolute bottom-3 right-3 flex items-center gap-2">
-          {stats && (
-            <span className="rounded bg-surface-raised px-2 py-1 text-xs text-muted-foreground">
-              {stats.triangles.toLocaleString()} triangles
-            </span>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="px-2 py-1 text-xs"
-            onClick={() => setResetKey(value => value + 1)}
-          >
-            Reset view
-          </Button>
-        </div>
+        <TooltipProvider delay={300}>
+          <div className="absolute bottom-3 right-3 flex items-center gap-2">
+            {stats && (
+              <span className="rounded bg-surface-raised px-2 py-1 text-xs text-muted-foreground">
+                {stats.triangles.toLocaleString()} triangles
+              </span>
+            )}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="secondary"
+                    size="icon-sm"
+                    disabled={!stats}
+                    aria-label={autoRotateLabel}
+                    aria-pressed={isAutoRotating}
+                    onClick={() => autoRotationRef.current?.toggle()}
+                  >
+                    {isAutoRotating ? (
+                      <Pause data-icon="inline-start" />
+                    ) : (
+                      <Rotate3D data-icon="inline-start" />
+                    )}
+                  </Button>
+                }
+              />
+              <TooltipContent>{autoRotateLabel}</TooltipContent>
+            </Tooltip>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="px-2 py-1 text-xs"
+              onClick={() => setResetKey(value => value + 1)}
+            >
+              Reset view
+            </Button>
+          </div>
+        </TooltipProvider>
       )}
     </div>
   );
