@@ -316,7 +316,7 @@ export const CodingGitPanel = ({
                     </span>
                   </div>
                 </CardContent>
-                <CardFooter className="-mx-3 -mb-3 justify-between gap-3 px-3 py-2">
+                <CardFooter className="-mx-3 justify-between gap-3 px-3 py-2">
                   <span className="text-xs text-muted-foreground">
                     {formatCount('codingGitChangesSummary', status.files.length)}
                   </span>
@@ -420,7 +420,7 @@ export const CodingGitPanel = ({
                     </Field>
                   </FieldGroup>
                 </CardContent>
-                <CardFooter className="-mx-3 -mb-3 justify-end gap-2 px-3 py-2">
+                <CardFooter className="-mx-3 justify-end gap-2 px-3 py-2">
                   <Button
                     type="button"
                     variant="outline"
