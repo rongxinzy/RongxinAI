@@ -8,6 +8,7 @@ import {
   type CodingPermissionResponse,
 } from '../../../shared/codingAgent';
 import { t } from '../../i18n';
+import { WorkbenchApprovalMode } from '../../../shared/workbenchTask';
 import { PiThinkingLevel } from '../../libs/agentEngine/piRuntimeTypes';
 import type {
   CodingAgentAuthRequest,
@@ -18,6 +19,7 @@ import type {
 
 export const BuiltinCodingConfigId = {
   ThinkingLevel: 'thinking-level',
+  PermissionMode: 'permission-mode',
 } as const;
 export type BuiltinCodingConfigId =
   (typeof BuiltinCodingConfigId)[keyof typeof BuiltinCodingConfigId];
@@ -25,6 +27,7 @@ export type BuiltinCodingConfigId =
 export interface BuiltinCodingSessionStartOptions {
   modelOverride?: string | null;
   thinkingLevel?: string;
+  permissionMode?: WorkbenchApprovalMode;
 }
 
 export interface BuiltinCodingRuntime {
@@ -40,6 +43,8 @@ export interface BuiltinCodingRuntime {
     sessionId: string,
     patch: { model?: string | null; thinkingLevel?: string | null },
   ): Promise<void>;
+  /** Applies approval-mode changes to a live Pi session. */
+  setApprovalMode?(sessionId: string, mode: WorkbenchApprovalMode): void;
 }
 
 const BUILTIN_CAPABILITIES: CodingAgentCapabilities = {
@@ -61,6 +66,9 @@ const THINKING_LEVEL_OPTIONS = Object.values(PiThinkingLevel).map(level => ({
 
 const isValidThinkingLevel = (value: string): value is PiThinkingLevel =>
   (Object.values(PiThinkingLevel) as string[]).includes(value);
+
+const isValidApprovalMode = (value: string): value is WorkbenchApprovalMode =>
+  (Object.values(WorkbenchApprovalMode) as string[]).includes(value);
 
 export class BuiltinCodingDriver implements CodingAgentDriver {
   private readonly sessionConfigOptions = new Map<string, CodingAgentConfigOption[]>();
@@ -115,6 +123,7 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     await this.runtime.start(input.sessionId, input.workspaceRoot, input.prompt, {
       ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
       ...(thinkingLevel ? { thinkingLevel } : {}),
+      permissionMode: this.currentPermissionMode(input.sessionId),
     });
     // The in-process runtime emits streaming events after start() returns. The
     // CodingRoomService subscribes to that runtime directly, which avoids
@@ -146,6 +155,10 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     if (configId === BuiltinCodingConfigId.ThinkingLevel) {
       await this.runtime.patchSession?.(sessionId, { thinkingLevel: value });
     }
+    if (configId === BuiltinCodingConfigId.PermissionMode) {
+      // The select-option whitelist above already validated the value.
+      this.runtime.setApprovalMode?.(sessionId, value as WorkbenchApprovalMode);
+    }
     return options;
   }
   getSessionConfigOptions(sessionId: string): CodingAgentConfigOption[] {
@@ -173,6 +186,9 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     const persistedThinking = existing?.find(
       candidate => candidate.id === BuiltinCodingConfigId.ThinkingLevel,
     )?.currentValue;
+    const persistedPermissionMode = existing?.find(
+      candidate => candidate.id === BuiltinCodingConfigId.PermissionMode,
+    )?.currentValue;
     return [
       {
         id: BuiltinCodingConfigId.ThinkingLevel,
@@ -184,6 +200,21 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
             : PiThinkingLevel.Medium,
         options: THINKING_LEVEL_OPTIONS,
       },
+      {
+        id: BuiltinCodingConfigId.PermissionMode,
+        name: t('codingAgentConfigPermissionMode'),
+        type: 'select',
+        currentValue:
+          typeof persistedPermissionMode === 'string' &&
+          isValidApprovalMode(persistedPermissionMode)
+            ? persistedPermissionMode
+            : WorkbenchApprovalMode.Ask,
+        options: [
+          { value: WorkbenchApprovalMode.Ask, name: t('codingAgentPermissionModeAsk') },
+          { value: WorkbenchApprovalMode.Auto, name: t('codingAgentPermissionModeAuto') },
+          { value: WorkbenchApprovalMode.AllowAll, name: t('codingAgentPermissionModeAllowAll') },
+        ],
+      },
     ];
   }
 
@@ -194,5 +225,14 @@ export class BuiltinCodingDriver implements CodingAgentDriver {
     return typeof option?.currentValue === 'string' && option.currentValue
       ? option.currentValue
       : undefined;
+  }
+
+  private currentPermissionMode(sessionId: string): WorkbenchApprovalMode {
+    const option = this.sessionConfigOptions
+      .get(sessionId)
+      ?.find(candidate => candidate.id === BuiltinCodingConfigId.PermissionMode);
+    return typeof option?.currentValue === 'string' && isValidApprovalMode(option.currentValue)
+      ? option.currentValue
+      : WorkbenchApprovalMode.Ask;
   }
 }

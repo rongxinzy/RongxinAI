@@ -4,6 +4,7 @@ import type { PiRuntime } from '../main/libs/agentEngine/piRuntimeTypes';
 import { getDefaultConversationWorkspacePath } from '../main/defaultConversationWorkspace';
 import { parseManagedSessionKey } from '../main/libs/channelSessionKey';
 import { CoworkSessionSource } from '../shared/cowork/constants';
+import { WorkbenchApprovalMode } from '../shared/workbenchTask';
 
 import { PayloadKind, SessionTarget } from './constants';
 import type { ScheduledTask, ScheduledTaskRun } from './types';
@@ -58,7 +59,7 @@ export class PiScheduledTaskExecutor {
       modelOverride: session.modelOverride || undefined,
       // Scheduled runs have no foreground permission UI. Their creator opted
       // into unattended execution, so tools must follow that run policy.
-      autoApprove: true,
+      approvalMode: WorkbenchApprovalMode.AllowAll,
     };
     try {
       const execution = this.runtime.isSessionActive(session.id)
