@@ -1,7 +1,16 @@
 import { Button } from '@shared/components/ui/button';
+import { Separator } from '@shared/components/ui/separator';
 import { LogIn, LogOut, Settings, UserRound } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
+import type {
+  EnterpriseSessionIdentity,
+  EnterpriseSessionResult,
+} from '../../shared/enterpriseSession';
+import {
+  publishEnterpriseSessionResult,
+  subscribeToEnterpriseSession,
+} from '../services/enterpriseSessionEvents';
 import { i18nService } from '../services/i18n';
 
 interface CommunityUser {
@@ -16,6 +25,10 @@ interface LoginButtonProps {
 const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [user, setUser] = useState<CommunityUser | null>(null);
+  const [enterpriseIdentity, setEnterpriseIdentity] = useState<EnterpriseSessionIdentity | null>(
+    null,
+  );
+  const [isEnterpriseManaged, setIsEnterpriseManaged] = useState(false);
   const [isStartingLogin, setIsStartingLogin] = useState(false);
   const [error, setError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -25,13 +38,53 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
     setUser(result.success && result.user ? result.user : null);
   }, []);
 
+  const applyEnterpriseSession = useCallback((result: EnterpriseSessionResult) => {
+    setEnterpriseIdentity(
+      result.ok && result.snapshot.status === 'authenticated' ? result.snapshot.identity : null,
+    );
+  }, []);
+
   useEffect(() => {
-    void refreshUser();
-    const unsubscribe = window.electron.auth.onCommunityCallback(() => {
-      void refreshUser();
+    let active = true;
+    let unsubscribeCommunity: () => void = () => undefined;
+    const unsubscribeEnterprise = subscribeToEnterpriseSession(result => {
+      if (!active) return;
+      setIsEnterpriseManaged(true);
+      setUser(null);
+      applyEnterpriseSession(result);
     });
-    return unsubscribe;
-  }, [refreshUser]);
+
+    void window.electron.enterprise.renderer
+      .sessionGateEntrypoint()
+      .then(async entrypoint => {
+        if (!active) return;
+        if (entrypoint) {
+          setIsEnterpriseManaged(true);
+          setUser(null);
+          applyEnterpriseSession(await window.electron.enterprise.session.snapshot());
+          return;
+        }
+
+        setIsEnterpriseManaged(false);
+        setEnterpriseIdentity(null);
+        await refreshUser();
+        if (!active) return;
+        unsubscribeCommunity = window.electron.auth.onCommunityCallback(() => {
+          void refreshUser();
+        });
+      })
+      .catch(() => {
+        if (!active) return;
+        setIsEnterpriseManaged(false);
+        void refreshUser();
+      });
+
+    return () => {
+      active = false;
+      unsubscribeCommunity();
+      unsubscribeEnterprise();
+    };
+  }, [applyEnterpriseSession, refreshUser]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -54,6 +107,17 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
   };
 
   const handleLogout = async () => {
+    if (isEnterpriseManaged) {
+      const result = await window.electron.enterprise.session.logout();
+      publishEnterpriseSessionResult(result);
+      if (result.ok) {
+        setEnterpriseIdentity(null);
+        setShowMenu(false);
+      } else {
+        setError(i18nService.t('accountLogoutFailed'));
+      }
+      return;
+    }
     await window.electron.auth.communityLogout();
     setUser(null);
     setShowMenu(false);
@@ -64,7 +128,12 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
     onShowSettings();
   };
 
-  const accountLabel = user?.email || i18nService.t('login');
+  const accountLabel =
+    enterpriseIdentity?.user.displayName ||
+    (isEnterpriseManaged
+      ? i18nService.t('enterpriseAccount')
+      : user?.email || i18nService.t('login'));
+  const hasAuthenticatedAccount = isEnterpriseManaged ? enterpriseIdentity !== null : user !== null;
 
   return (
     <div ref={containerRef} className="relative">
@@ -76,7 +145,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
         aria-haspopup="menu"
         className="inline-flex h-8 w-full items-center justify-start gap-2 rounded-lg px-2 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4"
       >
-        <UserRound className="size-4 shrink-0" />
+        <UserRound data-icon="inline-start" />
         <span className="truncate">{accountLabel}</span>
       </Button>
 
@@ -85,15 +154,17 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
           role="menu"
           className="absolute bottom-full left-0 right-0 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-surface p-1.5 shadow-popover"
         >
-          {user ? (
+          {hasAuthenticatedAccount ? (
             <>
               <div className="px-2.5 py-2 text-sm font-medium text-foreground">
-                <p className="truncate">{user.email}</p>
-                <p className="mt-0.5 text-xs font-normal text-muted-foreground">知远账号</p>
+                <p className="truncate">{enterpriseIdentity?.user.displayName || user?.email}</p>
+                <p className="mt-0.5 truncate text-xs font-normal text-muted-foreground">
+                  {enterpriseIdentity?.enterprise.name || i18nService.t('communityAccount')}
+                </p>
               </div>
-              <div className="my-1 h-px bg-border" />
+              <Separator className="my-1" />
             </>
-          ) : (
+          ) : !isEnterpriseManaged ? (
             <Button
               type="button"
               variant="ghost"
@@ -102,10 +173,12 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
               onClick={() => void handleLogin()}
               className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm"
             >
-              <LogIn className="size-4" />
-              {isStartingLogin ? '正在打开登录页…' : '登录知远'}
+              <LogIn data-icon="inline-start" />
+              {isStartingLogin
+                ? i18nService.t('accountOpeningLogin')
+                : i18nService.t('accountLoginZhiyuan')}
             </Button>
-          )}
+          ) : null}
 
           <Button
             type="button"
@@ -114,11 +187,11 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
             onClick={handleSettings}
             className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm"
           >
-            <Settings className="size-4" />
+            <Settings data-icon="inline-start" />
             {i18nService.t('settings')}
           </Button>
 
-          {user ? (
+          {hasAuthenticatedAccount ? (
             <Button
               type="button"
               variant="ghost"
@@ -126,12 +199,14 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
               onClick={() => void handleLogout()}
               className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm text-destructive hover:text-destructive"
             >
-              <LogOut className="size-4" />
-              退出登录
+              <LogOut data-icon="inline-start" />
+              {i18nService.t('accountLogout')}
             </Button>
           ) : null}
 
-          {error ? <p className="px-2.5 pb-1 pt-2 text-xs leading-5 text-destructive">{error}</p> : null}
+          {error ? (
+            <p className="px-2.5 pb-1 pt-2 text-xs leading-5 text-destructive">{error}</p>
+          ) : null}
         </div>
       ) : null}
     </div>
