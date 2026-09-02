@@ -1,11 +1,14 @@
-import { Button } from '@shared/components/ui/button';
+import { Button, buttonVariants } from '@shared/components/ui/button';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
 } from '@shared/components/ui/dialog';
+import { type VariantProps } from 'class-variance-authority';
 import { cn } from '@shared/lib/utils';
+
+type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
 
 type DestructiveConfirmDialogProps = {
   open: boolean;
@@ -17,6 +20,8 @@ type DestructiveConfirmDialogProps = {
   onConfirm: () => void;
   confirmDisabled?: boolean;
   isConfirming?: boolean;
+  cancelVariant?: ButtonVariant;
+  confirmVariant?: ButtonVariant;
   /** Optional lesser-emphasis danger action rendered between cancel and confirm. */
   secondaryConfirmLabel?: string;
   onSecondaryConfirm?: () => void;
@@ -33,6 +38,8 @@ function DestructiveConfirmDialog({
   onConfirm,
   confirmDisabled = false,
   isConfirming = false,
+  cancelVariant = 'ghost',
+  confirmVariant = 'destructive',
   secondaryConfirmLabel,
   onSecondaryConfirm,
   className,
@@ -61,8 +68,12 @@ function DestructiveConfirmDialog({
           <div className="flex min-w-0 items-center justify-end gap-2">
             <Button
               type="button"
-              variant="ghost"
-              className="h-8 min-w-16 cursor-pointer !border-0 px-3 text-muted-foreground shadow-none hover:bg-surface-raised hover:text-foreground"
+              variant={cancelVariant}
+              className={cn(
+                'h-8 min-w-16 cursor-pointer px-3 shadow-none',
+                cancelVariant === 'ghost' &&
+                  '!border-0 text-muted-foreground hover:bg-surface-raised hover:text-foreground',
+              )}
               data-destructive-confirm-cancel-button="true"
               disabled={isConfirming}
               onClick={onCancel}
@@ -83,7 +94,7 @@ function DestructiveConfirmDialog({
             ) : null}
             <Button
               type="button"
-              variant="destructive"
+              variant={confirmVariant}
               className="h-8 min-w-16 cursor-pointer px-3 shadow-none"
               data-destructive-confirm-button="true"
               disabled={confirmDisabled || isConfirming}

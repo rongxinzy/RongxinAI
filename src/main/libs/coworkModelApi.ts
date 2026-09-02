@@ -1,3 +1,5 @@
+export { buildAnthropicMessagesUrl } from '../../shared/providers';
+
 export const CoworkModelProtocol = {
   Anthropic: 'anthropic',
   GeminiNative: 'gemini_native',
@@ -39,20 +41,6 @@ const collectTextFromUnknown = (value: unknown): string[] => {
 
   return collected;
 };
-
-export function buildAnthropicMessagesUrl(baseUrl: string): string {
-  const normalized = baseUrl.trim().replace(/\/+$/, '');
-  if (!normalized) {
-    return '/v1/messages';
-  }
-  if (normalized.endsWith('/v1/messages')) {
-    return normalized;
-  }
-  if (normalized.endsWith('/v1')) {
-    return `${normalized}/messages`;
-  }
-  return `${normalized}/v1/messages`;
-}
 
 export function normalizeGeminiBaseUrl(rawBaseUrl: string): string {
   const normalized = rawBaseUrl.trim().replace(/\/+$/, '');
