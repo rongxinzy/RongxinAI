@@ -1,6 +1,7 @@
 import {
   ApiFormat,
   ModelCapabilityStatus,
+  type ModelCapabilities,
   type DiscoveredProviderModel,
   ProviderModelDiscoveryErrorCode,
   type ProviderModelDiscoveryErrorCode as ProviderModelDiscoveryErrorCodeValue,
