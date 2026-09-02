@@ -15,6 +15,7 @@ import {
   providerRequiresApiKey,
   shouldUseOpenAIResponsesApi,
 } from './apiConfigResolver';
+import { buildAnthropicMessagesUrl } from '../../shared/providers';
 
 export interface IpcChatTransportOptions {
   provider?: string;
@@ -181,7 +182,7 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     baseUrl: string,
     modelId: string,
   ): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
-    const url = `${baseUrl.trim().replace(/\/+$/, '')}/v1/messages`;
+    const url = buildAnthropicMessagesUrl(baseUrl);
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'x-api-key': apiKey,

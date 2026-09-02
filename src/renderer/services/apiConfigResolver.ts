@@ -35,7 +35,7 @@ export function shouldUseOpenAIResponsesApi(provider: string): boolean {
 }
 
 export function providerRequiresApiKey(provider: string): boolean {
-  return provider !== 'ollama' && provider !== 'github-copilot';
+  return provider !== 'ollama' && provider !== 'github-copilot' && !provider.startsWith('custom_');
 }
 
 export function detectProvider(modelId: string, providerHint?: string): string {
