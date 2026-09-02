@@ -25,12 +25,12 @@ import {
   extractApiErrorSnippet,
 } from './coworkModelApi';
 import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
+import { applyUvPackageIndexDefaults, PythonPackageIndexUrl } from './pythonPackageIndexes';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
 import { findSharedSkillPythonExecutable } from './skillPythonRuntime';
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './systemProxy';
 import { appendUvRuntimeToEnv, configureUvForManagedPython } from './uvRuntime';
 
-const DOMESTIC_PYPI_INDEX_URL = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
 const DOMESTIC_NPM_REGISTRY_URL = 'https://registry.npmmirror.com';
 
 type EnhancedEnvOptions = {
@@ -1095,11 +1095,9 @@ function ensureWindowsBashUtf8InitScript(): string | null {
 
 function applyDomesticPackageMirrorDefaults(env: Record<string, string | undefined>): void {
   if (!env.PIP_INDEX_URL) {
-    env.PIP_INDEX_URL = DOMESTIC_PYPI_INDEX_URL;
+    env.PIP_INDEX_URL = PythonPackageIndexUrl.Tsinghua;
   }
-  if (!env.UV_DEFAULT_INDEX) {
-    env.UV_DEFAULT_INDEX = DOMESTIC_PYPI_INDEX_URL;
-  }
+  applyUvPackageIndexDefaults(env);
 
   const hasNpmRegistry = Boolean(env.npm_config_registry || env.NPM_CONFIG_REGISTRY);
   if (!hasNpmRegistry) {
