@@ -32,7 +32,11 @@ import {
   verificationOutcomeLabel,
 } from '../utils';
 import { TimelineEntryList } from './TimelineEntries';
-import { formatDuration, formatTimeOfDay, type TimelineChapter as TimelineChapterModel } from './timelineModel';
+import {
+  formatDuration,
+  formatTimeOfDay,
+  type TimelineChapter as TimelineChapterModel,
+} from './timelineModel';
 
 interface TimelineChapterProps {
   chapter: TimelineChapterModel;
@@ -74,23 +78,25 @@ export function TimelineChapter({
   const duration = formatDuration(run.startedAt, run.endedAt);
 
   const expandedContent = (
-    <div className="flex flex-col gap-4 pt-1 pb-6">
-      <div className="pl-10">
-        <RunSummary run={run} />
+    <div className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
+      <div className="flex flex-col gap-4 pt-1 pb-6">
+        <div className="pl-10">
+          <RunSummary run={run} />
+        </div>
+        {entries.length > 0 ? (
+          <TimelineEntryList
+            entries={entries}
+            run={run}
+            runs={runs}
+            busy={busy}
+            onRespondToApproval={onRespondToApproval}
+          />
+        ) : (
+          <p className="pl-10 text-sm text-muted-foreground">
+            {i18nService.t('workbenchTaskNoEvents')}
+          </p>
+        )}
       </div>
-      {entries.length > 0 ? (
-        <TimelineEntryList
-          entries={entries}
-          run={run}
-          runs={runs}
-          busy={busy}
-          onRespondToApproval={onRespondToApproval}
-        />
-      ) : (
-        <p className="pl-10 text-sm text-muted-foreground">
-          {i18nService.t('workbenchTaskNoEvents')}
-        </p>
-      )}
     </div>
   );
 
