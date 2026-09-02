@@ -211,6 +211,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(LlamaCppIpcChannel.SetModelsDir, modelsDir),
     listLocalModels: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListLocalModels),
     listRunningModels: () => ipcRenderer.invoke(LlamaCppIpcChannel.ListRunningModels),
+    refreshRunningModelBindings: () =>
+      ipcRenderer.invoke(LlamaCppIpcChannel.RefreshRunningModelBindings),
     importModelFiles: (paths: string[]) =>
       ipcRenderer.invoke(LlamaCppIpcChannel.ImportModelFiles, paths),
     deleteModel: (name: string) => ipcRenderer.invoke(LlamaCppIpcChannel.DeleteModel, name),

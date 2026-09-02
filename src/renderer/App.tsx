@@ -62,6 +62,7 @@ interface AppToastOptions {
   autoClose?: boolean;
   durationMs?: number;
   isError?: boolean;
+  isSuccess?: boolean;
   onClose?: () => void;
 }
 
@@ -127,6 +128,7 @@ const App: React.FC = () => {
   const [initError, setInitError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isToastError, setIsToastError] = useState(false);
+  const [isToastSuccess, setIsToastSuccess] = useState(false);
   const [, forceLanguageRefresh] = useState(0);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [codingSelection, setCodingSelection] = useState<CodingSidebarSelection>({
@@ -572,6 +574,7 @@ const App: React.FC = () => {
     }
     setToastMessage(null);
     setIsToastError(false);
+    setIsToastSuccess(false);
     const onClose = toastOnCloseRef.current;
     toastOnCloseRef.current = null;
     onClose?.();
@@ -583,10 +586,12 @@ const App: React.FC = () => {
         autoClose = true,
         durationMs = DEFAULT_TOAST_DURATION_MS,
         isError = false,
+        isSuccess = false,
         onClose = null,
       } = options;
       setToastMessage(message);
       setIsToastError(isError);
+      setIsToastSuccess(isSuccess);
       toastOnCloseRef.current = onClose;
       if (toastTimerRef.current) {
         window.clearTimeout(toastTimerRef.current);
@@ -866,7 +871,12 @@ const App: React.FC = () => {
         className="h-screen overflow-hidden flex flex-col bg-surface-raised outline-none"
       >
         {toastMessage && (
-          <Toast message={toastMessage} isError={isToastError} onClose={dismissToast} />
+          <Toast
+            message={toastMessage}
+            isError={isToastError}
+            isSuccess={isToastSuccess}
+            onClose={dismissToast}
+          />
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar
