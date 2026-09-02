@@ -1,0 +1,73 @@
+# 独立的 Qwen3.6-35B-A3B-APEX-I-Compact 模型包；全部挂载均位于本模型包内。
+services:
+  # llama.cpp 的 OpenAI 兼容服务，主机默认端口为 8000。
+  # image 是 ROCm 版 llama.cpp；container_name 固定容器名；restart 使异常退出后自动恢复。
+  qwen36-llamacpp:
+    image: llama.cpp:server-rocm
+    container_name: qwen36-35b-llamacpp
+    restart: unless-stopped
+    healthcheck:
+      # llama-server 在容器内监听 8000；显式覆盖镜像的默认健康检查。
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    ports:
+      # 将“绑定地址:主机端口”映射到容器内 API 端口 8000。
+      - "${QWEN36_BIND_ADDRESS:-0.0.0.0}:${QWEN36_PORT:-8000}:8000"
+    volumes:
+      # 只读挂载本模型包内的 GGUF 权重目录。
+      - ./model:/model:ro
+    devices:
+      # 将 ROCm 所需的 KFD 和 DRM 设备传入容器。
+      - /dev/kfd:/dev/kfd
+      - /dev/dri:/dev/dri
+    group_add:
+      # 允许容器进程访问显卡设备所属的 video、render 用户组。
+      - video
+      - render
+    # 共享主机 IPC，并提供 16 GiB /dev/shm 及推理所需的资源上限。
+    ipc: host
+    shm_size: 16g
+    ulimits:
+      memlock: -1
+      stack: 67108864
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    environment:
+      # 仅向容器暴露编号为 0、1 的 ROCm/HIP GPU。
+      ROCR_VISIBLE_DEVICES: "${ROCR_VISIBLE_DEVICES:-0,1}"
+      HIP_VISIBLE_DEVICES: "${HIP_VISIBLE_DEVICES:-0,1}"
+    command:
+      # -m 指定 GGUF 文件；--host/--port 配置容器内监听地址；--alias 是 API 返回的模型名；
+      # --ctx-size 设置总上下文长度；--parallel 设置并行槽位数；--batch-size 设置预填充批大小；
+      # --split-mode layer 按层切分；--tensor-split 以 1:1 分配两张 GPU；
+      # --gpu-layers 999 尽可能将全部层放入 GPU；--cont-batching 开启连续批处理；
+      # --flash-attn on 启用 Flash Attention；
+      # --jinja 启用模型自带的聊天模板。
+      - -m
+      - /model/Qwen3.6-35B-A3B-APEX-I-Compact.gguf/Qwen3.6-35B-A3B-APEX-I-Compact.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --alias
+      - Qwen3.6-35B-A3B-APEX-I-Compact
+      - --ctx-size
+      - "${QWEN36_CTX_SIZE:-262144}"
+      - --parallel
+      - "${QWEN36_PARALLEL:-1}"
+      - --batch-size
+      - "${QWEN36_BATCH_SIZE:-8192}"
+      - --split-mode
+      - layer
+      - --tensor-split
+      - "1,1"
+      - --gpu-layers
+      - "999"
+      - --cont-batching
+      - --flash-attn
+      - "on"
+      - --jinja

@@ -1,4 +1,5 @@
 import {
+  buildAnthropicMessagesUrl,
   isProviderEnabled,
   type ModelCapabilities,
   ModelCapabilityStatus,
@@ -362,7 +363,8 @@ class ApiService {
     return (
       provider !== ProviderName.Ollama &&
       provider !== ProviderName.LlamaCpp &&
-      provider !== ProviderName.Copilot
+      provider !== ProviderName.Copilot &&
+      !provider.startsWith('custom_')
     );
   }
 
@@ -1419,7 +1421,7 @@ class ApiService {
     for (let turn = 0; turn < 4; turn += 1) {
       const tool = this.webSearchTool();
       const data = await this.streamAnthropicResponse(
-        `${config.baseUrl.trim().replace(/\/+$/, '')}/v1/messages`,
+        buildAnthropicMessagesUrl(config.baseUrl),
         headers,
         {
           model,
@@ -1736,12 +1738,13 @@ class ApiService {
         ]);
 
         // 发起流式请求
+        const requestUrl = buildAnthropicMessagesUrl(config.baseUrl);
         console.log(
-          `[api-chat] Anthropic request: baseUrl=${config.baseUrl}, finalUrl=${config.baseUrl}/v1/messages, model=${modelId}, apiFormat=${config.apiFormat}`,
+          `[api-chat] Anthropic request: baseUrl=${config.baseUrl}, finalUrl=${requestUrl}, model=${modelId}, apiFormat=${config.apiFormat}`,
         );
         window.electron.api
           .stream({
-            url: `${config.baseUrl}/v1/messages`,
+            url: requestUrl,
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',

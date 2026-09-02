@@ -524,6 +524,7 @@ interface IElectronAPI {
     setModelsDir: (modelsDir: string) => Promise<string>;
     listLocalModels: () => Promise<LlamaCppModel[]>;
     listRunningModels: () => Promise<LlamaCppRunningModel[]>;
+    refreshRunningModelBindings: () => Promise<void>;
     importModelFiles: (paths: string[]) => Promise<LlamaCppImportModelFilesResult>;
     deleteModel: (name: string) => Promise<{
       success: boolean;

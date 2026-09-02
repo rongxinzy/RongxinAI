@@ -610,6 +610,9 @@ export function registerLlamaCppIpcHandlers(
       throw error;
     }
   });
+  ipcMain.handle(LlamaCppIpcChannel.RefreshRunningModelBindings, async () => {
+    await refreshRunningModelBindings();
+  });
   ipcMain.handle(LlamaCppIpcChannel.DeleteModel, async (_event, name: string) => {
     const result = await manager.deleteModel(name);
     if (!result.success || !result.deleted || !result.removedModelName) {
