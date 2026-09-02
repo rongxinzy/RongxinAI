@@ -247,7 +247,7 @@ function VerificationCheckRow({ check }: { check: WorkbenchVerificationCheck }) 
   const { icon: Icon, className } =
     checkIcons[check.status] ?? checkIcons[WorkbenchVerificationCheckStatus.Skipped];
   return (
-    <li className="flex items-start gap-2">
+    <li className="flex flex-wrap items-start gap-2">
       <Icon className={cn('mt-0.5 size-3.5 shrink-0', className)} />
       <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
         {check.name}
