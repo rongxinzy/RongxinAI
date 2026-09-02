@@ -98,9 +98,6 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
             {formatActivityClockTime(run.updatedAt)}
           </span>
         </div>
-        {run.inputPreview && (
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{run.inputPreview}</p>
-        )}
         {run.replyPreview && !isFailed && (
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{run.replyPreview}</p>
         )}
