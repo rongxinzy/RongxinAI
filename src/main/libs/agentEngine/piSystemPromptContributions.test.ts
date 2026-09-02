@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import {
@@ -33,9 +34,19 @@ describe('piSystemPromptContributions', () => {
           typeof contribution.prompt === 'function'
             ? contribution.prompt(context)
             : contribution.prompt;
+        if (!prompt.trim()) continue;
         expect(prompt.trim().length, contribution.id).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('includes the Windows Bash contract without adding it to Unix sessions', () => {
+    expect(collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'win32' })).toContain(
+      createPiBashToolSystemPrompt('win32'),
+    );
+    expect(
+      collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'linux' }),
+    ).not.toContain(createPiBashToolSystemPrompt('win32'));
   });
 
   it('registers every exported tool policy constant', () => {

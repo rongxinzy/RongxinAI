@@ -10,6 +10,7 @@
  */
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
@@ -19,6 +20,8 @@ export interface PiSystemPromptContext {
   fileToolsEnabled: boolean;
   /** Current per-session output token budget, used by the large-write policy. */
   maxOutputTokens: number;
+  /** Runtime platform, used for platform-specific tool contracts. */
+  platform?: NodeJS.Platform;
 }
 
 export interface PiSystemPromptContribution {
@@ -33,6 +36,11 @@ export interface PiSystemPromptContribution {
 // Order matters: entries are appended to the system prompt in this sequence.
 export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
   { id: 'ask-user-question', prompt: PiAskUserQuestionSystemPrompt },
+  {
+    id: 'bash-tool',
+    requiresFileTools: true,
+    prompt: context => createPiBashToolSystemPrompt(context.platform),
+  },
   {
     id: 'document-reader',
     requiresFileTools: true,
@@ -54,7 +62,11 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
 export function collectPiSystemPromptContributions(context: PiSystemPromptContext): string[] {
   return PiSystemPromptContributions.filter(
     contribution => !contribution.requiresFileTools || context.fileToolsEnabled,
-  ).map(contribution =>
-    typeof contribution.prompt === 'function' ? contribution.prompt(context) : contribution.prompt,
-  );
+  )
+    .map(contribution =>
+      typeof contribution.prompt === 'function'
+        ? contribution.prompt(context)
+        : contribution.prompt,
+    )
+    .filter(prompt => prompt.trim().length > 0);
 }
