@@ -1,7 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
-import { Code2 } from 'lucide-react';
 import { useReducedMotion } from 'motion/react';
 import { type RefObject, useRef } from 'react';
 import { useSelector } from 'react-redux';
@@ -33,6 +32,10 @@ import {
   SidebarAnimatedUsersIcon,
   type SidebarAnimatedUsersIconHandle,
 } from './icons/SidebarAnimatedUsersIcon';
+import {
+  SidebarAnimatedTerminalIcon,
+  type SidebarAnimatedTerminalIconHandle,
+} from './icons/SidebarAnimatedTerminalIcon';
 
 export type SidebarActiveView =
   | 'cowork'
@@ -92,6 +95,7 @@ export const SidebarNavigationControls = ({
   const newConversationIconRef = useRef<SidebarAnimatedMessageCirclePlusIconHandle>(null);
   const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
   const expertIconRef = useRef<SidebarAnimatedUsersIconHandle>(null);
+  const codingIconRef = useRef<SidebarAnimatedTerminalIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const isNewConversationActive =
     activeView === 'cowork' && (workMode !== WorkMode.Chat || activeSkillIds.length === 0);
@@ -187,12 +191,16 @@ export const SidebarNavigationControls = ({
           type="button"
           variant="ghost"
           onClick={onShowCoding}
+          onMouseEnter={() => startIconAnimation(codingIconRef)}
+          onMouseLeave={() => codingIconRef.current?.stopAnimation()}
           className={
-            activeView === 'coding' ? activeSidebarViewNavItemClassName : sidebarViewNavItemClassName
+            activeView === 'coding'
+              ? activeSidebarViewNavItemClassName
+              : sidebarViewNavItemClassName
           }
           aria-current={activeView === 'coding' ? 'page' : undefined}
         >
-          <Code2 className="size-4" />
+          <SidebarAnimatedTerminalIcon ref={codingIconRef} />
           {i18nService.t('codingAgent')}
         </Button>
       )}
