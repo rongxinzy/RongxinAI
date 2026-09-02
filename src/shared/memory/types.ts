@@ -40,6 +40,7 @@ export interface ManagedMemoryRecord {
 }
 
 export interface ManagedMemoryListInput {
+  workingDirectory?: string;
   scope?: MemoryScope;
   status?: MemoryLifecycleStatus;
   query?: string;

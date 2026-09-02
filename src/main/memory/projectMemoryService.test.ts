@@ -112,6 +112,22 @@ test('always recalls with the current project identity', async () => {
   expect(recall.mock.calls[1][0]).toMatchObject({ project: 'project-beta' });
 });
 
+test('filters managed memories to the selected workspace while retaining personal memories', () => {
+  const memories = [
+    { id: 'project-alpha', scope: MemoryScope.Project, projectId: 'project-alpha' },
+    { id: 'project-beta', scope: MemoryScope.Project, projectId: 'project-beta' },
+    { id: 'session-alpha', scope: MemoryScope.Session, projectId: 'project-alpha' },
+    { id: 'personal', scope: MemoryScope.Personal, projectId: PERSONAL_MEMORY_PROJECT_ID },
+  ];
+  const listManaged = vi.fn(() => memories);
+  const service = new ProjectMemoryService({ listManaged } as never, {} as never, identityFor);
+
+  expect(
+    service.listManagedMemories({ workingDirectory: 'alpha' }).map(memory => memory.id),
+  ).toEqual(['project-alpha', 'session-alpha', 'personal']);
+  expect(listManaged).toHaveBeenCalledWith({ workingDirectory: 'alpha' });
+});
+
 test('returns referenced memory only when it is recallable in the current boundary', () => {
   const findLinkByMemoryId = vi.fn((memoryId: number) => ({
     memoryId,
@@ -308,7 +324,9 @@ test('edits active manual memory by confirming a superseding candidate', async (
     createPersonalCandidate: vi.fn(() => replacement.id),
   };
   const service = new ProjectMemoryService(repository as never, {} as never, identityFor);
-  const confirm = vi.spyOn(service, 'confirmMemoryCandidate').mockResolvedValue(replacement.memoryId);
+  const confirm = vi
+    .spyOn(service, 'confirmMemoryCandidate')
+    .mockResolvedValue(replacement.memoryId);
 
   await expect(
     service.updateManualMemory({

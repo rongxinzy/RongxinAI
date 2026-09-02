@@ -1417,6 +1417,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkMemoryCrudDeleteFailed: '删除记忆条目失败',
     managedMemoryTitle: '受控长期记忆',
     managedMemoryDescription: '统一管理个人、项目和会话记忆，以及它们的来源和生命周期。',
+    managedMemoryWorkspaceLabel: '记忆工作区',
+    managedMemoryWorkspaceEmpty: '暂无可用工作区',
     managedMemoryCreate: '新增记忆',
     managedMemoryTabLongTerm: '长期记忆',
     managedMemoryTabSessions: '会话摘要',
@@ -4680,6 +4682,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     managedMemoryTitle: 'Controlled long-term memory',
     managedMemoryDescription:
       'Manage personal, workspace, and session memories with their sources and lifecycle.',
+    managedMemoryWorkspaceLabel: 'Memory workspace',
+    managedMemoryWorkspaceEmpty: 'No workspace available',
     managedMemoryCreate: 'Add memory',
     managedMemoryTabLongTerm: 'Long-term memory',
     managedMemoryTabSessions: 'Session summaries',
