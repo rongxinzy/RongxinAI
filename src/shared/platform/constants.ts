@@ -56,7 +56,7 @@ const DEFINITIONS = [
     channel: 'feishu',
     channelAliases: [],
     logo: 'feishu.png',
-    guideUrl: '',
+    guideUrl: 'https://open.feishu.cn/app/',
   },
   {
     id: 'wecom',
