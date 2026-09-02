@@ -919,6 +919,7 @@ function isCurrentSemanticSessionMetadata(metadata: Record<string, unknown>): bo
 }
 
 function isCurrentAtomicMetadata(metadata: Record<string, unknown>): boolean {
+  if (metadata.manual === true) return true;
   const candidate =
     metadata.extractorKind === MemoryExtractorKind.Atomic ? metadata : metadata.extraction;
   return Boolean(
