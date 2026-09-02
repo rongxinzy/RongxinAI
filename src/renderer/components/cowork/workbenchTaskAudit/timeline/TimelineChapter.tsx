@@ -98,7 +98,7 @@ export function TimelineChapter({
     <>
       <span
         aria-hidden="true"
-        className="absolute top-0 left-0 flex size-7 items-center justify-center rounded-full border border-border bg-background"
+        className="absolute top-0 left-0 z-10 flex size-7 items-center justify-center rounded-full border border-border bg-background"
       >
         <StatusIcon
           className={cn(
