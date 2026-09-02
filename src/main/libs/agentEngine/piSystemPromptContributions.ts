@@ -15,6 +15,7 @@ import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
 import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
+import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 
 export interface PiSystemPromptContext {
@@ -24,6 +25,8 @@ export interface PiSystemPromptContext {
   maxOutputTokens: number;
   /** Runtime platform, used for platform-specific tool contracts. */
   platform?: NodeJS.Platform;
+  /** Whether the current run has no foreground user interaction. */
+  unattended?: boolean;
   /** Concrete MCP capabilities discovered before this session was created. */
   mcpToolManifest?: McpToolManifestEntry[];
   /** Configured MCP servers, including connection and discovery failures. */
@@ -43,7 +46,16 @@ export interface PiSystemPromptContribution {
 
 // Order matters: entries are appended to the system prompt in this sequence.
 export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContribution> = [
-  { id: 'ask-user-question', prompt: PiAskUserQuestionSystemPrompt },
+  {
+    id: 'ask-user-question',
+    enabled: context => context.unattended !== true,
+    prompt: PiAskUserQuestionSystemPrompt,
+  },
+  {
+    id: 'unattended-execution',
+    enabled: context => context.unattended === true,
+    prompt: PiUnattendedSystemPrompt,
+  },
   {
     id: 'bash-tool',
     requiresFileTools: true,

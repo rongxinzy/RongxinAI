@@ -236,6 +236,7 @@ vi.mock('../coworkUtil', async importOriginal => {
 
 import { PiRuntimeAdapter } from './piRuntimeAdapter';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAgentLoopAction, PiAgentLoopMode, PiAgentLoopToolName } from './piAgentLoop';
 import { CoworkErrorKind, type CoworkError } from '../../../common/coworkError';
@@ -2079,6 +2080,59 @@ describe('PiRuntimeAdapter', () => {
       if (process.platform === 'win32') {
         expect(appended.some(entry => entry.includes('## Bash execution contract'))).toBe(true);
       }
+    });
+
+    it('removes AskUserQuestion and adds autonomous guidance for unattended runs', async () => {
+      await adapter.startSession('unattended', 'Run the scheduled task', { unattended: true });
+
+      const sessionOptions = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(sessionOptions.customTools?.map(tool => tool.name) ?? []).not.toContain(
+        'AskUserQuestion',
+      );
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      const appended = loaderOptions.appendSystemPromptOverride();
+      expect(appended).not.toContain(PiAskUserQuestionSystemPrompt);
+      expect(appended).toContain(PiUnattendedSystemPrompt);
+    });
+
+    it('recreates the Pi session when unattended mode changes', async () => {
+      await adapter.startSession('mode-switch', 'Start in the foreground');
+      await adapter.continueSession('mode-switch', 'Run on schedule', { unattended: true });
+
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(2);
+      const unattendedOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(unattendedOptions.customTools?.map(tool => tool.name) ?? []).not.toContain(
+        'AskUserQuestion',
+      );
+      const unattendedLoaderOptions = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(unattendedLoaderOptions.appendSystemPromptOverride()).toContain(
+        PiUnattendedSystemPrompt,
+      );
+
+      await adapter.continueSession('mode-switch', 'Return to the foreground');
+
+      expect(mockCreateAgentSession).toHaveBeenCalledTimes(3);
+      const attendedOptions = mockCreateAgentSession.mock.calls[2]?.[0] as {
+        customTools?: Array<{ name: string }>;
+      };
+      expect(attendedOptions.customTools?.map(tool => tool.name) ?? []).toContain(
+        'AskUserQuestion',
+      );
+      const attendedLoaderOptions = mockDefaultResourceLoader.mock.calls[2]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      const attendedPrompt = attendedLoaderOptions.appendSystemPromptOverride();
+      expect(attendedPrompt).toContain(PiAskUserQuestionSystemPrompt);
+      expect(attendedPrompt).not.toContain(PiUnattendedSystemPrompt);
     });
 
     it('guards Windows Bash calls against cmd and PowerShell syntax', async () => {

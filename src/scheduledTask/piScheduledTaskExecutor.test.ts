@@ -126,6 +126,7 @@ test('runs a canonical task in its workspace and waits for complete', async () =
     'run',
     expect.objectContaining({
       approvalMode: WorkbenchApprovalMode.AllowAll,
+      unattended: true,
       skillIds: session.activeSkillIds,
       modelOverride: session.modelOverride,
     }),
@@ -213,7 +214,10 @@ test('reuses one stable dedicated session for every run of a task-bound task', a
   expect(runtime.continueSession).toHaveBeenCalledWith(
     `scheduled-task:${task.id}`,
     'run',
-    expect.anything(),
+    expect.objectContaining({
+      approvalMode: WorkbenchApprovalMode.AllowAll,
+      unattended: true,
+    }),
   );
 });
 

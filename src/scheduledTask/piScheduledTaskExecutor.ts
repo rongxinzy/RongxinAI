@@ -60,6 +60,7 @@ export class PiScheduledTaskExecutor {
       // Scheduled runs have no foreground permission UI. Their creator opted
       // into unattended execution, so tools must follow that run policy.
       approvalMode: WorkbenchApprovalMode.AllowAll,
+      unattended: true,
     };
     try {
       const execution = this.runtime.isSessionActive(session.id)

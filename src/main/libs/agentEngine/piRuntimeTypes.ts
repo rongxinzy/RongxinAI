@@ -82,6 +82,8 @@ export type PiStartOptions = {
   skillIds?: string[];
   systemPrompt?: string;
   approvalMode?: WorkbenchApprovalMode;
+  /** No foreground user is available to answer questions during this run. */
+  unattended?: boolean;
   workspaceRoot?: string;
   confirmationMode?: 'modal' | 'text';
   /** UI session mode, used to apply Work-only execution controls. */
@@ -123,6 +125,8 @@ export type PiContinueOptions = {
   thinkingLevel?: PiThinkingLevel;
   /** Forwarded to startSession when the runtime has to recreate the session. */
   approvalMode?: WorkbenchApprovalMode;
+  /** No foreground user is available to answer questions during this run. */
+  unattended?: boolean;
   /** Internal: run already created by an explicit Resume/Retry action. */
   _workbenchRunId?: string;
   /** Internal: the owning task already has a controlled production workflow. */
