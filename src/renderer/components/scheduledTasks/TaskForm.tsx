@@ -52,6 +52,7 @@ import {
   createFormState,
   formsEqual,
   getNotifyChannelLabel,
+  getNotifyConversationLabel,
   isIMChannel,
   previewCron,
   type FormState,
@@ -111,6 +112,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
   const isAdvanced = form.planType === 'advanced';
   const isCron = form.planType === 'cron';
   const showConversationSelector = isIMChannel(form.notifyChannel);
+  const selectedConversation = conversations.find(
+    conversation => conversation.conversationId === form.notifyTo,
+  );
 
   useEffect(() => {
     const nextForm = createFormState(task, prefill);
@@ -135,11 +139,26 @@ const TaskForm: React.FC<TaskFormProps> = ({
         // then append any saved channel that is not in the list (e.g. disabled platform).
         const next = [...channels];
         for (const saved of current) {
-          if (!next.some(item => channelOptionValue(item) === channelOptionValue(saved))) {
+          const sameValue = next.some(item => channelOptionValue(item) === channelOptionValue(saved));
+          const samePlatformHasAccount = next.some(
+            item => item.value === saved.value && Boolean(item.accountId),
+          );
+          if (!sameValue && !(samePlatformHasAccount && !saved.accountId)) {
             next.push(saved);
           }
         }
-        return next;
+        const deduplicated = next.filter(
+          (option, index, all) =>
+            all.findIndex(item => channelOptionValue(item) === channelOptionValue(option)) === index,
+        );
+        // A singleton channel can arrive both with and without an account ID
+        // (for example after upgrading an existing task). Prefer the routable
+        // account-backed option so the UI cannot show two identical labels.
+        return deduplicated.filter(
+          option =>
+            Boolean(option.accountId) ||
+            !deduplicated.some(item => item.value === option.value && Boolean(item.accountId)),
+        );
       });
     });
     return () => {
@@ -166,11 +185,18 @@ const TaskForm: React.FC<TaskFormProps> = ({
       )
       .then(result => {
         if (cancelled) return;
-        setConversations(result);
+        // Some connectors expose the same native private-chat target more than
+        // once (for example, `dm`). Keep one option per routable target so the
+        // selector does not present indistinguishable duplicate entries.
+        const uniqueConversations = result.filter(
+          (conversation, index, all) =>
+            all.findIndex(item => item.conversationId === conversation.conversationId) === index,
+        );
+        setConversations(uniqueConversations);
         setConversationsLoading(false);
 
-        if (result.length > 0 && !form.notifyTo) {
-          setForm(current => ({ ...current, notifyTo: result[0].conversationId }));
+        if (uniqueConversations.length > 0 && !form.notifyTo) {
+          setForm(current => ({ ...current, notifyTo: uniqueConversations[0].conversationId }));
         }
       });
 
@@ -642,7 +668,14 @@ const TaskForm: React.FC<TaskFormProps> = ({
                 {i18nService.t('scheduledTasksFormNotifyChannelNone')}
               </SelectItem>
               {channelOptions.map(channel => {
-                const displayName = getNotifyChannelLabel(channel);
+                const baseDisplayName = getNotifyChannelLabel(channel);
+                const duplicateLabels = channelOptions.filter(
+                  option => getNotifyChannelLabel(option) === baseDisplayName,
+                );
+                const displayName =
+                  duplicateLabels.length > 1 && channel.accountId
+                    ? `${baseDisplayName} · ${channel.accountId.slice(-4)}`
+                    : baseDisplayName;
                 return (
                   <SelectItem
                     key={`${channel.value}:${channel.accountId ?? ''}`}
@@ -665,7 +698,9 @@ const TaskForm: React.FC<TaskFormProps> = ({
             <SelectTrigger className="flex-1 min-w-0">
               <SelectValue
                 placeholder={i18nService.t('scheduledTasksFormNotifyConversationLoading')}
-              />
+              >
+                {selectedConversation ? getNotifyConversationLabel(selectedConversation) : undefined}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -676,7 +711,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
                 ) : (
                   conversations.map(conv => (
                     <SelectItem key={conv.conversationId} value={conv.conversationId}>
-                      {conv.conversationId}
+                      {getNotifyConversationLabel(conv)}
                     </SelectItem>
                   ))
                 )}
@@ -693,6 +728,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
       channelOptions,
       conversations,
       conversationsLoading,
+      selectedConversation,
       showConversationSelector,
       updateForm,
     ],

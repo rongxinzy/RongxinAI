@@ -50,6 +50,7 @@ export function listScheduledTaskChannels(): Array<{
   const configRecord = config as unknown as Record<string, unknown>;
 
   const enabledPlatforms = new Set<string>();
+  const singletonAccountIds = new Map<string, string>();
   // For multi-instance platforms: collect per-instance info (accountId + name).
   const instancesByPlatform = new Map<
     string,
@@ -59,6 +60,13 @@ export function listScheduledTaskChannels(): Array<{
   for (const [key, value] of Object.entries(configRecord)) {
     if (!isConfigKeyEnabled(key, value)) continue;
     enabledPlatforms.add(key);
+
+    if (key === 'weixin' && value && typeof value === 'object') {
+      const accountId = (value as { accountId?: unknown }).accountId;
+      if (typeof accountId === 'string' && accountId.trim()) {
+        singletonAccountIds.set(key, accountId.trim());
+      }
+    }
 
     if (MULTI_INSTANCE_CONFIG_KEYS.has(key)) {
       const instances = (value as { instances?: unknown[] }).instances ?? [];
@@ -101,7 +109,8 @@ export function listScheduledTaskChannels(): Array<{
         });
       }
     } else {
-      result.push(option);
+      const accountId = singletonAccountIds.get(platform);
+      result.push(accountId ? { ...option, accountId, filterAccountId: accountId } : option);
     }
   }
 
