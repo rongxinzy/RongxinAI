@@ -17,6 +17,7 @@ import path from 'path';
 
 import type { McpServerRecord } from '../mcpStore';
 import { getElectronNodeRuntimePath, getEnhancedEnv } from './coworkUtil';
+import { mergeMcpSpawnEnv } from './mcpEnvironment';
 import {
   getToolTextPreview,
   looksLikeTransportErrorText,
@@ -36,6 +37,13 @@ export interface McpToolManifestEntry {
   inputSchema: Record<string, unknown>;
 }
 
+export interface McpServerRuntimeStatus {
+  name: string;
+  connected: boolean;
+  toolCount: number;
+  error?: string;
+}
+
 interface ManagedMcpServer {
   record: McpServerRecord;
   client: Client;
@@ -50,7 +58,10 @@ const MCP_SERVER_CLOSE_TIMEOUT_MS = 3_000;
 function withMcpTimeout<T>(promise: Promise<T>, timeoutSeconds: number, label: string): Promise<T> {
   const timeoutMs = timeoutSeconds * 1000;
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutSeconds}s`)), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${timeoutSeconds}s`)),
+      timeoutMs,
+    );
     promise.then(
       value => {
         clearTimeout(timer);
@@ -71,7 +82,8 @@ async function closeClientWithTimeout(client: Client, serverName: string): Promi
       client.close(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(`MCP server close timed out after ${MCP_SERVER_CLOSE_TIMEOUT_MS}ms`)),
+          () =>
+            reject(new Error(`MCP server close timed out after ${MCP_SERVER_CLOSE_TIMEOUT_MS}ms`)),
           MCP_SERVER_CLOSE_TIMEOUT_MS,
         );
       }),
@@ -363,8 +375,12 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
     if (uvCommandType) {
       const bundledUvPath = findBundledUvExecutable(
         process.platform === 'win32'
-          ? uvCommandType === 'uv' ? 'uv.exe' : 'uvx.exe'
-          : uvCommandType === 'uv' ? 'uv' : 'uvx',
+          ? uvCommandType === 'uv'
+            ? 'uv.exe'
+            : 'uvx.exe'
+          : uvCommandType === 'uv'
+            ? 'uv'
+            : 'uvx',
       );
       if (bundledUvPath) {
         effectiveCommand = bundledUvPath;
@@ -407,7 +423,9 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
         log('INFO', `"${server.name}": using bundled Electron + npm-cli.js`);
       } else {
         if (nodeCommandType === 'npm' || nodeCommandType === 'npx') {
-          throw new Error('The bundled npm runtime is unavailable. Please reinstall the application.');
+          throw new Error(
+            'The bundled npm runtime is unavailable. Please reinstall the application.',
+          );
         } else {
           const systemNode = findSystemNodePath();
           if (systemNode) {
@@ -479,9 +497,14 @@ export async function resolveStdioCommand(server: McpServerRecord): Promise<Reso
 export class McpServerManager {
   private servers: Map<string, ManagedMcpServer> = new Map();
   private _toolManifest: McpToolManifestEntry[] = [];
+  private _serverStatuses: McpServerRuntimeStatus[] = [];
 
   get toolManifest(): McpToolManifestEntry[] {
     return this._toolManifest;
+  }
+
+  get serverStatuses(): McpServerRuntimeStatus[] {
+    return this._serverStatuses.map(status => ({ ...status }));
   }
 
   get isRunning(): boolean {
@@ -498,6 +521,11 @@ export class McpServerManager {
     }
 
     log('INFO', `Starting ${enabledServers.length} MCP servers`);
+    this._serverStatuses = enabledServers.map(server => ({
+      name: server.name,
+      connected: false,
+      toolCount: 0,
+    }));
 
     const results = await Promise.allSettled(
       enabledServers.map(server => this.startSingleServer(server)),
@@ -509,12 +537,24 @@ export class McpServerManager {
       if (result.status === 'fulfilled' && result.value) {
         this._toolManifest.push(...result.value.tools);
       } else if (result.status === 'rejected') {
-        log('WARN', `Failed to start MCP server "${enabledServers[i].name}": ${result.reason}`);
+        const error =
+          result.reason instanceof Error ? result.reason.message : String(result.reason);
+        this.updateServerStatus(enabledServers[i].name, { error });
+        log('WARN', `Failed to start MCP server "${enabledServers[i].name}": ${error}`);
       }
     }
 
     log('INFO', `Discovered ${this._toolManifest.length} tools from ${this.servers.size} servers`);
     return this._toolManifest;
+  }
+
+  private updateServerStatus(
+    serverName: string,
+    update: Partial<Omit<McpServerRuntimeStatus, 'name'>>,
+  ): void {
+    this._serverStatuses = this._serverStatuses.map(status =>
+      status.name === serverName ? { ...status, ...update } : status,
+    );
   }
 
   private buildRemoteRequestInit(record: McpServerRecord): RequestInit | undefined {
@@ -534,19 +574,14 @@ export class McpServerManager {
     if (record.transportType === 'stdio') {
       const resolved = await resolveStdioCommand(record);
       if (!resolved.command) {
+        const error = 'No command is configured.';
+        this.updateServerStatus(record.name, { error });
         log('WARN', `Server "${record.name}" has no command, skipping`);
         return null;
       }
 
       const enhancedEnv = await getEnhancedEnv();
-      const spawnEnv: Record<string, string> = {
-        ...Object.fromEntries(
-          Object.entries(enhancedEnv).filter(
-            (e): e is [string, string] => typeof e[1] === 'string',
-          ),
-        ),
-        ...(resolved.env || {}),
-      };
+      const spawnEnv = mergeMcpSpawnEnv(enhancedEnv, resolved.env);
       log(
         'INFO',
         `Starting "${record.name}" via stdio: command=${resolved.command}, args=${serializeForLog(resolved.args)}, configuredEnvKeys=${summarizeConfiguredEnvKeys(resolved.env)}, proxy=${isProxyConfigured(spawnEnv) ? 'enabled' : 'disabled'}`,
@@ -556,6 +591,7 @@ export class McpServerManager {
         command: resolved.command,
         args: resolved.args,
         env: spawnEnv,
+        stderr: 'pipe',
       });
       if (stdioTransport.stderr) {
         stdioTransport.stderr.on('data', (chunk: Buffer) => {
@@ -575,6 +611,8 @@ export class McpServerManager {
       );
       const rawUrl = record.url ? expandMcpTemplate(record.url, record.env).trim() : undefined;
       if (!rawUrl) {
+        const error = `No URL is configured for ${record.transportType} transport.`;
+        this.updateServerStatus(record.name, { error });
         log(
           'WARN',
           `Server "${record.name}" has no URL configured for ${record.transportType} transport`,
@@ -586,6 +624,8 @@ export class McpServerManager {
       try {
         parsedUrl = new URL(rawUrl);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.updateServerStatus(record.name, { error: `Invalid URL: ${errorMessage}` });
         log(
           'WARN',
           `Server "${record.name}" has invalid URL "${rawUrl}": ${error instanceof Error ? error.message : String(error)}`,
@@ -622,13 +662,18 @@ export class McpServerManager {
     );
 
     try {
-      await withMcpTimeout(client.connect(transport), record.timeout ?? 60, `MCP server "${record.name}" connection`);
+      await withMcpTimeout(
+        client.connect(transport),
+        record.timeout ?? 60,
+        `MCP server "${record.name}" connection`,
+      );
       log('INFO', `Connected to MCP server "${record.name}"`);
     } catch (error) {
       const errMsg = error instanceof Error ? error.message : String(error);
       const stderrSummary =
         recentStderr.length > 0 ? ` | recent stderr: ${summarizeRecentStderr(recentStderr)}` : '';
       log('ERROR', `Failed to connect to "${record.name}": ${errMsg}${stderrSummary}`);
+      this.updateServerStatus(record.name, { error: truncateForLog(`${errMsg}${stderrSummary}`) });
       try {
         await transport.close();
       } catch {
@@ -640,7 +685,11 @@ export class McpServerManager {
     // Discover tools
     let tools: McpToolManifestEntry[] = [];
     try {
-      const result = await withMcpTimeout(client.listTools(), record.timeout ?? 60, `MCP server "${record.name}" tool discovery`);
+      const result = await withMcpTimeout(
+        client.listTools(),
+        record.timeout ?? 60,
+        `MCP server "${record.name}" tool discovery`,
+      );
       tools = (result.tools || []).map(t => ({
         server: record.name,
         name: t.name,
@@ -651,7 +700,17 @@ export class McpServerManager {
         'INFO',
         `Server "${record.name}": discovered ${tools.length} tools: [${tools.map(t => t.name).join(', ')}]`,
       );
+      this.updateServerStatus(record.name, {
+        connected: true,
+        toolCount: tools.length,
+        error: undefined,
+      });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.updateServerStatus(record.name, {
+        connected: true,
+        error: `Tool discovery failed: ${truncateForLog(errorMessage)}`,
+      });
       log(
         'WARN',
         `Failed to list tools from "${record.name}": ${error instanceof Error ? error.message : String(error)}`,
@@ -769,5 +828,6 @@ export class McpServerManager {
     await Promise.allSettled(closePromises);
     this.servers.clear();
     this._toolManifest = [];
+    this._serverStatuses = [];
   }
 }

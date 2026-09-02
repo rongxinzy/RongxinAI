@@ -20,6 +20,28 @@ import { calculatePiWriteChunkCharacterLimit } from './piWriteTokenLimit';
 
 const FULL_CONTEXT = { fileToolsEnabled: true, maxOutputTokens: 8000 } as const;
 const TEXT_CONTEXT = { fileToolsEnabled: false, maxOutputTokens: 8000 } as const;
+const MCP_CONTEXT = {
+  ...FULL_CONTEXT,
+  mcpToolManifest: [
+    {
+      server: 'Blender MCP',
+      name: 'create_cube',
+      description: 'Create a cube in the active scene.',
+      inputSchema: { type: 'object' },
+    },
+  ],
+} as const;
+const FAILED_MCP_CONTEXT = {
+  ...FULL_CONTEXT,
+  mcpServerStatuses: [
+    {
+      name: 'Blender MCP',
+      connected: false,
+      toolCount: 0,
+      error: 'Connection closed',
+    },
+  ],
+} as const;
 
 describe('piSystemPromptContributions', () => {
   it('has unique ids', () => {
@@ -29,7 +51,8 @@ describe('piSystemPromptContributions', () => {
 
   it('produces a non-empty prompt for every contribution in both tool modes', () => {
     for (const contribution of PiSystemPromptContributions) {
-      for (const context of [FULL_CONTEXT, TEXT_CONTEXT]) {
+      for (const context of [FULL_CONTEXT, TEXT_CONTEXT, MCP_CONTEXT, FAILED_MCP_CONTEXT]) {
+        if (contribution.enabled && !contribution.enabled(context)) continue;
         const prompt =
           typeof contribution.prompt === 'function'
             ? contribution.prompt(context)
@@ -82,5 +105,19 @@ describe('piSystemPromptContributions', () => {
     const policy = full.find(prompt => prompt.includes('## Large File Writes'));
     expect(policy).toBeDefined();
     expect(policy).toContain(`${expectedLimit} characters`);
+  });
+
+  it('adds concrete MCP capabilities only when MCP tools are available', () => {
+    const withoutMcp = collectPiSystemPromptContributions(FULL_CONTEXT);
+    const withMcp = collectPiSystemPromptContributions(MCP_CONTEXT);
+
+    expect(withoutMcp.some(prompt => prompt.includes('MCP capability preflight'))).toBe(false);
+    expect(withMcp.some(prompt => prompt.includes('[Blender MCP] create_cube'))).toBe(true);
+  });
+
+  it('adds MCP connection diagnostics when configured servers expose no tools', () => {
+    const prompts = collectPiSystemPromptContributions(FAILED_MCP_CONTEXT);
+
+    expect(prompts.some(prompt => prompt.includes('[Blender MCP] unavailable'))).toBe(true);
   });
 });

@@ -45,26 +45,20 @@ const PlatformGuide: React.FC<{
   guideUrl?: string;
 }> = ({ steps, guideUrl }) => (
   <div className="mb-3 p-3 rounded-lg border border-dashed border-border-subtle">
+    {guideUrl && (
+      <Button type="button" variant="link" size="sm" onClick={() => {
+        window.electron.shell.openExternal(guideUrl).catch((err: unknown) => {
+          console.error('[IM] Failed to open guide URL:', err);
+        });
+      }} className="mb-2 h-auto p-0 text-xs font-medium underline underline-offset-2">
+        {i18nService.t('imFeishuConfigLink')}
+      </Button>
+    )}
     <ol className="text-xs text-muted-foreground flex flex-col gap-1 list-decimal list-inside">
       {steps.map((step, i) => (
         <li key={i}>{step}</li>
       ))}
     </ol>
-    {guideUrl && (
-      <Button
-        type="button"
-        variant="link"
-        size="sm"
-        onClick={() => {
-          window.electron.shell.openExternal(guideUrl).catch((err: unknown) => {
-            console.error('[IM] Failed to open guide URL:', err);
-          });
-        }}
-        className="mt-2 h-auto p-0 text-xs font-medium underline underline-offset-2"
-      >
-        {i18nService.t('imViewGuide')}
-      </Button>
-    )}
   </div>
 );
 
@@ -180,7 +174,11 @@ const FeishuInstanceSettings: React.FC<FeishuInstanceSettingsProps> = ({
 
       {/* Guide */}
       <PlatformGuide
-        steps={[i18nService.t('imFeishuGuideStep1'), i18nService.t('imFeishuGuideStep2')]}
+        steps={[
+          i18nService.t('imFeishuGuideStep1'),
+          i18nService.t('imFeishuGuideStep2'),
+          i18nService.t('imFeishuGuideStep3'),
+        ]}
         guideUrl={PlatformRegistry.guideUrl('feishu')}
       />
 

@@ -40,8 +40,8 @@ import { AssistantBubble } from './AssistantBubble';
 import { ExpertAvatar } from '../../expert/expertAvatars';
 import { ExecutionSummary } from './ExecutionSummary';
 import { PersistentChainOfThought, PersistentReasoning } from './PersistentCollapsible';
-import { TypingDots } from './StreamingBar';
 import { ToolCard } from './ToolCard';
+import { WorkingIndicator } from './WorkingIndicator';
 
 const getInterruptionMessage = (interruption: CoworkSessionInterruption): string => {
   switch (interruption.cause) {
@@ -172,7 +172,7 @@ const TurnBlockComponent: React.FC<{
       <div className="py-1">
         <div className="flex items-start gap-2">
           <span
-            className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isToolError ? 'bg-red-500' : 'bg-surface-raised'}`}
+            className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${isToolError ? 'bg-destructive' : 'bg-surface-raised'}`}
           />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-muted-foreground">
@@ -472,7 +472,7 @@ const TurnBlockComponent: React.FC<{
                 </ChainOfThoughtHeader>
               </ChainOfThought>
             )}
-            {showTypingIndicator && <TypingDots />}
+            {showTypingIndicator && <WorkingIndicator />}
             {artifacts?.some(
               artifact => artifact.role === ArtifactRole.Deliverable && artifact.declared,
             ) && (

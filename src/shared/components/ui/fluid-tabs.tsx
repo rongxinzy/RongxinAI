@@ -103,7 +103,7 @@ export function FluidTabs<Value extends string>({
           <span
             aria-hidden="true"
             className={cn(
-              'pointer-events-none absolute top-1 bottom-1 left-0 z-0 rounded-md border border-border-subtle bg-surface shadow-md',
+              'pointer-events-none absolute top-1 bottom-1 left-0 z-0 rounded-full border border-border-subtle bg-surface shadow-md',
               // Balanced glide (project --ease-smooth), not easeOutExpo: an
               // aggressive ease-out covers ~40% of the distance in the first
               // frame and then crawls, which reads as a jump, not a slide.
@@ -119,12 +119,12 @@ export function FluidTabs<Value extends string>({
               key={item.value}
               value={item.value}
               className={cn(
-                'group relative z-10 flex min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-sm leading-5 font-medium whitespace-nowrap outline-none transition-[color,opacity] duration-150 ease-out',
+                'group relative z-10 flex min-w-16 cursor-pointer items-center justify-center rounded-md px-3 text-sm leading-5 whitespace-nowrap outline-none transition-[color,opacity] duration-150 ease-out',
                 sizeClasses.tab,
                 'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-1 focus-visible:ring-offset-muted',
                 isActive
-                  ? 'font-medium text-foreground'
-                  : cn('font-medium text-muted-foreground opacity-50 hover:text-foreground', inactiveTabClassName),
+                  ? 'font-semibold text-foreground'
+                  : cn('font-normal text-muted-foreground opacity-50 hover:text-foreground', inactiveTabClassName),
               )}
             >
               {showInactiveHoverIndicator ? (
@@ -132,7 +132,7 @@ export function FluidTabs<Value extends string>({
                   aria-hidden="true"
                   data-fluid-tabs-hover-indicator="true"
                   className={cn(
-                    'pointer-events-none absolute inset-0 rounded-md border border-border-subtle bg-surface shadow-md opacity-0 transition-opacity duration-150',
+                    'pointer-events-none absolute inset-0 rounded-full border border-border-subtle bg-surface shadow-md opacity-0 transition-opacity duration-150',
                     // Keep mounted on activation so it fades out instead of
                     // vanishing in one frame (reads as a flash under the
                     // arriving active pill).

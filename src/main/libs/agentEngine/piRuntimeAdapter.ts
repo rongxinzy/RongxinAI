@@ -48,6 +48,7 @@ import {
 } from '../../../shared/productionLoop';
 import {
   WorkbenchApprovalDecision,
+  WorkbenchApprovalMode,
   WorkbenchApprovalRiskLevel,
   WorkbenchContractKind,
   WorkbenchArtifactCandidateSource,
@@ -117,6 +118,7 @@ import {
 } from './piConversationContext';
 import { getPiBashCommandViolation } from './piBashToolGuidelines';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
+import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
 import { buildPiResearchStateTool } from './piResearchStateTool';
 import {
@@ -304,7 +306,7 @@ interface ActivePiSession {
   workbenchContract: WorkbenchTaskContract;
   workspaceRoot: string;
   settingsManager: PiSettingsManager | null;
-  autoApprove: boolean;
+  approvalMode: WorkbenchApprovalMode;
   /** True while Pi is executing the current Work/Chat turn. */
   isRunning: boolean;
   /** True when the current turn settled with an unrecoverable Pi error. */
@@ -831,8 +833,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         sessionId,
         getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
         settingsManager,
-        getAutoApprove: () =>
-          this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
+        getApprovalMode: () =>
+          this.activeSessions.get(sessionId)?.approvalMode ??
+          options.approvalMode ??
+          WorkbenchApprovalMode.Ask,
       });
       this.applyPiCompactionOverrides(settingsManager, contextWindowTokens);
       if (!isCurrentInitialization()) return;
@@ -1008,8 +1012,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
             {
               sessionId,
               getRunId: () => this.activeSessions.get(sessionId)?.workbenchRunId ?? workbenchRunId,
-              getAutoApprove: () =>
-                this.activeSessions.get(sessionId)?.autoApprove ?? Boolean(options.autoApprove),
+              getApprovalMode: () =>
+                this.activeSessions.get(sessionId)?.approvalMode ??
+                options.approvalMode ??
+                WorkbenchApprovalMode.Ask,
             },
             extensionFactories,
           ),
@@ -1142,7 +1148,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workbenchContract,
         workspaceRoot,
         settingsManager,
-        autoApprove: Boolean(options.autoApprove),
+        approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
         isRunning: true,
         turnFailed: false,
         queueFlushInFlight: false,
@@ -1322,8 +1328,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       });
     }
 
-    if (options.autoApprove !== undefined) {
-      active.autoApprove = Boolean(options.autoApprove);
+    if (options.approvalMode !== undefined) {
+      active.approvalMode = options.approvalMode;
     }
     active.isRunning = true;
     active.turnFailed = false;
@@ -1729,10 +1735,10 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     }
   }
 
-  /** Applies the global permission mode to sessions that are already running. */
-  setAutoApproveForSession(sessionId: string, autoApprove: boolean): void {
+  /** Applies the current approval mode to sessions that are already running. */
+  setApprovalModeForSession(sessionId: string, approvalMode: WorkbenchApprovalMode): void {
     const active = this.activeSessions.get(sessionId);
-    if (active) active.autoApprove = autoApprove;
+    if (active) active.approvalMode = approvalMode;
   }
 
   respondToPermission(requestId: string, result: PiPermissionResult): void {
@@ -2058,7 +2064,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       sessionId: string;
       getRunId: () => string | null;
       settingsManager?: PiSettingsManager | null;
-      getAutoApprove: () => boolean;
+      getApprovalMode: () => WorkbenchApprovalMode;
     },
     additionalExtensionFactories: PiExtensionFactory[] = [],
   ): Promise<PiResourceLoader> {
@@ -2104,6 +2110,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
           platform: process.platform,
+          mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
+          mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
         }),
       ],
       extensionFactories: [
@@ -2128,7 +2136,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
                     toolCallId: event.toolCallId,
                     toolName: event.toolName,
                     toolInput,
-                    autoApprove: approvalContext.getAutoApprove(),
+                    approvalMode: approvalContext.getApprovalMode(),
                   });
                   return authorization && !authorization.allow
                     ? {
@@ -3183,29 +3191,35 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
    */
   private buildMcpProxyTool(): Record<string, unknown> | null {
     if (!this.mcpServerManager) return null;
-    if (this.mcpServerManager.toolManifest.length === 0) return null;
+    if (
+      this.mcpServerManager.toolManifest.length === 0 &&
+      this.mcpServerManager.serverStatuses.length === 0
+    ) {
+      return null;
+    }
 
     const mgr = this.mcpServerManager;
     const getManifest = () => mgr.toolManifest;
 
     const buildStatusLine = (): string => {
-      const servers = this.mcpServerManager?.toolManifest ?? [];
-      const serverNames = [...new Set(servers.map(t => t.server))];
-      const running = this.mcpServerManager?.isRunning ? 'running' : 'stopped';
-      return (
-        `MCP ${running} — ${serverNames.length} server(s), ${servers.length} tool(s):\n` +
-        serverNames
-          .map(s => {
-            const count = servers.filter(t => t.server === s).length;
-            return `  ${s}: ${count} tool(s)`;
-          })
-          .join('\n')
-      );
+      const manifest = this.mcpServerManager?.toolManifest ?? [];
+      const statuses = this.mcpServerManager?.serverStatuses ?? [];
+      const connectedCount = statuses.filter(status => status.connected).length;
+      const summary = `MCP — ${statuses.length} configured server(s), ${connectedCount} connected, ${manifest.length} tool(s)`;
+      if (statuses.length === 0) return summary;
+      return [
+        summary,
+        ...statuses.map(status => {
+          const state = status.connected ? 'connected' : 'unavailable';
+          const error = status.error ? ` — ${status.error}` : '';
+          return `  ${status.name}: ${state}, ${status.toolCount} tool(s)${error}`;
+        }),
+      ].join('\n');
     };
 
     return {
-      name: 'mcp',
-      label: 'MCP',
+      name: PiMcpTool.Name,
+      label: PiMcpTool.Label,
       description:
         'MCP gateway — call MCP tools, search, or describe. ' +
         'Use {tool, args} to invoke. Use {search} to find tools by name/description. ' +

@@ -5,7 +5,12 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 import type { McpServerFormData, McpServerRecord } from '../mcpStore';
 import { getEnhancedEnv } from './coworkUtil';
-import { expandMcpTemplate, resolveStdioCommand, unresolvedMcpTemplateKeys } from './mcpServerManager';
+import { mergeMcpSpawnEnv } from './mcpEnvironment';
+import {
+  expandMcpTemplate,
+  resolveStdioCommand,
+  unresolvedMcpTemplateKeys,
+} from './mcpServerManager';
 
 const MAX_RECENT_STDERR_LINES = 20;
 
@@ -94,19 +99,13 @@ export async function probeMcpConnection(
     if (record.transportType === 'stdio') {
       const resolved = await resolveStdioCommand(record);
       const enhancedEnv = await getEnhancedEnv('local', { includePackageMirrors: true });
-      const spawnEnv: Record<string, string> = {
-        ...Object.fromEntries(
-          Object.entries(enhancedEnv).filter(
-            (entry): entry is [string, string] => typeof entry[1] === 'string',
-          ),
-        ),
-        ...(resolved.env || {}),
-      };
+      const spawnEnv = mergeMcpSpawnEnv(enhancedEnv, resolved.env);
 
       transport = new StdioClientTransport({
         command: resolved.command,
         args: resolved.args,
         env: spawnEnv,
+        stderr: 'pipe',
       });
       if (transport.stderr) {
         transport.stderr.on('data', (chunk: Buffer) => appendRecentStderr(recentStderr, chunk));
@@ -154,16 +153,8 @@ export async function probeMcpConnection(
   );
 
   try {
-    await withTimeout(
-      client.connect(transport),
-      timeoutMs,
-      'MCP stdio initialize',
-    );
-    const toolResult = await withTimeout(
-      client.listTools(),
-      timeoutMs,
-      'MCP listTools',
-    );
+    await withTimeout(client.connect(transport), timeoutMs, 'MCP stdio initialize');
+    const toolResult = await withTimeout(client.listTools(), timeoutMs, 'MCP listTools');
     return {
       success: true,
       toolCount: Array.isArray(toolResult.tools) ? toolResult.tools.length : 0,

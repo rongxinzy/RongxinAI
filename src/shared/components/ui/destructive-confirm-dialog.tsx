@@ -17,6 +17,9 @@ type DestructiveConfirmDialogProps = {
   onConfirm: () => void;
   confirmDisabled?: boolean;
   isConfirming?: boolean;
+  /** Optional lesser-emphasis danger action rendered between cancel and confirm. */
+  secondaryConfirmLabel?: string;
+  onSecondaryConfirm?: () => void;
   className?: string;
 };
 
@@ -30,6 +33,8 @@ function DestructiveConfirmDialog({
   onConfirm,
   confirmDisabled = false,
   isConfirming = false,
+  secondaryConfirmLabel,
+  onSecondaryConfirm,
   className,
 }: DestructiveConfirmDialogProps) {
   return (
@@ -64,6 +69,18 @@ function DestructiveConfirmDialog({
             >
               {cancelLabel}
             </Button>
+            {secondaryConfirmLabel && onSecondaryConfirm ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 min-w-16 cursor-pointer !border-0 px-3 text-destructive shadow-none hover:bg-surface-raised"
+                data-destructive-confirm-secondary-button="true"
+                disabled={isConfirming}
+                onClick={onSecondaryConfirm}
+              >
+                {secondaryConfirmLabel}
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="destructive"

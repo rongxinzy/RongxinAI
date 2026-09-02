@@ -2,19 +2,13 @@ import { app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 
+import { applyUvPackageIndexDefaults, MANAGED_UV_CONFIG } from './pythonPackageIndexes';
 import { getManagedPythonExecutable } from './pythonRuntime';
 
 const UV_RUNTIME_DIR_NAME =
   process.platform === 'darwin' ? 'uv-mac' : process.platform === 'linux' ? 'uv-linux' : 'uv-win';
 const UV_CONFIG_DIR_NAME = 'uv';
 const UV_CONFIG_FILE_NAME = 'uv.toml';
-const DOMESTIC_PYPI_INDEX_URL = 'https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple';
-const MANAGED_UV_CONFIG = [
-  '[[index]]',
-  `url = '${DOMESTIC_PYPI_INDEX_URL}'`,
-  'default = true',
-  '',
-].join('\n');
 const IS_WINDOWS = process.platform === 'win32';
 type UvExecutableName = 'uv.exe' | 'uvx.exe' | 'uv' | 'uvx';
 
@@ -169,9 +163,9 @@ export function configureUvForManagedPython(
   const configPath = ensureManagedUvConfig();
   if (configPath) {
     env.UV_CONFIG_FILE = configPath;
-    // An inherited UV_DEFAULT_INDEX has higher priority than uv.toml. Pin this
-    // process to the app's mirror so external shell configuration cannot change it.
-    env.UV_DEFAULT_INDEX = DOMESTIC_PYPI_INDEX_URL;
+    // Environment variables have higher priority than uv.toml. Pin both indexes
+    // so external shell configuration cannot disable the official fallback.
+    applyUvPackageIndexDefaults(env, { overwrite: true });
   }
   env.ZHIYUAN_PYTHON_BIN = python;
   return env;

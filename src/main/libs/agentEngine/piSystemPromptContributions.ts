@@ -9,10 +9,12 @@
  * tests read exclusively from this registry.
  */
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
+import type { McpServerRuntimeStatus, McpToolManifestEntry } from '../mcpServerManager';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
 import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { buildPiMcpCapabilityPrompt } from './piMcpCapabilityPrompt';
 import { createPiLargeFileWriteSystemPrompt } from './piWriteTokenLimit';
 
 export interface PiSystemPromptContext {
@@ -22,6 +24,10 @@ export interface PiSystemPromptContext {
   maxOutputTokens: number;
   /** Runtime platform, used for platform-specific tool contracts. */
   platform?: NodeJS.Platform;
+  /** Concrete MCP capabilities discovered before this session was created. */
+  mcpToolManifest?: McpToolManifestEntry[];
+  /** Configured MCP servers, including connection and discovery failures. */
+  mcpServerStatuses?: McpServerRuntimeStatus[];
 }
 
 export interface PiSystemPromptContribution {
@@ -31,6 +37,8 @@ export interface PiSystemPromptContribution {
   requiresFileTools?: boolean;
   /** Static text or a factory for context-dependent policies. */
   prompt: string | ((context: PiSystemPromptContext) => string);
+  /** Optional runtime predicate for capabilities that are not always present. */
+  enabled?: (context: PiSystemPromptContext) => boolean;
 }
 
 // Order matters: entries are appended to the system prompt in this sequence.
@@ -52,6 +60,17 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
     prompt: PiBuiltinFileToolSystemPrompt,
   },
   {
+    id: 'mcp-capability-preflight',
+    requiresFileTools: true,
+    enabled: context =>
+      Boolean(context.mcpToolManifest?.length || context.mcpServerStatuses?.length),
+    prompt: context =>
+      buildPiMcpCapabilityPrompt(
+        context.mcpToolManifest ?? [],
+        context.mcpServerStatuses ?? [],
+      )[0] ?? '',
+  },
+  {
     id: 'large-file-write',
     requiresFileTools: true,
     prompt: context => createPiLargeFileWriteSystemPrompt(context.maxOutputTokens),
@@ -61,7 +80,9 @@ export const PiSystemPromptContributions: ReadonlyArray<PiSystemPromptContributi
 
 export function collectPiSystemPromptContributions(context: PiSystemPromptContext): string[] {
   return PiSystemPromptContributions.filter(
-    contribution => !contribution.requiresFileTools || context.fileToolsEnabled,
+    contribution =>
+      (!contribution.requiresFileTools || context.fileToolsEnabled) &&
+      (!contribution.enabled || contribution.enabled(context)),
   )
     .map(contribution =>
       typeof contribution.prompt === 'function'

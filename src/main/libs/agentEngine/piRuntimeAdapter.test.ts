@@ -23,6 +23,7 @@ import { AcademicResearchSkillIds } from '../../../shared/skills/constants';
 import { CoworkInterruptionCause } from '../../../shared/cowork/interruption';
 import { ProductionLoopAction } from '../../../shared/productionLoop';
 import {
+  WorkbenchApprovalMode,
   WorkbenchContractKind,
   WorkbenchRunTrigger,
   WorkbenchRunStatus,
@@ -30,6 +31,7 @@ import {
 } from '../../../shared/workbenchTask';
 import { ExpertProductionWorkflowHeading } from './piExpertProductionPrompt';
 import { PiExtensionEventType } from './piExtensionTypes';
+import { PiMcpTool } from './piMcpCapabilityPrompt';
 
 const hoisted = vi.hoisted(() => {
   const mockSession = {
@@ -1409,7 +1411,14 @@ describe('PiRuntimeAdapter', () => {
 
     it('recreates the session after MCP discovery refreshes its tool topology', async () => {
       adapter.setMcpServerManager({
-        toolManifest: [{ server: 'Supabase', name: 'list_projects', description: 'List projects' }],
+        toolManifest: [
+          {
+            server: 'Supabase',
+            name: 'list_projects',
+            description: 'List projects',
+            inputSchema: { type: 'object' },
+          },
+        ],
       } as never);
       await adapter.startSession('test', 'First');
 
@@ -1421,7 +1430,52 @@ describe('PiRuntimeAdapter', () => {
       const replacementOptions = mockCreateAgentSession.mock.calls[1]?.[0] as {
         customTools?: Array<{ name: string }>;
       };
-      expect(replacementOptions.customTools?.map(tool => tool.name)).toContain('mcp');
+      expect(replacementOptions.customTools?.map(tool => tool.name)).toContain(PiMcpTool.Name);
+      const replacementLoaderOptions = mockDefaultResourceLoader.mock.calls[1]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(replacementLoaderOptions.appendSystemPromptOverride().join('\n')).toContain(
+        '[Supabase] list_projects: List projects',
+      );
+    });
+
+    it('keeps MCP status available when every configured server failed to connect', async () => {
+      adapter.setMcpServerManager({
+        toolManifest: [],
+        serverStatuses: [
+          {
+            name: 'Blender MCP',
+            connected: false,
+            toolCount: 0,
+            error: 'MCP error -32000: Connection closed',
+          },
+        ],
+      } as never);
+
+      await adapter.startSession('test', 'Can you control Blender through MCP?');
+
+      const options = mockCreateAgentSession.mock.calls[0]?.[0] as {
+        customTools?: Array<{
+          name: string;
+          execute: (
+            toolCallId: string,
+            params: Record<string, unknown>,
+          ) => Promise<{
+            content: Array<{ type: string; text: string }>;
+          }>;
+        }>;
+      };
+      const mcpTool = options.customTools?.find(tool => tool.name === PiMcpTool.Name);
+      expect(mcpTool).toBeDefined();
+      const status = await mcpTool?.execute('status-call', {});
+      expect(status?.content[0].text).toContain('Blender MCP: unavailable');
+
+      const loaderOptions = mockDefaultResourceLoader.mock.calls[0]?.[0] as {
+        appendSystemPromptOverride: () => string[];
+      };
+      expect(loaderOptions.appendSystemPromptOverride().join('\n')).toContain(
+        '[Blender MCP] unavailable: MCP error -32000: Connection closed',
+      );
     });
 
     it('persists the selected expert on a continuation user message', async () => {
@@ -1691,7 +1745,7 @@ describe('PiRuntimeAdapter', () => {
           toolCallId: 'write-call',
           toolName: 'write',
           toolInput: { path: 'slides.md', content: 'draft' },
-          autoApprove: false,
+          approvalMode: WorkbenchApprovalMode.Ask,
         });
         const approval = service.getDetail(first.task.id)?.approvals[0];
         service.respondToApproval({ approvalId: approval!.id, approved: false });
@@ -1974,7 +2028,7 @@ describe('PiRuntimeAdapter', () => {
           toolCallId: 'write-call',
           toolName: 'write',
           toolInput: { path: 'release.md', content: 'draft' },
-          autoApprove: false,
+          approvalMode: WorkbenchApprovalMode.Ask,
         });
         await vi.waitFor(() => expect(requests).toHaveLength(1));
 
@@ -3086,7 +3140,7 @@ describe('PiRuntimeAdapter', () => {
     it('preserves Allow All across internal follow-up continuations', async () => {
       await adapter.startSession('allow-all-session', 'Start work', {
         sessionMode: 'work',
-        autoApprove: true,
+        approvalMode: WorkbenchApprovalMode.AllowAll,
       });
 
       await adapter.continueSession('allow-all-session', 'Continue work', {
@@ -3095,10 +3149,12 @@ describe('PiRuntimeAdapter', () => {
 
       const activeSessions = (
         adapter as unknown as {
-          activeSessions: Map<string, { autoApprove: boolean }>;
+          activeSessions: Map<string, { approvalMode: WorkbenchApprovalMode }>;
         }
       ).activeSessions;
-      expect(activeSessions.get('allow-all-session')?.autoApprove).toBe(true);
+      expect(activeSessions.get('allow-all-session')?.approvalMode).toBe(
+        WorkbenchApprovalMode.AllowAll,
+      );
     });
 
     it('delivers queued follow-ups in order after Pi settles', async () => {

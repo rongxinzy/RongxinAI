@@ -73,7 +73,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
             variant="ghost"
             size="sm"
             onClick={() => setShowTable(!showTable)}
-            className={`px-2 py-0.5 text-xs rounded transition-colors h-auto ${
+            className={`px-2 py-0.5 text-xs transition-colors h-auto ${
               showTable
                 ? 'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary'
                 : 'text-muted-foreground hover:text-foreground hover:bg-surface'

@@ -98,7 +98,7 @@ export function TimelineChapter({
     <>
       <span
         aria-hidden="true"
-        className="absolute top-0 left-0 flex size-7 items-center justify-center rounded-full border border-border bg-background"
+        className="absolute top-0 left-0 z-10 flex size-7 items-center justify-center rounded-full border border-border bg-background"
       >
         <StatusIcon
           className={cn(
@@ -121,7 +121,7 @@ export function TimelineChapter({
           .t('workbenchTimelineToggleChapter')
           .replace('{attempt}', String(run.attempt))}
         onClick={() => setOpen(current => !current)}
-        className="group flex min-h-7 w-full items-center gap-2 pl-10 text-left"
+        className="group flex min-h-7 w-full items-center gap-2 rounded-md pl-10 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px"
       >
         <span className="shrink-0 text-sm font-medium text-foreground">
           {i18nService.t('workbenchTaskRunAttempt').replace('{attempt}', String(run.attempt))}
@@ -247,7 +247,7 @@ function VerificationCheckRow({ check }: { check: WorkbenchVerificationCheck }) 
   const { icon: Icon, className } =
     checkIcons[check.status] ?? checkIcons[WorkbenchVerificationCheckStatus.Skipped];
   return (
-    <li className="flex items-start gap-2">
+    <li className="flex flex-wrap items-start gap-2">
       <Icon className={cn('mt-0.5 size-3.5 shrink-0', className)} />
       <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
         {check.name}
