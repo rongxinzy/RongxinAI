@@ -116,6 +116,7 @@ import {
   buildPiConversationPrompt,
   calculatePiConversationHistoryCharLimit,
 } from './piConversationContext';
+import { getPiBashCommandViolation } from './piBashToolGuidelines';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
@@ -2037,10 +2038,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // active model window. Pi's defaults (16K reserve, 20K recent) are tuned
     // for large hosted models and can exceed a local 16K/32K model's budget.
     const reserveTokens = Math.max(2_048, Math.min(16_384, Math.floor(contextWindow * 0.25)));
-    const keepRecentTokens = Math.max(
-      2_048,
-      Math.min(20_000, Math.floor(contextWindow * 0.5)),
-    );
+    const keepRecentTokens = Math.max(2_048, Math.min(20_000, Math.floor(contextWindow * 0.5)));
     settingsManager.applyOverrides({
       compaction: {
         enabled: true,
@@ -2111,6 +2109,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ...collectPiSystemPromptContributions({
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
+          platform: process.platform,
           mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
           mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
         }),
@@ -2149,6 +2148,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               },
             ]
           : []),
+        (extensionApi: PiExtensionApi) => {
+          extensionApi.on(PiExtensionEventType.ToolCall, event => {
+            if (event.toolName !== 'bash' || !event.input || typeof event.input !== 'object') {
+              return undefined;
+            }
+            const command = (event.input as Record<string, unknown>).command;
+            if (typeof command !== 'string') return undefined;
+            const reason = getPiBashCommandViolation(command);
+            return reason ? { block: true as const, reason } : undefined;
+          });
+        },
         ...additionalExtensionFactories,
       ],
     });
