@@ -8,7 +8,7 @@
     "esModuleInterop": true,
     "noImplicitAny": true,
     "strict": false,
-    "sourceMap": true,
+    "sourceMap": false,
     "rootDir": "./src",
     "outDir": "dist-electron",
     "moduleResolution": "NodeNext",
