@@ -136,7 +136,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
             <SelectTrigger className="h-8 w-32 text-xs">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent alignItemWithTrigger>
               <SelectGroup>
                 <SelectItem value={PiRuntimeSelectValue.Auto}>
                   {i18nService.t('piRuntimeApiAuto')}
@@ -190,7 +190,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       <SelectTrigger className="h-8 w-24 shrink-0 text-xs">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent alignItemWithTrigger>
                         <SelectGroup>
                           <SelectItem value={PiRuntimeSelectValue.Auto}>
                             {i18nService.t('piRuntimeCompatAuto')}
@@ -230,7 +230,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                     <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger>
                       <SelectGroup>
                         <SelectItem value={PiRuntimeSelectValue.Auto}>
                           {i18nService.t('piRuntimeCompatAuto')}
@@ -266,7 +266,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                     <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger>
                       <SelectGroup>
                         <SelectItem value={PiRuntimeSelectValue.Auto}>
                           {i18nService.t('piRuntimeCompatAuto')}
@@ -302,7 +302,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                     <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent alignItemWithTrigger>
                       <SelectGroup>
                         <SelectItem value={PiRuntimeSelectValue.Auto}>
                           {i18nService.t('piRuntimeCompatAuto')}

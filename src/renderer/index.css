@@ -453,9 +453,9 @@ blockquote {
 
 :root {
   font-family:
-    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter',
-    system-ui, 'Segoe UI', Roboto, sans-serif;
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', 'Hiragino Sans GB', 'Segoe UI',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Helvetica Neue', 'Inter', system-ui,
+    Roboto, sans-serif;
   line-height: 1.6;
   font-weight: 400;
 
