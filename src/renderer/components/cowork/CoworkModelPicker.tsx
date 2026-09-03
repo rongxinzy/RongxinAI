@@ -1,6 +1,4 @@
-import {
-  ModelSelectorName,
-} from '@shared/components/ai-elements/model-selector';
+import { ModelSelectorName } from '@shared/components/ai-elements/model-selector';
 import { PromptInputButton } from '@shared/components/ai-elements/prompt-input';
 import {
   Command,
@@ -24,6 +22,7 @@ type CoworkModelPickerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (model: Model) => void;
+  compact?: boolean;
 };
 
 function ModelProviderIcon({ provider }: { provider: string }) {
@@ -36,6 +35,7 @@ export function CoworkModelPicker({
   open,
   onOpenChange,
   onSelect,
+  compact = false,
 }: CoworkModelPickerProps) {
   const displayedSelectedModel = models.length > 0 ? selectedModel : null;
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,18 +64,25 @@ export function CoworkModelPicker({
       <PopoverTrigger
         nativeButton={true}
         render={
-          <PromptInputButton className="max-w-[200px] gap-1 px-2 text-sm hover:bg-surface-raised">
+          <PromptInputButton
+            className={compact ? 'gap-1 px-2' : 'max-w-[200px] gap-1 px-2 text-sm'}
+            aria-label={displayedSelectedModel?.name ?? i18nService.t('selectModel')}
+          >
             {displayedSelectedModel ? (
               <>
                 <ModelProviderIcon
                   provider={
-                    displayedSelectedModel.providerKey || displayedSelectedModel.provider || 'openai'
+                    displayedSelectedModel.providerKey ||
+                    displayedSelectedModel.provider ||
+                    'openai'
                   }
                 />
-                <ModelSelectorName>{displayedSelectedModel.name}</ModelSelectorName>
+                {!compact && <ModelSelectorName>{displayedSelectedModel.name}</ModelSelectorName>}
               </>
             ) : (
-              <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
+              !compact && (
+                <span className="text-muted-foreground">{i18nService.t('selectModel')}</span>
+              )
             )}
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </PromptInputButton>

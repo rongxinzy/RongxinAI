@@ -7,7 +7,7 @@ import {
   PromptInputTools,
 } from '@shared/components/ai-elements/prompt-input';
 import { Bot } from 'lucide-react';
-import { type ReactNode, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import type {
   CodingAgentAvailableCommand,
@@ -34,7 +34,10 @@ interface CodingComposerProps {
   leadingTools?: ReactNode;
   statusNotice?: ReactNode;
   sessionId?: string;
-  queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'>;
+  queueService?: Pick<
+    typeof coworkQueueService,
+    'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'
+  >;
   onChange: (value: string) => void;
   onConfigOptionChange: (optionId: string, value: string | boolean) => void;
   onSend: () => void;
@@ -64,6 +67,8 @@ export const CodingComposer = ({
   supportsSteerShortcut = false,
   onStop,
 }: CodingComposerProps) => {
+  const composerRootRef = useRef<HTMLDivElement | null>(null);
+  const [isTightToolbar, setIsTightToolbar] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [commandSelection, setCommandSelection] = useState<{
     query: string | null;
@@ -81,6 +86,16 @@ export const CodingComposer = ({
     query !== null &&
     availableCommands.length > 0 &&
     dismissedPrompt !== prompt;
+
+  useEffect(() => {
+    const element = composerRootRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const updateToolbarDensity = () => setIsTightToolbar(element.clientWidth <= 760);
+    updateToolbarDensity();
+    const observer = new ResizeObserver(updateToolbarDensity);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const selectCommand = (command: CodingAgentAvailableCommand) => {
     const nextPrompt = slashCommandPrompt(command);
@@ -106,11 +121,15 @@ export const CodingComposer = ({
   };
 
   return (
-    <div className="px-4 pt-2 pb-4">
+    <div ref={composerRootRef} className="px-4 pt-2 pb-4">
       <div className="relative mx-auto max-w-5xl">
         {statusNotice}
         {sessionId ? (
-          <PendingMessageQueue sessionId={sessionId} isStreaming={isRunning} queueService={queueService} />
+          <PendingMessageQueue
+            sessionId={sessionId}
+            isStreaming={isRunning}
+            queueService={queueService}
+          />
         ) : null}
         {commandMenuOpen ? (
           <CodingSlashCommandMenu
@@ -190,19 +209,22 @@ export const CodingComposer = ({
               className="max-h-48 min-h-20"
             />
           </PromptInputBody>
-          <PromptInputFooter className="flex-wrap">
-            <PromptInputTools className="flex-1 flex-wrap">
+          <PromptInputFooter className="flex-nowrap">
+            <PromptInputTools className="min-w-0 flex-1 flex-nowrap overflow-hidden">
               {leadingTools}
               {showRecipient ? (
                 <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
                   <Bot className="size-3.5 shrink-0" />
-                  <span className="shrink-0">{i18nService.t('codingAgentSendTo')}</span>
+                  {!isTightToolbar && (
+                    <span className="shrink-0">{i18nService.t('codingAgentSendTo')}</span>
+                  )}
                   <span className="truncate font-medium text-foreground">{recipientName}</span>
                 </div>
               ) : null}
               <CodingComposerConfigControls
                 options={configOptions}
                 onChange={onConfigOptionChange}
+                compact={isTightToolbar}
               />
             </PromptInputTools>
             <PromptInputSubmit

@@ -162,3 +162,37 @@ test('steers a running agent with Control S', () => {
 
   expect(onSteer).toHaveBeenCalledOnce();
 });
+
+test('uses a settings menu for configuration controls in a tight toolbar', () => {
+  const ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  vi.stubGlobal('ResizeObserver', ResizeObserver);
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(640);
+
+  render(
+    createElement(CodingComposer, {
+      availableCommands: [],
+      configOptions: [
+        {
+          id: 'model',
+          name: 'Model',
+          type: 'select',
+          currentValue: 'default',
+          options: [{ value: 'default', name: 'Default' }],
+        },
+      ],
+      disabled: false,
+      isRunning: false,
+      prompt: '',
+      recipientName: 'Codex',
+      onChange: vi.fn(),
+      onConfigOptionChange: vi.fn(),
+      onSend: vi.fn(),
+      onStop: vi.fn(),
+    }),
+  );
+
+  expect(screen.getByRole('button', { name: i18nService.t('settings') })).toBeTruthy();
+});

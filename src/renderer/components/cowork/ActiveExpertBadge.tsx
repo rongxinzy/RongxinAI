@@ -10,16 +10,26 @@ import { ExpertAvatar } from '../expert/expertAvatars';
 
 interface ActiveExpertBadgeProps {
   expertId?: string;
+  expertName?: string;
   onRemove: () => void;
+  compact?: boolean;
   className?: string;
 }
 
-const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({ expertId, onRemove, className }) => {
+const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({
+  expertId,
+  expertName,
+  onRemove,
+  compact = false,
+  className,
+}) => {
   const expert = useSelector((state: RootState) =>
     state.agent.agents.find(agent => agent.id === expertId),
   );
 
-  if (!expert) return null;
+  if (!expertId) return null;
+  const displayName = expert?.name ?? expertName ?? expertId;
+  const avatarName = expert?.presetId || expert?.id || expertId;
 
   return (
     <span
@@ -27,7 +37,7 @@ const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({ expertId, onRemov
         'sidebar-interactive-surface inline-flex h-7 max-w-48 items-center gap-1.5 rounded-full bg-transparent px-2 text-sm font-medium text-foreground transition-colors',
         className,
       )}
-      title={expert.name}
+      title={displayName}
     >
       <Button
         type="button"
@@ -39,13 +49,13 @@ const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({ expertId, onRemov
         className="group/expert relative size-4 rounded-full p-0 hover:bg-transparent"
       >
         <ExpertAvatar
-          name={expert.presetId || expert.id}
-          label={expert.name}
+          name={avatarName}
+          label={displayName}
           className="size-4 rounded-full border-0 transition-opacity group-hover/expert:opacity-0"
         />
         <X className="absolute size-4 text-primary opacity-0 transition-opacity group-hover/expert:opacity-100" />
       </Button>
-      <span className="truncate">{expert.name}</span>
+      {!compact && <span className="truncate">{displayName}</span>}
     </span>
   );
 };

@@ -1488,8 +1488,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             ref={composerOverlayRef}
             className="pointer-events-none absolute inset-x-0 bottom-0 z-20 px-4"
           >
-            <div className="mx-auto grid w-full max-w-5xl min-w-[320px] pl-4">
-              <div className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4">
+            <div className="mx-auto grid w-full max-w-5xl min-w-[320px] grid-cols-[minmax(0,1fr)] pl-4">
+              <div className="pointer-events-auto relative col-start-1 row-start-1 min-w-0 self-end rounded-t-3xl bg-background pb-4">
                 <CoworkPromptInput
                   ref={promptInputRef}
                   topAccessory={
