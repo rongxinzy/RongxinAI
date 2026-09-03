@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { ChartColumn, Globe, GraduationCap, Presentation, Smartphone } from 'lucide-react';
+import { ChartColumn, FileText, Globe, GraduationCap, Presentation, Smartphone, Telescope } from 'lucide-react';
 import React from 'react';
 
 import type { LocalizedQuickAction } from '../../types/quickAction';
@@ -16,6 +16,8 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Smartphone,
   ChartColumn,
   GraduationCap,
+  Telescope,
+  FileText,
 };
 
 const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect }) => {

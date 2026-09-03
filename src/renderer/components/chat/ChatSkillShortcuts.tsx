@@ -8,6 +8,7 @@ import { i18nService } from '../../services/i18n';
 import { RootState } from '../../store';
 import { selectIsStreaming } from '../../store/selectors/coworkSelectors';
 import { clearCurrentSession } from '../../store/slices/coworkSlice';
+import { selectAction } from '../../store/slices/quickActionSlice';
 import { setActiveSkillIds } from '../../store/slices/skillSlice';
 import {
   AnimatedFileTextIcon,
@@ -46,6 +47,7 @@ const ChatSkillShortcuts: React.FC = () => {
   const dispatch = useDispatch();
   const skills = useSelector((state: RootState) => state.skill.skills);
   const activeSkillIds = useSelector((state: RootState) => state.skill.activeSkillIds);
+  const quickActions = useSelector((state: RootState) => state.quickAction.actions);
   const isStreaming = useSelector(selectIsStreaming);
   const documentIconRef = React.useRef<AnimatedFileTextIconHandle>(null);
   const academicIconRef = React.useRef<AnimatedGraduationCapIconHandle>(null);
@@ -89,9 +91,23 @@ const ChatSkillShortcuts: React.FC = () => {
       return;
     }
     dispatch(setActiveSkillIds([...selectedSkillIds]));
+    const quickActionIdByShortcut: Record<string, string> = {
+      ppt: 'pptx',
+      sheets: 'data-analysis',
+      website: 'website',
+      docs: 'docs',
+      'deep-research': 'deep-research',
+      'academic-research': 'academic-research',
+    };
+    const quickActionId = quickActionIdByShortcut[entry.id];
+    dispatch(
+      selectAction(quickActions.some(action => action.id === quickActionId) ? quickActionId : null),
+    );
     dispatch(clearCurrentSession());
     window.setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: false } }));
+      // Switching shortcut skills starts a new prompt context. Clear the
+      // previous case text while preserving the conversation transcript.
+      window.dispatchEvent(new CustomEvent('cowork:focus-input', { detail: { clear: true } }));
     }, 0);
   };
 
