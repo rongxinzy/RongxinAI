@@ -193,8 +193,6 @@ export const EmailSettingsPage = forwardRef<EmailSettingsHandle>(
 
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
-        <p className="text-sm text-muted-foreground">{i18nService.t('emailSettingsDescription')}</p>
-
         {saveError && (
           <Alert variant="destructive">
             <CircleAlert />
