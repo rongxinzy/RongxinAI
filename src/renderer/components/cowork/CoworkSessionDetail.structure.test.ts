@@ -43,7 +43,7 @@ test('lets the conversation fill the pane behind the floating composer', () => {
   const overlayClose = source.indexOf('{!isSessionSwitching && inlinePermission', overlay);
   expect(overlayClose).toBeGreaterThan(scrollContainer);
   expect(source.slice(overlay, promptInput)).toContain(
-    'className="pointer-events-auto relative col-start-1 row-start-1 self-end rounded-t-3xl bg-background pb-4"',
+    'className="pointer-events-auto relative col-start-1 row-start-1 min-w-0 self-end rounded-t-3xl bg-background pb-4"',
   );
   expect(turnBlockSource).toContain('className="mx-auto w-full max-w-5xl min-w-[320px] pl-4"');
   expect(turnBlockSource).toContain('className="flex min-w-0 flex-1 flex-col gap-3 py-3"');

@@ -64,6 +64,17 @@ test('keeps the session permission selector available during an active run', () 
   expect(permissionMenu).not.toContain('disabled={disabled || isStreaming}');
 });
 
+test('keeps model, thinking, and permission controls reachable in compact toolbars', () => {
+  const compactControlsStart = source.lastIndexOf('<div className="flex items-center gap-1.5">');
+  const compactControls = source.slice(compactControlsStart);
+
+  expect(compactControlsStart).toBeGreaterThanOrEqual(0);
+  expect(compactControls).toContain('compact={isCompactToolbar}');
+  expect(compactControls).toContain('isCompactToolbar && isWorkVariant');
+  expect(compactControls).toContain('<PermissionModeMenu');
+  expect(compactControls).toContain('showModelSelector');
+});
+
 test('places the active expert identity between permissions and MCP controls', () => {
   const permissionMenu = source.indexOf('<PermissionModeMenu');
   const expertBadge = source.lastIndexOf('<ActiveExpertBadge');

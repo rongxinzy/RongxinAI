@@ -13,6 +13,7 @@ type LocalThinkingToggleProps = {
   enabled?: boolean;
   disabled: boolean;
   onEnabledChange?: (enabled: boolean | undefined) => void;
+  compact?: boolean;
 };
 
 export function LocalThinkingToggle({
@@ -21,6 +22,7 @@ export function LocalThinkingToggle({
   enabled,
   disabled,
   onEnabledChange,
+  compact = false,
 }: LocalThinkingToggleProps) {
   const previousSupportedModelRef = useRef<string | undefined>(undefined);
   const modelIdentity = model
@@ -49,7 +51,7 @@ export function LocalThinkingToggle({
             size="sm"
           >
             <Brain data-icon="inline-start" />
-            <span>{i18nService.t('chatThinkingToggle')}</span>
+            {!compact && <span>{i18nService.t('chatThinkingToggle')}</span>}
           </Toggle>
         }
       />
