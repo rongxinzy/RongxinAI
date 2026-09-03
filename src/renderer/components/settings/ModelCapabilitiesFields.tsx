@@ -60,10 +60,6 @@ export function ModelCapabilitiesFields({
 
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-3">
-      <p className="mb-2 text-xs font-medium text-foreground">{i18nService.t('modelCapabilities')}</p>
-      <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
-        {i18nService.t('modelCapabilitiesHint')}
-      </p>
       <div className="mb-3 grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm text-foreground">
           <span>{i18nService.t('modelContextWindowK')}</span>
@@ -107,7 +103,7 @@ export function ModelCapabilitiesFields({
                 <SelectTrigger className="w-full">
                   <SelectValue>{statusLabel(status)}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent alignItemWithTrigger={false} sideOffset={4}>
                   <SelectItem value={ModelCapabilityStatus.Supported}>
                     {i18nService.t('capabilitySupported')}
                   </SelectItem>
