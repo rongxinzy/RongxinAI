@@ -126,7 +126,7 @@ class AgentService {
         // to the runtime skill slice so new conversations pick up changes
         // immediately (switchAgent handles this on explicit switch, but
         // in-place editing without switching was missing the sync).
-        if (id === store.getState().agent.currentAgentId) {
+        if (id === store.getState().agent.currentAgentId && updates.skillIds !== undefined) {
           store.dispatch(setActiveSkillIds(agent.skillIds ?? []));
         }
         return agent;

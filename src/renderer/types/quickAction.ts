@@ -37,6 +37,8 @@ export interface QuickAction {
   color: string;
   /** 映射到 Skill ID */
   skillMapping: string;
+  /** 需要一并激活的 Skill ID；未配置时只激活 skillMapping。 */
+  skillIds?: string[];
   /** 预制提示词列表 */
   prompts: Prompt[];
 }
@@ -55,6 +57,8 @@ export interface LocalizedQuickAction {
   color: string;
   /** 映射到 Skill ID */
   skillMapping: string;
+  /** 需要一并激活的 Skill ID；未配置时只激活 skillMapping。 */
+  skillIds?: string[];
   /** 预制提示词列表（已本地化） */
   prompts: LocalizedPrompt[];
 }

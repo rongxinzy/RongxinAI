@@ -1,7 +1,11 @@
 import { BrowserWindow } from 'electron';
 import type Database from 'better-sqlite3';
 
-import { ActivityIpc, ActivityRetention } from '../../shared/activity/constants';
+import {
+  ActivityIpc,
+  ActivityRetention,
+  ActivityStatus,
+} from '../../shared/activity/constants';
 import { shouldAcceptActivityUpdate } from '../../shared/activity/ordering';
 import type { ActivityRun, ActivityRunUpdate } from '../../shared/activity/types';
 
@@ -36,6 +40,26 @@ export class ActivityService {
     return this.db
       .prepare('DELETE FROM zhiyuan_activity_runs WHERE updated_at < ?')
       .run(cutoffMs).changes;
+  }
+
+  /**
+   * A force-closed app cannot emit a terminal event. Clear those stale
+   * in-progress projections during startup so the sidebar indicator reflects
+   * work that is actually running in this process.
+   */
+  recoverInterruptedRuns(nowMs = Date.now()): number {
+    return this.db
+      .prepare(
+        `UPDATE zhiyuan_activity_runs
+         SET status = ?, updated_at = ?, error_message = COALESCE(error_message, ?)
+         WHERE status = ?`,
+      )
+      .run(
+        ActivityStatus.Failed,
+        nowMs,
+        'Run was interrupted when the application closed.',
+        ActivityStatus.Running,
+      ).changes;
   }
 
   upsert(update: ActivityRunUpdate): ActivityRun {
