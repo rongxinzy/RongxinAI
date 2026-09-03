@@ -49,19 +49,22 @@ Var /GLOBAL localInferenceLabel
 
 !macro customWelcomePage
   !define MUI_WELCOMEPAGE_TITLE "欢迎使用知远智能体"
-  !define MUI_WELCOMEPAGE_TEXT "知远智能体是面向真实工作的 AI 工作台。安装程序将为你准备完整的离线运行环境；本地推理组件可在应用启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
+  !define MUI_WELCOMEPAGE_TEXT "安装程序将在本地准备离线运行环境，完成后即可使用。本地推理组件可在首次启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
   !insertmacro MUI_PAGE_WELCOME
 !macroend
 
 Function LocalInferencePageCreate
-  !insertmacro MUI_HEADER_TEXT "本地推理组件" "选择是否在安装完成后准备本地推理环境"
+  !insertmacro MUI_HEADER_TEXT "本地推理组件" "按需启用本地模型推理"
   nsDialogs::Create 1018
   Pop $localInferenceDialog
   ${If} $localInferenceDialog == error
     Abort
   ${EndIf}
 
-  ${NSD_CreateLabel} 0 0 100% 48u "知远支持在本地运行推理模型。开启后，首次启动时会根据硬件下载 CPU 或 NVIDIA CUDA 后端（约 16 MB–621 MB）。$\r$\n$\r$\n不勾选不会影响其他功能。"
+  ${NSD_CreateLabel} 0 0 100% 32u "开启后，首次启动时会根据你的硬件下载 CPU 或 NVIDIA CUDA 后端（约 16 MB–621 MB）。"
+  Pop $localInferenceLabel
+
+  ${NSD_CreateLabel} 0 36u 100% 16u "不勾选不会影响其他功能。"
   Pop $localInferenceLabel
 
   ${NSD_CreateCheckbox} 0 80u 100% 12u "安装本地推理组件"
