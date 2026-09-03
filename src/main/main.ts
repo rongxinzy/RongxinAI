@@ -1240,6 +1240,7 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
     deferredCcConnectCronClient = new DeferredCcConnectCronClient();
     ccConnectDeliveryTransport = new CcConnectDeliveryTransport(
       new IMStore(getStore().getDatabase()),
+      getCoworkStore(),
     );
     const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
     activityService ??= new ActivityService(getStore().getDatabase());
