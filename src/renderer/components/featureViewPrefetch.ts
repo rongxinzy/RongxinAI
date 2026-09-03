@@ -11,7 +11,8 @@ export type PrefetchableFeatureView =
   | 'activity'
   | 'mcp'
   | 'localInference'
-  | 'expert';
+  | 'expert'
+  | 'todo';
 
 export const prefetchFeatureView = (view: PrefetchableFeatureView): void => {
   switch (view) {
@@ -35,6 +36,9 @@ export const prefetchFeatureView = (view: PrefetchableFeatureView): void => {
       break;
     case 'expert':
       void import('./expert/ExpertView').catch(() => undefined);
+      break;
+    case 'todo':
+      void import('./todo/TodoView').catch(() => undefined);
       break;
   }
 };

@@ -17,6 +17,8 @@ export type LanguageType = 'zh' | 'en';
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
     scheduledTaskDeliveryAccountMismatch: '频道账号与所选会话不匹配',
+    todoReminderTitle: '待办提醒',
+    todoReminderBody: '该完成：{title}',
     // Tray menu
     trayShowWindow: '打开知远',
     trayNewTask: '新建任务',
@@ -313,6 +315,8 @@ const translations: Record<LanguageType, Record<string, string>> = {
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
   en: {
+    todoReminderTitle: 'Todo reminder',
+    todoReminderBody: 'Due now: {title}',
     scheduledTaskDeliveryAccountMismatch:
       'The channel account does not match the selected conversation',
     // Tray menu

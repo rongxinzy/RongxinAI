@@ -948,6 +948,34 @@ interface IElectronAPI {
     ) => Promise<WorkbenchTaskActionResult>;
     onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) => () => void;
   };
+  todo: {
+    list: (
+      input: import('../../shared/todo').TodoListInput,
+    ) => Promise<import('../../shared/todo').TodoListResult>;
+    create: (
+      input: import('../../shared/todo').TodoCreateInput,
+    ) => Promise<import('../../shared/todo').TodoActionResult>;
+    update: (
+      input: import('../../shared/todo').TodoUpdateInput & { todoId: string },
+    ) => Promise<import('../../shared/todo').TodoActionResult>;
+    delete: (todoId: string) => Promise<{ success: boolean; error?: string }>;
+    listLists: () => Promise<import('../../shared/todo').TodoListsResult>;
+    createList: (
+      input: import('../../shared/todo').TodoListCreateInput,
+    ) => Promise<import('../../shared/todo').TodoListActionResult>;
+    updateList: (
+      input: import('../../shared/todo').TodoListUpdateInput & { listId: string },
+    ) => Promise<import('../../shared/todo').TodoListActionResult>;
+    deleteList: (listId: string) => Promise<{ success: boolean; error?: string }>;
+    createStep: (
+      input: import('../../shared/todo').TodoStepCreateInput,
+    ) => Promise<import('../../shared/todo').TodoStepActionResult>;
+    updateStep: (
+      input: import('../../shared/todo').TodoStepUpdateInput,
+    ) => Promise<import('../../shared/todo').TodoStepActionResult>;
+    deleteStep: (stepId: string) => Promise<{ success: boolean; error?: string }>;
+    onChanged: (callback: (event: import('../../shared/todo').TodoChangedEvent) => void) => () => void;
+  };
   codingAgent: {
     listProfiles: () => Promise<CodingAgentProfilesResult>;
     listWorkspaces: () => Promise<CodingWorkspaceActionResult>;
