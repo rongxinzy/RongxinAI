@@ -1,5 +1,6 @@
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
+import { Skeleton } from '@shared/components/ui/skeleton';
 import { ArrowLeft, Copy, Expand, Filter, Maximize2, Minimize2, Shrink } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -37,10 +38,19 @@ import { toLocalFileUrl } from './artifactFileUrl';
 import FileDirectoryView from './FileDirectoryView';
 import ArtifactPanelResizeHandle from './ArtifactPanelResizeHandle';
 import CodeRenderer from './renderers/CodeRenderer';
+import { invalidateArtifactFile, loadArtifactFile } from '@/services/artifactFileLoader';
 
 const t = (key: string) => i18nService.t(key);
 
 const BROWSER_OPENABLE_TYPES = new Set<ArtifactType>(['html', 'svg', 'mermaid']);
+const PANEL_LOADED_ARTIFACT_TYPES = new Set<ArtifactType>([
+  'mermaid',
+  'svg',
+  'image',
+  'code',
+  'markdown',
+  'text',
+]);
 
 function isDelimitedArtifact(artifact: Artifact): boolean {
   const name = (artifact.fileName || artifact.filePath || artifact.title || '').toLowerCase();
@@ -70,6 +80,7 @@ function escapeHtml(str: string): string {
 
 interface ArtifactPanelProps {
   sessionId: string | null;
+  cwd?: string | null;
   artifacts: Artifact[];
   panelWidth: number;
   minPanelWidth?: number;
@@ -80,6 +91,7 @@ interface ArtifactPanelProps {
 
 const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   sessionId,
+  cwd,
   artifacts,
   panelWidth,
   minPanelWidth = MIN_PANEL_WIDTH,
@@ -101,6 +113,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const toggleBtnRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [loadingArtifactId, setLoadingArtifactId] = useState<string | null>(null);
+  const [artifactLoadError, setArtifactLoadError] = useState<string | null>(null);
   const isMac = window.electron.platform === 'darwin';
   const isTopLevelPanel = layoutMode === ArtifactLayoutMode.Workspace || isFullscreen;
 
@@ -122,6 +136,51 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
   const displayedTab = availableTabs.includes(activeTab) ? activeTab : availableTabs[0];
   const isCodeView = displayedTab === 'code';
   const hasLocalFilePreview = Boolean(selectedArtifact?.filePath) && !isCodeView;
+
+  useEffect(() => {
+    if (
+      panelView !== ArtifactPanelView.Preview ||
+      !selectedArtifact ||
+      selectedArtifact.content ||
+      !selectedArtifact.filePath ||
+      (!PANEL_LOADED_ARTIFACT_TYPES.has(selectedArtifact.type) &&
+        !(isCodeView && selectedArtifact.type === 'html'))
+    ) {
+      setLoadingArtifactId(null);
+      setArtifactLoadError(null);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const artifactId = selectedArtifact.id;
+    setLoadingArtifactId(artifactId);
+    setArtifactLoadError(null);
+
+    loadArtifactFile(selectedArtifact, cwd)
+      .then(loaded => {
+        if (cancelled) return;
+        if (!loaded) {
+          setArtifactLoadError(artifactId);
+          return;
+        }
+        dispatch(
+          addArtifact({
+            sessionId: selectedArtifact.sessionId,
+            artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
+          }),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setArtifactLoadError(artifactId);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingArtifactId(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [cwd, dispatch, isCodeView, panelView, selectedArtifact]);
 
   const intermediateToggle = (
     <Button
@@ -278,6 +337,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 
   const handleRefresh = useCallback(async () => {
     if (!selectedArtifact?.filePath) return;
+    invalidateArtifactFile(selectedArtifact.filePath);
     try {
       const result = await window.electron.dialog.readFileAsDataUrl(selectedArtifact.filePath);
       if (result?.success && result.dataUrl) {
@@ -509,7 +569,15 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
 
             {/* Render area */}
             <div key={`${selectedArtifact.id}-${displayedTab}`} className="flex-1 min-h-0 overflow-hidden animate-fade-in">
-              {displayedTab === 'preview' ? (
+              {loadingArtifactId === selectedArtifact.id ? (
+                <div className="h-full min-h-0 p-4" aria-busy="true">
+                  <Skeleton className="h-full w-full rounded-lg" />
+                </div>
+              ) : artifactLoadError && artifactLoadError === selectedArtifact.id ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  {t('artifactDocumentError')}
+                </div>
+              ) : displayedTab === 'preview' ? (
                 <ArtifactRenderer
                   artifact={
                     isDelimitedArtifact(selectedArtifact)

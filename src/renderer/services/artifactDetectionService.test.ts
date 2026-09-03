@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { ArtifactRole, type Artifact } from '../types/artifact';
+import { ArtifactRole } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
 import { ArtifactDetectionService } from './artifactDetectionService';
 import type {
@@ -40,10 +40,7 @@ describe('ArtifactDetectionService', () => {
 
   test('reprocesses when a declare_artifact tool call arrives after thinking is done', async () => {
     const detectedArtifacts: ReturnType<typeof detectArtifactsFromMessages> = [];
-    const service = new ArtifactDetectionService(
-      detected => detectedArtifacts.push(...detected),
-      () => {},
-    );
+    const service = new ArtifactDetectionService(detected => detectedArtifacts.push(...detected));
     const messageId = 'assistant-message';
     const toolMessageId = 'tool-declare';
     const sessionId = 'session-1';
@@ -96,16 +93,9 @@ describe('ArtifactDetectionService', () => {
     });
   });
 
-  test('loads UTF-8 CSV files as text for the table preview', async () => {
-    const loadedArtifacts: Artifact[] = [];
-    const service = new ArtifactDetectionService(
-      () => {},
-      artifact => loadedArtifacts.push(artifact),
-      async () => ({
-        success: true,
-        dataUrl: `data:text/csv;base64,${Buffer.from('姓名,分数\n王浩哲,100', 'utf8').toString('base64')}`,
-      }),
-    );
+  test('does not read CSV files while detecting artifacts', async () => {
+    const detectedArtifacts: ReturnType<typeof detectArtifactsFromMessages> = [];
+    const service = new ArtifactDetectionService(detected => detectedArtifacts.push(...detected));
 
     await service.processMessages(
       [
@@ -121,25 +111,39 @@ describe('ArtifactDetectionService', () => {
         },
       ],
       'session-csv',
-      'C:/workspace',
     );
 
-    expect(loadedArtifacts).toHaveLength(1);
-    expect(loadedArtifacts[0]).toMatchObject({
-      type: 'document',
-      filePath: 'C:/workspace/scores.csv',
-      content: '姓名,分数\n王浩哲,100',
-    });
+    expect(detectedArtifacts).toHaveLength(1);
+    expect(detectedArtifacts[0].artifact.content).toBe('');
   });
 
-  test('keeps XLS files base64-encoded for the spreadsheet renderer', async () => {
-    const loadedArtifacts: Artifact[] = [];
-    const dataUrl = 'data:application/vnd.ms-excel;base64,AAEC';
-    const service = new ArtifactDetectionService(
-      () => {},
-      artifact => loadedArtifacts.push(artifact),
-      async () => ({ success: true, dataUrl }),
+  test('keeps binary artifact loading out of detection', async () => {
+    const detectedArtifacts: ReturnType<typeof detectArtifactsFromMessages> = [];
+    const service = new ArtifactDetectionService(detected => detectedArtifacts.push(...detected));
+
+    await service.processMessages(
+      [
+        {
+          id: 'write-model',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1,
+          metadata: {
+            toolName: 'write',
+            toolInput: { path: 'C:/workspace/model.stl' },
+          },
+        },
+      ],
+      'session-model',
     );
+
+    expect(detectedArtifacts).toHaveLength(1);
+    expect(detectedArtifacts[0].artifact).toMatchObject({ type: 'model', content: '' });
+  });
+
+  test('does not preload declared document files', async () => {
+    const detectedArtifacts: ReturnType<typeof detectArtifactsFromMessages> = [];
+    const service = new ArtifactDetectionService(detected => detectedArtifacts.push(...detected));
 
     await service.processMessages(
       [
@@ -155,10 +159,40 @@ describe('ArtifactDetectionService', () => {
         },
       ],
       'session-xls',
-      'C:/workspace',
     );
 
-    expect(loadedArtifacts).toHaveLength(1);
-    expect(loadedArtifacts[0].content).toBe(dataUrl);
+    expect(detectedArtifacts).toHaveLength(1);
+    expect(detectedArtifacts[0].artifact).toMatchObject({ type: 'document', content: '' });
+  });
+
+  test('keeps declared artifact metadata available before preview', async () => {
+    const detectedArtifacts: ReturnType<typeof detectArtifactsFromMessages> = [];
+    const service = new ArtifactDetectionService(
+      detected => detectedArtifacts.push(...detected),
+    );
+
+    await service.processMessages(
+      [
+        {
+          id: 'declare-model',
+          type: 'tool_use',
+          content: '',
+          timestamp: 1,
+          metadata: {
+            toolName: 'declare_artifact',
+            toolInput: {
+              filePath: 'C:/workspace/model.stl',
+              role: 'deliverable',
+            },
+          },
+        },
+      ],
+      'session-model',
+    );
+
+    expect(detectedArtifacts[0]?.artifact).toMatchObject({
+      type: 'model',
+      filePath: 'C:/workspace/model.stl',
+    });
   });
 });

@@ -300,15 +300,10 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const service = new ArtifactDetectionService(
       detected => {
         for (const { artifact } of detected) {
-          // Keep path-backed artifacts visible while their file contents load.
-          // Renderers can use filePath directly when the read is unavailable.
+          // Keep path-backed artifacts visible while their file contents remain deferred.
           dispatch(addArtifact({ sessionId, artifact }));
         }
       },
-      artifact => {
-        dispatch(addArtifact({ sessionId, artifact }));
-      },
-      absPath => window.electron.dialog.readFileAsDataUrl(absPath),
     );
     artifactDetectionServiceRef.current = service;
 
@@ -448,9 +443,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
         dispatch(addArtifact({ sessionId, artifact }));
       }
       // The async useEffect pass below will also call processMessages.
-      // addArtifact is idempotent (merges by id / filePath), so the only
-      // side-effect of the second pass is loadFiles — which fills in the
-      // content of already-painted artifact cards.
+      // addArtifact is idempotent (merges by id / filePath).
     }
   }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -461,7 +454,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
     const service = artifactDetectionServiceRef.current;
     if (!service) return;
 
-    service.processMessages(currentSession.messages, sessionId, currentSession.cwd).catch(err => {
+    service.processMessages(currentSession.messages, sessionId).catch(err => {
       console.error('[ArtifactDetection] failed:', err);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- message count and updatedAt cover message additions and content updates
@@ -1576,6 +1569,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             >
               <ArtifactPanelFrame
                 sessionId={previewSessionId}
+                cwd={currentSession?.cwd}
                 artifacts={previewArtifacts}
                 isOpen={isPanelOpen}
                 isVisible={isArtifactPanelVisible}
