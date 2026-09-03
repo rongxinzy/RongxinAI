@@ -99,6 +99,7 @@ export const CodingWorkbenchView = ({
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
   const [inspectorSheetOpen, setInspectorSheetOpen] = useState(false);
   const [gitSheetOpen, setGitSheetOpen] = useState(false);
@@ -195,6 +196,10 @@ export const CodingWorkbenchView = ({
       ) ?? null,
     [activeLane?.profileId, draftSession, snapshot],
   );
+  const agentNeedsProbe =
+    Boolean(activeProfile) &&
+    !activeProfile?.isBuiltin &&
+    activeProfile?.status === CodingAgentProfileStatus.Detected;
   const activeLaneId = activeLane?.id ?? null;
   const activeRemoteSessionId = activeLane?.remoteSessionId ?? null;
   const dispatch = useDispatch();
@@ -492,9 +497,12 @@ export const CodingWorkbenchView = ({
   };
   const sendPrompt = async (delivery?: 'followUp' | 'steer') => {
     if (!prompt.trim()) return;
-    if (draftSession) {
-      setError(null);
-      const result = await window.electron.codingAgent.startSession({
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      if (draftSession) {
+        const result = await window.electron.codingAgent.startSession({
         workspaceId: draftSession.workspaceId,
         sourceRoot: draftSession.sourceRoot,
         profileId: draftSession.profileId,
@@ -508,30 +516,35 @@ export const CodingWorkbenchView = ({
           ? { configOptionOverrides: draftConfigOverrides }
           : {}),
       });
-      const laneId = result.snapshot?.room.activeLaneId;
-      if (result.success && result.snapshot && laneId) {
-        setSnapshot(result.snapshot);
-        setNewSessionDraftState({ id: '', value: '' });
-        onSessionCreated(laneId);
-      } else {
-        setError(result.error ?? i18nService.t('codingSessionCreateFailed'));
+        const laneId = result.snapshot?.room.activeLaneId;
+        if (result.success && result.snapshot && laneId) {
+          setSnapshot(result.snapshot);
+          setNewSessionDraftState({ id: '', value: '' });
+          onSessionCreated(laneId);
+        } else {
+          setError(result.error ?? i18nService.t('codingSessionCreateFailed'));
+        }
+        return;
       }
-      return;
-    }
-    if (!activeLane) return;
-    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
-    const result = await window.electron.codingAgent.prompt({
+      if (!activeLane) return;
+      if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+      const result = await window.electron.codingAgent.prompt({
       workspaceRoot,
       prompt: { laneId: activeLane.id, prompt, delivery },
     });
-    if (result.success && result.snapshot) {
-      setDraftState({ laneId: activeLane.id, value: '' });
-      void window.electron.codingAgent.saveLaneView({
-        workspaceRoot,
-        view: { laneId: activeLane.id, draft: '', scrollPosition: activeLane.scrollPosition },
-      });
-      setSnapshot(result.snapshot);
-    } else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+      if (result.success && result.snapshot) {
+        setDraftState({ laneId: activeLane.id, value: '' });
+        void window.electron.codingAgent.saveLaneView({
+          workspaceRoot,
+          view: { laneId: activeLane.id, draft: '', scrollPosition: activeLane.scrollPosition },
+        });
+        setSnapshot(result.snapshot);
+      } else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : i18nService.t('codingAgentActionFailed'));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   const confirmSessionRecovery = async (includeRecoveryContext: boolean) => {
     if (!recoveryLane) return;
@@ -924,6 +937,8 @@ export const CodingWorkbenchView = ({
               : !activeLane || activeLane.status === CodingLaneStatus.WaitingApproval
           }
           isRunning={activeLane?.status === CodingLaneStatus.Running}
+          isSubmitting={isSubmitting}
+          hasError={Boolean(error)}
           prompt={prompt}
           recipientName={activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
           showRecipient={!draftSession}
@@ -960,6 +975,22 @@ export const CodingWorkbenchView = ({
                 onSelect={model => void setLaneModel(toAgentModelRef(model))}
               />
             ) : undefined
+          }
+          statusNotice={
+            agentNeedsProbe ? (
+              <div className="flex items-center gap-2 px-1 pb-2 text-xs text-muted-foreground">
+                <span>{i18nService.t('codingAgentProbeRequired')}</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={() => activeProfile && void probeAgent(activeProfile.id)}
+                >
+                  {i18nService.t('codingAgentProbeAgent')}
+                </Button>
+              </div>
+            ) : null
           }
           onChange={next => {
             if (draftSession) {
