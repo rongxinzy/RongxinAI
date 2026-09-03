@@ -15,8 +15,12 @@
 # 注意:preinst 以 root 运行,不能依赖 $HOME;因此不清 SingletonLock 文件
 # (Electron 启动时会检测残留 socket 并自动清理),只杀进程。
 
-DEB_INSTALL_PATTERN='/opt/知远'
-APPIMAGE_MOUNT_PATTERN='\.mount_知远'
+# Current packages install /opt/知远 and mount AppImages below
+# /tmp/.mount_知远*. Keep the legacy ZhiYuanAgent paths for shutdown during an
+# upgrade. Both expressions match the executable/mount path, never the .deb
+# filename passed to dpkg.
+DEB_INSTALL_PATTERN='/opt/(知远|ZhiYuanAgent)(/|$)'
+APPIMAGE_MOUNT_PATTERN='\.mount_(知远|ZhiYuanAgent)'
 
 # 终止旧实例;pkill 无匹配时返回 1,忽略
 pkill -f "$DEB_INSTALL_PATTERN" 2>/dev/null || true
@@ -32,6 +36,16 @@ while [ "$i" -lt 10 ]; do
   sleep 1
   i=$((i + 1))
 done
+
+# A renderer or sidecar can ignore/hold shutdown long enough for the bounded
+# wait above to expire. Do not leave its SingletonLock owner behind: dpkg may
+# replace a running binary, but the first launch of the upgraded app would
+# otherwise still exit as a second instance.
+if pgrep -f "$DEB_INSTALL_PATTERN" >/dev/null 2>&1 ||
+  pgrep -f "$APPIMAGE_MOUNT_PATTERN" >/dev/null 2>&1; then
+  pkill -KILL -f "$DEB_INSTALL_PATTERN" 2>/dev/null || true
+  pkill -KILL -f "$APPIMAGE_MOUNT_PATTERN" 2>/dev/null || true
+fi
 
 # preinst 失败不能阻塞安装,永远以 0 退出
 exit 0

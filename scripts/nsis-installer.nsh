@@ -169,148 +169,44 @@ FunctionEnd
   FileClose $8
 !macroend
 
-!macro EnsureOfflineComponent TOKEN KEY PREFIX SENTINEL LABEL
-  DetailPrint "[Installer] Checking ${LABEL}"
-  System::Call 'kernel32::GetTickCount()i .r7'
+!macro StageOfflineComponentMetadata KEY
   SetOutPath "$PLUGINSDIR"
   File /oname=component-${KEY}.version "${PROJECT_DIR}\build-tar\windows-components\${KEY}.version"
   File /oname=component-${KEY}.sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sha256"
   File /oname=component-${KEY}.sentinel-sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sentinel-sha256"
+!macroend
 
-  FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
-  IfErrors ComponentVersionInvalid_${TOKEN}
-  FileRead $2 $R1
-  FileClose $2
-  StrCpy $R1 $R1 64
-  StrLen $R5 $R1
-  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
-
-  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sha256" r
-  IfErrors ComponentVersionInvalid_${TOKEN}
-  FileRead $2 $R4
-  FileClose $2
-  StrCpy $R4 $R4 64
-  StrLen $R5 $R4
-  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
-
-  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sentinel-sha256" r
-  IfErrors ComponentVersionInvalid_${TOKEN}
-  FileRead $2 $R6
-  FileClose $2
-  StrCpy $R6 $R6 64
-  StrLen $R5 $R6
-  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
-
-  StrCpy $R2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1"
-  IfFileExists "$R2\.complete" 0 ComponentCacheMiss_${TOKEN}
-  FileOpen $2 "$R2\.complete" r
-  IfErrors ComponentCacheMiss_${TOKEN}
-  FileRead $2 $R5
-  FileClose $2
-  StrCpy $R5 $R5 64
-  StrCmp $R5 $R1 0 ComponentCacheMiss_${TOKEN}
-  IfFileExists "$R2\${SENTINEL}" 0 ComponentCacheMiss_${TOKEN}
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R2\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
-  Pop $0
-  Pop $1
-  StrCmp $0 "0" 0 ComponentCacheMiss_${TOKEN}
-  StrCpy $1 $1 64
-  StrCmp $1 $R6 ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
-
+!macro QueueOfflineComponent TOKEN KEY LABEL
+  DetailPrint "[Installer] Checking ${LABEL}"
+  System::Call 'kernel32::GetTickCount()i .r7'
+  IfFileExists "$PLUGINSDIR\component-${KEY}.cache-valid" ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
   ComponentCacheHit_${TOKEN}:
     DetailPrint "[Installer] Reusing ${LABEL}"
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-cache-hit component=${KEY} content_id=$R1$\r$\n"
+    FileWrite $2 "phase=component-cache-hit component=${KEY}$\r$\n"
     FileClose $2
-    Goto ComponentReady_${TOKEN}
+    Goto ComponentQueued_${TOKEN}
 
   ComponentCacheMiss_${TOKEN}:
     DetailPrint "[Installer] Expanding ${LABEL}"
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-cache-miss component=${KEY} content_id=$R1$\r$\n"
+    FileWrite $2 "phase=component-cache-miss component=${KEY}$\r$\n"
     FileClose $2
-    StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1.installing"
-    RMDir /r "$R3"
-    CreateDirectory "$R3"
     SetOutPath "$PLUGINSDIR"
     SetCompress off
     File /oname=component-${KEY}.7z "${PROJECT_DIR}\build-tar\windows-components\${KEY}.7z"
     SetCompress auto
+  ComponentQueued_${TOKEN}:
+!macroend
 
-    ; Hash check and archive entry validation are merged into a single
-    ; PowerShell invocation to avoid the per-component process startup cost.
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-component-archive.ps1" -ArchivePath "$PLUGINSDIR\component-${KEY}.7z" -SevenZipPath "$PLUGINSDIR\7za.exe" -Prefix "${PREFIX}" -ExpectedHash "$R4"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "2" ComponentHashFailed_${TOKEN}
-    StrCmp $0 "3" ComponentArchiveUnsafe_${TOKEN}
-    StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
-
-    DetailPrint "[Installer] Extracting ${LABEL}"
-    ; Extract with the bundled, hash-verified 7za.exe. Nsis7z::Extract can
-    ; silently skip PE files in BCJ2-filtered archives (electron-builder #9983),
-    ; and component packs are compressed with BCJ2.
-    nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
-    Pop $0
-    Pop $1
-    Delete "$PLUGINSDIR\component-${KEY}.7z"
-    StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
-    IntCmp $0 0 ComponentExtracted_${TOKEN} ComponentExtractFailed_${TOKEN} ComponentExtractFailed_${TOKEN}
-
-  ComponentHashFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
+!macro RecordOfflineComponentReady KEY
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
+  IfErrors OfflineComponentInstallFailed
+  FileRead $2 $R1
+  FileClose $2
+  StrCpy $R1 $R1 64
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 output=$1$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentArchiveUnsafe_${TOKEN}:
-    StrCpy $R9 "${LABEL} archive contains an unsafe path or link metadata."
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-archive-unsafe component=${KEY} exit=$0 output=$1$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentExtractFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentExtracted_${TOKEN}:
-    IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" 0 ComponentVerificationFailed_${TOKEN}
-    StrCpy $1 $1 64
-    StrCmp $1 $R6 0 ComponentVerificationFailed_${TOKEN}
-    FileOpen $2 "$R3\.complete" w
-    FileWrite $2 "$R1|$R4"
-    FileClose $2
-    RMDir /r "$R2"
-    Rename "$R3" "$R2"
-    IfErrors ComponentCommitFailed_${TOKEN}
-    Goto ComponentReady_${TOKEN}
-
-  ComponentVerificationFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 健康检查失败，${SENTINEL} 缺失或校验不匹配。"
-    Goto OfflineComponentInstallFailed
-
-  ComponentCommitFailed_${TOKEN}:
-    StrCpy $R9 "无法启用 ${LABEL}，请确认当前用户对 %LOCALAPPDATA%\ZhiYuanAgent 有写入权限。"
-    Goto OfflineComponentInstallFailed
-
-  ComponentVersionInvalid_${TOKEN}:
-    StrCpy $R9 "安装包缺少 ${LABEL} 的有效版本或校验信息。"
-    Goto OfflineComponentInstallFailed
-
-  ComponentReady_${TOKEN}:
-    System::Call 'kernel32::GetTickCount()i .r6'
-    IntOp $R5 $6 - $7
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 elapsed_ms=$R5$\r$\n"
+  FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 validation=batch$\r$\n"
     FileClose $2
 !macroend
 
@@ -323,7 +219,7 @@ FunctionEnd
   File /oname=7za.sha256 "${PROJECT_DIR}\build-tar\windows-components\7za.sha256"
   File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
   File /oname=recover-component-switch.ps1 "${PROJECT_DIR}\scripts\installer\recover-component-switch.ps1"
-  File /oname=validate-component-archive.ps1 "${PROJECT_DIR}\scripts\installer\validate-component-archive.ps1"
+  File /oname=validate-offline-components.ps1 "${PROJECT_DIR}\scripts\installer\validate-offline-components.ps1"
   ; Embed the routing table as a compile-time asset. Building it incrementally
   ; with NSIS FileWrite can split the skill-python key on Windows runners.
   File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
@@ -345,13 +241,68 @@ FunctionEnd
   Pop $1
   StrCmp $0 "0" 0 OfflineComponentInstallFailed
 
-  !insertmacro EnsureOfflineComponent CHANNEL_RUNTIME "channel-runtime" "channel-runtime" "channel-runtime\cc-connect-sidecar.exe" "频道运行环境"
-  !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
-  !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
-  !insertmacro EnsureOfflineComponent PORTABLE_GIT "portable-git" "mingit" "mingit\usr\bin\bash.exe" "PortableGit"
-  !insertmacro EnsureOfflineComponent PYTHON "python" "python-win" "python-win\python.exe" "Python 离线运行环境"
-  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\layers\shared\Scripts\python.exe" "Skill Python dependency layer"
-  !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
+  !insertmacro StageOfflineComponentMetadata "channel-runtime"
+  !insertmacro StageOfflineComponentMetadata "skills"
+  !insertmacro StageOfflineComponentMetadata "mcps"
+  !insertmacro StageOfflineComponentMetadata "portable-git"
+  !insertmacro StageOfflineComponentMetadata "python"
+  !insertmacro StageOfflineComponentMetadata "skill-python"
+  !insertmacro StageOfflineComponentMetadata "uv"
+
+  ; Verify all reusable cache entries in one PowerShell process before deciding
+  ; which archives NSIS needs to unpack from the installer.
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode cache -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" ComponentCacheValidated
+    StrCpy $R9 "安装包缺少有效离线组件校验信息：$1"
+    Goto OfflineComponentInstallFailed
+  ComponentCacheValidated:
+
+  !insertmacro QueueOfflineComponent CHANNEL_RUNTIME "channel-runtime" "频道运行环境"
+  !insertmacro QueueOfflineComponent SKILLS "skills" "内置 Skills"
+  !insertmacro QueueOfflineComponent MCPS "mcps" "内置 MCPs"
+  !insertmacro QueueOfflineComponent PORTABLE_GIT "portable-git" "PortableGit"
+  !insertmacro QueueOfflineComponent PYTHON "python" "Python 离线运行环境"
+  !insertmacro QueueOfflineComponent SKILL_PYTHON "skill-python" "Skill Python dependency layer"
+  !insertmacro QueueOfflineComponent UV "uv" "uv 离线运行环境"
+
+  ; The changed archives are now present in $PLUGINSDIR. Validate their hashes,
+  ; entries and sentinels, then extract them in one PowerShell batch. This keeps
+  ; cache hits fast while eliminating a PowerShell startup per component.
+  DetailPrint "[Installer] Validating and expanding offline components"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode expand -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" ComponentBatchExpanded
+  StrCmp $0 "2" ComponentBatchHashFailed
+  StrCmp $0 "3" ComponentBatchArchiveUnsafe
+  StrCmp $0 "4" ComponentBatchExtractFailed
+  StrCmp $0 "5" ComponentBatchVerificationFailed
+    StrCpy $R9 "离线组件批处理失败：$1"
+    Goto OfflineComponentInstallFailed
+
+  ComponentBatchHashFailed:
+    StrCpy $R9 "离线组件归档 SHA-256 校验失败，安装包可能不完整。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchArchiveUnsafe:
+    StrCpy $R9 "离线组件归档包含不安全路径或链接元数据。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchExtractFailed:
+    StrCpy $R9 "离线组件展开失败。请检查磁盘空间或安全软件后重试。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchVerificationFailed:
+    StrCpy $R9 "离线组件健康检查失败，哨兵文件缺失或校验不匹配。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchExpanded:
+
+  !insertmacro RecordOfflineComponentReady "channel-runtime"
+  !insertmacro RecordOfflineComponentReady "skills"
+  !insertmacro RecordOfflineComponentReady "mcps"
+  !insertmacro RecordOfflineComponentReady "portable-git"
+  !insertmacro RecordOfflineComponentReady "python"
+  !insertmacro RecordOfflineComponentReady "skill-python"
+  !insertmacro RecordOfflineComponentReady "uv"
 
   DetailPrint "[Installer] Activating offline components"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\

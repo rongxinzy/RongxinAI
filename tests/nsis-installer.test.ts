@@ -8,8 +8,8 @@ const installerSmokeScriptPath = path.resolve('scripts/ci/windows-installer-smok
 const elevatedActionsScriptPath = path.resolve('scripts/nsis-elevated-actions.ps1');
 const offlineComponentsPath = path.resolve('scripts/nsis-offline-components.json');
 const brandAssetScriptPath = path.resolve('scripts/generate-nsis-brand-assets.cjs');
-const componentArchiveValidatorPath = path.resolve(
-  'scripts/installer/validate-component-archive.ps1',
+const offlineComponentValidatorPath = path.resolve(
+  'scripts/installer/validate-offline-components.ps1',
 );
 
 describe('NSIS offline resource and local inference flow', () => {
@@ -19,7 +19,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('ManifestDPIAware true');
   });
 
-  test('embeds seven offline components but expands each only on its own cache miss', () => {
+  test('batches component validation while keeping archive payloads conditional on cache misses', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
     const cacheMissIndex = installerScript.indexOf('ComponentCacheMiss_${TOKEN}:');
@@ -28,34 +28,39 @@ describe('NSIS offline resource and local inference flow', () => {
     );
     expect(cacheMissIndex).toBeGreaterThan(-1);
     expect(payloadIndex).toBeGreaterThan(cacheMissIndex);
-    expect(installerScript.match(/!insertmacro EnsureOfflineComponent /g)).toHaveLength(7);
+    expect(installerScript.match(/!insertmacro QueueOfflineComponent /g)).toHaveLength(7);
     expect(installerScript).toContain('phase=component-cache-hit');
     expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
     expect(installerScript).toContain('File /oname=7za.exe');
     expect(installerScript).toContain('component-${KEY}.7z');
-    expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
     expect(installerScript).not.toContain('Nsis7z::Extract "$PLUGINSDIR');
     expect(installerScript).toContain('SetCompress off');
     expect(installerScript).toContain('SetCompress auto');
-    expect(installerScript).toContain('File /oname=validate-component-archive.ps1');
-    expect(installerScript).toContain('-File \"$PLUGINSDIR\\validate-component-archive.ps1\"');
-    expect(installerScript).toContain('-ExpectedHash "$R4"');
-    expect(installerScript).toContain('phase=component-archive-unsafe');
-    expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
-    expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
+    expect(installerScript).toContain('File /oname=validate-offline-components.ps1');
+    expect(
+      installerScript.match(/-File "\$PLUGINSDIR\\validate-offline-components\.ps1"/g),
+    ).toHaveLength(2);
+    expect(installerScript).toContain('-Mode cache');
+    expect(installerScript).toContain('-Mode expand');
+    expect(installerScript).toContain('component-${KEY}.cache-valid');
+    expect(installerScript).toContain('ComponentBatchHashFailed:');
+    expect(installerScript).not.toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
+    expect(installerScript).not.toContain('validate-component-archive.ps1');
     expect(installerScript).not.toContain('File /oname=win-resources.tar');
   });
 
-  test('normalizes 7-Zip entry separators before enforcing the component prefix', () => {
-    const validatorScript = fs.readFileSync(componentArchiveValidatorPath, 'utf8');
+  test('validates each batched archive path before extracting it', () => {
+    const validatorScript = fs.readFileSync(offlineComponentValidatorPath, 'utf8');
 
-    expect(validatorScript).toContain("$entry.Replace('\\', '/')");
+    expect(validatorScript).toContain("$Value.Replace('\\', '/')");
     expect(validatorScript).toContain(
       '$normalizedEntry.StartsWith("$normalizedPrefix/", [System.StringComparison]::Ordinal)',
     );
-    expect(validatorScript).toContain("$normalizedEntry -match '(^|/)\\.\\.(/|$)'");
+    expect(validatorScript).toContain("$normalized -match '(^|/)\\.\\.(/|$)'");
     expect(validatorScript).toContain("$value -and $value -ne '-'");
-    expect(validatorScript).not.toContain('-like');
+    expect(validatorScript).toContain("[ValidateSet('cache', 'expand')]");
+    expect(validatorScript).toContain('Get-FileHash -LiteralPath $sentinel');
+    expect(validatorScript).toContain('Stop-WithCode 2 "hash-mismatch:$($component.Key)"');
   });
 
   test('uses per-user installation and rolls back pointer changes after normal failures', () => {
@@ -102,13 +107,21 @@ describe('NSIS offline resource and local inference flow', () => {
       'New-Item -ItemType Junction -Path $$next -Target $$target -Force -ErrorAction Stop',
     );
     expect(offlineComponents).toEqual([
-      { key: 'channel-runtime', prefix: 'channel-runtime' },
-      { key: 'skills', prefix: 'SKILLs' },
-      { key: 'mcps', prefix: 'MCPs' },
-      { key: 'portable-git', prefix: 'mingit' },
-      { key: 'python', prefix: 'python-win' },
-      { key: 'skill-python', prefix: 'skill-python' },
-      { key: 'uv', prefix: 'uv-win' },
+      {
+        key: 'channel-runtime',
+        prefix: 'channel-runtime',
+        sentinel: 'channel-runtime\\cc-connect-sidecar.exe',
+      },
+      { key: 'skills', prefix: 'SKILLs', sentinel: 'SKILLs\\skills.config.json' },
+      { key: 'mcps', prefix: 'MCPs', sentinel: 'MCPs\\compatibility-review.md' },
+      { key: 'portable-git', prefix: 'mingit', sentinel: 'mingit\\usr\\bin\\bash.exe' },
+      { key: 'python', prefix: 'python-win', sentinel: 'python-win\\python.exe' },
+      {
+        key: 'skill-python',
+        prefix: 'skill-python',
+        sentinel: 'skill-python\\layers\\shared\\Scripts\\python.exe',
+      },
+      { key: 'uv', prefix: 'uv-win', sentinel: 'uv-win\\uv.exe' },
     ]);
   });
 
@@ -140,7 +153,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(14);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(11);
   });
 
   test('records optional local inference intent via an options checkbox instead of a popup', () => {
@@ -150,7 +163,9 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('${NSD_CreateCheckbox}');
     expect(installerScript).toContain('LocalInferencePageCreate');
     expect(installerScript).toContain('LocalInferencePageLeave');
-    expect(installerScript).toContain('Page custom LocalInferencePageCreate LocalInferencePageLeave');
+    expect(installerScript).toContain(
+      'Page custom LocalInferencePageCreate LocalInferencePageLeave',
+    );
     expect(installerScript).toContain('!ifndef BUILD_UNINSTALLER');
     expect(installerScript.indexOf('!ifndef BUILD_UNINSTALLER')).toBeLessThan(
       installerScript.indexOf('Var /GLOBAL installLocalInference'),
