@@ -26,7 +26,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-2.5">
+    <div className="flex items-center justify-center gap-2 overflow-x-auto px-1 pb-1 sm:overflow-visible sm:px-0 sm:pb-0 sm:[&>*]:shrink-0">
       {actions.map(action => {
         const IconComponent = iconMap[action.icon];
 
@@ -36,7 +36,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ actions, onActionSelect
             type="button"
             variant="outline"
             onClick={() => onActionSelect(action.id)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ease-out bg-surface border-border text-muted-foreground hover:bg-surface-raised hover:border-primary/40"
+            className="flex items-center gap-2 px-3 py-2 whitespace-nowrap rounded-lg text-sm font-medium transition-colors duration-200 ease-out bg-surface border-border text-muted-foreground hover:bg-surface-raised hover:border-primary/40"
           >
             {IconComponent && <IconComponent className="w-4 h-4 text-muted-foreground" />}
             <span>{action.label}</span>
