@@ -143,11 +143,15 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(14);
   });
 
-  test('records optional local inference intent without downloading in NSIS', () => {
+  test('records optional local inference intent via an options checkbox instead of a popup', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
 
     expect(installerScript).toContain('pending-local-inference-install');
-    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
+    expect(installerScript).toContain('${NSD_CreateCheckbox}');
+    expect(installerScript).toContain('LocalInferencePageCreate');
+    expect(installerScript).toContain('LocalInferencePageLeave');
+    expect(installerScript).toContain('Page custom LocalInferencePageCreate LocalInferencePageLeave');
+    expect(installerScript).not.toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
     expect(installerScript).not.toContain('install-llamacpp-backend-nsis.cjs');
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
   });

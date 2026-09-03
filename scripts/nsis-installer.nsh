@@ -1,7 +1,14 @@
 !include "FileFunc.nsh"
+!include "LogicLib.nsh"
+!include "nsDialogs.nsh"
 
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+
+Var /GLOBAL installLocalInference
+Var /GLOBAL localInferenceDialog
+Var /GLOBAL localInferenceCheckbox
+Var /GLOBAL localInferenceLabel
 
 !macro OpenTimingLogForAppend HANDLE
   ; NSIS append mode preserves existing data but starts at offset zero.
@@ -44,6 +51,33 @@
   !define MUI_WELCOMEPAGE_TITLE "欢迎使用知远智能体"
   !define MUI_WELCOMEPAGE_TEXT "知远智能体是面向真实工作的 AI 工作台。安装程序将为你准备完整的离线运行环境；本地推理组件可在应用启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
   !insertmacro MUI_PAGE_WELCOME
+!macroend
+
+Function LocalInferencePageCreate
+  !insertmacro MUI_HEADER_TEXT "本地推理组件" "选择是否在安装完成后准备本地推理环境"
+  nsDialogs::Create 1018
+  Pop $localInferenceDialog
+  ${If} $localInferenceDialog == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 48u "知远支持在本地运行推理模型。开启后，首次启动时会根据硬件下载 CPU 或 NVIDIA CUDA 后端（约 16 MB–621 MB）。$\r$\n$\r$\n不勾选不会影响其他功能。"
+  Pop $localInferenceLabel
+
+  ${NSD_CreateCheckbox} 0 80u 100% 12u "安装本地推理组件"
+  Pop $localInferenceCheckbox
+  ; Preserve the previous MessageBox default (No) by leaving the box unchecked.
+  ${NSD_SetState} $localInferenceCheckbox ${BST_UNCHECKED}
+
+  nsDialogs::Show
+FunctionEnd
+
+Function LocalInferencePageLeave
+  ${NSD_GetState} $localInferenceCheckbox $installLocalInference
+FunctionEnd
+
+!macro customPageAfterChangeDir
+  Page custom LocalInferencePageCreate LocalInferencePageLeave
 !macroend
 
 !macro customInit
@@ -476,16 +510,15 @@
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
   VcRuntimeReady:
 
-  ; Local inference remains optional. The installer records only an intent;
-  ; download, verification, extraction, cancellation and retry happen in-app.
-  IfSilent LocalInferencePromptDone 0
+  ; Local inference remains optional. The user chose on the custom options page
+  ; whether to prepare it; download, verification, extraction, cancellation and
+  ; retry happen in-app.
   Delete "$APPDATA\ZhiYuanAgent\pending-local-inference-install"
-  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "是否在启动知远后安装本地推理组件？$\r$\n$\r$\n知远会根据硬件推荐 CPU 或 NVIDIA CUDA 后端，需额外下载约 16 MB–621 MB。下载将在应用内显示进度并可取消；选择“否”不影响其他功能。" IDYES RecordLocalInferenceIntent IDNO LocalInferencePromptDone
-  RecordLocalInferenceIntent:
+  ${If} $installLocalInference == 1
     FileOpen $2 "$APPDATA\ZhiYuanAgent\pending-local-inference-install" w
     FileWrite $2 "$R1"
     FileClose $2
-  LocalInferencePromptDone:
+  ${EndIf}
 
   ; Cleanup begins only after core application and runtime links are ready, so
   ; it no longer competes with resource expansion on slow disks.
