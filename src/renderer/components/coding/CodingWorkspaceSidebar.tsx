@@ -326,6 +326,8 @@ export const CodingWorkspaceSidebar = ({
         description={i18nService.t('codingWorkspaceRemoveConfirm')}
         cancelLabel={i18nService.t('codingWorkspaceCancel')}
         confirmLabel={i18nService.t('codingWorkspaceRemove')}
+        cancelVariant="outline"
+        confirmVariant="outline"
         onCancel={() => setRemovingWorkspace(null)}
         onConfirm={() => void removeWorkspace()}
       />
@@ -335,6 +337,8 @@ export const CodingWorkspaceSidebar = ({
         description={i18nService.t('codingSessionRemoveConfirm')}
         cancelLabel={i18nService.t('codingWorkspaceCancel')}
         confirmLabel={i18nService.t('codingSessionRemove')}
+        cancelVariant="outline"
+        confirmVariant="outline"
         onCancel={() => setRemovingSession(null)}
         onConfirm={() => void removeSession()}
       />

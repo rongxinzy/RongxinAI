@@ -60,7 +60,7 @@ export function ModelCapabilitiesFields({
 
   return (
     <div className="rounded-lg border border-border bg-surface-raised p-3">
-      <div className="mb-3 grid grid-cols-2 gap-3">
+      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm text-foreground">
           <span>{i18nService.t('modelContextWindowK')}</span>
           <Input
@@ -84,7 +84,7 @@ export function ModelCapabilitiesFields({
           />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {fields.map(field => {
           const status = capabilities[field.key] ?? ModelCapabilityStatus.Unknown;
           const editable = editableCapabilities
