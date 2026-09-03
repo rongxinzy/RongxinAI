@@ -26,10 +26,13 @@ interface CodingComposerProps {
   configOptions: CodingAgentConfigOption[];
   disabled: boolean;
   isRunning: boolean;
+  isSubmitting?: boolean;
+  hasError?: boolean;
   prompt: string;
   recipientName: string;
   showRecipient?: boolean;
   leadingTools?: ReactNode;
+  statusNotice?: ReactNode;
   sessionId?: string;
   queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'>;
   onChange: (value: string) => void;
@@ -45,10 +48,13 @@ export const CodingComposer = ({
   configOptions,
   disabled,
   isRunning,
+  isSubmitting = false,
+  hasError = false,
   prompt,
   recipientName,
   showRecipient = true,
   leadingTools,
+  statusNotice,
   sessionId,
   queueService,
   onChange,
@@ -102,6 +108,7 @@ export const CodingComposer = ({
   return (
     <div className="px-4 pt-2 pb-4">
       <div className="relative mx-auto max-w-5xl">
+        {statusNotice}
         {sessionId ? (
           <PendingMessageQueue sessionId={sessionId} isStreaming={isRunning} queueService={queueService} />
         ) : null}
@@ -117,7 +124,7 @@ export const CodingComposer = ({
           className="input-aura rounded-3xl shadow-elevated transition-shadow **:data-[slot=input-group]:rounded-3xl"
           onSubmit={(_message, event) => {
             event.preventDefault();
-            if (!disabled && prompt.trim()) onSend();
+            if (!disabled && !isSubmitting && prompt.trim()) onSend();
           }}
         >
           <PromptInputBody>
@@ -199,9 +206,17 @@ export const CodingComposer = ({
               />
             </PromptInputTools>
             <PromptInputSubmit
-              status={isRunning ? CodingComposerStatus.Streaming : undefined}
-              onStop={onStop}
-              disabled={disabled || (!isRunning && !prompt.trim())}
+              status={
+                isRunning
+                  ? CodingComposerStatus.Streaming
+                  : isSubmitting
+                    ? CodingComposerStatus.Submitted
+                    : hasError
+                      ? CodingComposerStatus.Error
+                      : undefined
+              }
+              onStop={isRunning ? onStop : undefined}
+              disabled={disabled || isSubmitting || (!isRunning && !prompt.trim())}
               aria-label={
                 isRunning ? i18nService.t('codingAgentStop') : i18nService.t('codingAgentSend')
               }

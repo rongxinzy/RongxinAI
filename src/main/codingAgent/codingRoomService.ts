@@ -390,6 +390,14 @@ export class CodingRoomService extends EventEmitter {
   async startSession(input: StartCodingSessionInput): Promise<CodingRoomSnapshot> {
     const prompt = input.prompt.trim();
     if (!prompt) throw new Error('Prompt is required.');
+    const selectedProfile = this.registry.get(input.profileId);
+    if (
+      selectedProfile &&
+      selectedProfile.driverKind === CodingAgentDriverKind.Acp &&
+      selectedProfile.status === CodingAgentProfileStatus.Detected
+    ) {
+      await this.registry.probe(selectedProfile.id, input.sourceRoot);
+    }
     const prepared = await prepareCodingSession({
       request: input,
       prompt,
