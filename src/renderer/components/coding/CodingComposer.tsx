@@ -34,7 +34,10 @@ interface CodingComposerProps {
   leadingTools?: ReactNode;
   statusNotice?: ReactNode;
   sessionId?: string;
-  queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'>;
+  queueService?: Pick<
+    typeof coworkQueueService,
+    'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'
+  >;
   onChange: (value: string) => void;
   onConfigOptionChange: (optionId: string, value: string | boolean) => void;
   onSend: () => void;
@@ -122,7 +125,11 @@ export const CodingComposer = ({
       <div className="relative mx-auto max-w-5xl">
         {statusNotice}
         {sessionId ? (
-          <PendingMessageQueue sessionId={sessionId} isStreaming={isRunning} queueService={queueService} />
+          <PendingMessageQueue
+            sessionId={sessionId}
+            isStreaming={isRunning}
+            queueService={queueService}
+          />
         ) : null}
         {commandMenuOpen ? (
           <CodingSlashCommandMenu
@@ -217,6 +224,7 @@ export const CodingComposer = ({
               <CodingComposerConfigControls
                 options={configOptions}
                 onChange={onConfigOptionChange}
+                compact={isTightToolbar}
               />
             </PromptInputTools>
             <PromptInputSubmit

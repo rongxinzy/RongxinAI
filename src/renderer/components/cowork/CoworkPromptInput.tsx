@@ -1303,42 +1303,57 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                 </>
               )}
             </PromptInputTools>
-            {!isCompactToolbar && isPlusToolbar && (showLocalThinkingToggle || showModelSelector) && (
-              <div className="flex items-center gap-1.5">
-                {!isWorkVariant && (
-                  <LocalThinkingToggle
-                    model={effectiveSelectedModel}
-                    visible={showLocalThinkingToggle}
-                    enabled={localThinkingEnabled}
-                    disabled={disabled || isStreaming}
-                    onEnabledChange={onLocalThinkingEnabledChange}
-                  />
-                )}
-                {showModelSelector && (
-                  <>
-                    <ContextUsageIndicator
-                      usage={contextUsage}
-                      messageUsage={contextMessage?.metadata?.usage}
-                      modelId={contextMessage?.metadata?.model}
-                      modelProviderKey={contextMessage?.metadata?.modelProviderKey}
-                      selectedModelId={effectiveSelectedModel?.id}
-                      selectedModelProviderKey={effectiveSelectedModel?.providerKey}
-                      messages={currentSession?.messages}
-                      systemPrompt={currentSession?.systemPrompt}
+            {isPlusToolbar &&
+              (showLocalThinkingToggle ||
+                showModelSelector ||
+                (isCompactToolbar && isWorkVariant)) && (
+                <div className="flex items-center gap-1.5">
+                  {!isWorkVariant && showLocalThinkingToggle && (
+                    <LocalThinkingToggle
+                      model={effectiveSelectedModel}
+                      visible={showLocalThinkingToggle}
+                      enabled={localThinkingEnabled}
+                      disabled={disabled || isStreaming}
+                      onEnabledChange={onLocalThinkingEnabledChange}
+                      compact={isCompactToolbar}
                     />
-                    <CoworkModelPicker
-                      models={availableModels}
-                      selectedModel={effectiveSelectedModel}
-                      open={modelSelectorOpen}
-                      onOpenChange={setModelSelectorOpen}
-                      onSelect={model => {
-                        void handleModelSelect(model);
-                      }}
+                  )}
+                  {showModelSelector && (
+                    <>
+                      {!isCompactToolbar && (
+                        <ContextUsageIndicator
+                          usage={contextUsage}
+                          messageUsage={contextMessage?.metadata?.usage}
+                          modelId={contextMessage?.metadata?.model}
+                          modelProviderKey={contextMessage?.metadata?.modelProviderKey}
+                          selectedModelId={effectiveSelectedModel?.id}
+                          selectedModelProviderKey={effectiveSelectedModel?.providerKey}
+                          messages={currentSession?.messages}
+                          systemPrompt={currentSession?.systemPrompt}
+                        />
+                      )}
+                      <CoworkModelPicker
+                        models={availableModels}
+                        selectedModel={effectiveSelectedModel}
+                        open={modelSelectorOpen}
+                        onOpenChange={setModelSelectorOpen}
+                        onSelect={model => {
+                          void handleModelSelect(model);
+                        }}
+                        compact={isCompactToolbar}
+                      />
+                    </>
+                  )}
+                  {isCompactToolbar && isWorkVariant && (
+                    <PermissionModeMenu
+                      value={permissionMode ?? CoworkPermissionMode.Ask}
+                      onChange={mode => onPermissionModeChange?.(mode)}
+                      disabled={disabled}
+                      compact
                     />
-                  </>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
             <PromptInputSubmit
               disabled={sessionContextPending}
               status={isStreaming ? 'streaming' : 'ready'}

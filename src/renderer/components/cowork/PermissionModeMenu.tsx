@@ -16,6 +16,7 @@ interface PermissionModeMenuProps {
   value: CoworkPermissionMode;
   onChange: (mode: CoworkPermissionMode) => void;
   disabled?: boolean;
+  compact?: boolean;
 }
 
 const PERMISSION_MODE_LABEL_KEYS = {
@@ -31,6 +32,7 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
   value,
   onChange,
   disabled = false,
+  compact = false,
 }) => {
   const TriggerIcon = value === CoworkPermissionMode.Ask ? ShieldCheck : ShieldAlert;
 
@@ -42,10 +44,11 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
         render={
           <PromptInputButton
             disabled={disabled}
-            className="sidebar-interactive-surface gap-1 px-2 text-sm hover:shadow-subtle data-popup-open:shadow-subtle"
+            aria-label={i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}
+            className={compact ? 'gap-1 px-2' : 'sidebar-interactive-surface gap-1 px-2 text-sm'}
           >
             <TriggerIcon className="size-4 text-foreground" />
-            <span>{i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}</span>
+            {!compact && <span>{i18nService.t(PERMISSION_MODE_LABEL_KEYS[value])}</span>}
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </PromptInputButton>
         }
