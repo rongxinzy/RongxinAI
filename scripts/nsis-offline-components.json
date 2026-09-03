@@ -1,9 +1,17 @@
 [
-  { "key": "channel-runtime", "prefix": "channel-runtime" },
-  { "key": "skills", "prefix": "SKILLs" },
-  { "key": "mcps", "prefix": "MCPs" },
-  { "key": "portable-git", "prefix": "mingit" },
-  { "key": "python", "prefix": "python-win" },
-  { "key": "skill-python", "prefix": "skill-python" },
-  { "key": "uv", "prefix": "uv-win" }
+  {
+    "key": "channel-runtime",
+    "prefix": "channel-runtime",
+    "sentinel": "channel-runtime\\cc-connect-sidecar.exe"
+  },
+  { "key": "skills", "prefix": "SKILLs", "sentinel": "SKILLs\\skills.config.json" },
+  { "key": "mcps", "prefix": "MCPs", "sentinel": "MCPs\\compatibility-review.md" },
+  { "key": "portable-git", "prefix": "mingit", "sentinel": "mingit\\usr\\bin\\bash.exe" },
+  { "key": "python", "prefix": "python-win", "sentinel": "python-win\\python.exe" },
+  {
+    "key": "skill-python",
+    "prefix": "skill-python",
+    "sentinel": "skill-python\\layers\\shared\\Scripts\\python.exe"
+  },
+  { "key": "uv", "prefix": "uv-win", "sentinel": "uv-win\\uv.exe" }
 ]
