@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
-  [ValidateSet('add-defender-exclusion', 'remove-defender-exclusion', 'install-vc-runtime')]
+  [ValidateSet('install-vc-runtime')]
   [string]$Action,
 
   [Parameter(Mandatory = $true)]
@@ -34,12 +34,6 @@ try {
   $exitCode = 0
 
   switch ($Action) {
-    'add-defender-exclusion' {
-      Add-MpPreference -ExclusionPath $Target -ErrorAction Stop
-    }
-    'remove-defender-exclusion' {
-      Remove-MpPreference -ExclusionPath $Target -ErrorAction Stop
-    }
     'install-vc-runtime' {
       if (-not (Test-Path -LiteralPath $Target -PathType Leaf)) {
         throw "VC++ runtime installer is missing: $Target"

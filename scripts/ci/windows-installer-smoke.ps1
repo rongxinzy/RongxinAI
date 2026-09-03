@@ -102,7 +102,6 @@ $installer = $installers[0].FullName
 $installRoot = Join-Path $env:LOCALAPPDATA 'Programs\zhiyuan-agent'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'ZhiYuanAgent\runtimes'
 $timingLog = Join-Path $env:APPDATA 'ZhiYuanAgent\install-timing.log'
-$managedDefenderMarker = Join-Path $env:APPDATA 'ZhiYuanAgent\defender-exclusion-managed'
 $componentKeys = @('channel-runtime', 'skills', 'mcps', 'portable-git', 'python', 'skill-python', 'uv')
 
 try {
@@ -122,12 +121,6 @@ try {
   }
   if ($coldLog -notmatch 'phase=install-complete .*component_set=ready') {
     throw 'Cold installation did not record a ready component set'
-  }
-  if ($coldLog -notmatch 'phase=defender-exclusion-skipped-silent') {
-    throw 'CI silent installation unexpectedly entered the interactive Defender flow'
-  }
-  if (Test-Path -LiteralPath $managedDefenderMarker) {
-    throw 'CI silent installation must not create a managed Defender exclusion marker'
   }
 
   foreach ($key in $componentKeys) {

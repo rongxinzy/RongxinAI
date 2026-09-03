@@ -1,7 +1,18 @@
 !include "FileFunc.nsh"
+!include "LogicLib.nsh"
+!include "nsDialogs.nsh"
 
 !define ELEVATED_ACTION_SCRIPT "nsis-elevated-actions.ps1"
 !define ELEVATED_ACTION_RESULT "elevated-action-result.txt"
+
+; electron-builder compiles the uninstaller before the installer. Its assisted
+; template does not insert installation pages while BUILD_UNINSTALLER is set,
+; so keep the page state and callbacks out of that compilation pass.
+!ifndef BUILD_UNINSTALLER
+Var /GLOBAL installLocalInference
+Var /GLOBAL localInferenceDialog
+Var /GLOBAL localInferenceCheckbox
+Var /GLOBAL localInferenceLabel
 
 !macro OpenTimingLogForAppend HANDLE
   ; NSIS append mode preserves existing data but starts at offset zero.
@@ -31,16 +42,57 @@
 !macro customHeader
   ManifestDPIAware true
   ; The application and immutable runtime cache are per-user. Elevated helper
-  ; processes are used only for optional Windows-wide settings below.
+  ; processes are used only for the VC++ runtime installer below.
   RequestExecutionLevel user
   ShowInstDetails nevershow
+  ; NSIS startup CRC check reads the entire installer before the UI appears.
+  ; Every payload is already covered by per-component SHA-256 and 7z CRC, so
+  ; the extra full-file scan is redundant and slow for a multi-gigabyte exe.
+  CRCCheck off
 !macroend
 
 !macro customWelcomePage
   !define MUI_WELCOMEPAGE_TITLE "欢迎使用知远智能体"
-  !define MUI_WELCOMEPAGE_TEXT "知远智能体是面向真实工作的 AI 工作台。安装程序将为你准备完整的离线运行环境；本地推理组件可在应用启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
+  !define MUI_WELCOMEPAGE_TEXT "安装程序将在本地准备离线运行环境，完成后即可使用。本地推理组件可在首次启动后按需下载。$\r$\n$\r$\n点击“下一步”继续。"
   !insertmacro MUI_PAGE_WELCOME
 !macroend
+
+Function LocalInferencePageCreate
+  ; electron-builder prepends this script before installer.nsi includes
+  ; MUI2.nsh, so the MUI_HEADER_TEXT macro is undefined at compile time.
+  ; Set the standard MUI header controls (IDs 1037/1038) directly instead.
+  GetDlgItem $0 $HWNDPARENT 1037
+  SendMessage $0 ${WM_SETTEXT} 0 "STR:本地推理组件"
+  GetDlgItem $0 $HWNDPARENT 1038
+  SendMessage $0 ${WM_SETTEXT} 0 "STR:按需启用本地模型推理"
+  nsDialogs::Create 1018
+  Pop $localInferenceDialog
+  ${If} $localInferenceDialog == error
+    Abort
+  ${EndIf}
+
+  ${NSD_CreateLabel} 0 0 100% 32u "开启后，首次启动时会根据你的硬件下载 CPU 或 NVIDIA CUDA 后端（约 16 MB–621 MB）。"
+  Pop $localInferenceLabel
+
+  ${NSD_CreateLabel} 0 36u 100% 16u "不勾选不会影响其他功能。"
+  Pop $localInferenceLabel
+
+  ${NSD_CreateCheckbox} 0 80u 100% 12u "安装本地推理组件"
+  Pop $localInferenceCheckbox
+  ; Preserve the previous MessageBox default (No) by leaving the box unchecked.
+  ${NSD_SetState} $localInferenceCheckbox ${BST_UNCHECKED}
+
+  nsDialogs::Show
+FunctionEnd
+
+Function LocalInferencePageLeave
+  ${NSD_GetState} $localInferenceCheckbox $installLocalInference
+FunctionEnd
+
+!macro customPageAfterChangeDir
+  Page custom LocalInferencePageCreate LocalInferencePageLeave
+!macroend
+!endif
 
 !macro customInit
   SetDetailsPrint textonly
@@ -117,149 +169,44 @@
   FileClose $8
 !macroend
 
-!macro EnsureOfflineComponent TOKEN KEY PREFIX SENTINEL LABEL
-  DetailPrint "[Installer] Checking ${LABEL}"
-  System::Call 'kernel32::GetTickCount()i .r7'
+!macro StageOfflineComponentMetadata KEY
   SetOutPath "$PLUGINSDIR"
   File /oname=component-${KEY}.version "${PROJECT_DIR}\build-tar\windows-components\${KEY}.version"
   File /oname=component-${KEY}.sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sha256"
   File /oname=component-${KEY}.sentinel-sha256 "${PROJECT_DIR}\build-tar\windows-components\${KEY}.sentinel-sha256"
+!macroend
 
-  FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
-  IfErrors ComponentVersionInvalid_${TOKEN}
-  FileRead $2 $R1
-  FileClose $2
-  StrCpy $R1 $R1 64
-  StrLen $R5 $R1
-  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
-
-  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sha256" r
-  IfErrors ComponentVersionInvalid_${TOKEN}
-  FileRead $2 $R4
-  FileClose $2
-  StrCpy $R4 $R4 64
-  StrLen $R5 $R4
-  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
-
-  FileOpen $2 "$PLUGINSDIR\component-${KEY}.sentinel-sha256" r
-  IfErrors ComponentVersionInvalid_${TOKEN}
-  FileRead $2 $R6
-  FileClose $2
-  StrCpy $R6 $R6 64
-  StrLen $R5 $R6
-  IntCmp $R5 64 0 ComponentVersionInvalid_${TOKEN} ComponentVersionInvalid_${TOKEN}
-
-  StrCpy $R2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1"
-  IfFileExists "$R2\.complete" 0 ComponentCacheMiss_${TOKEN}
-  FileOpen $2 "$R2\.complete" r
-  IfErrors ComponentCacheMiss_${TOKEN}
-  FileRead $2 $R5
-  FileClose $2
-  StrCpy $R5 $R5 64
-  StrCmp $R5 $R1 0 ComponentCacheMiss_${TOKEN}
-  IfFileExists "$R2\${SENTINEL}" 0 ComponentCacheMiss_${TOKEN}
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R2\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
-  Pop $0
-  Pop $1
-  StrCmp $0 "0" 0 ComponentCacheMiss_${TOKEN}
-  StrCpy $1 $1 64
-  StrCmp $1 $R6 ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
-
+!macro QueueOfflineComponent TOKEN KEY LABEL
+  DetailPrint "[Installer] Checking ${LABEL}"
+  System::Call 'kernel32::GetTickCount()i .r7'
+  IfFileExists "$PLUGINSDIR\component-${KEY}.cache-valid" ComponentCacheHit_${TOKEN} ComponentCacheMiss_${TOKEN}
   ComponentCacheHit_${TOKEN}:
     DetailPrint "[Installer] Reusing ${LABEL}"
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-cache-hit component=${KEY} content_id=$R1$\r$\n"
+    FileWrite $2 "phase=component-cache-hit component=${KEY}$\r$\n"
     FileClose $2
-    Goto ComponentReady_${TOKEN}
+    Goto ComponentQueued_${TOKEN}
 
   ComponentCacheMiss_${TOKEN}:
     DetailPrint "[Installer] Expanding ${LABEL}"
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-cache-miss component=${KEY} content_id=$R1$\r$\n"
+    FileWrite $2 "phase=component-cache-miss component=${KEY}$\r$\n"
     FileClose $2
-    StrCpy $R3 "$LOCALAPPDATA\ZhiYuanAgent\runtimes\${KEY}\$R1.installing"
-    RMDir /r "$R3"
-    CreateDirectory "$R3"
     SetOutPath "$PLUGINSDIR"
     SetCompress off
     File /oname=component-${KEY}.7z "${PROJECT_DIR}\build-tar\windows-components\${KEY}.7z"
     SetCompress auto
+  ComponentQueued_${TOKEN}:
+!macroend
 
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.7z\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" 0 ComponentHashFailed_${TOKEN}
-    StrCpy $1 $1 64
-    StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
-
-    ; Validate every archive entry before extraction. Keep the parser in a
-    ; standalone script so PowerShell path semantics are not changed by NSIS quoting.
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-component-archive.ps1" -ArchivePath "$PLUGINSDIR\component-${KEY}.7z" -SevenZipPath "$PLUGINSDIR\7za.exe" -Prefix "${PREFIX}"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
-
-    nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
-    IntCmp $0 0 ComponentExtracted_${TOKEN} ComponentExtractFailed_${TOKEN} ComponentExtractFailed_${TOKEN}
-
-  ComponentHashFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
+!macro RecordOfflineComponentReady KEY
+  FileOpen $2 "$PLUGINSDIR\component-${KEY}.version" r
+  IfErrors OfflineComponentInstallFailed
+  FileRead $2 $R1
+  FileClose $2
+  StrCpy $R1 $R1 64
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 actual=$1 exit=$0$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentExtractFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentArchiveUnsafe_${TOKEN}:
-    StrCpy $R9 "${LABEL} archive contains an unsafe path or link metadata."
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-archive-unsafe component=${KEY} exit=$0 output=$1$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentExtracted_${TOKEN}:
-    IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "0" 0 ComponentVerificationFailed_${TOKEN}
-    StrCpy $1 $1 64
-    StrCmp $1 $R6 0 ComponentVerificationFailed_${TOKEN}
-    FileOpen $2 "$R3\.complete" w
-    FileWrite $2 "$R1|$R4"
-    FileClose $2
-    RMDir /r "$R2"
-    Rename "$R3" "$R2"
-    IfErrors ComponentCommitFailed_${TOKEN}
-    Delete "$PLUGINSDIR\component-${KEY}.7z"
-    Goto ComponentReady_${TOKEN}
-
-  ComponentVerificationFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 健康检查失败，${SENTINEL} 缺失或校验不匹配。"
-    Goto OfflineComponentInstallFailed
-
-  ComponentCommitFailed_${TOKEN}:
-    StrCpy $R9 "无法启用 ${LABEL}，请确认当前用户对 %LOCALAPPDATA%\ZhiYuanAgent 有写入权限。"
-    Goto OfflineComponentInstallFailed
-
-  ComponentVersionInvalid_${TOKEN}:
-    StrCpy $R9 "安装包缺少 ${LABEL} 的有效版本或校验信息。"
-    Goto OfflineComponentInstallFailed
-
-  ComponentReady_${TOKEN}:
-    System::Call 'kernel32::GetTickCount()i .r6'
-    IntOp $R5 $6 - $7
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 elapsed_ms=$R5$\r$\n"
+  FileWrite $2 "phase=component-ready component=${KEY} content_id=$R1 validation=batch$\r$\n"
     FileClose $2
 !macroend
 
@@ -272,7 +219,7 @@
   File /oname=7za.sha256 "${PROJECT_DIR}\build-tar\windows-components\7za.sha256"
   File /oname=component-manifest.json "${PROJECT_DIR}\build-tar\windows-components\manifest.json"
   File /oname=recover-component-switch.ps1 "${PROJECT_DIR}\scripts\installer\recover-component-switch.ps1"
-  File /oname=validate-component-archive.ps1 "${PROJECT_DIR}\scripts\installer\validate-component-archive.ps1"
+  File /oname=validate-offline-components.ps1 "${PROJECT_DIR}\scripts\installer\validate-offline-components.ps1"
   ; Embed the routing table as a compile-time asset. Building it incrementally
   ; with NSIS FileWrite can split the skill-python key on Windows runners.
   File /oname=component-targets.json "${PROJECT_DIR}\scripts\nsis-offline-components.json"
@@ -294,70 +241,68 @@
   Pop $1
   StrCmp $0 "0" 0 OfflineComponentInstallFailed
 
-  ; Defender exclusion is optional and requires explicit, informed consent.
-  ; Keep the scope limited to the immutable component cache; never exclude
-  ; user-created Skills, channel state, model data, or the full install tree.
-  DetailPrint "[Installer] Checking Microsoft Defender exclusion"
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    try {\
-      $$excluded = @((Get-MpPreference -ErrorAction Stop).ExclusionPath);\
-      if ($$excluded -contains $$runtimeRoot) { exit 0 }\
-    } catch { };\
-    exit 3"'
+  !insertmacro StageOfflineComponentMetadata "channel-runtime"
+  !insertmacro StageOfflineComponentMetadata "skills"
+  !insertmacro StageOfflineComponentMetadata "mcps"
+  !insertmacro StageOfflineComponentMetadata "portable-git"
+  !insertmacro StageOfflineComponentMetadata "python"
+  !insertmacro StageOfflineComponentMetadata "skill-python"
+  !insertmacro StageOfflineComponentMetadata "uv"
+
+  ; Verify all reusable cache entries in one PowerShell process before deciding
+  ; which archives NSIS needs to unpack from the installer.
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode cache -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe"'
   Pop $0
   Pop $1
-  StrCmp $0 "0" DefenderExclusionAlreadyActive
-  IfSilent DefenderExclusionSkipped
-  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1 "是否允许将知远的离线运行环境加入 Microsoft Defender 排除项？$\r$\n$\r$\n这样可以显著减少大量小文件在首次解压和后续运行时的扫描开销，但该目录中的文件将不再接受 Defender 实时扫描。设置会持续到卸载知远，你也可以随时在 Windows 安全中心撤销。$\r$\n$\r$\n目录：%LOCALAPPDATA%\ZhiYuanAgent\runtimes$\r$\n$\r$\n开源版推荐选择“是”；如不希望修改 Defender 设置，请选择“否”。" IDYES EnableDefenderExclusion IDNO DefenderExclusionDeclined
+  StrCmp $0 "0" ComponentCacheValidated
+    StrCpy $R9 "安装包缺少有效离线组件校验信息：$1"
+    Goto OfflineComponentInstallFailed
+  ComponentCacheValidated:
 
-  EnableDefenderExclusion:
-    DetailPrint "[Installer] Adding user-approved Defender exclusion"
-    !insertmacro RunElevatedAction ADD_DEFENDER add-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-    StrCmp $0 "0" DefenderExclusionEnabled
-      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-      !insertmacro OpenTimingLogForAppend $2
-      FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
-      FileClose $2
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加。可能是你取消了管理员授权，或系统安全策略不允许修改。知远仍会继续安装。"
-      Goto DefenderExclusionDone
+  !insertmacro QueueOfflineComponent CHANNEL_RUNTIME "channel-runtime" "频道运行环境"
+  !insertmacro QueueOfflineComponent SKILLS "skills" "内置 Skills"
+  !insertmacro QueueOfflineComponent MCPS "mcps" "内置 MCPs"
+  !insertmacro QueueOfflineComponent PORTABLE_GIT "portable-git" "PortableGit"
+  !insertmacro QueueOfflineComponent PYTHON "python" "Python 离线运行环境"
+  !insertmacro QueueOfflineComponent SKILL_PYTHON "skill-python" "Skill Python dependency layer"
+  !insertmacro QueueOfflineComponent UV "uv" "uv 离线运行环境"
 
-  DefenderExclusionEnabled:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" w
-    FileWrite $2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-    FileClose $2
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-enabled path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
-    FileClose $2
-    Goto DefenderExclusionDone
+  ; The changed archives are now present in $PLUGINSDIR. Validate their hashes,
+  ; entries and sentinels, then extract them in one PowerShell batch. This keeps
+  ; cache hits fast while eliminating a PowerShell startup per component.
+  DetailPrint "[Installer] Validating and expanding offline components"
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-offline-components.ps1" -Mode expand -PluginDir "$PLUGINSDIR" -RuntimeRoot "$LOCALAPPDATA\ZhiYuanAgent\runtimes" -ComponentTargetsPath "$PLUGINSDIR\component-targets.json" -SevenZipPath "$PLUGINSDIR\7za.exe"'
+  Pop $0
+  Pop $1
+  StrCmp $0 "0" ComponentBatchExpanded
+  StrCmp $0 "2" ComponentBatchHashFailed
+  StrCmp $0 "3" ComponentBatchArchiveUnsafe
+  StrCmp $0 "4" ComponentBatchExtractFailed
+  StrCmp $0 "5" ComponentBatchVerificationFailed
+    StrCpy $R9 "离线组件批处理失败：$1"
+    Goto OfflineComponentInstallFailed
 
-  DefenderExclusionAlreadyActive:
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-already-active path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
-    FileClose $2
-    Goto DefenderExclusionDone
+  ComponentBatchHashFailed:
+    StrCpy $R9 "离线组件归档 SHA-256 校验失败，安装包可能不完整。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchArchiveUnsafe:
+    StrCpy $R9 "离线组件归档包含不安全路径或链接元数据。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchExtractFailed:
+    StrCpy $R9 "离线组件展开失败。请检查磁盘空间或安全软件后重试。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchVerificationFailed:
+    StrCpy $R9 "离线组件健康检查失败，哨兵文件缺失或校验不匹配。"
+    Goto OfflineComponentInstallFailed
+  ComponentBatchExpanded:
 
-  DefenderExclusionDeclined:
-    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-declined$\r$\n"
-    FileClose $2
-    Goto DefenderExclusionDone
-
-  DefenderExclusionSkipped:
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-skipped-silent$\r$\n"
-    FileClose $2
-
-  DefenderExclusionDone:
-
-  !insertmacro EnsureOfflineComponent CHANNEL_RUNTIME "channel-runtime" "channel-runtime" "channel-runtime\cc-connect-sidecar.exe" "频道运行环境"
-  !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
-  !insertmacro EnsureOfflineComponent MCPS "mcps" "MCPs" "MCPs\compatibility-review.md" "内置 MCPs"
-  !insertmacro EnsureOfflineComponent PORTABLE_GIT "portable-git" "mingit" "mingit\usr\bin\bash.exe" "PortableGit"
-  !insertmacro EnsureOfflineComponent PYTHON "python" "python-win" "python-win\python.exe" "Python 离线运行环境"
-  !insertmacro EnsureOfflineComponent SKILL_PYTHON "skill-python" "skill-python" "skill-python\layers\shared\Scripts\python.exe" "Skill Python dependency layer"
-  !insertmacro EnsureOfflineComponent UV "uv" "uv-win" "uv-win\uv.exe" "uv 离线运行环境"
+  !insertmacro RecordOfflineComponentReady "channel-runtime"
+  !insertmacro RecordOfflineComponentReady "skills"
+  !insertmacro RecordOfflineComponentReady "mcps"
+  !insertmacro RecordOfflineComponentReady "portable-git"
+  !insertmacro RecordOfflineComponentReady "python"
+  !insertmacro RecordOfflineComponentReady "skill-python"
+  !insertmacro RecordOfflineComponentReady "uv"
 
   DetailPrint "[Installer] Activating offline components"
   nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
@@ -532,16 +477,15 @@
       MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Visual C++ Runtime 未能自动安装。知远仍会完成安装，但部分本地组件可能暂时不可用。"
   VcRuntimeReady:
 
-  ; Local inference remains optional. The installer records only an intent;
-  ; download, verification, extraction, cancellation and retry happen in-app.
-  IfSilent LocalInferencePromptDone 0
+  ; Local inference remains optional. The user chose on the custom options page
+  ; whether to prepare it; download, verification, extraction, cancellation and
+  ; retry happen in-app.
   Delete "$APPDATA\ZhiYuanAgent\pending-local-inference-install"
-  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "是否在启动知远后安装本地推理组件？$\r$\n$\r$\n知远会根据硬件推荐 CPU 或 NVIDIA CUDA 后端，需额外下载约 16 MB–621 MB。下载将在应用内显示进度并可取消；选择“否”不影响其他功能。" IDYES RecordLocalInferenceIntent IDNO LocalInferencePromptDone
-  RecordLocalInferenceIntent:
+  ${If} $installLocalInference == 1
     FileOpen $2 "$APPDATA\ZhiYuanAgent\pending-local-inference-install" w
     FileWrite $2 "$R1"
     FileClose $2
-  LocalInferencePromptDone:
+  ${EndIf}
 
   ; Cleanup begins only after core application and runtime links are ready, so
   ; it no longer competes with resource expansion on slow disks.
@@ -677,12 +621,4 @@
   LegacyRuntimeCleanupDone:
   RMDir "$3"
 
-  ; Remove only exclusions that this installer recorded as user-approved and
-  ; installer-managed. Never remove an exclusion created independently.
-  IfFileExists "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" 0 DefenderExclusionUninstallDone
-    !insertmacro ExtractElevatedActionScript
-    !insertmacro RunElevatedAction REMOVE_DEFENDER remove-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-    StrCmp $0 "0" 0 DefenderExclusionUninstallDone
-      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-  DefenderExclusionUninstallDone:
 !macroend
