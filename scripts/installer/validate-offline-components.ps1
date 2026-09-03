@@ -16,11 +16,11 @@ function Stop-WithCode([int]$Code, [string]$Message) {
 
 function Read-ExpectedHash([string]$Path, [string]$Description) {
   if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
-    throw "Missing $Description: $Path"
+    throw "Missing ${Description}: ${Path}"
   }
   $value = (Get-Content -LiteralPath $Path -Raw -ErrorAction Stop).Trim().ToLowerInvariant()
   if ($value -notmatch '^[0-9a-f]{64}$') {
-    throw "Invalid $Description: $Path"
+    throw "Invalid ${Description}: ${Path}"
   }
   return $value
 }
@@ -33,7 +33,7 @@ function Test-SafeRelativePath([string]$Value, [string]$Description) {
     $normalized -match '(^|/)\.\.(/|$)' -or
     $normalized -match ':'
   ) {
-    throw "Invalid $Description: $Value"
+    throw "Invalid ${Description}: ${Value}"
   }
   return $normalized
 }

@@ -53,6 +53,9 @@ describe('NSIS offline resource and local inference flow', () => {
     const validatorScript = fs.readFileSync(offlineComponentValidatorPath, 'utf8');
 
     expect(validatorScript).toContain("$Value.Replace('\\', '/')");
+    expect(validatorScript).toContain('"Missing ${Description}: ${Path}"');
+    expect(validatorScript).toContain('"Invalid ${Description}: ${Value}"');
+    expect(validatorScript).not.toContain('"Missing $Description: $Path"');
     expect(validatorScript).toContain(
       '$normalizedEntry.StartsWith("$normalizedPrefix/", [System.StringComparison]::Ordinal)',
     );

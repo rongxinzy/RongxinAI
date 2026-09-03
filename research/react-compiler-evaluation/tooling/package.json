@@ -1,0 +1,12 @@
+{
+  "name": "react-compiler-evaluation-tooling",
+  "private": true,
+  "packageManager": "bun@1.4.0",
+  "devDependencies": {
+    "@babel/core": "8.0.1",
+    "@babel/plugin-transform-runtime": "8.0.1",
+    "@babel/runtime": "8.0.0",
+    "@rolldown/plugin-babel": "0.2.3",
+    "babel-plugin-react-compiler": "1.0.0"
+  }
+}

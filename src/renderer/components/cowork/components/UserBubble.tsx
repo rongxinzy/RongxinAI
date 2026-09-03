@@ -80,6 +80,8 @@ export const UserBubble: React.FC<{
   skills: Skill[];
   onReEdit?: (message: CoworkMessage) => void;
 }> = React.memo(({ message, skills, onReEdit }) => {
+  'use memo';
+
   const [isHovered, setIsHovered] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ImagePreviewSource | null>(null);
   const modelLabel = getMessageModelLabel(message.metadata);
