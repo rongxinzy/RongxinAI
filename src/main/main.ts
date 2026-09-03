@@ -7048,6 +7048,10 @@ if (!gotTheLock) {
       console.log(`[Main] Reset ${resetCount} stuck cowork session(s) from running -> idle`);
     }
     activityService ??= new ActivityService(getStore().getDatabase());
+    const recoveredActivityRuns = activityService.recoverInterruptedRuns();
+    if (recoveredActivityRuns > 0) {
+      console.warn(`[Activity] marked ${recoveredActivityRuns} interrupted activity run(s) as failed`);
+    }
     const prunedActivityRuns = activityService.pruneExpired();
     if (prunedActivityRuns > 0) {
       console.log(`[Activity] removed ${prunedActivityRuns} expired activity run(s)`);

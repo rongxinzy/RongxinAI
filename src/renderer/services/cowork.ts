@@ -34,6 +34,7 @@ import {
   updateMessageContents,
   updateToolActivity,
   updateSessionPinned,
+  updateCurrentSessionModelOverride,
   updateSessionStatus,
   updateSessionTitle,
 } from '../store/slices/coworkSlice';
@@ -666,6 +667,7 @@ class CoworkService {
       if (result.session.agentId) {
         store.dispatch(setCurrentAgentId(result.session.agentId));
       }
+      const wasCurrentSession = store.getState().cowork.currentSessionId === sessionId;
       store.dispatch(setCurrentSession(result.session));
       // Only restore streaming for running sessions — never clear it here.
       // Clearing is the responsibility of complete/error stream events.
@@ -675,7 +677,9 @@ class CoworkService {
       // Session skills describe already-sent messages. Never reattach them to
       // the next prompt when reactive session loading runs during a stream.
       // Re-edit explicitly restores a message's skills in CoworkSessionDetail.
-      store.dispatch(clearActiveSkills());
+      if (!wasCurrentSession) {
+        store.dispatch(clearActiveSkills());
+      }
 
       const imResult = await cowork.remoteManaged(sessionId);
       if (requestId === this.latestLoadSessionRequestId) {
@@ -735,7 +739,15 @@ class CoworkService {
     if (result.success && result.session) {
       const currentSessionId = store.getState().cowork.currentSessionId;
       if (currentSessionId === sessionId) {
-        store.dispatch(setCurrentSession(result.session));
+        // Model updates return a metadata-only session snapshot. Patch just
+        // the model field so the in-memory transcript, draft and streaming
+        // state are not replaced while the user is switching models.
+        store.dispatch(
+          updateCurrentSessionModelOverride({
+            sessionId,
+            modelOverride: result.session.modelOverride,
+          }),
+        );
       }
       return result.session;
     }

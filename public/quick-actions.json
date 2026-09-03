@@ -80,6 +80,42 @@
           "id": "web-survey"
         }
       ]
+    },
+    {
+      "id": "deep-research",
+      "icon": "Telescope",
+      "color": "#0F766E",
+      "skillMapping": "deep-research",
+      "prompts": [
+        { "id": "research-industry" },
+        { "id": "research-competitors" },
+        { "id": "research-policy" },
+        { "id": "research-literature" }
+      ]
+    },
+    {
+      "id": "academic-research",
+      "icon": "GraduationCap",
+      "color": "#7C3AED",
+      "skillMapping": "deli-autoresearch",
+      "prompts": [
+        { "id": "academic-outline" },
+        { "id": "academic-review" },
+        { "id": "academic-method" },
+        { "id": "academic-polish" }
+      ]
+    },
+    {
+      "id": "docs",
+      "icon": "FileText",
+      "color": "#B45309",
+      "skillMapping": "docx",
+      "prompts": [
+        { "id": "docs-meeting" },
+        { "id": "docs-report" },
+        { "id": "docs-summary" },
+        { "id": "docs-polish" }
+      ]
     }
   ]
 }

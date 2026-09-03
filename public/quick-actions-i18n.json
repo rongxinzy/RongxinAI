@@ -99,6 +99,33 @@
           "prompt": "帮我做一个客户满意度调查问卷网页。\n\n问卷标题:「您的反馈对我们很重要」\n\n问卷内容:\n- 基本信息:姓名(选填)、联系方式(选填);\n- 单选题:整体满意度(非常满意/满意/一般/不满意/非常不满意);\n- 单选题:您是否愿意推荐给朋友(1-10分评分滑块);\n- 多选题:您最看重的方面(产品质量/服务态度/响应速度/性价比/售后保障);\n- 单选题:使用频率(每天/每周/每月/偶尔);\n- 文本题:您的建议或意见(大文本框);\n- 提交按钮,提交后显示感谢页面。\n\n设计目标:\n让填写过程轻松、可信且适合手机操作，清晰呈现进度和反馈状态。请根据这一任务选择克制而有辨识度的设计系统；不要默认使用白底蓝绿色问卷模板。"
         }
       }
+    },
+    "deep-research": {
+      "label": "深度调研",
+      "prompts": {
+        "research-industry": { "label": "行业趋势", "description": "梳理行业现状与发展方向", "prompt": "请对我指定的行业进行深度调研，梳理市场规模、主要参与者、关键趋势、机会与风险，并给出有来源依据的结论。" },
+        "research-competitors": { "label": "竞品分析", "description": "比较竞品能力与市场定位", "prompt": "请完成一份竞品分析，比较主要产品的定位、目标用户、核心功能、价格、优势短板和差异化机会，并用表格总结。" },
+        "research-policy": { "label": "政策分析", "description": "解读政策影响与执行要点", "prompt": "请分析我提供的政策或法规，提炼核心要求、适用范围、时间节点、对业务的影响和落地建议，标注不确定信息。" },
+        "research-literature": { "label": "文献综述", "description": "整理研究脉络与关键观点", "prompt": "请围绕指定主题撰写文献综述框架，归纳主要研究观点、方法、共识、争议与研究空白，并提出后续研究问题。" }
+      }
+    },
+    "academic-research": {
+      "label": "学术研究",
+      "prompts": {
+        "academic-outline": { "label": "论文大纲", "description": "搭建清晰的论文结构", "prompt": "请根据我的研究主题设计一份学术论文大纲，包含研究问题、理论框架、方法、结果与讨论，并说明各部分写作重点。" },
+        "academic-review": { "label": "文献整理", "description": "提炼文献并建立研究脉络", "prompt": "请整理我提供的文献，按主题、方法和结论分类，提炼关键观点并指出相互支持、矛盾和可引用之处。" },
+        "academic-method": { "label": "研究方法", "description": "选择合适的方法与实验方案", "prompt": "请根据研究目标和可用数据，比较可选研究方法，给出推荐方案、变量设计、样本要求、实施步骤和潜在局限。" },
+        "academic-polish": { "label": "学术润色", "description": "提升表达的准确性与连贯性", "prompt": "请将我提供的论文段落润色为规范、清晰、严谨的学术中文，保留原意，并列出关键修改理由。" }
+      }
+    },
+    "docs": {
+      "label": "文档",
+      "prompts": {
+        "docs-meeting": { "label": "会议纪要", "description": "整理讨论内容与行动项", "prompt": "请把我提供的会议记录整理成正式会议纪要，包含议题、关键结论、待办事项、负责人和截止时间。" },
+        "docs-report": { "label": "工作报告", "description": "生成结构清晰的正式报告", "prompt": "请根据我提供的材料撰写一份正式工作报告，包含背景、进展、数据、问题、建议和下一步计划。" },
+        "docs-summary": { "label": "文档摘要", "description": "快速提炼长文档重点", "prompt": "请阅读我提供的文档，输出简明摘要、关键事实、重要结论、风险点和需要进一步确认的问题。" },
+        "docs-polish": { "label": "文档润色", "description": "改善语句与整体表达", "prompt": "请润色我提供的文档，改善语法、措辞、结构和正式程度，保留原有事实与意图，并给出修改后的完整版本。" }
+      }
     }
   },
   "en": {
@@ -200,6 +227,33 @@
           "description": "Online form and questionnaire collection page",
           "prompt": "Help me create a customer satisfaction survey questionnaire webpage.\n\nQuestionnaire title: \"Your Feedback is Important to Us\"\n\nQuestionnaire content:\n- Basic information: Name (optional), Contact (optional)\n- Single choice: Overall satisfaction (Very satisfied/Satisfied/Neutral/Dissatisfied/Very dissatisfied)\n- Single choice: Would you recommend to friends (1-10 rating slider)\n- Multiple choice: What aspects do you value most (Product quality/Service attitude/Response speed/Value for money/After-sales support)\n- Single choice: Usage frequency (Daily/Weekly/Monthly/Occasionally)\n- Text question: Your suggestions or opinions (large text box)\n- Submit button, show thank you page after submission\n\nDesign goal:\nMake completion easy, trustworthy, and mobile-friendly with clear progress and feedback states. Choose a restrained but distinctive system for this task; do not default to a white-and-teal survey template."
         }
+      }
+    },
+    "deep-research": {
+      "label": "Deep Research",
+      "prompts": {
+        "research-industry": { "label": "Industry Trends", "description": "Map the market and its direction", "prompt": "Conduct deep research on the industry I specify, covering market size, key players, trends, opportunities, risks, and source-backed conclusions." },
+        "research-competitors": { "label": "Competitor Analysis", "description": "Compare positioning and capabilities", "prompt": "Prepare a competitor analysis comparing positioning, users, features, pricing, strengths, weaknesses, and differentiation opportunities in a table." },
+        "research-policy": { "label": "Policy Analysis", "description": "Explain impact and requirements", "prompt": "Analyze the policy or regulation I provide, extracting requirements, scope, dates, business impact, and implementation advice while flagging uncertainty." },
+        "research-literature": { "label": "Literature Review", "description": "Organize the research landscape", "prompt": "Create a literature review framework for the topic, summarizing methods, consensus, disagreements, gaps, and follow-up research questions." }
+      }
+    },
+    "academic-research": {
+      "label": "Academic Research",
+      "prompts": {
+        "academic-outline": { "label": "Paper Outline", "description": "Build a clear paper structure", "prompt": "Design an academic paper outline for my topic with research questions, framework, methods, results, and discussion, including writing guidance for each section." },
+        "academic-review": { "label": "Literature Notes", "description": "Extract and connect key studies", "prompt": "Organize the literature I provide by topic, method, and conclusion; extract key claims and identify support, contradictions, and useful citations." },
+        "academic-method": { "label": "Research Method", "description": "Choose a suitable study design", "prompt": "Compare research methods for my objective and data, then recommend a design with variables, sample needs, steps, and limitations." },
+        "academic-polish": { "label": "Academic Editing", "description": "Improve rigor and clarity", "prompt": "Edit the paper passage I provide into precise, coherent academic English while preserving meaning, and list the key revisions." }
+      }
+    },
+    "docs": {
+      "label": "Documents",
+      "prompts": {
+        "docs-meeting": { "label": "Meeting Minutes", "description": "Turn discussion into action items", "prompt": "Turn my meeting notes into formal minutes with agenda, decisions, action items, owners, and due dates." },
+        "docs-report": { "label": "Work Report", "description": "Create a structured formal report", "prompt": "Write a formal work report from my materials covering background, progress, data, issues, recommendations, and next steps." },
+        "docs-summary": { "label": "Document Summary", "description": "Extract the essentials quickly", "prompt": "Read the document I provide and return a concise summary, key facts, conclusions, risks, and questions requiring confirmation." },
+        "docs-polish": { "label": "Document Editing", "description": "Improve language and structure", "prompt": "Edit my document for grammar, wording, structure, and appropriate formality while preserving facts and intent, then provide the complete revised version." }
       }
     }
   }

@@ -1423,8 +1423,14 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   // Get selected quick action
   const selectedAction = React.useMemo(() => {
-    return quickActions.find(action => action.id === selectedActionId);
-  }, [quickActions, selectedActionId]);
+    const explicitlySelected = quickActions.find(action => action.id === selectedActionId);
+    if (explicitlySelected) return explicitlySelected;
+
+    // Skills can also be activated from the Chat sidebar or the skill badge.
+    // In that path there is no quick-action selection event, so derive the
+    // matching case panel from the active skill mapping.
+    return quickActions.find(action => activeSkillIds.includes(action.skillMapping));
+  }, [activeSkillIds, quickActions, selectedActionId]);
 
   // Handle quick action button click and activate its mapped skill.
   const handleActionSelect = (actionId: string) => {
@@ -1436,6 +1442,11 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       quickActionActivationRef.current = actionId;
       dispatch(setActiveSkillIds([targetSkill.id]));
     }
+    window.setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('cowork:focus-input', { detail: { clear: true } }),
+      );
+    }, 0);
   };
 
   // Activate a mapped skill once it becomes available, and clear the quick action when

@@ -44,3 +44,21 @@ test('prunes only activity snapshots older than 180 days', async () => {
   expect(service.pruneExpired(now)).toBe(1);
   expect(service.list().map(run => run.id)).toEqual(['recent', 'boundary']);
 });
+
+test('recovers interrupted running snapshots during startup', async () => {
+  const { ActivityService } = await import('./activityService');
+  const service = new ActivityService(new Database(':memory:'));
+  service.upsert({ id: 'stale', source: ActivitySource.ScheduledTask, status: ActivityStatus.Running, updatedAt: 10 });
+  service.upsert({ id: 'done', source: ActivitySource.Channel, status: ActivityStatus.Completed, updatedAt: 11 });
+
+  expect(service.recoverInterruptedRuns(20)).toBe(1);
+  expect(service.list()).toEqual([
+    expect.objectContaining({
+      id: 'stale',
+      status: ActivityStatus.Failed,
+      updatedAt: 20,
+      errorMessage: 'Run was interrupted when the application closed.',
+    }),
+    expect.objectContaining({ id: 'done', status: ActivityStatus.Completed, updatedAt: 11 }),
+  ]);
+});
