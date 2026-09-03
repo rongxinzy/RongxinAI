@@ -54,7 +54,13 @@ Var /GLOBAL localInferenceLabel
 !macroend
 
 Function LocalInferencePageCreate
-  !insertmacro MUI_HEADER_TEXT "本地推理组件" "按需启用本地模型推理"
+  ; electron-builder prepends this script before installer.nsi includes
+  ; MUI2.nsh, so the MUI_HEADER_TEXT macro is undefined at compile time.
+  ; Set the standard MUI header controls (IDs 1037/1038) directly instead.
+  GetDlgItem $0 $HWNDPARENT 1037
+  SendMessage $0 ${WM_SETTEXT} 0 "STR:本地推理组件"
+  GetDlgItem $0 $HWNDPARENT 1038
+  SendMessage $0 ${WM_SETTEXT} 0 "STR:按需启用本地模型推理"
   nsDialogs::Create 1018
   Pop $localInferenceDialog
   ${If} $localInferenceDialog == error
@@ -236,13 +242,15 @@ FunctionEnd
     StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
 
     DetailPrint "[Installer] Extracting ${LABEL}"
-    Push $OUTDIR
-    SetOutPath "$R3"
-    Nsis7z::Extract "$PLUGINSDIR\component-${KEY}.7z"
-    Pop $R0
-    SetOutPath $R0
+    ; Extract with the bundled, hash-verified 7za.exe. Nsis7z::Extract can
+    ; silently skip PE files in BCJ2-filtered archives (electron-builder #9983),
+    ; and component packs are compressed with BCJ2.
+    nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
+    Pop $0
+    Pop $1
     Delete "$PLUGINSDIR\component-${KEY}.7z"
-    Goto ComponentExtracted_${TOKEN}
+    StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
+    IntCmp $0 0 ComponentExtracted_${TOKEN} ComponentExtractFailed_${TOKEN} ComponentExtractFailed_${TOKEN}
 
   ComponentHashFailed_${TOKEN}:
     StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
@@ -259,14 +267,14 @@ FunctionEnd
     Goto OfflineComponentInstallFailed
 
   ComponentExtractFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 展开失败。请检查磁盘空间或安全软件后重试。"
+    StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-extract-failed component=${KEY} output=$1$\r$\n"
+    FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
 
   ComponentExtracted_${TOKEN}:
-    IfFileExists "$R3\${SENTINEL}" 0 ComponentExtractFailed_${TOKEN}
+    IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
     nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
     Pop $0
     Pop $1
