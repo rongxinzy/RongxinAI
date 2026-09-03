@@ -1463,7 +1463,7 @@ export class CodingRoomService extends EventEmitter {
     driver: CodingAgentDriver,
     sessionId: string,
     prompt: string,
-    queuedItemId?: string,
+    queuedItemId: string | undefined,
     turnGeneration: number,
   ): Promise<void> {
     try {
