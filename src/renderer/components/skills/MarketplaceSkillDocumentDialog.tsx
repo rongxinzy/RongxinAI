@@ -68,7 +68,12 @@ export function MarketplaceSkillDocumentDialog({
   }, [skill.id]);
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/10 p-4">
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/10 p-4"
+      onPointerDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section className="flex h-[min(32rem,calc(100%-3rem))] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-lg">
         <header className="flex h-14 shrink-0 items-center justify-between px-5">
           <div className="flex min-w-0 items-center gap-3">

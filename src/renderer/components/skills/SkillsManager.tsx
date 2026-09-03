@@ -178,6 +178,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
   }, [activeTab, refreshMarketplace]);
 
   useEffect(() => {
+    setSelectedSkill(null);
+    setSelectedMarketplaceSkill(null);
+  }, [activeTab]);
+
+  useEffect(() => {
     if (!isRemoteImportOpen) return;
 
     const handleEscape = (event: KeyboardEvent) => {
