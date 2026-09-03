@@ -5,6 +5,7 @@ import { TodoStatus } from '../../shared/todo';
 import { t } from '../i18n';
 
 const MAX_TIMER_DELAY_MS = 2_147_000_000;
+const NOTIFICATION_RETRY_DELAY_MS = 60_000;
 
 type TodoReminderRow = {
   id: string;
@@ -12,11 +13,26 @@ type TodoReminderRow = {
   remind_at: number;
 };
 
+interface TodoReminderNotifier {
+  isSupported: () => boolean;
+  show: (title: string, body: string) => void;
+}
+
+const electronTodoReminderNotifier: TodoReminderNotifier = {
+  isSupported: () => Notification.isSupported(),
+  show: (title, body) => {
+    new Notification({ title, body }).show();
+  },
+};
+
 export class TodoReminderScheduler {
   private timer: ReturnType<typeof setTimeout> | null = null;
   private isStarted = false;
 
-  constructor(private readonly db: Database.Database) {}
+  constructor(
+    private readonly db: Database.Database,
+    private readonly notifier: TodoReminderNotifier = electronTodoReminderNotifier,
+  ) {}
 
   start(): void {
     if (this.isStarted) return;
@@ -30,7 +46,7 @@ export class TodoReminderScheduler {
     this.timer = null;
   }
 
-  refresh(): void {
+  refresh(minimumDelayMs = 0): void {
     if (!this.isStarted) return;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
@@ -48,7 +64,10 @@ export class TodoReminderScheduler {
       .get(TodoStatus.Active) as TodoReminderRow | undefined;
     if (!nextReminder) return;
 
-    const delay = Math.min(Math.max(nextReminder.remind_at - Date.now(), 0), MAX_TIMER_DELAY_MS);
+    const delay = Math.min(
+      Math.max(nextReminder.remind_at - Date.now(), minimumDelayMs),
+      MAX_TIMER_DELAY_MS,
+    );
     this.timer = setTimeout(() => {
       this.timer = null;
       this.deliverDueReminders();
@@ -68,16 +87,22 @@ export class TodoReminderScheduler {
       )
       .all(TodoStatus.Active, Date.now()) as TodoReminderRow[];
 
+    let shouldRetry = false;
     for (const reminder of reminders) {
-      if (Notification.isSupported()) {
-        try {
-          new Notification({
-            title: t('todoReminderTitle'),
-            body: t('todoReminderBody', { title: reminder.title }),
-          }).show();
-        } catch (error) {
-          console.error('[TodoReminder] failed to show reminder:', error);
-        }
+      if (!this.notifier.isSupported()) {
+        shouldRetry = true;
+        continue;
+      }
+
+      try {
+        this.notifier.show(
+          t('todoReminderTitle'),
+          t('todoReminderBody', { title: reminder.title }),
+        );
+      } catch (error) {
+        shouldRetry = true;
+        console.error('[TodoReminder] failed to show reminder:', error);
+        continue;
       }
 
       this.db
@@ -90,6 +115,6 @@ export class TodoReminderScheduler {
         .run(Date.now(), reminder.id, TodoStatus.Active, reminder.remind_at);
     }
 
-    this.refresh();
+    this.refresh(shouldRetry ? NOTIFICATION_RETRY_DELAY_MS : 0);
   }
 }

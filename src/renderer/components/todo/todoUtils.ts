@@ -1,6 +1,4 @@
-import { TodoStatus, type Todo } from '../../../shared/todo';
-
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
+import { TodoStatus, TodoView, type Todo, type TodoCreateInput } from '../../../shared/todo';
 
 const startOfDay = (date: Date): Date => {
   const result = new Date(date);
@@ -79,7 +77,13 @@ export interface ParsedTodoInput {
 const dateForWeekday = (now: Date, weekday: number): Date => {
   const date = startOfDay(now);
   const offset = (weekday - date.getDay() + 7) % 7;
-  date.setTime(date.getTime() + offset * MS_PER_DAY);
+  date.setDate(date.getDate() + offset);
+  return date;
+};
+
+const dateAfterDays = (now: Date, days: number): Date => {
+  const date = new Date(now);
+  date.setDate(date.getDate() + days);
   return date;
 };
 
@@ -89,9 +93,9 @@ export const parseTodoInput = (value: string, now = new Date()): ParsedTodoInput
   if (/今天/.test(normalized) || /\btoday\b/.test(normalized)) {
     dueAt = endOfDay(now);
   } else if (/后天/.test(normalized) || /\bday after tomorrow\b/.test(normalized)) {
-    dueAt = endOfDay(new Date(now.getTime() + 2 * MS_PER_DAY));
+    dueAt = endOfDay(dateAfterDays(now, 2));
   } else if (/明天/.test(normalized) || /\btomorrow\b/.test(normalized)) {
-    dueAt = endOfDay(new Date(now.getTime() + MS_PER_DAY));
+    dueAt = endOfDay(dateAfterDays(now, 1));
   } else {
     const weekdayMatch = normalized.match(
       /(?:周|星期)(日|天|一|二|三|四|五|六)|\b(mon|tue|wed|thu|fri|sat|sun)\b/,
@@ -128,3 +132,30 @@ export const parseTodoInput = (value: string, now = new Date()): ParsedTodoInput
     important: /重要|很重要|\bimportant\b/.test(normalized),
   };
 };
+
+export const buildTodoCreateInput = (
+  title: string,
+  parsed: ParsedTodoInput,
+  activeView: TodoView,
+  activeListId: string | null,
+  referenceDate: string,
+): TodoCreateInput => ({
+  title,
+  dueAt: parsed.dueAt,
+  important: parsed.important,
+  listId: activeListId,
+  myDayDate: activeView === TodoView.MyDay ? referenceDate : null,
+});
+
+export const countTodosByView = (
+  activeTodos: Todo[],
+  completedCount: number,
+  referenceDate: string,
+): Record<TodoView, number> => ({
+  [TodoView.MyDay]: activeTodos.filter(todo => todo.myDayDate === referenceDate).length,
+  [TodoView.Important]: activeTodos.filter(todo => todo.important).length,
+  [TodoView.Planned]: activeTodos.filter(todo => todo.dueAt !== null || todo.remindAt !== null)
+    .length,
+  [TodoView.All]: activeTodos.length,
+  [TodoView.Completed]: completedCount,
+});

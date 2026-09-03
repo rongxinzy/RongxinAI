@@ -8,18 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@shared/components/ui/sheet';
-import {
-  CalendarDays,
-  CheckCircle2,
-  FolderPlus,
-  Inbox,
-  ListTodo,
-  Plus,
-  Search,
-  Star,
-  Sun,
-  Trash2,
-} from 'lucide-react';
+import { ListTodo, Menu, Plus, Search } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -31,9 +20,16 @@ import {
 import { i18nService } from '../../services/i18n';
 import { todoService } from '../../services/todo';
 import PageHeader from '../PageHeader';
+import TodoNavigationPanel, { todoNavigationItems } from './TodoNavigationPanel';
 import TodoTaskDetail from './TodoTaskDetail';
 import TodoTaskRow from './TodoTaskRow';
-import { formatTodoDate, parseTodoInput, todayDateKey } from './todoUtils';
+import {
+  buildTodoCreateInput,
+  countTodosByView,
+  formatTodoDate,
+  parseTodoInput,
+  todayDateKey,
+} from './todoUtils';
 
 interface TodoViewProps {
   isSidebarCollapsed?: boolean;
@@ -41,20 +37,6 @@ interface TodoViewProps {
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
 }
-
-interface TodoNavigationItem {
-  value: TodoViewFilter;
-  labelKey: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const navigationItems: readonly TodoNavigationItem[] = [
-  { value: TodoViewFilter.MyDay, labelKey: 'todoMyDay', icon: Sun },
-  { value: TodoViewFilter.Important, labelKey: 'todoImportant', icon: Star },
-  { value: TodoViewFilter.Planned, labelKey: 'todoPlanned', icon: CalendarDays },
-  { value: TodoViewFilter.All, labelKey: 'todoAll', icon: Inbox },
-  { value: TodoViewFilter.Completed, labelKey: 'todoCompleted', icon: CheckCircle2 },
-];
 
 const viewDescriptionKeys: Record<TodoViewFilter, string> = {
   [TodoViewFilter.MyDay]: 'todoMyDayDescription',
@@ -75,6 +57,7 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [activeListId, setActiveListId] = useState<string | null>(null);
   const [todos, setTodos] = useState<Todo[]>([]);
   const [allTodos, setAllTodos] = useState<Todo[]>([]);
+  const [completedCount, setCompletedCount] = useState(0);
   const [suggestionTodos, setSuggestionTodos] = useState<Todo[]>([]);
   const [lists, setLists] = useState<TodoList[]>([]);
   const [query, setQuery] = useState('');
@@ -83,6 +66,7 @@ const TodoView: React.FC<TodoViewProps> = ({
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null);
   const [deleteTodo, setDeleteTodo] = useState<Todo | null>(null);
   const [deleteList, setDeleteList] = useState<TodoList | null>(null);
+  const [isMobileNavigationOpen, setIsMobileNavigationOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
 
@@ -97,17 +81,8 @@ const TodoView: React.FC<TodoViewProps> = ({
   );
 
   const activeCounts = useMemo<Record<TodoViewFilter, number>>(() => {
-    const today = todayDateKey();
-    return {
-      [TodoViewFilter.MyDay]: allTodos.filter(todo => todo.myDayDate === today).length,
-      [TodoViewFilter.Important]: allTodos.filter(todo => todo.important).length,
-      [TodoViewFilter.Planned]: allTodos.filter(
-        todo => todo.dueAt !== null || todo.remindAt !== null,
-      ).length,
-      [TodoViewFilter.All]: allTodos.length,
-      [TodoViewFilter.Completed]: 0,
-    };
-  }, [allTodos]);
+    return countTodosByView(allTodos, completedCount, todayDateKey());
+  }, [allTodos, completedCount]);
 
   const listCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -131,12 +106,19 @@ const TodoView: React.FC<TodoViewProps> = ({
       query: '',
       referenceDate: todayDateKey(),
     };
-    const [todoResult, listsResult, allResult] = await Promise.all([
+    const completedInput = {
+      view: TodoViewFilter.Completed,
+      query: '',
+      referenceDate: todayDateKey(),
+    };
+    const [todoResult, listsResult, allResult, completedResult] = await Promise.all([
       todoService.list(listInput),
       todoService.listLists(),
       todoService.list(allInput),
+      todoService.list(completedInput),
     ]);
-    const succeeded = todoResult.success && listsResult.success && allResult.success;
+    const succeeded =
+      todoResult.success && listsResult.success && allResult.success && completedResult.success;
     if (!succeeded) {
       setLoadFailed(true);
       setIsLoading(false);
@@ -146,6 +128,7 @@ const TodoView: React.FC<TodoViewProps> = ({
     setLists(listsResult.lists ?? []);
     const allTodoItems = allResult.todos ?? [];
     setAllTodos(allTodoItems);
+    setCompletedCount(completedResult.todos?.length ?? 0);
     setSuggestionTodos(
       allTodoItems
         .filter(todo => todo.myDayDate !== todayDateKey())
@@ -179,12 +162,9 @@ const TodoView: React.FC<TodoViewProps> = ({
     const title = newTodoTitle.trim();
     if (!title) return;
     const parsed = parseTodoInput(title);
-    const result = await todoService.create({
-      title,
-      dueAt: parsed.dueAt,
-      important: parsed.important,
-      myDayDate: activeView === TodoViewFilter.MyDay ? todayDateKey() : null,
-    });
+    const result = await todoService.create(
+      buildTodoCreateInput(title, parsed, activeView, activeListId, todayDateKey()),
+    );
     if (!result.success) {
       showError();
       return;
@@ -242,11 +222,25 @@ const TodoView: React.FC<TodoViewProps> = ({
   const handleSelectView = (view: TodoViewFilter): void => {
     setActiveView(view);
     setActiveListId(null);
+    setIsMobileNavigationOpen(false);
+  };
+
+  const handleSelectList = (listId: string): void => {
+    setActiveListId(listId);
+    setActiveView(TodoViewFilter.All);
+    setIsMobileNavigationOpen(false);
+  };
+
+  const focusNewTodoInput = (): void => {
+    setIsMobileNavigationOpen(false);
+    window.setTimeout(() => document.getElementById('todo-new-input')?.focus(), 0);
   };
 
   const sectionTitle =
     activeList?.name ??
-    i18nService.t(navigationItems.find(item => item.value === activeView)?.labelKey ?? 'todoAll');
+    i18nService.t(
+      todoNavigationItems.find(item => item.value === activeView)?.labelKey ?? 'todoAll',
+    );
   const sectionDescription = activeList
     ? i18nService.t('todoListDescription')
     : activeView === TodoViewFilter.MyDay
@@ -266,113 +260,35 @@ const TodoView: React.FC<TodoViewProps> = ({
       />
       <div className="flex min-h-0 flex-1">
         <aside className="hidden w-56 shrink-0 flex-col border-r border-border-subtle bg-muted p-4 md:flex">
-          <Button
-            type="button"
-            onClick={() => document.getElementById('todo-new-input')?.focus()}
-            className="w-full justify-start"
-          >
-            <Plus />
-            {i18nService.t('todoNewTask')}
-          </Button>
-
-          <nav className="mt-4 space-y-1" aria-label={i18nService.t('todoTitle')}>
-            {navigationItems.map(item => {
-              const Icon = item.icon;
-              const isActive = activeView === item.value && activeListId === null;
-              const itemCount = activeCounts[item.value];
-              return (
-                <Button
-                  key={item.value}
-                  type="button"
-                  variant={isActive ? 'secondary' : 'ghost'}
-                  onClick={() => handleSelectView(item.value)}
-                  className="w-full justify-start gap-2"
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <Icon className="size-4" />
-                  {i18nService.t(item.labelKey)}
-                  {itemCount > 0 ? (
-                    <span className="ml-auto text-xs text-muted-foreground">{itemCount}</span>
-                  ) : null}
-                </Button>
-              );
-            })}
-          </nav>
-
-          <div className="mt-6 min-h-0 flex-1">
-            <div className="mb-2 flex items-center justify-between px-2 text-xs font-medium text-muted-foreground">
-              <span>{i18nService.t('todoListSection')}</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label={i18nService.t('todoNewList')}
-                title={i18nService.t('todoNewList')}
-                onClick={() => document.getElementById('todo-new-list-input')?.focus()}
-              >
-                <FolderPlus />
-              </Button>
-            </div>
-            <div className="space-y-1 overflow-y-auto">
-              {lists.map(list => {
-                const isActive = activeListId === list.id;
-                return (
-                  <div key={list.id} className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant={isActive ? 'secondary' : 'ghost'}
-                      onClick={() => {
-                        setActiveListId(list.id);
-                        setActiveView(TodoViewFilter.All);
-                      }}
-                      className="min-w-0 flex-1 justify-start gap-2"
-                      aria-current={isActive ? 'page' : undefined}
-                    >
-                      <ListTodo className="size-4 shrink-0" />
-                      <span className="truncate">{list.name}</span>
-                      {(listCounts.get(list.id) ?? 0) > 0 ? (
-                        <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                          {listCounts.get(list.id)}
-                        </span>
-                      ) : null}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label={`${i18nService.t('todoDeleteList')}: ${list.name}`}
-                      title={i18nService.t('todoDeleteList')}
-                      onClick={() => setDeleteList(list)}
-                    >
-                      <Trash2 className="text-muted-foreground" />
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <form onSubmit={handleCreateList} className="mt-3 flex items-center gap-2">
-            <Input
-              id="todo-new-list-input"
-              value={newListName}
-              onChange={event => setNewListName(event.target.value)}
-              placeholder={i18nService.t('todoListNamePlaceholder')}
-              aria-label={i18nService.t('todoNewList')}
-            />
-            <Button
-              type="submit"
-              variant="outline"
-              size="icon-sm"
-              aria-label={i18nService.t('todoNewList')}
-            >
-              <Plus />
-            </Button>
-          </form>
+          <TodoNavigationPanel
+            activeView={activeView}
+            activeListId={activeListId}
+            activeCounts={activeCounts}
+            lists={lists}
+            listCounts={listCounts}
+            newListName={newListName}
+            newListInputId="todo-new-list-input"
+            onNewListNameChange={setNewListName}
+            onCreateList={handleCreateList}
+            onFocusNewTask={focusNewTodoInput}
+            onSelectView={handleSelectView}
+            onSelectList={handleSelectList}
+            onDeleteList={setDeleteList}
+          />
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
           <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4 sm:px-8">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsMobileNavigationOpen(true)}
+              className="mt-4 w-full justify-start gap-2 md:hidden"
+              aria-label={i18nService.t('todoOpenNavigation')}
+            >
+              <Menu />
+              <span className="truncate">{sectionTitle}</span>
+            </Button>
             <div className="flex shrink-0 flex-col gap-4 border-b border-border-subtle pb-4 pt-6 sm:flex-row sm:items-end sm:justify-between">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
@@ -522,6 +438,35 @@ const TodoView: React.FC<TodoViewProps> = ({
           </div>
         </main>
       </div>
+
+      <Sheet open={isMobileNavigationOpen} onOpenChange={setIsMobileNavigationOpen}>
+        <SheetContent side="left" className="w-full sm:max-w-sm md:hidden">
+          <SheetHeader>
+            <SheetTitle>{i18nService.t('todoTitle')}</SheetTitle>
+            <SheetDescription>{i18nService.t('todoNavigationDescription')}</SheetDescription>
+          </SheetHeader>
+          <div className="flex min-h-0 flex-1 px-4 pb-4">
+            <TodoNavigationPanel
+              activeView={activeView}
+              activeListId={activeListId}
+              activeCounts={activeCounts}
+              lists={lists}
+              listCounts={listCounts}
+              newListName={newListName}
+              newListInputId="todo-new-list-input-mobile"
+              onNewListNameChange={setNewListName}
+              onCreateList={handleCreateList}
+              onFocusNewTask={focusNewTodoInput}
+              onSelectView={handleSelectView}
+              onSelectList={handleSelectList}
+              onDeleteList={list => {
+                setIsMobileNavigationOpen(false);
+                setDeleteList(list);
+              }}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={selectedTodo !== null} onOpenChange={open => !open && setSelectedTodoId(null)}>
         <SheetContent side="right" className="w-full sm:max-w-md">
