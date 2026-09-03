@@ -69,5 +69,9 @@ export const CodingToolPartState = {
 export type CodingToolPartState = (typeof CodingToolPartState)[keyof typeof CodingToolPartState];
 
 export const CodingComposerStatus = {
+  Submitted: 'submitted',
   Streaming: 'streaming',
+  Error: 'error',
 } as const;
+export type CodingComposerStatus =
+  (typeof CodingComposerStatus)[keyof typeof CodingComposerStatus];

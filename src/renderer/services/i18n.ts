@@ -1045,6 +1045,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentAddProfile: '添加 Agent',
     codingAgentTrustAgent: '确认信任',
     codingAgentProbeAgent: '检测连接',
+    codingAgentProbeRequired: '本地 Agent 尚未完成连接检测，发送时会自动检测。',
     codingAgentAuthenticate: '登录',
     codingAgentPermission: '需要操作许可',
     codingAgentPermissionDescription:
@@ -4307,6 +4308,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     codingAgentAddProfile: 'Add agent',
     codingAgentTrustAgent: 'Trust explicitly',
     codingAgentProbeAgent: 'Check connection',
+    codingAgentProbeRequired: 'This local agent has not been checked yet. It will be checked automatically when you send.',
     codingAgentAuthenticate: 'Sign in',
     codingAgentPermission: 'Action permission required',
     codingAgentPermissionDescription:
