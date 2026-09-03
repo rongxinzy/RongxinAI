@@ -86,7 +86,6 @@ import { themeService } from '../services/theme';
 import { selectCoworkConfig } from '../store/selectors/coworkSelectors';
 import Modal from './common/Modal';
 import { DestructiveConfirmDialog } from '@shared/components/ui/destructive-confirm-dialog';
-import EmbeddingSettingsSection from './cowork/EmbeddingSettingsSection';
 import ErrorMessage from './ErrorMessage';
 import { GitHubCopilotIcon } from './icons/providers';
 import {
@@ -3257,27 +3256,7 @@ const Settings: React.FC<SettingsProps> = ({
         return null;
 
       case 'coworkMemory':
-        return (
-          <div className="flex flex-col gap-6">
-            <ManagedMemorySettings workingDirectory={coworkConfig.workingDirectory} />
-
-            {/* Section 3: Embedding / Vector Memory Search */}
-            <EmbeddingSettingsSection
-              embeddingEnabled={embeddingEnabled}
-              embeddingProvider={embeddingProvider}
-              embeddingModel={embeddingModel}
-              embeddingVectorWeight={embeddingVectorWeight}
-              embeddingRemoteBaseUrl={embeddingRemoteBaseUrl}
-              embeddingRemoteApiKey={embeddingRemoteApiKey}
-              onEmbeddingEnabledChange={setEmbeddingEnabled}
-              onEmbeddingProviderChange={setEmbeddingProvider}
-              onEmbeddingModelChange={setEmbeddingModel}
-              onEmbeddingVectorWeightChange={setEmbeddingVectorWeight}
-              onEmbeddingRemoteBaseUrlChange={setEmbeddingRemoteBaseUrl}
-              onEmbeddingRemoteApiKeyChange={setEmbeddingRemoteApiKey}
-            />
-          </div>
-        );
+        return <ManagedMemorySettings workingDirectory={coworkConfig.workingDirectory} />;
 
       case 'model':
         return (
