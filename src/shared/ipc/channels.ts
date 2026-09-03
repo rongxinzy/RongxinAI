@@ -72,6 +72,12 @@ export const PermissionsIpc = {
 } as const;
 export type PermissionsIpc = (typeof PermissionsIpc)[keyof typeof PermissionsIpc];
 
+// ─── Todo ───────────────────────────────────────────────────────────────────
+export {
+  TodoIpc,
+  type TodoIpc as TodoIpcChannel,
+} from '../todo/constants';
+
 // ─── Enterprise ─────────────────────────────────────────────────────────────
 export const EnterpriseIpc = {
   GetConfig: 'enterprise:getConfig',

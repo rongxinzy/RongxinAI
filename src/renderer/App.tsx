@@ -90,6 +90,7 @@ const ExpertView = React.lazy(() => import('./components/expert/ExpertView'));
 const CodingWorkbenchView = React.lazy(() =>
   import('./components/coding').then(module => ({ default: module.CodingWorkbenchView })),
 );
+const TodoView = React.lazy(() => import('./components/todo/TodoView'));
 
 /**
  * Full-area fallback shown while a lazily loaded feature chunk downloads.
@@ -119,6 +120,7 @@ const App: React.FC = () => {
     | 'localInference'
     | 'expert'
     | 'coding'
+    | 'todo'
   >('cowork');
   const [expertInitialTab, setExpertInitialTab] = useState<ExpertTab | undefined>(undefined);
   const [mcpOpenRegistryId, setMcpOpenRegistryId] = useState<McpRegistryId | undefined>();
@@ -496,6 +498,10 @@ const App: React.FC = () => {
 
   const handleShowCoding = useCallback(() => {
     setMainView('coding');
+  }, []);
+
+  const handleShowTodo = useCallback(() => {
+    setMainView('todo');
   }, []);
 
   const handleToggleSidebar = useCallback(() => {
@@ -892,6 +898,7 @@ const App: React.FC = () => {
             onShowLocalInference={handleShowLocalInference}
             onShowExpert={handleShowExpert}
             onShowCoding={handleShowCoding}
+            onShowTodo={handleShowTodo}
             codingSelection={codingSelection}
             onCodingSelectionChange={setCodingSelection}
             onNewChat={handleNewChat}
@@ -994,6 +1001,13 @@ const App: React.FC = () => {
                       }
                       isSidebarCollapsed={isSidebarCollapsed}
                       onToggleSidebar={handleToggleSidebar}
+                    />
+                  ) : mainView === 'todo' ? (
+                    <TodoView
+                      isSidebarCollapsed={isSidebarCollapsed}
+                      onToggleSidebar={handleToggleSidebar}
+                      onNewChat={handleNewChat}
+                      updateBadge={null}
                     />
                   ) : mainView === 'localInference' ? null : (
                     <CoworkView
