@@ -17,7 +17,7 @@ import {
   CoworkToolActivityEventType,
   CoworkToolActivityPhase,
 } from '../cowork/toolActivity';
-import { ApiFormat, ProviderModelDiscoveryErrorCode } from '../providers';
+import { ApiFormat, ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '../providers';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -139,6 +139,54 @@ export const ProviderModelDiscoverySchema = {
           id: z.string().min(1),
           displayName: z.string().optional(),
           ownedBy: z.string().optional(),
+          contextWindow: z.number().int().positive().optional(),
+          maxTokens: z.number().int().positive().optional(),
+          capabilities: z
+            .object({
+              toolCalling: z
+                .enum([
+                  ModelCapabilityStatus.Supported,
+                  ModelCapabilityStatus.Unsupported,
+                  ModelCapabilityStatus.Unknown,
+                ])
+                .optional(),
+              imageInput: z
+                .enum([
+                  ModelCapabilityStatus.Supported,
+                  ModelCapabilityStatus.Unsupported,
+                  ModelCapabilityStatus.Unknown,
+                ])
+                .optional(),
+              videoInput: z
+                .enum([
+                  ModelCapabilityStatus.Supported,
+                  ModelCapabilityStatus.Unsupported,
+                  ModelCapabilityStatus.Unknown,
+                ])
+                .optional(),
+              audioInput: z
+                .enum([
+                  ModelCapabilityStatus.Supported,
+                  ModelCapabilityStatus.Unsupported,
+                  ModelCapabilityStatus.Unknown,
+                ])
+                .optional(),
+              documentInput: z
+                .enum([
+                  ModelCapabilityStatus.Supported,
+                  ModelCapabilityStatus.Unsupported,
+                  ModelCapabilityStatus.Unknown,
+                ])
+                .optional(),
+              reasoning: z
+                .enum([
+                  ModelCapabilityStatus.Supported,
+                  ModelCapabilityStatus.Unsupported,
+                  ModelCapabilityStatus.Unknown,
+                ])
+                .optional(),
+            })
+            .optional(),
         }),
       ),
     }),

@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
 import { CoworkPermissionMode } from '../cowork/constants';
-import { CoworkSessionContinueSchema, CoworkSessionStartSchema } from './schemas';
+import { ModelCapabilityStatus } from '../providers';
+import {
+  CoworkSessionContinueSchema,
+  CoworkSessionStartSchema,
+  ProviderModelDiscoverySchema,
+} from './schemas';
 
 describe('CoworkSessionStartSchema permissionMode', () => {
   const baseInput = { prompt: 'hello' };
@@ -62,5 +67,39 @@ describe.each([
 
   test('rejects multiple experts', () => {
     expect(() => schema.parse({ ...baseInput, expertIds: ['expert-a', 'expert-b'] })).toThrow();
+  });
+});
+
+test('preserves discovered model metadata in the IPC response', () => {
+  expect(
+    ProviderModelDiscoverySchema.output.parse({
+      success: true,
+      models: [
+        {
+          id: 'Qwen3.6-35B-A3B-APEX-I-Compact',
+          contextWindow: 262_144,
+          maxTokens: 16_384,
+          capabilities: {
+            toolCalling: ModelCapabilityStatus.Supported,
+            imageInput: ModelCapabilityStatus.Unsupported,
+            reasoning: ModelCapabilityStatus.Supported,
+          },
+        },
+      ],
+    }),
+  ).toEqual({
+    success: true,
+    models: [
+      {
+        id: 'Qwen3.6-35B-A3B-APEX-I-Compact',
+        contextWindow: 262_144,
+        maxTokens: 16_384,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          imageInput: ModelCapabilityStatus.Unsupported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      },
+    ],
   });
 });

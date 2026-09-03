@@ -90,6 +90,19 @@ describe('parseProviderModelsResponse', () => {
     ]);
   });
 
+  test('reads llama.cpp context metadata from the OpenAI-compatible model response', () => {
+    expect(
+      parseProviderModelsResponse({
+        data: [
+          {
+            id: 'qwen-local',
+            meta: { n_ctx: 262_144, n_ctx_train: 262_144 },
+          },
+        ],
+      }),
+    ).toEqual([{ id: 'qwen-local', contextWindow: 262_144 }]);
+  });
+
   test('rejects unsupported payloads', () => {
     expect(() => parseProviderModelsResponse({ items: [] })).toThrowError(
       expect.objectContaining<Partial<ProviderModelDiscoveryError>>({

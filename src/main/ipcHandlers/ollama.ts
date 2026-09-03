@@ -9,6 +9,10 @@ import type {
   OllamaStatusSnapshot,
 } from '../../shared/ollama';
 import { OllamaIpcChannel } from '../../shared/ollama';
+import {
+  updateOllamaRuntimeModelCapabilities,
+  updateOllamaRuntimeModels,
+} from '../libs/claudeSettings';
 import { OllamaManager } from '../libs/ollamaManager';
 import type { SqliteStore } from '../sqliteStore';
 
@@ -68,7 +72,9 @@ export function registerOllamaIpcHandlers(
   });
   ipcMain.handle(OllamaIpcChannel.ListRunningModels, async () => {
     const client = await manager.client();
-    return await client.runningModels();
+    const runningModels = await client.runningModels();
+    updateOllamaRuntimeModels(runningModels);
+    return runningModels;
   });
   ipcMain.handle(OllamaIpcChannel.DeleteModel, async (_event, name: string) => {
     const client = await manager.client();
@@ -77,7 +83,9 @@ export function registerOllamaIpcHandlers(
   });
   ipcMain.handle(OllamaIpcChannel.ShowModel, async (_event, name: string) => {
     const client = await manager.client();
-    return await client.showModel(name);
+    const model = await client.showModel(name);
+    updateOllamaRuntimeModelCapabilities(name, model);
+    return model;
   });
   ipcMain.handle(OllamaIpcChannel.CreateModel, async (_event, name: string, modelfile: string) => {
     const client = await manager.client();
@@ -88,14 +96,18 @@ export function registerOllamaIpcHandlers(
     const modelName = input.model.trim();
     if (!modelName) throw new Error('Model name is required');
     const client = await manager.client();
-    return await client.preloadModel({ ...input, model: modelName });
+    const result = await client.preloadModel({ ...input, model: modelName });
+    updateOllamaRuntimeModels(result.runningModels);
+    return result;
   });
   ipcMain.handle(OllamaIpcChannel.UnloadModel, async (_event, name: string) => {
     const modelName = name.trim();
     if (!modelName) throw new Error('Model name is required');
     const client = await manager.client();
     await client.unloadModel(modelName);
-    return { success: true, runningModels: await client.runningModels() };
+    const runningModels = await client.runningModels();
+    updateOllamaRuntimeModels(runningModels);
+    return { success: true, runningModels };
   });
   ipcMain.handle(OllamaIpcChannel.PullModel, async (_event, name: string) => {
     const modelName = name.trim();
