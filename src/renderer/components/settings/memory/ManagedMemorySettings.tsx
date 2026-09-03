@@ -3,6 +3,7 @@ import { Plus, RefreshCw } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 
+import { Badge } from '@shared/components/ui/badge';
 import { Button } from '@shared/components/ui/button';
 import {
   Card,
@@ -33,6 +34,7 @@ import {
 } from '@shared/components/ui/select';
 import { Spinner } from '@shared/components/ui/spinner';
 import { Textarea } from '@shared/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import {
   MemoryDeliveryStatus,
   MemoryKind,
@@ -45,8 +47,9 @@ import {
 import { i18nService } from '../../../services/i18n';
 import { memoryService } from '../../../services/memory';
 import type { RootState } from '../../../store';
+import { ManagedMemoryView } from './constants';
 import { MemoryRecordList } from './MemoryRecordList';
-import { collectMemorySourceSessionIds } from './memoryViewModel';
+import { collectMemorySourceSessionIds, countManagedMemories } from './memoryViewModel';
 
 const EDITOR_BUSY_ID = 'memory-editor';
 const OUTBOX_BUSY_ID = 'memory-outbox';
@@ -96,12 +99,16 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
   }, [workspaces, workingDirectory]);
   const defaultWorkspacePath = currentWorkspace?.path || workingDirectory.trim();
   const [selectedWorkspacePath, setSelectedWorkspacePath] = useState(defaultWorkspacePath);
+  const selectedWorkspace = workspaceOptions.find(
+    workspace => workspace.path === selectedWorkspacePath,
+  );
   const [records, setRecords] = useState<ManagedMemoryRecord[]>([]);
   const [sessionTitles, setSessionTitles] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editor, setEditor] = useState<MemoryEditor | null>(null);
   const [forgetTarget, setForgetTarget] = useState<ForgetTarget | null>(null);
+  const counts = useMemo(() => countManagedMemories(records), [records]);
 
   useEffect(() => {
     const nextPath = currentWorkspace?.path || workingDirectory.trim();
@@ -246,90 +253,124 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     }
   };
 
+  const memoryRecordListProps = {
+    workspaceName: selectedWorkspace?.name ?? selectedWorkspacePath,
+    records,
+    sessionTitles,
+    loading,
+    busy: busyId !== null,
+    onCreate: openCreateEditor,
+    onEdit: openEditEditor,
+    onConfirm: (record: ManagedMemoryRecord) =>
+      void runAction(
+        record.id,
+        () => memoryService.confirmCandidate(record.id),
+        'managedMemoryConfirmed',
+      ),
+    onArchive: (record: ManagedMemoryRecord) =>
+      void runAction(record.id, () => memoryService.archive(record.id), 'managedMemoryArchived'),
+    onRestore: (record: ManagedMemoryRecord) =>
+      void runAction(record.id, () => memoryService.restore(record.id), 'managedMemoryRestored'),
+    onForget: (record: ManagedMemoryRecord) => setForgetTarget({ record }),
+  };
+
   return (
-    <Card className="h-[40rem] min-h-0">
-      <CardHeader className="shrink-0 has-data-[slot=card-action]:grid-cols-1 sm:has-data-[slot=card-action]:grid-cols-[1fr_auto]">
-        <CardTitle>{i18nService.t('managedMemoryTitle')}</CardTitle>
-        <CardDescription>{i18nService.t('managedMemoryDescription')}</CardDescription>
-        <CardAction className="col-start-1 row-start-3 row-span-1 justify-self-start pt-2 sm:col-start-2 sm:row-start-1 sm:row-span-2 sm:justify-self-end sm:pt-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {i18nService.t('managedMemoryWorkspaceLabel')}
-            </span>
-            <Select
-              value={selectedWorkspacePath}
-              onValueChange={value => value && setSelectedWorkspacePath(value)}
-              disabled={workspaceOptions.length === 0}
+    <>
+      <div className="flex flex-col gap-4">
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="shrink-0 text-sm text-muted-foreground">
+            {i18nService.t('managedMemoryWorkspaceLabel')}
+          </span>
+          <Select
+            value={selectedWorkspacePath}
+            onValueChange={value => value && setSelectedWorkspacePath(value)}
+            disabled={workspaceOptions.length === 0}
+          >
+            <SelectTrigger
+              className="min-w-0 flex-1"
+              aria-label={i18nService.t('managedMemoryWorkspaceLabel')}
             >
-              <SelectTrigger
-                className="w-52"
-                aria-label={i18nService.t('managedMemoryWorkspaceLabel')}
+              <SelectValue placeholder={i18nService.t('managedMemoryWorkspaceEmpty')}>
+                {selectedWorkspace?.name}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent align="start" className="max-w-sm">
+              <SelectGroup>
+                {workspaceOptions.map(workspace => (
+                  <SelectItem key={workspace.id} value={workspace.path}>
+                    <span className="flex min-w-0 flex-col items-start">
+                      <span className="max-w-xs truncate">{workspace.name}</span>
+                      <span className="max-w-xs truncate text-xs text-muted-foreground">
+                        {workspace.path}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          {pendingCount > 0 && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => void handleRetry()}
+                    aria-label={i18nService
+                      .t('managedMemoryRetryPending')
+                      .replace('{count}', String(pendingCount))}
+                    disabled={busyId !== null}
+                  />
+                }
               >
-                <SelectValue placeholder={i18nService.t('managedMemoryWorkspaceEmpty')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  {workspaceOptions.map(workspace => (
-                    <SelectItem key={workspace.id} value={workspace.path}>
-                      {workspace.name}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-            {pendingCount > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void handleRetry()}
-                disabled={busyId !== null}
-              >
-                <RefreshCw data-icon="inline-start" />
+                <RefreshCw />
+              </TooltipTrigger>
+              <TooltipContent>
                 {i18nService
                   .t('managedMemoryRetryPending')
                   .replace('{count}', String(pendingCount))}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+
+        <Card className="h-96 min-h-0">
+          <CardHeader className="shrink-0">
+            <CardTitle className="flex items-center gap-2">
+              <span>{i18nService.t('managedMemoryTitle')}</span>
+              <span className="text-xs font-normal text-muted-foreground">{counts.longTerm}</span>
+            </CardTitle>
+            <CardDescription>{i18nService.t('managedMemoryDescription')}</CardDescription>
+            <CardAction>
+              <Button type="button" onClick={openCreateEditor} disabled={busyId !== null}>
+                <Plus data-icon="inline-start" />
+                {i18nService.t('managedMemoryCreate')}
               </Button>
-            )}
-            <Button type="button" size="sm" onClick={openCreateEditor} disabled={busyId !== null}>
-              <Plus data-icon="inline-start" />
-              {i18nService.t('managedMemoryCreate')}
-            </Button>
-          </div>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
-        <MemoryRecordList
-          records={records}
-          sessionTitles={sessionTitles}
-          loading={loading}
-          busy={busyId !== null}
-          onCreate={openCreateEditor}
-          onEdit={openEditEditor}
-          onConfirm={record =>
-            void runAction(
-              record.id,
-              () => memoryService.confirmCandidate(record.id),
-              'managedMemoryConfirmed',
-            )
-          }
-          onArchive={record =>
-            void runAction(
-              record.id,
-              () => memoryService.archive(record.id),
-              'managedMemoryArchived',
-            )
-          }
-          onRestore={record =>
-            void runAction(
-              record.id,
-              () => memoryService.restore(record.id),
-              'managedMemoryRestored',
-            )
-          }
-          onForget={record => setForgetTarget({ record })}
-        />
-      </CardContent>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col">
+            <MemoryRecordList view={ManagedMemoryView.LongTerm} {...memoryRecordListProps} />
+          </CardContent>
+        </Card>
+
+        <Card className="h-80 min-h-0">
+          <CardHeader className="shrink-0">
+            <CardTitle className="flex items-center gap-2">
+              <span>{i18nService.t('managedMemoryTabSessions')}</span>
+              <span className="text-xs font-normal text-muted-foreground">{counts.session}</span>
+            </CardTitle>
+            <CardDescription>{i18nService.t('managedMemorySessionDescription')}</CardDescription>
+            <CardAction>
+              <Badge variant="outline">{i18nService.t('managedMemoryReadOnly')}</Badge>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col">
+            <MemoryRecordList view={ManagedMemoryView.Session} {...memoryRecordListProps} />
+          </CardContent>
+        </Card>
+      </div>
 
       <MemoryEditorDialog
         editor={editor}
@@ -373,7 +414,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
         }
         onSecondaryConfirm={() => void handleForget(true)}
       />
-    </Card>
+    </>
   );
 }
 
