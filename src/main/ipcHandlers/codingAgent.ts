@@ -151,6 +151,32 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
       }
     },
   );
+  ipcMain.handle(CodingAgentIpc.ListPendingMessages, (_event, laneId: string) => ({
+    success: true,
+    items: service.listPendingMessages(laneId),
+  }));
+  ipcMain.handle(CodingAgentIpc.EnqueuePendingMessage, (_event, input: { laneId: string; text: string }) =>
+    service.enqueuePendingMessage(input.laneId, input.text),
+  );
+  ipcMain.handle(CodingAgentIpc.UpdatePendingMessage, (_event, input: { laneId: string; itemId: string; text: string }) =>
+    service.updatePendingMessage(input.laneId, input.itemId, input.text),
+  );
+  ipcMain.handle(CodingAgentIpc.DeletePendingMessage, (_event, input: { laneId: string; itemId: string }) =>
+    service.deletePendingMessage(input.laneId, input.itemId),
+  );
+  ipcMain.handle(
+    CodingAgentIpc.SteerPendingMessage,
+    async (_event, input: { workspaceRoot: string; laneId: string; itemId: string }) => {
+      try {
+        return {
+          success: true,
+          snapshot: await service.steerPendingMessage(input.workspaceRoot, input.laneId, input.itemId),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
   ipcMain.handle(
     CodingAgentIpc.ConfirmSessionRecovery,
     async (

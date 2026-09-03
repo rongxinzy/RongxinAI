@@ -985,6 +985,11 @@ interface IElectronAPI {
       workspaceRoot: string;
       prompt: import('../../shared/codingAgent').CodingPromptInput;
     }) => Promise<CodingAgentActionResult>;
+    listPendingMessages: (laneId: string) => Promise<{ success: boolean; items?: import('../../shared/cowork/pendingMessageQueue').CoworkPendingMessage[]; error?: string }>;
+    enqueuePendingMessage: (input: { laneId: string; text: string }) => Promise<{ success: boolean; item?: import('../../shared/cowork/pendingMessageQueue').CoworkPendingMessage; error?: string }>;
+    updatePendingMessage: (input: { laneId: string; itemId: string; text: string }) => Promise<{ success: boolean; error?: string }>;
+    deletePendingMessage: (input: { laneId: string; itemId: string }) => Promise<{ success: boolean; error?: string }>;
+    steerPendingMessage: (input: { workspaceRoot: string; laneId: string; itemId: string }) => Promise<CodingAgentActionResult>;
     confirmSessionRecovery: (input: {
       workspaceRoot: string;
       laneId: string;

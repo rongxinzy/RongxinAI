@@ -5,6 +5,7 @@ import path from 'path';
 import {
   CodingAgentDriverKind,
   CodingAgentEnvironmentKey,
+  CodingAgentManagedAdapterId,
   CodingAgentProfileStatus,
   type CodingAgentAuthMethod,
   type CodingAgentProfile,
@@ -150,6 +151,10 @@ export class AcpDiscoveryService {
       true,
     );
     if (!cliPath) return null;
+    const resolvedCliPath =
+      adapter.id === CodingAgentManagedAdapterId.ClaudeCode
+        ? await this.resolveClaudeNativeExecutable(cliPath)
+        : cliPath;
     const packageRoot = path.join(this.adapterRoot, 'node_modules', adapter.packageName);
     const manifest = await this.readPackageManifest(path.join(packageRoot, 'package.json'));
     if (!manifest || typeof manifest.version !== 'string') return null;
@@ -170,9 +175,32 @@ export class AcpDiscoveryService {
         [CodingAgentEnvironmentKey.ElectronRunAsNode]: '1',
         [CodingAgentEnvironmentKey.ManagedAdapterId]: adapter.id,
         [CodingAgentEnvironmentKey.ManagedAdapterVersion]: manifest.version,
-        [adapter.cliPathEnvironmentKey]: cliPath,
+        [adapter.cliPathEnvironmentKey]: resolvedCliPath,
       },
     });
+  }
+
+  /**
+   * Claude's Windows npm launcher is a .cmd/.ps1 shim. The Claude ACP SDK
+   * starts the configured executable with Node's spawn(), where those shims
+   * can fail with EINVAL. Point it at the native binary shipped by the same
+   * npm package instead.
+   */
+  private async resolveClaudeNativeExecutable(cliPath: string): Promise<string> {
+    if (this.platform !== 'win32' || !/\.(?:cmd|ps1|bat)$/i.test(cliPath)) return cliPath;
+    const candidate = path.join(
+      path.dirname(cliPath),
+      'node_modules',
+      '@anthropic-ai',
+      'claude-code',
+      'bin',
+      'claude.exe',
+    );
+    try {
+      return await realpath(candidate);
+    } catch {
+      return cliPath;
+    }
   }
 
   private profile(input: {

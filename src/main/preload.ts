@@ -634,6 +634,15 @@ contextBridge.exposeInMainWorld('electron', {
       workspaceRoot: string;
       prompt: import('../shared/codingAgent').CodingPromptInput;
     }) => ipcRenderer.invoke(CodingAgentIpc.Prompt, input),
+    listPendingMessages: (laneId: string) => ipcRenderer.invoke(CodingAgentIpc.ListPendingMessages, laneId),
+    enqueuePendingMessage: (input: { laneId: string; text: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.EnqueuePendingMessage, input),
+    updatePendingMessage: (input: { laneId: string; itemId: string; text: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.UpdatePendingMessage, input),
+    deletePendingMessage: (input: { laneId: string; itemId: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.DeletePendingMessage, input),
+    steerPendingMessage: (input: { workspaceRoot: string; laneId: string; itemId: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.SteerPendingMessage, input),
     confirmSessionRecovery: (input: {
       workspaceRoot: string;
       laneId: string;

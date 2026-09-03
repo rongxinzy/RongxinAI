@@ -27,6 +27,7 @@ import {
   type CodingLaneViewStateInput,
   type CodingPermissionResponse,
   type CodingPromptInput,
+  CodingPromptDelivery,
   type CodingRoomSnapshot,
   type CodingWorkspaceSummary,
   type CreateCodingSessionInput,
@@ -51,6 +52,8 @@ import type { CodingAgentDriver } from './drivers/codingAgentDriver';
 import { CodingDriverFactory } from './drivers/driverFactory';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 import type { WorkbenchApprovalMode } from '../../shared/workbenchTask';
+import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
+import { CoworkQueueDelivery, CoworkQueueItemStatus } from '../../shared/cowork/pendingMessageQueue';
 
 export interface CodingRoomRuntime {
   startBuiltinSession(input: {
@@ -64,6 +67,8 @@ export interface CodingRoomRuntime {
   /** Applies approval-mode changes to a live built-in session. */
   setBuiltinApprovalMode?(sessionId: string, mode: WorkbenchApprovalMode): void;
   cancelBuiltinSession(sessionId: string): Promise<void>;
+  enqueueBuiltinMessage?(sessionId: string, prompt: string): { success: boolean; error?: string };
+  steerBuiltinMessage?(sessionId: string, prompt: string): Promise<{ success: boolean; error?: string }>;
   /** Applies model/thinking-level changes to a live built-in session. */
   patchBuiltinSession?(
     sessionId: string,
@@ -137,6 +142,7 @@ export class CodingRoomService extends EventEmitter {
   private readonly authTerminals = new AuthTerminalService();
   private readonly git: CodingGitController;
   private readonly cancelledLanes = new Set<string>();
+  private readonly acpPendingMessages = new Map<string, CoworkPendingMessage[]>();
   private readonly stagedLaneIds = new Set<string>();
   /** Maps builtin sessionId → laneId to avoid scanning all rooms per event. */
   private readonly builtinSessionLaneMap = new Map<string, string>();
@@ -148,6 +154,7 @@ export class CodingRoomService extends EventEmitter {
     private readonly repository: CodingRoomRepository,
     readonly registry: CodingAgentRegistry,
     private readonly runtime: CodingRoomRuntime,
+    acpEnvironment: Record<string, string | undefined> = {},
   ) {
     super();
     this.git = new CodingGitController(repository);
@@ -167,7 +174,10 @@ export class CodingRoomService extends EventEmitter {
         patchSession: patchBuiltinSession,
         setApprovalMode: this.runtime.setBuiltinApprovalMode?.bind(this.runtime),
       },
-      Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]])),
+      {
+        ...Object.fromEntries(ACP_ENVIRONMENT_KEYS.map(key => [key, process.env[key]])),
+        ...acpEnvironment,
+      },
     );
     registry.on('changed', () => {
       for (const room of this.repository.listRooms()) this.publish(room.workspaceRoot);
@@ -484,6 +494,56 @@ export class CodingRoomService extends EventEmitter {
     return this.publish(workspaceRoot);
   }
 
+  listPendingMessages(laneId: string): CoworkPendingMessage[] {
+    return (this.acpPendingMessages.get(laneId) ?? []).map(item => ({ ...item }));
+  }
+
+  enqueuePendingMessage(laneId: string, text: string): { success: boolean; item?: CoworkPendingMessage; error?: string } {
+    const normalized = text.trim();
+    if (!normalized) return { success: false, error: 'Message text is required.' };
+    const item: CoworkPendingMessage = {
+      id: randomUUID(),
+      text: normalized,
+      delivery: CoworkQueueDelivery.FollowUp,
+      createdAt: Date.now(),
+      status: CoworkQueueItemStatus.Pending,
+    };
+    const items = this.acpPendingMessages.get(laneId) ?? [];
+    items.push(item);
+    this.acpPendingMessages.set(laneId, items);
+    return { success: true, item };
+  }
+
+  updatePendingMessage(laneId: string, itemId: string, text: string): { success: boolean; error?: string } {
+    const normalized = text.trim();
+    if (!normalized) return { success: false, error: 'Message text is required.' };
+    const items = this.acpPendingMessages.get(laneId) ?? [];
+    const item = items.find(candidate => candidate.id === itemId);
+    if (!item) return { success: false, error: 'Pending message was not found.' };
+    if (item.status === CoworkQueueItemStatus.Sending) {
+      return { success: false, error: 'A pending message cannot be edited while sending.' };
+    }
+    item.text = normalized;
+    return { success: true };
+  }
+
+  deletePendingMessage(laneId: string, itemId: string): { success: boolean; error?: string } {
+    const items = this.acpPendingMessages.get(laneId) ?? [];
+    const next = items.filter(item => item.id !== itemId);
+    if (next.length === items.length) return { success: false, error: 'Pending message was not found.' };
+    this.acpPendingMessages.set(laneId, next);
+    return { success: true };
+  }
+
+  async steerPendingMessage(workspaceRoot: string, laneId: string, itemId: string): Promise<CodingRoomSnapshot> {
+    const items = this.acpPendingMessages.get(laneId) ?? [];
+    const item = items.find(candidate => candidate.id === itemId);
+    if (!item) throw new Error('Pending message was not found.');
+    this.deletePendingMessage(laneId, itemId);
+    await this.cancel(workspaceRoot, laneId);
+    return await this.prompt(workspaceRoot, { laneId, prompt: item.text });
+  }
+
   async prompt(workspaceRoot: string, input: CodingPromptInput): Promise<CodingRoomSnapshot> {
     const snapshot = this.bootstrap(workspaceRoot);
     const lane = this.requireLane(snapshot.lanes, input.laneId);
@@ -491,6 +551,33 @@ export class CodingRoomService extends EventEmitter {
       lane.status === CodingLaneStatus.Running ||
       lane.status === CodingLaneStatus.WaitingApproval
     ) {
+      const profile = this.registry.get(lane.profileId);
+      const prompt = input.prompt.trim();
+      if (!prompt) throw new Error('Prompt is required.');
+      if (profile?.driverKind === CodingAgentDriverKind.Builtin) {
+        const driver = this.getDriver(lane);
+        const session = await this.ensureDriverSession(
+          driver,
+          lane,
+          this.executionRoot(lane, workspaceRoot),
+        );
+        if (input.delivery === CodingPromptDelivery.Steer) {
+          const result = await this.runtime.steerBuiltinMessage?.(session.id, prompt);
+          if (result?.success) return this.publish(workspaceRoot);
+          throw new Error(result?.error ?? 'Failed to steer the coding agent.');
+        }
+        const result = this.runtime.enqueueBuiltinMessage?.(session.id, prompt);
+        if (result?.success) return this.publish(workspaceRoot);
+        throw new Error(result?.error ?? 'Failed to queue the coding prompt.');
+      }
+      if (profile?.driverKind === CodingAgentDriverKind.Acp) {
+        const queued = this.enqueuePendingMessage(lane.id, prompt);
+        if (!queued.success || !queued.item) throw new Error(queued.error ?? 'Failed to queue the coding prompt.');
+        if (input.delivery === CodingPromptDelivery.Steer) {
+          return await this.steerPendingMessage(workspaceRoot, lane.id, queued.item.id);
+        }
+        return this.publish(workspaceRoot);
+      }
       throw new Error('This coding agent lane already has an active turn.');
     }
     const profile = this.registry.get(lane.profileId);
@@ -1361,6 +1448,7 @@ export class CodingRoomService extends EventEmitter {
         }
         this.repository.appendEvent(lane.id, CodingEventKind.TurnComplete, {});
         this.finishTurn(roomId, roomWorkspaceRoot, lane, CodingLaneStatus.Completed);
+        this.startNextAcpPendingMessage(roomWorkspaceRoot, lane);
       }
       this.publish(roomWorkspaceRoot);
     } catch (error) {
@@ -1379,6 +1467,22 @@ export class CodingRoomService extends EventEmitter {
       this.finishTurn(roomId, roomWorkspaceRoot, lane, this.failureStatus(lane, error));
       this.publish(roomWorkspaceRoot);
     }
+  }
+
+  private startNextAcpPendingMessage(workspaceRoot: string, lane: CodingAgentLane): void {
+    const profile = this.registry.get(lane.profileId);
+    if (profile?.driverKind !== CodingAgentDriverKind.Acp) return;
+    const next = this.acpPendingMessages.get(lane.id)?.[0];
+    if (!next) return;
+    next.status = CoworkQueueItemStatus.Sending;
+    void this.prompt(workspaceRoot, { laneId: lane.id, prompt: next.text })
+      .then(() => this.deletePendingMessage(lane.id, next.id))
+      .catch(error => {
+        next.status = CoworkQueueItemStatus.Failed;
+        next.error = this.errorMessage(error);
+        console.error('[CodingRoom] failed to start queued ACP message:', error);
+        this.publish(workspaceRoot);
+      });
   }
 
   private finishTurn(

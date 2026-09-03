@@ -32,7 +32,7 @@ export const CodingParticipants = ({
         label: (
           <span className="inline-flex items-center gap-1.5">
             <Bot className="size-4" />
-            <span className="max-w-32 truncate">{profile.name}</span>
+            <span className="max-w-24 truncate">{profile.name}</span>
           </span>
         ),
       },
@@ -46,7 +46,8 @@ export const CodingParticipants = ({
         if (laneId && laneId !== activeLaneId) onSelect(laneId);
       }}
       aria-label={i18nService.t('codingAgentParticipants')}
-      className="max-w-full overflow-x-auto"
+      className="min-w-0 max-w-[min(50vw,24rem)] overflow-x-auto"
+      listClassName="min-w-max flex-nowrap"
       items={items}
     />
   );
