@@ -66,7 +66,7 @@ jobs:
           set -euo pipefail
           mapfile -t debs < <(find release -maxdepth 1 -type f -name '*.deb' -print | sort)
           [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
-          sudo apt-get install -y "${debs[0]}"
+          sudo apt-get install -y "$(realpath "${debs[0]}")"
           test -x '/opt/知远/知远'
       - name: Verify the installed Ubuntu application starts and paints
         run: >-
