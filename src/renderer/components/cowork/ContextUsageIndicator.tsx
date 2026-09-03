@@ -92,7 +92,7 @@ export function ContextUsageIndicator({
         <TooltipTrigger
           render={
             <PopoverTrigger
-              nativeButton={false}
+              nativeButton={true}
               render={
                 <Button type="button" variant="ghost" size="icon-sm" aria-label={summary}>
                   <span className="sr-only">{summary}</span>

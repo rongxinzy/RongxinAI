@@ -62,7 +62,7 @@ export function CoworkModelPicker({
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
-        nativeButton={false}
+        nativeButton={true}
         render={
           <PromptInputButton className="max-w-[200px] gap-1 px-2 text-sm hover:bg-surface-raised">
             {displayedSelectedModel ? (

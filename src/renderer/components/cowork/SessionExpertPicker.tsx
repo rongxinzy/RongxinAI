@@ -61,7 +61,7 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          nativeButton={false}
+          nativeButton={true}
           render={
             <PromptInputButton
               type="button"

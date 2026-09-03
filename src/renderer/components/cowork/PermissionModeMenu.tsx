@@ -37,7 +37,7 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        nativeButton={false}
+        nativeButton={true}
         disabled={disabled}
         render={
           <PromptInputButton
