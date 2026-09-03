@@ -63,6 +63,7 @@ import {
   ModelConnectionStatus,
   useModelConnectionStatus,
 } from './settings/useModelConnectionStatus';
+import { shouldAutoDetectProviderModels } from './settings/providerModelAutoDetection';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -1432,6 +1433,27 @@ const Settings: React.FC<SettingsProps> = ({
   const handleProviderConfigChange = (provider: ProviderType, field: string, value: string) => {
     if (field === 'apiKey' || field === 'baseUrl' || field === 'apiFormat') {
       invalidateProviderModelConnectionStatuses(provider);
+    }
+    if (field === 'apiFormat') {
+      const currentProviderConfig = providers[provider];
+      const nextApiFormat = getEffectiveApiFormat(provider, value);
+      const nextBaseUrl = shouldAutoSwitchProviderBaseUrl(provider, currentProviderConfig.baseUrl)
+        ? getProviderDefaultBaseUrl(provider, nextApiFormat) || currentProviderConfig.baseUrl
+        : currentProviderConfig.baseUrl;
+      if (
+        shouldAutoDetectProviderModels({
+          providerId: provider,
+          baseUrl: nextBaseUrl,
+          apiKey: currentProviderConfig.apiKey,
+          authType: currentProviderConfig.authType,
+          requiresApiKey: providerRequiresApiKey(provider),
+        })
+      ) {
+        setAutoDetectRequest({
+          provider,
+          requestId: ++autoDetectRequestIdRef.current,
+        });
+      }
     }
     setProviders(prev => {
       if (field === 'apiFormat') {
