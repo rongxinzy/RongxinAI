@@ -1,0 +1,4 @@
+{"detail":"At least one pre-registered threshold did not pass.","event":"iteration_evaluated","level":"decision","source":"orchestrator","ts":"2026-09-03T05:58:56.413Z"}
+{"detail":"At least one pre-registered threshold did not pass.","event":"iteration_evaluated","level":"decision","source":"orchestrator","ts":"2026-09-03T06:00:27.412Z"}
+{"detail":"All pre-registered thresholds passed.","event":"iteration_evaluated","level":"info","source":"orchestrator","ts":"2026-09-03T06:02:32.948Z"}
+{"detail":"Direction two inspected the production virtualized list and narrowed the recommendation to static historical subtrees.","event":"scope_qualified","level":"decision","source":"orchestrator","ts":"2026-09-03T06:03:00.000Z"}

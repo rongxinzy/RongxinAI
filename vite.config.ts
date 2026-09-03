@@ -1,4 +1,5 @@
-import react from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
@@ -94,6 +95,9 @@ export default defineConfig(async ({ command }) => {
     plugins: [
       (await import('@tailwindcss/vite')).default(),
       react(),
+      babel({
+        presets: [reactCompilerPreset({ compilationMode: 'annotation' })],
+      }),
       // CI build-renderer job 跳过 electron 构建（由 build-main job 单独负责）
       // 避免 renderer + main/preload 在同一进程内叠加 heap 导致 OOM
       ...(process.env.VITE_SKIP_ELECTRON
