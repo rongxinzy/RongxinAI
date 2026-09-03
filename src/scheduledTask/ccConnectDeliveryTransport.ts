@@ -1,5 +1,6 @@
 import type { IMStore } from "../main/im/imStore";
 import { tryParseCcConnectScopedConversationId } from "../main/im/ccConnectConversationId";
+import type { CoworkStore } from "../main/coworkStore";
 
 import type { CcConnectDeliveryClient } from "./ccConnectDeliveryClient";
 import type { SchedulerDeliveryTransport } from "./deliveryDispatcher";
@@ -16,6 +17,7 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
 
   constructor(
     private readonly imStore: Pick<IMStore, "getCcConnectSessionKey" | "listSessionMappings">,
+    private readonly coworkStore?: Pick<CoworkStore, "addMessage">,
   ) {}
 
   attach(accountId: string, client: DeliveryClient): void {
@@ -53,7 +55,39 @@ export class CcConnectDeliveryTransport implements SchedulerDeliveryTransport {
       );
     }
     await client.send({ accountId, platform, sessionKey, content: input.content });
+    try {
+      this.persistAssistantMessage(platform, accountId, conversationId, input.content);
+    } catch (error) {
+      // Delivery has already succeeded. Do not turn an outbound notification
+      // into a failed delivery merely because its local context projection
+      // could not be persisted.
+      console.warn('[CcConnectDelivery] failed to persist assistant context:', error);
+    }
     return {};
+  }
+
+  private persistAssistantMessage(
+    platform: string,
+    accountId: string,
+    conversationId: string,
+    content: string,
+  ): void {
+    if (!this.coworkStore || !content.trim()) return;
+    const scopedConversationId = JSON.stringify([accountId, conversationId]);
+    const mapping = this.imStore.listSessionMappings().find(item => {
+      const parsed = tryParseCcConnectScopedConversationId(item.imConversationId);
+      return (
+        normalizePlatform(item.platform) === platform &&
+        parsed?.[0] === accountId &&
+        parsed?.[1] === conversationId
+      );
+    });
+    if (!mapping) return;
+    this.coworkStore.addMessage(mapping.coworkSessionId, {
+      type: 'assistant',
+      content,
+      metadata: { source: 'scheduled_task_delivery', scopedConversationId },
+    });
   }
 
   private resolveAccountId(platform: string, conversationId: string, configuredAccountId?: string): string {

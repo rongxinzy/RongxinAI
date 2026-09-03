@@ -299,6 +299,6 @@ export function getNotifyConversationLabel(conversation: Pick<ScheduledTaskConve
   // Connectors may return opaque user/session IDs for direct chats. They are
   // routing keys, not human-facing names, so never expose them in the form.
   return conversationId
-    ? `${i18nService.t('scheduledTasksFormNotifyDirectMessage')} · ${conversationId.slice(-4)}`
+    ? i18nService.t('scheduledTasksFormNotifyDirectMessage')
     : i18nService.t('scheduledTasksFormNotifyConversationUnknown');
 }
