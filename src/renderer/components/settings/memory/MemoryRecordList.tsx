@@ -4,6 +4,7 @@ import {
   Brain,
   Check,
   EllipsisVertical,
+  Funnel,
   Pencil,
   Plus,
   RotateCcw,
@@ -27,6 +28,9 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@shared/components/ui/dropdown-menu';
@@ -40,18 +44,9 @@ import {
 } from '@shared/components/ui/empty';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@shared/components/ui/input-group';
 import { ScrollArea } from '@shared/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@shared/components/ui/select';
 import { Separator } from '@shared/components/ui/separator';
 import { Skeleton } from '@shared/components/ui/skeleton';
-import { PageTabs } from '@shared/components/ui/page-tabs';
-import { Tabs, TabsContent } from '@shared/components/ui/tabs';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import {
   MemoryDeliveryStatus,
   MemoryKind,
@@ -62,6 +57,7 @@ import {
   type ManagedMemoryRecord,
 } from '../../../../shared/memory';
 import { i18nService } from '../../../services/i18n';
+import OverflowingSessionTitle from '../../agentSidebar/OverflowingSessionTitle';
 import {
   ManagedMemoryScopeFilter,
   ManagedMemoryStatusFilter,
@@ -77,6 +73,8 @@ import {
 } from './memoryViewModel';
 
 interface MemoryRecordListProps {
+  view: ManagedMemoryViewValue;
+  workspaceName: string;
   records: ManagedMemoryRecord[];
   sessionTitles: ReadonlyMap<string, string>;
   loading: boolean;
@@ -102,6 +100,8 @@ interface MemoryRecordActionProps {
 
 export function MemoryRecordList(props: MemoryRecordListProps) {
   const {
+    view,
+    workspaceName,
     records,
     sessionTitles,
     loading,
@@ -113,7 +113,6 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
     onRestore,
     onForget,
   } = props;
-  const [view, setView] = useState<ManagedMemoryViewValue>(ManagedMemoryView.LongTerm);
   const [scope, setScope] = useState<ManagedMemoryScopeFilterValue>(ManagedMemoryScopeFilter.All);
   const [status, setStatus] = useState<ManagedMemoryStatusFilterValue>(
     ManagedMemoryStatusFilter.All,
@@ -121,26 +120,21 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const counts = useMemo(() => countManagedMemories(records), [records]);
-  const longTermRecords = useMemo(
+  const activeFilterCount =
+    Number(status !== ManagedMemoryStatusFilter.All) +
+    Number(scope !== ManagedMemoryScopeFilter.All);
+  const filteredRecords = useMemo(
     () =>
       filterAndSortManagedMemories(records, {
-        view: ManagedMemoryView.LongTerm,
-        scope,
+        view,
+        scope: view === ManagedMemoryView.LongTerm ? scope : ManagedMemoryScopeFilter.All,
         status,
         query,
       }),
-    [query, records, scope, status],
+    [query, records, scope, status, view],
   );
-  const sessionRecords = useMemo(
-    () =>
-      filterAndSortManagedMemories(records, {
-        view: ManagedMemoryView.Session,
-        scope: ManagedMemoryScopeFilter.All,
-        status,
-        query,
-      }),
-    [query, records, status],
-  );
+  const viewTotal = view === ManagedMemoryView.LongTerm ? counts.longTerm : counts.session;
+  const readOnly = view === ManagedMemoryView.Session;
   const selectedRecord = useMemo(
     () => records.find(record => record.id === selectedId) ?? null,
     [records, selectedId],
@@ -157,31 +151,9 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
 
   return (
     <>
-      <Tabs
-        value={view}
-        onValueChange={value => setView(value as ManagedMemoryViewValue)}
-        className="min-h-0 flex-1 gap-3"
-      >
-        <PageTabs
-          bare
-          value={view}
-          className="w-full shrink-0"
-          items={[
-            {
-              value: ManagedMemoryView.LongTerm,
-              label: i18nService.t('managedMemoryTabLongTerm'),
-              badge: <Badge variant="secondary">{counts.longTerm}</Badge>,
-            },
-            {
-              value: ManagedMemoryView.Session,
-              label: i18nService.t('managedMemoryTabSessions'),
-              badge: <Badge variant="secondary">{counts.session}</Badge>,
-            },
-          ]}
-        />
-
-        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-          <InputGroup className="sm:flex-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex shrink-0 items-center gap-2">
+          <InputGroup className="min-w-0 flex-1">
             <InputGroupAddon>
               <Search />
             </InputGroupAddon>
@@ -189,57 +161,72 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
               type="search"
               value={query}
               onChange={event => setQuery(event.target.value)}
-              placeholder={i18nService.t('managedMemorySearchPlaceholder')}
-              aria-label={i18nService.t('managedMemorySearchPlaceholder')}
+              placeholder={i18nService.t(
+                readOnly
+                  ? 'managedMemorySessionSearchPlaceholder'
+                  : 'managedMemorySearchPlaceholder',
+              )}
+              aria-label={i18nService.t(
+                readOnly
+                  ? 'managedMemorySessionSearchPlaceholder'
+                  : 'managedMemorySearchPlaceholder',
+              )}
             />
           </InputGroup>
-          {view === ManagedMemoryView.LongTerm && (
-            <Select
-              value={scope}
-              onValueChange={value => setScope(value as ManagedMemoryScopeFilterValue)}
-            >
-              <SelectTrigger className="w-full sm:w-32" aria-label={scopeFilterLabel(scope)}>
-                <SelectValue>{scopeFilterLabel(scope)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={ManagedMemoryScopeFilter.All}>
-                    {i18nService.t('managedMemoryFilterScopeAll')}
-                  </SelectItem>
-                  <SelectItem value={ManagedMemoryScopeFilter.Personal}>
-                    {i18nService.t('managedMemoryScopePersonal')}
-                  </SelectItem>
-                  <SelectItem value={ManagedMemoryScopeFilter.Project}>
-                    {i18nService.t('managedMemoryScopeProject')}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+          {!readOnly && (
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button type="button" variant="outline" />}>
+                <Funnel data-icon="inline-start" />
+                {activeFilterCount > 0
+                  ? i18nService
+                      .t('managedMemoryFilterActive')
+                      .replace('{count}', String(activeFilterCount))
+                  : i18nService.t('managedMemoryFilter')}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>{i18nService.t('managedMemoryFieldScope')}</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={scope}
+                    onValueChange={value => setScope(value as ManagedMemoryScopeFilterValue)}
+                  >
+                    <DropdownMenuRadioItem value={ManagedMemoryScopeFilter.All}>
+                      {i18nService.t('managedMemoryFilterScopeAll')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value={ManagedMemoryScopeFilter.Personal}>
+                      {i18nService.t('managedMemoryScopePersonal')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value={ManagedMemoryScopeFilter.Project}>
+                      {i18nService.t('managedMemoryScopeProject')}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>
+                    {i18nService.t('managedMemoryColumnStatus')}
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={status}
+                    onValueChange={value => setStatus(value as ManagedMemoryStatusFilterValue)}
+                  >
+                    <DropdownMenuRadioItem value={ManagedMemoryStatusFilter.All}>
+                      {i18nService.t('managedMemoryFilterStatusAll')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value={ManagedMemoryStatusFilter.NeedsReview}>
+                      {i18nService.t('managedMemoryStatusNeedsReview')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value={ManagedMemoryStatusFilter.Active}>
+                      {i18nService.t('managedMemoryStatusActive')}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value={ManagedMemoryStatusFilter.Inactive}>
+                      {i18nService.t('managedMemoryFilterStatusInactive')}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
-          <Select
-            value={status}
-            onValueChange={value => setStatus(value as ManagedMemoryStatusFilterValue)}
-          >
-            <SelectTrigger className="w-full sm:w-32" aria-label={statusFilterLabel(status)}>
-              <SelectValue>{statusFilterLabel(status)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={ManagedMemoryStatusFilter.All}>
-                  {i18nService.t('managedMemoryFilterStatusAll')}
-                </SelectItem>
-                <SelectItem value={ManagedMemoryStatusFilter.NeedsReview}>
-                  {i18nService.t('managedMemoryStatusNeedsReview')}
-                </SelectItem>
-                <SelectItem value={ManagedMemoryStatusFilter.Active}>
-                  {i18nService.t('managedMemoryStatusActive')}
-                </SelectItem>
-                <SelectItem value={ManagedMemoryStatusFilter.Inactive}>
-                  {i18nService.t('managedMemoryFilterStatusInactive')}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
         </div>
 
         {loading ? (
@@ -252,49 +239,34 @@ export function MemoryRecordList(props: MemoryRecordListProps) {
             </div>
           </div>
         ) : (
-          <>
-            <TabsContent
-              value={ManagedMemoryView.LongTerm}
-              className="min-h-0 overflow-x-hidden overflow-y-auto"
-              style={{ scrollbarGutter: 'stable' }}
-            >
-              <div className="pr-3 pb-1">
-                <MemoryRows
-                  records={longTermRecords}
-                  viewTotal={counts.longTerm}
-                  view={ManagedMemoryView.LongTerm}
-                  busy={busy}
-                  onCreate={onCreate}
-                  onSelect={record => setSelectedId(record.id)}
-                  actionProps={actionProps}
-                />
-              </div>
-            </TabsContent>
-            <TabsContent
-              value={ManagedMemoryView.Session}
-              className="min-h-0 overflow-x-hidden overflow-y-auto"
-              style={{ scrollbarGutter: 'stable' }}
-            >
-              <div className="pr-3 pb-1">
-                <MemoryRows
-                  records={sessionRecords}
-                  viewTotal={counts.session}
-                  view={ManagedMemoryView.Session}
-                  busy={busy}
-                  onCreate={onCreate}
-                  onSelect={record => setSelectedId(record.id)}
-                  actionProps={actionProps}
-                />
-              </div>
-            </TabsContent>
-          </>
+          <div
+            className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+            style={{ scrollbarGutter: 'stable' }}
+          >
+            <div className="pr-3 pb-1">
+              <MemoryRows
+                records={filteredRecords}
+                viewTotal={viewTotal}
+                view={view}
+                busy={busy}
+                readOnly={readOnly}
+                workspaceName={workspaceName}
+                sessionTitles={sessionTitles}
+                onCreate={onCreate}
+                onSelect={record => setSelectedId(record.id)}
+                actionProps={actionProps}
+              />
+            </div>
+          </div>
         )}
-      </Tabs>
+      </div>
 
       <MemoryDetailsDialog
         record={selectedRecord}
         sessionTitles={sessionTitles}
+        workspaceName={workspaceName}
         busy={busy}
+        readOnly={readOnly}
         onClose={() => setSelectedId(null)}
         onEdit={record => {
           setSelectedId(null);
@@ -317,11 +289,25 @@ function MemoryRows(props: {
   viewTotal: number;
   view: ManagedMemoryViewValue;
   busy: boolean;
+  readOnly: boolean;
+  workspaceName: string;
+  sessionTitles: ReadonlyMap<string, string>;
   onCreate: () => void;
   onSelect: (record: ManagedMemoryRecord) => void;
   actionProps: (record: ManagedMemoryRecord) => Omit<MemoryRecordActionProps, 'record'>;
 }) {
-  const { records, viewTotal, view, busy, onCreate, onSelect, actionProps } = props;
+  const {
+    records,
+    viewTotal,
+    view,
+    busy,
+    readOnly,
+    workspaceName,
+    sessionTitles,
+    onCreate,
+    onSelect,
+    actionProps,
+  } = props;
   if (viewTotal === 0) {
     return (
       <Empty>
@@ -359,33 +345,41 @@ function MemoryRows(props: {
       {records.map((record, index) => (
         <div key={record.id}>
           {index > 0 && <Separator />}
-          <div className="flex min-w-0 items-start gap-2 px-3 py-3 transition-colors hover:bg-muted">
+          <div className="flex min-w-0 items-start gap-2 px-3 py-2.5 transition-colors hover:bg-muted">
             <Button
               type="button"
               variant="ghost"
               className="h-auto min-w-0 flex-1 items-start justify-start p-0 text-left"
               onClick={() => onSelect(record)}
             >
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate font-medium text-foreground">
-                    {displayTitle(record)}
-                  </span>
-                  <StatusBadge record={record} />
+                  {readOnly ? (
+                    <OverflowingSessionTitle
+                      title={displayTitle(record, sessionTitles, workspaceName)}
+                    />
+                  ) : (
+                    <span className="truncate font-medium text-foreground">
+                      {displayTitle(record, sessionTitles, workspaceName)}
+                    </span>
+                  )}
+                  {!readOnly && <StatusBadge record={record} />}
                   {isLegacySessionSummaryAwaitingUpgrade(record) && (
                     <Badge variant="outline">
                       {i18nService.t('managedMemoryLegacySummaryPendingUpgrade')}
                     </Badge>
                   )}
                 </div>
-                <p className="line-clamp-2 whitespace-normal wrap-break-word text-sm text-muted-foreground">
-                  {record.content}
-                </p>
+                <p className="truncate text-sm text-muted-foreground">{record.content}</p>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <span>{scopeLabel(record.scope)}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{kindLabel(record.kind)}</span>
-                  <span aria-hidden="true">·</span>
+                  {!readOnly && (
+                    <>
+                      <span>{scopeLabel(record.scope)}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>{kindLabel(record.kind)}</span>
+                      <span aria-hidden="true">·</span>
+                    </>
+                  )}
                   <span>{formatDate(record.updatedAt)}</span>
                   {record.sensitivity === MemorySensitivity.Sensitive && (
                     <span className="inline-flex items-center gap-1">
@@ -396,7 +390,7 @@ function MemoryRows(props: {
                 </div>
               </div>
             </Button>
-            <MemoryRecordActions record={record} {...actionProps(record)} />
+            {!readOnly && <MemoryRecordActions record={record} {...actionProps(record)} />}
           </div>
         </div>
       ))}
@@ -421,20 +415,33 @@ function MemoryRecordActions(props: MemoryRecordActionProps) {
     record.status === MemoryLifecycleStatus.Archived ||
     record.status === MemoryLifecycleStatus.Expired;
   const hasPrimaryMenuActions = !inlineLifecycleActions && (editable || active || restorable);
+  const confirmDisabled = busy || record.deliveryStatus === MemoryDeliveryStatus.Pending;
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {record.status === MemoryLifecycleStatus.NeedsReview && (
-        <Button
-          type="button"
-          size="sm"
-          className="px-2 sm:px-3"
-          onClick={onConfirm}
-          aria-label={i18nService.t('managedMemoryConfirm')}
-          disabled={busy || record.deliveryStatus === MemoryDeliveryStatus.Pending}
-        >
+      {record.status === MemoryLifecycleStatus.NeedsReview && inlineLifecycleActions && (
+        <Button type="button" size="sm" onClick={onConfirm} disabled={confirmDisabled}>
           <Check data-icon="inline-start" />
-          <span className="hidden sm:inline">{i18nService.t('managedMemoryConfirm')}</span>
+          {i18nService.t('managedMemoryConfirm')}
         </Button>
+      )}
+      {record.status === MemoryLifecycleStatus.NeedsReview && !inlineLifecycleActions && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={onConfirm}
+                aria-label={i18nService.t('managedMemoryConfirm')}
+                disabled={confirmDisabled}
+              />
+            }
+          >
+            <Check />
+          </TooltipTrigger>
+          <TooltipContent>{i18nService.t('managedMemoryConfirm')}</TooltipContent>
+        </Tooltip>
       )}
       {inlineLifecycleActions && editable && (
         <Button type="button" variant="outline" size="sm" onClick={onEdit} disabled={busy}>
@@ -509,7 +516,9 @@ function MemoryRecordActions(props: MemoryRecordActionProps) {
 function MemoryDetailsDialog(props: {
   record: ManagedMemoryRecord | null;
   sessionTitles: ReadonlyMap<string, string>;
+  workspaceName: string;
   busy: boolean;
+  readOnly: boolean;
   onClose: () => void;
   onEdit: (record: ManagedMemoryRecord) => void;
   onConfirm: (record: ManagedMemoryRecord) => void;
@@ -520,7 +529,9 @@ function MemoryDetailsDialog(props: {
   const {
     record,
     sessionTitles,
+    workspaceName,
     busy,
+    readOnly,
     onClose,
     onEdit,
     onConfirm,
@@ -533,7 +544,9 @@ function MemoryDetailsDialog(props: {
       <DialogContent className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-xl">
         <DialogHeader className="shrink-0 pr-8">
           <DialogTitle>
-            {record ? displayTitle(record) : i18nService.t('managedMemoryTitle')}
+            {record
+              ? displayTitle(record, sessionTitles, workspaceName)
+              : i18nService.t('managedMemoryTitle')}
           </DialogTitle>
           <DialogDescription>{i18nService.t('managedMemoryDetailDescription')}</DialogDescription>
         </DialogHeader>
@@ -590,7 +603,7 @@ function MemoryDetailsDialog(props: {
           <Button type="button" variant="outline" onClick={onClose}>
             {i18nService.t('close')}
           </Button>
-          {record && (
+          {record && !readOnly && (
             <MemoryRecordActions
               record={record}
               busy={busy}
@@ -620,9 +633,9 @@ function MemoryDetail(props: { label: string; children: React.ReactNode }) {
 function MemoryListSkeleton() {
   return (
     <div className="flex flex-col gap-2" aria-label={i18nService.t('loading')}>
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
-      <Skeleton className="h-20 w-full" />
+      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-16 w-full" />
+      <Skeleton className="h-16 w-full" />
     </div>
   );
 }
@@ -646,33 +659,17 @@ function canEdit(record: ManagedMemoryRecord): boolean {
   );
 }
 
-function displayTitle(record: ManagedMemoryRecord): string {
-  return record.scope === MemoryScope.Session
-    ? i18nService.t('managedMemorySessionSummaryTitle')
-    : record.title;
-}
-
-function scopeFilterLabel(scope: ManagedMemoryScopeFilterValue): string {
-  if (scope === ManagedMemoryScopeFilter.Personal) {
-    return i18nService.t('managedMemoryScopePersonal');
-  }
-  if (scope === ManagedMemoryScopeFilter.Project) {
-    return i18nService.t('managedMemoryScopeProject');
-  }
-  return i18nService.t('managedMemoryFilterScopeAll');
-}
-
-function statusFilterLabel(status: ManagedMemoryStatusFilterValue): string {
-  if (status === ManagedMemoryStatusFilter.NeedsReview) {
-    return i18nService.t('managedMemoryStatusNeedsReview');
-  }
-  if (status === ManagedMemoryStatusFilter.Active) {
-    return i18nService.t('managedMemoryStatusActive');
-  }
-  if (status === ManagedMemoryStatusFilter.Inactive) {
-    return i18nService.t('managedMemoryFilterStatusInactive');
-  }
-  return i18nService.t('managedMemoryFilterStatusAll');
+function displayTitle(
+  record: ManagedMemoryRecord,
+  sessionTitles: ReadonlyMap<string, string>,
+  workspaceName: string,
+): string {
+  if (record.scope !== MemoryScope.Session) return record.title;
+  const sessionTitle =
+    sessionTitles.get(record.sessionId)?.trim() ||
+    record.title.trim() ||
+    i18nService.t('managedMemorySessionSummaryTitle');
+  return workspaceName ? `${workspaceName} - ${sessionTitle}` : sessionTitle;
 }
 
 function scopeLabel(scope: ManagedMemoryRecord['scope']): string {
