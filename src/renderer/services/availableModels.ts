@@ -109,9 +109,10 @@ export function buildLlamaCppRunningModels(
       agentProviderId: ProviderRegistry.getAgentProviderId(ProviderName.LlamaCpp),
       supportsImage: false,
       capabilities: preferences[name]?.capabilities,
+      ...(preferences[name]?.maxTokens ? { maxTokens: preferences[name]?.maxTokens } : {}),
       supportsThinkingToggle: model.supportsThinkingToggle,
       llamaCppAgentEligibility: eligibility,
-      llamaCppRuntimeContextWindow: eligibility.runtimeContextWindow,
+      llamaCppRuntimeContextWindow: preferences[name]?.ctxSize ?? eligibility.runtimeContextWindow,
       llamaCppTrainedContextWindow: eligibility.trainedContextWindow,
     });
   });

@@ -192,26 +192,31 @@ function modelCapabilities(item: Record<string, unknown>): Partial<ModelCapabili
     : undefined;
 }
 
-function modelMetadata(item: Record<string, unknown>): Pick<DiscoveredProviderModel, 'contextWindow' | 'maxTokens' | 'capabilities'> {
+function modelMetadata(
+  item: Record<string, unknown>,
+): Pick<DiscoveredProviderModel, 'contextWindow' | 'maxTokens' | 'capabilities'> {
   const topProvider = nestedRecord(item.top_provider);
+  const meta = nestedRecord(item.meta);
   const contextWindow = firstPositiveInteger(
-      item.contextWindow,
-      item.context_window,
-      item.contextLength,
-      item.context_length,
-      item.max_context_length,
-      item.input_context_length,
-      topProvider?.context_length,
-    );
+    item.contextWindow,
+    item.context_window,
+    item.contextLength,
+    item.context_length,
+    item.max_context_length,
+    item.input_context_length,
+    meta?.n_ctx,
+    meta?.context_length,
+    topProvider?.context_length,
+  );
   const maxTokens = firstPositiveInteger(
-      item.maxTokens,
-      item.max_tokens,
-      item.maxOutputTokens,
-      item.max_output_tokens,
-      item.max_completion_tokens,
-      item.output_token_limit,
-      topProvider?.max_completion_tokens,
-    );
+    item.maxTokens,
+    item.max_tokens,
+    item.maxOutputTokens,
+    item.max_output_tokens,
+    item.max_completion_tokens,
+    item.output_token_limit,
+    topProvider?.max_completion_tokens,
+  );
   const capabilities = modelCapabilities(item);
   return {
     ...(contextWindow !== undefined ? { contextWindow } : {}),

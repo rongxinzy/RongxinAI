@@ -344,7 +344,8 @@ export type LlamaCppCancelInstallResult = {
 
 export type LlamaCppModelPreference = {
   ctxSize?: number;
-  capabilities?: Pick<ModelCapabilities, 'toolCalling'>;
+  maxTokens?: number;
+  capabilities?: Partial<ModelCapabilities>;
 };
 
 export type LlamaCppModelPreferences = Record<string, LlamaCppModelPreference>;

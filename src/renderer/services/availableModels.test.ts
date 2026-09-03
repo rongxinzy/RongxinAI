@@ -4,7 +4,11 @@ import { ModelCapabilityStatus, ProviderName } from '../../shared/providers';
 import { ManagedProviderAccessMode } from '../../shared/managedProviders';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
-import { buildConfiguredAvailableModels, collectAvailableModels } from './availableModels';
+import {
+  buildConfiguredAvailableModels,
+  buildLlamaCppRunningModels,
+  collectAvailableModels,
+} from './availableModels';
 
 function createConfig(): AppConfig {
   return {
@@ -146,6 +150,36 @@ test('collectAvailableModels merges running llama.cpp model metadata', async () 
     trainedContextWindow: 32768,
   });
   expect(llamaCppModel?.supportsThinkingToggle).toBe(true);
+});
+
+test('uses saved llama.cpp preferences for the model capability metadata', () => {
+  const models = buildLlamaCppRunningModels(
+    [{ name: 'qwen-local', runtime_context_length: 8192 }],
+    {
+      'qwen-local': {
+        ctxSize: 65_536,
+        maxTokens: 8192,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          imageInput: ModelCapabilityStatus.Unsupported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      },
+    },
+  );
+
+  expect(models).toEqual([
+    expect.objectContaining({
+      id: 'qwen-local',
+      maxTokens: 8192,
+      llamaCppRuntimeContextWindow: 65_536,
+      capabilities: {
+        toolCalling: ModelCapabilityStatus.Supported,
+        imageInput: ModelCapabilityStatus.Unsupported,
+        reasoning: ModelCapabilityStatus.Supported,
+      },
+    }),
+  ]);
 });
 
 test('preserves contextTokens for custom cloud models', () => {

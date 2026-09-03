@@ -6,6 +6,7 @@ import {
   LlamaCppRuntimeCudaMajor,
   LlamaCppMemoryPolicy,
 } from '../../shared/llamacpp';
+import { ModelCapabilityStatus } from '../../shared/providers';
 import type { LlamaCppManager } from '../libs/llamacppManager';
 import {
   enforceLlamaCppParallelTwo,
@@ -15,10 +16,49 @@ import {
   getTotalFreeVramMiB,
   hasRecoveredVram,
   sanitizeLlamaCppServiceConfig,
+  sanitizeLlamaCppModelPreference,
   waitForLlamaCppModelUnloadConfirmation,
   waitForLlamaCppStartupModelBindings,
   registerLlamaCppIpcHandlers,
 } from './llamacpp';
+
+test('sanitizeLlamaCppModelPreference retains every supported capability field', () => {
+  expect(
+    sanitizeLlamaCppModelPreference({
+      ctxSize: '65536',
+      maxTokens: '8192',
+      capabilities: {
+        toolCalling: ModelCapabilityStatus.Supported,
+        imageInput: ModelCapabilityStatus.Unsupported,
+        videoInput: ModelCapabilityStatus.Unknown,
+        audioInput: ModelCapabilityStatus.Supported,
+        documentInput: ModelCapabilityStatus.Unsupported,
+        reasoning: ModelCapabilityStatus.Supported,
+        ignored: ModelCapabilityStatus.Supported,
+      },
+    }),
+  ).toEqual({
+    ctxSize: 65536,
+    maxTokens: 8192,
+    capabilities: {
+      toolCalling: ModelCapabilityStatus.Supported,
+      imageInput: ModelCapabilityStatus.Unsupported,
+      videoInput: ModelCapabilityStatus.Unknown,
+      audioInput: ModelCapabilityStatus.Supported,
+      documentInput: ModelCapabilityStatus.Unsupported,
+      reasoning: ModelCapabilityStatus.Supported,
+    },
+  });
+});
+
+test('sanitizeLlamaCppModelPreference drops invalid maximum output and capability values', () => {
+  expect(
+    sanitizeLlamaCppModelPreference({
+      maxTokens: 0,
+      capabilities: { toolCalling: 'yes' },
+    }),
+  ).toBeNull();
+});
 
 const electronMocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),

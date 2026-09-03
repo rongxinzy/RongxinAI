@@ -47,7 +47,7 @@ describe('mergeDiscoveredProviderModels', () => {
     ).toEqual([...latestDraft, { id: 'model-b', name: 'Remote B' }]);
   });
 
-  test('fills missing metadata without overwriting explicit user values', () => {
+  test('updates an existing context length from explicit discovery metadata', () => {
     const existing = [
       {
         id: 'model-a',
@@ -74,7 +74,7 @@ describe('mergeDiscoveredProviderModels', () => {
       {
         id: 'model-a',
         name: 'Model A',
-        contextWindow: 8192,
+        contextWindow: 32768,
         maxTokens: 4096,
         supportsImage: true,
         capabilities: {
