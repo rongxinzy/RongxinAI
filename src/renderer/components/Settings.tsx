@@ -3281,9 +3281,9 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'model':
         return (
-          <div className="flex h-full">
-            {/* Provider List - Left Side */}
-            <div className="w-2/5 border-r border-border px-2 space-y-1.5 overflow-y-auto">
+            <div className="flex h-full flex-col md:flex-row">
+              {/* Provider List - Left Side */}
+            <div className="min-h-0 max-h-56 w-full shrink-0 space-y-1.5 overflow-y-auto border-b border-border px-2 md:max-h-none md:w-2/5 md:border-b-0 md:border-r">
               <div className="flex items-center justify-between mb-2 px-1">
                 <h3 className="text-sm font-medium text-foreground">
                   {i18nService.t('modelProviders')}
@@ -3406,7 +3406,7 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Provider Settings - Right Side */}
-            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable flex flex-col">
+            <div className="min-h-0 w-full min-w-0 flex-1 space-y-4 overflow-y-auto pl-4 pr-2 scrollbar-gutter-stable md:w-3/5 md:flex-none">
               {activeProvider !== ProviderName.LlamaCpp &&
                 (() => {
                   return (
@@ -3942,21 +3942,11 @@ const Settings: React.FC<SettingsProps> = ({
                         <div className="flex items-center justify-between mb-1">
                           <label
                             htmlFor={`${activeProvider}-apiKey`}
-                            className={cn(
-                              'block font-medium',
-                              isCustomProvider(activeProvider)
-                                ? 'text-sm text-foreground'
-                               : 'text-sm dark:text-claude-darkText text-claude-text',
-                            )}
+                            className="block text-sm font-medium text-foreground"
                           >
                             {i18nService.t('apiKey')}
                             {providerRequiresApiKey(activeProvider) && (
                               <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-                            )}
-                            {isCustomProvider(activeProvider) && (
-                              <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                                {i18nService.t('customFieldOptional')}
-                              </span>
                             )}
                           </label>
                           {ProviderRegistry.get(activeProvider)?.apiKeyUrl && (
@@ -4257,9 +4247,6 @@ const Settings: React.FC<SettingsProps> = ({
                     className="mb-1 block text-sm font-medium text-foreground"
                   >
                     {i18nService.t('customDisplayName')}
-                    <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
-                      {i18nService.t('customFieldOptional')}
-                    </span>
                   </label>
                   <Input
                     type="text"
@@ -4287,9 +4274,7 @@ const Settings: React.FC<SettingsProps> = ({
                       {i18nService.t('baseUrl')}
                     </span>
                     {isCustomProvider(activeProvider) && (
-                      <span className="ml-1.5 inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-xs font-normal text-destructive">
-                        {i18nService.t('customFieldRequired')}
-                      </span>
+                      <span className="ml-0.5 text-destructive">*</span>
                     )}
                   </label>
                   <div className="relative">
@@ -4730,13 +4715,14 @@ const Settings: React.FC<SettingsProps> = ({
                       )}
                       </div>
 
-                    <div
-                      className="max-h-60 space-y-1.5 overflow-y-auto p-2"
-                    >
+                    <div className="max-h-60 divide-y divide-border overflow-y-auto">
                     {(providers[activeProvider].models ?? []).map(model => (
                       <div
                         key={model.id}
-                        className="group cursor-pointer rounded-xl border border-border bg-surface p-2 transition-[background-color,transform] duration-150 ease-out hover:border-primary active:translate-y-px"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${i18nService.t('testConnection')} ${model.name}`}
+                        className="flex min-h-12 cursor-pointer items-center px-3 py-2 transition-colors duration-150 ease-out hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:translate-y-px"
                         onClick={event => {
                           if (event.target instanceof Element && event.target.closest('button')) {
                             return;
@@ -4744,8 +4730,15 @@ const Settings: React.FC<SettingsProps> = ({
                           setSelectedModelId(model.id);
                           void handleTestConnection(model.id);
                         }}
+                        onKeyDown={event => {
+                          if (event.target !== event.currentTarget) return;
+                          if (event.key !== 'Enter' && event.key !== ' ') return;
+                          event.preventDefault();
+                          setSelectedModelId(model.id);
+                          void handleTestConnection(model.id);
+                        }}
                       >
-                        <div className="flex min-w-0 items-center justify-between gap-2">
+                        <div className="flex w-full min-w-0 items-center justify-between gap-2">
                           <div className="flex min-w-0 flex-1 items-center gap-1.5">
                             <div
                               className={cn(
@@ -4802,7 +4795,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 )}
                             </div>
                           </div>
-                          <div className="flex items-center shrink-0 space-x-1">
+                          <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
                             {model.supportsImage && (
                               <span
                                 className={cn(
@@ -4876,7 +4869,7 @@ const Settings: React.FC<SettingsProps> = ({
                                   }}
                                   aria-label={`${i18nService.t('editModel')} ${model.name}`}
                                   title={i18nService.t('editModel')}
-                                  className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground [&_svg]:size-3.5"
+                                  className="text-muted-foreground hover:text-foreground"
                                 >
                                   <Pencil />
                                 </Button>
@@ -4887,7 +4880,7 @@ const Settings: React.FC<SettingsProps> = ({
                                   onClick={() => handleDeleteModel(model.id)}
                                   aria-label={`${i18nService.t('delete')} ${model.name}`}
                                   title={i18nService.t('delete')}
-                                  className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive [&_svg]:size-3.5"
+                                  className="text-muted-foreground hover:text-destructive"
                                 >
                                   <Trash2 />
                                 </Button>
