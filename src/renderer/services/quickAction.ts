@@ -10,10 +10,17 @@ import { i18nService } from './i18n';
 const CONFIG_PATH = './quick-actions.json';
 const I18N_PATH = './quick-actions-i18n.json';
 
-class QuickActionService {
+interface LanguageChangeSource {
+  subscribe(listener: () => void): () => void;
+}
+
+export class QuickActionService {
   private config: QuickActionsConfig | null = null;
   private i18nData: QuickActionsI18n | null = null;
   private listeners = new Set<() => void>();
+  private unsubscribeFromLanguageChange: (() => void) | null = null;
+
+  constructor(private readonly languageChangeSource: LanguageChangeSource = i18nService) {}
 
   /**
    * 加载快捷操作配置
@@ -170,10 +177,16 @@ class QuickActionService {
    * 初始化服务（订阅语言变化）
    */
   initialize(): void {
-    // 订阅 i18n 服务的语言变化事件
-    i18nService.subscribe(() => {
+    if (this.unsubscribeFromLanguageChange) return;
+
+    this.unsubscribeFromLanguageChange = this.languageChangeSource.subscribe(() => {
       this.clearCache();
     });
+  }
+
+  dispose(): void {
+    this.unsubscribeFromLanguageChange?.();
+    this.unsubscribeFromLanguageChange = null;
   }
 }
 
