@@ -18,6 +18,8 @@ import { CodingComposerConfigControls } from './CodingComposerConfigControls';
 import { CodingSlashCommandMenu } from './CodingSlashCommandMenu';
 import { filterSlashCommands, slashCommandPrompt, slashCommandQuery } from './codingSlashCommands';
 import { CodingComposerStatus } from './constants';
+import PendingMessageQueue from '../cowork/PendingMessageQueue';
+import type { coworkQueueService } from '../../services/coworkQueue';
 
 interface CodingComposerProps {
   availableCommands: CodingAgentAvailableCommand[];
@@ -28,9 +30,13 @@ interface CodingComposerProps {
   recipientName: string;
   showRecipient?: boolean;
   leadingTools?: ReactNode;
+  sessionId?: string;
+  queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'>;
   onChange: (value: string) => void;
   onConfigOptionChange: (optionId: string, value: string | boolean) => void;
   onSend: () => void;
+  onSteer?: () => void;
+  supportsSteerShortcut?: boolean;
   onStop: () => void;
 }
 
@@ -43,9 +49,13 @@ export const CodingComposer = ({
   recipientName,
   showRecipient = true,
   leadingTools,
+  sessionId,
+  queueService,
   onChange,
   onConfigOptionChange,
   onSend,
+  onSteer,
+  supportsSteerShortcut = false,
   onStop,
 }: CodingComposerProps) => {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -92,6 +102,9 @@ export const CodingComposer = ({
   return (
     <div className="px-4 pt-2 pb-4">
       <div className="relative mx-auto max-w-5xl">
+        {sessionId ? (
+          <PendingMessageQueue sessionId={sessionId} isStreaming={isRunning} queueService={queueService} />
+        ) : null}
         {commandMenuOpen ? (
           <CodingSlashCommandMenu
             commands={matchingCommands}
@@ -104,7 +117,7 @@ export const CodingComposer = ({
           className="input-aura rounded-3xl shadow-elevated transition-shadow **:data-[slot=input-group]:rounded-3xl"
           onSubmit={(_message, event) => {
             event.preventDefault();
-            if (!disabled && !isRunning && prompt.trim()) onSend();
+            if (!disabled && prompt.trim()) onSend();
           }}
         >
           <PromptInputBody>
@@ -114,6 +127,17 @@ export const CodingComposer = ({
               onChange={event => onChange(event.target.value)}
               onKeyDown={event => {
                 if (event.nativeEvent.isComposing) return;
+                if (
+                  event.key.toLowerCase() === 's' &&
+                  event.ctrlKey &&
+                  supportsSteerShortcut &&
+                  isRunning &&
+                  prompt.trim()
+                ) {
+                  event.preventDefault();
+                  onSteer?.();
+                  return;
+                }
                 if (event.key === 'Enter' && event.ctrlKey) {
                   event.preventDefault();
                   insertNewlineAtCursor();
@@ -155,7 +179,7 @@ export const CodingComposer = ({
               aria-autocomplete="list"
               aria-controls={commandMenuOpen ? 'coding-agent-command-menu' : undefined}
               aria-expanded={commandMenuOpen}
-              disabled={disabled || isRunning}
+              disabled={disabled}
               className="max-h-48 min-h-20"
             />
           </PromptInputBody>

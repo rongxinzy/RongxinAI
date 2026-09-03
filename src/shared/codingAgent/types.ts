@@ -10,6 +10,7 @@ import type {
   CodingPermissionOutcome,
   CodingWorkflowStage,
 } from './constants';
+import { CoworkQueueDelivery } from '../cowork/pendingMessageQueue';
 
 export interface CodingAgentCapabilities {
   supportsLoadSession: boolean;
@@ -172,6 +173,15 @@ export interface CodingRoomSnapshot {
   events: CodingEvent[];
 }
 
+export interface CodingPendingMessagesChangedEvent {
+  laneId: string;
+  items: import('../cowork/pendingMessageQueue').CoworkPendingMessage[];
+}
+
+/** Coding lanes use the same in-process delivery semantics as Work sessions. */
+export const CodingPromptDelivery = CoworkQueueDelivery;
+export type CodingPromptDelivery = CoworkQueueDelivery;
+
 export interface CodingWorkspaceSource {
   id: string;
   workspaceId: string;
@@ -235,6 +245,7 @@ export interface CreateCodingMissionInput {
 export interface CodingPromptInput {
   laneId: string;
   prompt: string;
+  delivery?: CodingPromptDelivery;
 }
 
 export interface CodingLaneViewStateInput {

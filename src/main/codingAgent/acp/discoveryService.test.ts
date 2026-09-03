@@ -7,7 +7,11 @@ import {
   CodingAgentManagedAdapterId,
   CodingAgentProfileStatus,
 } from '../../../shared/codingAgent';
-import { AcpDiscoveryService, discoveryDirectories } from './discoveryService';
+import {
+  AcpDiscoveryService,
+  discoveryDirectories,
+  resolveClaudeNativeExecutable,
+} from './discoveryService';
 import { resolveAcpAdapterRoot } from './adapterRoot';
 
 test('uses unpacked resources for packaged ACP adapter entrypoints', () => {
@@ -66,6 +70,53 @@ test('covers Windows user-level npm, pnpm, and Bun locations without scanning di
   expect(directories).toContain(path.join('C:\\Users\\agent\\AppData\\Roaming', 'npm'));
   expect(directories).toContain(path.join('C:\\Users\\agent\\AppData\\Local', 'pnpm'));
   expect(directories).toContain(path.join('C:\\Users\\agent', '.bun', 'bin'));
+});
+
+test('uses the native Claude executable from npm and pnpm global package layouts on Windows', async () => {
+  const root = path.join(process.cwd(), `.claude-native-executable-${Date.now()}`);
+  const npmLauncher = path.join(root, 'npm', 'claude.cmd');
+  const pnpmLauncher = path.join(root, 'pnpm', 'claude.cmd');
+  const npmExecutable = path.join(
+    root,
+    'npm',
+    'node_modules',
+    '@anthropic-ai',
+    'claude-code',
+    'bin',
+    'claude.exe',
+  );
+  const pnpmExecutable = path.join(
+    root,
+    'pnpm',
+    'global',
+    '5',
+    'node_modules',
+    '@anthropic-ai',
+    'claude-code',
+    'bin',
+    'claude.exe',
+  );
+  try {
+    await mkdir(path.dirname(npmLauncher), { recursive: true });
+    await mkdir(path.dirname(pnpmLauncher), { recursive: true });
+    await mkdir(path.dirname(npmExecutable), { recursive: true });
+    await mkdir(path.dirname(pnpmExecutable), { recursive: true });
+    await Promise.all([
+      writeFile(npmLauncher, '@echo off\n'),
+      writeFile(pnpmLauncher, '@echo off\n'),
+      writeFile(npmExecutable, ''),
+      writeFile(pnpmExecutable, ''),
+    ]);
+
+    await expect(resolveClaudeNativeExecutable(npmLauncher, 'win32')).resolves.toBe(
+      await realpath(npmExecutable),
+    );
+    await expect(resolveClaudeNativeExecutable(pnpmLauncher, 'win32')).resolves.toBe(
+      await realpath(pnpmExecutable),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('uses bundled ACP bridges for locally installed Codex and Claude Code', async () => {

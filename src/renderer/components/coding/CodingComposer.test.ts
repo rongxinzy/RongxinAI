@@ -138,3 +138,27 @@ test('inserts a newline at the cursor with Control Enter without submitting', ()
   expect(textbox).toHaveValue('hello\n world');
   expect(onSend).not.toHaveBeenCalled();
 });
+
+test('steers a running agent with Control S', () => {
+  const onSteer = vi.fn();
+  render(
+    createElement(CodingComposer, {
+      availableCommands: [],
+      configOptions: [],
+      disabled: false,
+      isRunning: true,
+      prompt: 'Change direction.',
+      recipientName: 'Codex',
+      onChange: vi.fn(),
+      onConfigOptionChange: vi.fn(),
+      onSend: vi.fn(),
+      onSteer,
+      supportsSteerShortcut: true,
+      onStop: vi.fn(),
+    }),
+  );
+
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 's', ctrlKey: true });
+
+  expect(onSteer).toHaveBeenCalledOnce();
+});
