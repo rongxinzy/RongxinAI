@@ -86,6 +86,7 @@
       "icon": "Telescope",
       "color": "#0F766E",
       "skillMapping": "deep-research",
+      "skillIds": ["deep-research", "web-search"],
       "prompts": [
         { "id": "research-industry" },
         { "id": "research-competitors" },
@@ -98,6 +99,7 @@
       "icon": "GraduationCap",
       "color": "#7C3AED",
       "skillMapping": "deli-autoresearch",
+      "skillIds": ["deli-autoresearch", "deep-research", "web-search"],
       "prompts": [
         { "id": "academic-outline" },
         { "id": "academic-review" },

@@ -51,7 +51,7 @@ import {
   updateSessionStatus,
 } from '../../store/slices/coworkSlice';
 import { clearSelection, selectAction, setActions } from '../../store/slices/quickActionSlice';
-import { setActiveSkillIds } from '../../store/slices/skillSlice';
+import { clearActiveSkills, setActiveSkillIds } from '../../store/slices/skillSlice';
 import { WorkMode } from '../../store/workMode/constants';
 import {
   CoworkSessionStatusValue,
@@ -71,7 +71,10 @@ import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInpu
 import CoworkSessionViewport from './CoworkSessionViewport';
 import { mergeDirectChatSnapshotMessages } from './directChatSnapshot';
 import SecurityStatusIndicator from './SecurityStatusIndicator';
-import { shouldClearQuickActionSelection } from '../quick-actions/quickActionSelection';
+import {
+  quickActionSkillIds,
+  shouldClearQuickActionSelection,
+} from '../quick-actions/quickActionSelection';
 import { useUnmanagedWorkingDirectory } from './useUnmanagedWorkingDirectory';
 import { useTaskResumeContext } from './hooks/useTaskResumeContext';
 
@@ -1429,18 +1432,27 @@ const CoworkView: React.FC<CoworkViewProps> = ({
     // Skills can also be activated from the Chat sidebar or the skill badge.
     // In that path there is no quick-action selection event, so derive the
     // matching case panel from the active skill mapping.
-    return quickActions.find(action => activeSkillIds.includes(action.skillMapping));
+    return quickActions.find(action =>
+      quickActionSkillIds(action).every(skillId => activeSkillIds.includes(skillId)),
+    );
   }, [activeSkillIds, quickActions, selectedActionId]);
 
-  // Handle quick action button click and activate its mapped skill.
+  // Handle quick action button click and activate its complete Skill bundle.
   const handleActionSelect = (actionId: string) => {
     dispatch(selectAction(actionId));
     quickActionActivationRef.current = null;
     const action = quickActions.find(a => a.id === actionId);
-    const targetSkill = action && skills.find(s => s.id === action.skillMapping);
-    if (targetSkill) {
+    const skillIds = action ? quickActionSkillIds(action) : [];
+    const skillsAvailable = skillIds.every(skillId =>
+      skills.some(skill => skill.id === skillId && skill.enabled),
+    );
+    if (action && skillsAvailable) {
       quickActionActivationRef.current = actionId;
-      dispatch(setActiveSkillIds([targetSkill.id]));
+      dispatch(setActiveSkillIds(skillIds));
+    } else {
+      // Do not send a new quick-action prompt with skills left over from a
+      // previous action when the requested bundle is unavailable.
+      dispatch(clearActiveSkills());
     }
     window.setTimeout(() => {
       window.dispatchEvent(
@@ -1457,13 +1469,17 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       return;
     }
     const action = quickActions.find(a => a.id === selectedActionId);
-    const targetSkill = action && skills.find(s => s.id === action.skillMapping);
-    if (!action || !targetSkill) return;
+    if (!action) return;
+    const skillIds = quickActionSkillIds(action);
+    const skillsAvailable = skillIds.every(skillId =>
+      skills.some(skill => skill.id === skillId && skill.enabled),
+    );
+    if (!skillsAvailable) return;
 
     if (quickActionActivationRef.current !== selectedActionId) {
       quickActionActivationRef.current = selectedActionId;
-      if (!activeSkillIds.includes(targetSkill.id)) {
-        dispatch(setActiveSkillIds([targetSkill.id]));
+      if (!skillIds.every(skillId => activeSkillIds.includes(skillId))) {
+        dispatch(setActiveSkillIds(skillIds));
       }
       return;
     }
