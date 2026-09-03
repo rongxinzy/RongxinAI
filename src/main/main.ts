@@ -610,6 +610,12 @@ const savePngWithDialog = async (
 };
 
 const configureUserDataPath = (): void => {
+  const memoryLeakTestUserDataPath = process.env.ZHIYUAN_MEMORY_LEAK_TEST_USER_DATA;
+  if (memoryLeakTestUserDataPath) {
+    app.setPath('userData', memoryLeakTestUserDataPath);
+    return;
+  }
+
   const appDataPath = app.getPath('appData');
   const targetUserDataPath = path.join(appDataPath, APP_DATA_DIR_NAME);
   const currentUserDataPath = app.getPath('userData');
@@ -928,9 +934,7 @@ const getCodingRoomService = (): CodingRoomService => {
             confirmationMode: 'modal',
             approvalMode,
             ...(modelOverride ? { modelOverride } : {}),
-            ...(thinkingLevel
-              ? { thinkingLevel: thinkingLevel as PiThinkingLevel }
-              : {}),
+            ...(thinkingLevel ? { thinkingLevel: thinkingLevel as PiThinkingLevel } : {}),
           });
         },
         setBuiltinApprovalMode: (sessionId, mode) =>
@@ -941,7 +945,8 @@ const getCodingRoomService = (): CodingRoomService => {
             thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
           }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
-        enqueueBuiltinMessage: (sessionId, prompt) => runtime.enqueuePendingMessage(sessionId, prompt),
+        enqueueBuiltinMessage: (sessionId, prompt) =>
+          runtime.enqueuePendingMessage(sessionId, prompt),
         steerBuiltinMessage: async (sessionId, prompt) => {
           const queued = runtime.enqueuePendingMessage(sessionId, prompt);
           if (!queued.success || !queued.item) return queued;

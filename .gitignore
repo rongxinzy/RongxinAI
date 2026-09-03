@@ -103,3 +103,4 @@ reasonix.toml
 # App runtime output (root-scoped so build tools can scan same-named source directories)
 /cowork/
 /logs/
+/artifacts/memory-leak/
