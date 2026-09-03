@@ -57,20 +57,7 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 
 ### Authentication Flow
 
-1. **登录：** 打开系统浏览器 → Portal 登录页 → 登录成功 → deep link callback with `code=<authCode>`
-2. **换取令牌：** `POST /api/auth/exchange` 消费一次性 authCode → 返回 `accessToken`(2h) + `refreshToken`(30d)
-3. **持久化：** SQLite kv store `auth_tokens` 存储双 token，应用重启后自动恢复登录态
-4. **请求认证：** `fetchWithAuth()` 在每个 API 请求附加 `Authorization: Bearer <accessToken>`
-5. **被动刷新：** 收到 HTTP 401 → 使用 refreshToken 调用 `POST /api/auth/refresh` → 获取新 accessToken → 重试原请求
-6. **主动刷新：** 定期检查 accessToken 距 exp < 5 分钟 → 后台静默刷新，避免请求失败
-7. **滚动续期：** 每次 refresh 签发新 refreshToken（新 30 天有效期），连续使用不掉线
-8. **退出条件：** 连续 30 天不使用（refreshToken 过期）→ 清除本地 token → 用户需重新登录
-
-**关键文件：**
-
-- Token 存储与请求：`src/renderer/services/api.ts`（`fetchWithAuth()`、token 管理）
-- 登录流程：`src/main/main.ts`（deep link callback 处理；legacy protocol names may still be present）
-- 持久化：`src/main/sqliteStore.ts`（kv 表存储 `auth_tokens`）
+浏览器登录后通过 deep-link 一次性 `authCode` 换取 2 小时 access token 与 30 天 refresh token；令牌保存在 SQLite `auth_tokens`。`fetchWithAuth()` 附带 Bearer token，401 或 access token 剩余不足 5 分钟时刷新并轮换 refresh token；30 天未使用则清除。实现见 `src/renderer/services/api.ts`、`src/main/main.ts`、`src/main/sqliteStore.ts`。
 
 ### Process Model
 
@@ -97,57 +84,15 @@ Public-facing product documentation and user-visible UI copy must use the 知远
 - All UI and business logic
 - Communicates with main process exclusively through IPC
 
-### Key Directories
+### Main Process / Worker Boundary
 
-```
-src/main/
-├── main.ts              # Entry point, IPC handlers
-├── sqliteStore.ts       # SQLite database (kv + cowork tables)
-├── coworkStore.ts       # Cowork session/message CRUD operations
-├── skillManager.ts      # Skill loading and management
-├── im/                  # IM/email gateway integrations
-└── libs/
-    ├── agentEngine/
-    │   ├── piRuntimeAdapter.ts      # Pi runtime — sole execution kernel
-    │   ├── piRuntimeTypes.ts        # Pi-native runtime/event/approval types
-    │   └── types.ts                 # Re-exported Pi runtime types
-    ├── ccConnectBridgeServer.ts # Authenticated Channel/Cron transport bridge
-    ├── ccConnectSidecarManager.ts # Channel sidecar lifecycle
-    ├── llamacppManager.ts       # llama.cpp service lifecycle and configuration
+The Electron main process owns lifecycle, IPC, security decisions, persistent state, and ordering. It must remain responsive: do not add synchronous recursive filesystem traversal, whole-file reads/hashes, large JSON/Markdown parsing, regex-heavy scanning, compression, or other CPU-bound work to request, IPC, or agent-stream paths.
 
-src/renderer/
-├── types/cowork.ts      # Cowork type definitions
-├── store/slices/
-│   ├── coworkSlice.ts   # Cowork sessions and streaming state
-│   └── artifactSlice.ts # Artifacts state
-├── services/
-│   ├── cowork.ts        # Cowork service (IPC wrapper, Redux integration)
-│   ├── api.ts           # LLM API with SSE streaming
-│   └── artifactParser.ts # Artifact detection and parsing
-├── components/
-│   ├── cowork/          # Cowork UI components
-│   │   ├── CoworkView.tsx          # Main cowork interface
-│   │   ├── CoworkSessionList.tsx   # Session sidebar
-│   │   ├── CoworkSessionDetail.tsx # Message display
-│   │   └── CoworkPermissionModal.tsx # Tool permission UI
-│   ├── localInference/  # llama.cpp local inference UI
-│   ├── skills/          # Skill management and marketplace UI
-│   ├── mcp/             # MCP server configuration UI
-│   └── artifacts/       # Artifact renderers
+Use a Node `worker_threads` worker for a task only when its input/output is serializable and it can be isolated from mutable application state. Workers may scan files, parse/index content, hash immutable files, and perform bounded transforms. Use a bounded reusable pool (maximum two background workers), cancellation, input/queue limits, structured error results, and transfer `ArrayBuffer` payloads when practical. Main process code validates paths and results, owns writes and user-visible state changes, and records queue wait/run time for new worker jobs.
 
-src/shared/
-├── components/
-│   ├── ui/              # shadcn/ui 基础组件（button、fluid-tabs、page-tabs、dialog 等）
-│   └── ai-elements/     # AI 对话组件（message、prompt-input、conversation 等）
-└── lib/utils.ts         # cn() 等共享工具
+Never move these across the boundary without an approved dedicated architecture change: Electron APIs (`BrowserWindow`, `ipcMain`, dialogs, `safeStorage`), SQLite connections/transactions, agent session lifecycle, tool approval, stream ordering, secrets, or renderer/DOM work. A Worker Thread does not make SQLite concurrency safe.
 
-SKILLs/                  # Custom skill definitions for cowork sessions
-├── skills.config.json   # Skill enable/order configuration
-├── docx/                # Word document generation skill
-├── xlsx/                # Excel skill
-├── pptx/                # PowerPoint skill
-└── ...
-```
+**Touch-to-refactor rule.** Any PR that changes a component containing blocking file scan/hash/parse/transform work must extract that work to a Worker Thread in the same PR; it is not optional cleanup. This applies in particular to Skill security scanning, artifact collection and hashing, backup snapshot hashing, model catalog scanning, and large artifact parsing. The PR must include a worker-boundary test plus before/after timing or event-loop-lag evidence. If the touched component owns a prohibited stateful operation, extract every separable pure blocking portion and document the retained ownership boundary in the PR; do not add further synchronous work there.
 
 ### Data Flow
 
@@ -210,34 +155,7 @@ SYSTEM_PROMPT.md declares this environment to the model (运行环境与工具�
 
 ### Artifacts System
 
-The Artifacts feature provides rich preview of code outputs similar to Claude's artifacts:
-
-**Supported Types**:
-
-- `html` - Full HTML pages rendered in sandboxed iframe
-- `svg` - SVG graphics with DOMPurify sanitization and zoom controls
-- `mermaid` - Flowcharts, sequence diagrams, class diagrams via Mermaid.js
-- `react` - React/JSX components compiled with Babel in isolated iframe
-- `code` - Syntax highlighted code with line numbers
-
-**Detection Methods**:
-
-1. Explicit markers: ` ```artifact:html title="My Page" `
-2. Heuristic detection: Analyzes code block language and content patterns
-
-**UI Components**:
-
-- Right-side resizable panel for side-by-side work
-- Full-window focus mode and native fullscreen mode for large artifacts
-- Header with type icon, title, copy/download/close buttons
-- Artifact badges in messages to switch between artifacts
-
-**Security**:
-
-- HTML: `sandbox="allow-scripts"` with no `allow-same-origin`
-- SVG: DOMPurify removes all script content
-- React: Completely isolated iframe with no network access
-- Mermaid: `securityLevel: 'strict'` configuration
+Artifacts support HTML, SVG, Mermaid, React/JSX, and code through explicit `artifact:*` fences or heuristics. HTML and React run in isolated iframes; SVG is sanitized with DOMPurify; Mermaid uses strict security. Preserve these boundaries when changing renderers.
 
 ### Configuration
 
@@ -269,53 +187,11 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 
 ### shadcn/ui（基础组件）
 
-位于 `src/shared/components/ui/`，基于 [shadcn/ui](https://ui.shadcn.com/)（base-nova 风格，lucide 图标库）。
-
-| 组件                                       | 用途       |
-| ------------------------------------------ | ---------- |
-| `button`, `button-group`                   | 按钮       |
-| `input`, `input-group`, `textarea`         | 输入框     |
-| `select`                                   | 下拉选择   |
-| `checkbox`, `radio-group`, `switch`        | 选择控件   |
-| `dialog`, `sheet`, `popover`, `hover-card` | 弹层       |
-| `tooltip`                                  | 提示       |
-| `dropdown-menu`, `command`                 | 菜单       |
-| `tabs`                                     | 标签页基元 |
-| `page-tabs`                                | 页面级标签页（唯一实现，见 DESIGN.md） |
-| `fluid-tabs`                               | 分段/筛选控件（唯一实现，见 DESIGN.md） |
-| `toggle`, `toggle-group`                   | 开关/多选 chips |
-| `card`                                     | 卡片       |
-| `sidebar`                                  | 侧边栏     |
-| `table`                                    | 表格       |
-| `badge`                                    | 徽标       |
-| `avatar`                                   | 头像       |
-| `label`                                    | 标签       |
-| `separator`                                | 分隔线     |
-| `scroll-area`                              | 滚动区域   |
-| `collapsible`                              | 折叠面板   |
-| `breadcrumb`                               | 面包屑     |
-| `skeleton`, `spinner`                      | 加载态     |
-| `empty`                                    | 空状态     |
-| `sonner`                                   | Toast 通知 |
-| `destructive-confirm-dialog`               | 删除确认（唯一实现，见 DESIGN.md） |
+位于 `src/shared/components/ui/`，基于 [shadcn/ui](https://ui.shadcn.com/) 和 lucide。优先使用现有按钮、输入、选择、弹层、菜单、表格、反馈和布局组件；页面 tab 仅用 `page-tabs`，分段/筛选仅用 `fluid-tabs`，删除确认仅用 `destructive-confirm-dialog`。
 
 ### ai-elements（对话组件）
 
-位于 `src/shared/components/ai-elements/`，用于聊天/AI 对话场景。
-
-| 组件           | 用途         |
-| -------------- | ------------ |
-| `conversation` | 对话容器     |
-| `message`      | 消息气泡     |
-| `prompt-input` | 输入框       |
-| `code-block`   | 代码块渲染   |
-| `reasoning`    | 推理过程展示 |
-| `tool`         | 工具调用展示 |
-| `attachments`  | 附件预览     |
-| `sources`      | 来源引用     |
-| `suggestion`   | 建议问题     |
-| `shimmer`      | 加载闪烁效果 |
-| `terminal`     | 终端输出     |
+位于 `src/shared/components/ai-elements/`；聊天使用 `conversation`、`message`、`prompt-input`，按需使用 code、reasoning、tool、attachment、source、suggestion、loading 与 terminal 组件。
 
 ### 规则
 
@@ -327,28 +203,7 @@ The Artifacts feature provides rich preview of code outputs similar to Claude's 
 6. **三个唯一实现。** 页面级标签页用 `PageTabs`（放 PageHeader 的 tabs 槽位）、分段/筛选控件用 `FluidTabs`、删除确认用 `DestructiveConfirmDialog`。禁止手搓 tab、自造分段条、自写确认框——细则与选中态语言见 DESIGN.md 对应章节。
 7. **Button 覆写守纪律。** className 只许布局类（`w-full`、`justify-start`、`gap-*`）；颜色、圆角、阴影、字重、字号、高度一律走 variant/size 枚举。行级可点区域不得用裸 `div onClick`（完整范式见 DESIGN.md「Button 使用纪律」）。
 
-### 样式工具
-
-- 样式合并：`cn()` from `@shared/lib/utils`（clsx + tailwind-merge）
-- 组件样式覆写：用 Tailwind className，不要写独立 CSS
-
-### 导入路径
-
-```typescript
-// shadcn/ui
-import { Button } from '@shared/components/ui/button';
-import { Dialog, DialogContent, DialogHeader } from '@shared/components/ui/dialog';
-
-// ai-elements
-import { Message } from '@shared/components/ai-elements/message';
-import { Conversation } from '@shared/components/ai-elements/conversation';
-
-// 工具
-import { cn } from '@shared/lib/utils';
-
-// 图标
-import { Settings, Plus, Trash } from 'lucide-react';
-```
+Use Tailwind `className` for component composition and `cn()` from `@shared/lib/utils` for class merging; do not add standalone CSS.
 
 ## Coding Style & Naming Conventions
 
