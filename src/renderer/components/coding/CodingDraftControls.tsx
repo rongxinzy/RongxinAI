@@ -63,7 +63,7 @@ export const CodingDraftControls = ({
       >
         <SelectTrigger
           size="sm"
-          className="h-7 max-w-52 border-0 bg-transparent px-2 shadow-none"
+          className="h-7 w-fit max-w-48 shrink-0 border-0 bg-transparent px-2 shadow-none"
           aria-label={i18nService.t('codingAgentChooseAgent')}
         >
           <Bot className="size-3.5 shrink-0" />
@@ -71,12 +71,12 @@ export const CodingDraftControls = ({
             {activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent alignItemWithTrigger={false} className="min-w-52 w-52">
           {profiles.map(profile => (
             <SelectItem key={profile.id} value={profile.id}>
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate">{profile.name}</span>
-                <span className="text-xs text-muted-foreground">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="min-w-0 flex-1 truncate">{profile.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
                   {i18nService.t(CodingAgentStatusI18nKey[profile.status])}
                 </span>
               </span>
