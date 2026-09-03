@@ -53,6 +53,10 @@ Var /GLOBAL localInferenceLabel
   !insertmacro MUI_PAGE_WELCOME
 !macroend
 
+; electron-builder compiles the uninstaller before the installer. Its assisted
+; template does not insert installation pages while BUILD_UNINSTALLER is set,
+; so keep the page callbacks out of that compilation pass.
+!ifndef BUILD_UNINSTALLER
 Function LocalInferencePageCreate
   ; electron-builder prepends this script before installer.nsi includes
   ; MUI2.nsh, so the MUI_HEADER_TEXT macro is undefined at compile time.
@@ -88,6 +92,7 @@ FunctionEnd
 !macro customPageAfterChangeDir
   Page custom LocalInferencePageCreate LocalInferencePageLeave
 !macroend
+!endif
 
 !macro customInit
   SetDetailsPrint textonly

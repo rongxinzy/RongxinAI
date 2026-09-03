@@ -33,8 +33,8 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
     expect(installerScript).toContain('File /oname=7za.exe');
     expect(installerScript).toContain('component-${KEY}.7z');
-    expect(installerScript).toContain('Nsis7z::Extract "$PLUGINSDIR\\component-${KEY}.7z"');
-    expect(installerScript).not.toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
+    expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
+    expect(installerScript).not.toContain('Nsis7z::Extract "$PLUGINSDIR');
     expect(installerScript).toContain('SetCompress off');
     expect(installerScript).toContain('SetCompress auto');
     expect(installerScript).toContain('File /oname=validate-component-archive.ps1');
@@ -151,6 +151,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('LocalInferencePageCreate');
     expect(installerScript).toContain('LocalInferencePageLeave');
     expect(installerScript).toContain('Page custom LocalInferencePageCreate LocalInferencePageLeave');
+    expect(installerScript).toContain('!ifndef BUILD_UNINSTALLER');
     expect(installerScript).not.toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
     expect(installerScript).not.toContain('install-llamacpp-backend-nsis.cjs');
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
