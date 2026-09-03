@@ -116,6 +116,7 @@ import {
   buildPiConversationPrompt,
   calculatePiConversationHistoryCharLimit,
 } from './piConversationContext';
+import { getPiBashCommandViolation } from './piBashToolGuidelines';
 import { prependProductionWorkflowPrompt } from './piExpertProductionPrompt';
 import { PiMcpTool } from './piMcpCapabilityPrompt';
 import { isAcademicResearchSkillSet, PiResearchRunController } from './piResearchRun';
@@ -143,6 +144,7 @@ import { PiThinkingLifecycle } from './piThinkingLifecycle';
 import { PiStreamAccumulator } from './piStreamAccumulator';
 import { PiAssistantEventType } from './piStreamConstants';
 import { PiPendingMessageQueue } from './piPendingMessageQueue';
+import { shouldExposeAskUserQuestionTool } from './piUnattendedPolicy';
 import { createPiWorkLoop } from './piWorkLoop';
 import { PiWriteTokenLimitRecovery } from './piWriteTokenLimit';
 import { collectPiSystemPromptContributions } from './piSystemPromptContributions';
@@ -306,6 +308,7 @@ interface ActivePiSession {
   workspaceRoot: string;
   settingsManager: PiSettingsManager | null;
   approvalMode: WorkbenchApprovalMode;
+  unattended: boolean;
   /** True while Pi is executing the current Work/Chat turn. */
   isRunning: boolean;
   /** True when the current turn settled with an unrecoverable Pi error. */
@@ -362,6 +365,7 @@ interface PiResourceState {
   skillIds: string[] | undefined;
   maxOutputTokens: number;
   fileToolsEnabled: boolean;
+  unattended: boolean;
   /** Bundled preset skill dirs for the session's experts (file-sourced, live). */
   expertSkillDirs: string[];
 }
@@ -731,6 +735,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: normalizeSkillIds(options.skillIds),
         maxOutputTokens: DEFAULT_PI_LOCAL_MAX_TOKENS,
         fileToolsEnabled: options.confirmationMode !== 'text',
+        unattended: options.unattended === true,
         expertSkillDirs: this.resolveExpertPresetSkillDirs(options.expertIds),
       };
 
@@ -849,11 +854,13 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       // sequential execution mode cannot block another session.
       const customTools: Record<string, unknown>[] = [];
 
-      customTools.push(
-        createPiAskUserQuestionTool((toolCallId, input, signal) =>
-          this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
-        ),
-      );
+      if (shouldExposeAskUserQuestionTool(resourceState.unattended)) {
+        customTools.push(
+          createPiAskUserQuestionTool((toolCallId, input, signal) =>
+            this.requestAskUserQuestion(sessionId, toolCallId, input, signal),
+          ),
+        );
+      }
       if (this.projectMemoryService) {
         customTools.push(
           buildPiProjectMemoryTool({
@@ -1006,6 +1013,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               skillIds,
               maxOutputTokens,
               fileToolsEnabled: true,
+              unattended: resourceState.unattended,
               expertSkillDirs: [],
             },
             {
@@ -1148,6 +1156,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         workspaceRoot,
         settingsManager,
         approvalMode: options.approvalMode ?? WorkbenchApprovalMode.Ask,
+        unattended: resourceState.unattended,
         isRunning: true,
         turnFailed: false,
         queueFlushInFlight: false,
@@ -1235,6 +1244,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     options: PiContinueOptions = {},
   ): Promise<void> {
     const explicitExpertIds = normalizeSingleExpertIds(options.expertIds);
+    const nextUnattended = options.unattended === true;
     const active = this.activeSessions.get(sessionId);
     if (!active || active.aborted) {
       if (active?.aborted) {
@@ -1260,6 +1270,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         agentId: options.agentId ?? storedSession?.agentId,
         modelOverride: options.modelOverride ?? storedSession?.modelOverride,
         goalMode: options.goalMode ?? active?.goalMode,
+        unattended: nextUnattended,
         _piPromptOverride: piPrompt,
       });
     }
@@ -1301,10 +1312,12 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
       productionControlsAvailable !== active.productionControlsAvailable;
     const mcpToolTopologyChanged =
       active.mcpToolManifestGeneration !== this.mcpToolManifestGeneration;
+    const unattendedTopologyChanged = nextUnattended !== active.unattended;
     if (
       !haveSameStringList(requestedExpertIds, active.requestedExpertIds) ||
       productionWorkflowTopologyChanged ||
-      mcpToolTopologyChanged
+      mcpToolTopologyChanged ||
+      unattendedTopologyChanged
     ) {
       const history = this.store?.getSession(sessionId)?.messages ?? [];
       if (mcpToolTopologyChanged) {
@@ -1318,6 +1331,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
+        unattended: nextUnattended,
         _piPromptOverride: buildPiConversationPrompt(history, prompt, {
           maxChars: calculatePiConversationHistoryCharLimit(
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
@@ -1346,6 +1360,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         skillIds: requestedSkillIds,
         expertIds: requestedExpertIds,
         goalMode: nextGoalMode,
+        unattended: nextUnattended,
         _piPromptOverride: buildPiConversationPrompt(history, prompt, {
           maxChars: calculatePiConversationHistoryCharLimit(
             typeof active.model.contextWindow === 'number' ? active.model.contextWindow : undefined,
@@ -2037,10 +2052,7 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
     // active model window. Pi's defaults (16K reserve, 20K recent) are tuned
     // for large hosted models and can exceed a local 16K/32K model's budget.
     const reserveTokens = Math.max(2_048, Math.min(16_384, Math.floor(contextWindow * 0.25)));
-    const keepRecentTokens = Math.max(
-      2_048,
-      Math.min(20_000, Math.floor(contextWindow * 0.5)),
-    );
+    const keepRecentTokens = Math.max(2_048, Math.min(20_000, Math.floor(contextWindow * 0.5)));
     settingsManager.applyOverrides({
       compaction: {
         enabled: true,
@@ -2111,6 +2123,8 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
         ...collectPiSystemPromptContributions({
           fileToolsEnabled: resourceState.fileToolsEnabled,
           maxOutputTokens: resourceState.maxOutputTokens,
+          platform: process.platform,
+          unattended: resourceState.unattended,
           mcpToolManifest: this.mcpServerManager?.toolManifest ?? [],
           mcpServerStatuses: this.mcpServerManager?.serverStatuses ?? [],
         }),
@@ -2149,6 +2163,17 @@ export class PiRuntimeAdapter extends EventEmitter implements PiRuntime {
               },
             ]
           : []),
+        (extensionApi: PiExtensionApi) => {
+          extensionApi.on(PiExtensionEventType.ToolCall, event => {
+            if (event.toolName !== 'bash' || !event.input || typeof event.input !== 'object') {
+              return undefined;
+            }
+            const command = (event.input as Record<string, unknown>).command;
+            if (typeof command !== 'string') return undefined;
+            const reason = getPiBashCommandViolation(command);
+            return reason ? { block: true as const, reason } : undefined;
+          });
+        },
         ...additionalExtensionFactories,
       ],
     });

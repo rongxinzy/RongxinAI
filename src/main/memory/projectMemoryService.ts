@@ -128,8 +128,7 @@ export class ProjectMemoryService {
     const project = this.resolveIdentity(input.workingDirectory);
     const replacementId = this.repository.createPersonalCandidate({
       projectId: current.scope === MemoryScope.Personal ? PERSONAL_MEMORY_PROJECT_ID : project.id,
-      projectRoot:
-        current.scope === MemoryScope.Personal ? this.personalDirectory : project.root,
+      projectRoot: current.scope === MemoryScope.Personal ? this.personalDirectory : project.root,
       scope: current.scope,
       sessionId: MANUAL_MEMORY_SESSION_ID,
       sourceKind: MemorySourceKind.Explicit,
@@ -148,7 +147,9 @@ export class ProjectMemoryService {
     id: string;
     title: string;
     content: string;
-    sourceKind: typeof MemorySourceKind.LegacyFileImport | typeof MemorySourceKind.LegacySqliteImport;
+    sourceKind:
+      | typeof MemorySourceKind.LegacyFileImport
+      | typeof MemorySourceKind.LegacySqliteImport;
     metadata: Record<string, unknown>;
   }): boolean {
     if (
@@ -563,11 +564,7 @@ export class ProjectMemoryService {
     record: Pick<MemoryMigrationRecord, 'storageKind'> & { memory: { id: string } },
     metadata: Record<string, unknown>,
   ): void {
-    this.repository.updateMigrationRecordMetadata(
-      record.memory.id,
-      record.storageKind,
-      metadata,
-    );
+    this.repository.updateMigrationRecordMetadata(record.memory.id, record.storageKind, metadata);
   }
 
   deleteMigrationCandidate(id: string): void {
@@ -575,7 +572,18 @@ export class ProjectMemoryService {
   }
 
   listManagedMemories(input: ManagedMemoryListInput = {}): ManagedMemoryRecord[] {
-    return this.repository.listManaged(input);
+    const records = this.repository.listManaged(input);
+    const workingDirectory = input.workingDirectory?.trim();
+    if (!workingDirectory) return records;
+
+    const projectId = this.resolveIdentity(workingDirectory).id;
+    return records.filter(
+      memory =>
+        (memory.scope === MemoryScope.Personal &&
+          memory.projectId === PERSONAL_MEMORY_PROJECT_ID) ||
+        ((memory.scope === MemoryScope.Project || memory.scope === MemoryScope.Session) &&
+          memory.projectId === projectId),
+    );
   }
 
   archiveMemory(id: string): void {
@@ -637,10 +645,7 @@ export class ProjectMemoryService {
     return memory;
   }
 
-  private assertManualMemoryBoundary(
-    memory: ManagedMemoryRecord,
-    workingDirectory: string,
-  ): void {
+  private assertManualMemoryBoundary(memory: ManagedMemoryRecord, workingDirectory: string): void {
     if (memory.scope === MemoryScope.Session) {
       throw new Error('Session summaries cannot be edited manually.');
     }

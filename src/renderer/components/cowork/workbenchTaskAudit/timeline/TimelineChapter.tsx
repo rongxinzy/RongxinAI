@@ -32,7 +32,11 @@ import {
   verificationOutcomeLabel,
 } from '../utils';
 import { TimelineEntryList } from './TimelineEntries';
-import { formatDuration, formatTimeOfDay, type TimelineChapter as TimelineChapterModel } from './timelineModel';
+import {
+  formatDuration,
+  formatTimeOfDay,
+  type TimelineChapter as TimelineChapterModel,
+} from './timelineModel';
 
 interface TimelineChapterProps {
   chapter: TimelineChapterModel;
@@ -74,23 +78,25 @@ export function TimelineChapter({
   const duration = formatDuration(run.startedAt, run.endedAt);
 
   const expandedContent = (
-    <div className="flex flex-col gap-4 pt-1 pb-6">
-      <div className="pl-10">
-        <RunSummary run={run} />
+    <div className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
+      <div className="flex flex-col gap-4 pt-1 pb-6">
+        <div className="pl-10">
+          <RunSummary run={run} />
+        </div>
+        {entries.length > 0 ? (
+          <TimelineEntryList
+            entries={entries}
+            run={run}
+            runs={runs}
+            busy={busy}
+            onRespondToApproval={onRespondToApproval}
+          />
+        ) : (
+          <p className="pl-10 text-sm text-muted-foreground">
+            {i18nService.t('workbenchTaskNoEvents')}
+          </p>
+        )}
       </div>
-      {entries.length > 0 ? (
-        <TimelineEntryList
-          entries={entries}
-          run={run}
-          runs={runs}
-          busy={busy}
-          onRespondToApproval={onRespondToApproval}
-        />
-      ) : (
-        <p className="pl-10 text-sm text-muted-foreground">
-          {i18nService.t('workbenchTaskNoEvents')}
-        </p>
-      )}
     </div>
   );
 
@@ -98,7 +104,7 @@ export function TimelineChapter({
     <>
       <span
         aria-hidden="true"
-        className="absolute top-0 left-0 flex size-7 items-center justify-center rounded-full border border-border bg-background"
+        className="absolute top-0 left-0 z-10 flex size-7 items-center justify-center rounded-full border border-border bg-background"
       >
         <StatusIcon
           className={cn(
@@ -247,7 +253,7 @@ function VerificationCheckRow({ check }: { check: WorkbenchVerificationCheck }) 
   const { icon: Icon, className } =
     checkIcons[check.status] ?? checkIcons[WorkbenchVerificationCheckStatus.Skipped];
   return (
-    <li className="flex items-start gap-2">
+    <li className="flex flex-wrap items-start gap-2">
       <Icon className={cn('mt-0.5 size-3.5 shrink-0', className)} />
       <span className="min-w-0 flex-1 break-all font-mono text-xs text-foreground">
         {check.name}

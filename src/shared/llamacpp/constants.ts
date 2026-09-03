@@ -13,6 +13,7 @@ export const LlamaCppIpcChannel = {
   SetModelsDir: 'llamacpp:models-dir:set',
   ListLocalModels: 'llamacpp:list-local-models',
   ListRunningModels: 'llamacpp:list-running-models',
+  RefreshRunningModelBindings: 'llamacpp:running-model-bindings:refresh',
   ImportModelFiles: 'llamacpp:import-model-files',
   DeleteModel: 'llamacpp:delete-model',
   ShowModel: 'llamacpp:show-model',

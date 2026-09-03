@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
+import { useSelector } from 'react-redux';
 import { toast } from 'sonner';
 
 import { Button } from '@shared/components/ui/button';
@@ -43,6 +44,7 @@ import {
 } from '../../../../shared/memory';
 import { i18nService } from '../../../services/i18n';
 import { memoryService } from '../../../services/memory';
+import type { RootState } from '../../../store';
 import { MemoryRecordList } from './MemoryRecordList';
 import { collectMemorySourceSessionIds } from './memoryViewModel';
 
@@ -79,6 +81,21 @@ const emptyDraft = (): MemoryDraft => ({
 });
 
 export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySettingsProps) {
+  const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
+  const currentWorkspaceId = useSelector((state: RootState) => state.workspace.currentWorkspaceId);
+  const currentWorkspace = workspaces.find(workspace => workspace.id === currentWorkspaceId);
+  const workspaceOptions = useMemo(() => {
+    const options = workspaces
+      .filter(workspace => !workspace.isHidden)
+      .map(workspace => ({ id: workspace.id, name: workspace.name, path: workspace.path }));
+    const configuredPath = workingDirectory.trim();
+    if (configuredPath && !options.some(option => option.path === configuredPath)) {
+      options.push({ id: configuredPath, name: configuredPath, path: configuredPath });
+    }
+    return options;
+  }, [workspaces, workingDirectory]);
+  const defaultWorkspacePath = currentWorkspace?.path || workingDirectory.trim();
+  const [selectedWorkspacePath, setSelectedWorkspacePath] = useState(defaultWorkspacePath);
   const [records, setRecords] = useState<ManagedMemoryRecord[]>([]);
   const [sessionTitles, setSessionTitles] = useState<ReadonlyMap<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -86,10 +103,21 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
   const [editor, setEditor] = useState<MemoryEditor | null>(null);
   const [forgetTarget, setForgetTarget] = useState<ForgetTarget | null>(null);
 
+  useEffect(() => {
+    const nextPath = currentWorkspace?.path || workingDirectory.trim();
+    if (nextPath) setSelectedWorkspacePath(nextPath);
+  }, [currentWorkspace?.path, workingDirectory]);
+
+  useEffect(() => {
+    if (!selectedWorkspacePath && defaultWorkspacePath) {
+      setSelectedWorkspacePath(defaultWorkspacePath);
+    }
+  }, [defaultWorkspacePath, selectedWorkspacePath]);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const nextRecords = await memoryService.list();
+      const nextRecords = await memoryService.list({ workingDirectory: selectedWorkspacePath });
       const sourceSessionIds = collectMemorySourceSessionIds(nextRecords);
       try {
         const resolvedTitles = sourceSessionIds.length
@@ -109,7 +137,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedWorkspacePath]);
 
   useEffect(() => {
     void load();
@@ -190,7 +218,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
       if (editor.record) {
         await memoryService.updateManual({
           id: editor.record.id,
-          workingDirectory,
+          workingDirectory: selectedWorkspacePath,
           title,
           content,
           kind: editor.draft.kind,
@@ -199,7 +227,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
         toast.success(i18nService.t('managedMemoryUpdated'));
       } else {
         await memoryService.createManual({
-          workingDirectory,
+          workingDirectory: selectedWorkspacePath,
           scope: editor.draft.scope,
           title,
           content,
@@ -224,7 +252,31 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
         <CardTitle>{i18nService.t('managedMemoryTitle')}</CardTitle>
         <CardDescription>{i18nService.t('managedMemoryDescription')}</CardDescription>
         <CardAction className="col-start-1 row-start-3 row-span-1 justify-self-start pt-2 sm:col-start-2 sm:row-start-1 sm:row-span-2 sm:justify-self-end sm:pt-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {i18nService.t('managedMemoryWorkspaceLabel')}
+            </span>
+            <Select
+              value={selectedWorkspacePath}
+              onValueChange={value => value && setSelectedWorkspacePath(value)}
+              disabled={workspaceOptions.length === 0}
+            >
+              <SelectTrigger
+                className="w-52"
+                aria-label={i18nService.t('managedMemoryWorkspaceLabel')}
+              >
+                <SelectValue placeholder={i18nService.t('managedMemoryWorkspaceEmpty')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {workspaceOptions.map(workspace => (
+                    <SelectItem key={workspace.id} value={workspace.path}>
+                      {workspace.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
             {pendingCount > 0 && (
               <Button
                 type="button"

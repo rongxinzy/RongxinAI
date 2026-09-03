@@ -13,18 +13,18 @@ import {
 import { Switch } from '@shared/components/ui/switch';
 import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { Textarea } from '@shared/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
 import {
   Building2,
-  CheckCircle,
   ExternalLink,
   Eye,
   EyeOff,
   Key,
   Pencil,
   PlusCircle,
-  Signal,
+  RefreshCw,
   ServerCog,
   ShieldCheck,
   Trash2,
@@ -38,27 +38,32 @@ import {
   isProviderEnabled,
   ModelCapabilityStatus,
   type ModelCapabilities,
+  type DiscoveredProviderModel,
   type ProviderModelPiRuntimeConfig,
   ProviderName,
   ProviderRegistry,
-  resolveCodingPlanBaseUrl,
 } from '../../shared/providers';
 import type { LlamaCppModelPreference } from '../../shared/llamacpp';
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../shared/appUpdate/constants';
 import {
   type AppConfig,
   defaultConfig,
-  getCustomProviderDefaultName,
   getProviderDisplayName,
   getVisibleProviders,
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
 import {
+  MODEL_CAPABILITY_FIELDS,
   ModelCapabilitiesFields,
   type ModelCapabilityKey,
 } from './settings/ModelCapabilitiesFields';
 import { ProviderModelDiscoveryButton } from './settings/ProviderModelDiscoveryButton';
+import {
+  ModelConnectionStatus,
+  useModelConnectionStatus,
+} from './settings/useModelConnectionStatus';
+import { shouldAutoDetectProviderModels } from './settings/providerModelAutoDetection';
 import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import { getProviderIcon } from '../providers/uiRegistry';
 import { apiService } from '../services/api';
@@ -76,6 +81,10 @@ import { i18nService, LanguageType } from '../services/i18n';
 import { imService } from '../services/im';
 import { reconcileDefaultModelConfig } from '../services/modelConfigReconciliation';
 import { mergeDiscoveredProviderModels } from '../services/providerModelDiscovery';
+import {
+  testProviderModelConnection,
+  testProviderModelsSequentially,
+} from '../services/providerModelConnection';
 import { buildAppSettingsSavePatch, getSettingsSaveErrorMessage } from '../services/settingsSave';
 import { formatShortcutLabel } from '../services/shortcutLabel';
 import { themeService } from '../services/theme';
@@ -198,17 +207,12 @@ type ProviderType = BuiltinProviderType | CustomProviderType;
 type ProvidersConfig = NonNullable<AppConfig['providers']>;
 type ProviderConfig = ProvidersConfig[string];
 type Model = NonNullable<ProviderConfig['models']>[number];
-type ProviderConnectionTestResult = {
-  success: boolean;
-  message: string;
-  provider: ProviderType;
-};
 
-type ProviderStatusBadge = {
-  labelKey: string;
-  className: string;
+const getCustomProviderLabel = (provider: string): string => {
+  const index = Number(provider.replace('custom_', '')) + 1;
+  const baseLabel = i18nService.t('customProviderDefaultName');
+  return index === 1 || !Number.isFinite(index) ? baseLabel : `${baseLabel} ${index}`;
 };
-
 const resolveModelSupportsImageForProvider = (
   providerName: string,
   model: { id: string; supportsImage?: boolean },
@@ -234,11 +238,15 @@ const CUSTOM_MODEL_CAPABILITY_KEYS: readonly ModelCapabilityKey[] = [
 ];
 
 const TOKENS_PER_K = 1024;
+const LOCAL_MODEL_REFRESH_MIN_LOADING_DURATION_MS = 1_000;
 
 const formatTokenK = (tokens?: number): string => {
   if (!tokens || !Number.isFinite(tokens) || tokens <= 0) return '';
   return String(Number((tokens / TOKENS_PER_K).toFixed(2)));
 };
+
+const formatDetectedTokenLimit = (tokens: number): string =>
+  tokens >= TOKENS_PER_K ? `${formatTokenK(tokens)}K` : String(tokens);
 
 const parseTokenK = (value: string): number | undefined => {
   const parsed = Number.parseFloat(value.trim());
@@ -297,8 +305,12 @@ const LOCAL_NO_KEY_PROVIDERS = new Set<ProviderType>([
   'github-copilot',
 ]);
 
-const providerRequiresApiKey = (provider: ProviderType) => !LOCAL_NO_KEY_PROVIDERS.has(provider);
+const providerRequiresApiKey = (provider: ProviderType) =>
+  !LOCAL_NO_KEY_PROVIDERS.has(provider) && !isCustomProvider(provider);
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
+  if (isCustomProvider(provider)) {
+    return config.baseUrl.trim().length > 0;
+  }
   if (provider === ProviderName.Ollama || provider === ProviderName.LlamaCpp) {
     return true;
   }
@@ -318,23 +330,6 @@ const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfi
   }
 
   return config.apiKey.trim().length > 0;
-};
-const getProviderStatusBadge = (
-  provider: ProviderType,
-  providerConfig: ProviderConfig,
-): ProviderStatusBadge => {
-  const enabled =
-    isProviderEnabled(provider, providerConfig) &&
-    hasProviderAuthConfigured(provider, providerConfig);
-  return enabled
-    ? {
-        labelKey: 'providerStatusOn',
-        className: 'bg-success/20 text-success',
-      }
-    : {
-        labelKey: 'providerStatusOff',
-        className: 'bg-destructive/20 text-destructive',
-      };
 };
 const normalizeBaseUrl = (baseUrl: string): string =>
   baseUrl.trim().replace(/\/+$/, '').toLowerCase();
@@ -460,69 +455,6 @@ const shouldAutoSwitchProviderBaseUrl = (
     (openaiUrl ? normalizedCurrent === normalizeBaseUrl(openaiUrl) : false)
   );
 };
-const buildOpenAICompatibleChatCompletionsUrl = (baseUrl: string, provider: string): string => {
-  const normalized = baseUrl.trim().replace(/\/+$/, '');
-  if (!normalized) {
-    return '/v1/chat/completions';
-  }
-  if (normalized.endsWith('/chat/completions')) {
-    return normalized;
-  }
-
-  const isGeminiLike =
-    provider === 'gemini' || normalized.includes('generativelanguage.googleapis.com');
-  if (isGeminiLike) {
-    if (normalized.endsWith('/v1beta/openai') || normalized.endsWith('/v1/openai')) {
-      return `${normalized}/chat/completions`;
-    }
-    if (normalized.endsWith('/v1beta') || normalized.endsWith('/v1')) {
-      const betaBase = normalized.endsWith('/v1') ? `${normalized.slice(0, -3)}v1beta` : normalized;
-      return `${betaBase}/openai/chat/completions`;
-    }
-    return `${normalized}/v1beta/openai/chat/completions`;
-  }
-
-  if (provider === 'github-copilot') {
-    return `${normalized}/chat/completions`;
-  }
-
-  // Handle /v1, /v4 etc. versioned paths
-  if (/\/v\d+$/.test(normalized)) {
-    return `${normalized}/chat/completions`;
-  }
-  return `${normalized}/v1/chat/completions`;
-};
-const buildOpenAIResponsesUrl = (baseUrl: string): string => {
-  const normalized = baseUrl.trim().replace(/\/+$/, '');
-  if (!normalized) {
-    return '/v1/responses';
-  }
-  if (normalized.endsWith('/responses')) {
-    return normalized;
-  }
-  if (normalized.endsWith('/v1')) {
-    return `${normalized}/responses`;
-  }
-  return `${normalized}/v1/responses`;
-};
-const shouldUseOpenAIResponsesForProvider = (provider: string): boolean => provider === 'openai';
-const shouldUseMaxCompletionTokensForOpenAI = (provider: string, modelId?: string): boolean => {
-  if (provider !== 'openai') {
-    return false;
-  }
-  const normalizedModel = (modelId ?? '').toLowerCase();
-  const resolvedModel = normalizedModel.includes('/')
-    ? normalizedModel.slice(normalizedModel.lastIndexOf('/') + 1)
-    : normalizedModel;
-  return (
-    resolvedModel.startsWith('gpt-5') ||
-    resolvedModel.startsWith('o1') ||
-    resolvedModel.startsWith('o3') ||
-    resolvedModel.startsWith('o4')
-  );
-};
-const CONNECTIVITY_TEST_TOKEN_BUDGET = 64;
-
 const shouldShowProviderModels = (providerKey: string, providerConfig: ProviderConfig): boolean => {
   if (providerKey === ProviderName.Ollama || providerKey === ProviderName.LlamaCpp) return true;
   if (isCustomProvider(providerKey)) return Boolean(providerConfig.baseUrl?.trim());
@@ -763,10 +695,9 @@ const Settings: React.FC<SettingsProps> = ({
   }, [notice, noticeExtra, noticeI18nKey]);
 
   const [noticeMessage, setNoticeMessage] = useState<string | null>(() => buildNoticeMessage());
-  const [testResult, setTestResult] = useState<ProviderConnectionTestResult | null>(null);
-  const [isTestResultModalOpen, setIsTestResultModalOpen] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<ProviderType | null>(null);
+  const [pendingApiKeyClearProvider, setPendingApiKeyClearProvider] =
+    useState<ProviderType | null>(null);
   const [pendingDeleteModel, setPendingDeleteModel] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -849,6 +780,31 @@ const Settings: React.FC<SettingsProps> = ({
 
   // Add state for providers configuration
   const [providers, setProviders] = useState<ProvidersConfig>(() => getDefaultProviders());
+  const [selectedModelId, setSelectedModelId] = useState('');
+  const [autoDetectRequest, setAutoDetectRequest] = useState<{
+    provider: ProviderType;
+    requestId: number;
+  } | null>(null);
+  const [isRefreshingLlamaCppModels, setIsRefreshingLlamaCppModels] = useState(false);
+  const autoDetectRequestIdRef = useRef(0);
+  const apiKeyInputDirtyRef = useRef<Partial<Record<ProviderType, boolean>>>({});
+  const baseUrlInputDirtyRef = useRef<Partial<Record<ProviderType, boolean>>>({});
+  const modelConnectionTestRequestIdRef = useRef<Partial<Record<ProviderType, number>>>({});
+  const {
+    getModelConnectionStatus,
+    resetProviderModelConnectionStatuses,
+    setModelConnectionStatus,
+    setProviderModelConnectionStatuses,
+  } = useModelConnectionStatus();
+
+  const invalidateProviderModelConnectionStatuses = useCallback(
+    (provider: ProviderType) => {
+      modelConnectionTestRequestIdRef.current[provider] =
+        (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
+      resetProviderModelConnectionStatuses(provider);
+    },
+    [resetProviderModelConnectionStatuses],
+  );
 
   // authType defaults to undefined on first open, which should behave as OAuth mode
   const minimaxIsOAuthMode = providers.minimax.authType !== 'apikey';
@@ -913,6 +869,13 @@ const Settings: React.FC<SettingsProps> = ({
   useEffect(() => {
     setShowApiKey(false);
   }, [activeProvider]);
+
+  useEffect(() => {
+    const models = providers[activeProvider]?.models ?? [];
+    setSelectedModelId(current =>
+      models.some(model => model.id === current) ? current : (models[0]?.id ?? ''),
+    );
+  }, [activeProvider, providers]);
 
   const handleExportLogs = useCallback(async () => {
     if (isExportingLogs) {
@@ -999,6 +962,30 @@ const Settings: React.FC<SettingsProps> = ({
       },
     }));
   }, []);
+
+  const handleRefreshLlamaCppModels = async (): Promise<void> => {
+    if (isRefreshingLlamaCppModels) return;
+
+    const loadingStartedAt = performance.now();
+    setIsRefreshingLlamaCppModels(true);
+    try {
+      await window.electron.llamacpp.refreshRunningModelBindings();
+      await syncLlamaCppProviderFromConfig();
+    } catch (error) {
+      console.error('[Settings] failed to refresh local model bindings:', error);
+    } finally {
+      const remainingLoadingDuration = Math.max(
+        0,
+        LOCAL_MODEL_REFRESH_MIN_LOADING_DURATION_MS - (performance.now() - loadingStartedAt),
+      );
+      if (remainingLoadingDuration > 0) {
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, remainingLoadingDuration);
+        });
+      }
+      setIsRefreshingLlamaCppModels(false);
+    }
+  };
 
   useEffect(() => {
     setEmbeddingEnabled(coworkConfig.embeddingEnabled ?? false);
@@ -1439,13 +1426,35 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setModelFormError(null);
     setActiveProvider(provider);
-    // 切换 provider 时清除测试结果
-    setIsTestResultModalOpen(false);
-    setTestResult(null);
+    setSelectedModelId('');
   };
 
   // Handle provider configuration change
   const handleProviderConfigChange = (provider: ProviderType, field: string, value: string) => {
+    if (field === 'apiKey' || field === 'baseUrl' || field === 'apiFormat') {
+      invalidateProviderModelConnectionStatuses(provider);
+    }
+    if (field === 'apiFormat') {
+      const currentProviderConfig = providers[provider];
+      const nextApiFormat = getEffectiveApiFormat(provider, value);
+      const nextBaseUrl = shouldAutoSwitchProviderBaseUrl(provider, currentProviderConfig.baseUrl)
+        ? getProviderDefaultBaseUrl(provider, nextApiFormat) || currentProviderConfig.baseUrl
+        : currentProviderConfig.baseUrl;
+      if (
+        shouldAutoDetectProviderModels({
+          providerId: provider,
+          baseUrl: nextBaseUrl,
+          apiKey: currentProviderConfig.apiKey,
+          authType: currentProviderConfig.authType,
+          requiresApiKey: providerRequiresApiKey(provider),
+        })
+      ) {
+        setAutoDetectRequest({
+          provider,
+          requestId: ++autoDetectRequestIdRef.current,
+        });
+      }
+    }
     setProviders(prev => {
       if (field === 'apiFormat') {
         const nextApiFormat = getEffectiveApiFormat(provider, value);
@@ -1495,6 +1504,59 @@ const Settings: React.FC<SettingsProps> = ({
           [field]: value,
         },
       };
+    });
+  };
+
+  const handleApiKeyInputChange = (provider: ProviderType, value: string) => {
+    apiKeyInputDirtyRef.current[provider] = true;
+    handleProviderConfigChange(provider, 'apiKey', value);
+  };
+
+  const handleBaseUrlInputChange = (provider: ProviderType, value: string) => {
+    baseUrlInputDirtyRef.current[provider] = true;
+    handleProviderConfigChange(provider, 'baseUrl', value);
+  };
+
+  const requestApiKeyClear = (provider: ProviderType) => {
+    if (!providers[provider].apiKey) return;
+    setPendingApiKeyClearProvider(provider);
+  };
+
+  const confirmApiKeyClear = () => {
+    const provider = pendingApiKeyClearProvider;
+    if (!provider) return;
+    setPendingApiKeyClearProvider(null);
+    handleApiKeyInputChange(provider, '');
+  };
+
+  const handleApiKeyBlur = (provider: ProviderType) => {
+    const providerConfig = providers[provider];
+    const wasEdited = apiKeyInputDirtyRef.current[provider] === true;
+    apiKeyInputDirtyRef.current[provider] = false;
+    if (
+      !wasEdited ||
+      !providerRequiresApiKey(provider) ||
+      providerConfig.authType === 'oauth' ||
+      !providerConfig.apiKey.trim() ||
+      !providerConfig.baseUrl.trim()
+    ) {
+      return;
+    }
+    setAutoDetectRequest({
+      provider,
+      requestId: ++autoDetectRequestIdRef.current,
+    });
+  };
+
+  const handleBaseUrlBlur = (provider: ProviderType) => {
+    const wasEdited = baseUrlInputDirtyRef.current[provider] === true;
+    baseUrlInputDirtyRef.current[provider] = false;
+    if (!wasEdited || provider !== ProviderName.Ollama || !providers[provider].baseUrl.trim()) {
+      return;
+    }
+    setAutoDetectRequest({
+      provider,
+      requestId: ++autoDetectRequestIdRef.current,
     });
   };
 
@@ -1806,7 +1868,11 @@ const Settings: React.FC<SettingsProps> = ({
     }
 
     if (isEnabling && !hasValidAuth) {
-      setError(i18nService.t('apiKeyRequired'));
+      setError(
+        isCustomProvider(provider)
+          ? i18nService.t('customProviderBaseUrlRequired')
+          : i18nService.t('apiKeyRequired'),
+      );
       return;
     }
 
@@ -2100,6 +2166,14 @@ const Settings: React.FC<SettingsProps> = ({
     e.stopPropagation();
   };
 
+  const handleSettingsFormKeyDown = (event: React.KeyboardEvent<HTMLFormElement>) => {
+    if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
+    if (event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) {
+      return;
+    }
+    event.preventDefault();
+  };
+
   // Handlers for model operations
   const handleAddModel = () => {
     setIsAddingModel(true);
@@ -2287,37 +2361,100 @@ const Settings: React.FC<SettingsProps> = ({
     }
   };
 
-  const showTestResultModal = (
-    result: Omit<ProviderConnectionTestResult, 'provider'>,
+  const showConnectionTestNotification = (
+    result: { success: boolean; message: string },
     provider: ProviderType,
+    model?: Pick<NonNullable<ProviderConfig['models']>[number], 'id' | 'name'>,
   ) => {
-    setTestResult({
-      ...result,
-      provider,
-    });
-    setIsTestResultModalOpen(true);
+    const providerLabel = ProviderRegistry.get(provider)?.label ?? provider;
+    const modelName = model?.name.trim();
+    const modelId = model?.id;
+    const modelLabel =
+      modelName && modelId && modelName !== modelId ? `${modelName} (${modelId})` : modelId;
+    const subject = modelLabel ?? providerLabel;
+    const message = result.success
+      ? `${subject}: ${i18nService.t('connectionSuccess')}`
+      : `${subject}: ${result.message}`;
+    window.dispatchEvent(
+      new CustomEvent('app:showToast', {
+        detail: {
+          message,
+          isError: !result.success,
+          isSuccess: result.success,
+          autoClose: true,
+          durationMs: result.success ? undefined : 5_000,
+        },
+      }),
+    );
+  };
+
+  const persistTestedProviderConfiguration = async (
+    provider: ProviderType,
+    providerConfig: ProviderConfig,
+  ): Promise<void> => {
+    if (provider === ProviderName.LlamaCpp) return;
+
+    const apiFormat = getEffectiveApiFormat(provider, providerConfig.apiFormat);
+    const currentConfig = configService.getConfig();
+    const nextProviders = {
+      ...(currentConfig.providers ?? {}),
+      [provider]: {
+        ...providerConfig,
+        enabled: true,
+        apiFormat,
+        baseUrl: resolveBaseUrl(provider, providerConfig.baseUrl, apiFormat),
+      },
+    } as ProvidersConfig;
+    await configService.updateConfig({ providers: nextProviders });
+  };
+
+  const completeSuccessfulConnectionTest = async (
+    provider: ProviderType,
+    providerConfig: ProviderConfig,
+    model: Pick<NonNullable<ProviderConfig['models']>[number], 'id' | 'name'>,
+  ): Promise<void> => {
+    try {
+      await persistTestedProviderConfiguration(provider, providerConfig);
+      if (provider !== ProviderName.LlamaCpp) {
+        enableProvider(provider);
+      }
+      showConnectionTestNotification(
+        { success: true, message: i18nService.t('connectionSuccess') },
+        provider,
+        model,
+      );
+    } catch (error) {
+      console.error('[Settings] failed to save tested provider configuration:', error);
+        showConnectionTestNotification(
+          { success: false, message: i18nService.t('failedToSaveSettings') },
+          provider,
+          model,
+        );
+    }
   };
 
   // 测试 API 连接
-  const handleTestConnection = async () => {
+  const handleTestConnection = async (requestedModelId?: string) => {
     const testingProvider = activeProvider;
     const providerConfig = providers[testingProvider];
-    setIsTesting(true);
-    setIsTestResultModalOpen(false);
-    setTestResult(null);
-
     const hasValidAuth = providerConfig.apiKey;
 
     if (providerRequiresApiKey(testingProvider) && !hasValidAuth) {
-      showTestResultModal(
+      showConnectionTestNotification(
         { success: false, message: i18nService.t('apiKeyRequired') },
         testingProvider,
       );
-      setIsTesting(false);
       return;
     }
 
-    let firstModel = providerConfig.models?.[0] ? { ...providerConfig.models[0] } : undefined;
+    const selectedModel = providerConfig.models?.find(
+      model => model.id === (requestedModelId ?? selectedModelId),
+    );
+    let firstModel = selectedModel
+      ? { ...selectedModel }
+      : providerConfig.models?.[0]
+        ? { ...providerConfig.models[0] }
+        : undefined;
 
     if (testingProvider === ProviderName.LlamaCpp) {
       const runningModels = await window.electron.llamacpp.listRunningModels().catch(() => []);
@@ -2325,14 +2462,13 @@ const Settings: React.FC<SettingsProps> = ({
         .map(model => model.name?.trim() || model.model?.trim() || model.id?.trim() || '')
         .filter(Boolean);
       if (runningModelNames.length === 0) {
-        showTestResultModal(
+        showConnectionTestNotification(
           {
             success: false,
             message: i18nService.t('agentLlamaCppModelNotRunningBlocked'),
           },
           testingProvider,
         );
-        setIsTesting(false);
         return;
       }
       const matchedConfiguredModel = (providerConfig.models ?? []).find(
@@ -2348,176 +2484,140 @@ const Settings: React.FC<SettingsProps> = ({
     }
 
     if (!firstModel) {
-      showTestResultModal(
+      showConnectionTestNotification(
         { success: false, message: i18nService.t('noModelsConfigured') },
         testingProvider,
       );
-      setIsTesting(false);
       return;
     }
 
-    try {
-      let response: Awaited<ReturnType<typeof window.electron.api.fetch>>;
-      // Apply Coding Plan endpoint switch
-      let effectiveBaseUrl = resolveBaseUrl(
+    if (testingProvider === 'qwen' && (firstModel.id === 'vision-model' || firstModel.id === 'coder-model')) {
+      const defaultQwenModel = defaultConfig.providers?.qwen?.models?.[0];
+      firstModel.id = defaultQwenModel?.id || 'qwen3.5-plus';
+    }
+
+    const requestId = (modelConnectionTestRequestIdRef.current[testingProvider] ?? 0) + 1;
+    modelConnectionTestRequestIdRef.current[testingProvider] = requestId;
+    const result = await testProviderModelConnection({
+      providerId: testingProvider,
+      provider: providerConfig,
+      baseUrl: resolveBaseUrl(
         testingProvider,
         providerConfig.baseUrl,
         getEffectiveApiFormat(testingProvider, providerConfig.apiFormat),
-      );
-      let effectiveApiFormat = getEffectiveApiFormat(testingProvider, providerConfig.apiFormat);
+      ),
+      apiFormat: getEffectiveApiFormat(testingProvider, providerConfig.apiFormat),
+      model: firstModel,
+    });
+    if (modelConnectionTestRequestIdRef.current[testingProvider] !== requestId) return;
 
-      // Handle Coding Plan endpoint switch for supported providers
-      if (
-        (providerConfig as { codingPlanEnabled?: boolean }).codingPlanEnabled &&
-        (effectiveApiFormat === 'anthropic' || effectiveApiFormat === 'openai')
-      ) {
-        const resolved = resolveCodingPlanBaseUrl(
-          testingProvider,
-          true,
-          effectiveApiFormat,
-          effectiveBaseUrl,
-        );
-        effectiveBaseUrl = resolved.baseUrl;
-        effectiveApiFormat = resolved.effectiveFormat;
-      }
-
-      let normalizedBaseUrl = effectiveBaseUrl.replace(/\/+$/, '');
-
-      // Determine effective API key
-      let effectiveApiKey = providerConfig.apiKey;
-
-      if (testingProvider === 'qwen') {
-        // Use regular API Key mode
-        effectiveApiKey = providerConfig.apiKey;
-        // Ensure model ID is not an OAuth-mapped name (vision-model/coder-model)
-        // This can happen if a previous OAuth test mutated the model in state and it got persisted
-        if (firstModel.id === 'vision-model' || firstModel.id === 'coder-model') {
-          // Restore from defaultConfig's first qwen model
-          const defaultQwenModel = defaultConfig.providers?.qwen?.models?.[0];
-          firstModel.id = defaultQwenModel?.id || 'qwen3.5-plus';
-        }
-      }
-
-      // Determine format after all overrides (OAuth may switch to openai)
-      // 统一为两种协议格式：
-      // - anthropic: /v1/messages
-      // - openai provider: /v1/responses
-      // - other openai-compatible providers: /v1/chat/completions
-      const useAnthropicFormat = effectiveApiFormat === 'anthropic';
-
-      if (useAnthropicFormat) {
-        const anthropicUrl = normalizedBaseUrl.endsWith('/v1')
-          ? `${normalizedBaseUrl}/messages`
-          : `${normalizedBaseUrl}/v1/messages`;
-        response = await window.electron.api.fetch({
-          url: anthropicUrl,
-          method: 'POST',
-          headers: {
-            'x-api-key': effectiveApiKey,
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: firstModel.id,
-            max_tokens: CONNECTIVITY_TEST_TOKEN_BUDGET,
-            messages: [{ role: 'user', content: 'Hi' }],
-          }),
-        });
-      } else {
-        const useResponsesApi = shouldUseOpenAIResponsesForProvider(testingProvider);
-        const openaiUrl = useResponsesApi
-          ? buildOpenAIResponsesUrl(normalizedBaseUrl)
-          : buildOpenAICompatibleChatCompletionsUrl(normalizedBaseUrl, testingProvider);
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (effectiveApiKey) {
-          headers.Authorization = `Bearer ${effectiveApiKey}`;
-        }
-        if (testingProvider === 'github-copilot') {
-          headers['Copilot-Integration-Id'] = 'vscode-chat';
-          headers['Editor-Version'] = 'vscode/1.96.2';
-          headers['Editor-Plugin-Version'] = 'copilot-chat/0.26.7';
-          headers['User-Agent'] = 'GitHubCopilotChat/0.26.7';
-          headers['Openai-Intent'] = 'conversation-panel';
-        }
-        const openAIRequestBody: Record<string, unknown> = useResponsesApi
-          ? {
-              model: firstModel.id,
-              input: [{ role: 'user', content: [{ type: 'input_text', text: 'Hi' }] }],
-              max_output_tokens: CONNECTIVITY_TEST_TOKEN_BUDGET,
-            }
-          : {
-              model: firstModel.id,
-              messages: [{ role: 'user', content: 'Hi' }],
-            };
-        if (
-          !useResponsesApi &&
-          shouldUseMaxCompletionTokensForOpenAI(testingProvider, firstModel.id)
-        ) {
-          openAIRequestBody.max_completion_tokens = CONNECTIVITY_TEST_TOKEN_BUDGET;
-        } else {
-          if (!useResponsesApi) {
-            openAIRequestBody.max_tokens = CONNECTIVITY_TEST_TOKEN_BUDGET;
-          }
-        }
-        response = await window.electron.api.fetch({
-          url: openaiUrl,
-          method: 'POST',
-          headers,
-          body: JSON.stringify(openAIRequestBody),
-        });
-      }
-
-      if (response.ok) {
-        if (testingProvider !== ProviderName.LlamaCpp) {
-          enableProvider(testingProvider);
-        }
-        showTestResultModal(
-          { success: true, message: i18nService.t('connectionSuccess') },
-          testingProvider,
-        );
-      } else {
-        const data = response.data || {};
-        // 提取错误信息
-        const errorMessage =
-          data.error?.message ||
-          data.message ||
-          `${i18nService.t('connectionFailed')}: ${response.status}`;
-        if (
-          typeof errorMessage === 'string' &&
-          errorMessage.toLowerCase().includes('model output limit was reached')
-        ) {
-          if (testingProvider !== ProviderName.LlamaCpp) {
-            enableProvider(testingProvider);
-          }
-          showTestResultModal(
-            { success: true, message: i18nService.t('connectionSuccess') },
-            testingProvider,
-          );
-          return;
-        }
-        showTestResultModal({ success: false, message: errorMessage }, testingProvider);
-      }
-    } catch (err) {
-      showTestResultModal(
-        {
-          success: false,
-          message: err instanceof Error ? err.message : i18nService.t('connectionFailed'),
-        },
-        testingProvider,
-      );
-    } finally {
-      setIsTesting(false);
+    setModelConnectionStatus(
+      testingProvider,
+      firstModel.id,
+      result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
+    );
+    if (result.success) {
+      await completeSuccessfulConnectionTest(testingProvider, providerConfig, firstModel);
+    } else {
+      showConnectionTestNotification({ success: false, message: result.message }, testingProvider, firstModel);
     }
+  };
+
+  const handleModelsDiscovered = async (
+    providerId: string,
+    discoveredModels: readonly DiscoveredProviderModel[],
+  ) => {
+      const provider = providerId as ProviderType;
+      const providerConfig = providers[provider];
+      const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels);
+      const nextProviderConfig: ProviderConfig = {
+        ...providerConfig,
+        models: merged.models,
+      };
+      const modelsToTest = merged.models.map(model => ({
+        id: model.id,
+        name: model.name,
+      }));
+      if (modelsToTest.length === 0) return false;
+      const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
+      modelConnectionTestRequestIdRef.current[provider] = requestId;
+
+      if (provider === activeProvider && discoveredModels.length > 0) {
+        setSelectedModelId(current => current || discoveredModels[0].id);
+      }
+      setProviders(current => ({
+        ...current,
+        [provider]: {
+          ...current[provider],
+          models: mergeDiscoveredProviderModels(current[provider].models ?? [], discoveredModels).models,
+        },
+      }));
+
+      const results = await testProviderModelsSequentially({
+        providerId: provider,
+        provider: nextProviderConfig,
+        baseUrl: resolveBaseUrl(
+          provider,
+          nextProviderConfig.baseUrl,
+          getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+        ),
+        apiFormat: getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+        models: modelsToTest,
+      });
+      if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return true;
+
+      const statuses = Object.fromEntries(
+        results.map(({ model, result }) => [
+          model.id,
+          result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
+        ]),
+      );
+      setProviderModelConnectionStatuses(provider, statuses);
+
+      const successCount = results.filter(({ result }) => result.success).length;
+      const failureCount = results.length - successCount;
+      if (successCount > 0) {
+        try {
+          await persistTestedProviderConfiguration(provider, nextProviderConfig);
+          if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
+        } catch (error) {
+          console.error('[Settings] failed to save auto-tested provider configuration:', error);
+          showConnectionTestNotification(
+            { success: false, message: i18nService.t('failedToSaveSettings') },
+            provider,
+          );
+          return true;
+        }
+      }
+
+      const summary = i18nService
+        .t(failureCount === 0 ? 'modelConnectionTestSuccessSummary' : 'modelConnectionTestSummary')
+        .replace('{total}', String(results.length))
+        .replace('{success}', String(successCount))
+        .replace('{failure}', String(failureCount));
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: {
+            message: summary,
+            isError: failureCount > 0,
+            isSuccess: failureCount === 0,
+            autoClose: true,
+            durationMs: failureCount > 0 ? 5_000 : undefined,
+          },
+        }),
+      );
+      return true;
   };
 
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
     // Only export providers that have an API key configured, regardless of enabled state.
     // Skip preset providers that were never configured to avoid exporting default models.
-    const configuredEntries = Object.entries(providers).filter(([, cfg]) =>
-      (cfg as ProviderConfig).apiKey?.trim(),
-    );
+    const configuredEntries = Object.entries(providers).filter(([providerKey, cfg]) => {
+      const providerConfig = cfg as ProviderConfig;
+      return isCustomProvider(providerKey)
+        ? Boolean(providerConfig.baseUrl?.trim() || providerConfig.apiKey?.trim())
+        : Boolean(providerConfig.apiKey?.trim());
+    });
     const entries = await Promise.all(
       configuredEntries.map(async ([providerKey, providerConfig]) => {
         const apiKey = await encryptWithPassword(providerConfig.apiKey, password);
@@ -2729,8 +2829,6 @@ const Settings: React.FC<SettingsProps> = ({
         });
         return next;
       });
-      setIsTestResultModalOpen(false);
-      setTestResult(null);
       console.log(
         `[Settings] v1 import complete: updated ${Object.keys(providerUpdates).length} providers`,
       );
@@ -2852,8 +2950,6 @@ const Settings: React.FC<SettingsProps> = ({
         });
         return next;
       });
-      setIsTestResultModalOpen(false);
-      setTestResult(null);
       console.log(
         `[Settings] v2 import complete: updated ${Object.keys(providerUpdates).length} providers`,
       );
@@ -3254,7 +3350,7 @@ const Settings: React.FC<SettingsProps> = ({
                   : providerEnabled;
                 const canToggleProvider = effectiveEnabled || hasValidAuth;
                 const displayLabel = isCustom
-                  ? (config as ProviderConfig).displayName || getCustomProviderDefaultName(provider)
+                  ? (config as ProviderConfig).displayName || getCustomProviderLabel(provider)
                   : (ProviderRegistry.get(providerKey)?.label ?? getProviderDisplayName(provider));
                 return (
                   <div
@@ -3334,64 +3430,53 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
 
             {/* Provider Settings - Right Side */}
-            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable">
-              {(() => {
-                const statusBadge = getProviderStatusBadge(
-                  activeProvider,
-                  providers[activeProvider],
-                );
-                return (
-                  <div className="flex items-center justify-between pb-2 border-b border-border">
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="text-base font-medium text-foreground">
-                        {isCustomProvider(activeProvider)
-                          ? (providers[activeProvider] as ProviderConfig)?.displayName ||
-                            getCustomProviderDefaultName(activeProvider)
-                          : (ProviderRegistry.get(activeProvider)?.label ??
-                            getProviderDisplayName(activeProvider))}{' '}
-                        {i18nService.t('providerSettings')}
-                      </h3>
-                      {ProviderRegistry.get(activeProvider)?.website && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() =>
-                            void window.electron.shell.openExternal(
-                              ProviderRegistry.get(activeProvider)!.website!,
-                            )
-                          }
-                          className="text-muted-foreground hover:text-primary"
-                          title={i18nService.t('visitOfficialSite')}
-                          aria-label={i18nService.t('visitOfficialSite')}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+            <div className="w-3/5 pl-4 pr-2 space-y-4 overflow-y-auto scrollbar-gutter-stable flex flex-col">
+              {activeProvider !== ProviderName.LlamaCpp &&
+                (() => {
+                  return (
                     <div
-                      className={`px-2 py-0.5 rounded-lg text-xs font-medium ${statusBadge.className}`}
+                      className={cn(
+                        'flex items-center pb-2 border-b border-border',
+                        isCustomProvider(activeProvider) && 'order-[-4]',
+                      )}
                     >
-                      {i18nService.t(statusBadge.labelKey)}
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-base font-medium text-foreground">
+                          {isCustomProvider(activeProvider)
+                            ? (providers[activeProvider] as ProviderConfig)?.displayName ||
+                              getCustomProviderLabel(activeProvider)
+                            : (ProviderRegistry.get(activeProvider)?.label ??
+                              getProviderDisplayName(activeProvider))}{' '}
+                          {i18nService.t('providerSettings')}
+                        </h3>
+                        {ProviderRegistry.get(activeProvider)?.website && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              void window.electron.shell.openExternal(
+                                ProviderRegistry.get(activeProvider)!.website!,
+                              )
+                            }
+                            className="text-muted-foreground hover:text-primary"
+                            title={i18nService.t('visitOfficialSite')}
+                            aria-label={i18nService.t('visitOfficialSite')}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
-
-              {activeProvider === ProviderName.LlamaCpp && (
-                <div className="rounded-xl border border-border bg-surface px-3 py-2">
-                  <p className="text-xs text-muted-foreground">
-                    {i18nService.t('llamaCppProviderSettingsTitle')}
-                  </p>
-                </div>
-              )}
+                  );
+                })()}
 
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
                 <div className="space-y-3">
                   {/* Auth type radio cards */}
                   <div>
-                    <p className="text-xs font-medium text-foreground mb-2">
+                    <p className="text-sm font-medium text-foreground mb-2">
                       {i18nService.t('minimaxAuthMethodLabel')}
                     </p>
                     <div className="flex gap-2">
@@ -3414,7 +3499,7 @@ const Settings: React.FC<SettingsProps> = ({
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Key className="h-4 w-4 text-foreground shrink-0" />
-                          <p className="text-xs font-semibold text-foreground">
+                          <p className="text-sm font-semibold text-foreground">
                             {i18nService.t('minimaxOAuthTabApiKey')}
                           </p>
                         </div>
@@ -3438,7 +3523,7 @@ const Settings: React.FC<SettingsProps> = ({
                       >
                         <div className="flex items-center justify-center gap-2">
                           <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
-                          <p className="text-xs font-semibold text-foreground">
+                          <p className="text-sm font-semibold text-foreground">
                             {i18nService.t('minimaxOAuthTabOAuth')}
                           </p>
                         </div>
@@ -3467,9 +3552,9 @@ const Settings: React.FC<SettingsProps> = ({
                                 ProviderRegistry.get('minimax')!.apiKeyUrl!,
                               )
                             }
-                            className="h-auto px-0 py-0 text-[11px] text-primary hover:underline"
+                             className="h-auto px-0 py-0 text-xs text-primary hover:underline"
                           >
-                            {i18nService.t('getApiKey')} →
+                            {i18nService.t('getApiKey')}
                           </Button>
                         )}
                       </div>
@@ -3481,40 +3566,50 @@ const Settings: React.FC<SettingsProps> = ({
                           onChange={e =>
                             handleProviderConfigChange('minimax', 'apiKey', e.target.value)
                           }
-                          className="pr-16 text-xs"
+                          className="pr-20 text-xs"
                           placeholder={i18nService.t('apiKeyPlaceholder')}
                         />
                         <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                          {providers.minimax.apiKey && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleProviderConfigChange('minimax', 'apiKey', '')}
-                              className="text-muted-foreground hover:text-primary"
-                              title={i18nService.t('clear') || 'Clear'}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          )}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setShowApiKey(!showApiKey)}
-                            className="text-muted-foreground hover:text-primary"
-                            title={
-                              showApiKey
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => setShowApiKey(!showApiKey)}
+                                  aria-label={
+                                    showApiKey
+                                      ? i18nService.t('hide') || 'Hide'
+                                      : i18nService.t('show') || 'Show'
+                                  }
+                                >
+                                  {showApiKey ? <Eye /> : <EyeOff />}
+                                </Button>
+                              }
+                            />
+                            <TooltipContent>
+                              {showApiKey
                                 ? i18nService.t('hide') || 'Hide'
-                                : i18nService.t('show') || 'Show'
-                            }
-                          >
-                            {showApiKey ? (
-                              <Eye className="h-4 w-4" />
-                            ) : (
-                              <EyeOff className="h-4 w-4" />
-                            )}
-                          </Button>
+                                : i18nService.t('show') || 'Show'}
+                            </TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => requestApiKeyClear('minimax')}
+                                    aria-label={i18nService.t('clear') || 'Clear'}
+                                  >
+                                    <XCircle />
+                                  </Button>
+                                }
+                              />
+                              <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     </div>
@@ -3535,7 +3630,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                              className="h-auto px-2.5 py-1 text-[11px]"
+                               className="h-auto px-2.5 py-1 text-xs"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
                             </Button>
@@ -3544,7 +3639,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleMiniMaxOAuthLogout}
-                              className="h-auto px-2.5 py-1 text-[11px] border-destructive/30 text-destructive hover:bg-destructive/10"
+                               className="h-auto px-2.5 py-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
                             >
                               {i18nService.t('minimaxOAuthLogout')}
                             </Button>
@@ -3576,7 +3671,7 @@ const Settings: React.FC<SettingsProps> = ({
                           >
                             {i18nService.t('minimaxOAuthLogin')}
                           </Button>
-                          <p className="text-[11px] text-muted-foreground">
+                           <p className="text-xs text-muted-foreground">
                             {i18nService.t('minimaxOAuthHint')}
                           </p>
                         </div>
@@ -3598,7 +3693,7 @@ const Settings: React.FC<SettingsProps> = ({
                             {i18nService.t('minimaxOAuthOpenBrowserHint')}
                           </p>
                           <div>
-                            <span className="text-[11px] text-muted-foreground">
+                             <span className="text-xs text-muted-foreground">
                               {i18nService.t('minimaxOAuthUserCode')}:&nbsp;
                             </span>
                             <code className="text-xs font-mono text-primary">
@@ -3613,11 +3708,11 @@ const Settings: React.FC<SettingsProps> = ({
                                 minimaxOAuthPhase.verificationUri,
                               );
                             }}
-                            className="block text-[11px] text-primary underline truncate"
+                             className="block text-xs text-primary underline truncate"
                           >
                             {minimaxOAuthPhase.verificationUri}
                           </a>
-                          <p className="text-[11px] text-muted-foreground">
+                           <p className="text-xs text-muted-foreground">
                             {i18nService.t('minimaxOAuthStatusPending')}
                           </p>
                           <Button
@@ -3625,7 +3720,7 @@ const Settings: React.FC<SettingsProps> = ({
                             variant="outline"
                             size="sm"
                             onClick={handleCancelMiniMaxLogin}
-                            className="h-auto px-2.5 py-1 text-[11px]"
+                             className="h-auto px-2.5 py-1 text-xs"
                           >
                             {i18nService.t('minimaxOAuthCancel')}
                           </Button>
@@ -3647,7 +3742,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <p className="text-xs text-destructive font-medium">
                             {i18nService.t('minimaxOAuthStatusError')}
                           </p>
-                          <p className="text-[11px] text-destructive/80 wrap-break-word">
+                           <p className="text-xs text-destructive/80 wrap-break-word">
                             {minimaxOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
@@ -3656,7 +3751,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                              className="h-auto px-2.5 py-1 text-[11px]"
+                               className="h-auto px-2.5 py-1 text-xs"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
                             </Button>
@@ -3665,7 +3760,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setMinimaxOAuthPhase({ kind: 'idle' })}
-                              className="h-auto px-2.5 py-1 text-[11px]"
+                               className="h-auto px-2.5 py-1 text-xs"
                             >
                               {i18nService.t('minimaxOAuthCancel')}
                             </Button>
@@ -3682,7 +3777,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="space-y-3">
                   {/* Auth type radio cards */}
                   <div>
-                    <p className="text-xs font-medium text-foreground mb-2">
+                     <p className="text-sm font-medium text-foreground mb-2">
                       {i18nService.t('openaiAuthMethodLabel')}
                     </p>
                     <div className="flex gap-2">
@@ -3703,7 +3798,7 @@ const Settings: React.FC<SettingsProps> = ({
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Key className="h-4 w-4 text-foreground shrink-0" />
-                          <p className="text-xs font-semibold text-foreground">
+                           <p className="text-sm font-semibold text-foreground">
                             {i18nService.t('openaiOAuthTabApiKey')}
                           </p>
                         </div>
@@ -3724,7 +3819,7 @@ const Settings: React.FC<SettingsProps> = ({
                       >
                         <div className="flex items-center justify-center gap-2">
                           <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
-                          <p className="text-xs font-semibold text-foreground">
+                           <p className="text-sm font-semibold text-foreground">
                             {i18nService.t('openaiOAuthTabOAuth')}
                           </p>
                         </div>
@@ -3748,7 +3843,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                              className="h-auto px-2.5 py-1 text-[11px]"
+                               className="h-auto px-2.5 py-1 text-xs"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
                             </Button>
@@ -3759,7 +3854,7 @@ const Settings: React.FC<SettingsProps> = ({
                               onClick={() => {
                                 void handleOpenAIOAuthLogout();
                               }}
-                              className="h-auto px-2.5 py-1 text-[11px] border-destructive/30 text-destructive hover:bg-destructive/10"
+                               className="h-auto px-2.5 py-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
                             >
                               {i18nService.t('openaiOAuthLogout')}
                             </Button>
@@ -3779,7 +3874,7 @@ const Settings: React.FC<SettingsProps> = ({
                             >
                               {i18nService.t('openaiOAuthLogin')}
                             </Button>
-                            <p className="text-[11px] text-muted-foreground">
+                             <p className="text-xs text-muted-foreground">
                               {i18nService.t('openaiOAuthHint')}
                             </p>
                           </div>
@@ -3791,7 +3886,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <p className="text-xs text-foreground font-medium">
                             {i18nService.t('openaiOAuthOpenBrowserHint')}
                           </p>
-                          <p className="text-[11px] text-muted-foreground">
+                           <p className="text-xs text-muted-foreground">
                             {i18nService.t('openaiOAuthStatusPending')}
                           </p>
                           <Button
@@ -3801,7 +3896,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onClick={() => {
                               void handleCancelOpenAIOAuthLogin();
                             }}
-                            className="h-auto px-2.5 py-1 text-[11px]"
+                             className="h-auto px-2.5 py-1 text-xs"
                           >
                             {i18nService.t('openaiOAuthCancel')}
                           </Button>
@@ -3824,7 +3919,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <p className="text-xs text-destructive font-medium">
                             {i18nService.t('openaiOAuthStatusError')}
                           </p>
-                          <p className="text-[11px] text-destructive/80 wrap-break-word">
+                           <p className="text-xs text-destructive/80 wrap-break-word">
                             {openaiOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
@@ -3832,7 +3927,7 @@ const Settings: React.FC<SettingsProps> = ({
                               type="button"
                               size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                              className="h-auto px-2.5 py-1 text-[11px]"
+                               className="h-auto px-2.5 py-1 text-xs"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
                             </Button>
@@ -3841,7 +3936,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setOpenaiOAuthPhase({ kind: 'idle' })}
-                              className="h-auto px-2.5 py-1 text-[11px]"
+                               className="h-auto px-2.5 py-1 text-xs"
                             >
                               {i18nService.t('openaiOAuthCancel')}
                             </Button>
@@ -3853,21 +3948,40 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               )}
 
+              <div
+                className={
+                  isCustomProvider(activeProvider)
+                    ? 'order-[-3] flex flex-col gap-4'
+                    : 'flex flex-col gap-4'
+                }
+              >
               {/* Standard API key section for non-MiniMax providers */}
-              {providerRequiresApiKey(activeProvider) &&
+              {(providerRequiresApiKey(activeProvider) || isCustomProvider(activeProvider)) &&
                 activeProvider !== 'minimax' &&
                 !(activeProvider === 'openai' && openaiIsOAuthMode) && (
-                  <div>
+                  <div className={isCustomProvider(activeProvider) ? 'order-[-2]' : 'order-2'}>
                     {/* Standard API Key input for non-Qwen providers */}
                     {activeProvider !== 'qwen' && (
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <label
                             htmlFor={`${activeProvider}-apiKey`}
-                            className="block text-xs font-medium text-foreground"
+                            className={cn(
+                              'block font-medium',
+                              isCustomProvider(activeProvider)
+                                ? 'text-sm text-foreground'
+                               : 'text-sm dark:text-claude-darkText text-claude-text',
+                            )}
                           >
                             {i18nService.t('apiKey')}
-                            <span className="text-destructive ml-0.5">*</span>
+                            {providerRequiresApiKey(activeProvider) && (
+                              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                            )}
+                            {isCustomProvider(activeProvider) && (
+                              <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                                {i18nService.t('customFieldOptional')}
+                              </span>
+                            )}
                           </label>
                           {ProviderRegistry.get(activeProvider)?.apiKeyUrl && (
                             <Button
@@ -3879,9 +3993,9 @@ const Settings: React.FC<SettingsProps> = ({
                                   ProviderRegistry.get(activeProvider)!.apiKeyUrl!,
                                 )
                               }
-                              className="h-auto px-0 py-0 text-[11px] text-primary hover:underline"
+                               className="h-auto px-0 py-0 text-xs text-primary hover:underline"
                             >
-                              {i18nService.t('getApiKey')} →
+                              {i18nService.t('getApiKey')}
                             </Button>
                           )}
                         </div>
@@ -3890,45 +4004,52 @@ const Settings: React.FC<SettingsProps> = ({
                             type={showApiKey ? 'text' : 'password'}
                             id={`${activeProvider}-apiKey`}
                             value={providers[activeProvider].apiKey}
-                            onChange={e =>
-                              handleProviderConfigChange(activeProvider, 'apiKey', e.target.value)
-                            }
-                            className="pr-16 text-xs"
+                            onChange={e => handleApiKeyInputChange(activeProvider, e.target.value)}
+                            onBlur={() => handleApiKeyBlur(activeProvider)}
+                             className="pr-20 text-sm"
                             placeholder={i18nService.t('apiKeyPlaceholder')}
                           />
                           <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                            {providers[activeProvider].apiKey && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() =>
-                                  handleProviderConfigChange(activeProvider, 'apiKey', '')
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => setShowApiKey(!showApiKey)}
+                                    aria-label={
+                                      showApiKey
+                                        ? i18nService.t('hide') || 'Hide'
+                                        : i18nService.t('show') || 'Show'
+                                    }
+                                  >
+                                    {showApiKey ? <Eye /> : <EyeOff />}
+                                  </Button>
                                 }
-                                className="text-muted-foreground hover:text-primary"
-                                title={i18nService.t('clear') || 'Clear'}
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              className="text-muted-foreground hover:text-primary"
-                              title={
-                                showApiKey
+                              />
+                              <TooltipContent>
+                                {showApiKey
                                   ? i18nService.t('hide') || 'Hide'
-                                  : i18nService.t('show') || 'Show'
-                              }
-                            >
-                              {showApiKey ? (
-                                <Eye className="h-4 w-4" />
-                              ) : (
-                                <EyeOff className="h-4 w-4" />
-                              )}
-                            </Button>
+                                  : i18nService.t('show') || 'Show'}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      onClick={() => requestApiKeyClear(activeProvider)}
+                                      aria-label={i18nService.t('clear') || 'Clear'}
+                                    >
+                                      <XCircle />
+                                    </Button>
+                                  }
+                                />
+                                <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
                       </div>
@@ -3940,7 +4061,7 @@ const Settings: React.FC<SettingsProps> = ({
                         <div className="flex items-center justify-between mb-1">
                           <label
                             htmlFor="qwen-apiKey"
-                            className="block text-xs font-medium text-foreground"
+                             className="block text-sm font-medium text-foreground"
                           >
                             API Key<span className="text-destructive ml-0.5">*</span>
                           </label>
@@ -3954,9 +4075,9 @@ const Settings: React.FC<SettingsProps> = ({
                                   ProviderRegistry.get('qwen')!.apiKeyUrl!,
                                 )
                               }
-                              className="h-auto px-0 py-0 text-[11px] text-primary hover:underline"
+                               className="h-auto px-0 py-0 text-xs text-primary hover:underline"
                             >
-                              {i18nService.t('getApiKey')} →
+                            {i18nService.t('getApiKey')}
                             </Button>
                           )}
                         </div>
@@ -3965,43 +4086,52 @@ const Settings: React.FC<SettingsProps> = ({
                             type={showApiKey ? 'text' : 'password'}
                             id="qwen-apiKey"
                             value={providers.qwen.apiKey}
-                            onChange={e =>
-                              handleProviderConfigChange('qwen', 'apiKey', e.target.value)
-                            }
-                            className="pr-16 text-xs"
+                            onChange={e => handleApiKeyInputChange('qwen', e.target.value)}
+                            onBlur={() => handleApiKeyBlur('qwen')}
+                             className="pr-20 text-sm"
                             placeholder={i18nService.t('apiKeyPlaceholder')}
                           />
                           <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                            {providers.qwen.apiKey && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleProviderConfigChange('qwen', 'apiKey', '')}
-                                className="text-muted-foreground hover:text-primary"
-                                title={i18nService.t('clear') || 'Clear'}
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setShowApiKey(!showApiKey)}
-                              className="text-muted-foreground hover:text-primary"
-                              title={
-                                showApiKey
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() => setShowApiKey(!showApiKey)}
+                                    aria-label={
+                                      showApiKey
+                                        ? i18nService.t('hide') || 'Hide'
+                                        : i18nService.t('show') || 'Show'
+                                    }
+                                  >
+                                    {showApiKey ? <Eye /> : <EyeOff />}
+                                  </Button>
+                                }
+                              />
+                              <TooltipContent>
+                                {showApiKey
                                   ? i18nService.t('hide') || 'Hide'
-                                  : i18nService.t('show') || 'Show'
-                              }
-                            >
-                              {showApiKey ? (
-                                <Eye className="h-4 w-4" />
-                              ) : (
-                                <EyeOff className="h-4 w-4" />
-                              )}
-                            </Button>
+                                  : i18nService.t('show') || 'Show'}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      onClick={() => requestApiKeyClear('qwen')}
+                                      aria-label={i18nService.t('clear') || 'Clear'}
+                                    >
+                                      <XCircle />
+                                    </Button>
+                                  }
+                                />
+                                <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
+                            </Tooltip>
                           </div>
                         </div>
                       </div>
@@ -4010,8 +4140,8 @@ const Settings: React.FC<SettingsProps> = ({
                 )}
 
               {activeProvider === 'github-copilot' && (
-                <div>
-                  <label className="block text-xs font-medium text-foreground mb-2">
+                <div className="order-2">
+                   <label className="block text-sm font-medium text-foreground mb-2">
                     {i18nService.t('githubCopilotAuth')}
                   </label>
 
@@ -4070,7 +4200,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onClick={() => {
                               navigator.clipboard.writeText(copilotUserCode);
                             }}
-                            className="h-auto px-2 py-0.5 text-[10px]"
+                             className="h-auto px-2 py-0.5 text-xs"
                           >
                             {i18nService.t('copy') || 'Copy'}
                           </Button>
@@ -4145,12 +4275,15 @@ const Settings: React.FC<SettingsProps> = ({
               )}
 
               {isCustomProvider(activeProvider) && (
-                <div>
+                <div className="order-[-1]">
                   <label
                     htmlFor={`${activeProvider}-displayName`}
-                    className="block text-xs font-medium text-foreground mb-1"
+                    className="mb-1 block text-sm font-medium text-foreground"
                   >
                     {i18nService.t('customDisplayName')}
+                    <span className="ml-1.5 inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                      {i18nService.t('customFieldOptional')}
+                    </span>
                   </label>
                   <Input
                     type="text"
@@ -4159,19 +4292,29 @@ const Settings: React.FC<SettingsProps> = ({
                     onChange={e =>
                       handleProviderConfigChange(activeProvider, 'displayName', e.target.value)
                     }
-                    className="text-xs"
+                    className="text-sm"
                     placeholder={i18nService.t('customDisplayNamePlaceholder')}
                   />
                 </div>
               )}
 
-              {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                <div>
+              {activeProvider !== ProviderName.LlamaCpp &&
+                !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
+                <div
+                  className={isCustomProvider(activeProvider) ? 'order-[-3]' : 'order-1'}
+                >
                   <label
                     htmlFor={`${activeProvider}-baseUrl`}
-                    className="block text-xs font-medium text-foreground mb-1"
+                    className="mb-1 block font-medium text-foreground"
                   >
-                    {i18nService.t('baseUrl')}
+                    <span className="text-sm">
+                      {i18nService.t('baseUrl')}
+                    </span>
+                    {isCustomProvider(activeProvider) && (
+                      <span className="ml-1.5 inline-flex items-center rounded-full bg-destructive/10 px-1.5 py-0.5 text-xs font-normal text-destructive">
+                        {i18nService.t('customFieldRequired')}
+                      </span>
+                    )}
                   </label>
                   <div className="relative">
                     <Input
@@ -4193,11 +4336,14 @@ const Settings: React.FC<SettingsProps> = ({
                         }
                         return providers[activeProvider].baseUrl;
                       })()}
-                      onChange={e =>
-                        handleProviderConfigChange(activeProvider, 'baseUrl', e.target.value)
-                      }
+                      onChange={e => handleBaseUrlInputChange(activeProvider, e.target.value)}
+                      onBlur={() => handleBaseUrlBlur(activeProvider)}
                       disabled={isBaseUrlLocked}
-                      className={`pr-8 text-xs ${isBaseUrlLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={cn(
+                        'pr-10',
+                        'text-sm',
+                        isBaseUrlLocked && 'cursor-not-allowed opacity-50',
+                      )}
                       placeholder={
                         activeProvider === 'qwen'
                           ? 'https://dashscope.aliyuncs.com/apps/anthropic'
@@ -4214,45 +4360,31 @@ const Settings: React.FC<SettingsProps> = ({
                     />
                     {providers[activeProvider].baseUrl && !isBaseUrlLocked && (
                       <div className="absolute right-2 inset-y-0 flex items-center">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleProviderConfigChange(activeProvider, 'baseUrl', '')}
-                          className="text-muted-foreground hover:text-primary"
-                          title={i18nService.t('clear') || 'Clear'}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() =>
+                                  handleProviderConfigChange(activeProvider, 'baseUrl', '')
+                                }
+                                aria-label={i18nService.t('clear') || 'Clear'}
+                              >
+                                <XCircle />
+                              </Button>
+                            }
+                          />
+                          <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
+                        </Tooltip>
                       </div>
                     )}
                   </div>
-                  {isCustomProvider(activeProvider) && (
-                    <div className="mt-1.5 flex flex-col gap-0.5 text-[11px] text-muted-foreground">
-                      <p className="flex min-w-0 items-start gap-1">
-                        <span className="shrink-0 text-sm text-muted">•</span>
-                        <span className="shrink-0 whitespace-nowrap">
-                          {i18nService.t('baseUrlHint1')}
-                        </span>
-                        <code className="min-w-0 text-primary break-all">
-                          {i18nService.t('baseUrlHintExample1')}
-                        </code>
-                      </p>
-                      <p className="flex min-w-0 items-start gap-1">
-                        <span className="shrink-0 text-sm text-muted">•</span>
-                        <span className="shrink-0 whitespace-nowrap">
-                          {i18nService.t('baseUrlHint2')}
-                        </span>
-                        <code className="min-w-0 text-primary break-all">
-                          {i18nService.t('baseUrlHintExample2')}
-                        </code>
-                      </p>
-                    </div>
-                  )}
                   {/* GLM Coding Plan 提示 */}
                   {activeProvider === 'zhipu' && providers.zhipu.codingPlanEnabled && (
                     <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-[11px] text-primary dark:text-primary">
+                      <p className="text-xs text-primary dark:text-primary">
                         <span className="font-medium">GLM Coding Plan:</span>{' '}
                         {i18nService.t('zhipuCodingPlanEndpointHint')}
                       </p>
@@ -4261,7 +4393,7 @@ const Settings: React.FC<SettingsProps> = ({
                   {/* Qwen Coding Plan 提示 */}
                   {activeProvider === 'qwen' && providers.qwen.codingPlanEnabled && (
                     <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-[11px] text-primary dark:text-primary">
+                      <p className="text-xs text-primary dark:text-primary">
                         <span className="font-medium">Coding Plan:</span>{' '}
                         {i18nService.t('qwenCodingPlanEndpointHint')}
                       </p>
@@ -4270,7 +4402,7 @@ const Settings: React.FC<SettingsProps> = ({
                   {/* Volcengine Coding Plan 提示 */}
                   {activeProvider === 'volcengine' && providers.volcengine.codingPlanEnabled && (
                     <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-[11px] text-primary dark:text-primary">
+                      <p className="text-xs text-primary dark:text-primary">
                         <span className="font-medium">Coding Plan:</span>{' '}
                         {i18nService.t('volcengineCodingPlanEndpointHint')}
                       </p>
@@ -4279,7 +4411,7 @@ const Settings: React.FC<SettingsProps> = ({
                   {/* Moonshot Coding Plan 提示 */}
                   {activeProvider === 'moonshot' && providers.moonshot.codingPlanEnabled && (
                     <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-[11px] text-primary dark:text-primary">
+                      <p className="text-xs text-primary dark:text-primary">
                         <span className="font-medium">Coding Plan:</span>{' '}
                         {i18nService.t('moonshotCodingPlanEndpointHint')}
                       </p>
@@ -4288,7 +4420,7 @@ const Settings: React.FC<SettingsProps> = ({
                   {/* Qianfan Coding Plan 提示 */}
                   {activeProvider === 'qianfan' && providers.qianfan.codingPlanEnabled && (
                     <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-[11px] text-primary dark:text-primary">
+                      <p className="text-xs text-primary dark:text-primary">
                         <span className="font-medium">Coding Plan:</span>{' '}
                         {i18nService.t('qianfanCodingPlanEndpointHint')}
                       </p>
@@ -4297,23 +4429,23 @@ const Settings: React.FC<SettingsProps> = ({
                   {/* Xiaomi Coding Plan 提示 */}
                   {activeProvider === 'xiaomi' && providers.xiaomi.codingPlanEnabled && (
                     <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-[11px] text-primary dark:text-primary">
+                      <p className="text-xs text-primary dark:text-primary">
                         <span className="font-medium">Coding Plan:</span>{' '}
                         {i18nService.t('xiaomiCodingPlanEndpointHint')}
                       </p>
                     </div>
                   )}
                 </div>
-              )}
+                )}
 
               {/* API 格式选择器 */}
               {shouldShowApiFormatSelector(activeProvider) &&
                 activeProvider !== ProviderName.LlamaCpp &&
                 !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                  <div>
+                  <div className={isCustomProvider(activeProvider) ? undefined : 'order-3'}>
                     <label
                       htmlFor={`${activeProvider}-apiFormat`}
-                      className="block text-xs font-medium text-foreground mb-1"
+                      className="mb-1 block text-sm font-medium text-foreground"
                     >
                       {i18nService.t('apiFormat')}
                     </label>
@@ -4339,7 +4471,7 @@ const Settings: React.FC<SettingsProps> = ({
                           />
                           <label
                             htmlFor={`${activeProvider}-apiFormat-anthropic`}
-                            className="text-xs text-foreground"
+                            className="text-sm text-foreground"
                           >
                             {i18nService.t('apiFormatNative')}
                           </label>
@@ -4351,30 +4483,29 @@ const Settings: React.FC<SettingsProps> = ({
                           />
                           <label
                             htmlFor={`${activeProvider}-apiFormat-openai`}
-                            className="text-xs text-foreground"
+                            className="text-sm text-foreground"
                           >
                             {i18nService.t('apiFormatOpenAI')}
                           </label>
                         </div>
                       </RadioGroup>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {i18nService.t('apiFormatHint')}
-                    </p>
                   </div>
                 )}
+
+              </div>
 
               {/* GLM Coding Plan 开关 (仅 Zhipu) */}
               {activeProvider === 'zhipu' && (
                 <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">GLM Coding Plan</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                      <span className="text-sm font-medium text-foreground">GLM Coding Plan</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('zhipuCodingPlanHint')}
                     </p>
                   </div>
@@ -4397,12 +4528,12 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">Coding Plan</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                      <span className="text-sm font-medium text-foreground">Coding Plan</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                         {i18nService.t('codingPlanSubscriptionBadge')}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('qwenCodingPlanHint')}
                     </p>
                   </div>
@@ -4425,12 +4556,12 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">Coding Plan</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                      <span className="text-sm font-medium text-foreground">Coding Plan</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('volcengineCodingPlanHint')}
                     </p>
                   </div>
@@ -4453,12 +4584,12 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">Coding Plan</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                      <span className="text-sm font-medium text-foreground">Coding Plan</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('moonshotCodingPlanHint')}
                     </p>
                   </div>
@@ -4481,12 +4612,12 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">Coding Plan</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                      <span className="text-sm font-medium text-foreground">Coding Plan</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('qianfanCodingPlanHint')}
                     </p>
                   </div>
@@ -4509,12 +4640,12 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="flex items-center justify-between p-3 rounded-xl bg-surface border border-border">
                   <div className="flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="text-xs font-medium text-foreground">Coding Plan</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                      <span className="text-sm font-medium text-foreground">Coding Plan</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
                         Beta
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {i18nService.t('xiaomiCodingPlanHint')}
                     </p>
                   </div>
@@ -4532,35 +4663,49 @@ const Settings: React.FC<SettingsProps> = ({
                 </div>
               )}
 
-              {/* 测试连接按钮 */}
-              {!(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                <div className="flex items-center space-x-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleTestConnection}
-                    disabled={
-                      isTesting ||
-                      (providerRequiresApiKey(activeProvider) && !providers[activeProvider].apiKey)
-                    }
-                    className="inline-flex items-center px-3 py-1.5 text-xs h-auto"
-                  >
-                    <Signal className="h-3.5 w-3.5 mr-1.5" />
-                    {isTesting ? i18nService.t('testing') : i18nService.t('testConnection')}
-                  </Button>
-                </div>
-              )}
-
               {
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <h3 className="text-xs font-medium text-foreground">
-                      {i18nService.t('availableModels')}
-                    </h3>
-                    {activeProvider !== ProviderName.LlamaCpp && (
-                      <div className="flex items-center gap-3">
+                <div
+                  className={cn(
+                    isCustomProvider(activeProvider) &&
+                      'space-y-4',
+                  )}
+                >
+                  <div className="rounded-lg border border-border bg-surface">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-1.5 pl-3 pr-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="text-sm font-medium text-foreground">
+                          {i18nService.t('modelList')}
+                        </p>
+                      </div>
+                      {activeProvider === ProviderName.LlamaCpp ? (
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={() => void handleRefreshLlamaCppModels()}
+                                disabled={isRefreshingLlamaCppModels}
+                                aria-label={i18nService.t('refresh')}
+                              >
+                                <RefreshCw
+                                  className={
+                                    isRefreshingLlamaCppModels
+                                      ? 'animate-spin motion-reduce:animate-none'
+                                      : undefined
+                                  }
+                                />
+                              </Button>
+                            }
+                          />
+                          <TooltipContent>{i18nService.t('refresh')}</TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <div className="flex flex-wrap items-center justify-end gap-1">
                         <ProviderModelDiscoveryButton
+                          prominent={isCustomProvider(activeProvider)}
+                          iconOnly
                           providerId={activeProvider}
                           provider={providers[activeProvider]}
                           baseUrl={resolveBaseUrl(
@@ -4579,60 +4724,123 @@ const Settings: React.FC<SettingsProps> = ({
                             providerRequiresApiKey(activeProvider) &&
                             providers[activeProvider].authType !== 'oauth'
                           }
-                          onModelsMerge={discoveredModels =>
-                            setProviders(previous => {
-                              const merged = mergeDiscoveredProviderModels(
-                                previous[activeProvider].models ?? [],
-                                discoveredModels,
-                              );
-                              if (!merged.changed) return previous;
-                              return {
-                                ...previous,
-                                [activeProvider]: {
-                                  ...previous[activeProvider],
-                                  models: merged.models,
-                                },
-                              };
-                            })
+                          autoDetectRequest={
+                            autoDetectRequest?.provider === activeProvider
+                              ? {
+                                  providerId: activeProvider,
+                                  requestId: autoDetectRequest.requestId,
+                                }
+                              : null
                           }
+                          onModelsDiscovered={handleModelsDiscovered}
                         />
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="xs"
-                          onClick={handleAddModel}
-                          className="h-auto px-0 py-0 [&_svg]:size-3.5"
-                        >
-                          <PlusCircle data-icon="inline-start" />
-                          {i18nService.t('addModel')}
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={handleAddModel}
+                                aria-label={i18nService.t('addModel')}
+                              >
+                                <PlusCircle />
+                              </Button>
+                            }
+                          />
+                          <TooltipContent>{i18nService.t('addModel')}</TooltipContent>
+                        </Tooltip>
+                        </div>
+                      )}
                       </div>
-                    )}
-                  </div>
 
-                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                    <div
+                      className="max-h-60 space-y-1.5 overflow-y-auto p-2"
+                    >
                     {(providers[activeProvider].models ?? []).map(model => (
                       <div
                         key={model.id}
-                        className="bg-surface p-2 rounded-xl border-border border transition-colors hover:border-primary group"
+                        className="group cursor-pointer rounded-xl border border-border bg-surface p-2 transition-[background-color,transform] duration-150 ease-out hover:border-primary active:translate-y-px"
+                        onClick={event => {
+                          if (event.target instanceof Element && event.target.closest('button')) {
+                            return;
+                          }
+                          setSelectedModelId(model.id);
+                          void handleTestConnection(model.id);
+                        }}
                       >
-                        <div className="flex items-center justify-between gap-2 min-w-0">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <div className="w-1.5 h-1.5 shrink-0 rounded-full bg-success"></div>
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                            <div
+                              className={cn(
+                                'h-1.5 w-1.5 shrink-0 rounded-full',
+                                getModelConnectionStatus(activeProvider, model.id) ===
+                                  ModelConnectionStatus.Success
+                                  ? 'bg-success'
+                                  : getModelConnectionStatus(activeProvider, model.id) ===
+                                      ModelConnectionStatus.Failure
+                                    ? 'bg-destructive'
+                                    : 'bg-muted-foreground',
+                              )}
+                            />
                             <div className="min-w-0">
-                              <div className="text-foreground font-medium text-[11px] truncate">
+                              <div
+                                className={cn(
+                                  'truncate font-medium text-foreground',
+                                  'text-sm',
+                                )}
+                              >
                                 {model.name}
                               </div>
                               {activeProvider !== ProviderName.LlamaCpp ? (
-                                <div className="text-[10px] text-muted-foreground truncate">
+                                <div
+                                  className={cn(
+                                    'truncate text-muted-foreground',
+                                    'text-xs',
+                                  )}
+                                >
                                   {model.id}
                                 </div>
                               ) : null}
+                              {isCustomProvider(activeProvider) &&
+                                (model.contextWindow ||
+                                  model.maxTokens ||
+                                  Object.values(model.capabilities ?? {}).some(
+                                    status => status === ModelCapabilityStatus.Supported,
+                                  )) && (
+                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                    {model.contextWindow && (
+                                      <span>
+                                        {i18nService.t('modelContextWindowShort')}:{' '}
+                                        {formatDetectedTokenLimit(model.contextWindow)}
+                                      </span>
+                                    )}
+                                    {model.maxTokens && (
+                                      <span>
+                                        {i18nService.t('modelMaxOutputTokensShort')}:{' '}
+                                        {formatDetectedTokenLimit(model.maxTokens)}
+                                      </span>
+                                    )}
+                                    {MODEL_CAPABILITY_FIELDS.filter(
+                                      field =>
+                                        field.key !== 'imageInput' &&
+                                        model.capabilities?.[field.key] ===
+                                        ModelCapabilityStatus.Supported,
+                                    ).map(field => (
+                                      <span key={field.key}>{i18nService.t(field.labelKey)}</span>
+                                    ))}
+                                  </div>
+                                )}
                             </div>
                           </div>
                           <div className="flex items-center shrink-0 space-x-1">
                             {model.supportsImage && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary-muted text-primary">
+                              <span
+                                className={cn(
+                                  'rounded-md bg-primary-muted px-1.5 py-0.5 text-primary',
+                                  'text-xs',
+                                )}
+                              >
                                 {i18nService.t('imageInput')}
                               </span>
                             )}
@@ -4707,27 +4915,22 @@ const Settings: React.FC<SettingsProps> = ({
 
                     {(!providers[activeProvider].models ||
                       providers[activeProvider].models.length === 0) && (
-                      <div className="bg-surface p-2.5 rounded-xl border border-border-subtle text-center">
-                        <p className="text-[11px] text-muted-foreground">
+                      <div className="p-3 text-center">
+                        <p
+                          className={cn(
+                            'text-muted-foreground',
+                            'text-sm',
+                          )}
+                        >
                           {i18nService.t('noModelsAvailable')}
                         </p>
-                        {activeProvider !== ProviderName.LlamaCpp && (
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="xs"
-                            onClick={handleAddModel}
-                            className="mt-1.5 h-auto px-0 py-0"
-                          >
-                            <PlusCircle data-icon="inline-start" />
-                            {i18nService.t('addFirstModel')}
-                          </Button>
-                        )}
                       </div>
                     )}
+                    </div>
                   </div>
                 </div>
               }
+
             </div>
           </div>
         );
@@ -5183,7 +5386,11 @@ const Settings: React.FC<SettingsProps> = ({
   };
 
   return (
-    <Modal onClose={onClose} className="w-auto sm:max-w-none p-0 ring-0! bg-transparent">
+    <Modal
+      onClose={onClose}
+      disablePointerDismissal
+      className="w-auto sm:max-w-none p-0 ring-0! bg-transparent"
+    >
       <div
         className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content bg-surface shadow-modal border border-border"
         onClick={handleSettingsClick}
@@ -5244,7 +5451,11 @@ const Settings: React.FC<SettingsProps> = ({
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <form
+            onSubmit={handleSubmit}
+            onKeyDown={handleSettingsFormKeyDown}
+            className="flex flex-col flex-1 overflow-hidden"
+          >
             {/* Tab content */}
             <div
               ref={contentRef}
@@ -5287,70 +5498,6 @@ const Settings: React.FC<SettingsProps> = ({
           </form>
         </div>
 
-        {isTestResultModalOpen && testResult && (
-          <div
-            className="absolute inset-0 z-30 flex items-center justify-center bg-black/35 px-4 rounded-2xl"
-            onClick={() => setIsTestResultModalOpen(false)}
-          >
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={i18nService.t('connectionTestResult')}
-              onClick={e => e.stopPropagation()}
-              className="w-full max-w-md rounded-2xl bg-background border-border border shadow-modal p-4"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold text-foreground">
-                  {i18nService.t('connectionTestResult')}
-                </h4>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsTestResultModalOpen(false)}
-                  className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-raised"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>
-                  {ProviderRegistry.get(testResult.provider)?.label ?? testResult.provider}
-                </span>
-                <span className="text-[11px]">•</span>
-                <span
-                  className={`inline-flex items-center gap-1 ${testResult.success ? 'text-success' : 'text-destructive'}`}
-                >
-                  {testResult.success ? (
-                    <CheckCircle className="h-4 w-4" />
-                  ) : (
-                    <XCircle className="h-4 w-4" />
-                  )}
-                  {testResult.success
-                    ? i18nService.t('connectionSuccess')
-                    : i18nService.t('connectionFailed')}
-                </span>
-              </div>
-
-              <p className="mt-3 text-xs leading-5 text-foreground whitespace-pre-wrap wrap-break-word max-h-56 overflow-y-auto">
-                {testResult.message}
-              </p>
-
-              <div className="mt-4 flex justify-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsTestResultModalOpen(false)}
-                >
-                  {i18nService.t('close')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
         <DestructiveConfirmDialog
           open={pendingDeleteProvider !== null}
           title={i18nService.t('deleteCustomProvider')}
@@ -5362,6 +5509,18 @@ const Settings: React.FC<SettingsProps> = ({
         />
 
         <DestructiveConfirmDialog
+          open={pendingApiKeyClearProvider !== null}
+          title={i18nService.t('clearApiKeyConfirmTitle')}
+          description={i18nService.t('clearApiKeyConfirmDescription')}
+          cancelLabel={i18nService.t('cancel')}
+          confirmLabel={i18nService.t('clear')}
+          cancelVariant="outline"
+          confirmVariant="outline"
+          onCancel={() => setPendingApiKeyClearProvider(null)}
+          onConfirm={confirmApiKeyClear}
+        />
+
+        <DestructiveConfirmDialog
           open={pendingDeleteModel !== null}
           title={i18nService.t('confirmDelete')}
           description={
@@ -5369,6 +5528,8 @@ const Settings: React.FC<SettingsProps> = ({
           }
           cancelLabel={i18nService.t('cancel')}
           confirmLabel={i18nService.t('delete')}
+          cancelVariant="outline"
+          confirmVariant="outline"
           onCancel={() => setPendingDeleteModel(null)}
           onConfirm={confirmDeleteModel}
         />
@@ -5406,8 +5567,8 @@ const Settings: React.FC<SettingsProps> = ({
                 value={modelDialogTab}
                 onValueChange={value => setModelDialogTab(value as 'basic' | 'capabilities')}
                 className="gap-4"
-              >
-                {isCustomProvider(activeProvider) && (
+                >
+                  {isCustomProvider(activeProvider) && (
                   <FluidTabs
                     aria-label={i18nService.t(isEditingModel ? 'editModel' : 'addNewModel')}
                     items={[

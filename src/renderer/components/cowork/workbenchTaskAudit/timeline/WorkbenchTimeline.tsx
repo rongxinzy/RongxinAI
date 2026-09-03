@@ -45,37 +45,47 @@ export function WorkbenchTimeline({
 
   return (
     <div className="relative pb-10">
-      <span aria-hidden="true" className="absolute inset-y-0 left-3.5 w-px bg-border" />
-      {!reducedMotion && (
-        <motion.span
-          aria-hidden="true"
-          className="absolute inset-y-0 left-3.5 w-px origin-top bg-primary/40"
-          initial={{ scaleY: 0 }}
-          animate={{ scaleY: 1 }}
-          transition={{ duration: 0.8, ease: TIMELINE_EASE }}
-        />
-      )}
       <motion.ol
         className="relative flex flex-col gap-4"
         variants={reducedMotion ? undefined : chapterListVariants}
         initial={reducedMotion ? false : 'hidden'}
         animate={reducedMotion ? undefined : 'show'}
       >
-        {chapters.map(chapter => (
-          <motion.li
-            key={chapter.run.id}
-            className="relative"
-            variants={reducedMotion ? undefined : chapterItemVariants}
-          >
-            <TimelineChapter
-              chapter={chapter}
-              runs={detail.runs}
-              defaultOpen={chapter.run.id === defaultOpenRunId}
-              busy={busy}
-              onRespondToApproval={onRespondToApproval}
-            />
-          </motion.li>
-        ))}
+        {chapters.map((chapter, index) => {
+          const hasNextChapter = index < chapters.length - 1;
+          return (
+            <motion.li
+              key={chapter.run.id}
+              className="relative"
+              variants={reducedMotion ? undefined : chapterItemVariants}
+            >
+              {hasNextChapter && (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-7 left-3.5 z-0 h-[calc(100%-0.75rem)] w-px bg-border"
+                  />
+                  {!reducedMotion && (
+                    <motion.span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-7 left-3.5 z-0 h-[calc(100%-0.75rem)] w-px origin-top bg-primary/40"
+                      initial={{ scaleY: 0 }}
+                      animate={{ scaleY: 1 }}
+                      transition={{ duration: 0.8, ease: TIMELINE_EASE }}
+                    />
+                  )}
+                </>
+              )}
+              <TimelineChapter
+                chapter={chapter}
+                runs={detail.runs}
+                defaultOpen={chapter.run.id === defaultOpenRunId}
+                busy={busy}
+                onRespondToApproval={onRespondToApproval}
+              />
+            </motion.li>
+          );
+        })}
       </motion.ol>
     </div>
   );

@@ -63,6 +63,7 @@ import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
 import type { CodingSidePanelView as CodingSidePanelViewType } from './constants';
 import type { CodingSessionDraft } from './CodingWorkspaceSidebar';
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
+import { createCodingQueueService } from '../../services/codingQueue';
 
 const profileStatusText = (status: CodingAgentProfileStatus): string =>
   i18nService.t(CodingAgentStatusI18nKey[status]);
@@ -98,6 +99,7 @@ export const CodingWorkbenchView = ({
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
   const [error, setError] = useState<string | null>(null);
+  const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
   const [inspectorSheetOpen, setInspectorSheetOpen] = useState(false);
   const [gitSheetOpen, setGitSheetOpen] = useState(false);
   const [sidePanelView, setSidePanelView] = useState<CodingSidePanelViewType | null>(null);
@@ -398,6 +400,12 @@ export const CodingWorkbenchView = ({
     const result = await window.electron.codingAgent.discoverAgents({ workspaceRoot });
     if (result.success && result.snapshot) {
       setSnapshot(result.snapshot);
+      if (activeLane?.status === CodingLaneStatus.Running)
+        void codingQueue.load(
+          activeProfile?.driverKind === CodingAgentDriverKind.Acp
+            ? activeLane.id
+            : activeLane.localSessionId,
+        );
       return true;
     }
     setError(result.error ?? i18nService.t('codingAgentActionFailed'));
@@ -407,6 +415,9 @@ export const CodingWorkbenchView = ({
     const result = await window.electron.codingAgent.probeAgent({ workspaceRoot, profileId });
     if (result.success && result.snapshot) {
       setSnapshot(result.snapshot);
+      if (activeProfile?.driverKind === CodingAgentDriverKind.Acp && activeLane) {
+        void codingQueue.load(activeLane.id);
+      }
       return true;
     }
     setError(result.error ?? i18nService.t('codingAgentActionFailed'));
@@ -479,7 +490,7 @@ export const CodingWorkbenchView = ({
     if (result.success && result.snapshot) setSnapshot(result.snapshot);
     else setError(result.error ?? i18nService.t('codingAgentActionFailed'));
   };
-  const sendPrompt = async () => {
+  const sendPrompt = async (delivery?: 'followUp' | 'steer') => {
     if (!prompt.trim()) return;
     if (draftSession) {
       setError(null);
@@ -511,7 +522,7 @@ export const CodingWorkbenchView = ({
     if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
     const result = await window.electron.codingAgent.prompt({
       workspaceRoot,
-      prompt: { laneId: activeLane.id, prompt },
+      prompt: { laneId: activeLane.id, prompt, delivery },
     });
     if (result.success && result.snapshot) {
       setDraftState({ laneId: activeLane.id, value: '' });
@@ -916,6 +927,16 @@ export const CodingWorkbenchView = ({
           prompt={prompt}
           recipientName={activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
           showRecipient={!draftSession}
+          sessionId={
+            activeProfile?.driverKind === CodingAgentDriverKind.Acp
+              ? activeLane?.id
+              : activeProfile?.driverKind === CodingAgentDriverKind.Builtin
+                ? activeLane?.localSessionId
+                : undefined
+          }
+          queueService={
+            activeProfile?.driverKind === CodingAgentDriverKind.Acp ? codingQueue : undefined
+          }
           leadingTools={
             draftSession ? (
               <CodingDraftControls
@@ -949,7 +970,9 @@ export const CodingWorkbenchView = ({
             }
           }}
           onConfigOptionChange={(optionId, value) => void changeConfigOption(optionId, value)}
+          supportsSteerShortcut={activeProfile?.driverKind === CodingAgentDriverKind.Builtin}
           onSend={() => void sendPrompt()}
+          onSteer={() => void sendPrompt('steer')}
           onStop={() => void cancel()}
         />
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}

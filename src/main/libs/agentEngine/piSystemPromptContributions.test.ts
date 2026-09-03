@@ -9,8 +9,10 @@ import { describe, expect, it } from 'vitest';
 
 import { DeclareArtifactSystemPrompt } from '../../declareArtifact/tool';
 import { PiAskUserQuestionSystemPrompt } from './piAskUserQuestion';
+import { createPiBashToolSystemPrompt } from './piBashToolGuidelines';
 import { PiBuiltinFileToolSystemPrompt } from './piBuiltinToolGuidelines';
 import { PiDocumentReaderSystemPrompt } from './piDocumentReaderTool';
+import { PiUnattendedSystemPrompt } from './piUnattendedPolicy';
 import {
   collectPiSystemPromptContributions,
   PiSystemPromptContributions,
@@ -19,6 +21,7 @@ import { calculatePiWriteChunkCharacterLimit } from './piWriteTokenLimit';
 
 const FULL_CONTEXT = { fileToolsEnabled: true, maxOutputTokens: 8000 } as const;
 const TEXT_CONTEXT = { fileToolsEnabled: false, maxOutputTokens: 8000 } as const;
+const UNATTENDED_CONTEXT = { ...FULL_CONTEXT, unattended: true } as const;
 const MCP_CONTEXT = {
   ...FULL_CONTEXT,
   mcpToolManifest: [
@@ -50,15 +53,31 @@ describe('piSystemPromptContributions', () => {
 
   it('produces a non-empty prompt for every contribution in both tool modes', () => {
     for (const contribution of PiSystemPromptContributions) {
-      for (const context of [FULL_CONTEXT, TEXT_CONTEXT, MCP_CONTEXT, FAILED_MCP_CONTEXT]) {
+      for (const context of [
+        FULL_CONTEXT,
+        TEXT_CONTEXT,
+        UNATTENDED_CONTEXT,
+        MCP_CONTEXT,
+        FAILED_MCP_CONTEXT,
+      ]) {
         if (contribution.enabled && !contribution.enabled(context)) continue;
         const prompt =
           typeof contribution.prompt === 'function'
             ? contribution.prompt(context)
             : contribution.prompt;
+        if (!prompt.trim()) continue;
         expect(prompt.trim().length, contribution.id).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('includes the Windows Bash contract without adding it to Unix sessions', () => {
+    expect(collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'win32' })).toContain(
+      createPiBashToolSystemPrompt('win32'),
+    );
+    expect(
+      collectPiSystemPromptContributions({ ...FULL_CONTEXT, platform: 'linux' }),
+    ).not.toContain(createPiBashToolSystemPrompt('win32'));
   });
 
   it('registers every exported tool policy constant', () => {
@@ -67,6 +86,7 @@ describe('piSystemPromptContributions', () => {
     );
     for (const policy of [
       PiAskUserQuestionSystemPrompt,
+      PiUnattendedSystemPrompt,
       PiDocumentReaderSystemPrompt,
       PiBuiltinFileToolSystemPrompt,
       DeclareArtifactSystemPrompt,
@@ -86,6 +106,16 @@ describe('piSystemPromptContributions', () => {
     // Tool-agnostic policies stay present in both modes.
     expect(text).toContain(PiAskUserQuestionSystemPrompt);
     expect(text).toContain(DeclareArtifactSystemPrompt);
+  });
+
+  it('replaces the user-question policy with autonomous guidance when unattended', () => {
+    const attended = collectPiSystemPromptContributions(FULL_CONTEXT);
+    const unattended = collectPiSystemPromptContributions(UNATTENDED_CONTEXT);
+
+    expect(attended).toContain(PiAskUserQuestionSystemPrompt);
+    expect(attended).not.toContain(PiUnattendedSystemPrompt);
+    expect(unattended).not.toContain(PiAskUserQuestionSystemPrompt);
+    expect(unattended).toContain(PiUnattendedSystemPrompt);
   });
 
   it('renders the large-file-write policy from the session token budget', () => {

@@ -5,6 +5,7 @@
 
 import axios from 'axios';
 
+import { buildAnthropicMessagesUrl } from '../../shared/providers';
 import { buildIMMediaInstruction } from './imMediaInstruction';
 import { IMMessage, IMSettings } from './types';
 
@@ -173,7 +174,7 @@ export class IMChatHandler {
     userMessage: string,
     systemPrompt?: string,
   ): Promise<string> {
-    const url = `${config.baseUrl.replace(/\/$/, '')}/v1/messages`;
+    const url = buildAnthropicMessagesUrl(config.baseUrl);
 
     const body: any = {
       model: config.model || 'claude-3-5-sonnet-20241022',

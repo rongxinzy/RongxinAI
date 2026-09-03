@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { session } from 'electron';
 import http from 'http';
 
+import { ProviderName } from '../../shared/providers';
 import {
   anthropicToOpenAI,
   buildOpenAIChatCompletionsURL,
@@ -72,6 +73,10 @@ const PROXY_BIND_HOST = '127.0.0.1';
 const LOCAL_HOST = '127.0.0.1';
 const SANDBOX_HOST = '10.0.2.2';
 const GEMINI_FALLBACK_THOUGHT_SIGNATURE = 'skip_thought_signature_validator';
+const DEVELOPER_ROLE_UNSUPPORTED_PROVIDERS = new Set<string>([
+  ProviderName.Minimax,
+  ProviderName.Qwen,
+]);
 
 function isGeminiProvider(provider?: string, baseURL?: string): boolean {
   return provider === 'gemini' || Boolean(baseURL?.includes('generativelanguage.googleapis.com'));
@@ -816,15 +821,14 @@ function filterOpenAIToolsForProvider(
 }
 
 /**
- * MiniMax API only accepts 'system', 'user', and 'assistant' roles.
- * OpenAI's newer API uses 'developer' role which MiniMax doesn't recognize.
- * This function remaps 'developer' to 'system' for MiniMax compatibility.
+ * Some OpenAI-compatible providers do not recognize the newer 'developer' role.
+ * This function remaps it to 'system' for those providers.
  */
-function remapMessageRolesForMiniMax(
+function remapDeveloperRoleForProvider(
   openAIRequest: Record<string, unknown>,
   provider?: string,
 ): void {
-  if (provider !== 'minimax') {
+  if (!provider || !DEVELOPER_ROLE_UNSUPPORTED_PROVIDERS.has(provider)) {
     return;
   }
 
@@ -2600,7 +2604,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
   }
   filterOpenAIToolsForProvider(openAIRequest, upstreamConfig.provider);
-  remapMessageRolesForMiniMax(openAIRequest, upstreamConfig.provider);
+  remapDeveloperRoleForProvider(openAIRequest, upstreamConfig.provider);
   hydrateOpenAIRequestToolCalls(openAIRequest, upstreamConfig.provider, upstreamConfig.baseURL);
   sanitizeToolsForGemini(openAIRequest, upstreamConfig.provider, upstreamConfig.baseURL);
 
@@ -2868,6 +2872,7 @@ export const __openAICompatProxyTestUtils = {
   processResponsesStreamEvent,
   convertChatCompletionsRequestToResponsesRequest,
   filterOpenAIToolsForProvider,
+  remapDeveloperRoleForProvider,
   isGeminiProvider,
   resolveProxyRequestToken,
 };

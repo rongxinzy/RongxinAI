@@ -10,6 +10,7 @@ import type {
   ScheduledTask,
   ScheduledTaskChannelOption,
   ScheduledTaskInput,
+  ScheduledTaskConversationOption,
 } from '../../../scheduledTask/types';
 import { i18nService } from '../../services/i18n';
 import {
@@ -283,5 +284,21 @@ export function formsEqual(a: FormState, b: FormState): boolean {
 export function getNotifyChannelLabel(channel: ScheduledTaskChannelOption): string {
   const platform = PlatformRegistry.platformOfChannel(channel.value);
   const platformLabel = platform ? i18nService.t(platform) || channel.label : channel.label;
-  return channel.accountId ? `${platformLabel} · ${channel.label}` : platformLabel;
+  // Singleton platforms use the platform name only. Multi-instance options
+  // carry a distinct instance label (for example, "Bot 1") after the dot.
+  const defaultLabel = platform ? PlatformRegistry.get(platform).label : channel.label;
+  return channel.accountId && channel.label !== defaultLabel
+    ? `${platformLabel} · ${channel.label}`
+    : platformLabel;
+}
+
+export function getNotifyConversationLabel(conversation: Pick<ScheduledTaskConversationOption, 'conversationId'>): string {
+  const conversationId = conversation.conversationId.trim();
+  if (conversationId === 'dm') return i18nService.t('scheduledTasksFormNotifyDirectMessage');
+  if (conversationId.startsWith('group:')) return `${i18nService.t('scheduledTasksFormNotifyGroup')} · ${conversationId.slice(6)}`;
+  // Connectors may return opaque user/session IDs for direct chats. They are
+  // routing keys, not human-facing names, so never expose them in the form.
+  return conversationId
+    ? i18nService.t('scheduledTasksFormNotifyDirectMessage')
+    : i18nService.t('scheduledTasksFormNotifyConversationUnknown');
 }

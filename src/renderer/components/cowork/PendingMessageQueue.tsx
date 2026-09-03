@@ -15,13 +15,14 @@ import { i18nService } from '../../services/i18n';
 interface PendingMessageQueueProps {
   sessionId: string;
   isStreaming: boolean;
+  queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'>;
 }
 
 const showQueueToast = (message: string): void => {
   window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
 };
 
-const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProps) => {
+const PendingMessageQueue = ({ sessionId, isStreaming, queueService = coworkQueueService }: PendingMessageQueueProps) => {
   const [items, setItems] = useState<CoworkPendingMessage[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -31,10 +32,10 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
   useEffect(() => {
     let disposed = false;
     setLoading(true);
-    const unsubscribe = coworkQueueService.subscribe(sessionId, nextItems => {
+    const unsubscribe = queueService.subscribe(sessionId, nextItems => {
       if (!disposed) setItems(nextItems);
     });
-    void coworkQueueService
+    void queueService
       .load(sessionId)
       .catch(error => {
         if (!disposed) {
@@ -48,7 +49,7 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
       disposed = true;
       unsubscribe();
     };
-  }, [sessionId]);
+  }, [queueService, sessionId]);
 
   const beginEdit = (item: CoworkPendingMessage): void => {
     setEditingId(item.id);
@@ -63,7 +64,7 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
   const saveEdit = async (itemId: string): Promise<void> => {
     const text = editingText.trim();
     if (!text) return;
-    const result = await coworkQueueService.update(sessionId, itemId, text);
+    const result = await queueService.update(sessionId, itemId, text);
     if (!result.success) {
       showQueueToast(result.error || i18nService.t('coworkQueueUpdateFailed'));
       return;
@@ -72,18 +73,18 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
   };
 
   const removeItem = async (itemId: string): Promise<void> => {
-    const result = await coworkQueueService.remove(sessionId, itemId);
+    const result = await queueService.remove(sessionId, itemId);
     if (!result.success) showQueueToast(result.error || i18nService.t('coworkQueueDeleteFailed'));
   };
 
   const steerItem = useCallback(
     async (itemId: string): Promise<void> => {
-      const result = await coworkQueueService.steer(sessionId, itemId);
+      const result = await queueService.steer(sessionId, itemId);
       if (!result.success) {
         showQueueToast(result.error || i18nService.t('coworkQueueSteerFailed'));
       }
     },
-    [sessionId],
+    [queueService, sessionId],
   );
 
   const retryItem = useCallback(
@@ -92,13 +93,13 @@ const PendingMessageQueue = ({ sessionId, isStreaming }: PendingMessageQueueProp
       if (!item) return;
       const result =
         item.delivery === CoworkQueueDelivery.FollowUp
-          ? await coworkQueueService.followUp(sessionId, itemId)
-          : await coworkQueueService.steer(sessionId, itemId);
+          ? await queueService.followUp(sessionId, itemId)
+          : await queueService.steer(sessionId, itemId);
       if (!result.success) {
         showQueueToast(result.error || i18nService.t('coworkQueueRetryFailed'));
       }
     },
-    [items, sessionId],
+    [items, queueService, sessionId],
   );
 
   useEffect(() => {

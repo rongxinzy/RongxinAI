@@ -113,7 +113,10 @@ function EntryMarker({ className }: { className?: string }) {
   return (
     <span
       aria-hidden="true"
-      className={cn('absolute top-[9px] left-[10px] size-2 rounded-full', className)}
+      className={cn(
+        'absolute top-[9px] left-[10px] z-10 size-2 rounded-full ring-2 ring-background',
+        className,
+      )}
     />
   );
 }
@@ -309,7 +312,10 @@ function PendingApprovalEntry({
 
   return (
     <li className="relative pl-10">
-      <span aria-hidden="true" className="absolute top-[9px] left-[10px] flex size-2">
+      <span
+        aria-hidden="true"
+        className="absolute top-[9px] left-[10px] z-10 flex size-2 rounded-full ring-2 ring-background"
+      >
         {!reducedMotion && (
           <motion.span
             className="absolute inline-flex size-full rounded-full bg-primary"

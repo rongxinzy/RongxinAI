@@ -87,7 +87,7 @@ export class CcConnectPiBridge {
     );
     this.imStore.setCcConnectSessionKey(
       request.accountId,
-      request.message.platform,
+      platform,
       nativeConversationId,
       request.message.sessionKey,
     );

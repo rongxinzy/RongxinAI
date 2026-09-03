@@ -1,6 +1,7 @@
 import type http from 'http';
 import { describe, expect, test } from 'vitest';
 
+import { ProviderName } from '../../shared/providers';
 import { __openAICompatProxyTestUtils, isAllowedProxyHost } from './coworkOpenAICompatProxy';
 
 const testUtils = __openAICompatProxyTestUtils;
@@ -606,6 +607,30 @@ test('H: filterOpenAIToolsForProvider removes Skill tool and normalizes tool_cho
   expect(openAIRequest.tools.length).toBe(1);
   expect(openAIRequest.tools[0].function.name).toBe('Bash');
   expect(openAIRequest.tool_choice).toBe('auto');
+});
+
+test('I: remapDeveloperRoleForProvider remaps developer for Qwen and preserves supported roles', () => {
+  const qwenRequest = {
+    messages: [
+      { role: 'developer', content: 'Follow the system instructions.' },
+      { role: 'user', content: 'Hello' },
+    ],
+  };
+
+  testUtils.remapDeveloperRoleForProvider(qwenRequest, ProviderName.Qwen);
+
+  expect(qwenRequest.messages).toEqual([
+    { role: 'system', content: 'Follow the system instructions.' },
+    { role: 'user', content: 'Hello' },
+  ]);
+
+  const openAIRequest = {
+    messages: [{ role: 'developer', content: 'Keep this role.' }],
+  };
+
+  testUtils.remapDeveloperRoleForProvider(openAIRequest, ProviderName.OpenAI);
+
+  expect(openAIRequest.messages[0].role).toBe('developer');
 });
 
 // ==================== SSE boundary tests ====================

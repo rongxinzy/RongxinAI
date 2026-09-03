@@ -1,5 +1,7 @@
 import {
   ApiFormat,
+  ModelCapabilityStatus,
+  type ModelCapabilities,
   type DiscoveredProviderModel,
   ProviderModelDiscoveryErrorCode,
   type ProviderModelDiscoveryErrorCode as ProviderModelDiscoveryErrorCodeValue,
@@ -87,6 +89,137 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function positiveInteger(value: unknown): number | undefined {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function nestedRecord(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
+}
+
+function firstPositiveInteger(...values: unknown[]): number | undefined {
+  for (const value of values) {
+    const parsed = positiveInteger(value);
+    if (parsed !== undefined) return parsed;
+  }
+  return undefined;
+}
+
+function capabilityStatus(value: unknown): ModelCapabilityStatus | undefined {
+  if (typeof value === 'boolean') {
+    return value ? ModelCapabilityStatus.Supported : ModelCapabilityStatus.Unsupported;
+  }
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['supported', 'support', 'true', 'yes'].includes(normalized)) {
+    return ModelCapabilityStatus.Supported;
+  }
+  if (['unsupported', 'unsupport', 'false', 'no'].includes(normalized)) {
+    return ModelCapabilityStatus.Unsupported;
+  }
+  return undefined;
+}
+
+function modelCapabilities(item: Record<string, unknown>): Partial<ModelCapabilities> | undefined {
+  const declared = nestedRecord(item.capabilities);
+  const architecture = nestedRecord(item.architecture);
+  const rawModalities = item.modalities ?? architecture?.input_modalities;
+  const modalities = Array.isArray(rawModalities)
+    ? rawModalities.filter((value): value is string => typeof value === 'string')
+    : [];
+  const supports = (keys: string[]): ModelCapabilityStatus | undefined => {
+    for (const key of keys) {
+      const status = capabilityStatus(item[key]) ?? capabilityStatus(declared?.[key]);
+      if (status !== undefined) return status;
+    }
+    return undefined;
+  };
+  const fromModalities = (names: string[]): ModelCapabilityStatus | undefined =>
+    modalities.length > 0
+      ? modalities.some(value => names.includes(value.trim().toLowerCase()))
+        ? ModelCapabilityStatus.Supported
+        : undefined
+      : undefined;
+
+  const capabilities: Partial<ModelCapabilities> = {
+    toolCalling:
+      supports([
+        'toolCalling',
+        'tool_calling',
+        'supports_tools',
+        'supports_tool_calls',
+        'tools',
+        'function_calling',
+      ]) ??
+      capabilityStatus(declared?.tools) ??
+      capabilityStatus(declared?.function_calling) ??
+      capabilityStatus(declared?.tool_use),
+    imageInput:
+      supports([
+        'imageInput',
+        'image_input',
+        'supports_image',
+        'supports_image_input',
+        'vision',
+        'supports_vision',
+      ]) ?? fromModalities(['image', 'vision']),
+    videoInput:
+      supports(['videoInput', 'video_input', 'supports_video', 'supports_video_input']) ??
+      fromModalities(['video']),
+    audioInput:
+      supports(['audioInput', 'audio_input', 'supports_audio', 'supports_audio_input']) ??
+      fromModalities(['audio']),
+    documentInput: supports([
+      'documentInput',
+      'document_input',
+      'supports_document',
+      'supports_document_input',
+      'file_input',
+      'supports_files',
+    ]),
+    reasoning: supports([
+      'reasoning',
+      'supports_reasoning',
+      'thinking',
+      'supports_thinking',
+      'reasoning_content',
+    ]),
+  };
+  const knownEntries = Object.entries(capabilities).filter(([, status]) => status !== undefined);
+  return knownEntries.length > 0
+    ? Object.fromEntries(knownEntries) as Partial<ModelCapabilities>
+    : undefined;
+}
+
+function modelMetadata(item: Record<string, unknown>): Pick<DiscoveredProviderModel, 'contextWindow' | 'maxTokens' | 'capabilities'> {
+  const topProvider = nestedRecord(item.top_provider);
+  const contextWindow = firstPositiveInteger(
+      item.contextWindow,
+      item.context_window,
+      item.contextLength,
+      item.context_length,
+      item.max_context_length,
+      item.input_context_length,
+      topProvider?.context_length,
+    );
+  const maxTokens = firstPositiveInteger(
+      item.maxTokens,
+      item.max_tokens,
+      item.maxOutputTokens,
+      item.max_output_tokens,
+      item.max_completion_tokens,
+      item.output_token_limit,
+      topProvider?.max_completion_tokens,
+    );
+  const capabilities = modelCapabilities(item);
+  return {
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+    ...(capabilities ? { capabilities } : {}),
+  };
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -110,6 +243,7 @@ export function parseProviderModelsResponse(payload: unknown): DiscoveredProvide
           id,
           ...(optionalString(item.name) ? { displayName: optionalString(item.name) } : {}),
           ...(optionalString(item.owned_by) ? { ownedBy: optionalString(item.owned_by) } : {}),
+          ...modelMetadata(item),
         },
       ];
     });
@@ -124,6 +258,7 @@ export function parseProviderModelsResponse(payload: unknown): DiscoveredProvide
           ...(optionalString(item.displayName)
             ? { displayName: optionalString(item.displayName) }
             : {}),
+          ...modelMetadata(item),
         },
       ];
     });

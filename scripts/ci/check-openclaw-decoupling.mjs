@@ -21,6 +21,7 @@ const productionRoots = [
 const buildRoots = ['scripts', 'resources'];
 const workflowFiles = [
   '.github/workflows/build-platforms.yml',
+  '.github/workflows/linux-install-pr.yml',
   '.github/workflows/online-update-release.yml',
   '.github/workflows/windows-installer-pr.yml',
 ];

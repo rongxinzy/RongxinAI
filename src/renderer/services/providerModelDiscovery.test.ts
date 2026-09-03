@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { ProviderModelDiscoveryErrorCode } from '@shared/providers';
+import { ModelCapabilityStatus, ProviderModelDiscoveryErrorCode } from '@shared/providers';
 
 import {
   applyProviderModelDiscoveryResult,
@@ -45,6 +45,45 @@ describe('mergeDiscoveredProviderModels', () => {
         { id: 'model-b', displayName: 'Remote B' },
       ]).models,
     ).toEqual([...latestDraft, { id: 'model-b', name: 'Remote B' }]);
+  });
+
+  test('fills missing metadata without overwriting explicit user values', () => {
+    const existing = [
+      {
+        id: 'model-a',
+        name: 'Model A',
+        contextWindow: 8192,
+        capabilities: { toolCalling: ModelCapabilityStatus.Unsupported },
+      },
+    ];
+
+    expect(
+      mergeDiscoveredProviderModels(existing, [
+        {
+          id: 'model-a',
+          contextWindow: 32768,
+          maxTokens: 4096,
+          capabilities: {
+            toolCalling: ModelCapabilityStatus.Supported,
+            imageInput: ModelCapabilityStatus.Supported,
+            reasoning: ModelCapabilityStatus.Supported,
+          },
+        },
+      ]).models,
+    ).toEqual([
+      {
+        id: 'model-a',
+        name: 'Model A',
+        contextWindow: 8192,
+        maxTokens: 4096,
+        supportsImage: true,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Unsupported,
+          imageInput: ModelCapabilityStatus.Supported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      },
+    ]);
   });
 
   test('leaves the draft unchanged after a failed or empty discovery', () => {

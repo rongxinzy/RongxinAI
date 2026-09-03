@@ -6,6 +6,7 @@ const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_DELAY_MS = 250;
 /** Grace window for a killed agent process to exit before dispose() returns. */
 const DISPOSE_EXIT_TIMEOUT_MS = 2_000;
+const MAX_STDERR_CONTEXT_BYTES = 16 * 1024;
 
 type ProcessTreeChild = Pick<ChildProcessWithoutNullStreams, 'pid' | 'kill'>;
 
@@ -61,6 +62,7 @@ export interface AcpConnectionLaunchOptions {
 }
 
 type PendingRequest = {
+  method: string;
   resolve: (result: unknown) => void;
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout> | null;
@@ -91,6 +93,7 @@ export class AcpConnectionSupervisor {
   private restartAttempts = 0;
   private disposed = false;
   private connectionGeneration = 0;
+  private stderrContext = '';
 
   get generation(): number {
     return this.connectionGeneration;
@@ -162,7 +165,11 @@ export class AcpConnectionSupervisor {
     this.connectionGeneration += 1;
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', chunk => this.consumeStdout(String(chunk)));
-    child.stderr.on('data', chunk => console.debug('[AcpConnection] agent stderr:', String(chunk)));
+    child.stderr.on('data', chunk => {
+      const text = String(chunk);
+      this.stderrContext = `${this.stderrContext}${text}`.slice(-MAX_STDERR_CONTEXT_BYTES);
+      console.debug('[AcpConnection] agent stderr:', text);
+    });
     child.once('exit', (code, signal) => {
       if (this.child !== child) return;
       this.child = null;
@@ -195,6 +202,7 @@ export class AcpConnectionSupervisor {
               reject(new Error(`ACP request timed out: ${method}.`));
             }, timeoutMs);
       this.pending.set(id, {
+        method,
         resolve: value => resolve(value as T),
         reject,
         timeout,
@@ -256,7 +264,7 @@ export class AcpConnectionSupervisor {
         method?: unknown;
         params?: unknown;
         result?: unknown;
-        error?: { message?: unknown };
+        error?: { code?: unknown; message?: unknown; data?: unknown };
       };
       if (typeof message.method === 'string') {
         const params = (message.params ?? {}) as Record<string, unknown>;
@@ -272,8 +280,20 @@ export class AcpConnectionSupervisor {
       if (!pending) return;
       this.pending.delete(message.id);
       if (pending.timeout) clearTimeout(pending.timeout);
-      if (message.error)
-        pending.reject(new Error(String(message.error.message ?? 'ACP request failed.')));
+      if (message.error) {
+        const detail = String(message.error.message ?? 'ACP request failed.');
+        const code =
+          typeof message.error.code === 'number' || typeof message.error.code === 'string'
+            ? ` (code ${message.error.code})`
+            : '';
+        const data =
+          message.error.data && typeof message.error.data === 'object'
+            ? ` Data: ${JSON.stringify(message.error.data).slice(0, 4000)}`
+            : '';
+        const context = this.stderrContext.trim();
+        const suffix = context ? ` Agent diagnostics: ${context.slice(-2000)}` : '';
+        pending.reject(new Error(`ACP request ${pending.method} failed${code}: ${detail}.${data}${suffix}`));
+      }
       else pending.resolve(message.result);
     } catch (error) {
       console.warn('[AcpConnection] ignored malformed stdout protocol message:', error);

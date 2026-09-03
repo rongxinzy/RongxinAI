@@ -474,6 +474,40 @@ test('synchronizes running models and notifies renderers after service startup',
   expect(send).toHaveBeenCalledWith(LlamaCppIpcChannel.ModelBindingsChanged, undefined);
 });
 
+test('synchronizes current running models when model bindings are refreshed', async () => {
+  electronMocks.handlers.clear();
+  const manager = {
+    on: vi.fn(() => manager),
+    listRunningModels: vi.fn(async () => [
+      { name: 'qwen-local', status: 'loaded', runtime_context_length: 8192 },
+    ]),
+    client: vi.fn(async () => ({ showModel: vi.fn(async () => ({})) })),
+  } as unknown as LlamaCppManager;
+  const store = {
+    get: vi.fn(() => undefined),
+    set: vi.fn(),
+  };
+
+  registerLlamaCppIpcHandlers(manager, {
+    getStore: () => store as never,
+  });
+
+  const refreshHandler = electronMocks.handlers.get(LlamaCppIpcChannel.RefreshRunningModelBindings);
+  if (!refreshHandler) throw new Error('The local model refresh handler was not registered.');
+
+  await expect(Promise.resolve(refreshHandler())).resolves.toBeUndefined();
+  expect(store.set).toHaveBeenCalledWith(
+    'app_config',
+    expect.objectContaining({
+      providers: expect.objectContaining({
+        llamacpp: expect.objectContaining({
+          models: [expect.objectContaining({ id: 'qwen-local', contextWindow: 8192 })],
+        }),
+      }),
+    }),
+  );
+});
+
 test('preserves model bindings when the running-model query temporarily fails', async () => {
   electronMocks.handlers.clear();
   electronMocks.windows.length = 0;

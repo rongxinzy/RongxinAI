@@ -236,6 +236,39 @@ test('reads local metadata for a confirmed memory link', () => {
   }
 });
 
+test('keeps manually added Personal memories recallable without extractor metadata', () => {
+  const db = new Database(':memory:');
+  const repository = new MemoryRepository(db);
+
+  try {
+    repository.createLink({
+      id: 'manual-personal-link',
+      memoryId: 9,
+      projectId: 'personal://zhiyuan-agent/user',
+      scope: MemoryScope.Personal,
+      sessionId: 'personal:settings-memory',
+      sourceKind: MemorySourceKind.Explicit,
+      title: 'Email address',
+      content: 'user@example.com',
+      kind: MemoryKind.Preference,
+      metadata: { manual: true },
+    });
+
+    expect(
+      repository.filterRecallableMemoryIds({
+        projectId: 'personal://zhiyuan-agent/user',
+        memoryIds: [9],
+        scope: MemoryScope.Personal,
+      }),
+    ).toEqual(new Set([9]));
+    expect(
+      repository.isCurrentSemanticMemoryLink('manual-personal-link', MemoryScope.Personal),
+    ).toBe(true);
+  } finally {
+    db.close();
+  }
+});
+
 test('deleting a candidate also cancels its pending outbox delivery', () => {
   const db = new Database(':memory:');
   const repository = new MemoryRepository(db);

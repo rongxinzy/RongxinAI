@@ -941,6 +941,12 @@ const getCodingRoomService = (): CodingRoomService => {
             thinkingLevel: patch.thinkingLevel as PiThinkingLevel | null | undefined,
           }),
         cancelBuiltinSession: async sessionId => runtime.stopSession(sessionId),
+        enqueueBuiltinMessage: (sessionId, prompt) => runtime.enqueuePendingMessage(sessionId, prompt),
+        steerBuiltinMessage: async (sessionId, prompt) => {
+          const queued = runtime.enqueuePendingMessage(sessionId, prompt);
+          if (!queued.success || !queued.item) return queued;
+          return await runtime.steerPendingMessage(sessionId, queued.item.id);
+        },
         getBuiltinWorkbenchLink: sessionId => {
           const detail = getWorkbenchTaskService().getCurrent(sessionId);
           const runId = detail?.task.activeRunId;
@@ -1018,6 +1024,17 @@ const getCodingRoomService = (): CodingRoomService => {
             repositoryRoot: workspaceRoot,
             worktreeRoot: isolatedWorkspaceRoot,
           }),
+      },
+      {
+        // The bundled Claude ACP adapter writes its own full exception details
+        // here. This is intentionally app-owned and never includes credentials.
+        CLAUDE_AGENT_LOGS: path.join(app.getPath('userData'), 'acp-logs', 'claude'),
+        CLAUDE_CODE_DIAGNOSTICS_FILE: path.join(
+          app.getPath('userData'),
+          'acp-logs',
+          'claude',
+          'sdk-diagnostics.jsonl',
+        ),
       },
     );
     codingRoomService.registry.hydrate();
@@ -1240,6 +1257,7 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
     deferredCcConnectCronClient = new DeferredCcConnectCronClient();
     ccConnectDeliveryTransport = new CcConnectDeliveryTransport(
       new IMStore(getStore().getDatabase()),
+      getCoworkStore(),
     );
     const executor = new PiScheduledTaskExecutor(getPiRuntimeAdapter(), getCoworkStore());
     activityService ??= new ActivityService(getStore().getDatabase());

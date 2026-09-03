@@ -1,5 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import { Spinner } from '@shared/components/ui/spinner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import {
   ApiFormat,
   type DiscoveredProviderModel,
@@ -8,7 +8,7 @@ import {
   resolveCodingPlanBaseUrl,
 } from '@shared/providers';
 import { RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { i18nService } from '../../services/i18n';
@@ -20,7 +20,14 @@ interface ProviderModelDiscoveryButtonProps {
   baseUrl: string;
   apiFormat: ApiFormat;
   requiresApiKey: boolean;
-  onModelsMerge: (models: readonly DiscoveredProviderModel[]) => void;
+  autoDetectRequest?: { providerId: string; requestId: number } | null;
+  showButton?: boolean;
+  iconOnly?: boolean;
+  prominent?: boolean;
+  onModelsDiscovered: (
+    providerId: string,
+    models: readonly DiscoveredProviderModel[],
+  ) => Promise<boolean> | boolean;
 }
 
 const errorTranslationKeys = {
@@ -34,13 +41,19 @@ const errorTranslationKeys = {
   [ProviderModelDiscoveryErrorCode.Http]: 'fetchModelsFailed',
 } as const;
 
+const MODEL_DISCOVERY_MIN_LOADING_DURATION_MS = 1_000;
+
 export function ProviderModelDiscoveryButton({
   providerId,
   provider,
   baseUrl,
   apiFormat,
   requiresApiKey,
-  onModelsMerge,
+  autoDetectRequest,
+  showButton = true,
+  iconOnly = false,
+  prominent = false,
+  onModelsDiscovered,
 }: ProviderModelDiscoveryButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const latestRequestId = useRef(0);
@@ -62,6 +75,7 @@ export function ProviderModelDiscoveryButton({
   const signature = `${providerId}\u0000${endpoint.baseUrl}\u0000${endpoint.apiFormat}\u0000${apiKey}`;
   const currentSignature = useRef(signature);
   currentSignature.current = signature;
+  const consumedAutoDetectRequestId = useRef(0);
 
   useEffect(() => {
     latestRequestId.current += 1;
@@ -71,7 +85,7 @@ export function ProviderModelDiscoveryButton({
     };
   }, [signature]);
 
-  const handleFetchModels = async () => {
+  const handleFetchModels = useCallback(async () => {
     if (!endpoint.baseUrl.trim()) {
       toast.error(i18nService.t('fetchModelsNeedEndpoint'));
       return;
@@ -83,6 +97,7 @@ export function ProviderModelDiscoveryButton({
 
     const requestId = ++latestRequestId.current;
     const requestSignature = signature;
+    const loadingStartedAt = performance.now();
     setIsLoading(true);
     try {
       const result = await window.electron.api.fetchModels({
@@ -104,15 +119,10 @@ export function ProviderModelDiscoveryButton({
         toast.error(i18nService.t(errorTranslationKeys[result.code]));
         return;
       }
-      if (result.models.length === 0) {
+      const didTestModels = await onModelsDiscovered(providerId, result.models);
+      if (result.models.length === 0 && !didTestModels) {
         toast.message(i18nService.t('fetchModelsEmpty'));
-        return;
       }
-
-      onModelsMerge(result.models);
-      toast.success(
-        i18nService.t('fetchModelsSuccess').replace('{count}', String(result.models.length)),
-      );
     } catch {
       if (
         isCurrentProviderModelDiscoveryRequest(
@@ -125,6 +135,15 @@ export function ProviderModelDiscoveryButton({
         toast.error(i18nService.t('fetchModelsFailed'));
       }
     } finally {
+      const remainingLoadingDuration = Math.max(
+        0,
+        MODEL_DISCOVERY_MIN_LOADING_DURATION_MS - (performance.now() - loadingStartedAt),
+      );
+      if (remainingLoadingDuration > 0) {
+        await new Promise<void>(resolve => {
+          window.setTimeout(resolve, remainingLoadingDuration);
+        });
+      }
       if (
         isCurrentProviderModelDiscoveryRequest(
           requestId,
@@ -136,18 +155,60 @@ export function ProviderModelDiscoveryButton({
         setIsLoading(false);
       }
     }
-  };
+  }, [apiKey, endpoint.apiFormat, endpoint.baseUrl, onModelsDiscovered, providerId, requiresApiKey, signature]);
+
+  useEffect(() => {
+    if (
+      !autoDetectRequest ||
+      autoDetectRequest.providerId !== providerId ||
+      autoDetectRequest.requestId <= consumedAutoDetectRequestId.current
+    ) {
+      return;
+    }
+    consumedAutoDetectRequestId.current = autoDetectRequest.requestId;
+    void handleFetchModels();
+  }, [autoDetectRequest, handleFetchModels, providerId]);
+
+  if (!showButton) return null;
+
+  if (iconOnly) {
+    const label = i18nService.t(isLoading ? 'fetchingModels' : 'refresh');
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => void handleFetchModels()}
+              disabled={isLoading}
+              aria-label={label}
+            >
+              <RefreshCw className={isLoading ? 'animate-spin motion-reduce:animate-none' : undefined} />
+            </Button>
+          }
+        />
+        <TooltipContent>{label}</TooltipContent>
+      </Tooltip>
+    );
+  }
 
   return (
     <Button
       type="button"
-      variant="link"
-      size="xs"
+      variant={prominent ? 'outline' : 'link'}
+      size={prominent ? 'sm' : 'xs'}
       onClick={() => void handleFetchModels()}
       disabled={isLoading}
-      className="h-auto px-0 py-0 [&_svg]:size-3.5"
+      className={
+        prominent ? 'h-8 px-3 text-sm [&_svg]:size-3.5' : 'h-auto px-0 py-0 [&_svg]:size-3.5'
+      }
     >
-      {isLoading ? <Spinner data-icon="inline-start" /> : <RefreshCw data-icon="inline-start" />}
+      <RefreshCw
+        data-icon="inline-start"
+        className={isLoading ? 'animate-spin motion-reduce:animate-none' : undefined}
+      />
       {i18nService.t(isLoading ? 'fetchingModels' : 'fetchModels')}
     </Button>
   );
