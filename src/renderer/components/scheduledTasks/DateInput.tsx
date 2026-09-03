@@ -115,7 +115,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
     <Popover open={open} onOpenChange={setOpen}>
       <div className="relative inline-flex">
         <PopoverTrigger
-          nativeButton={false}
+          nativeButton={true}
           render={
             <Button
               type="button"

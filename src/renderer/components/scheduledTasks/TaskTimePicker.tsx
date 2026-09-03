@@ -63,7 +63,7 @@ const TaskTimePicker: React.FC<TaskTimePickerProps> = ({ hour, minute, second, o
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        nativeButton={false}
+        nativeButton={true}
         render={
           <Button type="button" variant="outline" className="flex-1 min-w-0 justify-between">
             <span>{timeLabel}</span>

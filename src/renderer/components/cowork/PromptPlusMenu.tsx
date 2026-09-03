@@ -222,7 +222,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
-        nativeButton={false}
+        nativeButton={true}
         disabled={disabled}
         render={
           <PromptInputButton
