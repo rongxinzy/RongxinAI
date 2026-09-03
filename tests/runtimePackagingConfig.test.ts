@@ -399,7 +399,7 @@ test("installer-related pull requests build and exercise the Windows installer",
   assert.match(smoke, /'cache-hit upgrade'/);
   assert.match(smoke, /phase=component-cache-miss/);
   assert.match(smoke, /phase=component-cache-hit/);
-  assert.match(smoke, /phase=defender-exclusion-skipped-silent/);
+  assert.doesNotMatch(smoke, /phase=defender-exclusion/);
   assert.match(smoke, /'uninstall'/);
 
   const sizeSmoke = readFileSync(

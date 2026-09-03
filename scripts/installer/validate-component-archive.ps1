@@ -1,7 +1,8 @@
 param(
   [Parameter(Mandatory = $true)][string]$ArchivePath,
   [Parameter(Mandatory = $true)][string]$SevenZipPath,
-  [Parameter(Mandatory = $true)][string]$Prefix
+  [Parameter(Mandatory = $true)][string]$Prefix,
+  [Parameter(Mandatory = $false)][string]$ExpectedHash = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +13,14 @@ if (-not (Test-Path -LiteralPath $ArchivePath -PathType Leaf)) {
 }
 if (-not (Test-Path -LiteralPath $SevenZipPath -PathType Leaf)) {
   throw "7za executable is missing: $SevenZipPath"
+}
+
+if ($ExpectedHash) {
+  $actualHash = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actualHash -ne $ExpectedHash.ToLowerInvariant()) {
+    Write-Output "hash-mismatch"
+    exit 2
+  }
 }
 
 $normalizedPrefix = $Prefix.Replace('\', '/').Trim('/')

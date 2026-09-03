@@ -31,9 +31,13 @@
 !macro customHeader
   ManifestDPIAware true
   ; The application and immutable runtime cache are per-user. Elevated helper
-  ; processes are used only for optional Windows-wide settings below.
+  ; processes are used only for the VC++ runtime installer below.
   RequestExecutionLevel user
   ShowInstDetails nevershow
+  ; NSIS startup CRC check reads the entire installer before the UI appears.
+  ; Every payload is already covered by per-component SHA-256 and 7z CRC, so
+  ; the extra full-file scan is redundant and slow for a multi-gigabyte exe.
+  CRCCheck off
 !macroend
 
 !macro customWelcomePage
@@ -185,37 +189,28 @@
     File /oname=component-${KEY}.7z "${PROJECT_DIR}\build-tar\windows-components\${KEY}.7z"
     SetCompress auto
 
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$PLUGINSDIR\component-${KEY}.7z\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
+    ; Hash check and archive entry validation are merged into a single
+    ; PowerShell invocation to avoid the per-component process startup cost.
+    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-component-archive.ps1" -ArchivePath "$PLUGINSDIR\component-${KEY}.7z" -SevenZipPath "$PLUGINSDIR\7za.exe" -Prefix "${PREFIX}" -ExpectedHash "$R4"'
     Pop $0
     Pop $1
-    StrCmp $0 "0" 0 ComponentHashFailed_${TOKEN}
-    StrCpy $1 $1 64
-    StrCmp $1 $R4 0 ComponentHashFailed_${TOKEN}
-
-    ; Validate every archive entry before extraction. Keep the parser in a
-    ; standalone script so PowerShell path semantics are not changed by NSIS quoting.
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\validate-component-archive.ps1" -ArchivePath "$PLUGINSDIR\component-${KEY}.7z" -SevenZipPath "$PLUGINSDIR\7za.exe" -Prefix "${PREFIX}"'
-    Pop $0
-    Pop $1
+    StrCmp $0 "2" ComponentHashFailed_${TOKEN}
+    StrCmp $0 "3" ComponentArchiveUnsafe_${TOKEN}
     StrCmp $0 "0" 0 ComponentArchiveUnsafe_${TOKEN}
 
-    nsExec::ExecToStack '"$PLUGINSDIR\7za.exe" x -bd -y "-o$R3" "$PLUGINSDIR\component-${KEY}.7z"'
-    Pop $0
-    Pop $1
-    StrCmp $0 "error" ComponentExtractFailed_${TOKEN}
-    IntCmp $0 0 ComponentExtracted_${TOKEN} ComponentExtractFailed_${TOKEN} ComponentExtractFailed_${TOKEN}
+    DetailPrint "[Installer] Extracting ${LABEL}"
+    Push $OUTDIR
+    SetOutPath "$R3"
+    Nsis7z::Extract "$PLUGINSDIR\component-${KEY}.7z"
+    Pop $R0
+    SetOutPath $R0
+    Delete "$PLUGINSDIR\component-${KEY}.7z"
+    Goto ComponentExtracted_${TOKEN}
 
   ComponentHashFailed_${TOKEN}:
     StrCpy $R9 "${LABEL} 归档 SHA-256 校验失败，安装包可能不完整。"
     !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 actual=$1 exit=$0$\r$\n"
-    FileClose $2
-    Goto OfflineComponentInstallFailed
-
-  ComponentExtractFailed_${TOKEN}:
-    StrCpy $R9 "${LABEL} 展开失败（代码 $0）。请检查磁盘空间或安全软件后重试。"
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=component-extract-failed component=${KEY} exit=$0 output=$1$\r$\n"
+    FileWrite $2 "phase=component-hash-failed component=${KEY} expected=$R4 output=$1$\r$\n"
     FileClose $2
     Goto OfflineComponentInstallFailed
 
@@ -226,8 +221,15 @@
     FileClose $2
     Goto OfflineComponentInstallFailed
 
+  ComponentExtractFailed_${TOKEN}:
+    StrCpy $R9 "${LABEL} 展开失败。请检查磁盘空间或安全软件后重试。"
+    !insertmacro OpenTimingLogForAppend $2
+    FileWrite $2 "phase=component-extract-failed component=${KEY} output=$1$\r$\n"
+    FileClose $2
+    Goto OfflineComponentInstallFailed
+
   ComponentExtracted_${TOKEN}:
-    IfFileExists "$R3\${SENTINEL}" 0 ComponentVerificationFailed_${TOKEN}
+    IfFileExists "$R3\${SENTINEL}" 0 ComponentExtractFailed_${TOKEN}
     nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "(Get-FileHash -LiteralPath \"$R3\${SENTINEL}\" -Algorithm SHA256).Hash.ToLowerInvariant()"'
     Pop $0
     Pop $1
@@ -240,7 +242,6 @@
     RMDir /r "$R2"
     Rename "$R3" "$R2"
     IfErrors ComponentCommitFailed_${TOKEN}
-    Delete "$PLUGINSDIR\component-${KEY}.7z"
     Goto ComponentReady_${TOKEN}
 
   ComponentVerificationFailed_${TOKEN}:
@@ -293,63 +294,6 @@
   Pop $0
   Pop $1
   StrCmp $0 "0" 0 OfflineComponentInstallFailed
-
-  ; Defender exclusion is optional and requires explicit, informed consent.
-  ; Keep the scope limited to the immutable component cache; never exclude
-  ; user-created Skills, channel state, model data, or the full install tree.
-  DetailPrint "[Installer] Checking Microsoft Defender exclusion"
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$runtimeRoot = \"$LOCALAPPDATA\ZhiYuanAgent\runtimes\";\
-    try {\
-      $$excluded = @((Get-MpPreference -ErrorAction Stop).ExclusionPath);\
-      if ($$excluded -contains $$runtimeRoot) { exit 0 }\
-    } catch { };\
-    exit 3"'
-  Pop $0
-  Pop $1
-  StrCmp $0 "0" DefenderExclusionAlreadyActive
-  IfSilent DefenderExclusionSkipped
-  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1 "是否允许将知远的离线运行环境加入 Microsoft Defender 排除项？$\r$\n$\r$\n这样可以显著减少大量小文件在首次解压和后续运行时的扫描开销，但该目录中的文件将不再接受 Defender 实时扫描。设置会持续到卸载知远，你也可以随时在 Windows 安全中心撤销。$\r$\n$\r$\n目录：%LOCALAPPDATA%\ZhiYuanAgent\runtimes$\r$\n$\r$\n开源版推荐选择“是”；如不希望修改 Defender 设置，请选择“否”。" IDYES EnableDefenderExclusion IDNO DefenderExclusionDeclined
-
-  EnableDefenderExclusion:
-    DetailPrint "[Installer] Adding user-approved Defender exclusion"
-    !insertmacro RunElevatedAction ADD_DEFENDER add-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-    StrCmp $0 "0" DefenderExclusionEnabled
-      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-      !insertmacro OpenTimingLogForAppend $2
-      FileWrite $2 "phase=defender-exclusion-failed exit=$0 output=$1$\r$\n"
-      FileClose $2
-      MessageBox MB_OK|MB_ICONEXCLAMATION "Microsoft Defender 排除项未能添加。可能是你取消了管理员授权，或系统安全策略不允许修改。知远仍会继续安装。"
-      Goto DefenderExclusionDone
-
-  DefenderExclusionEnabled:
-    FileOpen $2 "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" w
-    FileWrite $2 "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-    FileClose $2
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-enabled path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
-    FileClose $2
-    Goto DefenderExclusionDone
-
-  DefenderExclusionAlreadyActive:
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-already-active path=$LOCALAPPDATA\ZhiYuanAgent\runtimes$\r$\n"
-    FileClose $2
-    Goto DefenderExclusionDone
-
-  DefenderExclusionDeclined:
-    Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-declined$\r$\n"
-    FileClose $2
-    Goto DefenderExclusionDone
-
-  DefenderExclusionSkipped:
-    !insertmacro OpenTimingLogForAppend $2
-    FileWrite $2 "phase=defender-exclusion-skipped-silent$\r$\n"
-    FileClose $2
-
-  DefenderExclusionDone:
 
   !insertmacro EnsureOfflineComponent CHANNEL_RUNTIME "channel-runtime" "channel-runtime" "channel-runtime\cc-connect-sidecar.exe" "频道运行环境"
   !insertmacro EnsureOfflineComponent SKILLS "skills" "SKILLs" "SKILLs\skills.config.json" "内置 Skills"
@@ -677,12 +621,4 @@
   LegacyRuntimeCleanupDone:
   RMDir "$3"
 
-  ; Remove only exclusions that this installer recorded as user-approved and
-  ; installer-managed. Never remove an exclusion created independently.
-  IfFileExists "$APPDATA\ZhiYuanAgent\defender-exclusion-managed" 0 DefenderExclusionUninstallDone
-    !insertmacro ExtractElevatedActionScript
-    !insertmacro RunElevatedAction REMOVE_DEFENDER remove-defender-exclusion "$LOCALAPPDATA\ZhiYuanAgent\runtimes"
-    StrCmp $0 "0" 0 DefenderExclusionUninstallDone
-      Delete "$APPDATA\ZhiYuanAgent\defender-exclusion-managed"
-  DefenderExclusionUninstallDone:
 !macroend

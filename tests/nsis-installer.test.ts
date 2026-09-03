@@ -33,11 +33,13 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('component-${KEY}.sentinel-sha256');
     expect(installerScript).toContain('File /oname=7za.exe');
     expect(installerScript).toContain('component-${KEY}.7z');
-    expect(installerScript).toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
+    expect(installerScript).toContain('Nsis7z::Extract "$PLUGINSDIR\\component-${KEY}.7z"');
+    expect(installerScript).not.toContain('"$PLUGINSDIR\\7za.exe" x -bd -y');
     expect(installerScript).toContain('SetCompress off');
     expect(installerScript).toContain('SetCompress auto');
     expect(installerScript).toContain('File /oname=validate-component-archive.ps1');
     expect(installerScript).toContain('-File \"$PLUGINSDIR\\validate-component-archive.ps1\"');
+    expect(installerScript).toContain('-ExpectedHash "$R4"');
     expect(installerScript).toContain('phase=component-archive-unsafe');
     expect(installerScript).toContain('Get-FileHash -LiteralPath \\"$R2\\${SENTINEL}\\"');
     expect(installerScript).toContain('$LOCALAPPDATA\\ZhiYuanAgent\\runtimes\\${KEY}\\$R1');
@@ -138,7 +140,7 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toMatch(
       /^\s*FileOpen \$\d+ "\$APPDATA\\ZhiYuanAgent\\install-timing\.log" a$/m,
     );
-    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(19);
+    expect(installerScript.match(/!insertmacro OpenTimingLogForAppend \$[28]/g)).toHaveLength(14);
   });
 
   test('records optional local inference intent without downloading in NSIS', () => {
@@ -150,21 +152,23 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
   });
 
-  test('adds only a user-approved scoped Defender exclusion and removes managed exclusions', () => {
+  test('does not request or manage Microsoft Defender exclusions', () => {
     const installerScript = fs.readFileSync(installerScriptPath, 'utf8');
     const elevatedActionsScript = fs.readFileSync(elevatedActionsScriptPath, 'utf8');
 
-    expect(installerScript).toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON1');
     expect(installerScript).toContain('ExecShellWait "runas"');
     expect(installerScript).toContain('-ExecutionPolicy Bypass -File');
-    expect(installerScript).toContain('!insertmacro RunElevatedAction ADD_DEFENDER');
     expect(installerScript).toContain('!insertmacro RunElevatedAction INSTALL_VC');
-    expect(installerScript).toContain('!insertmacro RunElevatedAction REMOVE_DEFENDER');
-    expect(installerScript).toContain('defender-exclusion-managed');
+    expect(installerScript).not.toContain('!insertmacro RunElevatedAction ADD_DEFENDER');
+    expect(installerScript).not.toContain('!insertmacro RunElevatedAction REMOVE_DEFENDER');
+    expect(installerScript).not.toContain('defender-exclusion-managed');
+    expect(installerScript).not.toContain('Get-MpPreference');
+    expect(installerScript).not.toContain('Defender');
+    expect(installerScript).not.toContain('Defender exclusion');
     expect(installerScript).not.toContain("''");
     expect(installerScript).not.toContain('Start-Process -FilePath powershell.exe -Verb RunAs');
-    expect(elevatedActionsScript).toContain('Add-MpPreference -ExclusionPath $Target');
-    expect(elevatedActionsScript).toContain('Remove-MpPreference -ExclusionPath $Target');
+    expect(elevatedActionsScript).not.toContain('Add-MpPreference');
+    expect(elevatedActionsScript).not.toContain('Remove-MpPreference');
     expect(elevatedActionsScript).toContain('-ArgumentList @(');
     expect(elevatedActionsScript).toContain("'/install'");
     expect(elevatedActionsScript).toContain("'/quiet'");
