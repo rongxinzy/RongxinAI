@@ -2,6 +2,7 @@ import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
+import { ListTodo } from 'lucide-react';
 import { type RefObject, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -45,13 +46,15 @@ export type SidebarActiveView =
   | 'mcp'
   | 'localInference'
   | 'expert'
-  | 'coding';
+  | 'coding'
+  | 'todo';
 
 interface SidebarNavigationControlsProps {
   activeView: SidebarActiveView;
   onNewChat: () => void;
   onShowExpert: () => void;
   onShowCoding: () => void;
+  onShowTodo: () => void;
   onShowLocalInference: () => void;
   onShowScheduledTasks: () => void;
   onShowActivity: () => void;
@@ -80,6 +83,7 @@ export const SidebarNavigationControls = ({
   onNewChat,
   onShowExpert,
   onShowCoding,
+  onShowTodo,
   onShowLocalInference,
   onShowScheduledTasks,
   onShowActivity,
@@ -203,6 +207,24 @@ export const SidebarNavigationControls = ({
         >
           <SidebarAnimatedTerminalIcon ref={codingIconRef} />
           {i18nService.t('codingAgent')}
+        </Button>
+      )}
+      {workMode !== WorkMode.Chat && (
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onShowTodo}
+          onMouseEnter={() => onPrefetchView?.('todo')}
+          onFocus={() => onPrefetchView?.('todo')}
+          className={
+            activeView === 'todo'
+              ? activeSidebarViewNavItemClassName
+              : sidebarViewNavItemClassName
+          }
+          aria-current={activeView === 'todo' ? 'page' : undefined}
+        >
+          <ListTodo className="size-4" />
+          {i18nService.t('todoTitle')}
         </Button>
       )}
       {workMode !== WorkMode.Chat && (

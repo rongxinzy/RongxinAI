@@ -177,6 +177,8 @@ import { CoworkInterruptionCause } from '../shared/cowork/interruption';
 import { normalizePiMessage, normalizePiToolActivity } from './codingAgent/piCodingEventAdapter';
 import { registerWorkbenchTaskIpcHandlers } from './workbenchTask/ipc';
 import { WorkbenchTaskService } from './workbenchTask/taskService';
+import { registerTodoIpcHandlers } from './todo/ipc';
+import { TodoReminderScheduler } from './todo/reminderScheduler';
 import { shouldRequireProductionOnResume } from './productionLoop/entryPolicy';
 import { type PermissionResult, PiRuntimeAdapter } from './libs/agentEngine';
 import type { PiThinkingLevel } from './libs/agentEngine/piRuntimeTypes';
@@ -858,6 +860,7 @@ let engramManager: EngramManager | null = null;
 let engramAdapter: ZhiYuanEngramAdapter | null = null;
 let memoryRepository: MemoryRepository | null = null;
 let projectMemoryService: ProjectMemoryService | null = null;
+let todoReminderScheduler: TodoReminderScheduler | null = null;
 
 const getWorkbenchTaskService = (): WorkbenchTaskService => {
   if (!workbenchTaskService) {
@@ -6870,6 +6873,8 @@ if (!gotTheLock) {
     }
 
     sqliteBackupManager?.stopPeriodicBackupLoop();
+    todoReminderScheduler?.stop();
+    todoReminderScheduler = null;
 
     // Close the SQLite database to flush the WAL and release the file lock.
     try {
@@ -7123,6 +7128,11 @@ if (!gotTheLock) {
           _skipUserMessage: !amendment,
         });
       },
+    });
+    todoReminderScheduler = new TodoReminderScheduler(getStore().getDatabase());
+    todoReminderScheduler.start();
+    registerTodoIpcHandlers(() => getStore().getDatabase(), {
+      onMutation: () => todoReminderScheduler?.refresh(),
     });
     registerCodingAgentIpcHandlers(getCodingRoomService);
     const recoveredCodingLanes = getCodingRoomService().recoverInterruptedState();

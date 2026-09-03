@@ -23,6 +23,7 @@ import {
 import { initializeWorkbenchTaskSchema } from './workbenchTask/schema';
 import { initializeCodingAgentSchema } from './codingAgent/schema';
 import { initializeProductionLoopSchema } from './productionLoop/schema';
+import { initializeTodoSchema } from './todo/schema';
 import { normalizeWorkspacePath, workspaceIdForPath, workspaceNameForPath } from './workspaceUtils';
 
 type ChangePayload<T = unknown> = {
@@ -188,6 +189,7 @@ export class SqliteStore {
     initializeWorkbenchTaskSchema(this.db);
     initializeCodingAgentSchema(this.db);
     initializeProductionLoopSchema(this.db);
+    initializeTodoSchema(this.db);
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS user_memories (

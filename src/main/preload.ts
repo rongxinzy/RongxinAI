@@ -59,6 +59,7 @@ import type {
   ProviderModelDiscoveryResult,
 } from '../shared/providers';
 import { TriageIpcChannel } from '../shared/triage';
+import { TodoIpc } from '../shared/todo';
 import { WorkspaceIpc } from '../shared/workspace';
 import {
   WorkbenchTaskIpc,
@@ -603,6 +604,29 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(WorkbenchTaskIpc.RespondToApproval, input),
     onChanged: (callback: (event: WorkbenchTaskChangedEvent) => void) =>
       onPush(WorkbenchTaskIpc.Changed, callback),
+  },
+
+  todo: {
+    list: (input: import('../shared/todo').TodoListInput) =>
+      ipcRenderer.invoke(TodoIpc.List, input),
+    create: (input: import('../shared/todo').TodoCreateInput) =>
+      ipcRenderer.invoke(TodoIpc.Create, input),
+    update: (input: import('../shared/todo').TodoUpdateInput & { todoId: string }) =>
+      ipcRenderer.invoke(TodoIpc.Update, input),
+    delete: (todoId: string) => ipcRenderer.invoke(TodoIpc.Delete, todoId),
+    listLists: () => ipcRenderer.invoke(TodoIpc.ListLists),
+    createList: (input: import('../shared/todo').TodoListCreateInput) =>
+      ipcRenderer.invoke(TodoIpc.CreateList, input),
+    updateList: (input: import('../shared/todo').TodoListUpdateInput & { listId: string }) =>
+      ipcRenderer.invoke(TodoIpc.UpdateList, input),
+    deleteList: (listId: string) => ipcRenderer.invoke(TodoIpc.DeleteList, listId),
+    createStep: (input: import('../shared/todo').TodoStepCreateInput) =>
+      ipcRenderer.invoke(TodoIpc.CreateStep, input),
+    updateStep: (input: import('../shared/todo').TodoStepUpdateInput) =>
+      ipcRenderer.invoke(TodoIpc.UpdateStep, input),
+    deleteStep: (stepId: string) => ipcRenderer.invoke(TodoIpc.DeleteStep, stepId),
+    onChanged: (callback: (event: import('../shared/todo').TodoChangedEvent) => void) =>
+      onPush(TodoIpc.Changed, callback),
   },
 
   codingAgent: {
