@@ -71,10 +71,17 @@ import { usePersistAgentModelSelection } from './usePersistAgentModelSelection';
 // so that attachment state survives view switches (cowork ↔ skills, etc.)
 type CoworkAttachment = DraftAttachment;
 
-const GoalModeChip: React.FC<{ onRemove: () => void }> = ({ onRemove }) => (
-  <span className="inline-flex h-6 items-center gap-1.5 rounded-full px-1.5 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)">
-    <Target className="size-3.5" />
-    <span className="max-w-24 truncate">{i18nService.t('goalMode')}</span>
+const GoalModeChip: React.FC<{ onRemove: () => void; compact?: boolean }> = ({
+  onRemove,
+  compact = false,
+}) => (
+  <span
+    className={cn(
+      'inline-flex h-6 items-center gap-1.5 rounded-full px-1.5 text-xs font-medium text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)',
+      compact && 'px-1',
+    )}
+    title={i18nService.t('goalMode')}
+  >
     <Button
       type="button"
       variant="ghost"
@@ -82,10 +89,12 @@ const GoalModeChip: React.FC<{ onRemove: () => void }> = ({ onRemove }) => (
       onClick={onRemove}
       aria-label={i18nService.t('clearGoalMode')}
       title={i18nService.t('clearGoalMode')}
-      className="ml-0.5 size-4 rounded-full hover:bg-(--zy-skill-blue-foreground)/10"
+      className="group/goal relative ml-0.5 size-4 rounded-full p-0 hover:bg-transparent"
     >
-      <X />
+      <Target className="size-3.5 transition-opacity group-hover/goal:opacity-0" />
+      <X className="absolute size-3.5 opacity-0 transition-opacity group-hover/goal:opacity-100" />
     </Button>
+    {!compact && <span className="max-w-24 truncate">{i18nService.t('goalMode')}</span>}
   </span>
 );
 
@@ -150,6 +159,10 @@ const buildInlinedSkillPrompt = (skill: Skill): string => {
 };
 
 const isMacPlatform = navigator.platform.includes('Mac');
+// Only collapse secondary controls when the chat column is genuinely narrow.
+// A split pane around 700px still has room for the full permission/model row.
+const COMPACT_TOOLBAR_MAX_WIDTH = 480;
+const TIGHT_TOOLBAR_MAX_WIDTH = 760;
 
 export interface CoworkPromptInputRef {
   /** 设置输入框值 */
@@ -305,8 +318,11 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const [imageVisionHint, setImageVisionHint] = useState(false);
     const [isPatchingModel, setIsPatchingModel] = useState(false);
     const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+    const [isCompactToolbar, setIsCompactToolbar] = useState(false);
+    const [isTightToolbar, setIsTightToolbar] = useState(false);
 
     const textareaRef = useRef<HTMLDivElement>(null);
+    const promptRootRef = useRef<HTMLDivElement>(null);
     const dragDepthRef = useRef(0);
     const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const modelPatchRequestIdRef = useRef(0);
@@ -491,6 +507,20 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
       modelPatchRequestIdRef.current += 1;
       setIsPatchingModel(false);
     }, [sessionId]);
+
+    useEffect(() => {
+      const element = promptRootRef.current;
+      if (!element || typeof ResizeObserver === 'undefined') return;
+      const updateCompactState = () => {
+        const width = element.clientWidth;
+        setIsCompactToolbar(width <= COMPACT_TOOLBAR_MAX_WIDTH);
+        setIsTightToolbar(width <= TIGHT_TOOLBAR_MAX_WIDTH);
+      };
+      updateCompactState();
+      const observer = new ResizeObserver(updateCompactState);
+      observer.observe(element);
+      return () => observer.disconnect();
+    }, []);
 
     // Sync value from draft when sessionId changes
     useEffect(() => {
@@ -1130,7 +1160,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
     const isPlusToolbar = !remoteManaged;
     const isWorkVariant = showFolderSelector || showPermissionModeSelector;
     return (
-      <div className="relative">
+      <div ref={promptRootRef} className="relative">
         {imageVisionHint && (
           <div className="mb-2 flex items-start gap-1.5 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-2.5 py-1.5 text-xs text-amber-700 dark:text-amber-400">
             <TriangleAlert className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -1187,16 +1217,16 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               className={size === 'large' ? 'max-h-48 overflow-y-auto' : undefined}
             />
           </PromptInputBody>
-          <PromptInputFooter className="flex-wrap">
+          <PromptInputFooter className="flex-nowrap">
             <PromptInputTools
               className={cn(
-                'min-w-0 flex-1 flex-wrap',
+                'min-w-0 flex-1 flex-nowrap overflow-hidden',
                 sessionContextPending && 'pointer-events-none opacity-50',
               )}
               aria-disabled={sessionContextPending}
               inert={sessionContextPending ? true : undefined}
             >
-              {!isPlusToolbar && showModelSelector && (
+              {!isCompactToolbar && !isPlusToolbar && showModelSelector && (
                 <>
                   <ContextUsageIndicator
                     usage={contextUsage}
@@ -1219,7 +1249,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   />
                 </>
               )}
-              {!isPlusToolbar && (
+              {!isCompactToolbar && !isPlusToolbar && (
                 <LocalThinkingToggle
                   model={effectiveSelectedModel}
                   visible={showLocalThinkingToggle}
@@ -1247,7 +1277,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                     onProductionLoopModeChange={setProductionLoopMode}
                     disabled={disabled || isStreaming || isAddingFile}
                   />
-                  {isWorkVariant && (
+                  {!isCompactToolbar && isWorkVariant && (
                     <PermissionModeMenu
                       value={permissionMode ?? CoworkPermissionMode.Ask}
                       onChange={mode => onPermissionModeChange?.(mode)}
@@ -1257,17 +1287,23 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
                   {isWorkVariant && (
                     <ActiveExpertBadge
                       expertId={selectedExpertIds[0]}
+                      expertName={
+                        currentSession?.experts?.find(
+                          expert => expert.expertId === selectedExpertIds[0],
+                        )?.expertName
+                      }
                       onRemove={() => setSelectedExpertIds([])}
+                      compact={isTightToolbar}
                     />
                   )}
                   {isWorkVariant && goalMode && (
-                    <GoalModeChip onRemove={() => setGoalMode(false)} />
+                    <GoalModeChip compact={isTightToolbar} onRemove={() => setGoalMode(false)} />
                   )}
                   <ActiveMcpBadge />
                 </>
               )}
             </PromptInputTools>
-            {isPlusToolbar && (showLocalThinkingToggle || showModelSelector) && (
+            {!isCompactToolbar && isPlusToolbar && (showLocalThinkingToggle || showModelSelector) && (
               <div className="flex items-center gap-1.5">
                 {!isWorkVariant && (
                   <LocalThinkingToggle

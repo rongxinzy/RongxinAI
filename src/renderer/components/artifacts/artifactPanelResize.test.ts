@@ -27,11 +27,10 @@ describe('artifact panel resize', () => {
     expect(clampArtifactPanelWidth(1536, 180, 1720)).toBe(1536);
   });
 
-  test('caps the drag maximum so the conversation column keeps its space', () => {
+  test('caps the drag maximum at half the content width and preserves chat space', () => {
     const contentWidth = 2031;
-    expect(resolveArtifactPanelMaxWidth(contentWidth, 180)).toBe(
-      contentWidth - ARTIFACT_PANEL_CHAT_RESERVE,
-    );
+    expect(resolveArtifactPanelMaxWidth(contentWidth, 180)).toBe(contentWidth * 0.5);
+    expect(resolveArtifactPanelMaxWidth(600, 180)).toBe(600 - ARTIFACT_PANEL_CHAT_RESERVE);
     // Never below the panel minimum, whatever the row width is.
     expect(resolveArtifactPanelMaxWidth(320, 180)).toBe(180);
   });
