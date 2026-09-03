@@ -990,6 +990,7 @@ interface IElectronAPI {
     updatePendingMessage: (input: { laneId: string; itemId: string; text: string }) => Promise<{ success: boolean; error?: string }>;
     deletePendingMessage: (input: { laneId: string; itemId: string }) => Promise<{ success: boolean; error?: string }>;
     steerPendingMessage: (input: { workspaceRoot: string; laneId: string; itemId: string }) => Promise<CodingAgentActionResult>;
+    followUpPendingMessage: (input: { workspaceRoot: string; laneId: string; itemId: string }) => Promise<CodingAgentActionResult>;
     confirmSessionRecovery: (input: {
       workspaceRoot: string;
       laneId: string;
@@ -1093,6 +1094,9 @@ interface IElectronAPI {
     }) => Promise<CodingAgentActionResult>;
     onChanged: (
       callback: (snapshot: import('../../shared/codingAgent').CodingRoomSnapshot) => void,
+    ) => () => void;
+    onPendingMessagesChanged: (
+      callback: (event: import('../../shared/codingAgent').CodingPendingMessagesChangedEvent) => void,
     ) => () => void;
     onAuthTerminalData: (callback: (event: { id: string; data: string }) => void) => () => void;
     onAuthTerminalExit: (

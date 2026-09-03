@@ -173,6 +173,11 @@ export interface CodingRoomSnapshot {
   events: CodingEvent[];
 }
 
+export interface CodingPendingMessagesChangedEvent {
+  laneId: string;
+  items: import('../cowork/pendingMessageQueue').CoworkPendingMessage[];
+}
+
 /** Coding lanes use the same in-process delivery semantics as Work sessions. */
 export const CodingPromptDelivery = CoworkQueueDelivery;
 export type CodingPromptDelivery = CoworkQueueDelivery;

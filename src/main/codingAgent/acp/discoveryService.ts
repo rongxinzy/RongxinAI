@@ -1,4 +1,4 @@
-import { access, readFile, realpath } from 'fs/promises';
+import { access, readdir, readFile, realpath } from 'fs/promises';
 import { homedir } from 'os';
 import path from 'path';
 
@@ -61,6 +61,38 @@ const uniqueDirectories = (directories: string[]): string[] => [
 ];
 const stringArguments = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((arg): arg is string => typeof arg === 'string') : [];
+
+const claudeNativeExecutablePath = (packageRoot: string): string =>
+  path.join(packageRoot, '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+
+/** Resolves npm and pnpm global-package layouts without executing a shell shim. */
+export const resolveClaudeNativeExecutable = async (
+  cliPath: string,
+  platform: NodeJS.Platform,
+): Promise<string> => {
+  if (platform !== 'win32' || !/\.(?:cmd|ps1|bat)$/i.test(cliPath)) return cliPath;
+  const binDirectory = path.dirname(cliPath);
+  const packageRoots = [path.join(binDirectory, 'node_modules')];
+  try {
+    const pnpmGlobalDirectory = path.join(binDirectory, 'global');
+    const entries = await readdir(pnpmGlobalDirectory, { withFileTypes: true });
+    packageRoots.push(
+      ...entries
+        .filter(entry => entry.isDirectory())
+        .map(entry => path.join(pnpmGlobalDirectory, entry.name, 'node_modules')),
+    );
+  } catch {
+    // The launcher is not installed through pnpm's global store.
+  }
+  for (const packageRoot of packageRoots) {
+    try {
+      return await realpath(claudeNativeExecutablePath(packageRoot));
+    } catch {
+      // Try the next known global-package layout.
+    }
+  }
+  return cliPath;
+};
 
 export const discoveryDirectories = (
   platform: NodeJS.Platform,
@@ -153,7 +185,7 @@ export class AcpDiscoveryService {
     if (!cliPath) return null;
     const resolvedCliPath =
       adapter.id === CodingAgentManagedAdapterId.ClaudeCode
-        ? await this.resolveClaudeNativeExecutable(cliPath)
+        ? await resolveClaudeNativeExecutable(cliPath, this.platform)
         : cliPath;
     const packageRoot = path.join(this.adapterRoot, 'node_modules', adapter.packageName);
     const manifest = await this.readPackageManifest(path.join(packageRoot, 'package.json'));
@@ -178,29 +210,6 @@ export class AcpDiscoveryService {
         [adapter.cliPathEnvironmentKey]: resolvedCliPath,
       },
     });
-  }
-
-  /**
-   * Claude's Windows npm launcher is a .cmd/.ps1 shim. The Claude ACP SDK
-   * starts the configured executable with Node's spawn(), where those shims
-   * can fail with EINVAL. Point it at the native binary shipped by the same
-   * npm package instead.
-   */
-  private async resolveClaudeNativeExecutable(cliPath: string): Promise<string> {
-    if (this.platform !== 'win32' || !/\.(?:cmd|ps1|bat)$/i.test(cliPath)) return cliPath;
-    const candidate = path.join(
-      path.dirname(cliPath),
-      'node_modules',
-      '@anthropic-ai',
-      'claude-code',
-      'bin',
-      'claude.exe',
-    );
-    try {
-      return await realpath(candidate);
-    } catch {
-      return cliPath;
-    }
   }
 
   private profile(input: {

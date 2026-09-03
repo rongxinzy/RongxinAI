@@ -157,6 +157,8 @@ export const CodingAgentIpc = {
   UpdatePendingMessage: 'codingAgent:updatePendingMessage',
   DeletePendingMessage: 'codingAgent:deletePendingMessage',
   SteerPendingMessage: 'codingAgent:steerPendingMessage',
+  FollowUpPendingMessage: 'codingAgent:followUpPendingMessage',
+  PendingMessagesChanged: 'codingAgent:pendingMessagesChanged',
   ConfirmSessionRecovery: 'codingAgent:confirmSessionRecovery',
   Cancel: 'codingAgent:cancel',
   PreviewHandoff: 'codingAgent:previewHandoff',

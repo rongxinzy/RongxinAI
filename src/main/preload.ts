@@ -643,6 +643,8 @@ contextBridge.exposeInMainWorld('electron', {
       ipcRenderer.invoke(CodingAgentIpc.DeletePendingMessage, input),
     steerPendingMessage: (input: { workspaceRoot: string; laneId: string; itemId: string }) =>
       ipcRenderer.invoke(CodingAgentIpc.SteerPendingMessage, input),
+    followUpPendingMessage: (input: { workspaceRoot: string; laneId: string; itemId: string }) =>
+      ipcRenderer.invoke(CodingAgentIpc.FollowUpPendingMessage, input),
     confirmSessionRecovery: (input: {
       workspaceRoot: string;
       laneId: string;
@@ -716,6 +718,9 @@ contextBridge.exposeInMainWorld('electron', {
     }) => ipcRenderer.invoke(CodingAgentIpc.RespondPermission, input),
     onChanged: (callback: (snapshot: import('../shared/codingAgent').CodingRoomSnapshot) => void) =>
       onPush(CodingAgentIpc.Changed, callback),
+    onPendingMessagesChanged: (
+      callback: (event: import('../shared/codingAgent').CodingPendingMessagesChangedEvent) => void,
+    ) => onPush(CodingAgentIpc.PendingMessagesChanged, callback),
     onAuthTerminalData: (callback: (event: { id: string; data: string }) => void) =>
       onPush(CodingAgentIpc.AuthTerminalData, callback),
     onAuthTerminalExit: (

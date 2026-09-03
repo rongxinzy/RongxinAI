@@ -10,6 +10,7 @@ import {
   type CodingLaneViewStateInput,
   type CodingLaneConfigOptionInput,
   type CodingPermissionResponse,
+  type CodingPendingMessagesChangedEvent,
   type CreateCodingCollaborationPresetInput,
   type CodingPromptInput,
   type CreateCodingSessionInput,
@@ -26,6 +27,11 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
   service.on('changed', snapshot => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.Changed, snapshot);
+    }
+  });
+  service.on('pendingMessagesChanged', (event: CodingPendingMessagesChangedEvent) => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) window.webContents.send(CodingAgentIpc.PendingMessagesChanged, event);
     }
   });
   service.on('authTerminalData', event => {
@@ -171,6 +177,23 @@ export function registerCodingAgentIpcHandlers(getService: () => CodingRoomServi
         return {
           success: true,
           snapshot: await service.steerPendingMessage(input.workspaceRoot, input.laneId, input.itemId),
+        };
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    },
+  );
+  ipcMain.handle(
+    CodingAgentIpc.FollowUpPendingMessage,
+    async (_event, input: { workspaceRoot: string; laneId: string; itemId: string }) => {
+      try {
+        return {
+          success: true,
+          snapshot: await service.followUpPendingMessage(
+            input.workspaceRoot,
+            input.laneId,
+            input.itemId,
+          ),
         };
       } catch (error) {
         return { success: false, error: error instanceof Error ? error.message : String(error) };
