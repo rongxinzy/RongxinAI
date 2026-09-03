@@ -151,6 +151,7 @@ export const SidebarNavigationControls = ({
         <Button
           type="button"
           variant="ghost"
+          data-testid="sidebar-new-conversation"
           onClick={handleNewConversation}
           onMouseEnter={() => startIconAnimation(newConversationIconRef)}
           onMouseLeave={() => newConversationIconRef.current?.stopAnimation()}
@@ -230,6 +231,7 @@ export const SidebarNavigationControls = ({
         <Button
           type="button"
           variant="ghost"
+          data-testid="sidebar-view-activity"
           onClick={onShowActivity}
           onMouseEnter={() => {
             startIconAnimation(activityIconRef);

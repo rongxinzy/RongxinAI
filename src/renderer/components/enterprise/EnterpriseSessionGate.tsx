@@ -32,43 +32,42 @@ export function EnterpriseSessionGate({ children }: EnterpriseSessionGateProps) 
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      window.electron.enterprise.renderer.sessionGateEntrypoint(),
-      window.electron.enterprise.session.snapshot(),
-    ])
-      .then(([entrypoint, session]) => {
-        if (!active) return;
-        if (!entrypoint) {
-          setState(EnterpriseSessionGateState.Passed);
-          return;
-        }
-        setGateContext({ entrypoint, session });
-        setState(
-          canEnterApplication(session)
-            ? EnterpriseSessionGateState.Passed
-            : EnterpriseSessionGateState.Open,
-        );
-      })
-      .catch(() => {
-        if (active) setState(EnterpriseSessionGateState.Passed);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    let entrypoint: string | null = null;
+    let latestSession: EnterpriseSessionResult | null = null;
+    const applySession = (session: EnterpriseSessionResult) => {
+      latestSession = session;
+      if (!active || !entrypoint) return;
 
-  useEffect(() => {
-    const entrypoint = gateContext?.entrypoint;
-    if (!entrypoint) return;
-    return subscribeToEnterpriseSession(session => {
       setGateContext({ entrypoint, session });
       setState(
         canEnterApplication(session)
           ? EnterpriseSessionGateState.Passed
           : EnterpriseSessionGateState.Open,
       );
-    });
-  }, [gateContext?.entrypoint]);
+    };
+    const unsubscribe = subscribeToEnterpriseSession(applySession);
+
+    void Promise.all([
+      window.electron.enterprise.renderer.sessionGateEntrypoint(),
+      window.electron.enterprise.session.snapshot(),
+    ])
+      .then(([resolvedEntrypoint, session]) => {
+        if (!active) return;
+        if (!resolvedEntrypoint) {
+          setState(EnterpriseSessionGateState.Passed);
+          return;
+        }
+        entrypoint = resolvedEntrypoint;
+        applySession(latestSession ?? session);
+      })
+      .catch(() => {
+        if (active) setState(EnterpriseSessionGateState.Passed);
+      });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
   if (state === EnterpriseSessionGateState.Passed) return children;
 
