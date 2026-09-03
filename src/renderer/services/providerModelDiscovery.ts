@@ -32,7 +32,10 @@ function applyDiscoveredMetadata(
   let changed = false;
   const next: ProviderModel = { ...current };
 
-  if (next.contextWindow === undefined && discovered.contextWindow !== undefined) {
+  if (
+    discovered.contextWindow !== undefined &&
+    next.contextWindow !== discovered.contextWindow
+  ) {
     next.contextWindow = discovered.contextWindow;
     changed = true;
   }

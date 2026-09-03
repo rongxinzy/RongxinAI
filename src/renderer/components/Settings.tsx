@@ -1,5 +1,4 @@
 import { Button } from '@shared/components/ui/button';
-import { Checkbox } from '@shared/components/ui/checkbox';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Input } from '@shared/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@shared/components/ui/radio-group';
@@ -11,7 +10,6 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { Switch } from '@shared/components/ui/switch';
-import { Tabs, TabsContent } from '@shared/components/ui/tabs';
 import { Textarea } from '@shared/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@shared/components/ui/tooltip';
 import { cn } from '@shared/lib/utils';
@@ -43,7 +41,6 @@ import {
   ProviderName,
   ProviderRegistry,
 } from '../../shared/providers';
-import type { LlamaCppModelPreference } from '../../shared/llamacpp';
 import { type AppUpdateRuntimeState, AppUpdateStatus } from '../../shared/appUpdate/constants';
 import {
   type AppConfig,
@@ -55,8 +52,6 @@ import {
 import { SettingsToggleRow } from './common/SettingsToggleRow';
 import {
   MODEL_CAPABILITY_FIELDS,
-  ModelCapabilitiesFields,
-  type ModelCapabilityKey,
 } from './settings/ModelCapabilitiesFields';
 import { ProviderModelDiscoveryButton } from './settings/ProviderModelDiscoveryButton';
 import {
@@ -130,7 +125,14 @@ import IMSettings from './im/IMSettings';
 import { EmailSettingsPage } from './settings/email/EmailSettingsPage';
 import { ManagedMemorySettings } from './settings/memory/ManagedMemorySettings';
 import { GeneralLanguageField } from './settings/general/GeneralLanguageField';
-import { ModelCapabilitySettingsModal } from './localInference/components/ModelCapabilitySettingsModal';
+import {
+  ProviderModelEditorDialog,
+  type ProviderModelEditorDraft,
+} from './settings/ProviderModelEditorDialog';
+import {
+  resolveDiscoveredModelContext,
+  resolveOllamaRunningModelContext,
+} from './settings/ollamaRuntimeMetadata';
 import { localInferenceCompactButtonClass } from './localInference/constants';
 import type { EmailSettingsHandle } from './settings/email/types';
 import type { EnterpriseRendererSettingsPage } from '../../shared/enterpriseRenderer';
@@ -227,15 +229,6 @@ const DEFAULT_CUSTOM_MODEL_CAPABILITIES: Partial<ModelCapabilities> = {
   documentInput: ModelCapabilityStatus.Unknown,
   reasoning: ModelCapabilityStatus.Unknown,
 };
-
-const CUSTOM_MODEL_CAPABILITY_KEYS: readonly ModelCapabilityKey[] = [
-  'toolCalling',
-  'imageInput',
-  'videoInput',
-  'audioInput',
-  'documentInput',
-  'reasoning',
-];
 
 const TOKENS_PER_K = 1024;
 const LOCAL_MODEL_REFRESH_MIN_LOADING_DURATION_MS = 1_000;
@@ -853,11 +846,6 @@ const Settings: React.FC<SettingsProps> = ({
     ProviderModelPiRuntimeConfig | undefined
   >(undefined);
   const [modelFormError, setModelFormError] = useState<string | null>(null);
-  const [modelDialogTab, setModelDialogTab] = useState<'basic' | 'capabilities'>('basic');
-  const [llamaCapabilityModel, setLlamaCapabilityModel] = useState<Model | null>(null);
-  const [llamaCapabilityPreference, setLlamaCapabilityPreference] =
-    useState<LlamaCppModelPreference>();
-  const [ollamaCapabilityModel, setOllamaCapabilityModel] = useState<Model | null>(null);
 
   // About tab
   const [appVersion, setAppVersion] = useState('');
@@ -2236,23 +2224,7 @@ const Settings: React.FC<SettingsProps> = ({
     setPendingDeleteModel(null);
   };
 
-  const handleSaveLlamaCapability = async (
-    model: Model,
-    toolCalling: ModelCapabilityStatus,
-  ): Promise<void> => {
-    const preferences = await window.electron.llamacpp.getModelPreferences();
-    await window.electron.llamacpp.setModelPreference({
-      modelName: model.id,
-      preference: {
-        ...preferences[model.id],
-        capabilities: { toolCalling },
-      },
-    });
-    window.dispatchEvent(new CustomEvent(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT));
-    setLlamaCapabilityModel(null);
-  };
-
-  const handleSaveNewModel = () => {
+  const handleSaveNewModel = async (): Promise<void> => {
     const modelId = newModelId.trim();
 
     if (activeProvider === 'ollama') {
@@ -2287,6 +2259,20 @@ const Settings: React.FC<SettingsProps> = ({
       return;
     }
 
+    if (activeProvider === ProviderName.LlamaCpp) {
+      await window.electron.llamacpp.setModelPreference({
+        modelName: modelId,
+        preference: {
+          ...(contextWindow ? { ctxSize: contextWindow } : {}),
+          ...(maxTokens ? { maxTokens } : {}),
+          capabilities: newModelCapabilities,
+        },
+      });
+      window.dispatchEvent(new CustomEvent(LLAMACPP_RUNNING_MODELS_CHANGED_EVENT));
+      handleCancelModelEdit();
+      return;
+    }
+
     const currentModels = providers[activeProvider].models ?? [];
     const duplicateModel = currentModels.find(
       model => model.id === modelId && (!isEditingModel || model.id !== editingModelId),
@@ -2306,7 +2292,9 @@ const Settings: React.FC<SettingsProps> = ({
       ),
       ...(contextWindow ? { contextWindow } : {}),
       ...(maxTokens ? { maxTokens } : {}),
-      ...(isCustomProvider(activeProvider) ? { capabilities: newModelCapabilities } : {}),
+      ...(isCustomProvider(activeProvider) || activeProvider === ProviderName.Ollama
+        ? { capabilities: newModelCapabilities }
+        : {}),
       ...(isCustomProvider(activeProvider) && newModelPiRuntime
         ? { piRuntime: newModelPiRuntime }
         : {}),
@@ -2347,18 +2335,6 @@ const Settings: React.FC<SettingsProps> = ({
     setNewModelCapabilities(DEFAULT_CUSTOM_MODEL_CAPABILITIES);
     setNewModelPiRuntime(undefined);
     setModelFormError(null);
-  };
-
-  const handleModelDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      handleCancelModelEdit();
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSaveNewModel();
-    }
   };
 
   const showConnectionTestNotification = (
@@ -3537,7 +3513,7 @@ const Settings: React.FC<SettingsProps> = ({
                       <div className="flex items-center justify-between mb-1">
                         <label
                           htmlFor="minimax-apiKey"
-                          className="block text-xs font-medium text-foreground"
+                          className="block text-sm font-medium text-foreground"
                         >
                           {i18nService.t('apiKey')}
                           <span className="text-destructive ml-0.5">*</span>
@@ -3566,7 +3542,7 @@ const Settings: React.FC<SettingsProps> = ({
                           onChange={e =>
                             handleProviderConfigChange('minimax', 'apiKey', e.target.value)
                           }
-                          className="pr-20 text-xs"
+                          className="pr-20 text-sm"
                           placeholder={i18nService.t('apiKeyPlaceholder')}
                         />
                         <div className="absolute right-2 inset-y-0 flex items-center gap-1">
@@ -3651,7 +3627,7 @@ const Settings: React.FC<SettingsProps> = ({
                       {minimaxOAuthPhase.kind === 'idle' && !providers.minimax.oauthAccessToken && (
                         <div className="space-y-2">
                           <div>
-                            <label className="block text-xs font-medium text-foreground mb-1">
+                            <label className="block text-sm font-medium text-foreground mb-1">
                               {i18nService.t('minimaxOAuthRegionLabel')}
                             </label>
                             <FluidTabs<MiniMaxRegion>
@@ -3667,7 +3643,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <Button
                             type="button"
                             onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                            className="w-full py-2 text-xs h-auto"
+                            className="w-full py-2 text-sm h-auto"
                           >
                             {i18nService.t('minimaxOAuthLogin')}
                           </Button>
@@ -4803,18 +4779,11 @@ const Settings: React.FC<SettingsProps> = ({
                                 </div>
                               ) : null}
                               {isCustomProvider(activeProvider) &&
-                                (model.contextWindow ||
-                                  model.maxTokens ||
+                                (model.maxTokens ||
                                   Object.values(model.capabilities ?? {}).some(
                                     status => status === ModelCapabilityStatus.Supported,
                                   )) && (
                                   <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                    {model.contextWindow && (
-                                      <span>
-                                        {i18nService.t('modelContextWindowShort')}:{' '}
-                                        {formatDetectedTokenLimit(model.contextWindow)}
-                                      </span>
-                                    )}
                                     {model.maxTokens && (
                                       <span>
                                         {i18nService.t('modelMaxOutputTokensShort')}:{' '}
@@ -4851,26 +4820,62 @@ const Settings: React.FC<SettingsProps> = ({
                                   variant="ghost"
                                   size="icon-xs"
                                   onClick={() => {
-                                    if (activeProvider === ProviderName.Ollama) {
-                                      setOllamaCapabilityModel(model);
+                                    const openEditor = (runtimeContextWindow?: number) =>
+                                      handleEditModel(
+                                        model.id,
+                                        model.name,
+                                        model.supportsImage,
+                                        model.capabilities,
+                                        model.piRuntime,
+                                        runtimeContextWindow ?? model.contextWindow,
+                                        model.maxTokens,
+                                      );
+                                    if (activeProvider !== ProviderName.Ollama) {
+                                      openEditor();
                                       return;
                                     }
-                                    handleEditModel(
-                                      model.id,
-                                      model.name,
-                                      model.supportsImage,
-                                      model.capabilities,
-                                      model.piRuntime,
-                                      model.contextWindow,
-                                      model.maxTokens,
+                                    const providerConfig = providers[activeProvider];
+                                    const apiFormat = getEffectiveApiFormat(
+                                      activeProvider,
+                                      providerConfig.apiFormat,
                                     );
+                                    const openWithLocalRuntimeFallback = () => {
+                                      void window.electron.ollama
+                                        .listRunningModels()
+                                        .then(runningModels =>
+                                          openEditor(
+                                            resolveOllamaRunningModelContext(
+                                              model.id,
+                                              runningModels,
+                                            ),
+                                          ),
+                                        )
+                                        .catch(() => openEditor());
+                                    };
+                                    void window.electron.api
+                                      .fetchModels({
+                                        baseUrl: resolveBaseUrl(
+                                          activeProvider,
+                                          providerConfig.baseUrl,
+                                          apiFormat,
+                                        ),
+                                        apiKey: providerConfig.apiKey,
+                                        apiFormat,
+                                      })
+                                      .then(result => {
+                                        const contextWindow = result.success
+                                          ? resolveDiscoveredModelContext(model.id, result.models)
+                                          : undefined;
+                                        if (contextWindow !== undefined) {
+                                          openEditor(contextWindow);
+                                          return;
+                                        }
+                                        openWithLocalRuntimeFallback();
+                                      })
+                                      .catch(openWithLocalRuntimeFallback);
                                   }}
-                                  aria-label={`${i18nService.t(activeProvider === ProviderName.Ollama ? 'modelCapabilities' : 'editModel')} ${model.name}`}
-                                  title={i18nService.t(
-                                    activeProvider === ProviderName.Ollama
-                                      ? 'modelCapabilities'
-                                      : 'editModel',
-                                  )}
+                                  aria-label={`${i18nService.t('editModel')} ${model.name}`}
+                                  title={i18nService.t('editModel')}
                                   className="size-5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground [&_svg]:size-3.5"
                                 >
                                   <Pencil />
@@ -4894,15 +4899,21 @@ const Settings: React.FC<SettingsProps> = ({
                                 variant="ghost"
                                 size="icon-xs"
                                 onClick={() => {
-                                  void window.electron.llamacpp
-                                    .getModelPreferences()
-                                    .then(preferences => {
-                                      setLlamaCapabilityPreference(preferences[model.id]);
-                                      setLlamaCapabilityModel(model);
-                                    });
+                                  void window.electron.llamacpp.getModelPreferences().then(preferences => {
+                                    const preference = preferences[model.id];
+                                    handleEditModel(
+                                      model.id,
+                                      model.name,
+                                      model.supportsImage,
+                                      { ...model.capabilities, ...preference?.capabilities },
+                                      undefined,
+                                      preference?.ctxSize ?? model.contextWindow,
+                                      preference?.maxTokens ?? model.maxTokens,
+                                    );
+                                  });
                                 }}
-                                aria-label={`${i18nService.t('modelCapabilities')} ${model.name}`}
-                                title={i18nService.t('modelCapabilities')}
+                                aria-label={`${i18nService.t('editModel')} ${model.name}`}
+                                title={i18nService.t('editModel')}
                                 className="size-5 text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
                               >
                                 <Pencil />
@@ -5534,222 +5545,32 @@ const Settings: React.FC<SettingsProps> = ({
           onConfirm={confirmDeleteModel}
         />
 
-        {(isAddingModel || isEditingModel) && (
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/35 px-4 rounded-2xl">
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-label={
-                isEditingModel ? i18nService.t('editModel') : i18nService.t('addNewModel')
-              }
-              onClick={e => e.stopPropagation()}
-              onKeyDown={handleModelDialogKeyDown}
-              className="w-full max-w-md rounded-2xl bg-background border-border border shadow-modal p-4"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-semibold text-foreground">
-                  {isEditingModel ? i18nService.t('editModel') : i18nService.t('addNewModel')}
-                </h4>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleCancelModelEdit}
-                  className="p-1 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-raised"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {modelFormError && <p className="mb-3 text-xs text-destructive">{modelFormError}</p>}
-
-              <Tabs
-                value={modelDialogTab}
-                onValueChange={value => setModelDialogTab(value as 'basic' | 'capabilities')}
-                className="gap-4"
-                >
-                  {isCustomProvider(activeProvider) && (
-                  <FluidTabs
-                    aria-label={i18nService.t(isEditingModel ? 'editModel' : 'addNewModel')}
-                    items={[
-                      { value: 'basic', label: i18nService.t('modelName') },
-                      { value: 'capabilities', label: i18nService.t('modelCapabilities') },
-                    ]}
-                    value={modelDialogTab}
-                    onValueChange={setModelDialogTab}
-                  />
-                )}
-                <TabsContent value="basic" className="mt-0">
-                  <div className="space-y-3">
-                    {activeProvider === 'ollama' ? (
-                      <>
-                        <div>
-                          <label className="block text-xs font-medium text-muted-foreground mb-1">
-                            {i18nService.t('ollamaModelName')}
-                            <span className="text-destructive ml-0.5">*</span>
-                          </label>
-                          <Input
-                            autoFocus
-                            type="text"
-                            value={newModelId}
-                            onChange={e => {
-                              setNewModelId(e.target.value);
-                              if (!newModelName || newModelName === newModelId) {
-                                setNewModelName(e.target.value);
-                              }
-                              if (modelFormError) {
-                                setModelFormError(null);
-                              }
-                            }}
-                            className="text-xs"
-                            placeholder={i18nService.t('ollamaModelNamePlaceholder')}
-                          />
-                          <p className="mt-1 text-[11px] text-muted">
-                            {i18nService.t('ollamaModelNameHint')}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-muted-foreground mb-1">
-                            {i18nService.t('ollamaDisplayName')}
-                          </label>
-                          <Input
-                            type="text"
-                            value={newModelName === newModelId ? '' : newModelName}
-                            onChange={e => {
-                              setNewModelName(e.target.value || newModelId);
-                              if (modelFormError) {
-                                setModelFormError(null);
-                              }
-                            }}
-                            className="text-xs"
-                            placeholder={i18nService.t('ollamaDisplayNamePlaceholder')}
-                          />
-                          <p className="mt-1 text-[11px] text-muted">
-                            {i18nService.t('ollamaDisplayNameHint')}
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div>
-                          <label className="block text-xs font-medium text-muted-foreground mb-1">
-                            {i18nService.t('modelName')}
-                            <span className="text-destructive ml-0.5">*</span>
-                          </label>
-                          <Input
-                            autoFocus
-                            type="text"
-                            value={newModelName}
-                            onChange={e => {
-                              setNewModelName(e.target.value);
-                              if (modelFormError) {
-                                setModelFormError(null);
-                              }
-                            }}
-                            className="text-xs"
-                            placeholder="GPT-4"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-muted-foreground mb-1">
-                            {i18nService.t('modelId')}
-                            <span className="text-destructive ml-0.5">*</span>
-                          </label>
-                          <Input
-                            type="text"
-                            value={newModelId}
-                            onChange={e => {
-                              setNewModelId(e.target.value);
-                              if (modelFormError) {
-                                setModelFormError(null);
-                              }
-                            }}
-                            className="text-xs"
-                            placeholder="gpt-4"
-                          />
-                        </div>
-                      </>
-                    )}
-                    {!isCustomProvider(activeProvider) && (
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${activeProvider}-supportsImage`}
-                          checked={
-                            newModelCapabilities.imageInput === ModelCapabilityStatus.Supported
-                          }
-                          onCheckedChange={checked =>
-                            setNewModelCapabilities(current => ({
-                              ...current,
-                              imageInput:
-                                checked === true
-                                  ? ModelCapabilityStatus.Supported
-                                  : ModelCapabilityStatus.Unsupported,
-                            }))
-                          }
-                        />
-                        <label
-                          htmlFor={`${activeProvider}-supportsImage`}
-                          className="text-xs text-muted-foreground"
-                        >
-                          {i18nService.t('supportsImageInput')}
-                        </label>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-                {isCustomProvider(activeProvider) && (
-                  <>
-                    <TabsContent value="capabilities" className="mt-0">
-                      <ModelCapabilitiesFields
-                        capabilities={newModelCapabilities}
-                        contextWindow={newModelContextWindow}
-                        maxTokens={newModelMaxTokens}
-                        visibleCapabilities={CUSTOM_MODEL_CAPABILITY_KEYS}
-                        onContextWindowChange={setNewModelContextWindow}
-                        onMaxTokensChange={setNewModelMaxTokens}
-                        onCapabilityChange={(key, value) =>
-                          setNewModelCapabilities(current => ({ ...current, [key]: value }))
-                        }
-                      />
-                    </TabsContent>
-                  </>
-                )}
-              </Tabs>
-
-              <div className="flex justify-end space-x-2 mt-4">
-                <Button type="button" variant="outline" size="sm" onClick={handleCancelModelEdit}>
-                  {i18nService.t('cancel')}
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleSaveNewModel}>
-                  {i18nService.t('save')}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <ModelCapabilitySettingsModal
-          isOpen={Boolean(llamaCapabilityModel)}
-          model={llamaCapabilityModel}
-          provider={ProviderName.LlamaCpp}
-          preference={llamaCapabilityPreference}
-          onClose={() => {
-            setLlamaCapabilityModel(null);
-            setLlamaCapabilityPreference(undefined);
+        <ProviderModelEditorDialog
+          isOpen={isAddingModel || isEditingModel}
+          isEditing={isEditingModel}
+          providerName={activeProvider}
+          draft={{
+            id: newModelId,
+            name: newModelName,
+            contextWindow: newModelContextWindow,
+            maxTokens: newModelMaxTokens,
+            capabilities: newModelCapabilities,
+            piRuntime: newModelPiRuntime,
+          } satisfies ProviderModelEditorDraft}
+          error={modelFormError}
+          onDraftChange={patch => {
+            if (patch.id !== undefined) setNewModelId(patch.id);
+            if (patch.name !== undefined) setNewModelName(patch.name);
+            if (patch.contextWindow !== undefined) setNewModelContextWindow(patch.contextWindow);
+            if (patch.maxTokens !== undefined) setNewModelMaxTokens(patch.maxTokens);
+            if (patch.capabilities !== undefined) setNewModelCapabilities(patch.capabilities);
+            if ('piRuntime' in patch) setNewModelPiRuntime(patch.piRuntime);
+            if (modelFormError) setModelFormError(null);
           }}
-          onSave={toolCalling => {
-            if (llamaCapabilityModel) {
-              void handleSaveLlamaCapability(llamaCapabilityModel, toolCalling);
-            }
-          }}
+          onClose={handleCancelModelEdit}
+          onSave={handleSaveNewModel}
         />
 
-        <ModelCapabilitySettingsModal
-          isOpen={Boolean(ollamaCapabilityModel)}
-          model={ollamaCapabilityModel}
-          provider={ProviderName.Ollama}
-          onClose={() => setOllamaCapabilityModel(null)}
-        />
       </div>
     </Modal>
   );

@@ -88,6 +88,14 @@ const LLAMACPP_UNLOAD_CONFIRM_POLL_INTERVAL_MS = 400;
 const LLAMACPP_UNLOAD_CONFIRM_STABLE_MISSING_POLLS = 2;
 const LLAMACPP_STARTUP_BINDING_SYNC_ATTEMPTS = 30;
 const LLAMACPP_STARTUP_BINDING_SYNC_INTERVAL_MS = 1_000;
+const LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS = [
+  'toolCalling',
+  'imageInput',
+  'videoInput',
+  'audioInput',
+  'documentInput',
+  'reasoning',
+] as const satisfies ReadonlyArray<keyof ModelCapabilities>;
 
 const LlamaCppServiceStatus = {
   Running: 'running',
@@ -298,7 +306,8 @@ export function registerLlamaCppIpcHandlers(
           } catch {
             // Runtime metadata is optional; context and loaded state remain usable.
           }
-          const preferenceCapabilities = modelPreferences[model.id]?.capabilities;
+          const preference = modelPreferences[model.id];
+          const preferenceCapabilities = preference?.capabilities;
           const capabilities = {
             ...detectedCapabilities,
             ...(runningModel.supportsThinkingToggle === true
@@ -306,7 +315,12 @@ export function registerLlamaCppIpcHandlers(
               : {}),
             ...(preferenceCapabilities ?? {}),
           };
-          return Object.keys(capabilities).length ? { ...model, capabilities } : model;
+          return {
+            ...model,
+            ...(preference?.ctxSize ? { contextWindow: preference.ctxSize } : {}),
+            ...(preference?.maxTokens ? { maxTokens: preference.maxTokens } : {}),
+            ...(Object.keys(capabilities).length ? { capabilities } : {}),
+          };
         }),
       )
     ).filter((model): model is NonNullable<typeof model> => Boolean(model));
@@ -1059,12 +1073,18 @@ function sanitizeUpdatedModelPreferences(
   };
 }
 
-function sanitizeLlamaCppModelPreference(preference: unknown): LlamaCppModelPreference | null {
+export function sanitizeLlamaCppModelPreference(
+  preference: unknown,
+): LlamaCppModelPreference | null {
   if (!preference || typeof preference !== 'object') {
     return null;
   }
 
-  const candidate = preference as { ctxSize?: unknown; capabilities?: { toolCalling?: unknown } };
+  const candidate = preference as {
+    ctxSize?: unknown;
+    maxTokens?: unknown;
+    capabilities?: Record<string, unknown>;
+  };
   const parsedCtxSize =
     typeof candidate.ctxSize === 'number'
       ? candidate.ctxSize
@@ -1081,16 +1101,35 @@ function sanitizeLlamaCppModelPreference(preference: unknown): LlamaCppModelPref
     parsedCtxSize <= ctxSizeRange.max
       ? parsedCtxSize
       : undefined;
-  const toolCalling = candidate.capabilities?.toolCalling;
-  const capabilities =
-    toolCalling === ModelCapabilityStatus.Supported ||
-    toolCalling === ModelCapabilityStatus.Unsupported ||
-    toolCalling === ModelCapabilityStatus.Unknown
-      ? { toolCalling }
+  const parsedMaxTokens =
+    typeof candidate.maxTokens === 'number'
+      ? candidate.maxTokens
+      : typeof candidate.maxTokens === 'string'
+        ? Number.parseInt(candidate.maxTokens, 10)
+        : undefined;
+  const maxTokens =
+    typeof parsedMaxTokens === 'number' &&
+    Number.isSafeInteger(parsedMaxTokens) &&
+    parsedMaxTokens > 0
+      ? parsedMaxTokens
       : undefined;
+  const capabilities = Object.fromEntries(
+    LLAMACPP_MODEL_PREFERENCE_CAPABILITY_KEYS.flatMap(key => {
+      const status = candidate.capabilities?.[key];
+      return status === ModelCapabilityStatus.Supported ||
+        status === ModelCapabilityStatus.Unsupported ||
+        status === ModelCapabilityStatus.Unknown
+        ? [[key, status]]
+        : [];
+    }),
+  ) as Partial<ModelCapabilities>;
 
-  return ctxSize || capabilities
-    ? { ...(ctxSize ? { ctxSize } : {}), ...(capabilities ? { capabilities } : {}) }
+  return ctxSize || maxTokens || Object.keys(capabilities).length > 0
+    ? {
+        ...(ctxSize ? { ctxSize } : {}),
+        ...(maxTokens ? { maxTokens } : {}),
+        ...(Object.keys(capabilities).length > 0 ? { capabilities } : {}),
+      }
     : null;
 }
 
