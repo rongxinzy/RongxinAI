@@ -152,6 +152,9 @@ describe('NSIS offline resource and local inference flow', () => {
     expect(installerScript).toContain('LocalInferencePageLeave');
     expect(installerScript).toContain('Page custom LocalInferencePageCreate LocalInferencePageLeave');
     expect(installerScript).toContain('!ifndef BUILD_UNINSTALLER');
+    expect(installerScript.indexOf('!ifndef BUILD_UNINSTALLER')).toBeLessThan(
+      installerScript.indexOf('Var /GLOBAL installLocalInference'),
+    );
     expect(installerScript).not.toContain('MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2');
     expect(installerScript).not.toContain('install-llamacpp-backend-nsis.cjs');
     expect(installerScript).not.toContain('llamacpp-backends\\manifest.json');
