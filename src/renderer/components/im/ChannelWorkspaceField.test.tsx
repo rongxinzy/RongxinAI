@@ -4,63 +4,31 @@ import { render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
-
 import type { Workspace } from '@shared/workspace';
-
 import { ChannelWorkspaceField } from './ChannelWorkspaceField';
 
 const workspaces: Workspace[] = [
-  {
-    id: 'ws-main',
-    name: '主工作区',
-    path: 'C:/main',
-    isHidden: false,
-    pinned: false,
-    createdAt: 1,
-    updatedAt: 1,
-  },
-  {
-    id: 'ws-sandbox',
-    name: '沙盒',
-    path: 'C:/sandbox',
-    isHidden: true,
-    pinned: false,
-    createdAt: 1,
-    updatedAt: 1,
-  },
-  {
-    id: 'ws-proj',
-    name: '项目 A',
-    path: 'C:/proj',
-    isHidden: false,
-    pinned: false,
-    createdAt: 1,
-    updatedAt: 1,
-  },
+  { id: 'ws-main', name: '主工作区', path: 'C:/main', isHidden: false, pinned: false, createdAt: 1, updatedAt: 1 },
+  { id: 'ws-sandbox', name: '沙盒', path: 'C:/sandbox', isHidden: true, pinned: false, createdAt: 1, updatedAt: 1 },
+  { id: 'ws-proj', name: '项目 A', path: 'C:/proj', isHidden: false, pinned: false, createdAt: 1, updatedAt: 1 },
 ];
 
 function renderField(workspaceId: string, onChange = vi.fn()) {
   render(
-    <ChannelWorkspaceField
-      accountId="acc-1"
-      workspaceId={workspaceId}
-      workspaces={workspaces}
-      onChange={onChange}
-    />,
+    <ChannelWorkspaceField accountId="acc-1" workspaceId={workspaceId} workspaces={workspaces} onChange={onChange} />,
   );
   return onChange;
 }
 
 describe('ChannelWorkspaceField', () => {
-  test('shows the workspace name for a preconfigured selection instead of the id', () => {
+  test('shows folder name instead of workspace id', () => {
     renderField('ws-proj');
     expect(screen.getByRole('combobox')).toHaveTextContent('项目 A');
     expect(screen.getByRole('combobox')).not.toHaveTextContent('ws-proj');
   });
 
-  test('shows the name of the workspace picked from the popup', async () => {
+  test('shows picked folder name', async () => {
     const user = userEvent.setup();
-    // Mirror the real flow: the parent (redux) updates the controlled value.
     function ControlledField() {
       const [currentId, setCurrentId] = React.useState('ws-main');
       return (
