@@ -138,7 +138,7 @@ export function ModelCapabilitySettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-md rounded-2xl border border-border bg-background p-4 shadow-modal"
+      className="w-full max-w-md rounded-xl border border-border bg-surface p-4 shadow-modal"
     >
       <div>
         <div className="mb-3 flex items-center justify-between">

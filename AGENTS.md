@@ -425,6 +425,16 @@ When using Claude Code with this repository, it reads `CLAUDE.md` (which points 
 
 These global skills complement, not replace, the conventions in this file.
 
+### Frontend design skill routing
+
+- `design-taste-frontend` - brief inference, anti-slop review, and redesign guidance for landing pages, marketing pages, portfolios, and brand surfaces.
+- `high-end-visual-design` - optional reference for premium visual direction and motion choreography when the brief explicitly calls for it.
+- `frontend-ui-change-strategy` is the project-specific entry point for existing ZhiYuan Agent UI changes.
+- For Work, Chat, Settings, MCP, Skills, local inference, and other product surfaces, use `DESIGN.md`, the shared UI components, and `rongxinai-ui-adapter` as the source of truth. Do not apply marketing-page defaults from the taste skills wholesale.
+- For landing, marketing, portfolio, brand, or redesign work, read `design-taste-frontend` for brief inference and audit guidance.
+- Read `high-end-visual-design` only when premium visual treatment or complex motion is an explicit requirement, and adapt its ideas to the project's tokens, components, accessibility, and performance rules.
+- Conflict precedence is: `AGENTS.md` / `DESIGN.md` > project UI skills (`frontend-ui-change-strategy`, `rongxinai-ui-adapter`) > `design-taste-frontend` > `high-end-visual-design`.
+
 > **主题 token 架构（已更新，旧的 hex/HSL 不兼容问题不复存在）**
 >
 > 颜色现在是双真源：`src/renderer/theme/css/shadcn-token-bridge.css` 的 `:root`/`.dark` **直写 oklch**（shadcn 语义层），`themes.css` 的 `--zy-*` 为兼容层。`bg-primary`、`bg-card`、`text-muted-foreground` 等 shadcn 语义 utility 可直接使用，不会再出现 `hsl(#hex)` 失效问题。以 DESIGN.md「色彩 → 事实来源」为准；新建组件优先使用 shadcn 语义 utility，减少新增 `--zy-*` 依赖。
