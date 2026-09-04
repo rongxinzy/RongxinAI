@@ -7,6 +7,7 @@ import {
 } from '@shared/components/ui/dialog';
 import { type VariantProps } from 'class-variance-authority';
 import { cn } from '@shared/lib/utils';
+import { AlertTriangle } from 'lucide-react';
 
 type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>['variant']>;
 
@@ -54,18 +55,29 @@ function DestructiveConfirmDialog({
       <DialogContent
         showCloseButton={false}
         className={cn(
-          'w-full max-w-sm rounded-2xl border border-border bg-surface p-0 shadow-2xl',
+          'w-full max-w-sm rounded-xl border border-border bg-surface p-0 shadow-modal',
           className,
         )}
       >
         <div className="flex w-full min-w-0 flex-col gap-5 p-6">
-          <div className="flex min-w-0 flex-col gap-2">
-            <DialogTitle className="text-base font-semibold text-foreground">{title}</DialogTitle>
-            <DialogDescription className="min-w-0 break-words whitespace-normal text-sm leading-6 text-muted-foreground">
-              {description}
-            </DialogDescription>
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="flex size-5 shrink-0 items-center justify-center text-destructive"
+            >
+              <AlertTriangle className="size-4" />
+            </span>
+            <div className="flex min-w-0 flex-col gap-2">
+              <DialogTitle className="text-base font-semibold text-foreground">{title}</DialogTitle>
+              <DialogDescription
+                className="min-w-0 truncate text-sm leading-6 text-muted-foreground"
+                title={description}
+              >
+                {description}
+              </DialogDescription>
+            </div>
           </div>
-          <div className="flex min-w-0 items-center justify-end gap-2">
+          <div className="-mx-6 -mb-6 flex min-w-0 flex-wrap items-center justify-end gap-2 rounded-b-xl border-t border-border-subtle bg-muted/50 px-6 py-4">
             <Button
               type="button"
               variant={cancelVariant}
