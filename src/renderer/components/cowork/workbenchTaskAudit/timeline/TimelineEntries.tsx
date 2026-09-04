@@ -82,13 +82,25 @@ export function TimelineEntryList({
   return (
     <TooltipProvider>
       <ol className="flex flex-col">
-        {entries.map(entry => {
+        {entries.map((entry, index) => {
+          const connectToNext = index < entries.length - 1;
           switch (entry.kind) {
             case 'event':
-              return <TimelineEventItem key={entry.id} event={entry.event} />;
+              return (
+                <TimelineEventItem
+                  key={entry.id}
+                  event={entry.event}
+                  connectToNext={connectToNext}
+                />
+              );
             case 'eventCluster':
               return (
-                <TimelineEventClusterItem key={entry.id} type={entry.type} events={entry.events} />
+                <TimelineEventClusterItem
+                  key={entry.id}
+                  type={entry.type}
+                  events={entry.events}
+                  connectToNext={connectToNext}
+                />
               );
             case 'approval':
               return (
@@ -98,10 +110,18 @@ export function TimelineEntryList({
                   run={run}
                   busy={busy}
                   onRespond={onRespondToApproval}
+                  connectToNext={connectToNext}
                 />
               );
             case 'artifact':
-              return <TimelineArtifactItem key={entry.id} artifact={entry.artifact} runs={runs} />;
+              return (
+                <TimelineArtifactItem
+                  key={entry.id}
+                  artifact={entry.artifact}
+                  runs={runs}
+                  connectToNext={connectToNext}
+                />
+              );
           }
         })}
       </ol>
@@ -114,9 +134,18 @@ function EntryMarker({ className }: { className?: string }) {
     <span
       aria-hidden="true"
       className={cn(
-        'absolute top-[9px] left-[10px] z-10 size-2 rounded-full ring-2 ring-background',
+        'absolute top-2.5 left-2.5 z-10 size-2 rounded-full',
         className,
       )}
+    />
+  );
+}
+
+function EntryConnector() {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute top-3.5 -bottom-3.5 left-3.5 z-0 w-px -translate-x-1/2 bg-border"
     />
   );
 }
@@ -140,14 +169,21 @@ const eventIcons: Partial<Record<WorkbenchRunEventType, LucideIcon>> = {
   [WorkbenchRunEventType.HarnessQualityMeasured]: Gauge,
 };
 
-const TimelineEventItem = memo(function TimelineEventItem({ event }: { event: WorkbenchRunEvent }) {
+const TimelineEventItem = memo(function TimelineEventItem({
+  event,
+  connectToNext,
+}: {
+  event: WorkbenchRunEvent;
+  connectToNext: boolean;
+}) {
   const [payloadOpen, setPayloadOpen] = useState(false);
   const Icon = eventIcons[event.type] ?? Activity;
   const hasPayload = Object.keys(event.payload).length > 0;
 
   return (
-    <li className="relative pl-10">
-      <EntryMarker className="bg-muted-foreground/40" />
+    <li className="relative isolate pl-10">
+      {connectToNext && <EntryConnector />}
+      <EntryMarker className="bg-muted-foreground" />
       <div className="flex items-center gap-2 py-1.5">
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">
@@ -190,16 +226,19 @@ const TimelineEventItem = memo(function TimelineEventItem({ event }: { event: Wo
 const TimelineEventClusterItem = memo(function TimelineEventClusterItem({
   type,
   events,
+  connectToNext,
 }: {
   type: WorkbenchRunEventType;
   events: WorkbenchRunEvent[];
+  connectToNext: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const Icon = eventIcons[type] ?? Activity;
 
   return (
-    <li className="relative pl-10">
-      <EntryMarker className="bg-muted-foreground/40" />
+    <li className="relative isolate pl-10">
+      {connectToNext && <EntryConnector />}
+      <EntryMarker className="bg-muted-foreground" />
       <button
         type="button"
         aria-expanded={open}
@@ -223,9 +262,7 @@ const TimelineEventClusterItem = memo(function TimelineEventClusterItem({
         <ol className="flex flex-col border-l border-border pl-3">
           {events.map(event => {
             const hasPayload = Object.keys(event.payload).length > 0;
-            return (
-              <ClusterEventRow key={event.id} event={event} hasPayload={hasPayload} />
-            );
+            return <ClusterEventRow key={event.id} event={event} hasPayload={hasPayload} />;
           })}
         </ol>
       )}
@@ -280,11 +317,13 @@ const TimelineApprovalItem = memo(function TimelineApprovalItem({
   run,
   busy,
   onRespond,
+  connectToNext,
 }: {
   approval: WorkbenchApproval;
   run: WorkbenchRun;
   busy: boolean;
   onRespond: (input: WorkbenchApprovalResponseInput) => void;
+  connectToNext: boolean;
 }) {
   const isPending =
     approval.decision === WorkbenchApprovalDecision.Pending &&
@@ -292,29 +331,37 @@ const TimelineApprovalItem = memo(function TimelineApprovalItem({
 
   if (isPending) {
     return (
-      <PendingApprovalEntry approval={approval} busy={busy} onRespond={onRespond} />
+      <PendingApprovalEntry
+        approval={approval}
+        busy={busy}
+        onRespond={onRespond}
+        connectToNext={connectToNext}
+      />
     );
   }
-  return <ResolvedApprovalEntry approval={approval} />;
+  return <ResolvedApprovalEntry approval={approval} connectToNext={connectToNext} />;
 });
 
 function PendingApprovalEntry({
   approval,
   busy,
   onRespond,
+  connectToNext,
 }: {
   approval: WorkbenchApproval;
   busy: boolean;
   onRespond: (input: WorkbenchApprovalResponseInput) => void;
+  connectToNext: boolean;
 }) {
   const reducedMotion = useReducedMotion();
   const [reason, setReason] = useState('');
 
   return (
-    <li className="relative pl-10">
+    <li className="relative isolate pl-10">
+      {connectToNext && <EntryConnector />}
       <span
         aria-hidden="true"
-        className="absolute top-[9px] left-[10px] z-10 flex size-2 rounded-full ring-2 ring-background"
+        className="absolute top-2.5 left-2.5 z-10 flex size-2 rounded-full"
       >
         {!reducedMotion && (
           <motion.span
@@ -389,8 +436,10 @@ const decisionTone: Record<string, string> = {
 
 const ResolvedApprovalEntry = memo(function ResolvedApprovalEntry({
   approval,
+  connectToNext,
 }: {
   approval: WorkbenchApproval;
+  connectToNext: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const approved = approval.decision === WorkbenchApprovalDecision.Approved;
@@ -400,9 +449,10 @@ const ResolvedApprovalEntry = memo(function ResolvedApprovalEntry({
   const Icon = approved ? ShieldCheck : negative ? ShieldX : ShieldQuestion;
 
   return (
-    <li className="relative pl-10">
+    <li className="relative isolate pl-10">
+      {connectToNext && <EntryConnector />}
       <EntryMarker
-        className={approved ? 'bg-primary' : negative ? 'bg-destructive' : 'bg-muted-foreground/40'}
+        className={approved ? 'bg-primary' : negative ? 'bg-destructive' : 'bg-muted-foreground'}
       />
       <button
         type="button"
@@ -411,10 +461,13 @@ const ResolvedApprovalEntry = memo(function ResolvedApprovalEntry({
         className="flex w-full items-center gap-2 rounded-md py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-px"
       >
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-          {approval.toolName}
-        </span>
-        <span className={cn('shrink-0 text-xs', decisionTone[approval.decision] ?? 'text-muted-foreground')}>
+        <span className="min-w-0 flex-1 truncate text-sm text-foreground">{approval.toolName}</span>
+        <span
+          className={cn(
+            'shrink-0 text-xs',
+            decisionTone[approval.decision] ?? 'text-muted-foreground',
+          )}
+        >
           {decisionLabel(approval.decision)}
         </span>
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
@@ -470,9 +523,11 @@ const artifactIcons: Record<WorkbenchArtifactKind, LucideIcon> = {
 const TimelineArtifactItem = memo(function TimelineArtifactItem({
   artifact,
   runs,
+  connectToNext,
 }: {
   artifact: WorkbenchArtifact;
   runs: WorkbenchRun[];
+  connectToNext: boolean;
 }) {
   const filePath = resolveArtifactFilePath(artifact, runs);
   const Icon = artifactIcons[artifact.kind] ?? FileText;
@@ -512,8 +567,9 @@ const TimelineArtifactItem = memo(function TimelineArtifactItem({
   };
 
   return (
-    <li className="group relative pl-10">
-      <EntryMarker className="bg-primary/60" />
+    <li className="group relative isolate pl-10">
+      {connectToNext && <EntryConnector />}
+      <EntryMarker className="bg-primary" />
       <div className="flex items-center gap-2 py-1.5">
         <Icon className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm text-foreground">

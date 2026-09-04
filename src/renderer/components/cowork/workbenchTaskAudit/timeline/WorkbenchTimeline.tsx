@@ -56,19 +56,20 @@ export function WorkbenchTimeline({
           return (
             <motion.li
               key={chapter.run.id}
-              className="relative"
+              className="relative isolate"
               variants={reducedMotion ? undefined : chapterItemVariants}
             >
               {hasNextChapter && (
                 <>
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none absolute top-7 left-3.5 z-0 h-[calc(100%-0.75rem)] w-px bg-border"
+                    className="pointer-events-none absolute top-3.5 left-3.5 z-0 h-[calc(100%+1rem)] w-px -translate-x-1/2 bg-border"
                   />
                   {!reducedMotion && (
                     <motion.span
                       aria-hidden="true"
-                      className="pointer-events-none absolute top-7 left-3.5 z-0 h-[calc(100%-0.75rem)] w-px origin-top bg-primary/40"
+                      className="pointer-events-none absolute top-3.5 left-3.5 z-0 h-[calc(100%+1rem)] w-px origin-top bg-primary/40"
+                      style={{ x: '-50%' }}
                       initial={{ scaleY: 0 }}
                       animate={{ scaleY: 1 }}
                       transition={{ duration: 0.8, ease: TIMELINE_EASE }}
