@@ -26,6 +26,7 @@ import {
   type CreateCodingCollaborationPresetInput,
   type CodingLaneViewStateInput,
   type CodingPermissionResponse,
+  type CodingPromptAttachment,
   type CodingPromptInput,
   CodingPromptDelivery,
   type CodingRoomSnapshot,
