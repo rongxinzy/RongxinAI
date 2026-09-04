@@ -1681,7 +1681,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
           {/* Quick Actions */}
           <div
-            className="mx-auto flex w-full max-w-3xl flex-col gap-4 animate-fade-in-up"
+            className="mx-auto flex w-full max-w-5xl flex-col gap-4 animate-fade-in-up"
             style={{ animationDelay: '300ms', animationFillMode: 'both' }}
           >
             {selectedAction ? (
