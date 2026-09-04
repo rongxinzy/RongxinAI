@@ -180,7 +180,10 @@ export class ZhiYuanEngramAdapter {
       signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) {
-      throw new Error(`Memory service request failed with HTTP ${response.status}.`);
+      const method = init.method ?? 'GET';
+      throw new Error(
+        `Memory service request failed with HTTP ${response.status} for ${method} ${pathname}.`,
+      );
     }
     return (await response.json()) as T;
   }

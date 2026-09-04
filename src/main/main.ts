@@ -7000,14 +7000,6 @@ if (!gotTheLock) {
 
     void getEngramManager()
       .start()
-      .then(connection => {
-        if (!connection || !store) return;
-        void getProjectMemoryService()
-          .drainOutbox()
-          .catch(error =>
-            console.warn('[ProjectMemory] Failed to drain pending operations:', error),
-          );
-      })
       .catch(error => console.warn('[MemoryRuntime] Failed to start local memory service:', error));
 
     // Note: Calendar permission is checked on-demand when calendar operations are requested
@@ -7053,6 +7045,13 @@ if (!gotTheLock) {
     } catch (error) {
       console.warn('[MemoryMigration] Failed to import legacy memory sources:', error);
     }
+    void getEngramManager()
+      .start()
+      .then(connection => {
+        if (!connection) return;
+        return getProjectMemoryService().drainOutbox();
+      })
+      .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     refreshEndpointsTestMode(store);
     sqliteBackupManager = new SqliteBackupManager(app.getPath('userData'));
     await startCcConnectBridge().catch(error =>
@@ -7113,9 +7112,6 @@ if (!gotTheLock) {
         `[WorkbenchTask] marked ${recoveredWorkbenchTasks} interrupted task(s) for explicit recovery`,
       );
     }
-    void getProjectMemoryService()
-      .drainOutbox()
-      .catch(error => console.warn('[ProjectMemory] Failed to drain pending operations:', error));
     registerWorkbenchTaskIpcHandlers({
       getService: getWorkbenchTaskService,
       startPreparedRun: async (task: WorkbenchTask, run: WorkbenchRun, resumeInput) => {

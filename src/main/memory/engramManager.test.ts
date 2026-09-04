@@ -75,6 +75,36 @@ test('starts the supervised runtime with private storage and launch credentials'
   expect(child.kill).toHaveBeenCalledOnce();
 });
 
+test('does not expose a connection before the runtime health check passes', async () => {
+  const child = new FakeProcess();
+  const spawnProcess = vi.fn(() => child);
+  const close = vi.fn(async () => undefined);
+  let resolveHealth!: (healthy: boolean) => void;
+  const healthCheck = new Promise<boolean>(resolve => {
+    resolveHealth = resolve;
+  });
+  const manager = new EngramManager({
+    userDataPath: createUserDataDirectory(),
+    env: {},
+    fileExists: () => true,
+    projectRoot: path.resolve('project'),
+    reservePort: async () => 43123,
+    createProxy: async () => ({ url: 'http://127.0.0.1:43124', close }),
+    spawnProcess,
+    checkHealth: () => healthCheck,
+  });
+
+  const startPromise = manager.start();
+  await vi.waitFor(() => expect(spawnProcess).toHaveBeenCalledOnce());
+  expect(manager.getConnection()).toBeNull();
+
+  resolveHealth(true);
+  await expect(startPromise).resolves.toMatchObject({ url: 'http://127.0.0.1:43124' });
+  expect(manager.getConnection()).toMatchObject({ url: 'http://127.0.0.1:43124' });
+
+  await manager.stop();
+});
+
 test('degrades without preventing the app from running when the binary is missing', async () => {
   const manager = new EngramManager({
     userDataPath: createUserDataDirectory(),
