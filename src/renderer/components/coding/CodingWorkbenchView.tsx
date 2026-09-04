@@ -16,18 +16,16 @@ import {
   SheetTrigger,
 } from '@shared/components/ui/sheet';
 import { cn } from '@shared/lib/utils';
-import {
-  FileDiff,
-  FolderGit2,
-  GitBranch,
-  Layers,
-  PanelRight,
-  Settings2,
-} from 'lucide-react';
+import { FileDiff, FolderGit2, GitBranch, Layers, PanelRight, Settings2 } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 
-import type { CodingAgentConfigOption, CodingRoomSnapshot } from '../../../shared/codingAgent';
+import type {
+  CodingAgentConfigOption,
+  CodingPromptAttachment,
+  CodingRoomSnapshot,
+  CodingWorkspaceSummary,
+} from '../../../shared/codingAgent';
 import {
   CodingAgentDriverKind,
   CodingAgentProfileStatus,
@@ -54,14 +52,20 @@ import { toAgentModelRef, resolveAgentModelRef } from '../../utils/agentModelRef
 import { CodingAgentManager } from './CodingAgentManager';
 import { CodingAuthAndPermissionDialogs } from './CodingAuthAndPermissionDialogs';
 import { CodingComposer } from './CodingComposer';
-import { CodingDraftControls } from './CodingDraftControls';
 import { CodingEventStream } from './CodingEventStream';
 import { CodingGitPanel } from './CodingGitPanel';
 import { CodingInspector } from './CodingInspector';
 import { CodingParticipants } from './CodingParticipants';
-import { CodingAgentStatusI18nKey, CodingSidePanelView } from './constants';
-import type { CodingSidePanelView as CodingSidePanelViewType } from './constants';
-import type { CodingSessionDraft } from './CodingWorkspaceSidebar';
+import { CodingSessionSetupDialog } from './CodingSessionSetupDialog';
+import {
+  CodingAgentStatusI18nKey,
+  CodingSidePanelView,
+  CodingUiEvent,
+  type CodingCreateSessionEventDetail,
+  type CodingManageAgentsEventDetail,
+  type CodingSidePanelView as CodingSidePanelViewType,
+} from './constants';
+import type { CodingSessionDraft, CodingSidebarSelection } from './CodingWorkspaceSidebar';
 import { CoworkModelPicker } from '../cowork/CoworkModelPicker';
 import { createCodingQueueService } from '../../services/codingQueue';
 
@@ -78,7 +82,7 @@ interface CodingWorkbenchViewProps {
   workspaceRoot: string;
   selectedLaneId: string | null;
   draftSession: CodingSessionDraft | null;
-  onDraftSessionChange: (draft: CodingSessionDraft) => void;
+  onSessionDraftCreated: (selection: CodingSidebarSelection) => void;
   onSessionCreated: (laneId: string) => void;
   onLaneSelected: (laneId: string) => void;
   isSidebarCollapsed?: boolean;
@@ -89,7 +93,7 @@ export const CodingWorkbenchView = ({
   workspaceRoot,
   selectedLaneId,
   draftSession,
-  onDraftSessionChange,
+  onSessionDraftCreated,
   onSessionCreated,
   onLaneSelected,
   isSidebarCollapsed = false,
@@ -98,6 +102,7 @@ export const CodingWorkbenchView = ({
   const [snapshot, setSnapshot] = useState<CodingRoomSnapshot | null>(EMPTY_SNAPSHOT);
   const [draftState, setDraftState] = useState({ laneId: '', value: '' });
   const [newSessionDraftState, setNewSessionDraftState] = useState({ id: '', value: '' });
+  const [promptAttachments, setPromptAttachments] = useState<CodingPromptAttachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const codingQueue = useMemo(() => createCodingQueueService(workspaceRoot), [workspaceRoot]);
@@ -113,12 +118,20 @@ export const CodingWorkbenchView = ({
   } | null>(null);
   const [authTerminalInput, setAuthTerminalInput] = useState('');
   const [agentManagerOpen, setAgentManagerOpen] = useState(false);
+  const [sessionSetupWorkspace, setSessionSetupWorkspace] = useState<CodingWorkspaceSummary | null>(
+    null,
+  );
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eventStreamRef = useRef<HTMLDivElement | null>(null);
+  const sessionSetupSelectionKeyRef = useRef<string | null>(null);
+  const selectionKey = `${workspaceRoot}:${selectedLaneId ?? ''}:${draftSession?.id ?? ''}`;
+  useEffect(() => {
+    setPromptAttachments([]);
+  }, [selectionKey]);
   useEffect(() => {
     if (!workspaceRoot) {
       setSnapshot(null);
@@ -154,12 +167,31 @@ export const CodingWorkbenchView = ({
   }, [selectedLaneId, snapshot, workspaceRoot]);
   useEffect(() => {
     const openManager = (event: Event) => {
-      const detail = (event as CustomEvent<{ workspaceRoot?: string }>).detail;
-      if (detail?.workspaceRoot === workspaceRoot) setAgentManagerOpen(true);
+      const detail = (event as CustomEvent<CodingManageAgentsEventDetail>).detail;
+      if (detail.workspaceRoot === workspaceRoot) setAgentManagerOpen(true);
     };
-    window.addEventListener('coding:manage-agents', openManager);
-    return () => window.removeEventListener('coding:manage-agents', openManager);
+    window.addEventListener(CodingUiEvent.ManageAgents, openManager);
+    return () => window.removeEventListener(CodingUiEvent.ManageAgents, openManager);
   }, [workspaceRoot]);
+  useEffect(() => {
+    const openSessionSetup = (event: Event) => {
+      const detail = (event as CustomEvent<CodingCreateSessionEventDetail>).detail;
+      sessionSetupSelectionKeyRef.current = selectionKey;
+      setSessionSetupWorkspace(detail.workspace);
+    };
+    window.addEventListener(CodingUiEvent.CreateSession, openSessionSetup);
+    return () => window.removeEventListener(CodingUiEvent.CreateSession, openSessionSetup);
+  }, [selectionKey]);
+  useEffect(() => {
+    if (
+      sessionSetupWorkspace &&
+      sessionSetupSelectionKeyRef.current !== null &&
+      sessionSetupSelectionKeyRef.current !== selectionKey
+    ) {
+      setSessionSetupWorkspace(null);
+      sessionSetupSelectionKeyRef.current = null;
+    }
+  }, [selectionKey, sessionSetupWorkspace]);
   useEffect(() => {
     const removeData = window.electron.codingAgent.onAuthTerminalData(event => {
       setAuthTerminal(current =>
@@ -268,7 +300,13 @@ export const CodingWorkbenchView = ({
     return () => {
       cancelled = true;
     };
-  }, [activeDriverKind, activeLaneId, activeRemoteSessionId, activeConfigOptionCount, workspaceRoot]);
+  }, [
+    activeDriverKind,
+    activeLaneId,
+    activeRemoteSessionId,
+    activeConfigOptionCount,
+    workspaceRoot,
+  ]);
   // A draft has no lane yet, so fetch the default config options of its
   // profile to show model/thinking controls before the session exists.
   const draftProfileId = draftSession?.profileId ?? null;
@@ -503,23 +541,25 @@ export const CodingWorkbenchView = ({
     try {
       if (draftSession) {
         const result = await window.electron.codingAgent.startSession({
-        workspaceId: draftSession.workspaceId,
-        sourceRoot: draftSession.sourceRoot,
-        profileId: draftSession.profileId,
-        modelOverride:
-          draftSession.modelOverride ??
-          (activeProfile?.isBuiltin && defaultSelectedModel
-            ? toAgentModelRef(defaultSelectedModel)
-            : undefined),
-        prompt,
-        ...(Object.keys(draftConfigOverrides).length > 0
-          ? { configOptionOverrides: draftConfigOverrides }
-          : {}),
-      });
+          workspaceId: draftSession.workspaceId,
+          sourceRoot: draftSession.sourceRoot,
+          profileId: draftSession.profileId,
+          modelOverride:
+            draftSession.modelOverride ??
+            (activeProfile?.isBuiltin && defaultSelectedModel
+              ? toAgentModelRef(defaultSelectedModel)
+              : undefined),
+          prompt,
+          ...(promptAttachments.length > 0 ? { attachments: promptAttachments } : {}),
+          ...(Object.keys(draftConfigOverrides).length > 0
+            ? { configOptionOverrides: draftConfigOverrides }
+            : {}),
+        });
         const laneId = result.snapshot?.room.activeLaneId;
         if (result.success && result.snapshot && laneId) {
           setSnapshot(result.snapshot);
           setNewSessionDraftState({ id: '', value: '' });
+          setPromptAttachments([]);
           onSessionCreated(laneId);
         } else {
           setError(result.error ?? i18nService.t('codingSessionCreateFailed'));
@@ -529,11 +569,17 @@ export const CodingWorkbenchView = ({
       if (!activeLane) return;
       if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
       const result = await window.electron.codingAgent.prompt({
-      workspaceRoot,
-      prompt: { laneId: activeLane.id, prompt, delivery },
-    });
+        workspaceRoot,
+        prompt: {
+          laneId: activeLane.id,
+          prompt,
+          delivery,
+          ...(promptAttachments.length > 0 ? { attachments: promptAttachments } : {}),
+        },
+      });
       if (result.success && result.snapshot) {
         setDraftState({ laneId: activeLane.id, value: '' });
+        setPromptAttachments([]);
         void window.electron.codingAgent.saveLaneView({
           workspaceRoot,
           view: { laneId: activeLane.id, draft: '', scrollPosition: activeLane.scrollPosition },
@@ -655,7 +701,7 @@ export const CodingWorkbenchView = ({
         desktopSidePanelOpen ? 'grid-cols-[minmax(0,1fr)_360px] max-lg:grid-cols-1' : 'grid-cols-1',
       )}
     >
-      <main className="flex min-h-0 flex-col">
+      <main className="relative flex min-h-0 flex-col">
         <CodingAuthAndPermissionDialogs
           authTerminal={authTerminal}
           authTerminalInput={authTerminalInput}
@@ -761,139 +807,139 @@ export const CodingWorkbenchView = ({
           onToggleSidebar={onToggleSidebar}
           leftContent={
             <>
-            <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-              <FolderGit2 className="size-4 shrink-0" />
-              <span className="truncate">{snapshot.room.name}</span>
-            </span>
-            <CodingParticipants
-              activeLaneId={activeLane?.id ?? null}
-              lanes={activeMissionLanes}
-              profiles={snapshot.profiles}
-              onSelect={laneId => void selectLane(laneId)}
-            />
-            {activeProfile && (
-              <Badge variant="secondary" className="shrink-0">
-                {profileStatusText(activeProfile.status)}
-              </Badge>
-            )}
+              <span className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+                <FolderGit2 className="size-4 shrink-0" />
+                <span className="truncate">{snapshot.room.name}</span>
+              </span>
+              <CodingParticipants
+                activeLaneId={activeLane?.id ?? null}
+                lanes={activeMissionLanes}
+                profiles={snapshot.profiles}
+                onSelect={laneId => void selectLane(laneId)}
+              />
+              {activeProfile && (
+                <Badge variant="secondary" className="shrink-0">
+                  {profileStatusText(activeProfile.status)}
+                </Badge>
+              )}
             </>
           }
           actions={
             <>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={i18nService.t('codingAgentManageAgents')}
-              onClick={() => setAgentManagerOpen(true)}
-            >
-              <Settings2 />
-            </Button>
-            {artifactSessionKey && laneArtifacts.length > 0 && (
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
-                aria-label={i18nService.t('codingAgentArtifacts')}
-                aria-pressed={isArtifactPanelOpen}
-                onClick={() => dispatch(togglePanel())}
+                size="icon"
+                aria-label={i18nService.t('codingAgentManageAgents')}
+                onClick={() => setAgentManagerOpen(true)}
               >
-                <Layers className="mr-1 size-4" />
-                {i18nService.t('codingAgentArtifacts')}
-                <Badge variant="secondary">{laneArtifacts.length}</Badge>
+                <Settings2 />
               </Button>
-            )}
-            {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
-              <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
-                <FileDiff className="mr-1 size-4" />
-                {i18nService.t('codingAgentReviewChanges')}
+              {artifactSessionKey && laneArtifacts.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={i18nService.t('codingAgentArtifacts')}
+                  aria-pressed={isArtifactPanelOpen}
+                  onClick={() => dispatch(togglePanel())}
+                >
+                  <Layers className="mr-1 size-4" />
+                  {i18nService.t('codingAgentArtifacts')}
+                  <Badge variant="secondary">{laneArtifacts.length}</Badge>
+                </Button>
+              )}
+              {activeLane && activeLane.executionRoot !== activeLane.sourceRoot && (
+                <Button size="sm" variant="outline" onClick={() => void previewLaneChanges()}>
+                  <FileDiff className="mr-1 size-4" />
+                  {i18nService.t('codingAgentReviewChanges')}
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="max-lg:hidden"
+                aria-label={i18nService.t('codingGitPanel')}
+                aria-pressed={sidePanelView === CodingSidePanelView.Git}
+                onClick={() =>
+                  setSidePanelView(current =>
+                    current === CodingSidePanelView.Git ? null : CodingSidePanelView.Git,
+                  )
+                }
+              >
+                <GitBranch />
               </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="max-lg:hidden"
-              aria-label={i18nService.t('codingGitPanel')}
-              aria-pressed={sidePanelView === CodingSidePanelView.Git}
-              onClick={() =>
-                setSidePanelView(current =>
-                  current === CodingSidePanelView.Git ? null : CodingSidePanelView.Git,
-                )
-              }
-            >
-              <GitBranch />
-            </Button>
-            <Sheet open={gitSheetOpen} onOpenChange={setGitSheetOpen}>
-              <SheetTrigger
-                render={
+              <Sheet open={gitSheetOpen} onOpenChange={setGitSheetOpen}>
+                <SheetTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="lg:hidden"
+                      aria-label={i18nService.t('codingGitPanel')}
+                    />
+                  }
+                >
+                  <GitBranch />
+                </SheetTrigger>
+                <SheetContent side="bottom" className="h-[80dvh] p-0">
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>{i18nService.t('codingGitPanel')}</SheetTitle>
+                  </SheetHeader>
+                  <CodingGitPanel
+                    workspaceRoot={workspaceRoot}
+                    laneId={activeLane?.id ?? null}
+                    sourceRoot={gitSourceRoot}
+                    refreshKey={gitRefreshKey}
+                  />
+                </SheetContent>
+              </Sheet>
+              {hasInspectorContent && (
+                <>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="lg:hidden"
-                    aria-label={i18nService.t('codingGitPanel')}
-                  />
-                }
-              >
-                <GitBranch />
-              </SheetTrigger>
-              <SheetContent side="bottom" className="h-[80dvh] p-0">
-                <SheetHeader className="sr-only">
-                  <SheetTitle>{i18nService.t('codingGitPanel')}</SheetTitle>
-                </SheetHeader>
-                <CodingGitPanel
-                  workspaceRoot={workspaceRoot}
-                  laneId={activeLane?.id ?? null}
-                  sourceRoot={gitSourceRoot}
-                  refreshKey={gitRefreshKey}
-                />
-              </SheetContent>
-            </Sheet>
-            {hasInspectorContent && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="max-lg:hidden"
-                  aria-label={i18nService.t('codingAgentInspector')}
-                  aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
-                  onClick={() =>
-                    setSidePanelView(current =>
-                      current === CodingSidePanelView.Inspector
-                        ? null
-                        : CodingSidePanelView.Inspector,
-                    )
-                  }
-                >
-                  <PanelRight />
-                </Button>
-                <Sheet open={inspectorSheetOpen} onOpenChange={setInspectorSheetOpen}>
-                  <SheetTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="lg:hidden"
-                        aria-label={i18nService.t('codingAgentInspector')}
-                      >
-                        <PanelRight />
-                      </Button>
+                    className="max-lg:hidden"
+                    aria-label={i18nService.t('codingAgentInspector')}
+                    aria-pressed={sidePanelView === CodingSidePanelView.Inspector}
+                    onClick={() =>
+                      setSidePanelView(current =>
+                        current === CodingSidePanelView.Inspector
+                          ? null
+                          : CodingSidePanelView.Inspector,
+                      )
                     }
-                  />
-                  <SheetContent side="bottom" className="h-[70dvh] p-0">
-                    <SheetHeader>
-                      <SheetTitle>{i18nService.t('codingAgentInspector')}</SheetTitle>
-                    </SheetHeader>
-                    <div className="min-h-0 flex-1">
-                      <CodingInspector events={activeEvents} />
-                    </div>
-                  </SheetContent>
-                </Sheet>
-              </>
-            )}
+                  >
+                    <PanelRight />
+                  </Button>
+                  <Sheet open={inspectorSheetOpen} onOpenChange={setInspectorSheetOpen}>
+                    <SheetTrigger
+                      render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="lg:hidden"
+                          aria-label={i18nService.t('codingAgentInspector')}
+                        >
+                          <PanelRight />
+                        </Button>
+                      }
+                    />
+                    <SheetContent side="bottom" className="h-[70dvh] p-0">
+                      <SheetHeader>
+                        <SheetTitle>{i18nService.t('codingAgentInspector')}</SheetTitle>
+                      </SheetHeader>
+                      <div className="min-h-0 flex-1">
+                        <CodingInspector events={activeEvents} />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                </>
+              )}
             </>
           }
         />
@@ -933,15 +979,15 @@ export const CodingWorkbenchView = ({
           configOptions={activeLane ? activeLane.configOptions : draftConfigOptions}
           disabled={
             draftSession
-              ? !draftSession.profileId || !draftSession.sourceRoot
+              ? !draftSession.profileId ||
+                !draftSession.sourceRoot ||
+                activeProfile?.status !== CodingAgentProfileStatus.Ready
               : !activeLane || activeLane.status === CodingLaneStatus.WaitingApproval
           }
           isRunning={activeLane?.status === CodingLaneStatus.Running}
           isSubmitting={isSubmitting}
           hasError={Boolean(error)}
           prompt={prompt}
-          recipientName={activeProfile?.name ?? i18nService.t('codingAgentChooseAgent')}
-          showRecipient={!draftSession}
           sessionId={
             activeProfile?.driverKind === CodingAgentDriverKind.Acp
               ? activeLane?.id
@@ -952,15 +998,13 @@ export const CodingWorkbenchView = ({
           queueService={
             activeProfile?.driverKind === CodingAgentDriverKind.Acp ? codingQueue : undefined
           }
+          attachments={promptAttachments}
+          canAttachFiles={
+            activeProfile?.driverKind === CodingAgentDriverKind.Acp &&
+            activeProfile.status === CodingAgentProfileStatus.Ready
+          }
           leadingTools={
-            draftSession ? (
-              <CodingDraftControls
-                draft={draftSession}
-                profiles={snapshot.profiles}
-                sources={draftSession.sources}
-                onChange={onDraftSessionChange}
-              />
-            ) : activeProfile?.driverKind === CodingAgentDriverKind.Builtin && activeLane ? (
+            activeProfile?.driverKind === CodingAgentDriverKind.Builtin && activeLane ? (
               <CoworkModelPicker
                 models={availableModels}
                 selectedModel={
@@ -1000,12 +1044,64 @@ export const CodingWorkbenchView = ({
               saveDraft(activeLane.id, next);
             }
           }}
+          onAddAttachments={() => {
+            void window.electron.dialog
+              .selectFiles({ title: i18nService.t('codingAttachmentAdd') })
+              .then(result => {
+                if (!result.success || result.paths.length === 0) return;
+                setPromptAttachments(current => {
+                  const existingPaths = new Set(current.map(attachment => attachment.path));
+                  return [
+                    ...current,
+                    ...result.paths
+                      .filter(filePath => !existingPaths.has(filePath))
+                      .map(filePath => ({
+                        path: filePath,
+                        name: filePath.split(/[/\\\\]/).at(-1) ?? filePath,
+                      })),
+                  ].slice(0, 8);
+                });
+              });
+          }}
+          onRemoveAttachment={filePath =>
+            setPromptAttachments(current =>
+              current.filter(attachment => attachment.path !== filePath),
+            )
+          }
           onConfigOptionChange={(optionId, value) => void changeConfigOption(optionId, value)}
           supportsSteerShortcut={activeProfile?.driverKind === CodingAgentDriverKind.Builtin}
           onSend={() => void sendPrompt()}
           onSteer={() => void sendPrompt('steer')}
           onStop={() => void cancel()}
         />
+        {sessionSetupWorkspace ? (
+          <CodingSessionSetupDialog
+            workspace={sessionSetupWorkspace}
+            profiles={snapshot.profiles}
+            onCancel={() => {
+              setSessionSetupWorkspace(null);
+              sessionSetupSelectionKeyRef.current = null;
+            }}
+            onManageAgents={() => setAgentManagerOpen(true)}
+            onSubmit={({ profileId, sourceRoot }) => {
+              onSessionDraftCreated({
+                workspaceId: sessionSetupWorkspace.id,
+                workspaceRoot: sessionSetupWorkspace.primaryRoot,
+                laneId: null,
+                draft: {
+                  id: crypto.randomUUID(),
+                  workspaceId: sessionSetupWorkspace.id,
+                  sourceRoot,
+                  profileId,
+                  modelOverride: null,
+                  sources: sessionSetupWorkspace.sources,
+                },
+              });
+              setSessionSetupWorkspace(null);
+              sessionSetupSelectionKeyRef.current = null;
+            }}
+          />
+        ) : null}
         {error && <p className="px-3 pb-2 text-xs text-destructive">{error}</p>}
       </main>
       {desktopSidePanelOpen && (

@@ -1,4 +1,17 @@
-import { CodingAgentProfileStatus } from '../../../shared/codingAgent';
+import { CodingAgentProfileStatus, type CodingWorkspaceSummary } from '../../../shared/codingAgent';
+
+export const CodingUiEvent = {
+  CreateSession: 'coding:create-session',
+  ManageAgents: 'coding:manage-agents',
+} as const;
+
+export interface CodingCreateSessionEventDetail {
+  workspace: CodingWorkspaceSummary;
+}
+
+export interface CodingManageAgentsEventDetail {
+  workspaceRoot: string;
+}
 
 export const CodingAgentStatusI18nKey: Record<CodingAgentProfileStatus, string> = {
   [CodingAgentProfileStatus.Detected]: 'codingAgentStatusDetected',

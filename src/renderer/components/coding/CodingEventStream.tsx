@@ -201,6 +201,15 @@ export const CodingEventStream = ({
                 key={turn.id}
                 turn={turn}
                 isStreaming={isStreaming && index === turns.length - 1}
+                showWaitingIndicator={
+                  isStreaming &&
+                  index === turns.length - 1 &&
+                  turn.userMessage !== null &&
+                  turn.reasoning === null &&
+                  turn.activities.length === 0 &&
+                  turn.assistantMessages.length === 0 &&
+                  turn.status === null
+                }
                 artifactsByMessageId={artifactsByMessageId}
                 artifactsByToolCallId={artifactsByToolCallId}
               />
