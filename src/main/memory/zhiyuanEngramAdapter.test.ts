@@ -41,6 +41,29 @@ test('keeps candidates local until they are explicitly confirmed', async () => {
   expect(requests[1].init?.headers).toMatchObject({ Authorization: 'Bearer token' });
 });
 
+test('includes the failed request method and path in runtime errors', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{"error":"not found"}', { status: 404 })),
+  );
+  const adapter = new ZhiYuanEngramAdapter({
+    getConnection: () => ({ url: 'http://127.0.0.1:4000', token: 'token' }),
+    start: vi.fn(),
+  } as never);
+  const candidate = adapter.saveCandidate({
+    sessionId: 'session-1',
+    project: 'project-a',
+    scope: EngramMemoryScope.Project,
+    type: EngramObservationType.Decision,
+    title: 'Use SQLite',
+    content: 'Keep local state in SQLite.',
+  });
+
+  await expect(adapter.confirmMemory(candidate.id, '/workspace/project-a')).rejects.toThrow(
+    'Memory service request failed with HTTP 404 for POST /sessions.',
+  );
+});
+
 test('recall degrades to an empty result when the runtime is unavailable', async () => {
   const adapter = new ZhiYuanEngramAdapter({
     getConnection: () => null,
