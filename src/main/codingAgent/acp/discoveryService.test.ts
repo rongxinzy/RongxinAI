@@ -52,6 +52,7 @@ test('discovers only PATH and known user-level installation directories', () => 
     path.join('/home/agent', '.local', 'bin'),
     path.join('/home/agent', '.npm-global', 'bin'),
     path.join('/home/agent', '.bun', 'bin'),
+    path.join('/home/agent', '.kimi-code', 'bin'),
     path.join('/home/agent', '.local', 'share', 'pnpm'),
     path.join('/home/agent', 'Library', 'pnpm'),
   ]);
@@ -70,6 +71,61 @@ test('covers Windows user-level npm, pnpm, and Bun locations without scanning di
   expect(directories).toContain(path.join('C:\\Users\\agent\\AppData\\Roaming', 'npm'));
   expect(directories).toContain(path.join('C:\\Users\\agent\\AppData\\Local', 'pnpm'));
   expect(directories).toContain(path.join('C:\\Users\\agent', '.bun', 'bin'));
+  expect(directories).toContain(path.join('C:\\Users\\agent', '.kimi-code', 'bin'));
+});
+
+test('discovers a standalone Kimi installation without npm package metadata', async () => {
+  const root = path.join(process.cwd(), `.coding-agent-discovery-kimi-${Date.now()}`);
+  const kimiDirectory = path.join(root, '.kimi-code', 'bin');
+  const kimiExecutable = path.join(kimiDirectory, 'kimi');
+  const registryPath = path.join(root, 'registry.json');
+  try {
+    await mkdir(kimiDirectory, { recursive: true });
+    await writeFile(kimiExecutable, '#!/bin/sh\nexit 0\n');
+    await chmod(kimiExecutable, 0o755);
+    await writeFile(
+      registryPath,
+      JSON.stringify({
+        agents: [
+          {
+            id: 'kimi',
+            name: 'Kimi Code',
+            description: 'Moonshot AI coding agent.',
+            distribution: {
+              binary: {
+                'darwin-aarch64': {
+                  cmd: './kimi',
+                  args: ['acp'],
+                },
+              },
+            },
+          },
+        ],
+      }),
+    );
+
+    const profiles = await new AcpDiscoveryService(registryPath, {
+      platform: 'darwin',
+      architecture: 'arm64',
+      environment: { PATH: '' },
+      home: root,
+      adapterRoot: process.cwd(),
+    }).discover();
+
+    expect(profiles).toContainEqual(
+      expect.objectContaining({
+        name: 'Kimi Code',
+        command: await realpath(kimiExecutable),
+        args: ['acp'],
+        status: CodingAgentProfileStatus.Detected,
+        environment: {
+          [CodingAgentEnvironmentKey.RegistryAgentId]: 'kimi',
+        },
+      }),
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });
 
 test('uses the native Claude executable from npm and pnpm global package layouts on Windows', async () => {

@@ -38,6 +38,7 @@ import {
   CodingWorkspaceSidebar,
   type CodingSidebarSelection,
 } from './coding/CodingWorkspaceSidebar';
+import { CodingUiEvent, type CodingManageAgentsEventDetail } from './coding/constants';
 import {
   SidebarAnimatedSearchIcon,
   type SidebarAnimatedSearchIconHandle,
@@ -575,7 +576,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                   onSelectionChange={onCodingSelectionChange}
                   onManageAgents={workspaceRoot =>
                     window.dispatchEvent(
-                      new CustomEvent('coding:manage-agents', { detail: { workspaceRoot } }),
+                      new CustomEvent<CodingManageAgentsEventDetail>(CodingUiEvent.ManageAgents, {
+                        detail: { workspaceRoot },
+                      }),
                     )
                   }
                 />
@@ -704,7 +707,10 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {!isCollapsed && (
             <div
-              className="non-draggable absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 transition-colors"
+              className={cn(
+                'non-draggable absolute top-0 right-0 h-full w-3 cursor-col-resize',
+                isResizing ? 'bg-border' : 'bg-transparent',
+              )}
               onMouseDown={handleResizeStart}
             />
           )}

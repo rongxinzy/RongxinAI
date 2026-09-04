@@ -22,6 +22,10 @@ export interface CodingAgentCapabilities {
   supportsConfigOptions: boolean;
   supportsUsage: boolean;
   supportsElicitation: boolean;
+  /** ACP promptCapabilities.image. Omitted profiles predate attachment support. */
+  supportsPromptImages?: boolean;
+  /** ACP promptCapabilities.embeddedContext. */
+  supportsEmbeddedContext?: boolean;
 }
 
 /** Advertised by ACP during probing; credentials themselves are never stored. */
@@ -232,6 +236,7 @@ export interface CreateCodingSessionInput {
 
 export interface StartCodingSessionInput extends CreateCodingSessionInput {
   prompt: string;
+  attachments?: CodingPromptAttachment[];
   /** Config option values chosen in the draft composer, applied at creation. */
   configOptionOverrides?: Record<string, string>;
 }
@@ -246,6 +251,13 @@ export interface CodingPromptInput {
   laneId: string;
   prompt: string;
   delivery?: CodingPromptDelivery;
+  attachments?: CodingPromptAttachment[];
+}
+
+/** A user-selected local file. The main process validates the path before use. */
+export interface CodingPromptAttachment {
+  name: string;
+  path: string;
 }
 
 export interface CodingLaneViewStateInput {

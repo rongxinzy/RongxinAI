@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { mkdir, readFile, stat, writeFile } from 'fs/promises';
 import path from 'path';
+import { pathToFileURL } from 'url';
 
 import {
   CodingEventKind,
@@ -12,6 +13,7 @@ import {
   type CodingAgentConfigOptionValue,
   type CodingEvent,
   type CodingPermissionResponse,
+  type CodingPromptAttachment,
 } from '../../../shared/codingAgent';
 import { AcpConnectionSupervisor } from '../acp/connectionSupervisor';
 import {
@@ -78,6 +80,18 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 // single screenshot cannot blow up the event stream, persistence, and the
 // markdown renderer.
 const MAX_INLINE_DATA_LENGTH = 200_000;
+const MAX_PROMPT_IMAGE_BYTES = 10 * 1024 * 1024;
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  '.gif': 'image/gif',
+  '.jpeg': 'image/jpeg',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+};
+const TEXT_EXTENSIONS = new Set([
+  '.c', '.cc', '.css', '.csv', '.go', '.html', '.java', '.js', '.json', '.jsx', '.md', '.py', '.rb',
+  '.rs', '.sh', '.sql', '.toml', '.ts', '.tsx', '.txt', '.xml', '.yaml', '.yml',
+]);
 
 const contentBlockToMarkdown = (block: Record<string, unknown>): string | null => {
   switch (block.type) {
@@ -144,6 +158,7 @@ const readContentText = (value: unknown): string | null => {
 const normalizeCapabilities = (result: AcpInitializeResult): CodingAgentCapabilities => {
   const capabilities = result.agentCapabilities ?? result.capabilities ?? {};
   const sessionCapabilities = asRecord(capabilities.sessionCapabilities);
+  const promptCapabilities = asRecord(capabilities.promptCapabilities);
   return {
     ...DEFAULT_CAPABILITIES,
     supportsLoadSession: capabilities.loadSession === true,
@@ -157,7 +172,48 @@ const normalizeCapabilities = (result: AcpInitializeResult): CodingAgentCapabili
     supportsConfigOptions: false,
     supportsUsage: true,
     supportsElicitation: false,
+    supportsPromptImages: promptCapabilities.image === true,
+    supportsEmbeddedContext: promptCapabilities.embeddedContext === true,
   };
+};
+
+const promptAttachmentBlocks = async (
+  attachments: CodingPromptAttachment[] | undefined,
+  capabilities: CodingAgentCapabilities,
+): Promise<Record<string, unknown>[]> => {
+  if (!attachments?.length) return [];
+  if (attachments.length > 8) throw new Error('At most 8 attachments can be sent in one prompt.');
+  const blocks: Record<string, unknown>[] = [];
+  for (const attachment of attachments) {
+    if (!path.isAbsolute(attachment.path)) throw new Error('Attached file path must be absolute.');
+    const filePath = path.resolve(attachment.path);
+    const fileInfo = await stat(filePath);
+    if (!fileInfo.isFile()) throw new Error('Attached path is not a regular file.');
+    const extension = path.extname(filePath).toLowerCase();
+    const name = path.basename(filePath);
+    const uri = pathToFileURL(filePath).toString();
+    const imageMimeType = IMAGE_MIME_TYPES[extension];
+    if (imageMimeType && capabilities.supportsPromptImages) {
+      const data = await readFile(filePath);
+      if (data.byteLength > MAX_PROMPT_IMAGE_BYTES) {
+        throw new Error('Attached image exceeds the 10 MB limit.');
+      }
+      blocks.push({ type: 'image', uri, mimeType: imageMimeType, data: data.toString('base64') });
+      continue;
+    }
+    if (capabilities.supportsEmbeddedContext && TEXT_EXTENSIONS.has(extension)) {
+      const data = await readFile(filePath);
+      if (data.byteLength <= MAX_INLINE_DATA_LENGTH) {
+        blocks.push({
+          type: 'resource',
+          resource: { uri, mimeType: 'text/plain', text: data.toString('utf8') },
+        });
+        continue;
+      }
+    }
+    blocks.push({ type: 'resource_link', uri, name });
+  }
+  return blocks;
 };
 
 const normalizeConfigOptions = (value: unknown): CodingAgentConfigOption[] => {
@@ -346,6 +402,7 @@ export class AcpCodingDriver implements CodingAgentDriver {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    attachments?: CodingPromptAttachment[];
     modelOverride?: string | null;
   }): AsyncIterable<DriverEvent> {
     await this.ensureConnected(input.workspaceRoot);
@@ -358,7 +415,10 @@ export class AcpCodingDriver implements CodingAgentDriver {
         AcpMethod.SessionPrompt,
         {
           sessionId: input.sessionId,
-          prompt: [{ type: 'text', text: input.prompt }],
+          prompt: [
+            { type: 'text', text: input.prompt },
+            ...(await promptAttachmentBlocks(input.attachments, this.capabilities)),
+          ],
         },
         // A hung agent must not leave the lane running forever. 5 minutes is
         // generous for a single turn; the watchdog can be cancelled by the

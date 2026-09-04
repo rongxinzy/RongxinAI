@@ -214,7 +214,8 @@ export class CodingAgentRegistry extends EventEmitter {
     for (const profile of discovered) {
       const managedAdapterId = profile.environment[CodingAgentEnvironmentKey.ManagedAdapterId];
       if (managedAdapterId) availableManagedAdapters.add(managedAdapterId);
-      const existing = this.findDiscoveredProfile(profile);
+      const matchingProfiles = this.findDiscoveredProfiles(profile);
+      const existing = this.selectCanonicalDiscoveredProfile(matchingProfiles);
       if (!existing) {
         this.registerExternal(profile);
         continue;
@@ -229,6 +230,7 @@ export class CodingAgentRegistry extends EventEmitter {
         id: existing.id,
         isBuiltin: false,
       });
+      this.removeUnreferencedDuplicates(matchingProfiles, existing.id);
     }
     for (const existing of this.list().filter(profile => !profile.isBuiltin)) {
       const adapter = bundledAdapterDefinition(existing);
@@ -246,13 +248,13 @@ export class CodingAgentRegistry extends EventEmitter {
     }
   }
 
-  private findDiscoveredProfile(
+  private findDiscoveredProfiles(
     discovered: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>,
-  ): CodingAgentProfile | undefined {
+  ): CodingAgentProfile[] {
     const managedAdapterId = discovered.environment[CodingAgentEnvironmentKey.ManagedAdapterId];
     if (managedAdapterId) {
       const adapter = BUNDLED_ACP_ADAPTERS.find(candidate => candidate.id === managedAdapterId);
-      return this.list().find(
+      return this.list().filter(
         existing =>
           !existing.isBuiltin &&
           (existing.environment[CodingAgentEnvironmentKey.ManagedAdapterId] === managedAdapterId ||
@@ -260,12 +262,57 @@ export class CodingAgentRegistry extends EventEmitter {
               existing.status !== CodingAgentProfileStatus.Untrusted)),
       );
     }
-    return this.list().find(
-      existing =>
-        !existing.isBuiltin &&
+    const registryAgentId = discovered.environment[CodingAgentEnvironmentKey.RegistryAgentId];
+    return this.list().filter(existing => {
+      if (existing.isBuiltin) return false;
+      if (registryAgentId) {
+        return (
+          existing.environment[CodingAgentEnvironmentKey.RegistryAgentId] === registryAgentId ||
+          this.isLegacyRegistryProfile(existing, discovered)
+        );
+      }
+      return (
         existing.command === discovered.command &&
-        this.argumentsMatch(existing.args, discovered.args),
+        this.argumentsMatch(existing.args, discovered.args)
+      );
+    });
+  }
+
+  private selectCanonicalDiscoveredProfile(
+    profiles: CodingAgentProfile[],
+  ): CodingAgentProfile | undefined {
+    return profiles.find(profile => this.repository?.isReferenced(profile.id)) ??
+      profiles.find(profile => profile.status === CodingAgentProfileStatus.Ready) ??
+      profiles[0];
+  }
+
+  private isLegacyRegistryProfile(
+    existing: CodingAgentProfile,
+    discovered: Omit<CodingAgentProfile, 'id' | 'isBuiltin'>,
+  ): boolean {
+    return (
+      existing.driverKind === CodingAgentDriverKind.Acp &&
+      existing.status !== CodingAgentProfileStatus.Untrusted &&
+      existing.name === discovered.name &&
+      existing.description.endsWith('Detected locally. Probe before using.') &&
+      this.argumentsMatch(existing.args, discovered.args)
     );
+  }
+
+  private removeUnreferencedDuplicates(
+    profiles: CodingAgentProfile[],
+    canonicalProfileId: string,
+  ): void {
+    for (const profile of profiles) {
+      if (profile.id === canonicalProfileId) continue;
+      if (
+        this.repository &&
+        !this.repository.removeIfUnreferenced(profile.id, canonicalProfileId)
+      ) {
+        continue;
+      }
+      this.profiles.delete(profile.id);
+    }
   }
 
   private launchConfigurationMatches(

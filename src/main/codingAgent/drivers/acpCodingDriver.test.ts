@@ -1,5 +1,5 @@
 import { execPath } from 'process';
-import { mkdtemp, readFile, rm } from 'fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { expect, test } from 'vitest';
@@ -69,6 +69,55 @@ test('normalizes ACP session updates into coding events', async () => {
     },
   ]);
   await driver.dispose();
+});
+
+test('sends supported images and text files as ACP prompt content blocks', async () => {
+  const workspaceRoot = await mkdtemp(path.join(os.tmpdir(), 'acp-coding-attachments-'));
+  const imagePath = path.join(workspaceRoot, 'screenshot.png');
+  const textPath = path.join(workspaceRoot, 'notes.txt');
+  await writeFile(imagePath, 'shot');
+  await writeFile(textPath, 'note');
+  const script = [
+    "let buffer='';",
+    "process.stdin.on('data', chunk => { buffer += chunk; while (buffer.includes('\\n')) { const index = buffer.indexOf('\\n'); const request = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1);",
+    "if (request.method === 'initialize') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { protocolVersion: 1, agentCapabilities: { promptCapabilities: { image: true, embeddedContext: true } } } }) + '\\n');",
+    "if (request.method === 'session/new') process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { sessionId: 'remote-session' } }) + '\\n');",
+    "if (request.method === 'session/prompt') { const prompt = request.params.prompt; const summary = `${prompt.map(block => block.type).join(',')}:${prompt[1].mimeType}:${prompt[1].data}:${prompt[2].resource.text}`; process.stdout.write(JSON.stringify({ jsonrpc: '2.0', method: 'session/update', params: { sessionId: 'remote-session', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: summary } } } }) + '\\n'); process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: request.id, result: { stopReason: 'end_turn' } }) + '\\n'); }",
+    '} });',
+  ].join('');
+  const driver = new AcpCodingDriver({
+    executable: execPath,
+    args: ['-e', script],
+    environment: process.env as Record<string, string>,
+  });
+
+  try {
+    const session = await driver.createSession({ workspaceRoot });
+    const events = [];
+    for await (const event of driver.prompt({
+      sessionId: session.id,
+      workspaceRoot,
+      prompt: 'Inspect these files.',
+      attachments: [
+        { name: 'screenshot.png', path: imagePath },
+        { name: 'notes.txt', path: textPath },
+      ],
+    }))
+      events.push(event);
+
+    expect(await driver.getCapabilities()).toEqual(
+      expect.objectContaining({ supportsPromptImages: true, supportsEmbeddedContext: true }),
+    );
+    expect(events).toEqual([
+      expect.objectContaining({
+        kind: CodingEventKind.MessageDelta,
+        payload: expect.objectContaining({ content: 'text,image,resource:image/png:c2hvdA==:note' }),
+      }),
+    ]);
+  } finally {
+    await driver.dispose();
+    await rm(workspaceRoot, { recursive: true, force: true });
+  }
 });
 
 test('declares only the client capabilities implemented by the ACP driver', async () => {

@@ -113,11 +113,13 @@ export const discoveryDirectories = (
           environment.APPDATA ? path.join(environment.APPDATA, 'npm') : '',
           environment.LOCALAPPDATA ? path.join(environment.LOCALAPPDATA, 'pnpm') : '',
           path.join(home, '.bun', 'bin'),
+          path.join(home, '.kimi-code', 'bin'),
         ]
       : [
           path.join(home, '.local', 'bin'),
           path.join(home, '.npm-global', 'bin'),
           path.join(home, '.bun', 'bin'),
+          path.join(home, '.kimi-code', 'bin'),
           path.join(home, '.local', 'share', 'pnpm'),
           platform === 'darwin' ? path.join(home, 'Library', 'pnpm') : '',
         ];
@@ -164,7 +166,10 @@ export class AcpDiscoveryService {
           description: `${agent.description} Detected locally. Probe before using.`,
           command: resolved,
           args: agent.args,
-          environment: agent.environment,
+          environment: {
+            ...agent.environment,
+            [CodingAgentEnvironmentKey.RegistryAgentId]: agent.id,
+          },
         });
       }),
     );

@@ -1,17 +1,23 @@
 import {
   PromptInput,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuItem,
+  PromptInputActionMenuTrigger,
   PromptInputBody,
+  PromptInputButton,
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
 } from '@shared/components/ai-elements/prompt-input';
-import { Bot } from 'lucide-react';
+import { ImageIcon, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import type {
   CodingAgentAvailableCommand,
   CodingAgentConfigOption,
+  CodingPromptAttachment,
 } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
 import { CodingComposerConfigControls } from './CodingComposerConfigControls';
@@ -29,8 +35,8 @@ interface CodingComposerProps {
   isSubmitting?: boolean;
   hasError?: boolean;
   prompt: string;
-  recipientName: string;
-  showRecipient?: boolean;
+  attachments: CodingPromptAttachment[];
+  canAttachFiles: boolean;
   leadingTools?: ReactNode;
   statusNotice?: ReactNode;
   sessionId?: string;
@@ -39,6 +45,8 @@ interface CodingComposerProps {
     'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'
   >;
   onChange: (value: string) => void;
+  onAddAttachments: () => void;
+  onRemoveAttachment: (path: string) => void;
   onConfigOptionChange: (optionId: string, value: string | boolean) => void;
   onSend: () => void;
   onSteer?: () => void;
@@ -54,13 +62,15 @@ export const CodingComposer = ({
   isSubmitting = false,
   hasError = false,
   prompt,
-  recipientName,
-  showRecipient = true,
+  attachments,
+  canAttachFiles,
   leadingTools,
   statusNotice,
   sessionId,
   queueService,
   onChange,
+  onAddAttachments,
+  onRemoveAttachment,
   onConfigOptionChange,
   onSend,
   onSteer,
@@ -208,19 +218,37 @@ export const CodingComposer = ({
               disabled={disabled}
               className="max-h-48 min-h-20"
             />
+            {attachments.length > 0 ? (
+              <div className="flex flex-wrap gap-1 px-3 pb-2">
+                {attachments.map(attachment => (
+                  <PromptInputButton
+                    key={attachment.path}
+                    type="button"
+                    className="max-w-48 gap-1 px-2 text-sm hover:bg-surface-raised"
+                    tooltip={i18nService.t('codingAttachmentRemove')}
+                    onClick={() => onRemoveAttachment(attachment.path)}
+                  >
+                    <span className="truncate">{attachment.name}</span>
+                    <X className="size-3.5 shrink-0" />
+                  </PromptInputButton>
+                ))}
+              </div>
+            ) : null}
           </PromptInputBody>
-          <PromptInputFooter className="flex-nowrap">
-            <PromptInputTools className="min-w-0 flex-1 flex-nowrap overflow-hidden">
-              {leadingTools}
-              {showRecipient ? (
-                <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                  <Bot className="size-3.5 shrink-0" />
-                  {!isTightToolbar && (
-                    <span className="shrink-0">{i18nService.t('codingAgentSendTo')}</span>
-                  )}
-                  <span className="truncate font-medium text-foreground">{recipientName}</span>
-                </div>
+          <PromptInputFooter className="flex-wrap">
+            <PromptInputTools className="flex-1 flex-wrap">
+              {canAttachFiles ? (
+                <PromptInputActionMenu>
+                  <PromptInputActionMenuTrigger tooltip={i18nService.t('codingAttachmentAdd')} />
+                  <PromptInputActionMenuContent>
+                    <PromptInputActionMenuItem onClick={onAddAttachments}>
+                      <ImageIcon className="mr-2 size-4" />
+                      {i18nService.t('codingAttachmentAdd')}
+                    </PromptInputActionMenuItem>
+                  </PromptInputActionMenuContent>
+                </PromptInputActionMenu>
               ) : null}
+              {leadingTools}
               <CodingComposerConfigControls
                 options={configOptions}
                 onChange={onConfigOptionChange}

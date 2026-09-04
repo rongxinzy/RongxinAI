@@ -186,3 +186,123 @@ test('upgrades legacy Codex records to the bundled bridge and preserves the prof
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test('merges an upgraded registry agent into the profile used by existing sessions', async () => {
+  db = new Database(':memory:');
+  initializeCodingAgentSchema(db);
+  const repository = new CodingAgentProfileRepository(db);
+  const root = path.join(process.cwd(), `.coding-agent-registry-cursor-${Date.now()}`);
+  const binDirectory = path.join(root, 'bin');
+  const cursorExecutable = path.join(binDirectory, 'cursor-agent');
+  const registryPath = path.join(root, 'registry.json');
+  try {
+    await mkdir(binDirectory, { recursive: true });
+    await writeFile(cursorExecutable, '#!/bin/sh\nexit 0\n');
+    await chmod(cursorExecutable, 0o755);
+    await writeFile(
+      registryPath,
+      JSON.stringify({
+        agents: [
+          {
+            id: 'cursor-agent',
+            name: 'Cursor',
+            description: "Cursor's coding agent.",
+            distribution: {
+              binary: { 'darwin-aarch64': { cmd: './cursor-agent', args: ['acp'] } },
+            },
+          },
+        ],
+      }),
+    );
+    const capabilities = {
+      supportsLoadSession: false,
+      supportsResumeSession: false,
+      supportsPlans: false,
+      supportsPermissions: false,
+      supportsFilesystem: false,
+      supportsTerminal: false,
+      supportsConfigOptions: false,
+      supportsUsage: false,
+      supportsElicitation: false,
+    };
+    repository.save({
+      id: 'cursor-session-profile',
+      name: 'Cursor',
+      description: "Cursor's coding agent. Detected locally. Probe before using.",
+      driverKind: CodingAgentDriverKind.Acp,
+      status: CodingAgentProfileStatus.Ready,
+      capabilities,
+      authMethods: [],
+      command: '/old/cursor-agent',
+      args: ['acp'],
+      environment: {},
+      isBuiltin: false,
+    });
+    repository.save({
+      id: 'cursor-stale-profile',
+      name: 'Cursor',
+      description: "Cursor's coding agent. Detected locally. Probe before using.",
+      driverKind: CodingAgentDriverKind.Acp,
+      status: CodingAgentProfileStatus.Detected,
+      capabilities,
+      authMethods: [],
+      command: cursorExecutable,
+      args: ['acp'],
+      environment: { [CodingAgentEnvironmentKey.RegistryAgentId]: 'cursor-agent' },
+      isBuiltin: false,
+    });
+    db.prepare(
+      `INSERT INTO coding_agent_lanes
+       (id, mission_id, profile_id, source_root, execution_root, config_options_json, available_commands_json, local_session_id, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      'cursor-lane',
+      'cursor-mission',
+      'cursor-session-profile',
+      root,
+      root,
+      '[]',
+      '[]',
+      'cursor-local-session',
+      'idle',
+      Date.now(),
+      Date.now(),
+    );
+    db.prepare(
+      `INSERT INTO coding_rooms
+       (id, name, workspace_root, default_profile_id, active_mission_id, active_lane_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)`,
+    ).run(
+      'cursor-workspace',
+      'Cursor workspace',
+      root,
+      'cursor-stale-profile',
+      Date.now(),
+      Date.now(),
+    );
+
+    const registry = new CodingAgentRegistry(repository, () => true, registryPath, root, {
+      environment: { PATH: binDirectory },
+      home: root,
+      platform: 'darwin',
+      architecture: 'arm64',
+    });
+    registry.hydrate();
+    await registry.discoverExternalAgents();
+
+    expect(registry.get('cursor-session-profile')).toMatchObject({
+      command: cursorExecutable,
+      status: CodingAgentProfileStatus.Detected,
+      environment: { [CodingAgentEnvironmentKey.RegistryAgentId]: 'cursor-agent' },
+    });
+    expect(registry.get('cursor-stale-profile')).toBeUndefined();
+    expect(repository.listExternal().map(profile => profile.id)).toEqual(['cursor-session-profile']);
+    expect(
+      db
+        .prepare('SELECT default_profile_id FROM coding_rooms WHERE id = ?')
+        .get('cursor-workspace'),
+    ).toEqual({ default_profile_id: 'cursor-session-profile' });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

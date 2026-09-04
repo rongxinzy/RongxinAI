@@ -27,6 +27,7 @@ export const CodingAgentEnvironmentKey = {
   ElectronRunAsNode: 'ELECTRON_RUN_AS_NODE',
   ManagedAdapterId: 'ZHIYUAN_ACP_ADAPTER_ID',
   ManagedAdapterVersion: 'ZHIYUAN_ACP_ADAPTER_VERSION',
+  RegistryAgentId: 'ZHIYUAN_ACP_REGISTRY_AGENT_ID',
   CodexPath: 'CODEX_PATH',
   ClaudeCodeExecutable: 'CLAUDE_CODE_EXECUTABLE',
 } as const;

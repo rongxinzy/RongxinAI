@@ -12,11 +12,13 @@ import { i18nService } from '../../services/i18n';
 import type { Artifact } from '../../types/artifact';
 import ArtifactPreviewCard from '../artifacts/ArtifactPreviewCard';
 import { CodingActivity } from './CodingActivityView';
+import { CodingAgentWorkingIndicator } from './CodingAgentWorkingIndicator';
 import { CodingConversationTurnStatus } from './constants';
 import { type CodingConversationTurn as CodingConversationTurnModel } from './codingEventProjection';
 
 interface CodingConversationTurnProps {
   isStreaming: boolean;
+  showWaitingIndicator: boolean;
   turn: CodingConversationTurnModel;
   /** Artifacts detected in this lane, keyed by the assistant message id. */
   artifactsByMessageId?: ReadonlyMap<string, Artifact[]>;
@@ -52,6 +54,7 @@ const TurnStatus = ({ turn }: { turn: CodingConversationTurnModel }) => {
 
 const CodingConversationTurnComponent = ({
   isStreaming,
+  showWaitingIndicator,
   turn,
   artifactsByMessageId,
   artifactsByToolCallId,
@@ -69,6 +72,8 @@ const CodingConversationTurnComponent = ({
     )}
 
     <div className="flex flex-col gap-3">
+      {showWaitingIndicator ? <CodingAgentWorkingIndicator /> : null}
+
       {turn.reasoning && (
         <Reasoning isStreaming={isStreaming} defaultOpen={false}>
           <ReasoningTrigger
@@ -178,6 +183,7 @@ const conversationTurnPropsEqual = (
   next: CodingConversationTurnProps,
 ): boolean =>
   prev.isStreaming === next.isStreaming &&
+  prev.showWaitingIndicator === next.showWaitingIndicator &&
   prev.artifactsByMessageId === next.artifactsByMessageId &&
   prev.artifactsByToolCallId === next.artifactsByToolCallId &&
   turnContentsEqual(prev.turn, next.turn);

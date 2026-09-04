@@ -12,7 +12,6 @@ import { useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  CodingAgentProfileId,
   CodingLaneStatus,
   type CodingAgentProfile,
   type CodingSessionSummary,
@@ -27,6 +26,7 @@ import {
   SidebarAnimatedMessageCirclePlusIcon,
   type SidebarAnimatedMessageCirclePlusIconHandle,
 } from '../icons/SidebarAnimatedMessageCirclePlusIcon';
+import { CodingUiEvent, type CodingCreateSessionEventDetail } from './constants';
 import { CodingWorkspaceDialog } from './CodingWorkspaceDialog';
 
 export interface CodingSessionDraft {
@@ -152,22 +152,14 @@ export const CodingWorkspaceSidebar = ({
     [selection.workspaceId, workspaces],
   );
 
-  const openSessionDraft = (workspace: CodingWorkspaceSummary) => {
+  const openSessionSetup = (workspace: CodingWorkspaceSummary) => {
     setError(null);
     setExpandedIds(current => new Set(current).add(workspace.id));
-    onSelectionChange({
-      workspaceId: workspace.id,
-      workspaceRoot: workspace.primaryRoot,
-      laneId: null,
-      draft: {
-        id: crypto.randomUUID(),
-        workspaceId: workspace.id,
-        sourceRoot: workspace.sources[0]?.path ?? workspace.primaryRoot,
-        profileId: workspace.defaultProfileId || CodingAgentProfileId.Builtin,
-        modelOverride: null,
-        sources: workspace.sources,
-      },
-    });
+    window.dispatchEvent(
+      new CustomEvent<CodingCreateSessionEventDetail>(CodingUiEvent.CreateSession, {
+        detail: { workspace },
+      }),
+    );
   };
 
   const saveWorkspace = async (input: {
@@ -291,7 +283,7 @@ export const CodingWorkspaceSidebar = ({
                   })
                 }
                 onSelectionChange={onSelectionChange}
-                onCreateSession={openSessionDraft}
+                onCreateSession={openSessionSetup}
                 onEditWorkspace={target => {
                   setEditingWorkspace(target);
                   setWorkspaceDialogOpen(true);
