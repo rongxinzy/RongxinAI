@@ -60,6 +60,6 @@ test('preselects the workspace default when that Agent is ready', () => {
     />,
   );
 
-  expect(screen.getByText('OpenCode')).toBeTruthy();
+  expect(screen.getByRole('combobox', { name: '选择 Agent' })).toHaveTextContent('OpenCode');
   expect(screen.getByRole('button', { name: '确认' })).toBeEnabled();
 });
