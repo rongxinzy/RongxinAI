@@ -1280,6 +1280,7 @@ const getCanonicalScheduledTaskService = (): CanonicalScheduledTaskService => {
       taskStore,
       canonicalSchedulerRuntime,
     );
+    piRuntimeAdapter?.setScheduledTaskService(canonicalScheduledTaskService);
   }
   return canonicalScheduledTaskService;
 };
