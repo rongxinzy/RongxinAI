@@ -1,10 +1,12 @@
 import { expect, test } from 'vitest';
 
+import { CoworkInterruptionCause } from '../../../../shared/cowork/interruption';
 import type { CoworkMessage } from '../../../types/cowork';
 import {
   buildConversationTurns,
   buildDisplayItems,
   buildTurnRailIndices,
+  getVisibleAssistantItems,
   stabilizeConversationTurns,
 } from './messageGrouping';
 
@@ -104,6 +106,30 @@ test('buildTurnRailIndices skips turns without user or assistant content', () =>
 
   expect(indices[0]).toEqual({ user: -1, assistant: 0 });
   expect(indices[1]).toEqual({ user: 1, assistant: -1 });
+});
+
+test('keeps empty interruption messages visible while hiding other empty system messages', () => {
+  const interruptionMessage: CoworkMessage = {
+    ...message('interruption-1', 'system', ''),
+    metadata: {
+      interruption: {
+        sessionId: 'session-1',
+        interruptionId: 'interruption-1',
+        cause: CoworkInterruptionCause.UserStop,
+        taskId: null,
+        recoverable: false,
+      },
+    },
+  };
+  const turn = buildTurns([
+    message('user-1', 'user', 'run task'),
+    interruptionMessage,
+    message('system-1', 'system', ''),
+  ])[0];
+
+  expect(getVisibleAssistantItems(turn.assistantItems)).toEqual([
+    { type: 'system', message: interruptionMessage },
+  ]);
 });
 
 // ── Scale fixtures (issue #141: 20/200/1000-turn sessions) ──
