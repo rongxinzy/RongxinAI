@@ -1,7 +1,7 @@
 import { app, ipcMain, session } from 'electron';
 
 import { ModelPoolIpc } from '../shared/ipc/channels';
-import { ModelPoolStreamSchema } from '../shared/ipc/schemas';
+import { ModelPoolModelsSchema, ModelPoolStreamSchema } from '../shared/ipc/schemas';
 import { ZhiyuanModelPool } from '../shared/modelPool/constants';
 import type { CommunityAuthSessionManager } from './communityAuthSession';
 import { t } from './i18n';
@@ -30,6 +30,12 @@ function modelPoolErrorMessage(rawBody: string, status: number): string {
   try {
     const payload = JSON.parse(rawBody) as { error?: { code?: unknown } };
     if (payload.error?.code === 'unauthorized') return t('modelPoolLoginRequired');
+    if (
+      payload.error?.code === 'account_disabled' ||
+      payload.error?.code === 'entitlement_required'
+    ) {
+      return t('modelPoolEntitlementRequired');
+    }
     if (payload.error?.code === 'quota_exceeded') return t('modelPoolQuotaExceeded');
   } catch {
     // Use the localized stable fallback for non-JSON upstream failures.
@@ -54,9 +60,66 @@ async function fetchModelPool(
   });
 }
 
+async function fetchModelPoolModels(
+  communityAuthSession: CommunityAuthSessionManager,
+): Promise<Response> {
+  const fetchModels = (token: string) =>
+    session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/models`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  let accessToken = await communityAuthSession.getAccessToken();
+  let response = await fetchModels(accessToken);
+  if (response.status === 401) {
+    accessToken = await communityAuthSession.getAccessToken({ forceRefresh: true });
+    response = await fetchModels(accessToken);
+  }
+  return response;
+}
+
+function parseModelIds(value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const data = (value as Record<string, unknown>).data;
+  if (!Array.isArray(data)) return [];
+  return data.flatMap(item => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return [];
+    const id = (item as Record<string, unknown>).id;
+    return typeof id === 'string' && id.trim() ? [id] : [];
+  });
+}
+
 export function registerModelPoolIpcHandlers(
   communityAuthSession: CommunityAuthSessionManager,
 ): void {
+  ipcMain.handle(ModelPoolIpc.ListModels, async () => {
+    try {
+      const response = await fetchModelPoolModels(communityAuthSession);
+      if (!response.ok) {
+        const result = {
+          ok: false,
+          status: response.status,
+          models: [],
+          error: modelPoolErrorMessage(await response.text(), response.status),
+        };
+        return ModelPoolModelsSchema.output.parse(result);
+      }
+      const result = {
+        ok: true,
+        status: response.status,
+        models: parseModelIds((await response.json()) as unknown),
+      };
+      return ModelPoolModelsSchema.output.parse(result);
+    } catch {
+      return ModelPoolModelsSchema.output.parse({
+        ok: false,
+        status: 0,
+        models: [],
+        error: communityAuthSession.getUser()
+          ? t('modelPoolServiceUnavailable')
+          : t('modelPoolLoginRequired'),
+      });
+    }
+  });
+
   ipcMain.handle(ModelPoolIpc.Stream, async (event, rawInput: unknown) => {
     const input = ModelPoolStreamSchema.input.parse(rawInput);
     const controller = new AbortController();

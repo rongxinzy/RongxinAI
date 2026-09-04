@@ -22,6 +22,7 @@ import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 function createSessionManager() {
   return {
     getAccessToken: vi.fn(async () => 'account-access-token'),
+    getUser: vi.fn(() => ({ id: 'user-1', email: 'user@example.com' })),
   } as unknown as CommunityAuthSessionManager;
 }
 
@@ -39,6 +40,49 @@ afterEach(() => {
 });
 
 describe('Model Pool IPC', () => {
+  test('lists only logical models returned for the authenticated account', async () => {
+    const sessionManager = createSessionManager();
+    electronMocks.fetch.mockResolvedValue(
+      Response.json({
+        object: 'list',
+        data: [
+          { id: 'zhiyuan-free', object: 'model', owned_by: 'zhiyuan' },
+          { id: 42, object: 'model' },
+        ],
+      }),
+    );
+    registerModelPoolIpcHandlers(sessionManager);
+    const handler = electronMocks.handlers.get(ModelPoolIpc.ListModels);
+
+    await expect(handler?.({})).resolves.toEqual({
+      ok: true,
+      status: 200,
+      models: ['zhiyuan-free'],
+    });
+    expect(electronMocks.fetch).toHaveBeenCalledWith(
+      'https://zhiyuan-model-pool-staging.windflyme5.workers.dev/v1/models',
+      { headers: { Authorization: 'Bearer account-access-token' } },
+    );
+  });
+
+  test('does not expose models when the business policy rejects the account', async () => {
+    const sessionManager = createSessionManager();
+    electronMocks.fetch.mockResolvedValue(
+      Response.json(
+        { error: { code: 'entitlement_required', message: 'not entitled' } },
+        { status: 403 },
+      ),
+    );
+    registerModelPoolIpcHandlers(sessionManager);
+    const handler = electronMocks.handlers.get(ModelPoolIpc.ListModels);
+
+    await expect(handler?.({})).resolves.toMatchObject({
+      ok: false,
+      status: 403,
+      models: [],
+    });
+  });
+
   test('owns the endpoint and authorization header in the main process', async () => {
     const sessionManager = createSessionManager();
     electronMocks.fetch.mockResolvedValue(

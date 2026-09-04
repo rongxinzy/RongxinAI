@@ -107,6 +107,7 @@ export const ApiIpc = {
 
 // ─── ZhiYuan Model Pool ────────────────────────────────────────────────────
 export const ModelPoolIpc = {
+  ListModels: 'model-pool:list-models',
   Stream: 'model-pool:stream',
   CancelStream: 'model-pool:stream:cancel',
   streamData: (requestId: string) => `model-pool:stream:${requestId}:data`,

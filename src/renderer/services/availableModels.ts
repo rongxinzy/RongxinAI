@@ -172,10 +172,12 @@ export async function collectAvailableModels(config: AppConfig): Promise<Model[]
 
   let zhiyuanModels: Model[] = [];
   try {
-    const account = await window.electron.auth?.getCommunityUser();
-    if (account?.success && account.user) zhiyuanModels = buildZhiyuanManagedModels();
+    const models = await window.electron.modelPool?.listModels();
+    if (models?.ok && models.models.includes(ZhiyuanModelPool.FreeModelId)) {
+      zhiyuanModels = buildZhiyuanManagedModels();
+    }
   } catch {
-    // Account availability is optional; user-configured and local models remain usable.
+    // Model Pool availability is optional; user-configured and local models remain usable.
   }
 
   try {

@@ -142,6 +142,15 @@ export const ModelPoolStreamSchema = {
   }),
 };
 
+export const ModelPoolModelsSchema = {
+  output: z.object({
+    ok: z.boolean(),
+    status: z.number(),
+    models: z.array(z.string()),
+    error: z.string().optional(),
+  }),
+};
+
 export const ProviderModelDiscoverySchema = {
   input: z.object({
     baseUrl: z.string().url(),

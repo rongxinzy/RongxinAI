@@ -1439,6 +1439,12 @@ interface IElectronAPI {
     ) => () => void;
   };
   modelPool: {
+    listModels: () => Promise<{
+      ok: boolean;
+      status: number;
+      models: string[];
+      error?: string;
+    }>;
     stream: (input: { requestId: string; body: Record<string, unknown> }) => Promise<{
       ok: boolean;
       status: number;

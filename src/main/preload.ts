@@ -993,6 +993,7 @@ contextBridge.exposeInMainWorld('electron', {
   },
 
   modelPool: {
+    listModels: () => ipcRenderer.invoke(ModelPoolIpc.ListModels),
     stream: (input: { requestId: string; body: Record<string, unknown> }) =>
       ipcRenderer.invoke(ModelPoolIpc.Stream, input),
     cancelStream: (requestId: string) => ipcRenderer.invoke(ModelPoolIpc.CancelStream, requestId),
