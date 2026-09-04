@@ -63,3 +63,26 @@ test('invalidating a path forces a fresh read', async () => {
   await expect(loadArtifactDataUrl('C:/workspace/notes.txt')).resolves.toContain('V29ybGQ');
   expect(readFileAsDataUrl).toHaveBeenCalledTimes(2);
 });
+
+test('clearing the cache prevents an old read from repopulating it', async () => {
+  let resolveRead: ((value: { success: true; dataUrl: string }) => void) | undefined;
+  const readFileAsDataUrl = vi.fn().mockImplementation(
+    () =>
+      new Promise<{ success: true; dataUrl: string }>(resolve => {
+        resolveRead = resolve;
+      }),
+  );
+  vi.stubGlobal('window', { electron: { dialog: { readFileAsDataUrl } } });
+
+  const firstLoad = loadArtifactDataUrl('C:/workspace/notes.txt');
+  clearArtifactFileCache();
+  resolveRead?.({ success: true, dataUrl: TEXT_DATA_URL });
+  await firstLoad;
+
+  readFileAsDataUrl.mockResolvedValueOnce({
+    success: true,
+    dataUrl: 'data:text/plain;base64,V29ybGQ=',
+  });
+  await expect(loadArtifactDataUrl('C:/workspace/notes.txt')).resolves.toContain('V29ybGQ');
+  expect(readFileAsDataUrl).toHaveBeenCalledTimes(2);
+});

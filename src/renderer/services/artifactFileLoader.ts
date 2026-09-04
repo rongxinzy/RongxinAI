@@ -21,6 +21,7 @@ const dataUrlCache = new Map<string, CachedDataUrl>();
 const pathGenerations = new Map<string, number>();
 let cachedBytes = 0;
 let usageCounter = 0;
+let cacheEpoch = 0;
 
 function normalizeFilePath(rawPath: string): string {
   let filePath = rawPath;
@@ -68,6 +69,7 @@ export function loadArtifactDataUrl(rawPath: string, cwd?: string | null): Promi
   const pending = pendingDataUrlLoads.get(filePath);
   if (pending) return pending;
   const generation = pathGenerations.get(filePath) ?? 0;
+  const epoch = cacheEpoch;
 
   const load = (async () => {
     const readFile = window.electron?.dialog?.readFileAsDataUrl;
@@ -78,7 +80,7 @@ export function loadArtifactDataUrl(rawPath: string, cwd?: string | null): Promi
       throw new Error(result?.error || 'Failed to read artifact file');
     }
 
-    if ((pathGenerations.get(filePath) ?? 0) === generation) {
+    if (cacheEpoch === epoch && (pathGenerations.get(filePath) ?? 0) === generation) {
       const entry: CachedDataUrl = {
         dataUrl: result.dataUrl,
         size: result.dataUrl.length * 2,
@@ -150,6 +152,7 @@ export function invalidateArtifactFile(filePath: string): void {
 }
 
 export function clearArtifactFileCache(): void {
+  cacheEpoch += 1;
   pendingLoads.clear();
   pendingDataUrlLoads.clear();
   dataUrlCache.clear();
