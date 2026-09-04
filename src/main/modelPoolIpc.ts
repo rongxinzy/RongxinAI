@@ -97,7 +97,7 @@ export function registerModelPoolIpcHandlers(
         const result = {
           ok: false,
           status: response.status,
-          models: [],
+          models: [] as string[],
           error: modelPoolErrorMessage(await response.text(), response.status),
         };
         return ModelPoolModelsSchema.output.parse(result);
@@ -112,7 +112,7 @@ export function registerModelPoolIpcHandlers(
       return ModelPoolModelsSchema.output.parse({
         ok: false,
         status: 0,
-        models: [],
+        models: [] as string[],
         error: communityAuthSession.getUser()
           ? t('modelPoolServiceUnavailable')
           : t('modelPoolLoginRequired'),
