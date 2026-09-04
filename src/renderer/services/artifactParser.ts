@@ -234,41 +234,45 @@ function normalizeDetectedPath(rawPath: string): string {
   }
 }
 
-function parseFinalAnswerPathArtifacts(messages: CoworkMessage[], sessionId: string): Artifact[] {
+export function parseFinalAnswerPathArtifactsForMessage(
+  message: CoworkMessage,
+  sessionId: string,
+): Artifact[] {
   const artifacts: Artifact[] = [];
+  const isFinalAnswer =
+    message.type === 'assistant' &&
+    !message.metadata?.isThinking &&
+    (message.metadata?.isFinalAnswer || message.metadata?.isFinal);
+  if (!isFinalAnswer || !message.content) return artifacts;
 
-  for (const message of messages) {
-    const isFinalAnswer =
-      message.type === 'assistant' &&
-      !message.metadata?.isThinking &&
-      (message.metadata?.isFinalAnswer || message.metadata?.isFinal);
-    if (!isFinalAnswer || !message.content) continue;
+  for (const match of message.content.matchAll(FINAL_ANSWER_PATH_PATTERN)) {
+    const rawPath = match[1];
+    if (!rawPath) continue;
+    const filePath = normalizeDetectedPath(rawPath);
+    const artifactType = getArtifactTypeFromExtension(getFileExtension(filePath));
+    if (!artifactType) continue;
 
-    for (const match of message.content.matchAll(FINAL_ANSWER_PATH_PATTERN)) {
-      const rawPath = match[1];
-      if (!rawPath) continue;
-      const filePath = normalizeDetectedPath(rawPath);
-      const artifactType = getArtifactTypeFromExtension(getFileExtension(filePath));
-      if (!artifactType) continue;
-
-      artifacts.push({
-        id: `artifact-final-path-${message.id}-${artifacts.length}`,
-        messageId: message.id,
-        sessionId,
-        type: artifactType,
-        title: getFileName(filePath),
-        content: '',
-        fileName: getFileName(filePath),
-        filePath,
-        source: 'tool',
-        role: ArtifactRole.Deliverable,
-        declared: false,
-        createdAt: message.timestamp || Date.now(),
-      });
-    }
+    artifacts.push({
+      id: `artifact-final-path-${message.id}-${artifacts.length}`,
+      messageId: message.id,
+      sessionId,
+      type: artifactType,
+      title: getFileName(filePath),
+      content: '',
+      fileName: getFileName(filePath),
+      filePath,
+      source: 'tool',
+      role: ArtifactRole.Deliverable,
+      declared: false,
+      createdAt: message.timestamp || Date.now(),
+    });
   }
 
   return artifacts;
+}
+
+function parseFinalAnswerPathArtifacts(messages: CoworkMessage[], sessionId: string): Artifact[] {
+  return messages.flatMap(message => parseFinalAnswerPathArtifactsForMessage(message, sessionId));
 }
 
 export function parseToolArtifact(
