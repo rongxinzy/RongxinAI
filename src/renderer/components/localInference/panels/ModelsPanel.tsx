@@ -475,7 +475,7 @@ const ModelCard = memo(function ModelCard({
   return (
     <div
       data-local-inference-model-card-frame="true"
-      className="relative z-0 h-full w-full rounded-xl transition-[box-shadow,z-index] duration-200 hover:z-20 hover:shadow-xl hover:shadow-foreground/20 focus-within:z-20"
+      className="relative z-0 h-full w-full rounded-lg transition-[z-index] duration-200 hover:z-20 focus-within:z-20"
     >
       <Card
         size="sm"
@@ -485,14 +485,14 @@ const ModelCard = memo(function ModelCard({
         onDrop={event => onDrop(event, model.name)}
         onDragEnd={onDragEnd}
         className={cn(
-          'relative h-full w-full cursor-grab select-none border border-border/70 bg-card p-0 shadow-sm ring-0 transition-[background-color,border-color,box-shadow] duration-200 active:cursor-grabbing',
-          'hover:border-border hover:bg-muted/20 hover:shadow-md',
+          'relative h-full w-full cursor-grab select-none rounded-lg border border-border/70 bg-card p-0 shadow-sm ring-0 transition-[background-color,border-color] duration-200 active:cursor-grabbing',
+          'hover:border-border hover:bg-muted/20',
           (loadingModel || unloading) && 'bg-muted/30',
           dragging && 'opacity-50',
         )}
       >
         {loadingModel || unloading ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-xl bg-background/80 backdrop-blur-[1px]">
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-lg bg-background/80 backdrop-blur-[1px]">
             <Button
               type="button"
               disabled
@@ -527,8 +527,19 @@ const ModelCard = memo(function ModelCard({
           </div>
         ) : null}
 
+        {isRunning ? (
+          <span className="pointer-events-none absolute right-4 top-2 z-10">
+            <BreathingDot
+              color="var(--zy-success)"
+              duration={2}
+              label={i18nService.t('localInferenceStatus_running')}
+              size={8}
+            />
+          </span>
+        ) : null}
+
         <CardHeader className="flex flex-col gap-2 p-4">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 w-full items-center gap-2">
             <span
               aria-hidden="true"
               className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
@@ -540,14 +551,6 @@ const ModelCard = memo(function ModelCard({
                 <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
                   {displayName}
                 </CardTitle>
-                {isRunning ? (
-                  <BreathingDot
-                    color="var(--zy-success)"
-                    duration={2}
-                    label={i18nService.t('localInferenceStatus_running')}
-                    size={8}
-                  />
-                ) : null}
               </div>
               {modifiedDate ? (
                 <div className="flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
@@ -557,6 +560,77 @@ const ModelCard = memo(function ModelCard({
               ) : null}
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-1">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground"
+                      disabled={buttonsDisabled}
+                      aria-label={i18nService.t('coworkSessionActions')}
+                      title={i18nService.t('coworkSessionActions')}
+                      data-local-inference-model-actions-button="true"
+                    >
+                      <Ellipsis className="size-5" />
+                    </Button>
+                  }
+                />
+                <DropdownMenuContent align="end" className="min-w-44">
+                  <DropdownMenuItem onClick={() => onConfigureContext(model)}>
+                    <Settings2 className="size-4" />
+                    {i18nService.t('localInferenceConfigureContext')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    data-local-inference-delete-button="true"
+                    onClick={() => onDelete(model)}
+                  >
+                    <Trash2 className="size-4" />
+                    {i18nService.t('delete')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 w-full items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              {hasDetailsTag ? (
+                <HoverCard>
+                  <HoverCardTrigger
+                    delay={200}
+                    closeDelay={100}
+                    render={
+                      <Badge
+                        variant="secondary"
+                        className={cn(modelCardTagBaseClassName, 'shrink-0 cursor-default')}
+                      >
+                        {i18nService.t('localInferenceDetails')}
+                      </Badge>
+                    }
+                  />
+                  <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
+                    <div className="flex flex-col gap-2">
+                      {details.map(item => (
+                        <MetadataRow key={item.label} label={item.label} value={item.value} />
+                      ))}
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
+              ) : null}
+              {visibleTags.map(tag => (
+                <Badge
+                  key={tag.label}
+                  variant="secondary"
+                  className={cn(modelCardTagBaseClassName, 'shrink-0')}
+                >
+                  {tag.label}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex shrink-0 items-center">
               {loadingModel ? (
                 <Button
                   type="button"
@@ -598,74 +672,7 @@ const ModelCard = memo(function ModelCard({
                   {i18nService.t('start')}
                 </Button>
               )}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-muted-foreground"
-                      disabled={buttonsDisabled}
-                      aria-label={i18nService.t('coworkSessionActions')}
-                      title={i18nService.t('coworkSessionActions')}
-                      data-local-inference-model-actions-button="true"
-                    >
-                      <Ellipsis className="size-5" />
-                    </Button>
-                  }
-                />
-                <DropdownMenuContent align="end" className="min-w-44">
-                  <DropdownMenuItem onClick={() => onConfigureContext(model)}>
-                    <Settings2 className="size-4" />
-                    {i18nService.t('localInferenceConfigureContext')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    data-local-inference-delete-button="true"
-                    onClick={() => onDelete(model)}
-                  >
-                    <Trash2 className="size-4" />
-                    {i18nService.t('delete')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
-          </div>
-
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {hasDetailsTag ? (
-              <HoverCard>
-                <HoverCardTrigger
-                  delay={200}
-                  closeDelay={100}
-                  render={
-                    <Badge
-                      variant="secondary"
-                      className={cn(modelCardTagBaseClassName, 'shrink-0 cursor-default')}
-                    >
-                      {i18nService.t('localInferenceDetails')}
-                    </Badge>
-                  }
-                />
-                <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
-                  <div className="flex flex-col gap-2">
-                    {details.map(item => (
-                      <MetadataRow key={item.label} label={item.label} value={item.value} />
-                    ))}
-                  </div>
-                </HoverCardContent>
-              </HoverCard>
-            ) : null}
-            {visibleTags.map(tag => (
-              <Badge
-                key={tag.label}
-                variant="secondary"
-                className={cn(modelCardTagBaseClassName, 'shrink-0')}
-              >
-                {tag.label}
-              </Badge>
-            ))}
           </div>
         </CardHeader>
       </Card>

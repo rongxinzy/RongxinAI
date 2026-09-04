@@ -7,6 +7,16 @@ description: Analyze and implement narrowly scoped frontend UI changes in the Zh
 
 Use this skill for existing ZhiYuan Agent frontend pages and components. Follow the repository's `AGENTS.md` and `DESIGN.md` rules, preserve unrelated worktree changes, and keep visual changes narrowly scoped.
 
+## Design Skill Routing
+
+Use this skill as the project-specific entry point, then route to the optional visual skills by page type:
+
+- For Work, Chat, Settings, MCP, Skills, local inference, and other product surfaces, follow `DESIGN.md`, the shared UI components, and `rongxinai-ui-adapter`. The marketing-page rules in the taste skills are not global defaults.
+- For landing pages, marketing pages, portfolios, brand surfaces, or redesigns, read `design-taste-frontend` before forming the design read and scoped strategy.
+- When the brief explicitly requests premium visual treatment or complex motion, also read `high-end-visual-design` and use it as a reference for direction and choreography.
+- Both optional skills are advisory. Resolve conflicts in this order: `AGENTS.md` / `DESIGN.md`, project UI skills, `design-taste-frontend`, then `high-end-visual-design`.
+- Do not install a font, icon library, animation library, or other dependency solely because an optional skill mentions it. Follow the repository's dependency approval rules.
+
 ## Required Workflow
 
 ### 1. Read Before Editing
