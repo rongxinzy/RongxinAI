@@ -1833,8 +1833,10 @@ const ensureBuiltInMcpDefaultsDisabled = (): void => {
 };
 
 const FEISHU_CLI_TIMEOUT_MS = 120_000;
+const FEISHU_CLI_INSTALL_TIMEOUT_MS = 300_000;
 const FEISHU_CLI_AUTH_TIMEOUT_MS = 600_000;
 const FEISHU_MCP_REGISTRY_ID = 'feishu';
+const FEISHU_CLI_PACKAGE = '@larksuite/cli@1.0.93';
 
 const getFeishuCliRoot = (): string => path.join(app.getPath('userData'), 'MCPs', 'feishu', 'cli');
 
@@ -1927,25 +1929,49 @@ const findFeishuCliCommand = async (): Promise<string | null> => {
   return getLocalFeishuCliCommand();
 };
 
+const installFeishuCli = async (cliRoot: string, force = false): Promise<void> => {
+  const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, [
+    'install',
+    '--prefix',
+    cliRoot,
+    '--no-save',
+    '--no-audit',
+    '--no-fund',
+    ...(force ? ['--force'] : []),
+    FEISHU_CLI_PACKAGE,
+  ]);
+  if (!bundledNpm)
+    throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
+  await runFeishuCliCommand(
+    bundledNpm.command,
+    bundledNpm.args,
+    cliRoot,
+    FEISHU_CLI_INSTALL_TIMEOUT_MS,
+  );
+};
+
+const verifyFeishuCli = async (command: string, cliRoot: string): Promise<void> => {
+  await runFeishuCliCommand(command, ['--version'], cliRoot);
+};
+
 const prepareFeishuCli = async (): Promise<void> => {
   let cliCommand = await findFeishuCliCommand();
-  if (!cliCommand) {
-    const cliRoot = getFeishuCliRoot();
-    fs.mkdirSync(cliRoot, { recursive: true });
-    const bundledNpm = resolveBundledNpmRuntime(NpmCli.Npm, [
-      'install',
-      '--prefix',
-      cliRoot,
-      '--no-save',
-      '@larksuite/cli',
-    ]);
-    if (!bundledNpm)
-      throw new Error('Bundled npm runtime is unavailable. Please reinstall the application.');
-    await runFeishuCliCommand(bundledNpm.command, bundledNpm.args, cliRoot);
+  const cliRoot = getFeishuCliRoot();
+  fs.mkdirSync(cliRoot, { recursive: true });
+  if (cliCommand) {
+    try {
+      await verifyFeishuCli(cliCommand, cliRoot);
+    } catch (error) {
+      console.warn('[Feishu] CLI health check failed, reinstalling the pinned version:', error);
+      await installFeishuCli(cliRoot, true);
+      cliCommand = await findFeishuCliCommand();
+    }
+  } else {
+    await installFeishuCli(cliRoot);
     cliCommand = await findFeishuCliCommand();
   }
   if (!cliCommand) throw new Error('Feishu CLI installation did not provide lark-cli');
-  const cliRoot = getFeishuCliRoot();
+  await verifyFeishuCli(cliCommand, cliRoot);
 
   try {
     await runFeishuCliCommand(cliCommand, ['config', 'show'], cliRoot);
