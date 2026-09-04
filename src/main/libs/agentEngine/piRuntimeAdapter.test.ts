@@ -232,7 +232,7 @@ vi.mock('./piOpenAICompatProxy', () => ({
 }));
 
 vi.mock('../../communityAuthSession', () => ({
-  getCommunityAuthAccessToken: hoisted.mockGetCommunityAuthAccessToken,
+  getModelPoolAccessToken: hoisted.mockGetCommunityAuthAccessToken,
 }));
 
 vi.mock('../coworkUtil', async importOriginal => {
@@ -1234,7 +1234,7 @@ describe('PiRuntimeAdapter', () => {
       );
     });
 
-    it('should inject and refresh account tokens for the managed model proxy', async () => {
+    it('should inject and refresh access tokens for the managed model proxy', async () => {
       mockGetModel.mockImplementationOnce(() => undefined);
       mockResolveRawApiConfigForModelRef.mockReturnValueOnce({
         config: {

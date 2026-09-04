@@ -21,7 +21,7 @@ import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 
 function createSessionManager() {
   return {
-    getAccessToken: vi.fn(async () => 'account-access-token'),
+    getModelPoolAccessToken: vi.fn(async () => 'model-pool-access-token'),
     getUser: vi.fn(() => ({ id: 'user-1', email: 'user@example.com' })),
   } as unknown as CommunityAuthSessionManager;
 }
@@ -61,7 +61,7 @@ describe('Model Pool IPC', () => {
     });
     expect(electronMocks.fetch).toHaveBeenCalledWith(
       'https://zhiyuan-model-pool-staging.windflyme5.workers.dev/v1/models',
-      { headers: { Authorization: 'Bearer account-access-token' } },
+      { headers: { Authorization: 'Bearer model-pool-access-token' } },
     );
   });
 
@@ -112,7 +112,7 @@ describe('Model Pool IPC', () => {
     expect(url).toBe(
       'https://zhiyuan-model-pool-staging.windflyme5.workers.dev/v1/chat/completions',
     );
-    expect(init.headers).toMatchObject({ Authorization: 'Bearer account-access-token' });
+    expect(init.headers).toMatchObject({ Authorization: 'Bearer model-pool-access-token' });
     expect(JSON.parse(String(init.body))).toMatchObject({
       model: 'zhiyuan-free',
       stream: true,
@@ -134,8 +134,10 @@ describe('Model Pool IPC', () => {
       ),
     ).resolves.toMatchObject({ ok: true, status: 200 });
 
-    expect(sessionManager.getAccessToken).toHaveBeenNthCalledWith(1);
-    expect(sessionManager.getAccessToken).toHaveBeenNthCalledWith(2, { forceRefresh: true });
+    expect(sessionManager.getModelPoolAccessToken).toHaveBeenNthCalledWith(1);
+    expect(sessionManager.getModelPoolAccessToken).toHaveBeenNthCalledWith(2, {
+      forceRefresh: true,
+    });
     expect(electronMocks.fetch).toHaveBeenCalledTimes(2);
   });
 });

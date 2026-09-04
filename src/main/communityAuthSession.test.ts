@@ -48,6 +48,32 @@ beforeEach(() => {
 });
 
 describe('CommunityAuthSessionManager', () => {
+  test('issues and reuses a guest token when no account is signed in', async () => {
+    const { store } = createStore();
+    const manager = new CommunityAuthSessionManager(() => store);
+    electronMocks.fetch.mockResolvedValue(
+      Response.json({ access_token: 'guest-access', expires_in: 900, token_type: 'Bearer' }),
+    );
+
+    await expect(manager.getModelPoolAccessToken()).resolves.toBe('guest-access');
+    await expect(manager.getModelPoolAccessToken()).resolves.toBe('guest-access');
+    expect(electronMocks.fetch).toHaveBeenCalledTimes(1);
+    const request = electronMocks.fetch.mock.calls[0];
+    expect(request?.[0]).toBe('https://account.rongxzyai.com/v1/auth/guest');
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({
+      installation_id: expect.stringMatching(/^[0-9a-f-]{36}$/iu),
+    });
+  });
+
+  test('prefers an account token after the user signs in', async () => {
+    const { store } = createStore();
+    const manager = new CommunityAuthSessionManager(() => store);
+    manager.saveTokenPayload(tokenPayload('account-access', 'refresh-1'));
+
+    await expect(manager.getModelPoolAccessToken()).resolves.toBe('account-access');
+    expect(electronMocks.fetch).not.toHaveBeenCalled();
+  });
+
   test('keeps access tokens inside encrypted main-process storage', async () => {
     const { store } = createStore();
     const manager = new CommunityAuthSessionManager(() => store);

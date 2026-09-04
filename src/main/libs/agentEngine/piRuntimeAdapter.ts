@@ -66,7 +66,7 @@ import {
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
-import { getCommunityAuthAccessToken } from '../../communityAuthSession';
+import { getModelPoolAccessToken } from '../../communityAuthSession';
 import type { CoworkStore } from '../../coworkStore';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
@@ -3593,9 +3593,9 @@ async function resolvePiCustomModelBaseUrl(
   }
 
   if (providerMetadata.providerName === ProviderName.Zhiyuan) {
-    const accessToken = await getCommunityAuthAccessToken();
+    const accessToken = await getModelPoolAccessToken();
     registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
-      getCommunityAuthAccessToken({ forceRefresh: true }),
+      getModelPoolAccessToken({ forceRefresh: true }),
     );
     return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
       baseURL: config.baseURL,

@@ -1,8 +1,10 @@
 import { net, safeStorage } from 'electron';
+import { randomUUID } from 'node:crypto';
 
 export const COMMUNITY_AUTH_ORIGIN = 'https://account.rongxzyai.com';
 
 const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
+const COMMUNITY_GUEST_INSTALLATION_KEY = 'community_guest_installation_v1';
 const COMMUNITY_AUTH_SESSION_VERSION = 2;
 const ACCESS_TOKEN_REFRESH_WINDOW_MS = 5 * 60 * 1000;
 
@@ -34,6 +36,11 @@ interface CommunityAuthTokenPayload {
   refresh_token?: unknown;
   expires_in?: unknown;
   user?: unknown;
+}
+
+interface GuestAccessToken {
+  accessToken: string;
+  accessTokenExpiresAt: number;
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -123,8 +130,27 @@ function parseTokenPayload(
   };
 }
 
+function parseGuestTokenPayload(
+  payload: CommunityAuthTokenPayload | null,
+  now: number,
+): GuestAccessToken | null {
+  if (!payload) return null;
+  const accessToken = typeof payload.access_token === 'string' ? payload.access_token : '';
+  const expiresIn =
+    typeof payload.expires_in === 'number' && Number.isSafeInteger(payload.expires_in)
+      ? payload.expires_in
+      : 0;
+  if (!accessToken || expiresIn <= 0) return null;
+  return {
+    accessToken,
+    accessTokenExpiresAt: now + expiresIn * 1000,
+  };
+}
+
 export class CommunityAuthSessionManager {
   private refreshPromise: Promise<CommunityAuthSession> | null = null;
+  private guestToken: GuestAccessToken | null = null;
+  private guestTokenPromise: Promise<GuestAccessToken> | null = null;
 
   constructor(private readonly getStore: () => CommunityAuthStore) {}
 
@@ -164,6 +190,24 @@ export class CommunityAuthSessionManager {
       });
     }
     return (await this.refreshPromise).accessToken;
+  }
+
+  async getModelPoolAccessToken(options: { forceRefresh?: boolean } = {}): Promise<string> {
+    if (this.getUser()) return this.getAccessToken(options);
+    if (
+      !options.forceRefresh &&
+      this.guestToken &&
+      this.guestToken.accessTokenExpiresAt > Date.now() + ACCESS_TOKEN_REFRESH_WINDOW_MS
+    ) {
+      return this.guestToken.accessToken;
+    }
+
+    if (!this.guestTokenPromise) {
+      this.guestTokenPromise = this.issueGuestToken().finally(() => {
+        this.guestTokenPromise = null;
+      });
+    }
+    return (await this.guestTokenPromise).accessToken;
   }
 
   private saveSession(session: CommunityAuthSession): void {
@@ -216,6 +260,28 @@ export class CommunityAuthSessionManager {
     this.saveSession(refreshed);
     return refreshed;
   }
+
+  private getGuestInstallationId(): string {
+    const stored = this.getStore().get<unknown>(COMMUNITY_GUEST_INSTALLATION_KEY);
+    if (typeof stored === 'string' && /^[0-9a-f-]{36}$/iu.test(stored)) return stored;
+    const installationId = randomUUID();
+    this.getStore().set(COMMUNITY_GUEST_INSTALLATION_KEY, installationId);
+    return installationId;
+  }
+
+  private async issueGuestToken(): Promise<GuestAccessToken> {
+    const response = await net.fetch(`${COMMUNITY_AUTH_ORIGIN}/v1/auth/guest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installation_id: this.getGuestInstallationId() }),
+    });
+    const token = parseGuestTokenPayload(await readResponsePayload(response), Date.now());
+    if (!response.ok || !token) {
+      throw new Error(`ZhiYuan guest token request failed with status ${response.status}.`);
+    }
+    this.guestToken = token;
+    return token;
+  }
 }
 
 let configuredSessionManager: CommunityAuthSessionManager | null = null;
@@ -230,4 +296,9 @@ export function configureCommunityAuthSession(
 export function getCommunityAuthAccessToken(options?: { forceRefresh?: boolean }): Promise<string> {
   if (!configuredSessionManager) throw new Error('Community authentication is not initialized.');
   return configuredSessionManager.getAccessToken(options);
+}
+
+export function getModelPoolAccessToken(options?: { forceRefresh?: boolean }): Promise<string> {
+  if (!configuredSessionManager) throw new Error('Community authentication is not initialized.');
+  return configuredSessionManager.getModelPoolAccessToken(options);
 }

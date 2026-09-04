@@ -25,11 +25,11 @@ function modelPoolBaseUrl(): string {
 }
 
 function modelPoolErrorMessage(rawBody: string, status: number): string {
-  if (status === 401) return t('modelPoolLoginRequired');
+  if (status === 401) return t('modelPoolServiceUnavailable');
   if (status === 429) return t('modelPoolQuotaExceeded');
   try {
     const payload = JSON.parse(rawBody) as { error?: { code?: unknown } };
-    if (payload.error?.code === 'unauthorized') return t('modelPoolLoginRequired');
+    if (payload.error?.code === 'unauthorized') return t('modelPoolServiceUnavailable');
     if (
       payload.error?.code === 'account_disabled' ||
       payload.error?.code === 'entitlement_required'
@@ -67,10 +67,10 @@ async function fetchModelPoolModels(
     session.defaultSession.fetch(`${modelPoolBaseUrl()}/v1/models`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-  let accessToken = await communityAuthSession.getAccessToken();
+  let accessToken = await communityAuthSession.getModelPoolAccessToken();
   let response = await fetchModels(accessToken);
   if (response.status === 401) {
-    accessToken = await communityAuthSession.getAccessToken({ forceRefresh: true });
+    accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
     response = await fetchModels(accessToken);
   }
   return response;
@@ -113,9 +113,7 @@ export function registerModelPoolIpcHandlers(
         ok: false,
         status: 0,
         models: [] as string[],
-        error: communityAuthSession.getUser()
-          ? t('modelPoolServiceUnavailable')
-          : t('modelPoolLoginRequired'),
+        error: t('modelPoolServiceUnavailable'),
       });
     }
   });
@@ -126,10 +124,10 @@ export function registerModelPoolIpcHandlers(
     activeModelPoolStreams.set(input.requestId, controller);
 
     try {
-      let accessToken = await communityAuthSession.getAccessToken();
+      let accessToken = await communityAuthSession.getModelPoolAccessToken();
       let response = await fetchModelPool(input.body, accessToken, controller.signal);
       if (response.status === 401) {
-        accessToken = await communityAuthSession.getAccessToken({ forceRefresh: true });
+        accessToken = await communityAuthSession.getModelPoolAccessToken({ forceRefresh: true });
         response = await fetchModelPool(input.body, accessToken, controller.signal);
       }
 
@@ -181,9 +179,7 @@ export function registerModelPoolIpcHandlers(
         ok: false,
         status: 0,
         statusText: 'Model Pool request failed',
-        error: communityAuthSession.getUser()
-          ? t('modelPoolServiceUnavailable')
-          : t('modelPoolLoginRequired'),
+        error: t('modelPoolServiceUnavailable'),
       };
     }
   });
