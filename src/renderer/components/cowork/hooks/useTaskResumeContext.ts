@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import type { CoworkSessionInterruption } from '../../../../shared/cowork/interruption';
 import type { WorkbenchTaskResumeInput } from '../../../../shared/workbenchTask';
 import { i18nService } from '../../../services/i18n';
+import { normalizeError } from '../../../services/errorNormalization';
 import { updateSessionStatus } from '../../../store/slices/coworkSlice';
 import { CoworkSessionStatusValue } from '../../../types/cowork';
 
@@ -38,7 +39,7 @@ export const useTaskResumeContext = (sessionId: string | undefined) => {
           taskId: interruption.taskId,
         });
         if (!result.success) {
-          toast.error(result.error || i18nService.t('coworkResumeTaskFailed'));
+          toast.error(normalizeError(result.error || i18nService.t('coworkResumeTaskFailed')));
           return false;
         }
         if (sessionId) {

@@ -1,4 +1,4 @@
-import { Button } from '@shared/components/ui/button';
+﻿import { Button } from '@shared/components/ui/button';
 import { TooltipProvider } from '@shared/components/ui/tooltip';
 import { MessageCircle } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -36,6 +36,11 @@ import {
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
+import {
+  normalizeError,
+  TOAST_DEFAULT_DURATION_MS,
+  TOAST_MAX_DURATION_MS,
+} from './services/errorNormalization';
 import { matchesShortcut } from './services/shortcuts';
 import { themeService } from './services/theme';
 import { workspaceService } from './services/workspace';
@@ -55,7 +60,6 @@ import type { CoworkPermissionResult } from './types/cowork';
 /** Used for config + i18n init; longer on Windows where main-process IPC can stall during cold start. */
 const INIT_STEP_TIMEOUT_MS_WINDOWS = 24_000;
 const INIT_STEP_TIMEOUT_MS_DEFAULT = 16_000;
-const DEFAULT_TOAST_DURATION_MS = 2_200;
 
 interface AppToastOptions {
   autoClose?: boolean;
@@ -198,7 +202,7 @@ const App: React.FC = () => {
     [],
   );
 
-  // 初始化应用
+  // 鍒濆鍖栧簲鐢?
   useEffect(() => {
     if (hasInitialized.current) {
       return;
@@ -509,7 +513,7 @@ const App: React.FC = () => {
   }, []);
 
   const openNewConversation = useCallback(() => {
-    // Only clear when already on home (no session) — preserve __home__ draft when returning from a session
+    // Only clear when already on home (no session) 鈥?preserve __home__ draft when returning from a session
     const shouldClearInput = mainView === 'cowork' && !currentSessionId;
     if (currentWorkspaceIsHidden) void workspaceService.clearWorkspaceSelection();
     coworkService.clearSession();
@@ -592,12 +596,12 @@ const App: React.FC = () => {
     (message: string, options: AppToastOptions = {}) => {
       const {
         autoClose = true,
-        durationMs = DEFAULT_TOAST_DURATION_MS,
+        durationMs = TOAST_DEFAULT_DURATION_MS,
         isError = false,
         isSuccess = false,
         onClose = null,
       } = options;
-      setToastMessage(message);
+      setToastMessage(isError ? normalizeError(message) : message);
       setIsToastError(isError);
       setIsToastSuccess(isSuccess);
       toastOnCloseRef.current = onClose;
@@ -605,13 +609,21 @@ const App: React.FC = () => {
         window.clearTimeout(toastTimerRef.current);
       }
       if (autoClose) {
-        toastTimerRef.current = window.setTimeout(dismissToast, durationMs);
+        toastTimerRef.current = window.setTimeout(
+          dismissToast,
+          Math.min(Math.max(durationMs, 0), TOAST_MAX_DURATION_MS),
+        );
       } else {
         toastTimerRef.current = null;
       }
     },
     [dismissToast],
   );
+
+  const isLikelyErrorToast = (message: string): boolean =>
+    /(failed|failure|error|unable|cannot|could not|invalid|denied|timeout|timed out|not found|失败|错误|无法|不允许|超时|拒绝|不存在)/i.test(
+      message,
+    );
 
   useEffect(() => {
     let mounted = true;
@@ -749,9 +761,19 @@ const App: React.FC = () => {
       const detail = (e as CustomEvent<({ message: string } & AppToastOptions) | string>).detail;
       if (!detail) return;
       if (typeof detail === 'string') {
-        showToast(detail);
+        showToast(
+          isLikelyErrorToast(detail) ? normalizeError(detail) : detail,
+          isLikelyErrorToast(detail) ? { isError: true } : undefined,
+        );
       } else {
-        showToast(detail.message, detail);
+        showToast(
+          detail.isError || isLikelyErrorToast(detail.message)
+            ? normalizeError(detail.message)
+            : detail.message,
+          detail.isError || isLikelyErrorToast(detail.message)
+            ? { ...detail, isError: true }
+            : detail,
+        );
       }
     };
     window.addEventListener('app:showToast', handler);
@@ -786,7 +808,7 @@ const App: React.FC = () => {
     return () => window.removeEventListener('app:show-local-inference', handler);
   }, [managedModelsOnly]);
 
-  // 监听托盘菜单打开设置的 IPC 事件
+  // 鐩戝惉鎵樼洏鑿滃崟鎵撳紑璁剧疆鐨?IPC 浜嬩欢
   useEffect(() => {
     const unsubscribe = window.electron.appEvents?.onOpenSettings(() => {
       handleShowSettings();
@@ -794,7 +816,7 @@ const App: React.FC = () => {
     return unsubscribe;
   }, [handleShowSettings]);
 
-  // 监听托盘菜单新建任务的 IPC 事件
+  // 鐩戝惉鎵樼洏鑿滃崟鏂板缓浠诲姟鐨?IPC 浜嬩欢
   useEffect(() => {
     const unsubscribe = window.electron.appEvents?.onNewTask(() => {
       handleNewChat();
@@ -883,7 +905,6 @@ const App: React.FC = () => {
             message={toastMessage}
             isError={isToastError}
             isSuccess={isToastSuccess}
-            onClose={dismissToast}
           />
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -1035,7 +1056,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* 设置窗口显示在所有主内容之上，但不影响主界面的交互 */}
+        {/* 璁剧疆绐楀彛鏄剧ず鍦ㄦ墍鏈変富鍐呭涔嬩笂锛屼絾涓嶅奖鍝嶄富鐣岄潰鐨勪氦浜?*/}
         {showSettings && (
           <LazyChunkErrorBoundary>
             <React.Suspense fallback={null}>

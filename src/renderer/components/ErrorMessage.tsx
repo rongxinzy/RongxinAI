@@ -1,4 +1,5 @@
 import React from 'react';
+import { reportError } from '../services/errorNormalization';
 
 interface ErrorMessageProps {
   message: string;
@@ -10,12 +11,13 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({ message, onClose }) => {
   onCloseRef.current = onClose;
 
   React.useEffect(() => {
+    const normalized = reportError(message);
     window.dispatchEvent(
       new CustomEvent('app:showToast', {
         detail: {
-          message,
-          durationMs: 5000,
+          message: normalized,
           isError: true,
+          durationMs: 5000,
           onClose: () => onCloseRef.current?.(),
         },
       }),

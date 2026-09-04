@@ -30,6 +30,7 @@ import { coworkService } from '../../services/cowork';
 import { coworkQueueService } from '../../services/coworkQueue';
 import { DirectChatTurnState } from '../../services/directChatTurnState';
 import { i18nService } from '../../services/i18n';
+import { normalizeError } from '../../services/errorNormalization';
 import { quickActionService } from '../../services/quickAction';
 import { RafMessageUpdateBatcher } from '../../services/rafMessageUpdateBatcher';
 import { workspaceService } from '../../services/workspace';
@@ -974,7 +975,10 @@ const CoworkView: React.FC<CoworkViewProps> = ({
       if (!result.success) {
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
-            detail: result.error || i18nService.t('coworkQueueEnqueueFailed'),
+            detail: {
+              message: normalizeError(result.error || i18nService.t('coworkQueueEnqueueFailed')),
+              isError: true,
+            },
           }),
         );
         return false;

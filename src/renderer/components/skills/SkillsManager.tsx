@@ -378,7 +378,10 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
     if (skill.isBuiltIn) {
       window.dispatchEvent(
         new CustomEvent('app:showToast', {
-          detail: i18nService.t('skillBuiltInCannotDelete'),
+          detail: {
+            message: i18nService.t('skillBuiltInCannotDelete'),
+            isError: true,
+          },
         }),
       );
       return;
@@ -415,6 +418,11 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
         const deletedIds = new Set(skillsPendingDelete.map(skill => skill.id));
         return new Set([...current].filter(id => !deletedIds.has(id)));
       });
+      window.dispatchEvent(
+        new CustomEvent('app:showToast', {
+          detail: { message: i18nService.t('skillDeleted'), isSuccess: true },
+        }),
+      );
       setSkillsPendingDelete([]);
     } catch (error) {
       setSkillActionError(

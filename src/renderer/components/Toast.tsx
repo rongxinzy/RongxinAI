@@ -1,42 +1,36 @@
-import { Button } from '@shared/components/ui/button';
-import { CircleCheck, Info, TriangleAlert, X } from 'lucide-react';
+import { Check, Info, X } from 'lucide-react';
 import React from 'react';
 
 interface ToastProps {
   message: string;
   isError?: boolean;
   isSuccess?: boolean;
-  onClose?: () => void;
 }
 
-const Toast: React.FC<ToastProps> = ({ message, isError = false, isSuccess = false, onClose }) => {
-  const Icon = isError ? TriangleAlert : isSuccess ? CircleCheck : Info;
+const Toast: React.FC<ToastProps> = ({ message, isError = false, isSuccess = false }) => {
+  const Icon = isError ? X : isSuccess ? Check : Info;
   const iconContainerClass = isError
-    ? 'bg-destructive/15'
+    ? 'size-6 bg-destructive text-destructive-foreground'
     : isSuccess
-      ? 'bg-success/15'
-      : 'bg-primary-muted';
-  const iconClass = isError ? 'text-destructive' : isSuccess ? 'text-success' : 'text-primary';
+      ? 'size-6 bg-success text-success-foreground'
+      : 'size-6 bg-primary-muted';
+  const iconClass = isError
+    ? 'size-3.5 text-destructive-foreground'
+    : isSuccess
+      ? 'size-3.5 text-success-foreground'
+      : 'size-4 text-primary';
+  const toastClass = isError
+    ? 'bg-foreground text-background'
+    : 'bg-popover text-popover-foreground';
 
   return (
-    <div className="pointer-events-none fixed right-4 top-16 z-10000 w-[min(24rem,calc(100vw-2rem))]">
-      <div className="pointer-events-auto rounded-xl border border-border-subtle bg-surface px-5 py-3.5 text-foreground shadow-xl backdrop-blur-md animate-scale-in">
+    <div className="pointer-events-none fixed left-1/2 top-4 z-10000 w-fit max-w-[calc(100vw-2rem)] -translate-x-1/2">
+      <div className={`pointer-events-auto animate-fade-in-down rounded-lg border border-border px-4 py-3 shadow-xl ${toastClass}`}>
         <div className="flex items-center gap-3">
-          <div className={`shrink-0 rounded-full p-2 ${iconContainerClass}`}>
-            <Icon className={`h-4 w-4 ${iconClass}`} />
+          <div className={`inline-flex size-6 shrink-0 items-center justify-center rounded-full leading-none ${iconContainerClass}`}>
+            <Icon className={`${iconClass} shrink-0`} strokeWidth={2.5} />
           </div>
           <div className="flex-1 text-sm font-medium leading-snug">{message}</div>
-          {onClose && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       </div>
     </div>

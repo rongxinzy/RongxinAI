@@ -11,6 +11,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux';
 
 import { i18nService } from '../../services/i18n';
+import { normalizeError } from '../../services/errorNormalization';
 import { mcpService, normalizeMcpErrorMessage } from '../../services/mcp';
 import { RootState } from '../../store';
 import { setMcpServers } from '../../store/slices/mcpSlice';
@@ -130,7 +131,10 @@ const ActiveMcpBadge: React.FC = () => {
         awaitingBridgeSyncRef.current = false;
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
-            detail: error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
+            detail: {
+              message: normalizeError(error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed')),
+              isError: true,
+            },
           }),
         );
       } finally {

@@ -73,6 +73,7 @@ import {
   PasswordEncryptedPayload,
 } from '../services/encryption';
 import { i18nService, LanguageType } from '../services/i18n';
+import { normalizeError } from '../services/errorNormalization';
 import { imService } from '../services/im';
 import { reconcileDefaultModelConfig } from '../services/modelConfigReconciliation';
 import { mergeDiscoveredProviderModels } from '../services/providerModelDiscovery';
@@ -5245,7 +5246,10 @@ const Settings: React.FC<SettingsProps> = ({
                         if (!result.success) {
                           window.dispatchEvent(
                             new CustomEvent('app:showToast', {
-                              detail: result.error || i18nService.t('updateInstallFailed'),
+                              detail: {
+                                message: normalizeError(result.error || i18nService.t('updateInstallFailed')),
+                                isError: true,
+                              },
                             }),
                           );
                         }
