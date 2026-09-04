@@ -257,6 +257,7 @@ export const buildTurnRailIndices = (turns: ConversationTurn[]): TurnRailIndices
 // ── Filter helpers ──
 
 export const isRenderableAssistantOrSystemMessage = (message: CoworkMessage): boolean => {
+  if (message.type === 'system' && message.metadata?.interruption) return true;
   if (hasText(message.content) || hasText(message.metadata?.error)) return true;
   if (message.metadata?.isThinking)
     return hasText(message.content) || Boolean(message.metadata?.isStreaming);
