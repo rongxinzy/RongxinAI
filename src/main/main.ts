@@ -7405,23 +7405,30 @@ if (!gotTheLock) {
     ]);
 
     // Skill services (web-search bridge) — fire-and-forget (Step 2).
-    // No IPC handler or downstream init depends on this completing.
-    try {
-      const skillServices = getSkillServiceManager();
-      console.log('[Main] initApp: getSkillServiceManager done');
-      const t0 = performance.now();
-      void skillServices
-        .startAll()
-        .then(() => {
-          console.log(
-            `[Main] initApp: skill services started (background, ${(performance.now() - t0).toFixed(0)}ms)`,
-          );
-        })
-        .catch(error => {
-          console.error('[Main] initApp: skill services failed:', error);
-        });
-    } catch (error) {
-      console.error('[Main] initApp: skill services init failed:', error);
+    // No IPC handler or downstream init depends on this completing. The
+    // memory-leak scenario intentionally omits optional services so a fresh
+    // isolated profile cannot block the Electron first-window check while
+    // synchronously repairing web-search dependencies.
+    if (process.env.ZHIYUAN_MEMORY_LEAK_TEST === '1') {
+      console.log('[Main] initApp: skipping optional skill services for memory leak test');
+    } else {
+      try {
+        const skillServices = getSkillServiceManager();
+        console.log('[Main] initApp: getSkillServiceManager done');
+        const t0 = performance.now();
+        void skillServices
+          .startAll()
+          .then(() => {
+            console.log(
+              `[Main] initApp: skill services started (background, ${(performance.now() - t0).toFixed(0)}ms)`,
+            );
+          })
+          .catch(error => {
+            console.error('[Main] initApp: skill services failed:', error);
+          });
+      } catch (error) {
+        console.error('[Main] initApp: skill services init failed:', error);
+      }
     }
     profiler.measure('skillManager');
 
