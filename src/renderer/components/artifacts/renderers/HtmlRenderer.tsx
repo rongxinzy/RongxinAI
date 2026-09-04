@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
+import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
 import type { Artifact } from '@/types/artifact';
 
 interface HtmlRendererProps {
@@ -44,8 +45,8 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
 
         // If content is empty but filePath exists, read file directly
         if (!html && artifact.filePath) {
-          const result = await readLocalFileAsDataUrl(artifact.filePath);
-          if (!result || cancelled) return;
+          const result = await loadArtifactDataUrl(artifact.filePath);
+          if (cancelled) return;
           try {
             const base64 = result.split(',')[1] || '';
             const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -120,16 +121,6 @@ const HtmlRenderer: React.FC<HtmlRendererProps> = ({ artifact }) => {
   );
 };
 
-async function readLocalFileAsDataUrl(absPath: string): Promise<string | null> {
-  if (typeof window.electron?.dialog?.readFileAsDataUrl !== 'function') return null;
-  try {
-    const res = await window.electron.dialog.readFileAsDataUrl(absPath);
-    return res?.success && res.dataUrl ? res.dataUrl : null;
-  } catch {
-    return null;
-  }
-}
-
 function resolveRelativePath(src: string, htmlDir: string): string | null {
   if (
     !src ||
@@ -157,9 +148,11 @@ async function inlineLocalResources(html: string, filePath: string): Promise<str
     const absPath = resolveRelativePath(originalSrc, dir);
     if (!absPath) continue;
 
-    const dataUrl = await readLocalFileAsDataUrl(absPath);
-    if (dataUrl) {
+    try {
+      const dataUrl = await loadArtifactDataUrl(absPath);
       replacements.push([originalSrc, dataUrl]);
+    } catch {
+      // Missing local resources are left untouched for the iframe to resolve.
     }
   }
 
