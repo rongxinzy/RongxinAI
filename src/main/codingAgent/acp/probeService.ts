@@ -89,6 +89,10 @@ export class AcpProbeService {
         capabilities.sessionCapabilities && typeof capabilities.sessionCapabilities === 'object'
           ? (capabilities.sessionCapabilities as Record<string, unknown>)
           : {};
+      const promptCapabilities =
+        capabilities.promptCapabilities && typeof capabilities.promptCapabilities === 'object'
+          ? (capabilities.promptCapabilities as Record<string, unknown>)
+          : {};
       return {
         capabilities: {
           ...EMPTY_CAPABILITIES,
@@ -101,6 +105,8 @@ export class AcpProbeService {
           supportsConfigOptions: false,
           supportsUsage: true,
           supportsElicitation: false,
+          supportsPromptImages: promptCapabilities.image === true,
+          supportsEmbeddedContext: promptCapabilities.embeddedContext === true,
         },
         authMethods: parseAuthMethods(response.authMethods),
       };

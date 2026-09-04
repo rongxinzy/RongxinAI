@@ -95,4 +95,29 @@ export class CodingAgentProfileRepository {
         now,
       );
   }
+
+  isReferenced(profileId: string): boolean {
+    return Boolean(
+      this.db
+        .prepare('SELECT 1 FROM coding_agent_lanes WHERE profile_id = ? LIMIT 1')
+        .get(profileId),
+    );
+  }
+
+  removeIfUnreferenced(profileId: string, replacementProfileId: string): boolean {
+    return this.db.transaction(() => {
+      if (this.isReferenced(profileId)) return false;
+      const profileExists = this.db
+        .prepare('SELECT 1 FROM coding_agent_profiles WHERE id = ? LIMIT 1')
+        .get(profileId);
+      if (!profileExists) return false;
+      const now = Date.now();
+      this.db
+        .prepare(
+          'UPDATE coding_rooms SET default_profile_id = ?, updated_at = ? WHERE default_profile_id = ?',
+        )
+        .run(replacementProfileId, now, profileId);
+      return this.db.prepare('DELETE FROM coding_agent_profiles WHERE id = ?').run(profileId).changes > 0;
+    })();
+  }
 }

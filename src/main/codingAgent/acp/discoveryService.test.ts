@@ -118,6 +118,9 @@ test('discovers a standalone Kimi installation without npm package metadata', as
         command: await realpath(kimiExecutable),
         args: ['acp'],
         status: CodingAgentProfileStatus.Detected,
+        environment: {
+          [CodingAgentEnvironmentKey.RegistryAgentId]: 'kimi',
+        },
       }),
     );
   } finally {

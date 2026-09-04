@@ -2,6 +2,7 @@ import type {
   CodingAgentAvailableCommand,
   CodingAgentCapabilities,
   CodingAgentConfigOption,
+  CodingPromptAttachment,
   CodingEvent,
   CodingPermissionResponse,
 } from '../../../shared/codingAgent';
@@ -45,6 +46,7 @@ export interface CodingAgentDriver {
     sessionId: string;
     workspaceRoot: string;
     prompt: string;
+    attachments?: CodingPromptAttachment[];
     modelOverride?: string | null;
   }): AsyncIterable<Omit<CodingEvent, 'id' | 'laneId' | 'sequence' | 'createdAt'>>;
   cancel(sessionId: string): Promise<void>;

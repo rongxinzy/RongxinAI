@@ -990,9 +990,7 @@ const App: React.FC = () => {
                       workspaceRoot={codingSelection.workspaceRoot}
                       selectedLaneId={codingSelection.laneId}
                       draftSession={codingSelection.draft}
-                      onDraftSessionChange={draft =>
-                        setCodingSelection(current => ({ ...current, draft, laneId: null }))
-                      }
+                      onSessionDraftCreated={setCodingSelection}
                       onSessionCreated={laneId =>
                         setCodingSelection(current => ({ ...current, laneId, draft: null }))
                       }

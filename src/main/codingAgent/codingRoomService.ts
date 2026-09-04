@@ -53,7 +53,10 @@ import { CodingDriverFactory } from './drivers/driverFactory';
 import type { CoworkSessionInterruption } from '../../shared/cowork/interruption';
 import type { WorkbenchApprovalMode } from '../../shared/workbenchTask';
 import type { CoworkPendingMessage } from '../../shared/cowork/pendingMessageQueue';
-import { CoworkQueueDelivery, CoworkQueueItemStatus } from '../../shared/cowork/pendingMessageQueue';
+import {
+  CoworkQueueDelivery,
+  CoworkQueueItemStatus,
+} from '../../shared/cowork/pendingMessageQueue';
 
 export interface CodingRoomRuntime {
   startBuiltinSession(input: {
@@ -68,7 +71,10 @@ export interface CodingRoomRuntime {
   setBuiltinApprovalMode?(sessionId: string, mode: WorkbenchApprovalMode): void;
   cancelBuiltinSession(sessionId: string): Promise<void>;
   enqueueBuiltinMessage?(sessionId: string, prompt: string): { success: boolean; error?: string };
-  steerBuiltinMessage?(sessionId: string, prompt: string): Promise<{ success: boolean; error?: string }>;
+  steerBuiltinMessage?(
+    sessionId: string,
+    prompt: string,
+  ): Promise<{ success: boolean; error?: string }>;
   /** Applies model/thinking-level changes to a live built-in session. */
   patchBuiltinSession?(
     sessionId: string,
@@ -420,7 +426,11 @@ export class CodingRoomService extends EventEmitter {
         id: driverSession.id,
         connectionGeneration: driver.getConnectionGeneration?.() ?? null,
       });
-      const snapshot = await this.prompt(room.workspaceRoot, { laneId: lane.id, prompt });
+      const snapshot = await this.prompt(room.workspaceRoot, {
+        laneId: lane.id,
+        prompt,
+        attachments: input.attachments,
+      });
       this.stagedLaneIds.delete(lane.id);
       return snapshot;
     } catch (error) {
@@ -554,7 +564,8 @@ export class CodingRoomService extends EventEmitter {
   deletePendingMessage(laneId: string, itemId: string): { success: boolean; error?: string } {
     const items = this.acpPendingMessages.get(laneId) ?? [];
     const next = items.filter(item => item.id !== itemId);
-    if (next.length === items.length) return { success: false, error: 'Pending message was not found.' };
+    if (next.length === items.length)
+      return { success: false, error: 'Pending message was not found.' };
     if (next.length) this.acpPendingMessages.set(laneId, next);
     else this.acpPendingMessages.delete(laneId);
     this.emitPendingMessagesChanged(laneId);
@@ -638,7 +649,8 @@ export class CodingRoomService extends EventEmitter {
       }
       if (profile?.driverKind === CodingAgentDriverKind.Acp) {
         const queued = this.enqueuePendingMessage(lane.id, prompt);
-        if (!queued.success || !queued.item) throw new Error(queued.error ?? 'Failed to queue the coding prompt.');
+        if (!queued.success || !queued.item)
+          throw new Error(queued.error ?? 'Failed to queue the coding prompt.');
         if (input.delivery === CodingPromptDelivery.Steer) {
           return await this.steerPendingMessage(workspaceRoot, lane.id, queued.item.id);
         }
@@ -661,6 +673,9 @@ export class CodingRoomService extends EventEmitter {
     this.repository.appendEvent(lane.id, CodingEventKind.Message, {
       role: 'user',
       content: prompt,
+      ...(input.attachments?.length
+        ? { attachments: input.attachments.map(attachment => ({ name: attachment.name })) }
+        : {}),
     });
     this.repository.updateLaneStatus(lane.id, CodingLaneStatus.Running);
     this.repository.updateMissionStatus(lane.missionId, CodingMissionStatus.Running);
@@ -699,6 +714,7 @@ export class CodingRoomService extends EventEmitter {
         prompt,
         queuedItemId,
         turnGeneration,
+        input.attachments,
       );
     } catch (error) {
       if (this.requiresWriterLease(lane.sourceRoot, executionRoot)) {
@@ -1274,7 +1290,12 @@ export class CodingRoomService extends EventEmitter {
       this.updateLaneAssignmentStatus(snapshot, lane.id, CodingAssignmentStatus.WaitingApproval);
     }
     if (kind === CodingEventKind.TurnComplete) {
-      this.finishTurn(snapshot.room.id, snapshot.room.workspaceRoot, lane, CodingLaneStatus.Completed);
+      this.finishTurn(
+        snapshot.room.id,
+        snapshot.room.workspaceRoot,
+        lane,
+        CodingLaneStatus.Completed,
+      );
       this.publish(workspaceRoot);
       return;
     }
@@ -1473,6 +1494,7 @@ export class CodingRoomService extends EventEmitter {
     prompt: string,
     queuedItemId: string | undefined,
     turnGeneration: number,
+    attachments?: CodingPromptAttachment[],
   ): Promise<void> {
     try {
       let receivedAssistantResponse = false;
@@ -1480,6 +1502,7 @@ export class CodingRoomService extends EventEmitter {
         sessionId,
         workspaceRoot: executionRoot,
         prompt,
+        attachments,
         modelOverride: lane.modelOverride,
       })) {
         if (isAssistantResponseEvent(event)) receivedAssistantResponse = true;
@@ -1558,15 +1581,17 @@ export class CodingRoomService extends EventEmitter {
   private startNextAcpPendingMessage(workspaceRoot: string, lane: CodingAgentLane): void {
     const profile = this.registry.get(lane.profileId);
     if (profile?.driverKind !== CodingAgentDriverKind.Acp) return;
-    const next = this.acpPendingMessages.get(lane.id)?.find(
-      item => item.status === CoworkQueueItemStatus.Pending,
-    );
+    const next = this.acpPendingMessages
+      .get(lane.id)
+      ?.find(item => item.status === CoworkQueueItemStatus.Pending);
     if (!next) return;
     next.status = CoworkQueueItemStatus.Sending;
     this.emitPendingMessagesChanged(lane.id);
-    void this.prompt(workspaceRoot, { laneId: lane.id, prompt: next.text }, next.id).catch(error => {
-      console.error('[CodingRoom] failed to start queued ACP message:', error);
-    });
+    void this.prompt(workspaceRoot, { laneId: lane.id, prompt: next.text }, next.id).catch(
+      error => {
+        console.error('[CodingRoom] failed to start queued ACP message:', error);
+      },
+    );
   }
 
   private beginLaneTurn(laneId: string): number {
@@ -1584,7 +1609,9 @@ export class CodingRoomService extends EventEmitter {
   }
 
   private failAcpPendingMessage(laneId: string, itemId: string, error: unknown): void {
-    const item = (this.acpPendingMessages.get(laneId) ?? []).find(candidate => candidate.id === itemId);
+    const item = (this.acpPendingMessages.get(laneId) ?? []).find(
+      candidate => candidate.id === itemId,
+    );
     if (!item) return;
     item.status = CoworkQueueItemStatus.Failed;
     item.error = this.errorMessage(error);

@@ -166,7 +166,10 @@ export class AcpDiscoveryService {
           description: `${agent.description} Detected locally. Probe before using.`,
           command: resolved,
           args: agent.args,
-          environment: agent.environment,
+          environment: {
+            ...agent.environment,
+            [CodingAgentEnvironmentKey.RegistryAgentId]: agent.id,
+          },
         });
       }),
     );
