@@ -59,6 +59,7 @@ export class EngramManager {
   }
 
   getConnection(): EngramConnection | null {
+    if (this.status.phase !== EngramManagerPhase.Running || !this.status.available) return null;
     return this.connection ? { ...this.connection } : null;
   }
 
