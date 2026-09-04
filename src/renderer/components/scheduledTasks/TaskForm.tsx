@@ -27,8 +27,10 @@ import type {
   ScheduledTaskConversationOption,
   ScheduledTaskInput,
 } from '../../../scheduledTask/types';
+import type { Workspace } from '../../../shared/workspace';
 import { CoworkSessionSource } from '../../../shared/cowork/constants';
 import { i18nService } from '../../services/i18n';
+import { getLastPathSegment } from '../../utils/path';
 import { coworkService } from '../../services/cowork';
 import { scheduledTaskService } from '../../services/scheduledTask';
 import { RootState } from '../../store';
@@ -68,6 +70,21 @@ interface TaskFormProps {
   onDirtyChange?: (dirty: boolean) => void;
 }
 
+const createInitialFormState = (
+  mode: TaskFormProps['mode'],
+  task: ScheduledTask | undefined,
+  prefill: TaskTemplateValues | undefined,
+): FormState => {
+  if (mode === 'create' && !prefill) {
+    return { ...createFormState(), planType: 'daily' };
+  }
+  return createFormState(task, prefill);
+};
+
+const getWorkspaceFolderName = (workspace: Workspace): string => {
+  return getLastPathSegment(workspace.path) || workspace.name;
+};
+
 const TaskForm: React.FC<TaskFormProps> = ({
   mode,
   task,
@@ -76,9 +93,11 @@ const TaskForm: React.FC<TaskFormProps> = ({
   onSaved,
   onDirtyChange,
 }) => {
-  const [form, setForm] = useState<FormState>(() => createFormState(task, prefill));
+  const [form, setForm] = useState<FormState>(() => createInitialFormState(mode, task, prefill));
   // Snapshot of the pristine form for the dirty check (shallow compare, no stringify).
-  const [initialForm, setInitialForm] = useState<FormState>(() => createFormState(task, prefill));
+  const [initialForm, setInitialForm] = useState<FormState>(() =>
+    createInitialFormState(mode, task, prefill),
+  );
   const availableModels = useSelector((state: RootState) => state.model.availableModels);
   const defaultSelectedModel = useSelector((state: RootState) => state.model.defaultSelectedModel);
   const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
@@ -117,10 +136,10 @@ const TaskForm: React.FC<TaskFormProps> = ({
   );
 
   useEffect(() => {
-    const nextForm = createFormState(task, prefill);
+    const nextForm = createInitialFormState(mode, task, prefill);
     setInitialForm(nextForm);
     setForm(nextForm);
-  }, [task, prefill]);
+  }, [mode, task, prefill]);
 
   useEffect(() => {
     if (form.workspaceId) return;
@@ -290,10 +309,24 @@ const TaskForm: React.FC<TaskFormProps> = ({
     [availableModels],
   );
   const workspaceOptions = useMemo(
-    () =>
-      workspaces
-        .filter(workspace => !workspace.isHidden)
-        .map(workspace => ({ value: workspace.id, label: workspace.name })),
+    () => {
+      const visible = workspaces.filter(workspace => !workspace.isHidden);
+      const counts = new Map<string, number>();
+      for (const workspace of visible) {
+        const folderName = getWorkspaceFolderName(workspace);
+        counts.set(folderName, (counts.get(folderName) ?? 0) + 1);
+      }
+      return visible.map(workspace => {
+        const folderName = getWorkspaceFolderName(workspace);
+        return {
+          value: workspace.id,
+          label:
+            (counts.get(folderName) ?? 0) > 1
+              ? `${folderName} (${workspace.name})`
+              : folderName,
+        };
+      });
+    },
     [workspaces],
   );
 
@@ -780,7 +813,7 @@ const TaskForm: React.FC<TaskFormProps> = ({
         </Alert>
       )}
 
-      <div className="shrink-0 flex items-center justify-end gap-2 py-2.5 border-t border-border">
+      <div className="shrink-0 flex items-center justify-end gap-2 py-2.5">
         <Button type="button" variant="outline" onClick={onCancel}>
           {i18nService.t('cancel')}
         </Button>

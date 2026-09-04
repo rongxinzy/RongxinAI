@@ -1,33 +1,31 @@
-import { motion, useAnimation, useReducedMotion, type Transition, type Variants } from 'motion/react';
+import { motion, useAnimation, useReducedMotion, type Variants } from 'motion/react';
 import type { HTMLAttributes, MouseEvent } from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 
 import { cn } from '@shared/lib/utils';
 
-export interface SidebarAnimatedPanelLeftCloseIconHandle {
+export interface SidebarAnimatedTodoIconHandle {
   startAnimation: () => void;
   stopAnimation: () => void;
 }
 
-interface SidebarAnimatedPanelLeftCloseIconProps extends HTMLAttributes<HTMLDivElement> {
+interface SidebarAnimatedTodoIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
-  direction?: 'left' | 'right';
 }
 
-const DEFAULT_TRANSITION: Transition = {
-  times: [0, 0.4, 1],
-  duration: 0.5,
+const VARIANTS: Variants = {
+  normal: { y: 0, rotate: 0, transition: { duration: 0.3, ease: 'easeOut' } },
+  animate: {
+    y: [0, -2, 0],
+    rotate: [0, -3, 0],
+    transition: { duration: 0.55, ease: 'easeInOut', times: [0, 0.45, 1] },
+  },
 };
 
-const PATH_VARIANTS: Variants = {
-  normal: { x: 0 },
-  animate: { x: [0, -1.5, 0] },
-};
-
-export const SidebarAnimatedPanelLeftCloseIcon = forwardRef<
-  SidebarAnimatedPanelLeftCloseIconHandle,
-  SidebarAnimatedPanelLeftCloseIconProps
->(({ onMouseEnter, onMouseLeave, className, size = 16, direction = 'left', ...props }, ref) => {
+export const SidebarAnimatedTodoIcon = forwardRef<
+  SidebarAnimatedTodoIconHandle,
+  SidebarAnimatedTodoIconProps
+>(({ onMouseEnter, onMouseLeave, className, size = 16, ...props }, ref) => {
   const controls = useAnimation();
   const isControlledRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
@@ -61,33 +59,35 @@ export const SidebarAnimatedPanelLeftCloseIcon = forwardRef<
   return (
     <div
       aria-hidden="true"
-      className={cn('sidebar-animated-panel-left-close-icon size-4 shrink-0', className)}
+      className={cn('sidebar-animated-todo-icon size-4 shrink-0', className)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       {...props}
     >
-      <svg
+      <motion.svg
+        animate={controls}
         fill="none"
         height={size}
+        initial="normal"
         stroke="currentColor"
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth="2"
+        style={{ transformOrigin: '12px 12px' }}
+        variants={VARIANTS}
         viewBox="0 0 24 24"
         width={size}
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect height="18" rx="2" width="18" x="3" y="3" />
-        <path d="M9 3v18" />
-        <motion.path
-          animate={controls}
-          d={direction === 'right' ? 'm13 9 3 3-3 3' : 'm16 15-3-3 3-3'}
-          transition={DEFAULT_TRANSITION}
-          variants={PATH_VARIANTS}
-        />
-      </svg>
+        <path d="M9 6h11" />
+        <path d="M9 12h11" />
+        <path d="M9 18h11" />
+        <path d="m3 6 1 1 2-2" />
+        <path d="m3 12 1 1 2-2" />
+        <path d="m3 18 1 1 2-2" />
+      </motion.svg>
     </div>
   );
 });
 
-SidebarAnimatedPanelLeftCloseIcon.displayName = 'SidebarAnimatedPanelLeftCloseIcon';
+SidebarAnimatedTodoIcon.displayName = 'SidebarAnimatedTodoIcon';
