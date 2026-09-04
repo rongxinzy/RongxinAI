@@ -12,6 +12,7 @@ import {
   subscribeToEnterpriseSession,
 } from '../services/enterpriseSessionEvents';
 import { i18nService } from '../services/i18n';
+import { ZhiyuanModelPoolEvent } from '../../shared/modelPool/constants';
 
 interface CommunityUser {
   id: string;
@@ -36,6 +37,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
   const refreshUser = useCallback(async () => {
     const result = await window.electron.auth.getCommunityUser();
     setUser(result.success && result.user ? result.user : null);
+    window.dispatchEvent(new CustomEvent(ZhiyuanModelPoolEvent.AuthChanged));
   }, []);
 
   const applyEnterpriseSession = useCallback((result: EnterpriseSessionResult) => {
@@ -120,6 +122,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
     }
     await window.electron.auth.communityLogout();
     setUser(null);
+    window.dispatchEvent(new CustomEvent(ZhiyuanModelPoolEvent.AuthChanged));
     setShowMenu(false);
   };
 

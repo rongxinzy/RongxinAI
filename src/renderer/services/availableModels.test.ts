@@ -63,6 +63,44 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
 });
 
+test('exposes the managed free model only when the account is entitled to it', async () => {
+  vi.stubGlobal('window', {
+    electron: {
+      modelPool: {
+        listModels: vi.fn(async () => ({
+          ok: true,
+          status: 200,
+          models: ['zhiyuan-free'],
+        })),
+      },
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const models = await collectAvailableModels(createConfig());
+
+  expect(models[0]).toMatchObject({
+    id: 'zhiyuan-free',
+    providerKey: ProviderName.Zhiyuan,
+  });
+});
+
+test('does not expose the managed free model when the account has no entitlement', async () => {
+  vi.stubGlobal('window', {
+    electron: {
+      modelPool: {
+        listModels: vi.fn(async () => ({ ok: true, status: 200, models: [] })),
+      },
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const models = await collectAvailableModels(createConfig());
+
+  expect(models.some(model => model.providerKey === ProviderName.Zhiyuan)).toBe(false);
+  expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
+});
+
 test('exclusive managed policy exposes only the synchronized custom provider', async () => {
   const config = createConfig();
   config.providers = {

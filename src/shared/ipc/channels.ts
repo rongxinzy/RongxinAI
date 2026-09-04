@@ -105,6 +105,18 @@ export const ApiIpc = {
   streamAbort: (requestId: string) => `api:stream:${requestId}:abort`,
 } as const;
 
+// ─── ZhiYuan Model Pool ────────────────────────────────────────────────────
+export const ModelPoolIpc = {
+  ListModels: 'model-pool:list-models',
+  Stream: 'model-pool:stream',
+  CancelStream: 'model-pool:stream:cancel',
+  streamData: (requestId: string) => `model-pool:stream:${requestId}:data`,
+  streamDone: (requestId: string) => `model-pool:stream:${requestId}:done`,
+  streamError: (requestId: string) => `model-pool:stream:${requestId}:error`,
+  streamAbort: (requestId: string) => `model-pool:stream:${requestId}:abort`,
+} as const;
+export type ModelPoolIpc = (typeof ModelPoolIpc)[keyof typeof ModelPoolIpc];
+
 // ─── Window ─────────────────────────────────────────────────────────────────
 export const WindowIpc = {
   Minimize: 'window-minimize',

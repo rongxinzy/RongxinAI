@@ -286,6 +286,7 @@ const ADDED_PROVIDER_MODELS: Record<
 };
 
 const PROVIDER_MODEL_CATALOG_MIGRATION_VERSION = 1;
+const MODEL_POOL_PROVIDER_MIGRATION_VERSION = 1;
 
 export class ConfigService {
   private config: AppConfig = defaultConfig;
@@ -309,6 +310,9 @@ export class ConfigService {
       const shouldMigrateProviderModels =
         (storedConfig.migrations?.providerModelCatalog ?? 0) <
         PROVIDER_MODEL_CATALOG_MIGRATION_VERSION;
+      const shouldMigrateModelPoolProvider =
+        (storedConfig.migrations?.modelPoolProvider ?? 0) <
+        MODEL_POOL_PROVIDER_MIGRATION_VERSION;
       const mergedProviders = storedConfig.providers
         ? Object.fromEntries(
             Object.entries({
@@ -413,6 +417,7 @@ export class ConfigService {
           ...defaultConfig.migrations,
           ...storedConfig.migrations,
           providerModelCatalog: PROVIDER_MODEL_CATALOG_MIGRATION_VERSION,
+          modelPoolProvider: MODEL_POOL_PROVIDER_MIGRATION_VERSION,
         },
       });
       const shortcuts = this.config.shortcuts!;
@@ -423,7 +428,7 @@ export class ConfigService {
         settings:
           shortcuts.settings === 'Ctrl+,' ? defaultConfig.shortcuts!.settings : shortcuts.settings,
       };
-      if (shouldMigrateProviderModels) {
+      if (shouldMigrateProviderModels || shouldMigrateModelPoolProvider) {
         await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
       }
     } else {

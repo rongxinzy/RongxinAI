@@ -1,4 +1,4 @@
-import { resolveCodingPlanBaseUrl } from '../../shared/providers';
+import { ProviderName, resolveCodingPlanBaseUrl } from '../../shared/providers';
 import { configService } from './config';
 
 export interface ResolvedApiConfig {
@@ -35,7 +35,12 @@ export function shouldUseOpenAIResponsesApi(provider: string): boolean {
 }
 
 export function providerRequiresApiKey(provider: string): boolean {
-  return provider !== 'ollama' && provider !== 'github-copilot' && !provider.startsWith('custom_');
+  return (
+    provider !== ProviderName.Zhiyuan &&
+    provider !== 'ollama' &&
+    provider !== 'github-copilot' &&
+    !provider.startsWith('custom_')
+  );
 }
 
 export function detectProvider(modelId: string, providerHint?: string): string {
@@ -58,12 +63,14 @@ export function detectProvider(modelId: string, providerHint?: string): string {
       'volcengine',
       'github-copilot',
       'ollama',
+      ProviderName.Zhiyuan,
     ].includes(normalizedHint) ||
       normalizedHint.startsWith('custom_'))
   ) {
     return normalizedHint;
   }
   const normalizedModelId = modelId.toLowerCase();
+  if (normalizedModelId === 'zhiyuan-free') return ProviderName.Zhiyuan;
   if (normalizedModelId.startsWith('claude')) return 'anthropic';
   if (
     normalizedModelId.startsWith('gpt') ||

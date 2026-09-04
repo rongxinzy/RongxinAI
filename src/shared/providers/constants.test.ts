@@ -18,9 +18,10 @@ describe('ProviderName constants', () => {
 });
 
 describe('ProviderRegistry', () => {
-  test('providerIds returns 17 providers (no custom or legacy server)', () => {
+  test('providerIds returns 18 providers (no custom or legacy server)', () => {
     const ids = ProviderRegistry.providerIds;
-    expect(ids.length).toBe(17);
+    expect(ids.length).toBe(18);
+    expect(ids).toContain(ProviderName.Zhiyuan);
     expect(ids).not.toContain(ProviderName.Custom);
     expect(ids).not.toContain('zhiyuan-server');
   });
@@ -85,15 +86,21 @@ describe('ProviderRegistry', () => {
     expect(ProviderRegistry.getModel(ProviderName.Minimax, 'MiniMax-M3')).toMatchObject({
       contextWindow: 1_000_000,
     });
-    expect(ProviderRegistry.getModel(ProviderName.Minimax, 'MiniMax-M3')?.maxTokens).toBeUndefined();
+    expect(
+      ProviderRegistry.getModel(ProviderName.Minimax, 'MiniMax-M3')?.maxTokens,
+    ).toBeUndefined();
     expect(ProviderRegistry.getModel(ProviderName.StepFun, 'step-3.7-flash')).toMatchObject({
       contextWindow: 256_000,
     });
-    expect(ProviderRegistry.getModel(ProviderName.StepFun, 'step-3.7-flash')?.maxTokens).toBeUndefined();
+    expect(
+      ProviderRegistry.getModel(ProviderName.StepFun, 'step-3.7-flash')?.maxTokens,
+    ).toBeUndefined();
     expect(ProviderRegistry.getModel(ProviderName.Moonshot, 'kimi-k2.6')).toMatchObject({
       contextWindow: 256_000,
     });
-    expect(ProviderRegistry.getModel(ProviderName.Moonshot, 'kimi-k2.6')?.maxTokens).toBeUndefined();
+    expect(
+      ProviderRegistry.getModel(ProviderName.Moonshot, 'kimi-k2.6')?.maxTokens,
+    ).toBeUndefined();
   });
 
   test('stores coding-plan capacity for Kimi for Coding', () => {
@@ -387,9 +394,10 @@ describe('ProviderRegistry', () => {
     expect(ProviderRegistry.supportsCodingPlan('unknown')).toBe(false);
   });
 
-  test('idsByRegion china returns 11 providers', () => {
+  test('idsByRegion china returns 12 providers', () => {
     const china = ProviderRegistry.idsByRegion('china');
-    expect(china.length).toBe(11);
+    expect(china.length).toBe(12);
+    expect(china).toContain(ProviderName.Zhiyuan);
     expect(china).toContain(ProviderName.DeepSeek);
     expect(china).toContain(ProviderName.Qianfan);
     expect(china).toContain(ProviderName.LlamaCpp);
@@ -432,11 +440,8 @@ describe('ProviderRegistry', () => {
       ProviderName.OpenAI,
     );
     expect(
-      ProviderRegistry.resolveModelCapabilities(
-        ProviderName.OpenAI,
-        ' GPT-5.4 ',
-        ApiFormat.OpenAI,
-      ).reasoning,
+      ProviderRegistry.resolveModelCapabilities(ProviderName.OpenAI, ' GPT-5.4 ', ApiFormat.OpenAI)
+        .reasoning,
     ).toBe(ModelCapabilityStatus.Supported);
   });
 
