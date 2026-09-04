@@ -14,6 +14,7 @@ import { ChevronRight, Download } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
+import { normalizeError } from '../../../services/errorNormalization';
 
 import {
   WorkbenchTaskStatus,
@@ -56,7 +57,7 @@ export function WorkbenchTaskAuditView({
         toast.error(
           i18nService
             .t('workbenchTaskExportFailed')
-            .replace('{error}', result.error || i18nService.t('unknownError')),
+            .replace('{error}', normalizeError(result.error || i18nService.t('unknownError'))),
         );
       } else if (!result.canceled) {
         toast.success(i18nService.t('workbenchTaskExported'));
@@ -65,7 +66,7 @@ export function WorkbenchTaskAuditView({
       toast.error(
         i18nService
           .t('workbenchTaskExportFailed')
-          .replace('{error}', error instanceof Error ? error.message : String(error)),
+          .replace('{error}', normalizeError(error)),
       );
     } finally {
       setExporting(false);

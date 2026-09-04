@@ -23,6 +23,7 @@ import {
   type ProductionLoopMode as ProductionLoopModeValue,
 } from '../../../shared/productionLoop';
 import { i18nService } from '../../services/i18n';
+import { normalizeError } from '../../services/errorNormalization';
 import { mcpService, normalizeMcpErrorMessage } from '../../services/mcp';
 import { skillService } from '../../services/skill';
 import { getSkillInitial, resolveSkillIconUrl } from '../../services/skillIcon';
@@ -209,7 +210,10 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
         awaitingBridgeSyncRef.current = false;
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
-            detail: error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
+            detail: {
+              message: normalizeError(error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed')),
+              isError: true,
+            },
           }),
         );
       } finally {

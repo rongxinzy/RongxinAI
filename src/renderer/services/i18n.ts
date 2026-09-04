@@ -1,4 +1,4 @@
-import { configService } from './config';
+﻿import { configService } from './config';
 
 // 支持的语言类型
 export type LanguageType = 'zh' | 'en';
@@ -6,6 +6,15 @@ export type LanguageType = 'zh' | 'en';
 // 语言文本映射
 const translations: Record<LanguageType, Record<string, string>> = {
   zh: {
+    operationFailed: '操作失败',
+    authenticationExpired: '登录状态已过期，请重新登录',
+    apiKeyMissing: '缺少 API Key，请先完成配置',
+    modelNotFound: '未找到指定模型',
+    requestTimeout: '请求超时，请稍后重试',
+    permissionDenied: '权限不足，无法完成操作',
+    fileNotFound: '文件不存在或无法访问',
+    gitConflict: 'Git 存在冲突，请先解决冲突',
+    mcpEndpointInvalid: 'MCP endpoint 无效，请检查配置',
     localInferenceBackendSwitchRequiresStoppedService: '请先停止本地推理服务，再切换版本。',
     localInferenceBackendInUse: '正在使用',
     localInferenceCudaRequiresNvidiaGpu: 'CUDA 版本需要 NVIDIA 显卡，请切换到 CPU 版本。',
@@ -2282,6 +2291,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillDeleteConfirm: '确定删除技能“{name}”吗？',
     skillBatchDeleteConfirm: '确定删除已选的 {count} 个技能吗？',
     skillDeleteFailed: '删除技能失败',
+    skillDeleted: '技能已删除',
     skillBuiltInCannotDelete: '系统内置技能不允许删除',
     skillDownloadFailed: '下载技能失败',
     skillUpdateFailed: '更新技能失败',
@@ -3234,6 +3244,15 @@ const translations: Record<LanguageType, Record<string, string>> = {
     todoParsedImportant: '已识别为重要',
   },
   en: {
+    operationFailed: 'Operation failed',
+    authenticationExpired: 'Authentication expired. Please sign in again',
+    apiKeyMissing: 'API key is missing. Check your configuration',
+    modelNotFound: 'The requested model was not found',
+    requestTimeout: 'The request timed out. Please try again',
+    permissionDenied: 'You do not have permission to complete this operation',
+    fileNotFound: 'The file was not found or cannot be accessed',
+    gitConflict: 'Git reported a conflict. Resolve it and try again',
+    mcpEndpointInvalid: 'The MCP endpoint is invalid. Check your configuration',
     localInferenceBackendSwitchRequiresStoppedService:
       'Stop the local inference service before switching versions.',
     localInferenceBackendInUse: 'In use',
@@ -5658,6 +5677,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     skillDeleteConfirm: 'Delete skill \"{name}\"?',
     skillBatchDeleteConfirm: 'Delete the {count} selected skills?',
     skillDeleteFailed: 'Failed to delete skill',
+    skillDeleted: 'Skill deleted',
     skillBuiltInCannotDelete: 'Built-in skills cannot be deleted',
     skillDownloadFailed: 'Failed to download skill',
     skillUpdateFailed: 'Failed to update skill',
