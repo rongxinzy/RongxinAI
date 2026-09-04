@@ -255,7 +255,6 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         description={i18nService.t('deleteTaskConfirmMessage')}
         cancelLabel={i18nService.t('cancel')}
         confirmLabel={i18nService.t('deleteSession')}
-        cancelVariant="outline"
         confirmVariant="outline"
         onCancel={() => setShowConfirmDelete(false)}
         onConfirm={() => {

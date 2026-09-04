@@ -5504,7 +5504,6 @@ const Settings: React.FC<SettingsProps> = ({
           description={i18nService.t('clearApiKeyConfirmDescription')}
           cancelLabel={i18nService.t('cancel')}
           confirmLabel={i18nService.t('clear')}
-          cancelVariant="outline"
           confirmVariant="outline"
           onCancel={() => setPendingApiKeyClearProvider(null)}
           onConfirm={confirmApiKeyClear}
@@ -5518,7 +5517,6 @@ const Settings: React.FC<SettingsProps> = ({
           }
           cancelLabel={i18nService.t('cancel')}
           confirmLabel={i18nService.t('delete')}
-          cancelVariant="outline"
           confirmVariant="outline"
           onCancel={() => setPendingDeleteModel(null)}
           onConfirm={confirmDeleteModel}
