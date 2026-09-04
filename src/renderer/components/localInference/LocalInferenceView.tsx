@@ -1382,6 +1382,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           if (!contextModel) return;
           handleSaveModelContext(contextModel.name, ctxSize);
         }}
+        onValidationError={message => showToast(message, LocalInferenceToastKind.Error)}
       />
     </div>
   );

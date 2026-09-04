@@ -3386,8 +3386,7 @@ const Settings: React.FC<SettingsProps> = ({
 
             {/* Provider Settings - Right Side */}
             <div className="min-h-0 w-full min-w-0 flex-1 space-y-4 overflow-y-auto pl-4 pr-2 scrollbar-gutter-stable md:w-3/5 md:flex-none">
-              {activeProvider !== ProviderName.LlamaCpp &&
-                (() => {
+              {(() => {
                   return (
                     <div
                       className={cn(
@@ -3397,14 +3396,22 @@ const Settings: React.FC<SettingsProps> = ({
                     >
                       <div className="flex items-center gap-1.5">
                         <h3 className="text-base font-medium text-foreground">
-                          {isCustomProvider(activeProvider)
-                            ? (providers[activeProvider] as ProviderConfig)?.displayName ||
-                              getCustomProviderLabel(activeProvider)
-                            : (ProviderRegistry.get(activeProvider)?.label ??
-                              getProviderDisplayName(activeProvider))}{' '}
-                          {i18nService.t('providerSettings')}
+                          {isCustomProvider(activeProvider) ? (
+                            (providers[activeProvider] as ProviderConfig)?.displayName ||
+                            getCustomProviderLabel(activeProvider)
+                          ) : activeProvider === ProviderName.LlamaCpp ? (
+                            ProviderRegistry.get(activeProvider)?.label ??
+                            getProviderDisplayName(activeProvider)
+                          ) : (
+                            <>
+                              {ProviderRegistry.get(activeProvider)?.label ??
+                                getProviderDisplayName(activeProvider)}{' '}
+                              {i18nService.t('providerSettings')}
+                            </>
+                          )}
                         </h3>
-                        {ProviderRegistry.get(activeProvider)?.website && (
+                        {activeProvider !== ProviderName.LlamaCpp &&
+                          ProviderRegistry.get(activeProvider)?.website && (
                           <Button
                             type="button"
                             variant="ghost"
