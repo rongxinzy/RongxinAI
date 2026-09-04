@@ -2355,7 +2355,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpFeishuInstallTitle: '安装飞书连接器',
     mcpFeishuLoginTitle: '登录飞书账号',
     mcpFeishuSubtitle: '连接飞书，通过官方 CLI 授权调用日历、云文档、多维表格、聊天等能力。',
-    mcpFeishuInstallFailed: '飞书连接器安装失败，请检查网络和 Node.js 环境后重试。',
+    mcpFeishuInstallFailed: '飞书连接器安装失败，请检查网络后重试。错误详情：',
     mcpConfigureTitle: '配置 {name}',
     mcpGithubConfigureSubtitle: '连接 GitHub 以访问你授权的仓库、Issue 和 Pull Request。',
     mcpGithubPat: 'GitHub 个人访问令牌',
@@ -5727,7 +5727,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     mcpFeishuSubtitle:
       'Connect Feishu through its official CLI to use calendars, documents, Bitable, chat, and more.',
     mcpFeishuInstallFailed:
-      'Could not install the Feishu connector. Check your network and Node.js setup, then try again.',
+      'Could not install the Feishu connector. Check your network, then try again. Error details:',
     mcpConfigureTitle: 'Configure {name}',
     mcpGithubConfigureSubtitle:
       'Connect GitHub to access the repositories, issues, and pull requests you authorize.',

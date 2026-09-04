@@ -88,6 +88,16 @@ test("unpacks AnyDoc native bindings from the application archive", () => {
   );
 });
 
+test("unpacks npm for connector installation without a system Node.js runtime", () => {
+  const config = JSON.parse(
+    readFileSync(path.join(root, "electron-builder.json"), "utf8"),
+  ) as {
+    asarUnpack?: string[];
+  };
+
+  assert.ok(config.asarUnpack?.includes("node_modules/npm/**"));
+});
+
 test("unpacks ACP adapters without bundling external agent binaries", () => {
   const config = JSON.parse(
     readFileSync(path.join(root, "electron-builder.json"), "utf8"),
