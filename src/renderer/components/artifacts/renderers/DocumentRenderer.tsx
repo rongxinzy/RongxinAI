@@ -3,6 +3,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '@/services/i18n';
+import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
 import type { Artifact } from '@/types/artifact';
 
 import type { CsvPreviewWorkerResponse } from './csvPreview.worker';
@@ -60,28 +61,11 @@ function useFileContent(artifact: Artifact): {
         return;
       }
 
-      if (artifact.filePath && window.electron?.dialog?.readFileAsDataUrl) {
-        let filePath = artifact.filePath;
-        if (filePath.startsWith('file:///')) {
-          filePath = filePath.slice(7);
-        } else if (filePath.startsWith('file://')) {
-          filePath = filePath.slice(7);
-        } else if (filePath.startsWith('file:/')) {
-          filePath = filePath.slice(5);
-        }
-        // Strip leading / before Windows drive letter
-        if (/^\/[A-Za-z]:/.test(filePath)) {
-          filePath = filePath.slice(1);
-        }
+      if (artifact.filePath) {
         try {
-          const result = await window.electron.dialog.readFileAsDataUrl(filePath);
+          const dataUrl = await loadArtifactDataUrl(artifact.filePath);
           if (cancelled) return;
-          if (result?.success && result.dataUrl) {
-            const buf = dataUrlToArrayBuffer(result.dataUrl);
-            setData(buf);
-          } else {
-            setError(result?.error || 'Failed to read file');
-          }
+          setData(dataUrlToArrayBuffer(dataUrl));
         } catch (e) {
           if (!cancelled) setError(e instanceof Error ? e.message : String(e));
         }
@@ -284,7 +268,8 @@ const XlsxSubRenderer: React.FC<{ artifact: Artifact }> = ({ artifact }) => {
         const fileName = artifact.fileName || artifact.filePath || '';
         if (isCsvOrTsv(fileName) || artifact.language === 'csv' || artifact.language === 'tsv') {
           const text = new TextDecoder('utf-8').decode(new Uint8Array(data));
-          const delimiter = fileName.toLowerCase().endsWith('.tsv') || artifact.language === 'tsv' ? '\t' : ',';
+          const delimiter =
+            fileName.toLowerCase().endsWith('.tsv') || artifact.language === 'tsv' ? '\t' : ',';
           const worker = new Worker(new URL('./csvPreview.worker.ts', import.meta.url), {
             type: 'module',
           });
@@ -847,23 +832,19 @@ const PptxHtmlFallback: React.FC<{ artifact: Artifact; data: ArrayBuffer }> = ({
     let cancelled = false;
 
     const loadSlideHtmls = async () => {
-      let filePath = artifact.filePath!;
-      if (filePath.startsWith('file:///')) filePath = filePath.slice(7);
-      else if (filePath.startsWith('file://')) filePath = filePath.slice(7);
-      else if (filePath.startsWith('file:/')) filePath = filePath.slice(5);
-      // Strip leading / before Windows drive letter
-      if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1);
-
-      const dir = filePath.substring(0, filePath.lastIndexOf('/'));
+      const lastSeparator = Math.max(
+        artifact.filePath!.lastIndexOf('/'),
+        artifact.filePath!.lastIndexOf('\\'),
+      );
+      const dir = artifact.filePath!.substring(0, lastSeparator);
       const slidesDir = `${dir}/slides`;
       const nextSlides: PptxPreviewSlide[] = [];
 
       for (let i = 1; i <= 500; i++) {
         const slidePath = `${slidesDir}/slide${i}.html`;
         try {
-          const result = await window.electron?.dialog?.readFileAsDataUrl(slidePath);
-          if (!result?.success || !result.dataUrl) break;
-          const base64 = result.dataUrl.split(',')[1] || '';
+          const dataUrl = await loadArtifactDataUrl(slidePath);
+          const base64 = dataUrl.split(',')[1] || '';
           const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
           const html = new TextDecoder('utf-8').decode(bytes);
           nextSlides.push({ srcDoc: html, width: 960, height: 540 });

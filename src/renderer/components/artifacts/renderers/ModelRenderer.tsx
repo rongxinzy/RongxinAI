@@ -17,6 +17,7 @@ import { ThreeMFLoader } from 'three/examples/jsm/loaders/3MFLoader.js';
 
 import type { Artifact } from '@/types/artifact';
 import { i18nService } from '@/services/i18n';
+import { loadArtifactDataUrl } from '@/services/artifactFileLoader';
 
 import { MODEL_AUTO_ROTATE_SPEED, ModelFileExtension } from './constants';
 
@@ -84,16 +85,8 @@ function dataUrlToArrayBuffer(dataUrl: string): ArrayBuffer {
 async function loadModelBuffer(artifact: Artifact): Promise<ArrayBuffer> {
   if (artifact.content) return dataUrlToArrayBuffer(artifact.content);
   if (!artifact.filePath) throw new Error('No content available');
-  let filePath = artifact.filePath;
-  if (filePath.startsWith('file:///')) filePath = filePath.slice(7);
-  else if (filePath.startsWith('file://')) filePath = filePath.slice(7);
-  else if (filePath.startsWith('file:/')) filePath = filePath.slice(5);
-  if (/^\/[A-Za-z]:/.test(filePath)) filePath = filePath.slice(1);
-  const result = await window.electron.dialog.readFileAsDataUrl(filePath);
-  if (!result?.success || !result.dataUrl) {
-    throw new Error(result?.error || 'Failed to read file');
-  }
-  return dataUrlToArrayBuffer(result.dataUrl);
+  const dataUrl = await loadArtifactDataUrl(artifact.filePath);
+  return dataUrlToArrayBuffer(dataUrl);
 }
 
 export async function parseModelObject(
