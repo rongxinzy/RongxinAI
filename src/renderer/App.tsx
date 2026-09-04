@@ -33,6 +33,7 @@ import {
   LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
   notifyLlamaCppRunningModelsChanged,
 } from './services/availableModels';
+import { ZhiyuanModelPoolEvent } from '../shared/modelPool/constants';
 import { configService } from './services/config';
 import { coworkService } from './services/cowork';
 import { i18nService } from './services/i18n';
@@ -346,6 +347,7 @@ const App: React.FC = () => {
       LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
       handleLlamaCppRunningModelsChanged,
     );
+    window.addEventListener(ZhiyuanModelPoolEvent.AuthChanged, handleLlamaCppRunningModelsChanged);
     const unsubscribeModelBindings = window.electron.llamacpp.onModelBindingsChanged(
       handleLlamaCppModelBindingsChanged,
     );
@@ -353,6 +355,10 @@ const App: React.FC = () => {
       window.removeEventListener('config-updated', handleConfigUpdated);
       window.removeEventListener(
         LLAMACPP_RUNNING_MODELS_CHANGED_EVENT,
+        handleLlamaCppRunningModelsChanged,
+      );
+      window.removeEventListener(
+        ZhiyuanModelPoolEvent.AuthChanged,
         handleLlamaCppRunningModelsChanged,
       );
       unsubscribeModelBindings();

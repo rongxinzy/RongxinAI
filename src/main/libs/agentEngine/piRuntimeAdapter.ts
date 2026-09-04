@@ -61,10 +61,12 @@ import {
   isLocalProviderName,
   type ModelCapabilities,
   ModelCapabilityStatus,
+  ProviderName,
   ProviderModelPiApi,
   resolveProviderModelPiReasoning,
 } from '../../../shared/providers';
 import type { CoworkMessage } from '../../coworkStore';
+import { getModelPoolAccessToken } from '../../communityAuthSession';
 import type { CoworkStore } from '../../coworkStore';
 import { resolveBundledPresetMembers } from '../../presetExpertSnapshot';
 import { buildPiConversationHistoryTool } from '../../conversationHistory/piTool';
@@ -127,7 +129,10 @@ import {
   ShortcutWorkflowKind,
 } from './piShortcutWorkflow';
 import { buildPiShortcutWorkflowStateTool } from './piShortcutWorkflowStateTool';
-import { registerPiOpenAICompatUpstream } from './piOpenAICompatProxy';
+import {
+  registerPiOpenAICompatTokenRefresher,
+  registerPiOpenAICompatUpstream,
+} from './piOpenAICompatProxy';
 import {
   PiExtensionEventType,
   type PiExtensionApi,
@@ -3489,6 +3494,7 @@ const DEFAULT_PI_LOCAL_MAX_TOKENS = 4096;
 const DEFAULT_PI_CLOUD_CONTEXT_WINDOW = 256000;
 const DEFAULT_PI_CLOUD_MAX_TOKENS = 32768;
 const PI_LOCAL_API_KEY = 'sk-zhiyuan-local';
+const PI_MANAGED_PROXY_API_KEY = `sk-zhiyuan-${randomUUID()}`;
 
 function resolvePiCustomModelApi(resolution: ApiConfigResolution): ProviderModelPiApi {
   const configuredApi = resolution.providerMetadata?.piRuntime?.api;
@@ -3570,7 +3576,7 @@ function shouldUsePiOpenAICompatProxy(
 ): boolean {
   const providerName = resolution.providerMetadata?.providerName ?? '';
   return (
-    providerName.startsWith('custom_') &&
+    (providerName === ProviderName.Zhiyuan || providerName.startsWith('custom_')) &&
     resolution.config?.apiType === 'openai' &&
     api === ProviderModelPiApi.OpenAICompletions
   );
@@ -3584,6 +3590,18 @@ async function resolvePiCustomModelBaseUrl(
   const providerMetadata = resolution.providerMetadata;
   if (!config || !providerMetadata) {
     return '';
+  }
+
+  if (providerMetadata.providerName === ProviderName.Zhiyuan) {
+    const accessToken = await getModelPoolAccessToken();
+    registerPiOpenAICompatTokenRefresher(providerMetadata.providerName, () =>
+      getModelPoolAccessToken({ forceRefresh: true }),
+    );
+    return registerPiOpenAICompatUpstream(providerMetadata.providerName, {
+      baseURL: config.baseURL,
+      apiKey: accessToken,
+      requiredIncomingApiKey: PI_MANAGED_PROXY_API_KEY,
+    });
   }
 
   if (!shouldUsePiOpenAICompatProxy(resolution, api)) {
@@ -3643,8 +3661,10 @@ async function resolvePiCustomModelRuntime(
     models: [model],
   });
   const apiKey =
-    config.apiKey?.trim() ||
-    (isLocalProviderName(providerMetadata.providerName) ? PI_LOCAL_API_KEY : '');
+    providerMetadata.providerName === ProviderName.Zhiyuan
+      ? PI_MANAGED_PROXY_API_KEY
+      : config.apiKey?.trim() ||
+        (isLocalProviderName(providerMetadata.providerName) ? PI_LOCAL_API_KEY : '');
   if (apiKey) await modelRuntime.setRuntimeApiKey(providerId, apiKey);
   return { modelRuntime, customModel: model };
 }
@@ -3718,7 +3738,12 @@ async function resolvePiModel(
         : DEFAULT_PI_CLOUD_MAX_TOKENS),
     providerName: resolution.providerMetadata.providerName,
     capabilities: resolution.endpoint?.capabilities ?? resolution.providerMetadata.capabilities,
-    requestOptions: resolution.config.apiKey ? { apiKey: resolution.config.apiKey } : undefined,
+    requestOptions:
+      resolution.providerMetadata.providerName === ProviderName.Zhiyuan
+        ? { apiKey: PI_MANAGED_PROXY_API_KEY }
+        : resolution.config.apiKey
+          ? { apiKey: resolution.config.apiKey }
+          : undefined,
   };
 }
 

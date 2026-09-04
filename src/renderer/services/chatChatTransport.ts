@@ -7,8 +7,10 @@ import {
 } from 'ai';
 
 import { apiService } from './api';
+import { IpcChatTransport } from './ipcChatTransport';
 import type { DirectChatRequestOptions } from './localThinkingRequest';
 import type { ChatUserMessageInput, ImageAttachment } from '../types/chat';
+import { ProviderName } from '../../shared/providers';
 import {
   createToolInputAvailableChunk,
   createToolInputStartChunk,
@@ -64,6 +66,9 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
   // -- ChatTransport impl --------------------------------------------
 
   async sendMessages({
+    trigger,
+    chatId,
+    messageId,
     messages,
     abortSignal,
   }: {
@@ -73,6 +78,13 @@ export class ChatChatTransport implements ChatTransport<UIMessage> {
     messages: UIMessage[];
     abortSignal: AbortSignal | undefined;
   } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
+    if (this.options.modelProviderKey === ProviderName.Zhiyuan) {
+      return new IpcChatTransport({
+        provider: ProviderName.Zhiyuan,
+        model: this.options.modelId,
+      }).sendMessages({ trigger, chatId, messageId, messages, abortSignal });
+    }
+
     const directChatOptions = this.options;
     const lastUser = [...messages].reverse().find(m => m.role === 'user');
     const prompt = lastUser ? extractText(lastUser) : '';

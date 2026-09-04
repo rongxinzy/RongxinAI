@@ -1438,6 +1438,25 @@ interface IElectronAPI {
       }) => void,
     ) => () => void;
   };
+  modelPool: {
+    listModels: () => Promise<{
+      ok: boolean;
+      status: number;
+      models: string[];
+      error?: string;
+    }>;
+    stream: (input: { requestId: string; body: Record<string, unknown> }) => Promise<{
+      ok: boolean;
+      status: number;
+      statusText: string;
+      error?: string;
+    }>;
+    cancelStream: (requestId: string) => Promise<boolean>;
+    onStreamData: (requestId: string, callback: (data: string) => void) => () => void;
+    onStreamDone: (requestId: string, callback: () => void) => () => void;
+    onStreamError: (requestId: string, callback: (error: string) => void) => () => void;
+    onStreamAbort: (requestId: string, callback: () => void) => () => void;
+  };
   enterprise: {
     getConfig: () => Promise<{
       ui?: Record<string, 'hide' | 'disable' | 'readonly'>;

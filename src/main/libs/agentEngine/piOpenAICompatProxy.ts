@@ -1,10 +1,21 @@
 ﻿import http, { type IncomingMessage, type ServerResponse } from 'http';
 
-import { buildOpenAIChatCompletionsURL } from '../coworkFormatTransform';
+import { timingSafeEqual } from 'crypto';
 
+import { buildOpenAIChatCompletionsURL } from '../coworkFormatTransform';
 interface PiOpenAICompatUpstream {
   baseURL: string;
   apiKey?: string;
+  requiredIncomingApiKey?: string;
+}
+
+function incomingApiKeyMatches(request: IncomingMessage, expected: string): boolean {
+  const authorization = request.headers.authorization;
+  const actual = typeof authorization === 'string' ? authorization : '';
+  const expectedAuthorization = `Bearer ${expected}`;
+  const actualBytes = Buffer.from(actual, 'utf8');
+  const expectedBytes = Buffer.from(expectedAuthorization, 'utf8');
+  return actualBytes.length === expectedBytes.length && timingSafeEqual(actualBytes, expectedBytes);
 }
 
 export type PiOpenAICompatTokenRefresher = () => Promise<string>;
@@ -429,6 +440,13 @@ async function handleProxyRequest(
     writeJson(response, 404, { error: 'Pi OpenAI compatibility upstream is not registered.' });
     return;
   }
+  if (
+    upstream.requiredIncomingApiKey &&
+    !incomingApiKeyMatches(request, upstream.requiredIncomingApiKey)
+  ) {
+    writeJson(response, 401, { error: 'Pi OpenAI compatibility proxy authentication failed.' });
+    return;
+  }
 
   const proxiedPath = `/${pathSegments.slice(2).join('/')}`;
   if (!isOpenAIChatCompletionsPath(proxiedPath)) {
@@ -538,6 +556,7 @@ export async function registerPiOpenAICompatUpstream(
   upstreams.set(providerId, {
     baseURL: upstream.baseURL,
     apiKey: upstream.apiKey,
+    requiredIncomingApiKey: upstream.requiredIncomingApiKey,
   });
   return `http://127.0.0.1:${port}${PI_OPENAI_COMPAT_PROXY_PREFIX}/${encodeURIComponent(
     providerId,

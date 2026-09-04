@@ -324,7 +324,17 @@ function getEffectiveProviderApiFormat(
 }
 
 function providerRequiresApiKey(providerName: string): boolean {
-  return providerName !== ProviderName.Ollama && providerName !== ProviderName.LlamaCpp;
+  return (
+    providerName !== ProviderName.Zhiyuan &&
+    providerName !== ProviderName.Ollama &&
+    providerName !== ProviderName.LlamaCpp
+  );
+}
+
+function resolveEffectiveApiKey(providerName: string, apiKey: string): string {
+  if (apiKey) return apiKey;
+  if (providerName === ProviderName.Zhiyuan) return 'sk-zhiyuan-managed';
+  return providerRequiresApiKey(providerName) ? '' : 'sk-zhiyuan-local';
 }
 
 function getEffectiveProviderModels(
@@ -566,8 +576,7 @@ function buildRawApiResolutionFromMatched(matched: MatchedProvider): ApiConfigRe
       providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' },
     }),
   );
-  const effectiveApiKey =
-    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
+  const effectiveApiKey = resolveEffectiveApiKey(matched.providerName, apiKey);
   const endpoint = resolveModelEndpoint(matched.providerName, matched.modelId, {
     providerConfig: matched.providerConfig,
     modelConfig: matched.userModelConfig,
@@ -718,8 +727,7 @@ export function resolveCurrentApiConfig(
   // Providers that don't require auth (e.g. Ollama) still need a non-empty
   // placeholder so downstream components such as the compatibility proxy
   // don't reject the request with "No API key found for provider".
-  const effectiveApiKey =
-    resolvedApiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
+  const effectiveApiKey = resolveEffectiveApiKey(matched.providerName, resolvedApiKey);
 
   if (matched.apiFormat === 'anthropic') {
     const endpoint = resolveModelEndpoint(matched.providerName, matched.modelId, {
@@ -873,8 +881,7 @@ export function resolveRawApiConfig(): ApiConfigResolution {
   // local servers that do not enforce auth. When the user leaves the key blank,
   // supply a placeholder so request validation does not reject
   // the request with "No API key found for provider".
-  const effectiveApiKey =
-    apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-zhiyuan-local' : '');
+  const effectiveApiKey = resolveEffectiveApiKey(matched.providerName, apiKey);
   const endpoint = resolveModelEndpoint(matched.providerName, matched.modelId, {
     providerConfig: matched.providerConfig,
     modelConfig: matched.userModelConfig,

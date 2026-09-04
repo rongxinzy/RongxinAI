@@ -311,6 +311,10 @@ const translations: Record<LanguageType, Record<string, string>> = {
     // Community account authentication
     communityAuthLoginIncomplete: '登录未完成，请重试。',
     communityAuthServiceUnavailable: '登录服务暂时不可用，请稍后重试。',
+    modelPoolLoginRequired: '请先登录知远账号后使用免费模型。',
+    modelPoolEntitlementRequired: '当前账号没有免费模型权益。',
+    modelPoolQuotaExceeded: '今日免费模型额度已用完，请明日再试。',
+    modelPoolServiceUnavailable: '免费模型服务暂时不可用，请稍后重试。',
 
     'enterprise.updateBlocked': '版本更新由企业统一管理',
   },
@@ -665,6 +669,11 @@ const translations: Record<LanguageType, Record<string, string>> = {
     communityAuthLoginIncomplete: 'Login was not completed. Please try again.',
     communityAuthServiceUnavailable:
       'The login service is temporarily unavailable. Please try again later.',
+    modelPoolLoginRequired: 'Sign in to your ZhiYuan account to use the free model.',
+    modelPoolEntitlementRequired: 'This account is not entitled to use the free model.',
+    modelPoolQuotaExceeded: 'Your free model quota is exhausted for today. Try again tomorrow.',
+    modelPoolServiceUnavailable:
+      'The free model service is temporarily unavailable. Please try again later.',
 
     'enterprise.updateBlocked': 'Updates are managed by enterprise',
   },
