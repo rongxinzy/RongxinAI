@@ -1862,7 +1862,7 @@ const runFeishuCliCommand = (
     const env: Record<string, string | undefined> = { ...process.env };
     // lark-cli's generated launcher invokes `node` through PATH. Use the
     // application runtime here as well as for its initial npm installation.
-    applyApplicationRuntimeEnv(env);
+    applyApplicationRuntimeEnv(env, { includePackageMirrors: true });
     const child = spawn(command, args, {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
