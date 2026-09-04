@@ -197,7 +197,16 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
       </div>
 
       {/* Create-task modal */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={createOpen}
+        onOpenChange={open => {
+          setCreateOpen(open);
+          if (!open) {
+            setCreatePrefill(undefined);
+            setCreateFormKey(key => key + 1);
+          }
+        }}
+      >
         <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{i18nService.t('scheduledTasksNewTask')}</DialogTitle>

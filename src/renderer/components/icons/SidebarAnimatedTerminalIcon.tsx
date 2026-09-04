@@ -17,8 +17,7 @@ const LINE_VARIANTS: Variants = {
   [TerminalIconAnimationState.Animate]: {
     opacity: [1, 0, 1],
     transition: {
-      duration: 0.8,
-      repeat: Number.POSITIVE_INFINITY,
+      duration: 0.35,
       ease: 'linear',
     },
   },

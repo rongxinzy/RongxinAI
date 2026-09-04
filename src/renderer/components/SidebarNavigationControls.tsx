@@ -2,7 +2,6 @@ import { Button } from '@shared/components/ui/button';
 import { Switch } from '@shared/components/ui/switch';
 import { cn } from '@shared/lib/utils';
 import { useReducedMotion } from 'motion/react';
-import { ListTodo } from 'lucide-react';
 import { type RefObject, useRef } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -37,6 +36,10 @@ import {
   SidebarAnimatedTerminalIcon,
   type SidebarAnimatedTerminalIconHandle,
 } from './icons/SidebarAnimatedTerminalIcon';
+import {
+  SidebarAnimatedTodoIcon,
+  type SidebarAnimatedTodoIconHandle,
+} from './icons/SidebarAnimatedTodoIcon';
 
 export type SidebarActiveView =
   | 'cowork'
@@ -100,6 +103,7 @@ export const SidebarNavigationControls = ({
   const localInferenceIconRef = useRef<SidebarAnimatedBotIconHandle>(null);
   const expertIconRef = useRef<SidebarAnimatedUsersIconHandle>(null);
   const codingIconRef = useRef<SidebarAnimatedTerminalIconHandle>(null);
+  const todoIconRef = useRef<SidebarAnimatedTodoIconHandle>(null);
   const prefersReducedMotion = useReducedMotion();
   const isNewConversationActive =
     activeView === 'cowork' && (workMode !== WorkMode.Chat || activeSkillIds.length === 0);
@@ -214,8 +218,12 @@ export const SidebarNavigationControls = ({
           type="button"
           variant="ghost"
           onClick={onShowTodo}
-          onMouseEnter={() => onPrefetchView?.('todo')}
+          onMouseEnter={() => {
+            startIconAnimation(todoIconRef);
+            onPrefetchView?.('todo');
+          }}
           onFocus={() => onPrefetchView?.('todo')}
+          onMouseLeave={() => todoIconRef.current?.stopAnimation()}
           className={
             activeView === 'todo'
               ? activeSidebarViewNavItemClassName
@@ -223,7 +231,7 @@ export const SidebarNavigationControls = ({
           }
           aria-current={activeView === 'todo' ? 'page' : undefined}
         >
-          <ListTodo className="size-4" />
+          <SidebarAnimatedTodoIcon ref={todoIconRef} />
           {i18nService.t('todoTitle')}
         </Button>
       )}

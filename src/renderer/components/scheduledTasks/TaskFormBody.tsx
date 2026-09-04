@@ -129,7 +129,11 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
             {i18nService.t('scheduledTasksFormWorkspace')}
             <span className="text-destructive">*</span>
           </FieldLabel>
-          <Select value={workspaceId} onValueChange={value => onWorkspaceChange(value ?? '')}>
+          <Select
+            items={Object.fromEntries(workspaceOptions.map(option => [option.value, option.label]))}
+            value={workspaceId}
+            onValueChange={value => onWorkspaceChange(value ?? '')}
+          >
             <SelectTrigger
               id="scheduled-task-workspace"
               className="w-full"
@@ -158,6 +162,11 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
             {i18nService.t('scheduledTasksFormSessionBinding')}
           </FieldLabel>
           <Select
+            items={{
+              [SessionBindingStrategy.PerRun]: i18nService.t('scheduledTasksFormSessionBindingPerRun'),
+              [SessionBindingStrategy.Task]: i18nService.t('scheduledTasksFormSessionBindingTask'),
+              [SessionBindingStrategy.Existing]: i18nService.t('scheduledTasksFormSessionBindingExisting'),
+            }}
             value={sessionBinding}
             onValueChange={value => onSessionBindingChange(value as SessionBindingStrategyType)}
           >

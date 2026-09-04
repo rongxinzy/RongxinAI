@@ -11,6 +11,7 @@ export interface SidebarAnimatedPanelLeftCloseIconHandle {
 
 interface SidebarAnimatedPanelLeftCloseIconProps extends HTMLAttributes<HTMLDivElement> {
   size?: number;
+  direction?: 'left' | 'right';
 }
 
 const DEFAULT_TRANSITION: Transition = {
@@ -26,7 +27,7 @@ const PATH_VARIANTS: Variants = {
 export const SidebarAnimatedPanelLeftCloseIcon = forwardRef<
   SidebarAnimatedPanelLeftCloseIconHandle,
   SidebarAnimatedPanelLeftCloseIconProps
->(({ onMouseEnter, onMouseLeave, className, size = 16, ...props }, ref) => {
+>(({ onMouseEnter, onMouseLeave, className, size = 16, direction = 'left', ...props }, ref) => {
   const controls = useAnimation();
   const isControlledRef = useRef(false);
   const prefersReducedMotion = useReducedMotion();
@@ -80,7 +81,7 @@ export const SidebarAnimatedPanelLeftCloseIcon = forwardRef<
         <path d="M9 3v18" />
         <motion.path
           animate={controls}
-          d="m16 15-3-3 3-3"
+          d={direction === 'right' ? 'm13 9 3 3-3 3' : 'm16 15-3-3 3-3'}
           transition={DEFAULT_TRANSITION}
           variants={PATH_VARIANTS}
         />

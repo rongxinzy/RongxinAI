@@ -1,10 +1,10 @@
 import { Button } from '@shared/components/ui/button';
 import { cn } from '@shared/lib/utils';
-import { PanelLeftOpen } from 'lucide-react';
 import React from 'react';
 
 import { i18nService } from '../services/i18n';
 import { SidebarAnimatedMessageCirclePlusIcon } from './icons/SidebarAnimatedMessageCirclePlusIcon';
+import { SidebarAnimatedPanelLeftCloseIcon } from './icons/SidebarAnimatedPanelLeftCloseIcon';
 import WindowTitleBar from './window/WindowTitleBar';
 
 /**
@@ -65,7 +65,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                   title={i18nService.t('expand')}
                   className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-surface-raised hover:text-foreground"
                 >
-                  <PanelLeftOpen className="h-4 w-4" />
+                  <SidebarAnimatedPanelLeftCloseIcon direction="right" />
                 </Button>
               )}
               {onNewChat && (
