@@ -26,9 +26,11 @@ import {
   getIndexedProviderModels,
   type ProviderModelIndex,
 } from './modelCatalog';
+import { ZhiyuanModelPool } from '../modelPool/constants';
 
 // providerName identifies the ZhiYuanAgent internal provider (config key).
 export const ProviderName = {
+  Zhiyuan: ZhiyuanModelPool.ProviderId,
   OpenAI: 'openai',
   Gemini: 'gemini',
   Anthropic: 'anthropic',
@@ -237,6 +239,32 @@ interface ProviderDefInput {
 // ═══════════════════════════════════════════════════════
 
 const PROVIDER_DEFINITIONS = [
+  {
+    id: ProviderName.Zhiyuan,
+    label: 'ZhiYuan',
+    website: 'https://www.rongxzyai.com',
+    apiKeyUrl: 'https://account.rongxzyai.com',
+    agentProviderId: AgentProviderId.Zhiyuan,
+    defaultBaseUrl: ZhiyuanModelPool.ProductionBaseUrl,
+    defaultApiFormat: ApiFormat.OpenAI,
+    codingPlanSupported: false,
+    region: 'china',
+    enPriority: 0,
+    defaultModels: [
+      {
+        id: ZhiyuanModelPool.FreeModelId,
+        name: 'ZhiYuan Free',
+        supportsImage: false,
+        contextWindow: 131_072,
+        maxTokens: 32_768,
+        capabilities: {
+          toolCalling: ModelCapabilityStatus.Supported,
+          imageInput: ModelCapabilityStatus.Unsupported,
+          reasoning: ModelCapabilityStatus.Supported,
+        },
+      },
+    ],
+  },
   // ── China ──
   {
     id: ProviderName.DeepSeek,

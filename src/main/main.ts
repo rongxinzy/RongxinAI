@@ -16,7 +16,6 @@ import {
   screen,
   session,
   shell,
-  safeStorage,
 } from 'electron';
 import fs from 'fs';
 import os from 'os';
@@ -40,6 +39,7 @@ import { PiScheduledTaskExecutor } from '../scheduledTask/piScheduledTaskExecuto
 import { SqliteScheduledTaskStore } from '../scheduledTask/sqliteScheduledTaskStore';
 import { ActivityService } from './activity/activityService';
 import { registerActivityIpcHandlers } from './activity/ipcHandlers';
+import { COMMUNITY_AUTH_ORIGIN, configureCommunityAuthSession } from './communityAuthSession';
 import { ActivitySource, ActivityStatus } from '../shared/activity/constants';
 import { AgentIpcChannel } from '../shared/agent/constants';
 import {
@@ -115,6 +115,7 @@ import { SessionSummaryService } from './memory/sessionSummaryService';
 import { SessionSummaryBackfillService } from './memory/sessionSummaryBackfillService';
 import { ZhiYuanEngramAdapter } from './memory/zhiyuanEngramAdapter';
 import { registerMemoryIpcHandlers } from './memory/ipc';
+import { registerModelPoolIpcHandlers } from './modelPoolIpc';
 import { resolveMemorySessionTitles } from './memory/sessionTitleResolver';
 import { promoteVerifiedWorkbenchRun } from './memory/taskMemoryPromotion';
 import { searchAnySearchGateway } from './libs/anysearchGateway';
@@ -2670,8 +2671,6 @@ if (!gotTheLock) {
     app.setAsDefaultProtocolClient('zhiyuan');
   }
 
-  const COMMUNITY_AUTH_ORIGIN = 'https://account.rongxzyai.com';
-  const COMMUNITY_AUTH_SESSION_KEY = 'community_auth_session_v1';
   let pendingCommunityLogin: { state: string; verifier: string; expiresAt: number } | null = null;
 
   type CommunityAuthPayload = Record<string, unknown>;
@@ -2955,65 +2954,22 @@ if (!gotTheLock) {
   );
 
   // ── Community auth IPC handlers ──
+  const communityAuthSession = configureCommunityAuthSession(getStore);
+  registerModelPoolIpcHandlers(communityAuthSession);
 
-  type CommunityAuthSession = {
-    accessToken: string;
-    refreshToken: string;
-    user: { id: string; email: string };
-  };
-
-  const canPersistCommunitySession = () => {
-    if (!safeStorage.isEncryptionAvailable()) return false;
-    return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text';
-  };
-
-  const saveCommunitySession = (value: CommunityAuthSession) => {
-    if (!canPersistCommunitySession()) {
-      throw new Error(
-        'System secure storage is unavailable; the login session cannot be saved safely.',
-      );
-    }
-    const encrypted = safeStorage.encryptString(JSON.stringify(value)).toString('base64');
-    getStore().set(COMMUNITY_AUTH_SESSION_KEY, { version: 1, encrypted });
-  };
-
-  const getCommunitySession = (): CommunityAuthSession | null => {
-    const stored = getStore().get<{ version?: unknown; encrypted?: unknown }>(
-      COMMUNITY_AUTH_SESSION_KEY,
-    );
-    if (
-      stored?.version !== 1 ||
-      typeof stored.encrypted !== 'string' ||
-      !canPersistCommunitySession()
-    )
-      return null;
+  ipcMain.handle(CommunityAuthIpc.GetCommunityUser, async () => {
+    const user = communityAuthSession.getUser();
+    if (!user) return { success: false };
     try {
-      const decoded = JSON.parse(
-        safeStorage.decryptString(Buffer.from(stored.encrypted, 'base64')),
-      ) as CommunityAuthSession;
-      if (
-        !decoded.accessToken ||
-        !decoded.refreshToken ||
-        !decoded.user?.id ||
-        !decoded.user?.email
-      )
-        throw new Error('invalid session');
-      return decoded;
+      await communityAuthSession.getAccessToken();
+      return { success: true, user };
     } catch {
-      getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
-      return null;
+      return { success: false };
     }
-  };
-
-  const clearCommunitySession = () => getStore().delete(COMMUNITY_AUTH_SESSION_KEY);
-
-  ipcMain.handle(CommunityAuthIpc.GetCommunityUser, () => {
-    const session = getCommunitySession();
-    return session ? { success: true, user: session.user } : { success: false };
   });
 
   ipcMain.handle(CommunityAuthIpc.Logout, () => {
-    clearCommunitySession();
+    communityAuthSession.clear();
     return { success: true };
   });
 
@@ -3033,29 +2989,16 @@ if (!gotTheLock) {
         }),
       });
       const payload = await readCommunityAuthPayload(response);
-      const accessToken = typeof payload?.access_token === 'string' ? payload.access_token : null;
-      const refreshToken =
-        typeof payload?.refresh_token === 'string' ? payload.refresh_token : null;
-      const user =
-        payload?.user && typeof payload.user === 'object' && !Array.isArray(payload.user)
-          ? (payload.user as CommunityAuthPayload)
-          : null;
-      const userId = typeof user?.id === 'string' ? user.id : null;
-      const userEmail = typeof user?.email === 'string' ? user.email : null;
-      if (!response.ok || !accessToken || !refreshToken || !userId || !userEmail) {
+      if (!response.ok) {
         console.warn(
           `[CommunityAuth] token exchange returned an invalid response with status ${response.status}`,
         );
         throw new Error('Token exchange failed');
       }
-      saveCommunitySession({
-        accessToken,
-        refreshToken,
-        user: { id: userId, email: userEmail },
-      });
+      const user = communityAuthSession.saveTokenPayload(payload);
       mainWindow?.webContents.send(CommunityAuthIpc.Callback, {
         success: true,
-        user: { id: userId, email: userEmail, name: userEmail },
+        user: { id: user.id, email: user.email, name: user.email },
       });
       if (mainWindow?.isMinimized()) mainWindow.restore();
       if (mainWindow && !mainWindow.isVisible()) mainWindow.show();
@@ -3074,7 +3017,7 @@ if (!gotTheLock) {
 
   ipcMain.handle(CommunityAuthIpc.Login, async () => {
     try {
-      if (!canPersistCommunitySession()) {
+      if (!communityAuthSession.canPersist()) {
         return { success: false, error: '系统安全存储不可用，无法安全地保存登录状态。' };
       }
       const verifier = crypto.randomBytes(48).toString('base64url');

@@ -225,6 +225,43 @@ describe('piOpenAICompatProxy', () => {
     }
   });
 
+  it('protects managed upstream credentials with a per-process local capability', async () => {
+    let upstreamRequestCount = 0;
+    const upstream = http.createServer((_request, response) => {
+      upstreamRequestCount += 1;
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ choices: [] }));
+    });
+    const upstreamBaseURL = await listen(upstream);
+
+    try {
+      const proxyBaseURL = await registerPiOpenAICompatUpstream('zhiyuan', {
+        baseURL: upstreamBaseURL,
+        apiKey: 'account-access-token',
+        requiredIncomingApiKey: 'random-local-capability',
+      });
+      const unauthorized = await fetch(`${proxyBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: 'zhiyuan-free', messages: [] }),
+      });
+      const authorized = await fetch(`${proxyBaseURL}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer random-local-capability',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ model: 'zhiyuan-free', messages: [] }),
+      });
+
+      expect(unauthorized.status).toBe(401);
+      expect(authorized.status).toBe(200);
+      expect(upstreamRequestCount).toBe(1);
+    } finally {
+      await close(upstream);
+    }
+  });
+
   it('refreshes a rejected provider token once and retries the request', async () => {
     const authorizations: Array<string | undefined> = [];
     const upstream = http.createServer((request, response) => {

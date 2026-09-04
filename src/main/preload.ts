@@ -30,6 +30,7 @@ import {
   LogIpc,
   ManagedProviderIpc,
   McpIpc,
+  ModelPoolIpc,
   NetworkIpc,
   OpenAICodexOAuthIpc,
   PermissionsIpc,
@@ -989,6 +990,20 @@ contextBridge.exposeInMainWorld('electron', {
         error?: string;
       }) => void,
     ) => onPush(CommunityAuthIpc.Callback, callback),
+  },
+
+  modelPool: {
+    stream: (input: { requestId: string; body: Record<string, unknown> }) =>
+      ipcRenderer.invoke(ModelPoolIpc.Stream, input),
+    cancelStream: (requestId: string) => ipcRenderer.invoke(ModelPoolIpc.CancelStream, requestId),
+    onStreamData: (requestId: string, callback: (data: string) => void) =>
+      onPush(ModelPoolIpc.streamData(requestId), callback),
+    onStreamDone: (requestId: string, callback: () => void) =>
+      onPushVoid(ModelPoolIpc.streamDone(requestId), callback),
+    onStreamError: (requestId: string, callback: (error: string) => void) =>
+      onPush(ModelPoolIpc.streamError(requestId), callback),
+    onStreamAbort: (requestId: string, callback: () => void) =>
+      onPushVoid(ModelPoolIpc.streamAbort(requestId), callback),
   },
 
   feishu: {

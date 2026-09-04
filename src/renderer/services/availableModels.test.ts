@@ -63,6 +63,27 @@ test('collectAvailableModels exposes running llama.cpp models when provider is d
   expect(models.some(model => model.providerKey === ProviderName.DeepSeek)).toBe(true);
 });
 
+test('exposes the managed free model only for a signed-in community user', async () => {
+  vi.stubGlobal('window', {
+    electron: {
+      auth: {
+        getCommunityUser: vi.fn(async () => ({
+          success: true,
+          user: { id: 'user-1', email: 'user@example.com' },
+        })),
+      },
+      llamacpp: { listRunningModels: vi.fn(async () => []) },
+    },
+  });
+
+  const models = await collectAvailableModels(createConfig());
+
+  expect(models[0]).toMatchObject({
+    id: 'zhiyuan-free',
+    providerKey: ProviderName.Zhiyuan,
+  });
+});
+
 test('exclusive managed policy exposes only the synchronized custom provider', async () => {
   const config = createConfig();
   config.providers = {

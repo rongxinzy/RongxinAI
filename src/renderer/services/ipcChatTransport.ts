@@ -15,7 +15,16 @@ import {
   providerRequiresApiKey,
   shouldUseOpenAIResponsesApi,
 } from './apiConfigResolver';
-import { buildAnthropicMessagesUrl } from '../../shared/providers';
+import { buildAnthropicMessagesUrl, ProviderName } from '../../shared/providers';
+
+interface StreamBridge {
+  start(requestId: string): Promise<{ ok: boolean; status: number; error?: string }>;
+  cancel(requestId: string): Promise<unknown>;
+  onData(requestId: string, callback: (chunk: string) => void): () => void;
+  onDone(requestId: string, callback: () => void): () => void;
+  onError(requestId: string, callback: (error: string | { message: string }) => void): () => void;
+  onAbort(requestId: string, callback: () => void): () => void;
+}
 
 export interface IpcChatTransportOptions {
   provider?: string;
@@ -89,6 +98,21 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
   } & ChatRequestOptions): Promise<ReadableStream<UIMessageChunk>> {
     const modelId = this.options.model || detectModel(messages);
     const provider = this.options.provider || detectProvider(modelId);
+    if (provider === ProviderName.Zhiyuan) {
+      const { body } = this.buildOpenAICompatibleRequest(messages, '', '', modelId, provider);
+      return this.streamOverBridge(chatId, abortSignal, 'openai', {
+        start: requestId => window.electron.modelPool.stream({ requestId, body }),
+        cancel: requestId => window.electron.modelPool.cancelStream(requestId),
+        onData: (requestId, callback) =>
+          window.electron.modelPool.onStreamData(requestId, callback),
+        onDone: (requestId, callback) =>
+          window.electron.modelPool.onStreamDone(requestId, callback),
+        onError: (requestId, callback) =>
+          window.electron.modelPool.onStreamError(requestId, callback),
+        onAbort: (requestId, callback) =>
+          window.electron.modelPool.onStreamAbort(requestId, callback),
+      });
+    }
     const config = this.options.apiKey
       ? {
           apiKey: this.options.apiKey,
@@ -251,12 +275,36 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
     abortSignal: AbortSignal | undefined,
     apiFormat: 'anthropic' | 'openai' | 'gemini',
   ): ReadableStream<UIMessageChunk> {
+    return this.streamOverBridge(chatId, abortSignal, apiFormat, {
+      start: requestId =>
+        window.electron.api.stream({
+          url,
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+          requestId,
+        }),
+      cancel: requestId => window.electron.api.cancelStream(requestId),
+      onData: (requestId, callback) => window.electron.api.onStreamData(requestId, callback),
+      onDone: (requestId, callback) => window.electron.api.onStreamDone(requestId, callback),
+      onError: (requestId, callback) => window.electron.api.onStreamError(requestId, callback),
+      onAbort: (requestId, callback) => window.electron.api.onStreamAbort(requestId, callback),
+    });
+  }
+
+  private streamOverBridge(
+    chatId: string,
+    abortSignal: AbortSignal | undefined,
+    apiFormat: 'anthropic' | 'openai' | 'gemini',
+    bridge: StreamBridge,
+  ): ReadableStream<UIMessageChunk> {
     const requestId = `ipcchat_${chatId}_${Date.now()}`;
     const parser = new SseChunkParser(apiFormat);
 
     return new ReadableStream({
       start(controller) {
         let closed = false;
+        let bufferedSse = '';
         const close = () => {
           if (closed) return;
           closed = true;
@@ -266,11 +314,14 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
 
         const cleanup: Array<() => void> = [];
 
-        const removeData = window.electron.api.onStreamData(requestId, chunk => {
-          const lines = chunk.split('\n');
+        const consumeSse = (chunk: string, flush = false) => {
+          bufferedSse += chunk;
+          const lines = bufferedSse.split('\n');
+          bufferedSse = flush ? '' : (lines.pop() ?? '');
           for (const line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            const data = line.slice(6);
+            const normalizedLine = line.endsWith('\r') ? line.slice(0, -1) : line;
+            if (!normalizedLine.startsWith('data: ')) continue;
+            const data = normalizedLine.slice(6);
             if (data === '[DONE]') {
               for (const c of parser.flush()) controller.enqueue(c);
               controller.enqueue({ type: 'finish', finishReason: 'stop' });
@@ -287,11 +338,16 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
               console.warn('[IpcChatTransport] Failed to parse SSE chunk:', e);
             }
           }
+        };
+
+        const removeData = bridge.onData(requestId, chunk => {
+          consumeSse(chunk);
         });
         cleanup.push(removeData);
 
-        const removeDone = window.electron.api.onStreamDone(requestId, () => {
+        const removeDone = bridge.onDone(requestId, () => {
           if (!closed) {
+            consumeSse('\n', true);
             for (const c of parser.flush()) controller.enqueue(c);
             controller.enqueue({ type: 'finish', finishReason: 'stop' });
           }
@@ -299,14 +355,14 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
         });
         cleanup.push(removeDone);
 
-        const removeError = window.electron.api.onStreamError(requestId, error => {
+        const removeError = bridge.onError(requestId, error => {
           const message = typeof error === 'string' ? error : error.message;
           controller.enqueue({ type: 'error', errorText: message });
           close();
         });
         cleanup.push(removeError);
 
-        const removeAbort = window.electron.api.onStreamAbort(requestId, () => {
+        const removeAbort = bridge.onAbort(requestId, () => {
           if (!closed) {
             controller.enqueue({ type: 'abort', reason: 'user' });
           }
@@ -314,14 +370,8 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
         });
         cleanup.push(removeAbort);
 
-        window.electron.api
-          .stream({
-            url,
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body),
-            requestId,
-          })
+        bridge
+          .start(requestId)
           .then(response => {
             if (!response.ok) {
               const message = response.error || `API request failed (${response.status})`;
@@ -338,7 +388,7 @@ export class IpcChatTransport implements ChatTransport<UIMessage> {
           });
 
         const handleAbort = () => {
-          void window.electron.api.cancelStream(requestId);
+          void bridge.cancel(requestId);
         };
         abortSignal?.addEventListener('abort', handleAbort, { once: true });
         cleanup.push(() => abortSignal?.removeEventListener('abort', handleAbort));
