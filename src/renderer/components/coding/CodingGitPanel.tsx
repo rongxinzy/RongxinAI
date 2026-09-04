@@ -56,6 +56,7 @@ import type {
 } from '../../../shared/codingAgent';
 import { CodingGitDiffScope, CodingGitFileStatus } from '../../../shared/codingAgent';
 import { i18nService } from '../../services/i18n';
+import { normalizeError } from '../../services/errorNormalization';
 
 interface CodingGitPanelProps {
   workspaceRoot: string;
@@ -167,7 +168,9 @@ export const CodingGitPanel = ({
       toast.success(i18nService.t(successKey));
       return true;
     }
-    const message = result.error ?? i18nService.t('codingGitActionFailed');
+    const message = result.error
+      ? normalizeError(result.error)
+      : i18nService.t('codingGitActionFailed');
     setError(message);
     toast.error(message);
     return false;
