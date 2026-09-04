@@ -78,10 +78,18 @@ export function TimelineChapter({
   const duration = formatDuration(run.startedAt, run.endedAt);
 
   const expandedContent = (
-    <div className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
-      <div className="flex flex-col gap-4 pt-1 pb-6">
-        <div className="pl-10">
-          <RunSummary run={run} />
+    <div className="h-64 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain [&_pre]:wrap-break-word [&_pre]:whitespace-pre-wrap">
+      <div className="flex flex-col gap-4 pt-1 pb-6 pr-4">
+        <div className="relative">
+          {entries.length > 0 && (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute -top-1 -bottom-8 left-3.5 z-0 w-px -translate-x-1/2 bg-border"
+            />
+          )}
+          <div className="relative z-10 pl-10">
+            <RunSummary run={run} />
+          </div>
         </div>
         {entries.length > 0 ? (
           <TimelineEntryList
