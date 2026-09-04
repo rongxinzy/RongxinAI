@@ -402,6 +402,8 @@ src/shared/components/ui/page-tabs.tsx
 4. 页面只提供受控 `value`、`items` 和回调；不要在页面中重新实现指示器测量、滑动或 separator 逻辑。
 ### 全局提示与错误文案
 
+全局系统提示唯一复用组件：`src/renderer/components/Toast.tsx`。任何新功能不得新建提示组件或自行拼接 Toast；跨页面提示必须派发 `app:showToast`，由 App 统一渲染。Sonner 只能通过共享宿主使用，并必须保持与该组件一致的视觉和行为。
+
 - Toast 统一通过 App Toast 或 Sonner 宿主呈现，位置固定为顶部居中，使用从上方下落动画、语义图标、`rounded-lg` 与标准阴影。
 - 短暂提示默认显示 2.2 秒，最长不超过 3 秒，并保留手动关闭；持续状态使用页面内 Alert 或表单错误。
 - 错误文案必须先分类翻译常见网络、认证、配置、模型、文件、权限、Git 与 MCP 错误，再为未知错误保留清理后的原因摘要。
