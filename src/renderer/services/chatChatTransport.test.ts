@@ -4,10 +4,20 @@ import { ChatMessagePayload } from '../types/chat';
 import { apiService } from './api';
 import { ChatChatTransport } from './chatChatTransport';
 
+const ipcMocks = vi.hoisted(() => ({
+  sendMessages: vi.fn(),
+}));
+
 vi.mock('./api', () => ({
   apiService: {
     chatWithWebSearch: vi.fn(),
     cancelOngoingRequest: vi.fn(),
+  },
+}));
+
+vi.mock('./ipcChatTransport', () => ({
+  IpcChatTransport: class {
+    sendMessages = ipcMocks.sendMessages;
   },
 }));
 
@@ -23,6 +33,30 @@ async function collectChunks(
   }
   return chunks;
 }
+
+test('routes the managed ZhiYuan model through the main-process Model Pool bridge', async () => {
+  const managedStream = new ReadableStream<Record<string, unknown>>({
+    start(controller) {
+      controller.close();
+    },
+  });
+  ipcMocks.sendMessages.mockResolvedValue(managedStream);
+  const transport = new ChatChatTransport({
+    modelId: 'zhiyuan-free',
+    modelProviderKey: 'zhiyuan',
+  });
+  const input = {
+    trigger: 'submit-message' as const,
+    chatId: 'chat-managed',
+    messageId: undefined,
+    messages: [{ id: 'u1', role: 'user' as const, parts: [{ type: 'text' as const, text: 'hi' }] }],
+    abortSignal: undefined,
+  };
+
+  await expect(transport.sendMessages(input)).resolves.toBe(managedStream);
+  expect(ipcMocks.sendMessages).toHaveBeenCalledWith(input);
+  expect(apiService.chatWithWebSearch).not.toHaveBeenCalled();
+});
 
 test('emits reasoning-end when reasoning stream finishes before content', async () => {
   let onProgress: ((content: string, reasoning?: string) => void) | undefined;
