@@ -27,7 +27,6 @@ import {
   ArtifactPreviewMode,
   ArtifactRole,
   getArtifactPreviewMode,
-  isBinaryArtifactFile,
   type Artifact,
   type ArtifactType,
 } from '@/types/artifact';
@@ -339,30 +338,19 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
     if (!selectedArtifact?.filePath) return;
     invalidateArtifactFile(selectedArtifact.filePath);
     try {
-      const result = await window.electron.dialog.readFileAsDataUrl(selectedArtifact.filePath);
-      if (result?.success && result.dataUrl) {
-        const isTextType = !isBinaryArtifactFile(selectedArtifact.filePath);
-        let content = result.dataUrl;
-        if (isTextType) {
-          try {
-            const base64 = result.dataUrl.split(',')[1] || '';
-            const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-            content = new TextDecoder('utf-8').decode(bytes);
-          } catch {
-            content = result.dataUrl;
-          }
-        }
+      const loaded = await loadArtifactFile({ ...selectedArtifact, content: '' }, cwd);
+      if (loaded) {
         dispatch(
           addArtifact({
             sessionId: selectedArtifact.sessionId,
-            artifact: { ...selectedArtifact, content },
+            artifact: { ...selectedArtifact, content: loaded.content, filePath: loaded.filePath },
           }),
         );
       }
     } catch {
       // File unreadable or missing
     }
-  }, [selectedArtifact, dispatch]);
+  }, [cwd, dispatch, selectedArtifact]);
 
   return (
     <>
@@ -465,8 +453,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   <BrowserIcon />
                 </Button>
               )}
-              {hasLocalFilePreview &&
-                !BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
+              {hasLocalFilePreview && !BROWSER_OPENABLE_TYPES.has(selectedArtifact.type) && (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -568,7 +555,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
             </div>
 
             {/* Render area */}
-            <div key={`${selectedArtifact.id}-${displayedTab}`} className="flex-1 min-h-0 overflow-hidden animate-fade-in">
+            <div
+              key={`${selectedArtifact.id}-${displayedTab}`}
+              className="flex-1 min-h-0 overflow-hidden animate-fade-in"
+            >
               {loadingArtifactId === selectedArtifact.id ? (
                 <div className="h-full min-h-0 p-4" aria-busy="true">
                   <Skeleton className="h-full w-full rounded-lg" />
