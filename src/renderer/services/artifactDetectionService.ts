@@ -1,5 +1,6 @@
 import type { Artifact } from '../types/artifact';
 import type { CoworkMessage } from '../types/cowork';
+import { ArtifactDetectionRequestKind } from './artifactDetection.constants';
 import type {
   ArtifactDetectionWorkerRequest,
   ArtifactDetectionWorkerResponse,
@@ -52,10 +53,10 @@ export class ArtifactDetectionService {
   private pending = new Map<number, (result: ArtifactDetectionResult[]) => void>();
   private seq = 0;
   private processedMessages = new Map<string, ProcessedMessageSnapshot>();
+  private processedMessageOrder: string[] = [];
+  private processedSessionId: string | null = null;
 
-  constructor(
-    private onDetected: (artifacts: ArtifactDetectionResult[]) => void,
-  ) {}
+  constructor(private onDetected: (artifacts: ArtifactDetectionResult[]) => void) {}
 
   private ensureWorker(): Worker {
     if (this.worker) return this.worker;
@@ -86,32 +87,55 @@ export class ArtifactDetectionService {
     this.pending.clear();
   }
 
-  /**
-   * Process when messages are added or their artifact-relevant state changes.
-   *
-   * For incremental detection we send the full message list because tool_use
-   * messages need to be paired with their tool_result, and the result may
-   * arrive later. Assistant messages also update in place while streaming, so
-   * message ids alone cannot determine whether a snapshot was processed.
-   */
-  async processMessages(
-    messages: CoworkMessage[],
-    sessionId: string,
-  ): Promise<void> {
+  async processMessages(messages: CoworkMessage[], sessionId: string): Promise<void> {
     const snapshots = messages.map(message => ({
       id: message.id,
       snapshot: createMessageSnapshot(message),
     }));
-    const hasChanges = snapshots.some(({ id, snapshot }) =>
-      hasMessageChanged(this.processedMessages.get(id), snapshot),
+    const messagesById = new Map(messages.map(message => [message.id, message]));
+    const changedMessages = snapshots
+      .filter(({ id, snapshot }) => hasMessageChanged(this.processedMessages.get(id), snapshot))
+      .map(({ id }) => messagesById.get(id))
+      .filter((message): message is CoworkMessage => message !== undefined);
+    const currentMessageIds = new Set(snapshots.map(({ id }) => id));
+    const removedMessageIds = [...this.processedMessages.keys()].filter(
+      messageId => !currentMessageIds.has(messageId),
     );
-    if (!hasChanges) return;
+    const currentMessageOrder = snapshots.map(({ id }) => id);
+    const orderChanged = !areArraysEqual(this.processedMessageOrder, currentMessageOrder);
+    const sessionChanged = this.processedSessionId !== sessionId;
+    const hasChanges = changedMessages.length > 0 || removedMessageIds.length > 0 || orderChanged;
+    if (!hasChanges && !sessionChanged) return;
+
+    const isInitialSnapshot = sessionChanged || this.processedMessageOrder.length === 0;
 
     for (const { id, snapshot } of snapshots) {
       this.processedMessages.set(id, snapshot);
     }
+    for (const messageId of removedMessageIds) {
+      this.processedMessages.delete(messageId);
+    }
+    this.processedMessageOrder = currentMessageOrder;
+    this.processedSessionId = sessionId;
 
-    const detected = await this.detect(messages, sessionId);
+    const detected = await this.detect(
+      isInitialSnapshot
+        ? {
+            kind: ArtifactDetectionRequestKind.Snapshot,
+            messages,
+            sessionId,
+            seq: 0,
+          }
+        : {
+            kind: ArtifactDetectionRequestKind.Patch,
+            upserts: changedMessages,
+            relatedMessages: collectRelatedMessages(messages, changedMessages),
+            removedMessageIds,
+            messageOrder: orderChanged ? currentMessageOrder : undefined,
+            sessionId,
+            seq: 0,
+          },
+    );
     if (detected.length === 0) return;
 
     this.onDetected(detected);
@@ -119,18 +143,55 @@ export class ArtifactDetectionService {
 
   reset(): void {
     this.processedMessages.clear();
+    this.processedMessageOrder = [];
+    this.processedSessionId = null;
   }
 
-  private detect(messages: CoworkMessage[], sessionId: string): Promise<ArtifactDetectionResult[]> {
+  private detect(request: ArtifactDetectionWorkerRequest): Promise<ArtifactDetectionResult[]> {
     return new Promise(resolve => {
       const seq = ++this.seq;
       this.pending.set(seq, resolve);
-      this.ensureWorker().postMessage({
-        messages,
-        sessionId,
-        seq,
-      } satisfies ArtifactDetectionWorkerRequest);
+      this.ensureWorker().postMessage({ ...request, seq } satisfies ArtifactDetectionWorkerRequest);
     });
   }
+}
 
+function areArraysEqual(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function collectRelatedMessages(
+  messages: CoworkMessage[],
+  changedMessages: CoworkMessage[],
+): CoworkMessage[] {
+  const changedIds = new Set(changedMessages.map(message => message.id));
+  const toolUseIds = new Set(
+    changedMessages
+      .map(message => message.metadata?.toolUseId)
+      .filter((toolUseId): toolUseId is string => typeof toolUseId === 'string'),
+  );
+  const related = new Map<string, CoworkMessage>();
+
+  for (const message of messages) {
+    if (changedIds.has(message.id)) continue;
+    if (message.metadata?.toolUseId && toolUseIds.has(message.metadata.toolUseId)) {
+      related.set(message.id, message);
+    }
+  }
+
+  for (const changedMessage of changedMessages) {
+    const index = messages.findIndex(message => message.id === changedMessage.id);
+    if (index < 0) continue;
+    for (const neighbor of [messages[index - 1], messages[index + 1]]) {
+      if (
+        neighbor &&
+        (neighbor.type === 'tool_use' || neighbor.type === 'tool_result') &&
+        !changedIds.has(neighbor.id)
+      ) {
+        related.set(neighbor.id, neighbor);
+      }
+    }
+  }
+
+  return [...related.values()];
 }
