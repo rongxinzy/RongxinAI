@@ -1,27 +1,11 @@
 name: Windows installer gate
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/windows-installer-pr.yml"
-      - "bun.lock"
-      - "package.json"
-      - "electron-builder.json"
-      - "vite.config.ts"
-      - "build/icons/**"
-      - "build/installer-assets/**"
-      - "scripts/**"
-      - "MCPs/**"
-      - "SKILLs/**"
-      - "resources/vc_redist.x64.exe"
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: windows-installer-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -36,10 +20,10 @@ jobs:
         run: node scripts/ci/check-openclaw-decoupling.mjs
       - uses: actions/setup-node@v6
         with:
-          node-version: "24.x"
+          node-version: '24.x'
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.0"
+          bun-version: '1.4.0'
       - name: Restore packaging caches
         uses: actions/cache@v5
         with:
@@ -72,8 +56,8 @@ jobs:
             -TimeoutMinutes 55 `
             -HeartbeatSeconds 60
         env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Check offline installer size
         shell: powershell
         run: >-

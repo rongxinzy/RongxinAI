@@ -1,0 +1,69 @@
+name: Memory regression
+
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        type: string
+        default: ''
+      analyze-heap:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+
+jobs:
+  memory-leak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - name: Restore Bun and Electron caches
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.cache/electron
+          key: memory-leak-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            memory-leak-${{ runner.os }}-1.4.0-
+      - name: Install Electron runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 xvfb
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - run: bun run apply:patches
+      - name: Install Electron runtime
+        run: node node_modules/electron/install.js
+      - name: Build application for the memory regression scenario
+        run: |
+          bun run build:vite
+          bun run compile:electron
+      - name: Run Electron memory regression check
+        run: xvfb-run -a bun run test:memory-leak
+      - name: Analyze Renderer heap snapshots with MemLab
+        if: inputs.analyze-heap
+        run: npm exec --yes --package=memlab@2.0.5 -- memlab analyze unbound-object --snapshot-dir artifacts/memory-leak
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+      - name: Upload available memory diagnostics
+        if: ${{ always() && hashFiles('artifacts/memory-leak/**') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: memory-leak-diagnostics
+          path: artifacts/memory-leak
+          if-no-files-found: error
+          retention-days: 7

@@ -6,13 +6,14 @@ import { test } from 'vitest';
 
 const root = path.resolve(__dirname, '..');
 
-test('every pull request installs and starts the generated Ubuntu package', () => {
+test('selected pull requests install and start the generated Ubuntu package', () => {
   const workflow = readFileSync(
     path.join(root, '.github', 'workflows', 'linux-install-pr.yml'),
     'utf8',
   );
 
-  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /workflow_call:/);
+  assert.doesNotMatch(workflow, /pull_request:/);
   assert.doesNotMatch(workflow, /paths:/);
   assert.match(workflow, /runs-on: ubuntu-latest/);
   assert.match(workflow, /bun run dist:linux/);

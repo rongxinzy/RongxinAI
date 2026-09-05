@@ -5,7 +5,11 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
   workflow_call:
+    secrets:
+      MODELSCOPE_TOKENS:
+        required: false
 
 permissions:
   contents: read
@@ -18,8 +22,31 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      plan: ${{ steps.plan.outputs.plan }}
+      linux-install: ${{ steps.plan.outputs.linux-install }}
+      windows-install: ${{ steps.plan.outputs.windows-install }}
+      memory-leak: ${{ steps.plan.outputs.memory-leak }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.x'
+      - name: Select expensive checks from the complete PR diff
+        id: plan
+        run: node scripts/ci/gates/plan.ts
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -46,6 +73,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -77,6 +105,7 @@ jobs:
 
   bundle-budget:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -94,6 +123,8 @@ jobs:
             bun-${{ runner.os }}-1.4.0-
       - run: bun install --frozen-lockfile --ignore-scripts
       - run: bun run apply:patches
+      - name: Typecheck renderer sources
+        run: bun run build:tsc
       - name: Build renderer bundle
         run: bun run build:vite
         env:
@@ -102,42 +133,35 @@ jobs:
         run: bun run test:bundle-budget
 
   memory-leak:
+    needs: changes
+    if: needs.changes.outputs.memory-leak == 'true'
+    uses: ./.github/workflows/memory-regression.yml
+
+  linux-install:
+    needs: changes
+    if: needs.changes.outputs.linux-install == 'true'
+    uses: ./.github/workflows/linux-install-pr.yml
+    secrets:
+      MODELSCOPE_TOKENS: ${{ secrets.MODELSCOPE_TOKENS }}
+
+  windows-install:
+    needs: changes
+    if: needs.changes.outputs.windows-install == 'true'
+    uses: ./.github/workflows/windows-installer-pr.yml
+
+  merge-gate:
+    name: merge-gate
+    if: always()
+    needs: [changes, lint, test, bundle-budget, memory-leak, linux-install, windows-install]
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: '1.4.0'
-      - name: Restore Bun and Electron caches
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.bun/install/cache
-            ~/.cache/electron
-          key: memory-leak-${{ runner.os }}-1.4.0-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            memory-leak-${{ runner.os }}-1.4.0-
-      - name: Install Electron runtime libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils libatspi2.0-0 libuuid1 libsecret-1-0 xvfb
-      - run: bun install --frozen-lockfile --ignore-scripts
-      - run: bun run apply:patches
-      - name: Install Electron runtime
-        run: node node_modules/electron/install.js
-      - name: Build application for the memory regression scenario
-        run: |
-          bun run build:vite
-          bun run compile:electron
-      - name: Run Electron memory regression check
-        run: xvfb-run -a bun run test:memory-leak
-      - name: Upload heap snapshots when the threshold is exceeded
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: memory-leak-diagnostics
-          path: artifacts/memory-leak
-          if-no-files-found: error
+      - name: Require every selected check to succeed
+        run: node scripts/ci/gates/verify.ts
+        env:
+          GATE_PLAN: ${{ needs.changes.outputs.plan }}
+          GATE_RESULTS: ${{ toJSON(needs) }}
