@@ -60,8 +60,8 @@ bundled runtime dependencies live there.
 
 High/critical findings and audit/registry failures return nonzero. All child projects
 are attempted even if one fails; JSON reports, stderr, copied locks and a summary TSV
-are uploaded on failure as well as success. Artifact retention is seven days, matching
-the repository's existing artifact cleanup policy. A red audit with valid findings
+are uploaded on failure as well as success. Artifact retention is three days, matching
+the repository's effective Actions retention setting. A red audit with valid findings
 requires vulnerability triage; it must not be silenced with an unconditional success.
 Known vulnerability remediation is separate from repairing the scanning mechanism.
 This full scheduled scan is not an additional heavy PR gate.

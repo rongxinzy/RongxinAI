@@ -48,7 +48,7 @@ jobs:
           name: security-bun-audit
           path: security-reports/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3
 
   skills-audit:
     runs-on: ubuntu-latest
@@ -70,7 +70,7 @@ jobs:
           name: security-npm-audit
           path: ${{ runner.temp }}/security-npm-reports/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3
 
   codeql:
     runs-on: ubuntu-latest
