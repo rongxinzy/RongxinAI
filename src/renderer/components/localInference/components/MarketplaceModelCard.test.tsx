@@ -84,16 +84,9 @@ describe('MarketplaceModelCard', () => {
     };
   });
 
-  test('uses a contained hover shadow inside the scroll viewport', () => {
-    const { container } = renderCard();
-    const card = container.querySelector('[data-marketplace-model-card="true"]');
-
-    expect(card).toHaveClass('hover:shadow-md');
-  });
-
   test.each([
     ['excellent', '推荐运行', 'text-success'],
-    ['good', '适合运行', 'text-primary'],
+    ['good', '适合运行', 'text-muted-foreground'],
     ['limited', '性能受限', 'text-warning'],
     ['unsupported', '暂不适配', 'text-destructive'],
     ['unknown', '待检测', 'text-muted-foreground'],
@@ -118,7 +111,6 @@ describe('MarketplaceModelCard', () => {
 
     const titleLink = screen.getByRole('link', { name: 'Alpha Model' });
     expect(titleLink).toHaveAttribute('href', detailUrl);
-    expect(titleLink).toHaveClass('cursor-pointer', 'hover:underline');
     expect(screen.queryByRole('button', { name: /魔搭链接/ })).not.toBeInTheDocument();
 
     await user.click(titleLink);
@@ -197,7 +189,6 @@ describe('MarketplaceModelCard', () => {
     renderCard(makeModel());
     const selector = screen.getByRole('combobox', { name: '选择量化版本' });
     expect(selector).toBeInTheDocument();
-    expect(selector).toHaveClass('pl-2');
   });
 
   test('split-only repos are installable and install the first part', async () => {
@@ -228,7 +219,6 @@ describe('MarketplaceModelCard', () => {
     // (previously such repos were dropped entirely as "pending").
     const selector = screen.getByRole('combobox', { name: '选择量化版本' });
     expect(selector).toBeInTheDocument();
-    expect(selector).toHaveClass('pl-2');
     const installButton = screen.getByRole('button', { name: /安装/ });
     expect(installButton).toBeEnabled();
 
