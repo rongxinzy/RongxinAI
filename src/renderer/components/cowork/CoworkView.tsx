@@ -1540,7 +1540,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   if (!isInitialized) {
     return (
-      <div className="flex-1 h-full flex flex-col bg-background">
+      <div data-page-canvas className="flex-1 h-full flex flex-col bg-background">
         <PageHeader />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-muted-foreground">{i18nService.t('loading')}</div>
@@ -1600,7 +1600,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({
 
   // Home view - no current session
   return (
-    <div className="flex-1 flex flex-col bg-background h-full">
+    <div data-page-canvas className="flex-1 flex flex-col bg-background h-full">
       {/* Header */}
       {homeHeader}
 

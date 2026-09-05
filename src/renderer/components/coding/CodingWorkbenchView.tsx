@@ -696,6 +696,7 @@ export const CodingWorkbenchView = ({
 
   return (
     <div
+      data-page-canvas
       className={cn(
         'grid h-full min-h-0 bg-background',
         desktopSidePanelOpen ? 'grid-cols-[minmax(0,1fr)_360px] max-lg:grid-cols-1' : 'grid-cols-1',

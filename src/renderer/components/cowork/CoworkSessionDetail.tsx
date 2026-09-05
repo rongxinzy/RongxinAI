@@ -1192,6 +1192,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
         <div
           ref={detailRootRef}
+          data-page-canvas
           className={`relative min-w-0 flex-1 flex flex-col bg-background h-full ${
             !isSessionSwitching && isArtifactWorkspace ? 'hidden' : ''
           }`}

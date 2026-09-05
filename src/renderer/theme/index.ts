@@ -19,3 +19,11 @@ export {
   THEME_PLUGIN_VERSION,
 } from './themes/plugins';
 export type { ThemePlugin } from './themes/plugins';
+
+export {
+  BackgroundKind,
+  BackgroundFit,
+  BackgroundTexture,
+  DEFAULT_BACKGROUND,
+} from './background/background';
+export type { ThemeBackground } from './background/background';

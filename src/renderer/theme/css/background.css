@@ -1,0 +1,17 @@
+[data-main-canvas] { isolation: isolate; }
+[data-main-canvas]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--main-background-color, transparent);
+  background-image: var(--main-background-image, none);
+  background-size: var(--main-background-size, cover);
+  background-position: center;
+  background-repeat: var(--main-background-repeat, no-repeat);
+  opacity: var(--main-background-opacity, 0);
+}
+html[data-main-background]:not([data-main-background='none']) [data-main-canvas] [data-page-canvas] {
+  background-color: transparent;
+}

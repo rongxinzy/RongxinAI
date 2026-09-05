@@ -1,3 +1,4 @@
+import { applyThemeBackground } from '../background/background';
 import { generateThemeCSS } from './css-generator';
 import { injectStyles } from './style-injector';
 import { validateTheme } from '../themes/plugins';
@@ -112,6 +113,7 @@ export class ThemeManager {
 
       // Replace one stylesheet atomically; never remount the application.
       injectStyles(css);
+      applyThemeBackground(theme.background);
 
       // Set data-theme attribute — CSS selectors do the rest
       root.dataset.theme = id;

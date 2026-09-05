@@ -17,3 +17,5 @@
 
 @import './theme/css/tailwind.css';
 @import './theme/css/components.css';
+
+@import './theme/css/background.css';

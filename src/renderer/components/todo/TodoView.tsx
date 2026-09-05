@@ -250,7 +250,7 @@ const TodoView: React.FC<TodoViewProps> = ({
   const parsedNewTodo = parseTodoInput(newTodoTitle);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div data-page-canvas className="flex h-full min-h-0 flex-col bg-background">
       <PageHeader
         title={i18nService.t('todoTitle')}
         isSidebarCollapsed={isSidebarCollapsed}

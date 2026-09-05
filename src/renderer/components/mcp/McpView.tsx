@@ -25,7 +25,7 @@ const McpView: React.FC<McpViewProps> = ({
   openMarketplace,
 }) => {
   return (
-    <div className="flex-1 flex flex-col bg-background h-full">
+    <div data-page-canvas className="flex-1 flex flex-col bg-background h-full">
       <PageHeader
         title={i18nService.t('connectors')}
         isSidebarCollapsed={isSidebarCollapsed}

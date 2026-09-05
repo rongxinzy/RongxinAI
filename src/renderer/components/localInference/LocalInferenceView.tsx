@@ -1089,7 +1089,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 
   return (
-    <div className="relative flex h-full flex-1 flex-col bg-background">
+    <div data-page-canvas className="relative flex h-full flex-1 flex-col bg-background">
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}

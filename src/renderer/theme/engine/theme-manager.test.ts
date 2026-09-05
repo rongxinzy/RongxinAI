@@ -73,3 +73,37 @@ test('rejects incomplete, duplicate and unsafe theme definitions before they rea
     ]),
   ).toThrow();
 });
+
+test('switches packaged backgrounds with the complete theme and clears them on default themes', async () => {
+  const { BackgroundKind, DEFAULT_BACKGROUND } = await import('../background/background');
+  const painted = {
+    ...classicLight,
+    meta: { ...classicLight.meta, id: 'painted' },
+    background: {
+      ...DEFAULT_BACKGROUND,
+      kind: BackgroundKind.Color,
+      color: '#aabbcc',
+      opacity: 0.4,
+    },
+  };
+  const manager = new ThemeManager([...allThemes, painted], {
+    storage: { get: () => null, set: () => {} },
+  });
+  const input = document.createElement('textarea');
+  document.body.append(input);
+  input.value = 'draft';
+  input.focus();
+  await manager.setTheme('painted');
+  expect(document.documentElement.style.getPropertyValue('--main-background-color')).toBe(
+    '#aabbcc',
+  );
+  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0.4');
+  await manager.setTheme('classic-dark');
+  expect(document.documentElement.style.getPropertyValue('--main-background-color')).toBe(
+    'transparent',
+  );
+  expect(document.documentElement.style.getPropertyValue('--main-background-image')).toBe('none');
+  expect(document.documentElement.style.getPropertyValue('--main-background-opacity')).toBe('0');
+  expect(input.value).toBe('draft');
+  expect(document.activeElement).toBe(input);
+});
