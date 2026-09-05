@@ -56,8 +56,21 @@ function CommandDialog({
 
 function CommandInput({
   className,
+  variant = 'default',
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Input>) {
+}: React.ComponentProps<typeof CommandPrimitive.Input> & { variant?: 'default' | 'palette' }) {
+  if (variant === 'palette') {
+    return (
+      <CommandPrimitive.Input
+        data-slot="command-palette-input"
+        className={cn(
+          'h-12 w-full shrink-0 border-0 bg-transparent px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground',
+          className,
+        )}
+        {...props}
+      />
+    );
+  }
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
       <InputGroup
@@ -138,13 +151,16 @@ function CommandSeparator({
 function CommandItem({
   className,
   children,
+  variant = 'default',
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.Item>) {
+}: React.ComponentProps<typeof CommandPrimitive.Item> & { variant?: 'default' | 'palette' }) {
   return (
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
         "group/command-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none in-data-[slot=dialog-content]:rounded-lg! data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 hover:bg-muted hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 hover:*:[svg]:text-foreground",
+        variant === 'palette' &&
+          'h-8 in-data-[slot=dialog-content]:rounded-full! data-[selected=true]:bg-muted data-[selected=true]:text-foreground',
         className,
       )}
       {...props}
