@@ -8,7 +8,7 @@ import {
 import { Monitor, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Skeleton } from '@shared/components/ui/skeleton';
+import { MarketplaceModelCardSkeleton } from '../components/MarketplaceCardLayout';
 
 import { type MarketplaceModel, type MarketplaceSearchParams, type MarketplaceTaskFilter } from '../../../../shared/marketplace';
 import {
@@ -32,11 +32,12 @@ import { ListPagination } from '../../common/ListPagination';
 import {
   localInferenceCompactButtonClass,
   MARKETPLACE_PAGE_SIZE,
-  MARKETPLACE_GRID_COLUMN_COUNT,
 } from '../constants';
 import {
   getInstallableMarketplaceModels,
 } from '../utils/marketplace';
+
+const marketplaceGridClassName = 'grid w-full grid-cols-1 auto-rows-min content-start gap-4 @3xl/marketplace:grid-cols-2';
 
 export function MarketplacePanel({
   loading,
@@ -80,7 +81,6 @@ export function MarketplacePanel({
   const [fitFilter, setFitFilter] = useState<NonNullable<MarketplaceSearchParams['fit']>>('all');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [page, setPage] = useState(1);
-  const gridColumnCount = MARKETPLACE_GRID_COLUMN_COUNT;
   const marketplaceGridViewportRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef(page);
   const appliedFilterSignatureRef = useRef<string | null>(null);
@@ -319,8 +319,8 @@ export function MarketplacePanel({
       ) : null}
 
       {marketplaceLoading && models.length === 0 ? (
-        <div ref={marketplaceGridViewportRef} className="relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
-          <MarketplaceGridSkeleton columnCount={gridColumnCount} pageSize={MARKETPLACE_PAGE_SIZE} />
+        <div ref={marketplaceGridViewportRef} className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
+          <MarketplaceGridSkeleton pageSize={MARKETPLACE_PAGE_SIZE} />
         </div>
       ) : !hasSearched ? null : visibleModels.length === 0 ? (
         <EmptyState
@@ -340,10 +340,9 @@ export function MarketplacePanel({
           }
         />
       ) : (
-        <div ref={marketplaceGridViewportRef} className="relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
+        <div ref={marketplaceGridViewportRef} className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
           <div
-            className="grid w-full auto-rows-min content-start gap-4"
-            style={{ gridTemplateColumns: `repeat(${gridColumnCount}, minmax(0, 1fr))` }}
+            className={marketplaceGridClassName}
           >
             {visibleModels.map(model => {
               return (
@@ -378,42 +377,15 @@ export function MarketplacePanel({
 // In-place loading placeholder that mirrors the model card grid, so the first
 // paint of a search never flashes a centered spinner (DESIGN.md: skeletons,
 // not full-screen spinners).
-function MarketplaceGridSkeleton({ columnCount, pageSize }: { columnCount: number; pageSize: number }) {
+function MarketplaceGridSkeleton({ pageSize }: { pageSize: number }) {
   return (
     <div
       aria-hidden="true"
-      className="grid w-full auto-rows-min content-start gap-4"
-      style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+      className={marketplaceGridClassName}
     >
       {Array.from({ length: pageSize }, (_, index) => (
         <MarketplaceModelCardSkeleton key={index} />
       ))}
-    </div>
-  );
-}
-
-// Mirrors MarketplaceModelCard geometry (header row, tag row, footer actions)
-// so the skeleton and the loaded grid share the same silhouette.
-function MarketplaceModelCardSkeleton() {
-  return (
-    <div className="flex h-full flex-col gap-3 rounded-xl border border-border/70 bg-card pb-3 shadow-sm">
-      <div className="flex items-start gap-4 px-5 pt-3">
-        <Skeleton className="size-12 shrink-0 rounded-xl" />
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <Skeleton className="h-5 w-2/3" />
-          <Skeleton className="h-4 w-16" />
-        </div>
-        <Skeleton className="h-8 w-20 rounded-md" />
-      </div>
-      <div className="flex items-center gap-1.5 px-5">
-        <Skeleton className="h-6 w-14 rounded-md" />
-        <Skeleton className="h-6 w-10 rounded-md" />
-        <Skeleton className="h-6 w-12 rounded-md" />
-      </div>
-      <div className="mt-auto flex items-center gap-3 px-5 pt-3">
-        <Skeleton className="h-8 min-w-0 flex-1 rounded-md" />
-        <Skeleton className="h-8 w-20 shrink-0 rounded-md" />
-      </div>
     </div>
   );
 }
