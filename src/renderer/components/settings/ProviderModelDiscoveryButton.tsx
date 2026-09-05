@@ -155,7 +155,15 @@ export function ProviderModelDiscoveryButton({
         setIsLoading(false);
       }
     }
-  }, [apiKey, endpoint.apiFormat, endpoint.baseUrl, onModelsDiscovered, providerId, requiresApiKey, signature]);
+  }, [
+    apiKey,
+    endpoint.apiFormat,
+    endpoint.baseUrl,
+    onModelsDiscovered,
+    providerId,
+    requiresApiKey,
+    signature,
+  ]);
 
   useEffect(() => {
     if (
@@ -185,7 +193,9 @@ export function ProviderModelDiscoveryButton({
               disabled={isLoading}
               aria-label={label}
             >
-              <RefreshCw className={isLoading ? 'animate-spin motion-reduce:animate-none' : undefined} />
+              <RefreshCw
+                className={isLoading ? 'animate-spin motion-reduce:animate-none' : undefined}
+              />
             </Button>
           }
         />
@@ -202,7 +212,9 @@ export function ProviderModelDiscoveryButton({
       onClick={() => void handleFetchModels()}
       disabled={isLoading}
       className={
-        prominent ? 'h-8 px-3 text-sm [&_svg]:size-3.5' : 'h-auto px-0 py-0 [&_svg]:size-3.5'
+        prominent
+          ? 'theme-page-provider-model-discovery-button-button-variant-1 [&_svg]:size-3.5'
+          : 'theme-page-provider-model-discovery-button-button-variant-2 [&_svg]:size-3.5'
       }
     >
       <RefreshCw

@@ -100,7 +100,7 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
         {TEMPLATES.map(tpl => (
           <Card
             key={tpl.id}
-            className="cursor-pointer hover:bg-muted/50 hover:shadow-md transition-[background-color,box-shadow] shadow-sm h-full"
+            className="theme-page-task-template-gallery-card-1 cursor-pointer h-full"
             onClick={() =>
               onSelectTemplate({
                 name: i18nService.t(tpl.nameKey as Parameters<typeof i18nService.t>[0]),
@@ -132,17 +132,14 @@ const TaskTemplateGallery: React.FC<TaskTemplateGalleryProps> = ({
       </div>
 
       {/* Custom Task */}
-      <Card
-        className="cursor-pointer border-dashed hover:bg-muted/50 hover:shadow-md transition-[background-color,box-shadow]"
-        onClick={onCustom}
-      >
+      <Card className="theme-page-task-template-gallery-card-2 cursor-pointer" onClick={onCustom}>
         <CardHeader>
           <div className="flex items-start gap-2">
             <div className="size-9 shrink-0 rounded-lg flex items-center justify-center text-muted-foreground bg-muted">
               <SlidersHorizontal className="size-4.5" />
             </div>
             <div className="flex min-w-0 flex-col gap-1">
-              <CardTitle className="text-muted-foreground">
+              <CardTitle className="theme-control-muted">
                 {i18nService.t('taskTemplateCustomName')}
               </CardTitle>
               <CardDescription>{i18nService.t('taskTemplateCustomDesc')}</CardDescription>

@@ -52,11 +52,13 @@ export function ExpertDetailDialog({
 
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
-      <DialogContent className="flex max-h-[min(720px,calc(100vh-2rem))] w-[min(640px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0">
-        <DialogHeader className="flex-row items-center gap-3 border-b border-border px-6 py-4">
+      <DialogContent className="theme-control-sizing-4 flex max-h-[min(720px,calc(100vh-2rem))] w-[min(640px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden">
+        <DialogHeader className="theme-part-expert-detail-dialog-dialog-header-1 flex-row items-center">
           <ExpertAvatar name={expert.name} label={displayName} />
           <div className="min-w-0">
-            <DialogTitle className="truncate text-base font-semibold">{displayName}</DialogTitle>
+            <DialogTitle className="theme-part-expert-detail-dialog-dialog-title-1 truncate">
+              {displayName}
+            </DialogTitle>
             <DialogDescription className="sr-only">{workScope}</DialogDescription>
           </div>
         </DialogHeader>
@@ -94,7 +96,7 @@ export function ExpertDetailDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="m-0 rounded-none px-6 py-4">
+        <DialogFooter className="theme-part-expert-detail-dialog-dialog-footer-1 m-0">
           <Button
             type="button"
             disabled={isInstalling}

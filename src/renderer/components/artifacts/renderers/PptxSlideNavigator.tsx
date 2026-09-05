@@ -206,8 +206,8 @@ const PptxSlideNavigator: React.FC<PptxSlideNavigatorProps> = ({ slides, title }
                         aria-current={selected ? 'page' : undefined}
                         aria-label={slideLabel}
                         className={cn(
-                          'flex w-full flex-col items-center gap-1 rounded-md p-1 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
-                          selected ? 'bg-accent text-accent-foreground' : 'hover:bg-muted',
+                          'theme-native-slide flex w-full flex-col items-center gap-1 p-1 text-left',
+                          selected ? 'theme-native-slide-selected' : 'theme-native-slide-idle',
                         )}
                         type="button"
                         onClick={() => selectSlide(virtualSlide.index)}

@@ -245,7 +245,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop">
-      <div className="modal-content w-full max-w-2xl mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden">
+      <div className="modal-content w-full max-w-2xl mx-4 overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
           <div className="flex-1">
@@ -273,7 +273,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex-1">
                 {currentQuestion.header && (
-                  <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-1 rounded-full bg-surface-raised text-muted-foreground mb-3">
+                  <span className="inline-block text-xs uppercase tracking-wide px-2 py-1 rounded-full bg-surface-raised text-muted-foreground mb-3">
                     {currentQuestion.header}
                   </span>
                 )}
@@ -318,7 +318,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
                           '[&_svg]:size-3.5',
                           isAnswered &&
                             !isActive &&
-                            'border-success bg-success/10 text-success hover:bg-success/20',
+                            'theme-page-cowork-question-wizard-button-variant-1',
                         )}
                         title={question.question}
                       >
@@ -350,7 +350,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
                   <Button
                     key={option.label}
                     variant={isSelected ? 'default' : 'outline'}
-                    className="w-full justify-start px-4 py-3"
+                    className="theme-control-sizing-11 w-full justify-start"
                     onClick={() => handleSelectOption(currentQuestion, option.label)}
                   >
                     <div className="flex items-start gap-3">
@@ -406,7 +406,7 @@ const CoworkQuestionWizard: React.FC<CoworkQuestionWizardProps> = ({ permission,
                 value={otherInputs[currentStep] || ''}
                 onChange={e => handleOtherInputChange(e.target.value)}
                 placeholder={i18nService.t('coworkQuestionWizardOther')}
-                className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground transition-colors outline-none hover:ring-1 hover:ring-ring/40 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40 dark:placeholder:text-foregroundSecondary"
+                className="theme-native-field theme-native-question-field flex-1 px-3 py-2"
               />
               <Button variant="ghost" onClick={handleSkip}>
                 {i18nService.t('coworkQuestionWizardSkip')}

@@ -43,14 +43,11 @@ const PromptPanel: React.FC<PromptPanelProps> = ({ action, onPromptSelect }) => 
               type="button"
               variant="outline"
               onClick={() => handlePromptClick(prompt)}
-              className={`
-                group relative flex flex-col items-start gap-1.5 px-3.5 py-3 rounded-lg
-                border text-left transition-colors duration-200 h-auto
-                ${
-                  isPromptSelected
-                    ? 'dark:bg-primary-muted bg-primary-muted border-[color-mix(in_srgb,var(--zy-primary)_50%,transparent)]'
-                    : 'bg-surface border-border hover:border-border hover:border-border hover:bg-surface-raised'
-                }
+              className={` theme-page-prompt-panel-button-variant-3 group relative flex flex-col items-start text-left ${
+                isPromptSelected
+                  ? 'theme-page-prompt-panel-button-variant-1'
+                  : 'theme-page-prompt-panel-button-variant-2'
+              }
               `}
             >
               {/* 标题 */}

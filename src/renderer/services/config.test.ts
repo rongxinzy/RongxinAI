@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { ProviderName } from '@shared/providers';
 import type { AppConfig } from '../config';
 import { defaultConfig } from '../config';
 import { ConfigService } from './config';
@@ -26,6 +27,28 @@ describe('ConfigService', () => {
     vi.stubGlobal('window', {
       dispatchEvent: vi.fn(),
     });
+  });
+
+  test('repairs managed access disabled by legacy key validation and preserves user providers', async () => {
+    storedConfig.providers![ProviderName.Zhiyuan].enabled = false;
+    storedConfig.providers![ProviderName.Zhiyuan].apiKey = '';
+    storedConfig.providers![ProviderName.Zhiyuan].models = [];
+    storedConfig.providers![ProviderName.DeepSeek].enabled = false;
+    const service = new ConfigService();
+    await service.reload();
+    expect(service.getConfig().providers![ProviderName.Zhiyuan].enabled).toBe(true);
+    expect(storedConfig.providers![ProviderName.Zhiyuan].enabled).toBe(true);
+    expect(storedConfig.providers![ProviderName.Zhiyuan].models?.length).toBeGreaterThan(0);
+    expect(service.getConfig().providers![ProviderName.Zhiyuan].apiKey).toBe('');
+    expect(service.getConfig().providers![ProviderName.DeepSeek].enabled).toBe(false);
+
+    const providers = structuredClone(service.getConfig().providers!);
+    providers[ProviderName.Zhiyuan].enabled = false;
+    await service.updateConfig({ providers, theme: 'light' });
+    expect(storedConfig.providers![ProviderName.Zhiyuan].enabled).toBe(true);
+    expect(storedConfig.providers![ProviderName.Zhiyuan].models?.length).toBeGreaterThan(0);
+    expect(storedConfig.providers![ProviderName.DeepSeek].enabled).toBe(false);
+    expect(storedConfig.theme).toBe('light');
   });
 
   test('serializes concurrent partial updates against the latest stored config', async () => {

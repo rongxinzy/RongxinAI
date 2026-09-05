@@ -60,7 +60,7 @@ export class LazyChunkErrorBoundary extends React.Component<
             type="button"
             variant="ghost"
             onClick={this.handleRetry}
-            className="inline-flex items-center gap-2 text-muted-foreground"
+            className="theme-page-lazy-chunk-error-boundary-button-1 inline-flex items-center"
           >
             <TriangleAlert className="size-4" />
             {i18nService.t('viewLoadFailedRetry')}

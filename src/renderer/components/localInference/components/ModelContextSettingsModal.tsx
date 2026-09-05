@@ -46,7 +46,8 @@ export function ModelContextSettingsModal({
   const selectedPresetIndex = contextPresets.indexOf(contextSize);
   const customSliderIndex = contextPresets.length;
   const sliderLabelCount = contextPresets.length + 1;
-  const sliderValue = customContextValue !== null ? customSliderIndex : Math.max(0, selectedPresetIndex);
+  const sliderValue =
+    customContextValue !== null ? customSliderIndex : Math.max(0, selectedPresetIndex);
   const parsedCustomContextK = customContextValue?.trim()
     ? Number(customContextValue.trim())
     : undefined;
@@ -54,7 +55,11 @@ export function ModelContextSettingsModal({
     parsedCustomContextK !== undefined && Number.isFinite(parsedCustomContextK)
       ? Math.round(parsedCustomContextK * TOKENS_PER_K)
       : undefined;
-  const customContextError = getCustomContextError(parsedCustomContextValue, customContextValue, trainedLimit);
+  const customContextError = getCustomContextError(
+    parsedCustomContextValue,
+    customContextValue,
+    trainedLimit,
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -76,7 +81,7 @@ export function ModelContextSettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-md rounded-xl border border-border bg-surface p-0"
+      className="theme-local-context-modal w-full max-w-md p-0"
     >
       <div className="flex flex-col gap-5 p-6">
         <div className="flex min-w-0 items-center gap-2">
@@ -94,14 +99,14 @@ export function ModelContextSettingsModal({
               {i18nService.t('localInferenceServiceConfigCtxSizeLabel')}：
             </span>
             {customContextValue !== null ? (
-              <InputGroup className="h-7 w-fit">
+              <InputGroup className="theme-control-sizing-22 w-fit">
                 <InputGroupInput
                   type="number"
                   min={1}
                   step={1}
                   value={customContextValue}
                   aria-invalid={Boolean(customContextError)}
-                  className="h-7 w-10 flex-none appearance-none pl-1 text-left text-sm font-semibold leading-5 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  className="theme-part-model-context-settings-modal-input-group-input-1 flex-none appearance-none text-left [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   onChange={event => {
                     const nextValue = event.target.value;
                     setCustomContextValue(nextValue);
@@ -119,7 +124,9 @@ export function ModelContextSettingsModal({
                   }}
                 />
                 <InputGroupAddon align="inline-end">
-                  <InputGroupText className="text-sm font-semibold leading-5 text-foreground">K</InputGroupText>
+                  <InputGroupText className="theme-part-model-context-settings-modal-input-group-text-1">
+                    K
+                  </InputGroupText>
                 </InputGroupAddon>
               </InputGroup>
             ) : (
@@ -205,12 +212,7 @@ export function ModelContextSettingsModal({
         ) : null}
 
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            className="min-w-16"
-            onClick={onClose}
-          >
+          <Button type="button" variant="ghost" className="min-w-16" onClick={onClose}>
             {i18nService.t('cancel')}
           </Button>
           <Button
@@ -275,9 +277,7 @@ function getInitialContextValue(
   }
   const nearestCandidate = candidate ?? CONTEXT_SLIDER_DEFAULT_VALUE;
   return contextPresets.reduce((closest, preset) =>
-    Math.abs(preset - nearestCandidate) < Math.abs(closest - nearestCandidate)
-      ? preset
-      : closest,
+    Math.abs(preset - nearestCandidate) < Math.abs(closest - nearestCandidate) ? preset : closest,
   );
 }
 
@@ -292,7 +292,8 @@ function getCustomContextError(
     return i18nService.t('localInferenceContextInvalid');
   }
   if (trainedLimit && parsedValue > trainedLimit) {
-    return i18nService.t('localInferenceLaunchContextExceedsTrainingLimit')
+    return i18nService
+      .t('localInferenceLaunchContextExceedsTrainingLimit')
       .replace('{requested}', String(parsedValue))
       .replace('{trained}', String(trainedLimit));
   }

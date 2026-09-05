@@ -118,7 +118,7 @@ export function ContextUsageIndicator({
         />
         <TooltipContent>{summary}</TooltipContent>
       </Tooltip>
-      <PopoverContent side="top" align="end" className="w-72 max-w-[calc(100vw-2rem)] gap-3 p-3">
+      <PopoverContent side="top" align="end" className="theme-control-sizing-10 w-72 max-w-[calc(100vw-2rem)] gap-3">
         <div className="flex items-center justify-between gap-3 text-sm">
           <span className={`font-medium ${usageStateClassName}`}>{percent.toFixed(1)}%</span>
           <span className="shrink-0 tabular-nums text-muted-foreground">

@@ -26,7 +26,7 @@ export const CodingTaskList = ({ snapshot, onSelect }: CodingTaskListProps) => (
             variant={isActive ? 'secondary' : 'ghost'}
             disabled={!lane}
             onClick={() => lane && onSelect(lane.id)}
-            className="h-auto w-full flex-col items-start px-2 py-2 text-left"
+            className="theme-control-sizing-7 theme-control-content-height w-full flex-col items-start text-left"
           >
             <span className="flex w-full min-w-0 items-center justify-between gap-2">
               <span className="truncate text-sm">{mission.title}</span>

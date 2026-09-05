@@ -15,14 +15,21 @@ import { i18nService } from '../../services/i18n';
 interface PendingMessageQueueProps {
   sessionId: string;
   isStreaming: boolean;
-  queueService?: Pick<typeof coworkQueueService, 'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'>;
+  queueService?: Pick<
+    typeof coworkQueueService,
+    'subscribe' | 'load' | 'update' | 'remove' | 'steer' | 'followUp'
+  >;
 }
 
 const showQueueToast = (message: string): void => {
   window.dispatchEvent(new CustomEvent('app:showToast', { detail: message }));
 };
 
-const PendingMessageQueue = ({ sessionId, isStreaming, queueService = coworkQueueService }: PendingMessageQueueProps) => {
+const PendingMessageQueue = ({
+  sessionId,
+  isStreaming,
+  queueService = coworkQueueService,
+}: PendingMessageQueueProps) => {
   const [items, setItems] = useState<CoworkPendingMessage[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
@@ -139,9 +146,9 @@ const PendingMessageQueue = ({ sessionId, isStreaming, queueService = coworkQueu
               role="button"
               tabIndex={0}
               className={cn(
-                'flex min-w-0 items-center gap-2 border-b border-border/70 px-3 py-2.5 transition-colors last:border-b-0 hover:bg-accent/40 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
-                selectedItemId === item.id && 'bg-accent/40',
-                isFailed && 'bg-destructive/5',
+                'theme-surface-pending-row flex min-w-0 items-center gap-2 px-3 py-2.5',
+                selectedItemId === item.id && 'theme-surface-pending-selected',
+                isFailed && 'theme-surface-pending-failed',
               )}
               onClick={() => setSelectedItemId(item.id)}
               onKeyDown={event => {
@@ -163,7 +170,7 @@ const PendingMessageQueue = ({ sessionId, isStreaming, queueService = coworkQueu
                       void saveEdit(item.id);
                     }
                   }}
-                  className="h-8 min-w-0 flex-1"
+                  className="theme-control-sizing-14 min-w-0 flex-1"
                 />
               ) : (
                 <>
@@ -218,7 +225,7 @@ const PendingMessageQueue = ({ sessionId, isStreaming, queueService = coworkQueu
                       type="button"
                       variant={isFailed ? 'outline' : 'ghost'}
                       size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
+                      className="theme-action-small"
                       disabled={isSending || (!isFailed && !isStreaming)}
                       onClick={() => void (isFailed ? retryItem(item.id) : steerItem(item.id))}
                     >
@@ -231,7 +238,7 @@ const PendingMessageQueue = ({ sessionId, isStreaming, queueService = coworkQueu
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-7 gap-1 px-2 text-xs"
+                      className="theme-action-small"
                       disabled={isSending}
                       onClick={() => beginEdit(item)}
                     >

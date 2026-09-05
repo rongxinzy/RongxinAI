@@ -142,7 +142,13 @@ export function SkillDocumentDialog({
         <header className="flex h-14 shrink-0 items-center justify-between gap-3 px-5">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="size-9 rounded-lg">
-              {skill.iconUrl && <AvatarImage src={resolveSkillIconUrl(skill.iconUrl)} alt="" className="object-contain" />}
+              {skill.iconUrl && (
+                <AvatarImage
+                  src={resolveSkillIconUrl(skill.iconUrl)}
+                  alt=""
+                  className="object-contain"
+                />
+              )}
               <AvatarFallback className="rounded-lg text-lg font-semibold text-muted-foreground">
                 {getSkillInitial(skill.displayName || skill.name)}
               </AvatarFallback>
@@ -159,7 +165,13 @@ export function SkillDocumentDialog({
               aria-label={skill.displayName || skill.name}
               onCheckedChange={() => onToggle(skill.id)}
             />
-            <Button type="button" variant="ghost" size="icon-sm" aria-label={i18nService.t('close')} onClick={onClose}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={i18nService.t('close')}
+              onClick={onClose}
+            >
               <X />
             </Button>
           </div>
@@ -173,7 +185,9 @@ export function SkillDocumentDialog({
                 .map(([key, value]) => (
                   <div key={key}>
                     <dt className="font-medium text-muted-foreground">{getMetadataLabel(key)}:</dt>
-                    <dd className="mt-1 whitespace-pre-wrap break-words text-foreground">{value}</dd>
+                    <dd className="mt-1 whitespace-pre-wrap break-words text-foreground">
+                      {value}
+                    </dd>
                   </div>
                 ))}
             </dl>
@@ -200,13 +214,18 @@ export function SkillDocumentDialog({
             variant="ghost"
             size="sm"
             disabled={readOnly}
-            className="text-destructive hover:text-destructive"
+            className="theme-page-skill-document-dialog-button-1"
             onClick={() => onRequestDelete(skill)}
           >
             <Trash2 data-icon="inline-start" />
             {i18nService.t('skillUninstall')}
           </Button>
-          <Button type="button" size="sm" disabled={!onTrySkill} onClick={() => onTrySkill?.(skill.id)}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!onTrySkill}
+            onClick={() => onTrySkill?.(skill.id)}
+          >
             <MessageCircle data-icon="inline-start" />
             {i18nService.t('skillUseNow')}
           </Button>

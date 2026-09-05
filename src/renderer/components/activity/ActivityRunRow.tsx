@@ -54,8 +54,8 @@ const ActivityRunRow: React.FC<ActivityRunRowProps> = ({ run, animateEntrance })
           : undefined
       }
       className={cn(
-        'flex gap-3 rounded-lg px-3 py-2.5 transition-colors',
-        hasExpandableError && 'cursor-pointer hover:bg-surface-raised',
+        'theme-surface-activity-row flex gap-3 px-3 py-2.5',
+        hasExpandableError && 'theme-surface-activity-expandable cursor-pointer',
       )}
     >
       {/* Status: one quiet dot. Running breathes with a slow pulse. */}

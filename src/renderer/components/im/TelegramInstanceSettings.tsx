@@ -101,13 +101,13 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
                 }
               }}
               autoFocus
-              className="text-sm font-medium px-0 py-0 border-0 border-b border-primary rounded-none bg-transparent"
+              className="theme-control-inline-edit"
             />
           ) : (
             <Button
               type="button"
               variant="ghost"
-              className="h-auto min-w-0 justify-start truncate p-0"
+              className="theme-control-sizing-4 theme-control-content-height min-w-0 justify-start truncate"
               onClick={() => setEditingName(true)}
               title={i18nService.t('imTelegramClickToRename')}
             >
@@ -170,7 +170,7 @@ const TelegramInstanceSettings: React.FC<TelegramInstanceSettingsProps> = ({
                   console.error('[IM] Failed to open guide URL:', err);
                 });
             }}
-            className="mt-2 h-auto p-0 text-xs font-medium underline underline-offset-2"
+            className="theme-action-inline-underlined mt-2"
           >
             {i18nService.t('imViewGuide')}
           </Button>

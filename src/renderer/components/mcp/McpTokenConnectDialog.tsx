@@ -64,7 +64,7 @@ export function McpTokenConnectDialog({ entry, isSaving, error, onClose, onSave 
               <div className="relative">
                 <Input
                   id={tokenInputId}
-                  className="pr-10"
+                  className="theme-control-sizing-26"
                   type={visible ? 'text' : 'password'}
                   value={token}
                   onChange={event => setToken(event.target.value)}

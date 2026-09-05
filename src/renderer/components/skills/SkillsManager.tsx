@@ -735,8 +735,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  'w-full justify-start text-muted-foreground hover:bg-muted hover:text-foreground',
-                  skillCategory === item && 'bg-muted text-foreground',
+                  'theme-page-skills-manager-button-variant-1 w-full justify-start',
+                  skillCategory === item && 'theme-page-skills-manager-button-variant-2',
                 )}
                 onClick={() => {
                   setSkillCategory(item);
@@ -1024,8 +1024,8 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
               setIsRemoteImportOpen(false);
               setSkillActionError('');
             }}
-            overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-            className="w-full max-w-md mx-4 rounded-2xl bg-surface border border-border shadow-2xl p-6"
+            overlayClassName="theme-skill-modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
+            className="theme-skill-import-modal w-full max-w-md mx-4 p-6"
           >
             <div className="flex items-start justify-between">
               <div className="text-lg font-semibold text-foreground">
@@ -1039,7 +1039,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                   setIsRemoteImportOpen(false);
                   setSkillActionError('');
                 }}
-                className="rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-raised transition-colors"
+                className="theme-page-skills-manager-button-1"
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -1058,7 +1058,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 value={skillDownloadSource}
                 onChange={e => setSkillDownloadSource(e.target.value)}
                 placeholder={i18nService.t('remoteSkillImportPlaceholder')}
-                className="w-full px-3 py-2.5 text-sm rounded-xl bg-background text-foreground placeholder-secondary border border-border"
+                className="theme-page-skills-manager-input-1 w-full placeholder-secondary"
               />
               <p className="text-xs text-muted-foreground">
                 {i18nService.t('remoteSkillImportExamples')}
@@ -1068,7 +1068,7 @@ const SkillsManager: React.FC<SkillsManagerProps> = ({
                 type="button"
                 onClick={handleImportFromDialog}
                 disabled={isDownloadingSkill || !skillDownloadSource.trim()}
-                className="w-full py-2.5 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50"
+                className="theme-page-skills-manager-button-2 w-full"
               >
                 {isDownloadingSkill
                   ? i18nService.t('importingSkill')

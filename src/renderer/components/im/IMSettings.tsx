@@ -90,7 +90,7 @@ const PlatformGuide: React.FC<{
             console.error('[IM] Failed to open guide URL:', err);
           });
         }}
-        className="mt-2 h-auto p-0 text-xs font-medium underline underline-offset-2"
+        className="theme-action-inline-underlined mt-2"
       >
         {guideLabel || i18nService.t('imViewGuide')}
       </Button>
@@ -253,17 +253,17 @@ const IMSettings: React.FC = () => {
     });
 
     try {
-    if (!(await imService.syncPendingConfig())) {
-      setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
-      return null;
-    }
-    const result = await imService.testGateway(platform, configOverride, accountId);
-    if (result) {
-      setConnectivityResults(prev => ({ ...prev, [platform]: result }));
+      if (!(await imService.syncPendingConfig())) {
+        setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
+        return null;
+      }
+      const result = await imService.testGateway(platform, configOverride, accountId);
+      if (result) {
+        setConnectivityResults(prev => ({ ...prev, [platform]: result }));
       } else {
         setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
-    }
-    return result;
+      }
+      return result;
     } catch {
       setConnectivityFailures(prev => ({ ...prev, [platform]: true }));
       return null;
@@ -416,196 +416,220 @@ const IMSettings: React.FC = () => {
     setTestingPlatform(platform);
 
     try {
-    // For Telegram, persist telegram config and test (multi-instance)
-    if (platform === 'telegram') {
-      await imService.persistConfig({ telegram: tgMultiConfig });
-      const result = await runConnectivityTest(platform, {
-        telegram: tgMultiConfig,
-      } as Partial<IMGatewayConfig>, activeTelegramInstanceId ?? undefined);
-      // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
-      if (activeTelegramInstanceId && result) {
-        const inst = tgMultiConfig.instances.find(i => i.instanceId === activeTelegramInstanceId);
-        if (inst && !inst.enabled) {
-          const authCheck = result.checks.find(c => c.code === 'auth_check');
-          if (authCheck && authCheck.level === 'pass') {
-            dispatch(
-              setTelegramInstanceConfig({
-                instanceId: activeTelegramInstanceId,
-                config: { enabled: true },
-              }),
-            );
-            await imService.updateTelegramInstanceConfig(activeTelegramInstanceId, {
-              enabled: true,
-            });
-          }
-        }
-      }
-      return;
-    }
-
-    // Persist DingTalk config and test connectivity.
-    if (platform === 'dingtalk') {
-      await imService.persistConfig({ dingtalk: dingtalkMultiConfig });
-      const result = await runConnectivityTest(platform, {
-        dingtalk: dingtalkMultiConfig,
-      } as Partial<IMGatewayConfig>, activeDingTalkInstanceId ?? undefined);
-      // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
-      if (activeDingTalkInstanceId && result) {
-        const inst = dingtalkMultiConfig.instances.find(
-          i => i.instanceId === activeDingTalkInstanceId,
+      // For Telegram, persist telegram config and test (multi-instance)
+      if (platform === 'telegram') {
+        await imService.persistConfig({ telegram: tgMultiConfig });
+        const result = await runConnectivityTest(
+          platform,
+          {
+            telegram: tgMultiConfig,
+          } as Partial<IMGatewayConfig>,
+          activeTelegramInstanceId ?? undefined,
         );
-        if (inst && !inst.enabled) {
-          const authCheck = result.checks.find(c => c.code === 'auth_check');
-          if (authCheck && authCheck.level === 'pass') {
-            dispatch(
-              setDingTalkInstanceConfig({
-                instanceId: activeDingTalkInstanceId,
-                config: { enabled: true },
-              }),
-            );
-            await imService.updateDingTalkInstanceConfig(activeDingTalkInstanceId, {
-              enabled: true,
-            });
+        // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
+        if (activeTelegramInstanceId && result) {
+          const inst = tgMultiConfig.instances.find(i => i.instanceId === activeTelegramInstanceId);
+          if (inst && !inst.enabled) {
+            const authCheck = result.checks.find(c => c.code === 'auth_check');
+            if (authCheck && authCheck.level === 'pass') {
+              dispatch(
+                setTelegramInstanceConfig({
+                  instanceId: activeTelegramInstanceId,
+                  config: { enabled: true },
+                }),
+              );
+              await imService.updateTelegramInstanceConfig(activeTelegramInstanceId, {
+                enabled: true,
+              });
+            }
           }
         }
+        return;
       }
-      return;
-    }
 
-    // Persist QQ config and test connectivity.
-    if (platform === 'qq') {
-      await imService.persistConfig({ qq: qqMultiConfig });
+      // Persist DingTalk config and test connectivity.
+      if (platform === 'dingtalk') {
+        await imService.persistConfig({ dingtalk: dingtalkMultiConfig });
+        const result = await runConnectivityTest(
+          platform,
+          {
+            dingtalk: dingtalkMultiConfig,
+          } as Partial<IMGatewayConfig>,
+          activeDingTalkInstanceId ?? undefined,
+        );
+        // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
+        if (activeDingTalkInstanceId && result) {
+          const inst = dingtalkMultiConfig.instances.find(
+            i => i.instanceId === activeDingTalkInstanceId,
+          );
+          if (inst && !inst.enabled) {
+            const authCheck = result.checks.find(c => c.code === 'auth_check');
+            if (authCheck && authCheck.level === 'pass') {
+              dispatch(
+                setDingTalkInstanceConfig({
+                  instanceId: activeDingTalkInstanceId,
+                  config: { enabled: true },
+                }),
+              );
+              await imService.updateDingTalkInstanceConfig(activeDingTalkInstanceId, {
+                enabled: true,
+              });
+            }
+          }
+        }
+        return;
+      }
+
+      // Persist QQ config and test connectivity.
+      if (platform === 'qq') {
+        await imService.persistConfig({ qq: qqMultiConfig });
+        const result = await runConnectivityTest(
+          platform,
+          {
+            qq: qqMultiConfig,
+          } as Partial<IMGatewayConfig>,
+          activeQQInstanceId ?? undefined,
+        );
+        // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
+        if (activeQQInstanceId && result) {
+          const inst = qqMultiConfig.instances.find(i => i.instanceId === activeQQInstanceId);
+          if (inst && !inst.enabled) {
+            const authCheck = result.checks.find(c => c.code === 'auth_check');
+            if (authCheck && authCheck.level === 'pass') {
+              dispatch(
+                setQQInstanceConfig({ instanceId: activeQQInstanceId, config: { enabled: true } }),
+              );
+              await imService.updateQQInstanceConfig(activeQQInstanceId, { enabled: true });
+            }
+          }
+        }
+        return;
+      }
+
+      // Persist WeCom config and test connectivity.
+      if (platform === 'wecom') {
+        const wecomMultiConfig = config.wecom;
+        await imService.persistConfig({ wecom: wecomMultiConfig });
+        const result = await runConnectivityTest(
+          platform,
+          {
+            wecom: wecomMultiConfig,
+          } as Partial<IMGatewayConfig>,
+          activeWecomInstanceId ?? undefined,
+        );
+        // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
+        if (activeWecomInstanceId && result) {
+          const inst = wecomMultiConfig.instances.find(i => i.instanceId === activeWecomInstanceId);
+          if (inst && !inst.enabled) {
+            const authCheck = result.checks.find(c => c.code === 'auth_check');
+            if (authCheck && authCheck.level === 'pass') {
+              dispatch(
+                setWecomInstanceConfig({
+                  instanceId: activeWecomInstanceId,
+                  config: { enabled: true },
+                }),
+              );
+              await imService.updateWecomInstanceConfig(activeWecomInstanceId, { enabled: true });
+            }
+          }
+        }
+        return;
+      }
+
+      // Persist Weixin config and test connectivity.
+      if (platform === 'weixin') {
+        const result = await runConnectivityTest(platform);
+        if (!weixinConfig.enabled && result) {
+          const authCheck = result.checks.find(c => c.code === 'auth_check');
+          if (authCheck && authCheck.level === 'pass') {
+            toggleGateway(platform);
+          }
+        }
+        return;
+      }
+
+      // Persist Feishu config and test connectivity.
+      if (platform === 'feishu') {
+        await imService.persistConfig({ feishu: feishuMultiConfig });
+        const result = await runConnectivityTest(
+          platform,
+          {
+            feishu: feishuMultiConfig,
+          } as Partial<IMGatewayConfig>,
+          activeFeishuInstanceId ?? undefined,
+        );
+        // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
+        if (activeFeishuInstanceId && result) {
+          const inst = feishuMultiConfig.instances.find(
+            i => i.instanceId === activeFeishuInstanceId,
+          );
+          if (inst && !inst.enabled) {
+            const authCheck = result.checks.find(c => c.code === 'auth_check');
+            if (authCheck && authCheck.level === 'pass') {
+              dispatch(
+                setFeishuInstanceConfig({
+                  instanceId: activeFeishuInstanceId,
+                  config: { enabled: true },
+                }),
+              );
+              await imService.updateFeishuInstanceConfig(activeFeishuInstanceId, { enabled: true });
+            }
+          }
+        }
+        return;
+      }
+      // Persist Discord config and test connectivity.
+      if (platform === 'discord') {
+        await imService.persistConfig({ discord: discordMultiConfig });
+        const result = await runConnectivityTest(
+          platform,
+          {
+            discord: discordMultiConfig,
+          } as Partial<IMGatewayConfig>,
+          activeDiscordInstanceId ?? undefined,
+        );
+        if (activeDiscordInstanceId && result) {
+          const inst = discordMultiConfig.instances.find(
+            i => i.instanceId === activeDiscordInstanceId,
+          );
+          if (inst && !inst.enabled) {
+            const authCheck = result.checks.find(c => c.code === 'auth_check');
+            if (authCheck && authCheck.level === 'pass') {
+              dispatch(
+                setDiscordInstanceConfig({
+                  instanceId: activeDiscordInstanceId,
+                  config: { enabled: true },
+                }),
+              );
+              await imService.updateDiscordInstanceConfig(activeDiscordInstanceId, {
+                enabled: true,
+              });
+            }
+          }
+        }
+        return;
+      }
+
+      // 1. Persist latest config to backend (without changing enabled state)
+      await imService.persistConfig({
+        [platform]: config[platform],
+      } as Partial<IMGatewayConfig>);
+
+      const isEnabled = isPlatformEnabled(platform);
+
+      // Run connectivity test (always passes configOverride so the backend uses
+      // the latest unsaved credential values from the form).
       const result = await runConnectivityTest(platform, {
-        qq: qqMultiConfig,
-      } as Partial<IMGatewayConfig>, activeQQInstanceId ?? undefined);
-      // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
-      if (activeQQInstanceId && result) {
-        const inst = qqMultiConfig.instances.find(i => i.instanceId === activeQQInstanceId);
-        if (inst && !inst.enabled) {
-          const authCheck = result.checks.find(c => c.code === 'auth_check');
-          if (authCheck && authCheck.level === 'pass') {
-            dispatch(
-              setQQInstanceConfig({ instanceId: activeQQInstanceId, config: { enabled: true } }),
-            );
-            await imService.updateQQInstanceConfig(activeQQInstanceId, { enabled: true });
-          }
-        }
-      }
-      return;
-    }
+        [platform]: config[platform],
+      } as Partial<IMGatewayConfig>);
 
-    // Persist WeCom config and test connectivity.
-    if (platform === 'wecom') {
-      const wecomMultiConfig = config.wecom;
-      await imService.persistConfig({ wecom: wecomMultiConfig });
-      const result = await runConnectivityTest(platform, {
-        wecom: wecomMultiConfig,
-      } as Partial<IMGatewayConfig>, activeWecomInstanceId ?? undefined);
-      // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
-      if (activeWecomInstanceId && result) {
-        const inst = wecomMultiConfig.instances.find(i => i.instanceId === activeWecomInstanceId);
-        if (inst && !inst.enabled) {
-          const authCheck = result.checks.find(c => c.code === 'auth_check');
-          if (authCheck && authCheck.level === 'pass') {
-            dispatch(
-              setWecomInstanceConfig({
-                instanceId: activeWecomInstanceId,
-                config: { enabled: true },
-              }),
-            );
-            await imService.updateWecomInstanceConfig(activeWecomInstanceId, { enabled: true });
-          }
-        }
-      }
-      return;
-    }
-
-    // Persist Weixin config and test connectivity.
-    if (platform === 'weixin') {
-      const result = await runConnectivityTest(platform);
-      if (!weixinConfig.enabled && result) {
+      // Auto-enable: if the platform was OFF but auth_check passed, start it automatically.
+      if (!isEnabled && result) {
         const authCheck = result.checks.find(c => c.code === 'auth_check');
         if (authCheck && authCheck.level === 'pass') {
           toggleGateway(platform);
         }
       }
-      return;
-    }
-
-    // Persist Feishu config and test connectivity.
-    if (platform === 'feishu') {
-      await imService.persistConfig({ feishu: feishuMultiConfig });
-      const result = await runConnectivityTest(platform, {
-        feishu: feishuMultiConfig,
-      } as Partial<IMGatewayConfig>, activeFeishuInstanceId ?? undefined);
-      // Auto-enable: if the active instance is OFF and auth_check passed, turn on automatically
-      if (activeFeishuInstanceId && result) {
-          const inst = feishuMultiConfig.instances.find(
-            i => i.instanceId === activeFeishuInstanceId,
-          );
-        if (inst && !inst.enabled) {
-          const authCheck = result.checks.find(c => c.code === 'auth_check');
-          if (authCheck && authCheck.level === 'pass') {
-            dispatch(
-              setFeishuInstanceConfig({
-                instanceId: activeFeishuInstanceId,
-                config: { enabled: true },
-              }),
-            );
-            await imService.updateFeishuInstanceConfig(activeFeishuInstanceId, { enabled: true });
-          }
-        }
-      }
-      return;
-    }
-    // Persist Discord config and test connectivity.
-    if (platform === 'discord') {
-      await imService.persistConfig({ discord: discordMultiConfig });
-      const result = await runConnectivityTest(platform, {
-        discord: discordMultiConfig,
-      } as Partial<IMGatewayConfig>, activeDiscordInstanceId ?? undefined);
-      if (activeDiscordInstanceId && result) {
-        const inst = discordMultiConfig.instances.find(
-          i => i.instanceId === activeDiscordInstanceId,
-        );
-        if (inst && !inst.enabled) {
-          const authCheck = result.checks.find(c => c.code === 'auth_check');
-          if (authCheck && authCheck.level === 'pass') {
-            dispatch(
-              setDiscordInstanceConfig({
-                instanceId: activeDiscordInstanceId,
-                config: { enabled: true },
-              }),
-            );
-              await imService.updateDiscordInstanceConfig(activeDiscordInstanceId, {
-                enabled: true,
-              });
-          }
-        }
-      }
-      return;
-    }
-
-    // 1. Persist latest config to backend (without changing enabled state)
-    await imService.persistConfig({
-      [platform]: config[platform],
-    } as Partial<IMGatewayConfig>);
-
-    const isEnabled = isPlatformEnabled(platform);
-
-    // Run connectivity test (always passes configOverride so the backend uses
-    // the latest unsaved credential values from the form).
-    const result = await runConnectivityTest(platform, {
-      [platform]: config[platform],
-    } as Partial<IMGatewayConfig>);
-
-    // Auto-enable: if the platform was OFF but auth_check passed, start it automatically.
-    if (!isEnabled && result) {
-      const authCheck = result.checks.find(c => c.code === 'auth_check');
-      if (authCheck && authCheck.level === 'pass') {
-        toggleGateway(platform);
-      }
-    }
     } catch {
       setConnectivityResults(prev => {
         const { [platform]: _, ...remaining } = prev;
@@ -642,7 +666,7 @@ const IMSettings: React.FC = () => {
       {testingPlatform === platform ? (
         <Spinner data-icon="inline-start" />
       ) : (
-      <Signal data-icon="inline-start" />
+        <Signal data-icon="inline-start" />
       )}
       {testingPlatform === platform
         ? i18nService.t('imConnectivityTesting')
@@ -712,10 +736,10 @@ const IMSettings: React.FC = () => {
                     setDingtalkExpanded(!dingtalkExpanded);
                   }}
                   className={cn(
-                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
+                    'theme-page-imsettings-button-variant-1 w-full justify-start',
                     activePlatform === 'dingtalk'
-                      ? 'border-primary bg-primary-muted shadow-subtle'
-                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                      ? 'theme-page-imsettings-button-variant-2'
+                      : 'theme-page-imsettings-button-variant-3',
                   )}
                 >
                   <div className="flex flex-1 items-center">
@@ -761,8 +785,10 @@ const IMSettings: React.FC = () => {
                             setActiveDingTalkInstanceId(inst.instanceId);
                           }}
                           className={cn(
-                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                            'theme-page-imsettings-button-variant-4 w-full justify-start',
+                            isSelected
+                              ? 'theme-page-imsettings-button-variant-5'
+                              : 'theme-page-imsettings-button-variant-6',
                           )}
                         >
                           <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
@@ -789,10 +815,10 @@ const IMSettings: React.FC = () => {
                     setFeishuExpanded(!feishuExpanded);
                   }}
                   className={cn(
-                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
+                    'theme-page-imsettings-button-variant-7 w-full justify-start',
                     activePlatform === 'feishu'
-                      ? 'border-primary bg-primary-muted shadow-subtle'
-                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                      ? 'theme-page-imsettings-button-variant-8'
+                      : 'theme-page-imsettings-button-variant-9',
                   )}
                 >
                   <div className="flex flex-1 items-center">
@@ -835,8 +861,10 @@ const IMSettings: React.FC = () => {
                             setActiveFeishuInstanceId(inst.instanceId);
                           }}
                           className={cn(
-                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                            'theme-page-imsettings-button-variant-10 w-full justify-start',
+                            isSelected
+                              ? 'theme-page-imsettings-button-variant-11'
+                              : 'theme-page-imsettings-button-variant-12',
                           )}
                         >
                           <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
@@ -863,10 +891,10 @@ const IMSettings: React.FC = () => {
                     setQqExpanded(!qqExpanded);
                   }}
                   className={cn(
-                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
+                    'theme-page-imsettings-button-variant-13 w-full justify-start',
                     activePlatform === 'qq'
-                      ? 'border-primary bg-primary-muted shadow-subtle'
-                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                      ? 'theme-page-imsettings-button-variant-14'
+                      : 'theme-page-imsettings-button-variant-15',
                   )}
                 >
                   <div className="flex flex-1 items-center">
@@ -909,8 +937,10 @@ const IMSettings: React.FC = () => {
                             setActiveQQInstanceId(inst.instanceId);
                           }}
                           className={cn(
-                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                            'theme-page-imsettings-button-variant-16 w-full justify-start',
+                            isSelected
+                              ? 'theme-page-imsettings-button-variant-17'
+                              : 'theme-page-imsettings-button-variant-18',
                           )}
                         >
                           <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
@@ -937,10 +967,10 @@ const IMSettings: React.FC = () => {
                     setWecomExpanded(!wecomExpanded);
                   }}
                   className={cn(
-                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
+                    'theme-page-imsettings-button-variant-19 w-full justify-start',
                     activePlatform === 'wecom'
-                      ? 'border-primary bg-primary-muted shadow-subtle'
-                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                      ? 'theme-page-imsettings-button-variant-20'
+                      : 'theme-page-imsettings-button-variant-21',
                   )}
                 >
                   <div className="flex flex-1 items-center">
@@ -983,8 +1013,10 @@ const IMSettings: React.FC = () => {
                             setActiveWecomInstanceId(inst.instanceId);
                           }}
                           className={cn(
-                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                            'theme-page-imsettings-button-variant-22 w-full justify-start',
+                            isSelected
+                              ? 'theme-page-imsettings-button-variant-23'
+                              : 'theme-page-imsettings-button-variant-24',
                           )}
                         >
                           <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
@@ -1011,10 +1043,10 @@ const IMSettings: React.FC = () => {
                     setTelegramExpanded(!telegramExpanded);
                   }}
                   className={cn(
-                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
+                    'theme-page-imsettings-button-variant-25 w-full justify-start',
                     activePlatform === 'telegram'
-                      ? 'border-primary bg-primary-muted shadow-subtle'
-                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                      ? 'theme-page-imsettings-button-variant-26'
+                      : 'theme-page-imsettings-button-variant-27',
                   )}
                 >
                   <div className="flex flex-1 items-center">
@@ -1060,8 +1092,10 @@ const IMSettings: React.FC = () => {
                             setActiveTelegramInstanceId(inst.instanceId);
                           }}
                           className={cn(
-                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                            'theme-page-imsettings-button-variant-28 w-full justify-start',
+                            isSelected
+                              ? 'theme-page-imsettings-button-variant-29'
+                              : 'theme-page-imsettings-button-variant-30',
                           )}
                         >
                           <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
@@ -1088,10 +1122,10 @@ const IMSettings: React.FC = () => {
                     setDiscordExpanded(!discordExpanded);
                   }}
                   className={cn(
-                    'h-auto w-full justify-start rounded-lg border p-2 transition-colors',
+                    'theme-page-imsettings-button-variant-31 w-full justify-start',
                     activePlatform === 'discord'
-                      ? 'border-primary bg-primary-muted shadow-subtle'
-                      : 'border-transparent bg-surface hover:bg-surface-raised',
+                      ? 'theme-page-imsettings-button-variant-32'
+                      : 'theme-page-imsettings-button-variant-33',
                   )}
                 >
                   <div className="flex flex-1 items-center">
@@ -1134,8 +1168,10 @@ const IMSettings: React.FC = () => {
                             setActiveDiscordInstanceId(inst.instanceId);
                           }}
                           className={cn(
-                            'h-auto w-full justify-start rounded-lg p-1.5 pl-2 text-sm transition-colors',
-                            isSelected ? 'bg-primary/10' : 'hover:bg-surface-raised',
+                            'theme-page-imsettings-button-variant-34 w-full justify-start',
+                            isSelected
+                              ? 'theme-page-imsettings-button-variant-35'
+                              : 'theme-page-imsettings-button-variant-36',
                           )}
                         >
                           <span className={cn('mr-2 size-2 shrink-0 rounded-full', dotColor)} />
@@ -1155,7 +1191,7 @@ const IMSettings: React.FC = () => {
               className={cn(
                 'flex items-center rounded-lg border transition-colors',
                 activePlatform === platform
-                  ? 'border-primary bg-primary-muted shadow-subtle'
+                  ? 'border-primary bg-primary-muted'
                   : 'border-transparent bg-surface hover:bg-surface-raised',
               )}
             >
@@ -1164,7 +1200,7 @@ const IMSettings: React.FC = () => {
                 variant="ghost"
                 onClick={() => setActivePlatform(platform)}
                 aria-current={activePlatform === platform ? 'page' : undefined}
-                className="h-auto min-w-0 flex-1 justify-start p-2"
+                className="theme-control-sizing-17 theme-control-content-height min-w-0 flex-1 justify-start"
               >
                 <span className="mr-2 flex size-7 items-center justify-center">
                   <img
@@ -1269,86 +1305,93 @@ const IMSettings: React.FC = () => {
             );
             return (
               <div className="flex flex-col gap-4">
-              <ChannelWorkspaceField
-                accountId={selectedInstance.instanceId}
-                workspaceId={selectedInstance.workspaceId}
-                workspaces={workspaces}
-                onChange={workspaceId => {
-                  dispatch(setDingTalkInstanceConfig({ instanceId: activeDingTalkInstanceId, config: { workspaceId } }));
-                  void imService.updateDingTalkInstanceConfig(activeDingTalkInstanceId, { workspaceId });
-                }}
-              />
-              <DingTalkInstanceSettings
-                instance={selectedInstance}
-                instanceStatus={selectedStatus}
-                onConfigChange={update => {
-                  dispatch(
-                    setDingTalkInstanceConfig({
-                      instanceId: activeDingTalkInstanceId,
-                      config: update,
-                    }),
-                  );
-                }}
-                onSave={async override => {
-                  const configToSave = override
-                    ? { ...selectedInstance, ...override }
-                    : selectedInstance;
-                  if (selectedInstance.enabled) {
-                    await imService.updateDingTalkInstanceConfig(
-                      activeDingTalkInstanceId,
-                      configToSave,
-                    );
-                  } else {
-                    await imService.persistDingTalkInstanceConfig(
-                      activeDingTalkInstanceId,
-                      configToSave,
-                    );
-                  }
-                }}
-                onRename={async newName => {
-                  dispatch(
-                    setDingTalkInstanceConfig({
-                      instanceId: activeDingTalkInstanceId,
-                      config: { instanceName: newName } as any,
-                    }),
-                  );
-                  await imService.persistDingTalkInstanceConfig(activeDingTalkInstanceId, {
-                    instanceName: newName,
-                  } as any);
-                }}
-                onDelete={async () => {
-                  await imService.deleteDingTalkInstance(activeDingTalkInstanceId);
-                  const remaining = config.dingtalk.instances.filter(
-                    i => i.instanceId !== activeDingTalkInstanceId,
-                  );
-                  setActiveDingTalkInstanceId(
-                    remaining.length > 0 ? remaining[0].instanceId : null,
-                  );
-                }}
-                onToggleEnabled={async () => {
-                  const newEnabled = !selectedInstance.enabled;
-                  if (newEnabled && !(selectedInstance.clientId && selectedInstance.clientSecret))
-                    return;
-                  const success = await imService.updateDingTalkInstanceConfig(
-                    activeDingTalkInstanceId,
-                    { enabled: newEnabled },
-                  );
-                  if (success) {
+                <ChannelWorkspaceField
+                  accountId={selectedInstance.instanceId}
+                  workspaceId={selectedInstance.workspaceId}
+                  workspaces={workspaces}
+                  onChange={workspaceId => {
                     dispatch(
                       setDingTalkInstanceConfig({
                         instanceId: activeDingTalkInstanceId,
-                        config: { enabled: newEnabled },
+                        config: { workspaceId },
                       }),
                     );
-                    if (newEnabled) dispatch(clearError());
-                  }
-                }}
-                onTestConnectivity={() => {
-                  void handleConnectivityTest('dingtalk');
-                }}
-                testingPlatform={testingPlatform}
-                connectivityResults={connectivityResults}
-              />
+                    void imService.updateDingTalkInstanceConfig(activeDingTalkInstanceId, {
+                      workspaceId,
+                    });
+                  }}
+                />
+                <DingTalkInstanceSettings
+                  instance={selectedInstance}
+                  instanceStatus={selectedStatus}
+                  onConfigChange={update => {
+                    dispatch(
+                      setDingTalkInstanceConfig({
+                        instanceId: activeDingTalkInstanceId,
+                        config: update,
+                      }),
+                    );
+                  }}
+                  onSave={async override => {
+                    const configToSave = override
+                      ? { ...selectedInstance, ...override }
+                      : selectedInstance;
+                    if (selectedInstance.enabled) {
+                      await imService.updateDingTalkInstanceConfig(
+                        activeDingTalkInstanceId,
+                        configToSave,
+                      );
+                    } else {
+                      await imService.persistDingTalkInstanceConfig(
+                        activeDingTalkInstanceId,
+                        configToSave,
+                      );
+                    }
+                  }}
+                  onRename={async newName => {
+                    dispatch(
+                      setDingTalkInstanceConfig({
+                        instanceId: activeDingTalkInstanceId,
+                        config: { instanceName: newName } as any,
+                      }),
+                    );
+                    await imService.persistDingTalkInstanceConfig(activeDingTalkInstanceId, {
+                      instanceName: newName,
+                    } as any);
+                  }}
+                  onDelete={async () => {
+                    await imService.deleteDingTalkInstance(activeDingTalkInstanceId);
+                    const remaining = config.dingtalk.instances.filter(
+                      i => i.instanceId !== activeDingTalkInstanceId,
+                    );
+                    setActiveDingTalkInstanceId(
+                      remaining.length > 0 ? remaining[0].instanceId : null,
+                    );
+                  }}
+                  onToggleEnabled={async () => {
+                    const newEnabled = !selectedInstance.enabled;
+                    if (newEnabled && !(selectedInstance.clientId && selectedInstance.clientSecret))
+                      return;
+                    const success = await imService.updateDingTalkInstanceConfig(
+                      activeDingTalkInstanceId,
+                      { enabled: newEnabled },
+                    );
+                    if (success) {
+                      dispatch(
+                        setDingTalkInstanceConfig({
+                          instanceId: activeDingTalkInstanceId,
+                          config: { enabled: newEnabled },
+                        }),
+                      );
+                      if (newEnabled) dispatch(clearError());
+                    }
+                  }}
+                  onTestConnectivity={() => {
+                    void handleConnectivityTest('dingtalk');
+                  }}
+                  testingPlatform={testingPlatform}
+                  connectivityResults={connectivityResults}
+                />
               </div>
             );
           })()}
@@ -1398,80 +1441,93 @@ const IMSettings: React.FC = () => {
             );
             return (
               <div className="flex flex-col gap-4">
-              <ChannelWorkspaceField
-                accountId={selectedInstance.instanceId}
-                workspaceId={selectedInstance.workspaceId}
-                workspaces={workspaces}
-                onChange={workspaceId => {
-                  dispatch(setFeishuInstanceConfig({ instanceId: activeFeishuInstanceId, config: { workspaceId } }));
-                  void imService.updateFeishuInstanceConfig(activeFeishuInstanceId, { workspaceId });
-                }}
-              />
-              <FeishuInstanceSettings
-                instance={selectedInstance}
-                instanceStatus={selectedStatus}
-                onConfigChange={update => {
-                  dispatch(
-                    setFeishuInstanceConfig({ instanceId: activeFeishuInstanceId, config: update }),
-                  );
-                }}
-                onSave={async override => {
-                  const configToSave = override
-                    ? { ...selectedInstance, ...override }
-                    : selectedInstance;
-                  if (selectedInstance.enabled) {
-                    await imService.updateFeishuInstanceConfig(
-                      activeFeishuInstanceId,
-                      configToSave,
-                    );
-                  } else {
-                    await imService.persistFeishuInstanceConfig(
-                      activeFeishuInstanceId,
-                      configToSave,
-                    );
-                  }
-                }}
-                onRename={async newName => {
-                  dispatch(
-                    setFeishuInstanceConfig({
-                      instanceId: activeFeishuInstanceId,
-                      config: { instanceName: newName } as any,
-                    }),
-                  );
-                  await imService.persistFeishuInstanceConfig(activeFeishuInstanceId, {
-                    instanceName: newName,
-                  } as any);
-                }}
-                onDelete={async () => {
-                  await imService.deleteFeishuInstance(activeFeishuInstanceId);
-                  const remaining = config.feishu.instances.filter(
-                    i => i.instanceId !== activeFeishuInstanceId,
-                  );
-                  setActiveFeishuInstanceId(remaining.length > 0 ? remaining[0].instanceId : null);
-                }}
-                onToggleEnabled={async () => {
-                  const newEnabled = !selectedInstance.enabled;
-                  if (newEnabled && !(selectedInstance.appId && selectedInstance.appSecret)) return;
-                  const success = await imService.updateFeishuInstanceConfig(
-                    activeFeishuInstanceId,
-                    { enabled: newEnabled },
-                  );
-                  if (success) {
+                <ChannelWorkspaceField
+                  accountId={selectedInstance.instanceId}
+                  workspaceId={selectedInstance.workspaceId}
+                  workspaces={workspaces}
+                  onChange={workspaceId => {
                     dispatch(
                       setFeishuInstanceConfig({
                         instanceId: activeFeishuInstanceId,
-                        config: { enabled: newEnabled },
+                        config: { workspaceId },
                       }),
                     );
-                    if (newEnabled) dispatch(clearError());
-                  }
-                }}
-                onTestConnectivity={() => {
-                  void handleConnectivityTest('feishu');
-                }}
-                testingPlatform={testingPlatform}
-                connectivityResults={connectivityResults}
-              />
+                    void imService.updateFeishuInstanceConfig(activeFeishuInstanceId, {
+                      workspaceId,
+                    });
+                  }}
+                />
+                <FeishuInstanceSettings
+                  instance={selectedInstance}
+                  instanceStatus={selectedStatus}
+                  onConfigChange={update => {
+                    dispatch(
+                      setFeishuInstanceConfig({
+                        instanceId: activeFeishuInstanceId,
+                        config: update,
+                      }),
+                    );
+                  }}
+                  onSave={async override => {
+                    const configToSave = override
+                      ? { ...selectedInstance, ...override }
+                      : selectedInstance;
+                    if (selectedInstance.enabled) {
+                      await imService.updateFeishuInstanceConfig(
+                        activeFeishuInstanceId,
+                        configToSave,
+                      );
+                    } else {
+                      await imService.persistFeishuInstanceConfig(
+                        activeFeishuInstanceId,
+                        configToSave,
+                      );
+                    }
+                  }}
+                  onRename={async newName => {
+                    dispatch(
+                      setFeishuInstanceConfig({
+                        instanceId: activeFeishuInstanceId,
+                        config: { instanceName: newName } as any,
+                      }),
+                    );
+                    await imService.persistFeishuInstanceConfig(activeFeishuInstanceId, {
+                      instanceName: newName,
+                    } as any);
+                  }}
+                  onDelete={async () => {
+                    await imService.deleteFeishuInstance(activeFeishuInstanceId);
+                    const remaining = config.feishu.instances.filter(
+                      i => i.instanceId !== activeFeishuInstanceId,
+                    );
+                    setActiveFeishuInstanceId(
+                      remaining.length > 0 ? remaining[0].instanceId : null,
+                    );
+                  }}
+                  onToggleEnabled={async () => {
+                    const newEnabled = !selectedInstance.enabled;
+                    if (newEnabled && !(selectedInstance.appId && selectedInstance.appSecret))
+                      return;
+                    const success = await imService.updateFeishuInstanceConfig(
+                      activeFeishuInstanceId,
+                      { enabled: newEnabled },
+                    );
+                    if (success) {
+                      dispatch(
+                        setFeishuInstanceConfig({
+                          instanceId: activeFeishuInstanceId,
+                          config: { enabled: newEnabled },
+                        }),
+                      );
+                      if (newEnabled) dispatch(clearError());
+                    }
+                  }}
+                  onTestConnectivity={() => {
+                    void handleConnectivityTest('feishu');
+                  }}
+                  testingPlatform={testingPlatform}
+                  connectivityResults={connectivityResults}
+                />
               </div>
             );
           })()}
@@ -1521,71 +1577,79 @@ const IMSettings: React.FC = () => {
             );
             return (
               <div className="flex flex-col gap-4">
-              <ChannelWorkspaceField
-                accountId={selectedInstance.instanceId}
-                workspaceId={selectedInstance.workspaceId}
-                workspaces={workspaces}
-                onChange={workspaceId => {
-                  dispatch(setQQInstanceConfig({ instanceId: activeQQInstanceId, config: { workspaceId } }));
-                  void imService.updateQQInstanceConfig(activeQQInstanceId, { workspaceId });
-                }}
-              />
-              <QQInstanceSettings
-                instance={selectedInstance}
-                instanceStatus={selectedStatus}
-                onConfigChange={update => {
-                  dispatch(setQQInstanceConfig({ instanceId: activeQQInstanceId, config: update }));
-                }}
-                onSave={async override => {
-                  const configToSave = override
-                    ? { ...selectedInstance, ...override }
-                    : selectedInstance;
-                  if (selectedInstance.enabled) {
-                    await imService.updateQQInstanceConfig(activeQQInstanceId, configToSave);
-                  } else {
-                    await imService.persistQQInstanceConfig(activeQQInstanceId, configToSave);
-                  }
-                }}
-                onRename={async newName => {
-                  dispatch(
-                    setQQInstanceConfig({
-                      instanceId: activeQQInstanceId,
-                      config: { instanceName: newName } as any,
-                    }),
-                  );
-                  await imService.persistQQInstanceConfig(activeQQInstanceId, {
-                    instanceName: newName,
-                  } as any);
-                }}
-                onDelete={async () => {
-                  await imService.deleteQQInstance(activeQQInstanceId);
-                  const remaining = config.qq.instances.filter(
-                    i => i.instanceId !== activeQQInstanceId,
-                  );
-                  setActiveQQInstanceId(remaining.length > 0 ? remaining[0].instanceId : null);
-                }}
-                onToggleEnabled={async () => {
-                  const newEnabled = !selectedInstance.enabled;
-                  if (newEnabled && !(selectedInstance.appId && selectedInstance.appSecret)) return;
-                  const success = await imService.updateQQInstanceConfig(activeQQInstanceId, {
-                    enabled: newEnabled,
-                  });
-                  if (success) {
+                <ChannelWorkspaceField
+                  accountId={selectedInstance.instanceId}
+                  workspaceId={selectedInstance.workspaceId}
+                  workspaces={workspaces}
+                  onChange={workspaceId => {
                     dispatch(
                       setQQInstanceConfig({
                         instanceId: activeQQInstanceId,
-                        config: { enabled: newEnabled },
+                        config: { workspaceId },
                       }),
                     );
-                    if (newEnabled) dispatch(clearError());
-                  }
-                }}
-                onTestConnectivity={() => {
-                  void handleConnectivityTest('qq');
-                }}
-                testingPlatform={testingPlatform}
-                connectivityResults={connectivityResults}
-              />
+                    void imService.updateQQInstanceConfig(activeQQInstanceId, { workspaceId });
+                  }}
+                />
+                <QQInstanceSettings
+                  instance={selectedInstance}
+                  instanceStatus={selectedStatus}
+                  onConfigChange={update => {
+                    dispatch(
+                      setQQInstanceConfig({ instanceId: activeQQInstanceId, config: update }),
+                    );
+                  }}
+                  onSave={async override => {
+                    const configToSave = override
+                      ? { ...selectedInstance, ...override }
+                      : selectedInstance;
+                    if (selectedInstance.enabled) {
+                      await imService.updateQQInstanceConfig(activeQQInstanceId, configToSave);
+                    } else {
+                      await imService.persistQQInstanceConfig(activeQQInstanceId, configToSave);
+                    }
+                  }}
+                  onRename={async newName => {
+                    dispatch(
+                      setQQInstanceConfig({
+                        instanceId: activeQQInstanceId,
+                        config: { instanceName: newName } as any,
+                      }),
+                    );
+                    await imService.persistQQInstanceConfig(activeQQInstanceId, {
+                      instanceName: newName,
+                    } as any);
+                  }}
+                  onDelete={async () => {
+                    await imService.deleteQQInstance(activeQQInstanceId);
+                    const remaining = config.qq.instances.filter(
+                      i => i.instanceId !== activeQQInstanceId,
+                    );
+                    setActiveQQInstanceId(remaining.length > 0 ? remaining[0].instanceId : null);
+                  }}
+                  onToggleEnabled={async () => {
+                    const newEnabled = !selectedInstance.enabled;
+                    if (newEnabled && !(selectedInstance.appId && selectedInstance.appSecret))
+                      return;
+                    const success = await imService.updateQQInstanceConfig(activeQQInstanceId, {
+                      enabled: newEnabled,
+                    });
+                    if (success) {
+                      dispatch(
+                        setQQInstanceConfig({
+                          instanceId: activeQQInstanceId,
+                          config: { enabled: newEnabled },
+                        }),
+                      );
+                      if (newEnabled) dispatch(clearError());
+                    }
+                  }}
+                  onTestConnectivity={() => {
+                    void handleConnectivityTest('qq');
+                  }}
+                  testingPlatform={testingPlatform}
+                  connectivityResults={connectivityResults}
+                />
               </div>
             );
           })()}
@@ -1637,85 +1701,92 @@ const IMSettings: React.FC = () => {
             );
             return (
               <div className="flex flex-col gap-4">
-              <ChannelWorkspaceField
-                accountId={selectedInstance.instanceId}
-                workspaceId={selectedInstance.workspaceId}
-                workspaces={workspaces}
-                onChange={workspaceId => {
-                  dispatch(setTelegramInstanceConfig({ instanceId: activeTelegramInstanceId, config: { workspaceId } }));
-                  void imService.updateTelegramInstanceConfig(activeTelegramInstanceId, { workspaceId });
-                }}
-              />
-              <TelegramInstanceSettings
-                instance={selectedInstance}
-                instanceStatus={selectedStatus}
-                onConfigChange={update => {
-                  dispatch(
-                    setTelegramInstanceConfig({
-                      instanceId: activeTelegramInstanceId,
-                      config: update,
-                    }),
-                  );
-                }}
-                onSave={async override => {
-                  const configToSave = override
-                    ? { ...selectedInstance, ...override }
-                    : selectedInstance;
-                  if (selectedInstance.enabled) {
-                    await imService.updateTelegramInstanceConfig(
-                      activeTelegramInstanceId,
-                      configToSave,
-                    );
-                  } else {
-                    await imService.persistTelegramInstanceConfig(
-                      activeTelegramInstanceId,
-                      configToSave,
-                    );
-                  }
-                }}
-                onRename={async newName => {
-                  dispatch(
-                    setTelegramInstanceConfig({
-                      instanceId: activeTelegramInstanceId,
-                      config: { instanceName: newName } as any,
-                    }),
-                  );
-                  await imService.persistTelegramInstanceConfig(activeTelegramInstanceId, {
-                    instanceName: newName,
-                  } as any);
-                }}
-                onDelete={async () => {
-                  await imService.deleteTelegramInstance(activeTelegramInstanceId);
-                  const remaining = config.telegram.instances.filter(
-                    i => i.instanceId !== activeTelegramInstanceId,
-                  );
-                  setActiveTelegramInstanceId(
-                    remaining.length > 0 ? remaining[0].instanceId : null,
-                  );
-                }}
-                onToggleEnabled={async () => {
-                  const newEnabled = !selectedInstance.enabled;
-                  if (newEnabled && !selectedInstance.botToken) return;
-                  const success = await imService.updateTelegramInstanceConfig(
-                    activeTelegramInstanceId,
-                    { enabled: newEnabled },
-                  );
-                  if (success) {
+                <ChannelWorkspaceField
+                  accountId={selectedInstance.instanceId}
+                  workspaceId={selectedInstance.workspaceId}
+                  workspaces={workspaces}
+                  onChange={workspaceId => {
                     dispatch(
                       setTelegramInstanceConfig({
                         instanceId: activeTelegramInstanceId,
-                        config: { enabled: newEnabled },
+                        config: { workspaceId },
                       }),
                     );
-                    if (newEnabled) dispatch(clearError());
-                  }
-                }}
-                onTestConnectivity={() => {
-                  void handleConnectivityTest('telegram');
-                }}
-                testingPlatform={testingPlatform}
-                connectivityResults={connectivityResults}
-              />
+                    void imService.updateTelegramInstanceConfig(activeTelegramInstanceId, {
+                      workspaceId,
+                    });
+                  }}
+                />
+                <TelegramInstanceSettings
+                  instance={selectedInstance}
+                  instanceStatus={selectedStatus}
+                  onConfigChange={update => {
+                    dispatch(
+                      setTelegramInstanceConfig({
+                        instanceId: activeTelegramInstanceId,
+                        config: update,
+                      }),
+                    );
+                  }}
+                  onSave={async override => {
+                    const configToSave = override
+                      ? { ...selectedInstance, ...override }
+                      : selectedInstance;
+                    if (selectedInstance.enabled) {
+                      await imService.updateTelegramInstanceConfig(
+                        activeTelegramInstanceId,
+                        configToSave,
+                      );
+                    } else {
+                      await imService.persistTelegramInstanceConfig(
+                        activeTelegramInstanceId,
+                        configToSave,
+                      );
+                    }
+                  }}
+                  onRename={async newName => {
+                    dispatch(
+                      setTelegramInstanceConfig({
+                        instanceId: activeTelegramInstanceId,
+                        config: { instanceName: newName } as any,
+                      }),
+                    );
+                    await imService.persistTelegramInstanceConfig(activeTelegramInstanceId, {
+                      instanceName: newName,
+                    } as any);
+                  }}
+                  onDelete={async () => {
+                    await imService.deleteTelegramInstance(activeTelegramInstanceId);
+                    const remaining = config.telegram.instances.filter(
+                      i => i.instanceId !== activeTelegramInstanceId,
+                    );
+                    setActiveTelegramInstanceId(
+                      remaining.length > 0 ? remaining[0].instanceId : null,
+                    );
+                  }}
+                  onToggleEnabled={async () => {
+                    const newEnabled = !selectedInstance.enabled;
+                    if (newEnabled && !selectedInstance.botToken) return;
+                    const success = await imService.updateTelegramInstanceConfig(
+                      activeTelegramInstanceId,
+                      { enabled: newEnabled },
+                    );
+                    if (success) {
+                      dispatch(
+                        setTelegramInstanceConfig({
+                          instanceId: activeTelegramInstanceId,
+                          config: { enabled: newEnabled },
+                        }),
+                      );
+                      if (newEnabled) dispatch(clearError());
+                    }
+                  }}
+                  onTestConnectivity={() => {
+                    void handleConnectivityTest('telegram');
+                  }}
+                  testingPlatform={testingPlatform}
+                  connectivityResults={connectivityResults}
+                />
               </div>
             );
           })()}
@@ -1765,83 +1836,92 @@ const IMSettings: React.FC = () => {
             );
             return (
               <div className="flex flex-col gap-4">
-              <ChannelWorkspaceField
-                accountId={selectedInstance.instanceId}
-                workspaceId={selectedInstance.workspaceId}
-                workspaces={workspaces}
-                onChange={workspaceId => {
-                  dispatch(setDiscordInstanceConfig({ instanceId: activeDiscordInstanceId, config: { workspaceId } }));
-                  void imService.updateDiscordInstanceConfig(activeDiscordInstanceId, { workspaceId });
-                }}
-              />
-              <DiscordInstanceSettings
-                instance={selectedInstance}
-                instanceStatus={selectedStatus}
-                onConfigChange={update => {
-                  dispatch(
-                    setDiscordInstanceConfig({
-                      instanceId: activeDiscordInstanceId,
-                      config: update,
-                    }),
-                  );
-                }}
-                onSave={async override => {
-                  const configToSave = override
-                    ? { ...selectedInstance, ...override }
-                    : selectedInstance;
-                  if (selectedInstance.enabled) {
-                    await imService.updateDiscordInstanceConfig(
-                      activeDiscordInstanceId,
-                      configToSave,
-                    );
-                  } else {
-                    await imService.persistDiscordInstanceConfig(
-                      activeDiscordInstanceId,
-                      configToSave,
-                    );
-                  }
-                }}
-                onRename={async newName => {
-                  dispatch(
-                    setDiscordInstanceConfig({
-                      instanceId: activeDiscordInstanceId,
-                      config: { instanceName: newName } as any,
-                    }),
-                  );
-                  await imService.persistDiscordInstanceConfig(activeDiscordInstanceId, {
-                    instanceName: newName,
-                  } as any);
-                }}
-                onDelete={async () => {
-                  await imService.deleteDiscordInstance(activeDiscordInstanceId);
-                  const remaining = config.discord.instances.filter(
-                    i => i.instanceId !== activeDiscordInstanceId,
-                  );
-                  setActiveDiscordInstanceId(remaining.length > 0 ? remaining[0].instanceId : null);
-                }}
-                onToggleEnabled={async () => {
-                  const newEnabled = !selectedInstance.enabled;
-                  if (newEnabled && !selectedInstance.botToken) return;
-                  const success = await imService.updateDiscordInstanceConfig(
-                    activeDiscordInstanceId,
-                    { enabled: newEnabled },
-                  );
-                  if (success) {
+                <ChannelWorkspaceField
+                  accountId={selectedInstance.instanceId}
+                  workspaceId={selectedInstance.workspaceId}
+                  workspaces={workspaces}
+                  onChange={workspaceId => {
                     dispatch(
                       setDiscordInstanceConfig({
                         instanceId: activeDiscordInstanceId,
-                        config: { enabled: newEnabled },
+                        config: { workspaceId },
                       }),
                     );
-                    if (newEnabled) dispatch(clearError());
-                  }
-                }}
-                onTestConnectivity={() => {
-                  void handleConnectivityTest('discord');
-                }}
-                testingPlatform={testingPlatform}
-                connectivityResults={connectivityResults}
-              />
+                    void imService.updateDiscordInstanceConfig(activeDiscordInstanceId, {
+                      workspaceId,
+                    });
+                  }}
+                />
+                <DiscordInstanceSettings
+                  instance={selectedInstance}
+                  instanceStatus={selectedStatus}
+                  onConfigChange={update => {
+                    dispatch(
+                      setDiscordInstanceConfig({
+                        instanceId: activeDiscordInstanceId,
+                        config: update,
+                      }),
+                    );
+                  }}
+                  onSave={async override => {
+                    const configToSave = override
+                      ? { ...selectedInstance, ...override }
+                      : selectedInstance;
+                    if (selectedInstance.enabled) {
+                      await imService.updateDiscordInstanceConfig(
+                        activeDiscordInstanceId,
+                        configToSave,
+                      );
+                    } else {
+                      await imService.persistDiscordInstanceConfig(
+                        activeDiscordInstanceId,
+                        configToSave,
+                      );
+                    }
+                  }}
+                  onRename={async newName => {
+                    dispatch(
+                      setDiscordInstanceConfig({
+                        instanceId: activeDiscordInstanceId,
+                        config: { instanceName: newName } as any,
+                      }),
+                    );
+                    await imService.persistDiscordInstanceConfig(activeDiscordInstanceId, {
+                      instanceName: newName,
+                    } as any);
+                  }}
+                  onDelete={async () => {
+                    await imService.deleteDiscordInstance(activeDiscordInstanceId);
+                    const remaining = config.discord.instances.filter(
+                      i => i.instanceId !== activeDiscordInstanceId,
+                    );
+                    setActiveDiscordInstanceId(
+                      remaining.length > 0 ? remaining[0].instanceId : null,
+                    );
+                  }}
+                  onToggleEnabled={async () => {
+                    const newEnabled = !selectedInstance.enabled;
+                    if (newEnabled && !selectedInstance.botToken) return;
+                    const success = await imService.updateDiscordInstanceConfig(
+                      activeDiscordInstanceId,
+                      { enabled: newEnabled },
+                    );
+                    if (success) {
+                      dispatch(
+                        setDiscordInstanceConfig({
+                          instanceId: activeDiscordInstanceId,
+                          config: { enabled: newEnabled },
+                        }),
+                      );
+                      if (newEnabled) dispatch(clearError());
+                    }
+                  }}
+                  onTestConnectivity={() => {
+                    void handleConnectivityTest('discord');
+                  }}
+                  testingPlatform={testingPlatform}
+                  connectivityResults={connectivityResults}
+                />
               </div>
             );
           })()}
@@ -1972,9 +2052,7 @@ const IMSettings: React.FC = () => {
                             size="icon-xs"
                             aria-label={i18nService.t('delete')}
                             onClick={() => {
-                              const newIds = weixinConfig.allowFrom.filter(
-                                uid => uid !== id,
-                              );
+                              const newIds = weixinConfig.allowFrom.filter(uid => uid !== id);
                               void imService.updateConfig({
                                 weixin: { allowFrom: newIds },
                               });
@@ -2006,104 +2084,111 @@ const IMSettings: React.FC = () => {
             if (activeWecomInstance) {
               return (
                 <div className="flex flex-col gap-4">
-                <ChannelWorkspaceField
-                  accountId={activeWecomInstance.instanceId}
-                  workspaceId={activeWecomInstance.workspaceId}
-                  workspaces={workspaces}
-                  onChange={workspaceId => {
-                    dispatch(setWecomInstanceConfig({ instanceId: activeWecomInstanceId!, config: { workspaceId } }));
-                    void imService.updateWecomInstanceConfig(activeWecomInstanceId!, { workspaceId });
-                  }}
-                />
-                <WecomInstanceSettings
-                  instance={activeWecomInstance}
-                  instanceStatus={activeWecomStatus}
-                  onConfigChange={update => {
-                    dispatch(
-                      setWecomInstanceConfig({
-                        instanceId: activeWecomInstanceId!,
-                        config: update,
-                      }),
-                    );
-                  }}
-                  onSave={async override => {
-                    if (!configLoaded) return;
-                    const configToSave = override
-                      ? { ...activeWecomInstance, ...override }
-                      : activeWecomInstance;
-                    await imService.persistWecomInstanceConfig(
-                      activeWecomInstanceId!,
-                      configToSave,
-                    );
-                  }}
-                  onRename={async newName => {
-                    dispatch(
-                      setWecomInstanceConfig({
-                        instanceId: activeWecomInstanceId!,
-                        config: { instanceName: newName } as any,
-                      }),
-                    );
-                    await imService.persistWecomInstanceConfig(activeWecomInstanceId!, {
-                      instanceName: newName,
-                    } as any);
-                  }}
-                  onDelete={async () => {
-                    await imService.deleteWecomInstance(activeWecomInstanceId!);
-                    setActiveWecomInstanceId(null);
-                  }}
-                  onToggleEnabled={async () => {
-                    const newEnabled = !activeWecomInstance.enabled;
-                    dispatch(
-                      setWecomInstanceConfig({
-                        instanceId: activeWecomInstanceId!,
-                        config: { enabled: newEnabled },
-                      }),
-                    );
-                    await imService.updateWecomInstanceConfig(activeWecomInstanceId!, {
-                      enabled: newEnabled,
-                    });
-                  }}
-                  onTestConnectivity={() => void handleConnectivityTest('wecom')}
-                  onQuickSetup={async () => {
-                    setWecomQuickSetupStatus('pending');
-                    setWecomQuickSetupError('');
-                    try {
-                      const bot = await WecomAIBotSDK.openBotInfoAuthWindow({
-                        source: 'zhiyuan-ai',
-                      });
-                      if (!isMountedRef.current) return;
+                  <ChannelWorkspaceField
+                    accountId={activeWecomInstance.instanceId}
+                    workspaceId={activeWecomInstance.workspaceId}
+                    workspaces={workspaces}
+                    onChange={workspaceId => {
                       dispatch(
                         setWecomInstanceConfig({
                           instanceId: activeWecomInstanceId!,
-                          config: { botId: bot.botid, secret: bot.secret, enabled: true },
+                          config: { workspaceId },
                         }),
                       );
-                      dispatch(clearError());
-                      await imService.updateWecomInstanceConfig(activeWecomInstanceId!, {
-                        botId: bot.botid,
-                        secret: bot.secret,
-                        enabled: true,
+                      void imService.updateWecomInstanceConfig(activeWecomInstanceId!, {
+                        workspaceId,
                       });
-                      if (!isMountedRef.current) return;
-                      await imService.loadStatus();
-                      if (!isMountedRef.current) return;
-                      setWecomQuickSetupStatus('success');
-                    } catch (error: unknown) {
-                      if (!isMountedRef.current) return;
-                      setWecomQuickSetupStatus('error');
-                      const err = error as { message?: string; code?: string };
-                      setWecomQuickSetupError(
-                        err.message || err.code || i18nService.t('unknownError'),
+                    }}
+                  />
+                  <WecomInstanceSettings
+                    instance={activeWecomInstance}
+                    instanceStatus={activeWecomStatus}
+                    onConfigChange={update => {
+                      dispatch(
+                        setWecomInstanceConfig({
+                          instanceId: activeWecomInstanceId!,
+                          config: update,
+                        }),
                       );
+                    }}
+                    onSave={async override => {
+                      if (!configLoaded) return;
+                      const configToSave = override
+                        ? { ...activeWecomInstance, ...override }
+                        : activeWecomInstance;
+                      await imService.persistWecomInstanceConfig(
+                        activeWecomInstanceId!,
+                        configToSave,
+                      );
+                    }}
+                    onRename={async newName => {
+                      dispatch(
+                        setWecomInstanceConfig({
+                          instanceId: activeWecomInstanceId!,
+                          config: { instanceName: newName } as any,
+                        }),
+                      );
+                      await imService.persistWecomInstanceConfig(activeWecomInstanceId!, {
+                        instanceName: newName,
+                      } as any);
+                    }}
+                    onDelete={async () => {
+                      await imService.deleteWecomInstance(activeWecomInstanceId!);
+                      setActiveWecomInstanceId(null);
+                    }}
+                    onToggleEnabled={async () => {
+                      const newEnabled = !activeWecomInstance.enabled;
+                      dispatch(
+                        setWecomInstanceConfig({
+                          instanceId: activeWecomInstanceId!,
+                          config: { enabled: newEnabled },
+                        }),
+                      );
+                      await imService.updateWecomInstanceConfig(activeWecomInstanceId!, {
+                        enabled: newEnabled,
+                      });
+                    }}
+                    onTestConnectivity={() => void handleConnectivityTest('wecom')}
+                    onQuickSetup={async () => {
+                      setWecomQuickSetupStatus('pending');
+                      setWecomQuickSetupError('');
+                      try {
+                        const bot = await WecomAIBotSDK.openBotInfoAuthWindow({
+                          source: 'zhiyuan-ai',
+                        });
+                        if (!isMountedRef.current) return;
+                        dispatch(
+                          setWecomInstanceConfig({
+                            instanceId: activeWecomInstanceId!,
+                            config: { botId: bot.botid, secret: bot.secret, enabled: true },
+                          }),
+                        );
+                        dispatch(clearError());
+                        await imService.updateWecomInstanceConfig(activeWecomInstanceId!, {
+                          botId: bot.botid,
+                          secret: bot.secret,
+                          enabled: true,
+                        });
+                        if (!isMountedRef.current) return;
+                        await imService.loadStatus();
+                        if (!isMountedRef.current) return;
+                        setWecomQuickSetupStatus('success');
+                      } catch (error: unknown) {
+                        if (!isMountedRef.current) return;
+                        setWecomQuickSetupStatus('error');
+                        const err = error as { message?: string; code?: string };
+                        setWecomQuickSetupError(
+                          err.message || err.code || i18nService.t('unknownError'),
+                        );
+                      }
+                    }}
+                    quickSetupStatus={wecomQuickSetupStatus}
+                    quickSetupError={wecomQuickSetupError}
+                    testingPlatform={testingPlatform}
+                    connectivityResults={
+                      connectivityResults as Record<string, IMConnectivityTestResult>
                     }
-                  }}
-                  quickSetupStatus={wecomQuickSetupStatus}
-                  quickSetupError={wecomQuickSetupError}
-                  testingPlatform={testingPlatform}
-                  connectivityResults={
-                    connectivityResults as Record<string, IMConnectivityTestResult>
-                  }
-                />
+                  />
                 </div>
               );
             }

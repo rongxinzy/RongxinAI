@@ -56,7 +56,7 @@ export const CodingSessionSetupDialog = ({
 
   return (
     <section
-      className="absolute inset-0 z-20 flex items-center justify-center bg-black/10 p-4"
+      className="theme-surface-session-overlay absolute inset-0 z-20 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="false"
       aria-labelledby="coding-session-setup-title"

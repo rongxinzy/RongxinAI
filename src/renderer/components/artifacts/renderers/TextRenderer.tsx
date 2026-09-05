@@ -73,10 +73,10 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
             variant="ghost"
             size="sm"
             onClick={() => setShowTable(!showTable)}
-            className={`px-2 py-0.5 text-xs transition-colors h-auto ${
+            className={` theme-page-text-renderer-button-variant-3 ${
               showTable
-                ? 'bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary'
-                : 'text-muted-foreground hover:text-foreground hover:bg-surface'
+                ? 'theme-page-text-renderer-button-variant-1'
+                : 'theme-page-text-renderer-button-variant-2'
             }`}
           >
             {showTable ? t('artifactTextView') : t('artifactTableView')}
@@ -92,9 +92,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
                 {csvData[0]?.map((cell, i) => (
                   <th
                     key={i}
-                    className={`px-3 py-1.5 text-left font-medium border-b border-border sticky top-0 ${
-                      isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
-                    }`}
+                    className={`px-3 py-1.5 text-left font-medium border-b border-border sticky top-0 ${'bg-editor-background text-editor-foreground'}`}
                   >
                     {cell}
                   </th>
@@ -115,9 +113,7 @@ const TextRenderer: React.FC<TextRendererProps> = ({ artifact }) => {
           </table>
         ) : (
           <pre
-            className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre-wrap wrap-break-word min-h-full ${
-              isDark ? 'bg-[#282c34] text-[#abb2bf]' : 'bg-[#f0f2f5] text-[#383a42]'
-            }`}
+            className={`text-xs font-mono leading-relaxed p-4 m-0 whitespace-pre-wrap wrap-break-word min-h-full ${'bg-editor-background text-editor-foreground'}`}
           >
             {lines.map((line, i) => (
               <span key={i} className="flex">

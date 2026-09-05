@@ -96,7 +96,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         key={getModelIdentityKey(model)}
         value={getModelIdentityKey(model)}
         disabled={!selectable}
-        className="items-start px-3 py-2.5"
+        className="theme-control-sizing-1 items-start"
       >
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-w-0 items-center gap-1.5">
@@ -122,7 +122,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         disabled={disabled}
       >
         <SelectTrigger
-          className={`h-auto max-w-[320px] border-none bg-transparent px-3 py-1.5 shadow-none transition-colors hover:bg-surface-raised disabled:cursor-wait disabled:opacity-70 ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}
+          className={` theme-page-model-selector-select-trigger-variant-1 max-w-[320px] disabled:cursor-wait ${disabled ? 'cursor-wait' : 'cursor-pointer'}`}
         >
           <SelectValue placeholder={defaultLabel}>
             <span className="truncate text-sm font-medium text-foreground">{triggerLabel}</span>
@@ -131,7 +131,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
         <SelectContent side={side} className="w-72">
           {defaultLabel ? (
             <SelectGroup>
-              <SelectItem value="__default__" className="px-3 py-2">
+              <SelectItem value="__default__" className="theme-control-sizing-2">
                 <span className="text-sm">{defaultLabel}</span>
               </SelectItem>
             </SelectGroup>

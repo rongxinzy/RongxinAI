@@ -10,6 +10,7 @@ import React from 'react';
 
 import { CoworkPermissionMode } from '../../../shared/cowork/constants';
 import { i18nService } from '../../services/i18n';
+import { SelectorOptionContent } from './SelectorOptionContent';
 import { PromptSelectorButton } from './PromptSelectorButton';
 
 interface PermissionModeMenuProps {
@@ -50,7 +51,12 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
           />
         }
       />
-      <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56 p-2">
+      <DropdownMenuContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        className="theme-permission-menu w-56"
+      >
         <DropdownMenuRadioGroup
           value={value}
           onValueChange={nextValue => onChange(nextValue as CoworkPermissionMode)}
@@ -69,19 +75,19 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
             <DropdownMenuRadioItem
               key={mode}
               value={mode}
-              className="items-start gap-2 rounded-lg px-2 py-2.5 data-checked:bg-surface-raised"
+              className="theme-permission-option items-start"
             >
-              {mode === CoworkPermissionMode.Ask ? (
-                <ShieldCheck className="mt-0.5 size-5" />
-              ) : (
-                <ShieldAlert className="mt-0.5 size-5" />
-              )}
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-sm">{i18nService.t(labelKey)}</span>
-                <span className="text-xs text-muted-foreground">
-                  {i18nService.t(descriptionKey)}
-                </span>
-              </div>
+              <SelectorOptionContent
+                icon={
+                  mode === CoworkPermissionMode.Ask ? (
+                    <ShieldCheck className="size-4" />
+                  ) : (
+                    <ShieldAlert className="size-4" />
+                  )
+                }
+                title={i18nService.t(labelKey)}
+                description={i18nService.t(descriptionKey)}
+              />
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

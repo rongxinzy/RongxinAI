@@ -34,7 +34,7 @@ const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({
   return (
     <span
       className={cn(
-        'sidebar-interactive-surface inline-flex h-7 max-w-48 items-center gap-1.5 rounded-full bg-transparent px-2 text-sm font-medium text-foreground transition-colors',
+        'theme-prompt-expert-chip sidebar-interactive-surface inline-flex max-w-48 items-center gap-1.5',
         className,
       )}
       title={displayName}
@@ -46,7 +46,7 @@ const ActiveExpertBadge: React.FC<ActiveExpertBadgeProps> = ({
         aria-label={i18nService.t('clearExpert')}
         title={i18nService.t('clearExpert')}
         onClick={onRemove}
-        className="group/expert relative size-4 rounded-full p-0 hover:bg-transparent"
+        className="theme-page-active-expert-badge-button-1 group/expert relative"
       >
         <ExpertAvatar
           name={avatarName}

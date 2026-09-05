@@ -43,7 +43,7 @@ export function EmailAdvancedFields({
 }: EmailAdvancedFieldsProps) {
   return (
     <Collapsible open={open} onOpenChange={onOpenChange} className="flex flex-col gap-4">
-      <CollapsibleTrigger className="focus-ring flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-raised">
+      <CollapsibleTrigger className="theme-fold-settings flex w-full items-center gap-2">
         <SlidersHorizontal className="size-4 text-muted-foreground" />
         <span className="flex-1 text-left">{i18nService.t('emailAdvancedSettings')}</span>
         <ChevronDown

@@ -61,7 +61,7 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
 
   return (
     <Card>
-      <CardContent className="space-y-4 pt-4">
+      <CardContent className="theme-control-sizing-13 space-y-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
             <div className="text-sm font-medium">
@@ -143,7 +143,11 @@ const EmbeddingSettingsSection: React.FC<EmbeddingSettingsSectionProps> = props 
 
             <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
               <CollapsibleTrigger>
-                <Button variant="link" size="sm" className="text-xs h-auto p-0">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="theme-page-embedding-settings-section-button-1"
+                >
                   {showAdvanced
                     ? i18nService.t('coworkMemoryAdvancedHide')
                     : i18nService.t('coworkMemoryAdvancedShow')}

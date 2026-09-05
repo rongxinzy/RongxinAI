@@ -17,4 +17,4 @@ export const LOCAL_INFERENCE_MODEL_ORDER_STORAGE_KEY = 'zhiyuan:llamacpp-model-o
 export const localInferenceMutedTextClass = 'text-muted-foreground';
 
 export const localInferenceCompactButtonClass =
-  'h-8 min-w-16 cursor-pointer px-3 transition-[background-color,border-color] duration-200 ease-out hover:bg-muted';
+  'theme-local-compact-action min-w-16 cursor-pointer';

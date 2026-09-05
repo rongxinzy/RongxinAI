@@ -1,9 +1,8 @@
-import { classicDark } from './classic-dark';
-import { classicLight } from './classic-light';
+import { themePlugins } from './plugins';
 import type { ThemeDefinition } from './types';
 
-/** Built-in themes: light + dark. First entry is the default. */
-export const allThemes: ThemeDefinition[] = [classicLight, classicDark];
-
-/** Quick lookup by theme ID */
-export const themeMap = new Map(allThemes.map(t => [t.meta.id, t]));
+export const allThemes: ThemeDefinition[] = themePlugins.flatMap(plugin => [
+  plugin.appearances.light,
+  plugin.appearances.dark,
+]);
+export const themeMap = new Map(allThemes.map(theme => [theme.meta.id, theme]));

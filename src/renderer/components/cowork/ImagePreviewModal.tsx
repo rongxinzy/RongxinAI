@@ -56,7 +56,7 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
       role="dialog"
       aria-modal="true"
       aria-label={label}
-      className="fixed inset-0 z-10000 flex flex-col bg-neutral-950/70 backdrop-blur-sm"
+      className="theme-surface-image-overlay fixed inset-0 z-10000 flex flex-col"
       onMouseDown={handleBackdropMouseDown}
       onClick={handleBackdropClick}
     >
@@ -65,7 +65,7 @@ const ImagePreviewModal: React.FC<ImagePreviewModalProps> = ({ image, onClose })
           variant="ghost"
           size="icon"
           onClick={onClose}
-          className="pointer-events-auto text-white/80 hover:bg-white/15 hover:text-white"
+          className="theme-page-image-preview-modal-button-1 pointer-events-auto"
           title={i18nService.t('close')}
           aria-label={i18nService.t('close')}
         >

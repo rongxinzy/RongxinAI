@@ -1,9 +1,12 @@
+import { ZhiyuanModelPool } from '../../shared/modelPool/constants';
+import { getCoworkOpenAICompatProxyStatus } from './coworkOpenAICompatProxy';
+import { defaultConfig } from '../../renderer/config';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 vi.mock('./coworkOpenAICompatProxy', () => ({
   configureCoworkOpenAICompatProxy: vi.fn(),
   getCoworkOpenAICompatProxyBaseURL: () => 'http://127.0.0.1:3456/v1',
-  getCoworkOpenAICompatProxyStatus: () => ({ running: true }),
+  getCoworkOpenAICompatProxyStatus: vi.fn(() => ({ running: true })),
   getCoworkOpenAICompatProxyToken: () => 'proxy-auth-token',
 }));
 
@@ -597,4 +600,24 @@ test('resolveRawApiConfigForModelRef forwards custom model Pi runtime metadata',
       },
     }),
   );
+});
+
+test('managed free model is available without a user key or compatibility proxy', () => {
+  vi.mocked(getCoworkOpenAICompatProxyStatus).mockReturnValue({ running: false } as ReturnType<
+    typeof getCoworkOpenAICompatProxyStatus
+  >);
+  const config = structuredClone(defaultConfig);
+  setStoreGetter(() => ({ get: () => config }) as never);
+  try {
+    const resolved = resolveRawApiConfig();
+    expect(resolved.error).toBeUndefined();
+    expect(resolved.config?.model).toBe(ZhiyuanModelPool.FreeModelId);
+    expect(resolved.config?.apiKey).toBe('sk-zhiyuan-managed');
+    expect(resolved.providerMetadata?.providerName).toBe(ProviderName.Zhiyuan);
+    expect(resolveCurrentApiConfig().config).toBeNull();
+  } finally {
+    vi.mocked(getCoworkOpenAICompatProxyStatus).mockReturnValue({ running: true } as ReturnType<
+      typeof getCoworkOpenAICompatProxyStatus
+    >);
+  }
 });

@@ -122,13 +122,15 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
               variant="outline"
               size="sm"
               className={cn(
-                'flex h-auto items-center gap-1.5 rounded-md border border-border-subtle bg-surface px-2 py-1 text-xs transition-colors',
-                value && 'pr-6',
+                'theme-page-date-input-button-variant-1 flex items-center',
+                value && 'theme-page-date-input-button-variant-2',
                 open
-                  ? 'border-primary text-foreground'
+                  ? 'theme-page-date-input-button-variant-3'
                   : cn(
-                      'hover:border-primary/50',
-                      value ? 'text-foreground' : 'text-muted-foreground',
+                      'theme-page-date-input-button-variant-4',
+                      value
+                        ? 'theme-page-date-input-button-variant-5'
+                        : 'theme-page-date-input-button-variant-6',
                     ),
               )}
             >
@@ -152,7 +154,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
           </Button>
         )}
       </div>
-      <PopoverContent align="start" className="w-auto min-w-60 select-none p-3">
+      <PopoverContent align="start" className="theme-control-sizing-10 w-auto min-w-60 select-none">
         {/* Month/Year nav */}
         <div className="flex items-center justify-between mb-2">
           <Button type="button" variant="ghost" size="icon-xs" onClick={goPrev}>
@@ -169,7 +171,7 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
         {/* Weekday headers */}
         <div className="grid grid-cols-7 gap-0.5 mb-1">
           {WEEKDAY_KEYS.map(key => (
-            <div key={key} className="text-center text-[10px] text-muted-foreground py-0.5">
+            <div key={key} className="text-center text-xs text-muted-foreground py-0.5">
               {i18nService.t(key)}
             </div>
           ))}
@@ -197,14 +199,14 @@ const DateInput: React.FC<DateInputProps> = ({ value, onChange, min, max, placeh
                 disabled={disabled}
                 onClick={() => handleSelect(day)}
                 className={cn(
-                  'w-7 h-7 text-xs transition-colors p-0',
+                  'theme-page-date-input-button-variant-7',
                   isSelected
-                    ? 'bg-primary text-primary-foreground font-medium'
+                    ? 'theme-page-date-input-button-variant-8'
                     : disabled
-                      ? 'text-muted-foreground/30 cursor-not-allowed'
+                      ? 'theme-page-date-input-button-variant-9 cursor-not-allowed'
                       : isToday
-                        ? 'text-primary font-medium hover:bg-surface-raised'
-                        : 'text-foreground hover:bg-surface-raised',
+                        ? 'theme-page-date-input-button-variant-10'
+                        : 'theme-page-date-input-button-variant-11',
                 )}
               >
                 {day}

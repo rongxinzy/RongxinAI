@@ -73,7 +73,7 @@
     "build:tsc": "tsc",
     "build:vite": "cross-env NODE_OPTIONS=--max-old-space-size=6144 vite build",
     "build:eval-policy": "node scripts/build-zhiyuan-evaluation-policy.mjs",
-    "lint": "oxlint src/",
+    "lint": "oxlint src/ && bun run theme:check && bun run theme:audit",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
     "prepare": "husky",
@@ -154,7 +154,10 @@
     "upload:artifact": "node scripts/upload-artifact.cjs",
     "regenerate:icon": "python3 scripts/generate-app-icons.py",
     "fix:mac-icon": "bash scripts/fix-mac-icon-display.sh",
-    "check:electron-runtime-dependencies": "node scripts/ci/check-electron-runtime-dependencies.mjs"
+    "check:electron-runtime-dependencies": "node scripts/ci/check-electron-runtime-dependencies.mjs",
+    "theme:generate": "bun src/renderer/theme/scripts/generate-css.ts",
+    "theme:check": "bun src/renderer/theme/scripts/generate-css.ts --check",
+    "theme:audit": "bun src/renderer/theme/scripts/audit-styles.ts"
   },
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "0.70.0",

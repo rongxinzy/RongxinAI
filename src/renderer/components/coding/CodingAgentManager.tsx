@@ -118,8 +118,8 @@ export const CodingAgentManager = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(44rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <DialogHeader className="border-b border-border px-6 py-5 pr-14">
+      <DialogContent className="theme-control-sizing-4 flex h-[min(44rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden sm:max-w-3xl">
+        <DialogHeader className="theme-part-coding-agent-manager-dialog-header-1">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-2">
               <DialogTitle>{i18nService.t('codingAgentManagerTitle')}</DialogTitle>
@@ -268,7 +268,7 @@ export const CodingAgentManager = ({
                       </FieldLabel>
                       <Textarea
                         id="coding-agent-arguments"
-                        className="min-h-20"
+                        className="theme-control-sizing-5"
                         value={argumentsText}
                         onChange={event => setArgumentsText(event.target.value)}
                       />
@@ -279,7 +279,7 @@ export const CodingAgentManager = ({
                   </FieldGroup>
                 </div>
               </ScrollArea>
-              <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none bg-background px-6 py-4">
+              <DialogFooter className="theme-part-coding-agent-manager-dialog-footer-1 mx-0 mb-0 shrink-0">
                 <Button type="submit" disabled={submitting}>
                   {submitting && <Spinner data-icon="inline-start" />}
                   {i18nService.t('codingAgentAddProfile')}

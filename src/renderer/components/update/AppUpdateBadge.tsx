@@ -27,7 +27,7 @@ const AppUpdateBadge: React.FC<AppUpdateBadgeProps> = ({ latestVersion, status, 
       type="button"
       variant="outline"
       onClick={onClick}
-      className="non-draggable flex h-8 w-full items-center justify-start gap-2 rounded-md px-1.5 text-[14px] font-normal text-primary hover:bg-primary/10"
+      className="theme-page-app-update-badge-button-1 non-draggable flex w-full items-center justify-start"
       title={`${label} ${latestVersion}`}
       aria-label={`${label} ${latestVersion}`}
     >

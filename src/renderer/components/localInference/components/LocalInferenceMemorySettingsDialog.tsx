@@ -59,7 +59,7 @@ export function LocalInferenceMemorySettingsDialog({
       }}
     >
       <DialogContent className="w-[min(32rem,calc(100%-2rem))] gap-4 sm:max-w-lg">
-        <DialogHeader className="gap-1 pr-8">
+        <DialogHeader className="theme-control-sizing-19 gap-1">
           <DialogTitle>{i18nService.t('localInferenceMemorySettings')}</DialogTitle>
         </DialogHeader>
 

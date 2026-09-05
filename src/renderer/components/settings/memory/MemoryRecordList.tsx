@@ -349,7 +349,7 @@ function MemoryRows(props: {
             <Button
               type="button"
               variant="ghost"
-              className="h-auto min-w-0 flex-1 items-start justify-start p-0 text-left"
+              className="theme-control-sizing-4 theme-control-content-height min-w-0 flex-1 items-start justify-start text-left"
               onClick={() => onSelect(record)}
             >
               <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -542,7 +542,7 @@ function MemoryDetailsDialog(props: {
   return (
     <Dialog open={record !== null} onOpenChange={open => !open && onClose()}>
       <DialogContent className="flex max-h-[calc(100vh-2rem)] min-h-0 flex-col overflow-hidden sm:max-w-xl">
-        <DialogHeader className="shrink-0 pr-8">
+        <DialogHeader className="theme-control-sizing-19 shrink-0">
           <DialogTitle>
             {record
               ? displayTitle(record, sessionTitles, workspaceName)

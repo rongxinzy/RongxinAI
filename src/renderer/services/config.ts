@@ -1,4 +1,9 @@
-import { type ApiFormat, type ProviderConfig, ProviderRegistry } from '@shared/providers';
+import {
+  type ApiFormat,
+  type ProviderConfig,
+  ProviderName,
+  ProviderRegistry,
+} from '@shared/providers';
 
 import { AppConfig, CONFIG_KEYS, defaultConfig, isCustomProvider } from '../config';
 import { localStore } from './store';
@@ -102,11 +107,15 @@ const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig[
       providerKey,
       {
         ...providerConfig,
+        // Managed access never requires a user API key or an enable toggle.
+        ...(providerKey === ProviderName.Zhiyuan ? { enabled: true } : {}),
         baseUrl: normalizeProviderBaseUrl(providerKey, providerConfig.baseUrl),
         apiFormat: normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
         models: normalizeProviderModels(
           providerKey,
-          providerConfig.models,
+          providerKey === ProviderName.Zhiyuan && !providerConfig.models?.length
+            ? defaultConfig.providers![ProviderName.Zhiyuan].models
+            : providerConfig.models,
           normalizeProviderApiFormat(providerKey, providerConfig.apiFormat),
         ),
       },
@@ -311,8 +320,7 @@ export class ConfigService {
         (storedConfig.migrations?.providerModelCatalog ?? 0) <
         PROVIDER_MODEL_CATALOG_MIGRATION_VERSION;
       const shouldMigrateModelPoolProvider =
-        (storedConfig.migrations?.modelPoolProvider ?? 0) <
-        MODEL_POOL_PROVIDER_MIGRATION_VERSION;
+        (storedConfig.migrations?.modelPoolProvider ?? 0) < MODEL_POOL_PROVIDER_MIGRATION_VERSION;
       const mergedProviders = storedConfig.providers
         ? Object.fromEntries(
             Object.entries({
@@ -412,7 +420,7 @@ export class ConfigService {
           ...defaultConfig.shortcuts!,
           ...(storedConfig.shortcuts ?? {}),
         } as AppConfig['shortcuts'],
-        providers: mergedProviders as AppConfig['providers'],
+        providers: normalizeProvidersConfig(mergedProviders as AppConfig['providers']),
         migrations: {
           ...defaultConfig.migrations,
           ...storedConfig.migrations,
@@ -423,12 +431,20 @@ export class ConfigService {
       const shortcuts = this.config.shortcuts!;
       this.config.shortcuts = {
         ...shortcuts,
-        newChat: shortcuts.newChat === 'Ctrl+N' ? defaultConfig.shortcuts!.newChat : shortcuts.newChat,
+        newChat:
+          shortcuts.newChat === 'Ctrl+N' ? defaultConfig.shortcuts!.newChat : shortcuts.newChat,
         search: shortcuts.search === 'Ctrl+F' ? defaultConfig.shortcuts!.search : shortcuts.search,
         settings:
           shortcuts.settings === 'Ctrl+,' ? defaultConfig.shortcuts!.settings : shortcuts.settings,
       };
-      if (shouldMigrateProviderModels || shouldMigrateModelPoolProvider) {
+      const shouldRepairManagedAccess =
+        storedConfig.providers?.[ProviderName.Zhiyuan]?.enabled !== true ||
+        !storedConfig.providers?.[ProviderName.Zhiyuan]?.models?.length;
+      if (
+        shouldMigrateProviderModels ||
+        shouldMigrateModelPoolProvider ||
+        shouldRepairManagedAccess
+      ) {
         await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
       }
     } else {

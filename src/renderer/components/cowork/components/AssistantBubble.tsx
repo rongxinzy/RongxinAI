@@ -37,7 +37,7 @@ export const AssistantBubble: React.FC<{
         </MessageContent>
       </Message>
       {modelLabel && (
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
           <span>{modelLabel}</span>
         </div>
       )}

@@ -7,6 +7,7 @@ export function hasSettingsValueChanged(current: unknown, next: unknown): boolea
 export function buildAppSettingsSavePatch(input: {
   current: AppConfig;
   theme: AppConfig['theme'];
+  themeStyle?: string;
   language: AppConfig['language'];
   useSystemProxy: boolean;
   sqliteAutoBackupEnabled: boolean;
@@ -17,6 +18,8 @@ export function buildAppSettingsSavePatch(input: {
 }): Partial<AppConfig> {
   const patch: Partial<AppConfig> = {};
 
+  if (input.themeStyle !== undefined && (input.current.themeStyle ?? 'codex') !== input.themeStyle)
+    patch.themeStyle = input.themeStyle;
   if (input.current.theme !== input.theme) patch.theme = input.theme;
   if (input.current.language !== input.language) patch.language = input.language;
   if (input.current.useSystemProxy !== input.useSystemProxy) {

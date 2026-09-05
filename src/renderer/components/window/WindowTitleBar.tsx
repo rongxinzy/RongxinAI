@@ -98,7 +98,7 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
         variant="ghost"
         size="icon"
         onClick={handleMinimize}
-        className="non-draggable h-8 w-8 rounded-lg text-foreground/60 hover:text-foreground hover:bg-surface-raised"
+        className="theme-action-window non-draggable"
         aria-label="Minimize"
         title="Minimize"
       >
@@ -119,7 +119,7 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
         variant="ghost"
         size="icon"
         onClick={handleToggleMaximize}
-        className="non-draggable h-8 w-8 rounded-lg text-foreground/60 hover:text-foreground hover:bg-surface-raised"
+        className="theme-action-window non-draggable"
         aria-label={state.isMaximized ? 'Restore' : 'Maximize'}
         title={state.isMaximized ? 'Restore' : 'Maximize'}
       >
@@ -155,7 +155,7 @@ const WindowTitleBar: React.FC<WindowTitleBarProps> = ({
         variant="ghost"
         size="icon"
         onClick={handleClose}
-        className="non-draggable h-8 w-8 rounded-lg text-foreground/60 hover:bg-destructive hover:text-destructive-foreground"
+        className="theme-page-window-title-bar-button-1 non-draggable"
         aria-label="Close"
         title="Close"
       >

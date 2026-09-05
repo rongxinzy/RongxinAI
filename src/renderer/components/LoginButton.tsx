@@ -146,7 +146,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
         onClick={() => setShowMenu(open => !open)}
         aria-expanded={showMenu}
         aria-haspopup="menu"
-        className="inline-flex h-8 w-full items-center justify-start gap-2 rounded-lg px-2 text-[14px] font-normal text-muted-foreground transition-colors hover:bg-black/3 dark:hover:bg-white/4"
+        className="theme-page-login-button-button-1 inline-flex w-full items-center justify-start"
       >
         <UserRound data-icon="inline-start" />
         <span className="truncate">{accountLabel}</span>
@@ -174,7 +174,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
               role="menuitem"
               disabled={isStartingLogin}
               onClick={() => void handleLogin()}
-              className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm"
+              className="theme-action-row w-full justify-start gap-2"
             >
               <LogIn data-icon="inline-start" />
               {isStartingLogin
@@ -188,7 +188,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
             variant="ghost"
             role="menuitem"
             onClick={handleSettings}
-            className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm"
+            className="theme-action-row w-full justify-start gap-2"
           >
             <Settings data-icon="inline-start" />
             {i18nService.t('settings')}
@@ -200,7 +200,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({ onShowSettings }) => {
               variant="ghost"
               role="menuitem"
               onClick={() => void handleLogout()}
-              className="h-9 w-full justify-start gap-2 rounded-lg px-2.5 text-sm text-destructive hover:text-destructive"
+              className="theme-page-login-button-button-2 w-full justify-start"
             >
               <LogOut data-icon="inline-start" />
               {i18nService.t('accountLogout')}

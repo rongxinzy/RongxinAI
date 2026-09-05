@@ -120,10 +120,7 @@ export const TerminalCopyButton = ({
 
   return (
     <Button
-      className={cn(
-        'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-        className,
-      )}
+      className={cn('theme-page-terminal-button-variant-1 shrink-0', className)}
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"
@@ -149,10 +146,7 @@ export const TerminalClearButton = ({
 
   return (
     <Button
-      className={cn(
-        'size-7 shrink-0 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100',
-        className,
-      )}
+      className={cn('theme-page-terminal-button-variant-2 shrink-0', className)}
       onClick={onClear}
       size="icon"
       variant="ghost"

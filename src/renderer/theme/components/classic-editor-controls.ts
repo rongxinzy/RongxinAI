@@ -1,0 +1,96 @@
+import { recipe } from './recipe';
+export function classicEditorControls() {
+  return {
+    'editor-search-nav-icon': recipe({ base: { width: '0.875rem', height: '0.875rem' } }),
+    'editor-search-close-icon': recipe({ base: { width: '0.875rem', height: '0.875rem' } }),
+    'editor-search-custom': recipe({
+      base: {
+        gap: '4px',
+        padding: '5px 10px',
+        'border-bottom-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--zy-surface-raised)',
+        'font-family': 'var(--zy-style-font-mono)',
+        'font-size': 'var(--zy-component-text-xs)',
+      },
+    }),
+    'editor-search-input': recipe({
+      base: {
+        height: '26px',
+        padding: '0 8px',
+        'border-radius': 'var(--zy-style-radius-sm)',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--zy-surface)',
+        color: 'var(--zy-foreground)',
+        'font-size': 'var(--zy-component-text-xs)',
+        'outline-style': 'none',
+      },
+      focused: { 'border-color': 'var(--zy-primary)' },
+    }),
+    'editor-search-count': recipe({
+      base: {
+        'font-size': 'var(--zy-component-text-xs)',
+        color: 'var(--zy-text-secondary)',
+        'font-variant-numeric': 'tabular-nums',
+      },
+    }),
+    'editor-search-count--none': recipe({ base: { color: 'var(--zy-component-editor-error)' } }),
+    'editor-search-nav-btn': recipe({
+      base: {
+        width: '26px',
+        height: '26px',
+        padding: '0',
+        'border-radius': 'var(--zy-style-radius-sm)',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'var(--zy-border)',
+        'background-color': 'var(--zy-surface-raised)',
+        color: 'var(--zy-text-secondary)',
+        'transition-property': 'background-color, color',
+        'transition-duration': '150ms',
+        'transition-timing-function': 'ease',
+      },
+      hover: { 'background-color': 'var(--zy-surface-tertiary)', color: 'var(--zy-foreground)' },
+    }),
+    'editor-search-sep': recipe({
+      base: { width: '1px', height: '16px', 'background-color': 'var(--zy-border)' },
+    }),
+    'editor-search-opt': recipe({
+      base: {
+        gap: '4px',
+        height: '26px',
+        padding: '0 6px',
+        'border-radius': 'var(--zy-style-radius-sm)',
+        'border-width': '1px',
+        'border-style': 'solid',
+        'border-color': 'transparent',
+        'font-size': 'var(--zy-component-text-xs)',
+        color: 'var(--zy-text-secondary)',
+        'transition-property': 'background-color, border-color, color',
+        'transition-duration': '150ms',
+        'transition-timing-function': 'ease',
+      },
+      hover: { 'background-color': 'var(--zy-surface-raised)', color: 'var(--zy-foreground)' },
+    }),
+    'editor-search-opt-checkbox': recipe({ base: { 'accent-color': 'var(--zy-primary)' } }),
+    'editor-search-close-btn': recipe({
+      base: {
+        width: '26px',
+        height: '26px',
+        padding: '0',
+        'border-radius': 'var(--zy-style-radius-sm)',
+        'border-width': '0px',
+        'border-style': 'none',
+        'background-color': 'transparent',
+        color: 'var(--zy-text-secondary)',
+        'transition-property': 'background-color, color',
+        'transition-duration': '150ms',
+        'transition-timing-function': 'ease',
+      },
+      hover: { 'background-color': 'var(--zy-surface-raised)', color: 'var(--zy-foreground)' },
+    }),
+  };
+}

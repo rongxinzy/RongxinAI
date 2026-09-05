@@ -267,7 +267,7 @@ const AllRunsHistory: React.FC<AllRunsHistoryProps> = ({ task, showRunning = tru
         )}
 
         {hasMore && (
-          <Button type="button" variant="ghost" onClick={handleLoadMore} className="w-full py-3">
+          <Button type="button" variant="ghost" onClick={handleLoadMore} className="theme-control-sizing-27 w-full">
             {i18nService.t('scheduledTasksLoadMore')}
           </Button>
         )}

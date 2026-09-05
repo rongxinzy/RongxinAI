@@ -79,7 +79,7 @@ export function WorkbenchTaskAcceptanceCard({ sessionId }: WorkbenchTaskAcceptan
         </Badge>
       </div>
 
-      <QueueItemContent className="line-clamp-none text-sm text-muted-foreground">
+      <QueueItemContent className="theme-queue-acceptance-content line-clamp-none">
         {i18nService.t('workbenchTaskAcceptanceCardDescription')}
       </QueueItemContent>
 

@@ -25,7 +25,7 @@ const SkillsView: React.FC<SkillsViewProps> = ({
 }) => {
   const detailContainerRef = useRef<HTMLDivElement>(null);
   return (
-    <div className="flex-1 flex flex-col bg-background h-full">
+    <div data-page-canvas className="flex-1 flex flex-col bg-background h-full">
       <PageHeader
         title={i18nService.t('skills')}
         isSidebarCollapsed={isSidebarCollapsed}

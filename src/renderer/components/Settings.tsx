@@ -1,3 +1,4 @@
+import { AppearanceSettings } from './settings/AppearanceSettings';
 import { Button } from '@shared/components/ui/button';
 import { FluidTabs } from '@shared/components/ui/fluid-tabs';
 import { Input } from '@shared/components/ui/input';
@@ -50,9 +51,7 @@ import {
   isCustomProvider,
 } from '../config';
 import { SettingsToggleRow } from './common/SettingsToggleRow';
-import {
-  MODEL_CAPABILITY_FIELDS,
-} from './settings/ModelCapabilitiesFields';
+import { MODEL_CAPABILITY_FIELDS } from './settings/ModelCapabilitiesFields';
 import { ProviderModelDiscoveryButton } from './settings/ProviderModelDiscoveryButton';
 import {
   ModelConnectionStatus,
@@ -294,19 +293,24 @@ interface ProvidersImportPayload {
   providers?: Record<string, ProvidersImportEntry>;
 }
 
-const LOCAL_NO_KEY_PROVIDERS = new Set<ProviderType>([
+const NO_USER_KEY_PROVIDERS = new Set<ProviderType>([
+  ProviderName.Zhiyuan,
   ProviderName.Ollama,
   ProviderName.LlamaCpp,
   'github-copilot',
 ]);
 
 const providerRequiresApiKey = (provider: ProviderType) =>
-  !LOCAL_NO_KEY_PROVIDERS.has(provider) && !isCustomProvider(provider);
+  !NO_USER_KEY_PROVIDERS.has(provider) && !isCustomProvider(provider);
 const hasProviderAuthConfigured = (provider: ProviderType, config: ProviderConfig): boolean => {
   if (isCustomProvider(provider)) {
     return config.baseUrl.trim().length > 0;
   }
-  if (provider === ProviderName.Ollama || provider === ProviderName.LlamaCpp) {
+  if (
+    provider === ProviderName.Zhiyuan ||
+    provider === ProviderName.Ollama ||
+    provider === ProviderName.LlamaCpp
+  ) {
     return true;
   }
 
@@ -451,7 +455,12 @@ const shouldAutoSwitchProviderBaseUrl = (
   );
 };
 const shouldShowProviderModels = (providerKey: string, providerConfig: ProviderConfig): boolean => {
-  if (providerKey === ProviderName.Ollama || providerKey === ProviderName.LlamaCpp) return true;
+  if (
+    providerKey === ProviderName.Zhiyuan ||
+    providerKey === ProviderName.Ollama ||
+    providerKey === ProviderName.LlamaCpp
+  )
+    return true;
   if (isCustomProvider(providerKey)) return Boolean(providerConfig.baseUrl?.trim());
   return Boolean(providerConfig.apiKey?.trim());
 };
@@ -600,13 +609,7 @@ const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void 
       onKeyDown={handleKeyDown}
       onClick={() => setRecording(true)}
       onBlur={() => setRecording(false)}
-      className={`w-36 justify-center px-3 py-1.5 text-sm font-normal select-none transition-colors
-        bg-surface-raised text-foreground
-        ${
-          recording
-            ? 'border-primary ring-1 ring-primary/30 text-muted-foreground'
-            : 'border-border hover:border-primary/50'
-        }`}
+      className={`theme-shortcut-input w-36 justify-center select-none ${recording ? 'theme-shortcut-recording' : ''}`}
     >
       {value ? formatShortcutLabel(value, isMacPlatform) : i18nService.t('shortcutNotSet')}
     </Button>
@@ -625,21 +628,17 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
 
   return (
     <Select value={value} onValueChange={newValue => onChange(newValue ?? value)}>
-      <SelectTrigger
-        className="w-36 border border-border
-          bg-surface-raised text-foreground
-          px-3 py-1.5 text-sm"
-      >
+      <SelectTrigger className="theme-send-shortcut-trigger w-36">
         <SelectValue placeholder={currentLabel} />
       </SelectTrigger>
-      <SelectContent className="bg-surface-raised">
+      <SelectContent className="theme-send-shortcut-popup">
         {SEND_SHORTCUT_OPTIONS.map(option => {
           const label = isMacPlatform ? option.labelMac : option.label;
           return (
             <SelectItem
               key={option.value}
               value={option.value}
-              className="text-sm text-foreground focus:bg-primary/10 focus:text-primary"
+              className="theme-send-shortcut-option"
             >
               {label}
             </SelectItem>
@@ -691,8 +690,9 @@ const Settings: React.FC<SettingsProps> = ({
 
   const [noticeMessage, setNoticeMessage] = useState<string | null>(() => buildNoticeMessage());
   const [pendingDeleteProvider, setPendingDeleteProvider] = useState<ProviderType | null>(null);
-  const [pendingApiKeyClearProvider, setPendingApiKeyClearProvider] =
-    useState<ProviderType | null>(null);
+  const [pendingApiKeyClearProvider, setPendingApiKeyClearProvider] = useState<ProviderType | null>(
+    null,
+  );
   const [pendingDeleteModel, setPendingDeleteModel] = useState<{ id: string; name: string } | null>(
     null,
   );
@@ -703,6 +703,8 @@ const Settings: React.FC<SettingsProps> = ({
   const [triageMaxConversationRounds, setTriageMaxConversationRounds] = useState(20);
   const [triageUseLocalModel, setTriageUseLocalModel] = useState(false);
   const [triageModelName, setTriageModelName] = useState('');
+  const [themeStyle, setThemeStyle] = useState(themeService.getStyle());
+  const initialThemeStyleRef = useRef(themeService.getStyle());
   const initialThemeRef = useRef<'light' | 'dark' | 'system'>(themeService.getTheme());
   const initialLanguageRef = useRef<LanguageType>(i18nService.getLanguage());
   const didSaveRef = useRef(false);
@@ -1006,6 +1008,7 @@ const Settings: React.FC<SettingsProps> = ({
         initialThemeRef.current = config.theme;
         initialLanguageRef.current = config.language;
         setTheme(config.theme);
+        setThemeStyle(themeService.getStyle());
         setLanguage(config.language);
         setUseSystemProxy(config.useSystemProxy ?? false);
         setSqliteAutoBackupEnabled(config.sqliteAutoBackupEnabled === true);
@@ -1251,11 +1254,13 @@ const Settings: React.FC<SettingsProps> = ({
 
   useEffect(() => {
     const initialTheme = initialThemeRef.current;
+    const initialThemeStyle = initialThemeStyleRef.current;
     const initialLanguage = initialLanguageRef.current;
     return () => {
       if (didSaveRef.current) {
         return;
       }
+      themeService.setStyle(initialThemeStyle);
       themeService.setTheme(initialTheme);
       i18nService.setLanguage(initialLanguage, { persist: false });
     };
@@ -1991,9 +1996,11 @@ const Settings: React.FC<SettingsProps> = ({
             providerConfig,
           );
           const normalizedEnabled =
-            providerKey === ProviderName.LlamaCpp
-              ? providerConfig.userEnabled === true
-              : providerConfig.enabled && hasValidAuth;
+            providerKey === ProviderName.Zhiyuan
+              ? true
+              : providerKey === ProviderName.LlamaCpp
+                ? providerConfig.userEnabled === true
+                : providerConfig.enabled && hasValidAuth;
           return [
             providerKey,
             {
@@ -2033,6 +2040,7 @@ const Settings: React.FC<SettingsProps> = ({
       const appConfigPatch = buildAppSettingsSavePatch({
         current: currentAppConfig,
         theme,
+        themeStyle,
         language,
         useSystemProxy,
         sqliteAutoBackupEnabled,
@@ -2050,6 +2058,7 @@ const Settings: React.FC<SettingsProps> = ({
       }
 
       // 应用主题
+      themeService.setStyle(themeStyle);
       themeService.setTheme(theme);
 
       // 应用语言
@@ -2403,11 +2412,11 @@ const Settings: React.FC<SettingsProps> = ({
       );
     } catch (error) {
       console.error('[Settings] failed to save tested provider configuration:', error);
-        showConnectionTestNotification(
-          { success: false, message: i18nService.t('failedToSaveSettings') },
-          provider,
-          model,
-        );
+      showConnectionTestNotification(
+        { success: false, message: i18nService.t('failedToSaveSettings') },
+        provider,
+        model,
+      );
     }
   };
 
@@ -2469,7 +2478,10 @@ const Settings: React.FC<SettingsProps> = ({
       return;
     }
 
-    if (testingProvider === 'qwen' && (firstModel.id === 'vision-model' || firstModel.id === 'coder-model')) {
+    if (
+      testingProvider === 'qwen' &&
+      (firstModel.id === 'vision-model' || firstModel.id === 'coder-model')
+    ) {
       const defaultQwenModel = defaultConfig.providers?.qwen?.models?.[0];
       firstModel.id = defaultQwenModel?.id || 'qwen3.5-plus';
     }
@@ -2497,7 +2509,11 @@ const Settings: React.FC<SettingsProps> = ({
     if (result.success) {
       await completeSuccessfulConnectionTest(testingProvider, providerConfig, firstModel);
     } else {
-      showConnectionTestNotification({ success: false, message: result.message }, testingProvider, firstModel);
+      showConnectionTestNotification(
+        { success: false, message: result.message },
+        testingProvider,
+        firstModel,
+      );
     }
   };
 
@@ -2505,86 +2521,87 @@ const Settings: React.FC<SettingsProps> = ({
     providerId: string,
     discoveredModels: readonly DiscoveredProviderModel[],
   ) => {
-      const provider = providerId as ProviderType;
-      const providerConfig = providers[provider];
-      const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels);
-      const nextProviderConfig: ProviderConfig = {
-        ...providerConfig,
-        models: merged.models,
-      };
-      const modelsToTest = merged.models.map(model => ({
-        id: model.id,
-        name: model.name,
-      }));
-      if (modelsToTest.length === 0) return false;
-      const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
-      modelConnectionTestRequestIdRef.current[provider] = requestId;
+    const provider = providerId as ProviderType;
+    const providerConfig = providers[provider];
+    const merged = mergeDiscoveredProviderModels(providerConfig.models ?? [], discoveredModels);
+    const nextProviderConfig: ProviderConfig = {
+      ...providerConfig,
+      models: merged.models,
+    };
+    const modelsToTest = merged.models.map(model => ({
+      id: model.id,
+      name: model.name,
+    }));
+    if (modelsToTest.length === 0) return false;
+    const requestId = (modelConnectionTestRequestIdRef.current[provider] ?? 0) + 1;
+    modelConnectionTestRequestIdRef.current[provider] = requestId;
 
-      if (provider === activeProvider && discoveredModels.length > 0) {
-        setSelectedModelId(current => current || discoveredModels[0].id);
-      }
-      setProviders(current => ({
-        ...current,
-        [provider]: {
-          ...current[provider],
-          models: mergeDiscoveredProviderModels(current[provider].models ?? [], discoveredModels).models,
-        },
-      }));
+    if (provider === activeProvider && discoveredModels.length > 0) {
+      setSelectedModelId(current => current || discoveredModels[0].id);
+    }
+    setProviders(current => ({
+      ...current,
+      [provider]: {
+        ...current[provider],
+        models: mergeDiscoveredProviderModels(current[provider].models ?? [], discoveredModels)
+          .models,
+      },
+    }));
 
-      const results = await testProviderModelsSequentially({
-        providerId: provider,
-        provider: nextProviderConfig,
-        baseUrl: resolveBaseUrl(
+    const results = await testProviderModelsSequentially({
+      providerId: provider,
+      provider: nextProviderConfig,
+      baseUrl: resolveBaseUrl(
+        provider,
+        nextProviderConfig.baseUrl,
+        getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+      ),
+      apiFormat: getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
+      models: modelsToTest,
+    });
+    if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return true;
+
+    const statuses = Object.fromEntries(
+      results.map(({ model, result }) => [
+        model.id,
+        result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
+      ]),
+    );
+    setProviderModelConnectionStatuses(provider, statuses);
+
+    const successCount = results.filter(({ result }) => result.success).length;
+    const failureCount = results.length - successCount;
+    if (successCount > 0) {
+      try {
+        await persistTestedProviderConfiguration(provider, nextProviderConfig);
+        if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
+      } catch (error) {
+        console.error('[Settings] failed to save auto-tested provider configuration:', error);
+        showConnectionTestNotification(
+          { success: false, message: i18nService.t('failedToSaveSettings') },
           provider,
-          nextProviderConfig.baseUrl,
-          getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
-        ),
-        apiFormat: getEffectiveApiFormat(provider, nextProviderConfig.apiFormat),
-        models: modelsToTest,
-      });
-      if (modelConnectionTestRequestIdRef.current[provider] !== requestId) return true;
-
-      const statuses = Object.fromEntries(
-        results.map(({ model, result }) => [
-          model.id,
-          result.success ? ModelConnectionStatus.Success : ModelConnectionStatus.Failure,
-        ]),
-      );
-      setProviderModelConnectionStatuses(provider, statuses);
-
-      const successCount = results.filter(({ result }) => result.success).length;
-      const failureCount = results.length - successCount;
-      if (successCount > 0) {
-        try {
-          await persistTestedProviderConfiguration(provider, nextProviderConfig);
-          if (provider !== ProviderName.LlamaCpp) enableProvider(provider);
-        } catch (error) {
-          console.error('[Settings] failed to save auto-tested provider configuration:', error);
-          showConnectionTestNotification(
-            { success: false, message: i18nService.t('failedToSaveSettings') },
-            provider,
-          );
-          return true;
-        }
+        );
+        return true;
       }
+    }
 
-      const summary = i18nService
-        .t(failureCount === 0 ? 'modelConnectionTestSuccessSummary' : 'modelConnectionTestSummary')
-        .replace('{total}', String(results.length))
-        .replace('{success}', String(successCount))
-        .replace('{failure}', String(failureCount));
-      window.dispatchEvent(
-        new CustomEvent('app:showToast', {
-          detail: {
-            message: summary,
-            isError: failureCount > 0,
-            isSuccess: failureCount === 0,
-            autoClose: true,
-            durationMs: failureCount > 0 ? 5_000 : undefined,
-          },
-        }),
-      );
-      return true;
+    const summary = i18nService
+      .t(failureCount === 0 ? 'modelConnectionTestSuccessSummary' : 'modelConnectionTestSummary')
+      .replace('{total}', String(results.length))
+      .replace('{success}', String(successCount))
+      .replace('{failure}', String(failureCount));
+    window.dispatchEvent(
+      new CustomEvent('app:showToast', {
+        detail: {
+          message: summary,
+          isError: failureCount > 0,
+          isSuccess: failureCount === 0,
+          autoClose: true,
+          durationMs: failureCount > 0 ? 5_000 : undefined,
+        },
+      }),
+    );
+    return true;
   };
 
   const buildProvidersExport = async (password: string): Promise<ProvidersExportPayload> => {
@@ -3023,131 +3040,18 @@ const Settings: React.FC<SettingsProps> = ({
   }, [activeTab, sidebarTabs]);
 
   const renderAppearanceSettings = () => (
-    <div className="space-y-8">
-      <div>
-        <h4 className="text-sm font-medium mb-3" style={{ color: 'var(--zy-text-primary)' }}>
-          {i18nService.t('appearance')}
-        </h4>
-
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          {(['light', 'dark', 'system'] as const).map(mode => {
-            const isSelected = theme === mode;
-            return (
-              <Button
-                key={mode}
-                type="button"
-                variant="outline"
-                size="lg"
-                aria-pressed={isSelected}
-                onClick={() => {
-                  setTheme(mode);
-                  themeService.setTheme(mode);
-                }}
-                className="h-auto w-full flex-col items-center rounded-lg border p-3"
-                style={{
-                  borderColor: isSelected ? 'var(--zy-primary)' : 'var(--zy-border)',
-                  backgroundColor: isSelected ? 'var(--zy-primary-muted)' : 'transparent',
-                }}
-              >
-                <span className="mb-2 block aspect-[3/2] w-full overflow-hidden rounded-md">
-                  <svg
-                    viewBox="0 0 120 80"
-                    className="size-full"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    {mode === 'light' && (
-                      <>
-                        <rect width="120" height="80" fill="#ffffff" />
-                        <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
-                        <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
-                        <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#d4d4d8" />
-                        <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#d4d4d8" />
-                        <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#d4d4d8" />
-                        <rect x="36" y="8" width="78" height="64" rx="4" fill="#ffffff" />
-                        <rect x="42" y="16" width="50" height="4" rx="2" fill="#d4d4d8" />
-                        <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                        <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#e5e5e5" />
-                        <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
-                        <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
-                        <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                        <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#e5e5e5" />
-                      </>
-                    )}
-                    {mode === 'dark' && (
-                      <>
-                        <rect width="120" height="80" fill="#1a1d23" />
-                        <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
-                        <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
-                        <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="36" y="8" width="78" height="64" rx="4" fill="#2d2d2d" />
-                        <rect x="42" y="16" width="50" height="4" rx="2" fill="#52525b" />
-                        <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
-                        <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                        <rect x="42" y="60" width="58" height="3" rx="1.5" fill="#3f3f46" />
-                      </>
-                    )}
-                    {mode === 'system' && (
-                      <>
-                        <defs>
-                          <clipPath id="left-half">
-                            <rect x="0" y="0" width="60" height="80" />
-                          </clipPath>
-                          <clipPath id="right-half">
-                            <rect x="60" y="0" width="60" height="80" />
-                          </clipPath>
-                        </defs>
-                        <g clipPath="url(#left-half)">
-                          <rect width="120" height="80" fill="#ffffff" />
-                          <rect x="0" y="0" width="30" height="80" fill="#f4f4f5" />
-                          <rect x="4" y="8" width="22" height="4" rx="2" fill="#a1a1aa" />
-                          <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#d4d4d8" />
-                          <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#d4d4d8" />
-                          <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#d4d4d8" />
-                          <rect x="36" y="8" width="78" height="64" rx="4" fill="#ffffff" />
-                          <rect x="42" y="16" width="50" height="4" rx="2" fill="#d4d4d8" />
-                          <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                          <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#e5e5e5" />
-                          <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#e5e5e5" />
-                          <rect x="42" y="46" width="40" height="4" rx="2" fill="#d4d4d8" />
-                          <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#e5e5e5" />
-                        </g>
-                        <g clipPath="url(#right-half)">
-                          <rect width="120" height="80" fill="#1a1d23" />
-                          <rect x="0" y="0" width="30" height="80" fill="#2d2d2d" />
-                          <rect x="4" y="8" width="22" height="4" rx="2" fill="#52525b" />
-                          <rect x="4" y="16" width="18" height="3" rx="1.5" fill="#3f3f46" />
-                          <rect x="4" y="22" width="20" height="3" rx="1.5" fill="#3f3f46" />
-                          <rect x="4" y="28" width="16" height="3" rx="1.5" fill="#3f3f46" />
-                          <rect x="36" y="8" width="78" height="64" rx="4" fill="#2d2d2d" />
-                          <rect x="42" y="16" width="50" height="4" rx="2" fill="#52525b" />
-                          <rect x="42" y="24" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                          <rect x="42" y="30" width="60" height="3" rx="1.5" fill="#3f3f46" />
-                          <rect x="42" y="36" width="55" height="3" rx="1.5" fill="#3f3f46" />
-                          <rect x="42" y="46" width="40" height="4" rx="2" fill="#52525b" />
-                          <rect x="42" y="54" width="66" height="3" rx="1.5" fill="#3f3f46" />
-                        </g>
-                        <line x1="60" y1="0" x2="60" y2="80" stroke="#71717a" strokeWidth="0.5" />
-                      </>
-                    )}
-                  </svg>
-                </span>
-                <span
-                  className="text-xs font-medium"
-                  style={{ color: isSelected ? 'var(--zy-primary)' : 'var(--zy-text-primary)' }}
-                >
-                  {i18nService.t(mode)}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    <AppearanceSettings
+      appearance={theme}
+      styleId={themeStyle}
+      onAppearanceChange={mode => {
+        setTheme(mode);
+        themeService.setTheme(mode);
+      }}
+      onStyleChange={id => {
+        setThemeStyle(id);
+        themeService.setStyle(id);
+      }}
+    />
   );
 
   const renderTabContent = () => {
@@ -3263,8 +3167,8 @@ const Settings: React.FC<SettingsProps> = ({
 
       case 'model':
         return (
-            <div className="flex h-full flex-col md:flex-row">
-              {/* Provider List - Left Side */}
+          <div className="flex h-full flex-col md:flex-row">
+            {/* Provider List - Left Side */}
             <div className="min-h-0 max-h-56 w-full shrink-0 space-y-1.5 overflow-y-auto border-b border-border px-2 md:max-h-none md:w-2/5 md:border-b-0 md:border-r">
               <div className="flex items-center justify-between mb-2 px-1">
                 <h3 className="text-sm font-medium text-foreground">
@@ -3323,10 +3227,10 @@ const Settings: React.FC<SettingsProps> = ({
                       handleProviderChange(providerKey);
                     }}
                     className={cn(
-                      'group flex items-center p-2 rounded-xl cursor-pointer transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 border',
+                      'theme-surface-provider-row group flex items-center p-2 cursor-pointer',
                       activeProvider === provider
-                        ? 'bg-surface shadow-elevated border-border'
-                        : 'bg-surface hover:bg-surface-raised border-transparent',
+                        ? 'theme-surface-provider-selected'
+                        : 'theme-surface-provider-idle',
                     )}
                   >
                     <div className="flex flex-1 items-center min-w-0">
@@ -3338,7 +3242,7 @@ const Settings: React.FC<SettingsProps> = ({
                           {displayLabel}
                         </span>
                         {isCustom && (
-                          <span className="text-[9px] leading-tight mt-0.5 text-primary">
+                          <span className="text-xs leading-tight mt-0.5 text-primary">
                             {i18nService.t('customBadge')}
                           </span>
                         )}
@@ -3350,7 +3254,7 @@ const Settings: React.FC<SettingsProps> = ({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive h-auto w-auto p-0.5"
+                          className="theme-page-settings-button-1"
                           onClick={e => {
                             e.stopPropagation();
                             handleDeleteCustomProvider(providerKey);
@@ -3380,7 +3284,7 @@ const Settings: React.FC<SettingsProps> = ({
                   type="button"
                   variant="outline"
                   onClick={handleAddCustomProvider}
-                  className="w-full border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary"
+                  className="theme-page-settings-button-2 w-full"
                 >
                   {i18nService.t('addCustomProvider')}
                 </Button>
@@ -3390,31 +3294,31 @@ const Settings: React.FC<SettingsProps> = ({
             {/* Provider Settings - Right Side */}
             <div className="min-h-0 w-full min-w-0 flex-1 space-y-4 overflow-y-auto pl-4 pr-2 scrollbar-gutter-stable md:w-3/5 md:flex-none">
               {(() => {
-                  return (
-                    <div
-                      className={cn(
-                        'flex items-center pb-2 border-b border-border',
-                        isCustomProvider(activeProvider) && 'order-[-4]',
-                      )}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <h3 className="text-base font-medium text-foreground">
-                          {isCustomProvider(activeProvider) ? (
-                            (providers[activeProvider] as ProviderConfig)?.displayName ||
-                            getCustomProviderLabel(activeProvider)
-                          ) : activeProvider === ProviderName.LlamaCpp ? (
-                            ProviderRegistry.get(activeProvider)?.label ??
-                            getProviderDisplayName(activeProvider)
-                          ) : (
-                            <>
-                              {ProviderRegistry.get(activeProvider)?.label ??
-                                getProviderDisplayName(activeProvider)}{' '}
-                              {i18nService.t('providerSettings')}
-                            </>
-                          )}
-                        </h3>
-                        {activeProvider !== ProviderName.LlamaCpp &&
-                          ProviderRegistry.get(activeProvider)?.website && (
+                return (
+                  <div
+                    className={cn(
+                      'flex items-center pb-2 border-b border-border',
+                      isCustomProvider(activeProvider) && 'order-[-4]',
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-base font-medium text-foreground">
+                        {isCustomProvider(activeProvider) ? (
+                          (providers[activeProvider] as ProviderConfig)?.displayName ||
+                          getCustomProviderLabel(activeProvider)
+                        ) : activeProvider === ProviderName.LlamaCpp ? (
+                          (ProviderRegistry.get(activeProvider)?.label ??
+                          getProviderDisplayName(activeProvider))
+                        ) : (
+                          <>
+                            {ProviderRegistry.get(activeProvider)?.label ??
+                              getProviderDisplayName(activeProvider)}{' '}
+                            {i18nService.t('providerSettings')}
+                          </>
+                        )}
+                      </h3>
+                      {activeProvider !== ProviderName.LlamaCpp &&
+                        ProviderRegistry.get(activeProvider)?.website && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -3424,17 +3328,17 @@ const Settings: React.FC<SettingsProps> = ({
                                 ProviderRegistry.get(activeProvider)!.website!,
                               )
                             }
-                            className="text-muted-foreground hover:text-primary"
+                            className="theme-action-muted-accent"
                             title={i18nService.t('visitOfficialSite')}
                             aria-label={i18nService.t('visitOfficialSite')}
                           >
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         )}
-                      </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                );
+              })()}
 
               {/* MiniMax OAuth auth section */}
               {activeProvider === 'minimax' && (
@@ -3460,7 +3364,8 @@ const Settings: React.FC<SettingsProps> = ({
                           }));
                           setMinimaxOAuthPhase({ kind: 'idle' });
                         }}
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${!minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        aria-pressed={!minimaxIsOAuthMode}
+                        className="theme-auth-choice flex-1 text-left"
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Key className="h-4 w-4 text-foreground shrink-0" />
@@ -3484,7 +3389,8 @@ const Settings: React.FC<SettingsProps> = ({
                             },
                           }))
                         }
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        aria-pressed={minimaxIsOAuthMode}
+                        className="theme-auth-choice flex-1 text-left"
                       >
                         <div className="flex items-center justify-center gap-2">
                           <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
@@ -3517,7 +3423,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 ProviderRegistry.get('minimax')!.apiKeyUrl!,
                               )
                             }
-                             className="h-auto px-0 py-0 text-xs text-primary hover:underline"
+                            className="theme-action-inline-link"
                           >
                             {i18nService.t('getApiKey')}
                           </Button>
@@ -3531,7 +3437,7 @@ const Settings: React.FC<SettingsProps> = ({
                           onChange={e =>
                             handleProviderConfigChange('minimax', 'apiKey', e.target.value)
                           }
-                          className="pr-20 text-sm"
+                          className="theme-control-sizing-3 theme-control-small-text"
                           placeholder={i18nService.t('apiKeyPlaceholder')}
                         />
                         <div className="absolute right-2 inset-y-0 flex items-center gap-1">
@@ -3560,20 +3466,20 @@ const Settings: React.FC<SettingsProps> = ({
                             </TooltipContent>
                           </Tooltip>
                           <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => requestApiKeyClear('minimax')}
-                                    aria-label={i18nService.t('clear') || 'Clear'}
-                                  >
-                                    <XCircle />
-                                  </Button>
-                                }
-                              />
-                              <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={() => requestApiKeyClear('minimax')}
+                                  aria-label={i18nService.t('clear') || 'Clear'}
+                                >
+                                  <XCircle />
+                                </Button>
+                              }
+                            />
+                            <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
                           </Tooltip>
                         </div>
                       </div>
@@ -3595,7 +3501,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                               className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
                             </Button>
@@ -3604,7 +3510,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleMiniMaxOAuthLogout}
-                               className="h-auto px-2.5 py-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                              className="theme-action-compact-danger"
                             >
                               {i18nService.t('minimaxOAuthLogout')}
                             </Button>
@@ -3623,7 +3529,10 @@ const Settings: React.FC<SettingsProps> = ({
                               aria-label={i18nService.t('minimaxOAuthRegionLabel')}
                               items={[
                                 { value: 'cn', label: i18nService.t('minimaxOAuthRegionCN') },
-                                { value: 'global', label: i18nService.t('minimaxOAuthRegionGlobal') },
+                                {
+                                  value: 'global',
+                                  label: i18nService.t('minimaxOAuthRegionGlobal'),
+                                },
                               ]}
                               value={minimaxOAuthRegion}
                               onValueChange={setMinimaxOAuthRegion}
@@ -3632,11 +3541,11 @@ const Settings: React.FC<SettingsProps> = ({
                           <Button
                             type="button"
                             onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                            className="w-full py-2 text-sm h-auto"
+                            className="theme-page-settings-button-3 w-full"
                           >
                             {i18nService.t('minimaxOAuthLogin')}
                           </Button>
-                           <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {i18nService.t('minimaxOAuthHint')}
                           </p>
                         </div>
@@ -3658,7 +3567,7 @@ const Settings: React.FC<SettingsProps> = ({
                             {i18nService.t('minimaxOAuthOpenBrowserHint')}
                           </p>
                           <div>
-                             <span className="text-xs text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {i18nService.t('minimaxOAuthUserCode')}:&nbsp;
                             </span>
                             <code className="text-xs font-mono text-primary">
@@ -3673,11 +3582,11 @@ const Settings: React.FC<SettingsProps> = ({
                                 minimaxOAuthPhase.verificationUri,
                               );
                             }}
-                             className="block text-xs text-primary underline truncate"
+                            className="theme-surface-provider-link block truncate"
                           >
                             {minimaxOAuthPhase.verificationUri}
                           </a>
-                           <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {i18nService.t('minimaxOAuthStatusPending')}
                           </p>
                           <Button
@@ -3685,7 +3594,7 @@ const Settings: React.FC<SettingsProps> = ({
                             variant="outline"
                             size="sm"
                             onClick={handleCancelMiniMaxLogin}
-                             className="h-auto px-2.5 py-1 text-xs"
+                            className="theme-action-compact"
                           >
                             {i18nService.t('minimaxOAuthCancel')}
                           </Button>
@@ -3707,7 +3616,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <p className="text-xs text-destructive font-medium">
                             {i18nService.t('minimaxOAuthStatusError')}
                           </p>
-                           <p className="text-xs text-destructive/80 wrap-break-word">
+                          <p className="text-xs text-destructive/80 wrap-break-word">
                             {minimaxOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
@@ -3716,7 +3625,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                               className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
                             </Button>
@@ -3725,7 +3634,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setMinimaxOAuthPhase({ kind: 'idle' })}
-                               className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('minimaxOAuthCancel')}
                             </Button>
@@ -3742,7 +3651,7 @@ const Settings: React.FC<SettingsProps> = ({
                 <div className="space-y-3">
                   {/* Auth type radio cards */}
                   <div>
-                     <p className="text-sm font-medium text-foreground mb-2">
+                    <p className="text-sm font-medium text-foreground mb-2">
                       {i18nService.t('openaiAuthMethodLabel')}
                     </p>
                     <div className="flex gap-2">
@@ -3759,11 +3668,11 @@ const Settings: React.FC<SettingsProps> = ({
                           }));
                           setOpenaiOAuthPhase({ kind: 'idle' });
                         }}
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${!openaiIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        className={` theme-page-settings-button-variant-3 flex-1 text-left ${!openaiIsOAuthMode ? 'theme-page-settings-button-variant-1' : 'theme-page-settings-button-variant-2'}`}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Key className="h-4 w-4 text-foreground shrink-0" />
-                           <p className="text-sm font-semibold text-foreground">
+                          <p className="text-sm font-semibold text-foreground">
                             {i18nService.t('openaiOAuthTabApiKey')}
                           </p>
                         </div>
@@ -3780,11 +3689,11 @@ const Settings: React.FC<SettingsProps> = ({
                             },
                           }))
                         }
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${openaiIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        className={` theme-page-settings-button-variant-6 flex-1 text-left ${openaiIsOAuthMode ? 'theme-page-settings-button-variant-4' : 'theme-page-settings-button-variant-5'}`}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
-                           <p className="text-sm font-semibold text-foreground">
+                          <p className="text-sm font-semibold text-foreground">
                             {i18nService.t('openaiOAuthTabOAuth')}
                           </p>
                         </div>
@@ -3808,7 +3717,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                               className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
                             </Button>
@@ -3819,7 +3728,7 @@ const Settings: React.FC<SettingsProps> = ({
                               onClick={() => {
                                 void handleOpenAIOAuthLogout();
                               }}
-                               className="h-auto px-2.5 py-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                              className="theme-action-compact-danger"
                             >
                               {i18nService.t('openaiOAuthLogout')}
                             </Button>
@@ -3835,11 +3744,11 @@ const Settings: React.FC<SettingsProps> = ({
                             <Button
                               type="button"
                               onClick={handleOpenAIOAuthLogin}
-                              className="w-full py-2 text-xs h-auto"
+                              className="theme-page-settings-button-4 w-full"
                             >
                               {i18nService.t('openaiOAuthLogin')}
                             </Button>
-                             <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground">
                               {i18nService.t('openaiOAuthHint')}
                             </p>
                           </div>
@@ -3851,7 +3760,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <p className="text-xs text-foreground font-medium">
                             {i18nService.t('openaiOAuthOpenBrowserHint')}
                           </p>
-                           <p className="text-xs text-muted-foreground">
+                          <p className="text-xs text-muted-foreground">
                             {i18nService.t('openaiOAuthStatusPending')}
                           </p>
                           <Button
@@ -3861,7 +3770,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onClick={() => {
                               void handleCancelOpenAIOAuthLogin();
                             }}
-                             className="h-auto px-2.5 py-1 text-xs"
+                            className="theme-action-compact"
                           >
                             {i18nService.t('openaiOAuthCancel')}
                           </Button>
@@ -3884,7 +3793,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <p className="text-xs text-destructive font-medium">
                             {i18nService.t('openaiOAuthStatusError')}
                           </p>
-                           <p className="text-xs text-destructive/80 wrap-break-word">
+                          <p className="text-xs text-destructive/80 wrap-break-word">
                             {openaiOAuthPhase.message}
                           </p>
                           <div className="flex gap-2">
@@ -3892,7 +3801,7 @@ const Settings: React.FC<SettingsProps> = ({
                               type="button"
                               size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                               className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
                             </Button>
@@ -3901,7 +3810,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setOpenaiOAuthPhase({ kind: 'idle' })}
-                               className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('openaiOAuthCancel')}
                             </Button>
@@ -3920,76 +3829,78 @@ const Settings: React.FC<SettingsProps> = ({
                     : 'flex flex-col gap-4'
                 }
               >
-              {/* Standard API key section for non-MiniMax providers */}
-              {(providerRequiresApiKey(activeProvider) || isCustomProvider(activeProvider)) &&
-                activeProvider !== 'minimax' &&
-                !(activeProvider === 'openai' && openaiIsOAuthMode) && (
-                  <div className={isCustomProvider(activeProvider) ? 'order-[-2]' : 'order-2'}>
-                    {/* Standard API Key input for non-Qwen providers */}
-                    {activeProvider !== 'qwen' && (
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label
-                            htmlFor={`${activeProvider}-apiKey`}
-                            className="block text-sm font-medium text-foreground"
-                          >
-                            {i18nService.t('apiKey')}
-                            {providerRequiresApiKey(activeProvider) && (
-                              <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
-                            )}
-                          </label>
-                          {ProviderRegistry.get(activeProvider)?.apiKeyUrl && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                void window.electron.shell.openExternal(
-                                  ProviderRegistry.get(activeProvider)!.apiKeyUrl!,
-                                )
-                              }
-                               className="h-auto px-0 py-0 text-xs text-primary hover:underline"
+                {/* Standard API key section for non-MiniMax providers */}
+                {(providerRequiresApiKey(activeProvider) || isCustomProvider(activeProvider)) &&
+                  activeProvider !== 'minimax' &&
+                  !(activeProvider === 'openai' && openaiIsOAuthMode) && (
+                    <div className={isCustomProvider(activeProvider) ? 'order-[-2]' : 'order-2'}>
+                      {/* Standard API Key input for non-Qwen providers */}
+                      {activeProvider !== 'qwen' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label
+                              htmlFor={`${activeProvider}-apiKey`}
+                              className="block text-sm font-medium text-foreground"
                             >
-                              {i18nService.t('getApiKey')}
-                            </Button>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <Input
-                            type={showApiKey ? 'text' : 'password'}
-                            id={`${activeProvider}-apiKey`}
-                            value={providers[activeProvider].apiKey}
-                            onChange={e => handleApiKeyInputChange(activeProvider, e.target.value)}
-                            onBlur={() => handleApiKeyBlur(activeProvider)}
-                             className="pr-20 text-sm"
-                            placeholder={i18nService.t('apiKeyPlaceholder')}
-                          />
-                          <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => setShowApiKey(!showApiKey)}
-                                    aria-label={
-                                      showApiKey
-                                        ? i18nService.t('hide') || 'Hide'
-                                        : i18nService.t('show') || 'Show'
-                                    }
-                                  >
-                                    {showApiKey ? <Eye /> : <EyeOff />}
-                                  </Button>
+                              {i18nService.t('apiKey')}
+                              {providerRequiresApiKey(activeProvider) && (
+                                <span className="text-red-500 dark:text-red-400 ml-0.5">*</span>
+                              )}
+                            </label>
+                            {ProviderRegistry.get(activeProvider)?.apiKeyUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  void window.electron.shell.openExternal(
+                                    ProviderRegistry.get(activeProvider)!.apiKeyUrl!,
+                                  )
                                 }
-                              />
-                              <TooltipContent>
-                                {showApiKey
-                                  ? i18nService.t('hide') || 'Hide'
-                                  : i18nService.t('show') || 'Show'}
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
+                                className="theme-action-inline-link"
+                              >
+                                {i18nService.t('getApiKey')}
+                              </Button>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <Input
+                              type={showApiKey ? 'text' : 'password'}
+                              id={`${activeProvider}-apiKey`}
+                              value={providers[activeProvider].apiKey}
+                              onChange={e =>
+                                handleApiKeyInputChange(activeProvider, e.target.value)
+                              }
+                              onBlur={() => handleApiKeyBlur(activeProvider)}
+                              className="theme-control-sizing-3 theme-control-small-text"
+                              placeholder={i18nService.t('apiKeyPlaceholder')}
+                            />
+                            <div className="absolute right-2 inset-y-0 flex items-center gap-1">
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      onClick={() => setShowApiKey(!showApiKey)}
+                                      aria-label={
+                                        showApiKey
+                                          ? i18nService.t('hide') || 'Hide'
+                                          : i18nService.t('show') || 'Show'
+                                      }
+                                    >
+                                      {showApiKey ? <Eye /> : <EyeOff />}
+                                    </Button>
+                                  }
+                                />
+                                <TooltipContent>
+                                  {showApiKey
+                                    ? i18nService.t('hide') || 'Hide'
+                                    : i18nService.t('show') || 'Show'}
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
                                 <TooltipTrigger
                                   render={
                                     <Button
@@ -4004,74 +3915,74 @@ const Settings: React.FC<SettingsProps> = ({
                                   }
                                 />
                                 <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
-                            </Tooltip>
+                              </Tooltip>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {/* Qwen API Key section */}
-                    {activeProvider === 'qwen' && (
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <label
-                            htmlFor="qwen-apiKey"
-                             className="block text-sm font-medium text-foreground"
-                          >
-                            API Key<span className="text-destructive ml-0.5">*</span>
-                          </label>
-                          {ProviderRegistry.get('qwen')?.apiKeyUrl && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                void window.electron.shell.openExternal(
-                                  ProviderRegistry.get('qwen')!.apiKeyUrl!,
-                                )
-                              }
-                               className="h-auto px-0 py-0 text-xs text-primary hover:underline"
+                      {/* Qwen API Key section */}
+                      {activeProvider === 'qwen' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label
+                              htmlFor="qwen-apiKey"
+                              className="block text-sm font-medium text-foreground"
                             >
-                            {i18nService.t('getApiKey')}
-                            </Button>
-                          )}
-                        </div>
-                        <div className="relative">
-                          <Input
-                            type={showApiKey ? 'text' : 'password'}
-                            id="qwen-apiKey"
-                            value={providers.qwen.apiKey}
-                            onChange={e => handleApiKeyInputChange('qwen', e.target.value)}
-                            onBlur={() => handleApiKeyBlur('qwen')}
-                             className="pr-20 text-sm"
-                            placeholder={i18nService.t('apiKeyPlaceholder')}
-                          />
-                          <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger
-                                render={
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => setShowApiKey(!showApiKey)}
-                                    aria-label={
-                                      showApiKey
-                                        ? i18nService.t('hide') || 'Hide'
-                                        : i18nService.t('show') || 'Show'
-                                    }
-                                  >
-                                    {showApiKey ? <Eye /> : <EyeOff />}
-                                  </Button>
+                              API Key<span className="text-destructive ml-0.5">*</span>
+                            </label>
+                            {ProviderRegistry.get('qwen')?.apiKeyUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  void window.electron.shell.openExternal(
+                                    ProviderRegistry.get('qwen')!.apiKeyUrl!,
+                                  )
                                 }
-                              />
-                              <TooltipContent>
-                                {showApiKey
-                                  ? i18nService.t('hide') || 'Hide'
-                                  : i18nService.t('show') || 'Show'}
-                              </TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
+                                className="theme-action-inline-link"
+                              >
+                                {i18nService.t('getApiKey')}
+                              </Button>
+                            )}
+                          </div>
+                          <div className="relative">
+                            <Input
+                              type={showApiKey ? 'text' : 'password'}
+                              id="qwen-apiKey"
+                              value={providers.qwen.apiKey}
+                              onChange={e => handleApiKeyInputChange('qwen', e.target.value)}
+                              onBlur={() => handleApiKeyBlur('qwen')}
+                              className="theme-control-sizing-3 theme-control-small-text"
+                              placeholder={i18nService.t('apiKeyPlaceholder')}
+                            />
+                            <div className="absolute right-2 inset-y-0 flex items-center gap-1">
+                              <Tooltip>
+                                <TooltipTrigger
+                                  render={
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-sm"
+                                      onClick={() => setShowApiKey(!showApiKey)}
+                                      aria-label={
+                                        showApiKey
+                                          ? i18nService.t('hide') || 'Hide'
+                                          : i18nService.t('show') || 'Show'
+                                      }
+                                    >
+                                      {showApiKey ? <Eye /> : <EyeOff />}
+                                    </Button>
+                                  }
+                                />
+                                <TooltipContent>
+                                  {showApiKey
+                                    ? i18nService.t('hide') || 'Hide'
+                                    : i18nService.t('show') || 'Show'}
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
                                 <TooltipTrigger
                                   render={
                                     <Button
@@ -4086,363 +3997,363 @@ const Settings: React.FC<SettingsProps> = ({
                                   }
                                 />
                                 <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
-                            </Tooltip>
+                              </Tooltip>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-              {activeProvider === 'github-copilot' && (
-                <div className="order-2">
-                   <label className="block text-sm font-medium text-foreground mb-2">
-                    {i18nService.t('githubCopilotAuth')}
-                  </label>
-
-                  {(copilotAuthStatus === 'idle' || copilotAuthStatus === 'error') &&
-                    !providers['github-copilot'].apiKey && (
-                      <div className="space-y-2">
-                        <Button
-                          type="button"
-                          onClick={handleCopilotSignIn}
-                          className="flex items-center gap-2 px-4 py-2 text-xs h-auto"
-                        >
-                          <GitHubCopilotIcon className="w-4 h-4" />
-                          {i18nService.t('githubCopilotSignIn')}
-                        </Button>
-                        {copilotError && (
-                          <p className="text-xs text-destructive">{copilotError}</p>
-                        )}
-                      </div>
-                    )}
-
-                  {copilotAuthStatus === 'requesting' && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
-                      </svg>
-                      {i18nService.t('githubCopilotRequesting')}
+                      )}
                     </div>
                   )}
 
-                  {(copilotAuthStatus === 'awaiting_user' || copilotAuthStatus === 'polling') && (
-                    <div className="space-y-3">
-                      <div className="p-3 rounded-xl bg-surface-raised border border-border">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          {i18nService.t('githubCopilotEnterCode')}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <code className="text-lg font-mono font-bold tracking-widest text-foreground">
-                            {copilotUserCode}
-                          </code>
+                {activeProvider === 'github-copilot' && (
+                  <div className="order-2">
+                    <label className="block text-sm font-medium text-foreground mb-2">
+                      {i18nService.t('githubCopilotAuth')}
+                    </label>
+
+                    {(copilotAuthStatus === 'idle' || copilotAuthStatus === 'error') &&
+                      !providers['github-copilot'].apiKey && (
+                        <div className="space-y-2">
                           <Button
                             type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(copilotUserCode);
-                            }}
-                             className="h-auto px-2 py-0.5 text-xs"
+                            onClick={handleCopilotSignIn}
+                            className="theme-page-settings-button-5 flex items-center"
                           >
-                            {i18nService.t('copy') || 'Copy'}
+                            <GitHubCopilotIcon className="w-4 h-4" />
+                            {i18nService.t('githubCopilotSignIn')}
+                          </Button>
+                          {copilotError && (
+                            <p className="text-xs text-destructive">{copilotError}</p>
+                          )}
+                        </div>
+                      )}
+
+                    {copilotAuthStatus === 'requesting' && (
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                          />
+                        </svg>
+                        {i18nService.t('githubCopilotRequesting')}
+                      </div>
+                    )}
+
+                    {(copilotAuthStatus === 'awaiting_user' || copilotAuthStatus === 'polling') && (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-xl bg-surface-raised border border-border">
+                          <p className="text-xs text-muted-foreground mb-2">
+                            {i18nService.t('githubCopilotEnterCode')}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <code className="text-lg font-mono font-bold tracking-widest text-foreground">
+                              {copilotUserCode}
+                            </code>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(copilotUserCode);
+                              }}
+                              className="theme-page-settings-button-6"
+                            >
+                              {i18nService.t('copy') || 'Copy'}
+                            </Button>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            onClick={() =>
+                              window.electron.shell.openExternal(copilotVerificationUri)
+                            }
+                            className="theme-page-settings-button-7 mt-2"
+                          >
+                            {copilotVerificationUri}
                           </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          onClick={() => window.electron.shell.openExternal(copilotVerificationUri)}
-                          className="mt-2 h-auto px-0 py-0 text-xs"
-                        >
-                          {copilotVerificationUri}
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                            />
-                          </svg>
-                          {i18nService.t('githubCopilotWaiting')}
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none">
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                              />
+                            </svg>
+                            {i18nService.t('githubCopilotWaiting')}
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCopilotCancelAuth}
+                            className="theme-action-inline-danger"
+                          >
+                            {i18nService.t('cancel')}
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleCopilotCancelAuth}
-                          className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          {i18nService.t('cancel')}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {(copilotAuthStatus === 'authenticated' || providers['github-copilot'].apiKey) &&
-                    copilotAuthStatus !== 'requesting' &&
-                    copilotAuthStatus !== 'awaiting_user' &&
-                    copilotAuthStatus !== 'polling' && (
-                      <div className="flex items-center justify-between p-3 rounded-xl bg-surface-raised border border-border">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-success" />
-                          <span className="text-xs text-foreground">
-                            {copilotGithubUser
-                              ? `${i18nService.t('githubCopilotConnected')} @${copilotGithubUser}`
-                              : i18nService.t('githubCopilotConnected')}
-                          </span>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={handleCopilotSignOut}
-                          className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-destructive"
-                        >
-                          {i18nService.t('githubCopilotSignOut')}
-                        </Button>
                       </div>
                     )}
-                </div>
-              )}
 
-              {isCustomProvider(activeProvider) && (
-                <div className="order-[-1]">
-                  <label
-                    htmlFor={`${activeProvider}-displayName`}
-                    className="mb-1 block text-sm font-medium text-foreground"
-                  >
-                    {i18nService.t('customDisplayName')}
-                  </label>
-                  <Input
-                    type="text"
-                    id={`${activeProvider}-displayName`}
-                    value={(providers[activeProvider] as ProviderConfig)?.displayName ?? ''}
-                    onChange={e =>
-                      handleProviderConfigChange(activeProvider, 'displayName', e.target.value)
-                    }
-                    className="text-sm"
-                    placeholder={i18nService.t('customDisplayNamePlaceholder')}
-                  />
-                </div>
-              )}
-
-              {activeProvider !== ProviderName.LlamaCpp &&
-                !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                <div
-                  className={isCustomProvider(activeProvider) ? 'order-[-3]' : 'order-1'}
-                >
-                  <label
-                    htmlFor={`${activeProvider}-baseUrl`}
-                    className="mb-1 block font-medium text-foreground"
-                  >
-                    <span className="text-sm">
-                      {i18nService.t('baseUrl')}
-                    </span>
-                    {isCustomProvider(activeProvider) && (
-                      <span className="ml-0.5 text-destructive">*</span>
-                    )}
-                  </label>
-                  <div className="relative">
-                    <Input
-                      type="text"
-                      id={`${activeProvider}-baseUrl`}
-                      value={(() => {
-                        // Coding plan override: delegate to ProviderRegistry (50e20b76)
-                        const fmt = getEffectiveApiFormat(
-                          activeProvider,
-                          providers[activeProvider].apiFormat,
-                        );
-                        if (fmt !== 'gemini') {
-                          const cpUrl = (
-                            providers[activeProvider] as { codingPlanEnabled?: boolean }
-                          ).codingPlanEnabled
-                            ? ProviderRegistry.getCodingPlanUrl(activeProvider, fmt)
-                            : undefined;
-                          if (cpUrl) return cpUrl;
-                        }
-                        return providers[activeProvider].baseUrl;
-                      })()}
-                      onChange={e => handleBaseUrlInputChange(activeProvider, e.target.value)}
-                      onBlur={() => handleBaseUrlBlur(activeProvider)}
-                      disabled={isBaseUrlLocked}
-                      className={cn(
-                        'pr-10',
-                        'text-sm',
-                        isBaseUrlLocked && 'cursor-not-allowed opacity-50',
+                    {(copilotAuthStatus === 'authenticated' ||
+                      providers['github-copilot'].apiKey) &&
+                      copilotAuthStatus !== 'requesting' &&
+                      copilotAuthStatus !== 'awaiting_user' &&
+                      copilotAuthStatus !== 'polling' && (
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-surface-raised border border-border">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-success" />
+                            <span className="text-xs text-foreground">
+                              {copilotGithubUser
+                                ? `${i18nService.t('githubCopilotConnected')} @${copilotGithubUser}`
+                                : i18nService.t('githubCopilotConnected')}
+                            </span>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleCopilotSignOut}
+                            className="theme-action-inline-danger"
+                          >
+                            {i18nService.t('githubCopilotSignOut')}
+                          </Button>
+                        </div>
                       )}
-                      placeholder={
-                        activeProvider === 'qwen'
-                          ? 'https://dashscope.aliyuncs.com/apps/anthropic'
-                          : getProviderDefaultBaseUrl(
-                              activeProvider,
-                              getEffectiveApiFormat(
-                                activeProvider,
-                                providers[activeProvider].apiFormat,
-                              ),
-                            ) ||
-                            defaultConfig.providers?.[activeProvider]?.baseUrl ||
-                            i18nService.t('baseUrlPlaceholder')
-                      }
-                    />
-                    {providers[activeProvider].baseUrl && !isBaseUrlLocked && (
-                      <div className="absolute right-2 inset-y-0 flex items-center">
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() =>
-                                  handleProviderConfigChange(activeProvider, 'baseUrl', '')
-                                }
-                                aria-label={i18nService.t('clear') || 'Clear'}
-                              >
-                                <XCircle />
-                              </Button>
-                            }
-                          />
-                          <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    )}
                   </div>
-                  {/* GLM Coding Plan 提示 */}
-                  {activeProvider === 'zhipu' && providers.zhipu.codingPlanEnabled && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-xs text-primary dark:text-primary">
-                        <span className="font-medium">GLM Coding Plan:</span>{' '}
-                        {i18nService.t('zhipuCodingPlanEndpointHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/* Qwen Coding Plan 提示 */}
-                  {activeProvider === 'qwen' && providers.qwen.codingPlanEnabled && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-xs text-primary dark:text-primary">
-                        <span className="font-medium">Coding Plan:</span>{' '}
-                        {i18nService.t('qwenCodingPlanEndpointHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/* Volcengine Coding Plan 提示 */}
-                  {activeProvider === 'volcengine' && providers.volcengine.codingPlanEnabled && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-xs text-primary dark:text-primary">
-                        <span className="font-medium">Coding Plan:</span>{' '}
-                        {i18nService.t('volcengineCodingPlanEndpointHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/* Moonshot Coding Plan 提示 */}
-                  {activeProvider === 'moonshot' && providers.moonshot.codingPlanEnabled && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-xs text-primary dark:text-primary">
-                        <span className="font-medium">Coding Plan:</span>{' '}
-                        {i18nService.t('moonshotCodingPlanEndpointHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/* Qianfan Coding Plan 提示 */}
-                  {activeProvider === 'qianfan' && providers.qianfan.codingPlanEnabled && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-xs text-primary dark:text-primary">
-                        <span className="font-medium">Coding Plan:</span>{' '}
-                        {i18nService.t('qianfanCodingPlanEndpointHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/* Xiaomi Coding Plan 提示 */}
-                  {activeProvider === 'xiaomi' && providers.xiaomi.codingPlanEnabled && (
-                    <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
-                      <p className="text-xs text-primary dark:text-primary">
-                        <span className="font-medium">Coding Plan:</span>{' '}
-                        {i18nService.t('xiaomiCodingPlanEndpointHint')}
-                      </p>
-                    </div>
-                  )}
-                </div>
                 )}
 
-              {/* API 格式选择器 */}
-              {shouldShowApiFormatSelector(activeProvider) &&
-                activeProvider !== ProviderName.LlamaCpp &&
-                !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
-                  <div className={isCustomProvider(activeProvider) ? undefined : 'order-3'}>
+                {isCustomProvider(activeProvider) && (
+                  <div className="order-[-1]">
                     <label
-                      htmlFor={`${activeProvider}-apiFormat`}
+                      htmlFor={`${activeProvider}-displayName`}
                       className="mb-1 block text-sm font-medium text-foreground"
                     >
-                      {i18nService.t('apiFormat')}
+                      {i18nService.t('customDisplayName')}
                     </label>
-                    <div className="flex items-center space-x-4">
-                      <RadioGroup
-                        value={
-                          getEffectiveApiFormat(
-                            activeProvider,
-                            providers[activeProvider].apiFormat,
-                          ) === 'openai'
-                            ? 'openai'
-                            : 'anthropic'
-                        }
-                        onValueChange={value =>
-                          handleProviderConfigChange(activeProvider, 'apiFormat', value)
-                        }
-                        className="flex items-center space-x-4"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem
-                            value="anthropic"
-                            id={`${activeProvider}-apiFormat-anthropic`}
-                          />
-                          <label
-                            htmlFor={`${activeProvider}-apiFormat-anthropic`}
-                            className="text-sm text-foreground"
-                          >
-                            {i18nService.t('apiFormatNative')}
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem
-                            value="openai"
-                            id={`${activeProvider}-apiFormat-openai`}
-                          />
-                          <label
-                            htmlFor={`${activeProvider}-apiFormat-openai`}
-                            className="text-sm text-foreground"
-                          >
-                            {i18nService.t('apiFormatOpenAI')}
-                          </label>
-                        </div>
-                      </RadioGroup>
-                    </div>
+                    <Input
+                      type="text"
+                      id={`${activeProvider}-displayName`}
+                      value={(providers[activeProvider] as ProviderConfig)?.displayName ?? ''}
+                      onChange={e =>
+                        handleProviderConfigChange(activeProvider, 'displayName', e.target.value)
+                      }
+                      className="theme-page-settings-input-1"
+                      placeholder={i18nService.t('customDisplayNamePlaceholder')}
+                    />
                   </div>
                 )}
 
+                {activeProvider !== ProviderName.LlamaCpp &&
+                  !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
+                    <div className={isCustomProvider(activeProvider) ? 'order-[-3]' : 'order-1'}>
+                      <label
+                        htmlFor={`${activeProvider}-baseUrl`}
+                        className="mb-1 block font-medium text-foreground"
+                      >
+                        <span className="text-sm">{i18nService.t('baseUrl')}</span>
+                        {isCustomProvider(activeProvider) && (
+                          <span className="ml-0.5 text-destructive">*</span>
+                        )}
+                      </label>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          id={`${activeProvider}-baseUrl`}
+                          value={(() => {
+                            // Coding plan override: delegate to ProviderRegistry (50e20b76)
+                            const fmt = getEffectiveApiFormat(
+                              activeProvider,
+                              providers[activeProvider].apiFormat,
+                            );
+                            if (fmt !== 'gemini') {
+                              const cpUrl = (
+                                providers[activeProvider] as { codingPlanEnabled?: boolean }
+                              ).codingPlanEnabled
+                                ? ProviderRegistry.getCodingPlanUrl(activeProvider, fmt)
+                                : undefined;
+                              if (cpUrl) return cpUrl;
+                            }
+                            return providers[activeProvider].baseUrl;
+                          })()}
+                          onChange={e => handleBaseUrlInputChange(activeProvider, e.target.value)}
+                          onBlur={() => handleBaseUrlBlur(activeProvider)}
+                          disabled={isBaseUrlLocked}
+                          className={cn(
+                            'theme-page-settings-input-variant-1',
+                            'theme-page-settings-input-variant-2',
+                            isBaseUrlLocked &&
+                              'theme-page-settings-input-variant-3 cursor-not-allowed',
+                          )}
+                          placeholder={
+                            activeProvider === 'qwen'
+                              ? 'https://dashscope.aliyuncs.com/apps/anthropic'
+                              : getProviderDefaultBaseUrl(
+                                  activeProvider,
+                                  getEffectiveApiFormat(
+                                    activeProvider,
+                                    providers[activeProvider].apiFormat,
+                                  ),
+                                ) ||
+                                defaultConfig.providers?.[activeProvider]?.baseUrl ||
+                                i18nService.t('baseUrlPlaceholder')
+                          }
+                        />
+                        {providers[activeProvider].baseUrl && !isBaseUrlLocked && (
+                          <div className="absolute right-2 inset-y-0 flex items-center">
+                            <Tooltip>
+                              <TooltipTrigger
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={() =>
+                                      handleProviderConfigChange(activeProvider, 'baseUrl', '')
+                                    }
+                                    aria-label={i18nService.t('clear') || 'Clear'}
+                                  >
+                                    <XCircle />
+                                  </Button>
+                                }
+                              />
+                              <TooltipContent>{i18nService.t('clear') || 'Clear'}</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        )}
+                      </div>
+                      {/* GLM Coding Plan 提示 */}
+                      {activeProvider === 'zhipu' && providers.zhipu.codingPlanEnabled && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
+                          <p className="text-xs text-primary dark:text-primary">
+                            <span className="font-medium">GLM Coding Plan:</span>{' '}
+                            {i18nService.t('zhipuCodingPlanEndpointHint')}
+                          </p>
+                        </div>
+                      )}
+                      {/* Qwen Coding Plan 提示 */}
+                      {activeProvider === 'qwen' && providers.qwen.codingPlanEnabled && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
+                          <p className="text-xs text-primary dark:text-primary">
+                            <span className="font-medium">Coding Plan:</span>{' '}
+                            {i18nService.t('qwenCodingPlanEndpointHint')}
+                          </p>
+                        </div>
+                      )}
+                      {/* Volcengine Coding Plan 提示 */}
+                      {activeProvider === 'volcengine' &&
+                        providers.volcengine.codingPlanEnabled && (
+                          <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
+                            <p className="text-xs text-primary dark:text-primary">
+                              <span className="font-medium">Coding Plan:</span>{' '}
+                              {i18nService.t('volcengineCodingPlanEndpointHint')}
+                            </p>
+                          </div>
+                        )}
+                      {/* Moonshot Coding Plan 提示 */}
+                      {activeProvider === 'moonshot' && providers.moonshot.codingPlanEnabled && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
+                          <p className="text-xs text-primary dark:text-primary">
+                            <span className="font-medium">Coding Plan:</span>{' '}
+                            {i18nService.t('moonshotCodingPlanEndpointHint')}
+                          </p>
+                        </div>
+                      )}
+                      {/* Qianfan Coding Plan 提示 */}
+                      {activeProvider === 'qianfan' && providers.qianfan.codingPlanEnabled && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
+                          <p className="text-xs text-primary dark:text-primary">
+                            <span className="font-medium">Coding Plan:</span>{' '}
+                            {i18nService.t('qianfanCodingPlanEndpointHint')}
+                          </p>
+                        </div>
+                      )}
+                      {/* Xiaomi Coding Plan 提示 */}
+                      {activeProvider === 'xiaomi' && providers.xiaomi.codingPlanEnabled && (
+                        <div className="mt-1.5 p-2 rounded-lg bg-primary-muted border border-primary-muted">
+                          <p className="text-xs text-primary dark:text-primary">
+                            <span className="font-medium">Coding Plan:</span>{' '}
+                            {i18nService.t('xiaomiCodingPlanEndpointHint')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                {/* API 格式选择器 */}
+                {shouldShowApiFormatSelector(activeProvider) &&
+                  activeProvider !== ProviderName.LlamaCpp &&
+                  !(activeProvider === 'minimax' && minimaxIsOAuthMode) && (
+                    <div className={isCustomProvider(activeProvider) ? undefined : 'order-3'}>
+                      <label
+                        htmlFor={`${activeProvider}-apiFormat`}
+                        className="mb-1 block text-sm font-medium text-foreground"
+                      >
+                        {i18nService.t('apiFormat')}
+                      </label>
+                      <div className="flex items-center space-x-4">
+                        <RadioGroup
+                          value={
+                            getEffectiveApiFormat(
+                              activeProvider,
+                              providers[activeProvider].apiFormat,
+                            ) === 'openai'
+                              ? 'openai'
+                              : 'anthropic'
+                          }
+                          onValueChange={value =>
+                            handleProviderConfigChange(activeProvider, 'apiFormat', value)
+                          }
+                          className="flex items-center space-x-4"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem
+                              value="anthropic"
+                              id={`${activeProvider}-apiFormat-anthropic`}
+                            />
+                            <label
+                              htmlFor={`${activeProvider}-apiFormat-anthropic`}
+                              className="text-sm text-foreground"
+                            >
+                              {i18nService.t('apiFormatNative')}
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem
+                              value="openai"
+                              id={`${activeProvider}-apiFormat-openai`}
+                            />
+                            <label
+                              htmlFor={`${activeProvider}-apiFormat-openai`}
+                              className="text-sm text-foreground"
+                            >
+                              {i18nService.t('apiFormatOpenAI')}
+                            </label>
+                          </div>
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  )}
               </div>
 
               {/* GLM Coding Plan 开关 (仅 Zhipu) */}
@@ -4614,12 +4525,7 @@ const Settings: React.FC<SettingsProps> = ({
               )}
 
               {
-                <div
-                  className={cn(
-                    isCustomProvider(activeProvider) &&
-                      'space-y-4',
-                  )}
-                >
+                <div className={cn(isCustomProvider(activeProvider) && 'space-y-4')}>
                   <div className="rounded-lg border border-border bg-surface">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border py-1.5 pl-3 pr-2">
                       <div className="flex min-w-0 items-center gap-2">
@@ -4653,277 +4559,265 @@ const Settings: React.FC<SettingsProps> = ({
                         </Tooltip>
                       ) : (
                         <div className="flex flex-wrap items-center justify-end gap-1">
-                        <ProviderModelDiscoveryButton
-                          prominent={isCustomProvider(activeProvider)}
-                          iconOnly
-                          providerId={activeProvider}
-                          provider={providers[activeProvider]}
-                          baseUrl={resolveBaseUrl(
-                            activeProvider,
-                            providers[activeProvider].baseUrl,
-                            getEffectiveApiFormat(
+                          <ProviderModelDiscoveryButton
+                            prominent={isCustomProvider(activeProvider)}
+                            iconOnly
+                            providerId={activeProvider}
+                            provider={providers[activeProvider]}
+                            baseUrl={resolveBaseUrl(
+                              activeProvider,
+                              providers[activeProvider].baseUrl,
+                              getEffectiveApiFormat(
+                                activeProvider,
+                                providers[activeProvider].apiFormat,
+                              ),
+                            )}
+                            apiFormat={getEffectiveApiFormat(
                               activeProvider,
                               providers[activeProvider].apiFormat,
-                            ),
-                          )}
-                          apiFormat={getEffectiveApiFormat(
-                            activeProvider,
-                            providers[activeProvider].apiFormat,
-                          )}
-                          requiresApiKey={
-                            providerRequiresApiKey(activeProvider) &&
-                            providers[activeProvider].authType !== 'oauth'
-                          }
-                          autoDetectRequest={
-                            autoDetectRequest?.provider === activeProvider
-                              ? {
-                                  providerId: activeProvider,
-                                  requestId: autoDetectRequest.requestId,
-                                }
-                              : null
-                          }
-                          onModelsDiscovered={handleModelsDiscovered}
-                        />
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={handleAddModel}
-                                aria-label={i18nService.t('addModel')}
-                              >
-                                <PlusCircle />
-                              </Button>
+                            )}
+                            requiresApiKey={
+                              providerRequiresApiKey(activeProvider) &&
+                              providers[activeProvider].authType !== 'oauth'
                             }
+                            autoDetectRequest={
+                              autoDetectRequest?.provider === activeProvider
+                                ? {
+                                    providerId: activeProvider,
+                                    requestId: autoDetectRequest.requestId,
+                                  }
+                                : null
+                            }
+                            onModelsDiscovered={handleModelsDiscovered}
                           />
-                          <TooltipContent>{i18nService.t('addModel')}</TooltipContent>
-                        </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  onClick={handleAddModel}
+                                  aria-label={i18nService.t('addModel')}
+                                >
+                                  <PlusCircle />
+                                </Button>
+                              }
+                            />
+                            <TooltipContent>{i18nService.t('addModel')}</TooltipContent>
+                          </Tooltip>
                         </div>
                       )}
-                      </div>
+                    </div>
 
                     <div className="max-h-60 divide-y divide-border overflow-y-auto">
-                    {(providers[activeProvider].models ?? []).map(model => (
-                      <div
-                        key={model.id}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${i18nService.t('testConnection')} ${model.name}`}
-                        className="flex min-h-12 cursor-pointer items-center px-3 py-2 transition-colors duration-150 ease-out hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:translate-y-px"
-                        onClick={event => {
-                          if (event.target instanceof Element && event.target.closest('button')) {
-                            return;
-                          }
-                          setSelectedModelId(model.id);
-                          void handleTestConnection(model.id);
-                        }}
-                        onKeyDown={event => {
-                          if (event.target !== event.currentTarget) return;
-                          if (event.key !== 'Enter' && event.key !== ' ') return;
-                          event.preventDefault();
-                          setSelectedModelId(model.id);
-                          void handleTestConnection(model.id);
-                        }}
-                      >
-                        <div className="flex w-full min-w-0 items-center justify-between gap-2">
-                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                            <div
-                              className={cn(
-                                'h-1.5 w-1.5 shrink-0 rounded-full',
-                                getModelConnectionStatus(activeProvider, model.id) ===
-                                  ModelConnectionStatus.Success
-                                  ? 'bg-success'
-                                  : getModelConnectionStatus(activeProvider, model.id) ===
-                                      ModelConnectionStatus.Failure
-                                    ? 'bg-destructive'
-                                    : 'bg-muted-foreground',
-                              )}
-                            />
-                            <div className="min-w-0">
+                      {(providers[activeProvider].models ?? []).map(model => (
+                        <div
+                          key={model.id}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${i18nService.t('testConnection')} ${model.name}`}
+                          className="theme-surface-settings-row flex min-h-12 cursor-pointer items-center px-3 py-2"
+                          onClick={event => {
+                            if (event.target instanceof Element && event.target.closest('button')) {
+                              return;
+                            }
+                            setSelectedModelId(model.id);
+                            void handleTestConnection(model.id);
+                          }}
+                          onKeyDown={event => {
+                            if (event.target !== event.currentTarget) return;
+                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            setSelectedModelId(model.id);
+                            void handleTestConnection(model.id);
+                          }}
+                        >
+                          <div className="flex w-full min-w-0 items-center justify-between gap-2">
+                            <div className="flex min-w-0 flex-1 items-center gap-1.5">
                               <div
                                 className={cn(
-                                  'truncate font-medium text-foreground',
-                                  'text-sm',
+                                  'h-1.5 w-1.5 shrink-0 rounded-full',
+                                  getModelConnectionStatus(activeProvider, model.id) ===
+                                    ModelConnectionStatus.Success
+                                    ? 'bg-success'
+                                    : getModelConnectionStatus(activeProvider, model.id) ===
+                                        ModelConnectionStatus.Failure
+                                      ? 'bg-destructive'
+                                      : 'bg-muted-foreground',
                                 )}
-                              >
-                                {model.name}
-                              </div>
-                              {activeProvider !== ProviderName.LlamaCpp ? (
+                              />
+                              <div className="min-w-0">
                                 <div
+                                  className={cn('truncate font-medium text-foreground', 'text-sm')}
+                                >
+                                  {model.name}
+                                </div>
+                                {activeProvider !== ProviderName.LlamaCpp ? (
+                                  <div className={cn('truncate text-muted-foreground', 'text-xs')}>
+                                    {model.id}
+                                  </div>
+                                ) : null}
+                                {isCustomProvider(activeProvider) &&
+                                  (model.maxTokens ||
+                                    Object.values(model.capabilities ?? {}).some(
+                                      status => status === ModelCapabilityStatus.Supported,
+                                    )) && (
+                                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                      {model.maxTokens && (
+                                        <span>
+                                          {i18nService.t('modelMaxOutputTokensShort')}:{' '}
+                                          {formatDetectedTokenLimit(model.maxTokens)}
+                                        </span>
+                                      )}
+                                      {MODEL_CAPABILITY_FIELDS.filter(
+                                        field =>
+                                          field.key !== 'imageInput' &&
+                                          model.capabilities?.[field.key] ===
+                                            ModelCapabilityStatus.Supported,
+                                      ).map(field => (
+                                        <span key={field.key}>{i18nService.t(field.labelKey)}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                              </div>
+                            </div>
+                            <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
+                              {model.supportsImage && (
+                                <span
                                   className={cn(
-                                    'truncate text-muted-foreground',
+                                    'rounded-md bg-primary-muted px-1.5 py-0.5 text-primary',
                                     'text-xs',
                                   )}
                                 >
-                                  {model.id}
-                                </div>
-                              ) : null}
-                              {isCustomProvider(activeProvider) &&
-                                (model.maxTokens ||
-                                  Object.values(model.capabilities ?? {}).some(
-                                    status => status === ModelCapabilityStatus.Supported,
-                                  )) && (
-                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                    {model.maxTokens && (
-                                      <span>
-                                        {i18nService.t('modelMaxOutputTokensShort')}:{' '}
-                                        {formatDetectedTokenLimit(model.maxTokens)}
-                                      </span>
-                                    )}
-                                    {MODEL_CAPABILITY_FIELDS.filter(
-                                      field =>
-                                        field.key !== 'imageInput' &&
-                                        model.capabilities?.[field.key] ===
-                                        ModelCapabilityStatus.Supported,
-                                    ).map(field => (
-                                      <span key={field.key}>{i18nService.t(field.labelKey)}</span>
-                                    ))}
-                                  </div>
-                                )}
-                            </div>
-                          </div>
-                          <div className="ml-auto flex shrink-0 items-center justify-end gap-1">
-                            {model.supportsImage && (
-                              <span
-                                className={cn(
-                                  'rounded-md bg-primary-muted px-1.5 py-0.5 text-primary',
-                                  'text-xs',
-                                )}
-                              >
-                                {i18nService.t('imageInput')}
-                              </span>
-                            )}
-                            {activeProvider !== ProviderName.LlamaCpp && (
-                              <>
+                                  {i18nService.t('imageInput')}
+                                </span>
+                              )}
+                              {activeProvider !== ProviderName.LlamaCpp && (
+                                <>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => {
+                                      const openEditor = (runtimeContextWindow?: number) =>
+                                        handleEditModel(
+                                          model.id,
+                                          model.name,
+                                          model.supportsImage,
+                                          model.capabilities,
+                                          model.piRuntime,
+                                          runtimeContextWindow ?? model.contextWindow,
+                                          model.maxTokens,
+                                        );
+                                      if (activeProvider !== ProviderName.Ollama) {
+                                        openEditor();
+                                        return;
+                                      }
+                                      const providerConfig = providers[activeProvider];
+                                      const apiFormat = getEffectiveApiFormat(
+                                        activeProvider,
+                                        providerConfig.apiFormat,
+                                      );
+                                      const openWithLocalRuntimeFallback = () => {
+                                        void window.electron.ollama
+                                          .listRunningModels()
+                                          .then(runningModels =>
+                                            openEditor(
+                                              resolveOllamaRunningModelContext(
+                                                model.id,
+                                                runningModels,
+                                              ),
+                                            ),
+                                          )
+                                          .catch(() => openEditor());
+                                      };
+                                      void window.electron.api
+                                        .fetchModels({
+                                          baseUrl: resolveBaseUrl(
+                                            activeProvider,
+                                            providerConfig.baseUrl,
+                                            apiFormat,
+                                          ),
+                                          apiKey: providerConfig.apiKey,
+                                          apiFormat,
+                                        })
+                                        .then(result => {
+                                          const contextWindow = result.success
+                                            ? resolveDiscoveredModelContext(model.id, result.models)
+                                            : undefined;
+                                          if (contextWindow !== undefined) {
+                                            openEditor(contextWindow);
+                                            return;
+                                          }
+                                          openWithLocalRuntimeFallback();
+                                        })
+                                        .catch(openWithLocalRuntimeFallback);
+                                    }}
+                                    aria-label={`${i18nService.t('editModel')} ${model.name}`}
+                                    title={i18nService.t('editModel')}
+                                    className="theme-page-settings-button-8"
+                                  >
+                                    <Pencil />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    onClick={() => handleDeleteModel(model.id)}
+                                    aria-label={`${i18nService.t('delete')} ${model.name}`}
+                                    title={i18nService.t('delete')}
+                                    className="theme-page-settings-button-9"
+                                  >
+                                    <Trash2 />
+                                  </Button>
+                                </>
+                              )}
+                              {activeProvider === ProviderName.LlamaCpp && (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon-xs"
                                   onClick={() => {
-                                    const openEditor = (runtimeContextWindow?: number) =>
-                                      handleEditModel(
-                                        model.id,
-                                        model.name,
-                                        model.supportsImage,
-                                        model.capabilities,
-                                        model.piRuntime,
-                                        runtimeContextWindow ?? model.contextWindow,
-                                        model.maxTokens,
-                                      );
-                                    if (activeProvider !== ProviderName.Ollama) {
-                                      openEditor();
-                                      return;
-                                    }
-                                    const providerConfig = providers[activeProvider];
-                                    const apiFormat = getEffectiveApiFormat(
-                                      activeProvider,
-                                      providerConfig.apiFormat,
-                                    );
-                                    const openWithLocalRuntimeFallback = () => {
-                                      void window.electron.ollama
-                                        .listRunningModels()
-                                        .then(runningModels =>
-                                          openEditor(
-                                            resolveOllamaRunningModelContext(
-                                              model.id,
-                                              runningModels,
-                                            ),
-                                          ),
-                                        )
-                                        .catch(() => openEditor());
-                                    };
-                                    void window.electron.api
-                                      .fetchModels({
-                                        baseUrl: resolveBaseUrl(
-                                          activeProvider,
-                                          providerConfig.baseUrl,
-                                          apiFormat,
-                                        ),
-                                        apiKey: providerConfig.apiKey,
-                                        apiFormat,
-                                      })
-                                      .then(result => {
-                                        const contextWindow = result.success
-                                          ? resolveDiscoveredModelContext(model.id, result.models)
-                                          : undefined;
-                                        if (contextWindow !== undefined) {
-                                          openEditor(contextWindow);
-                                          return;
-                                        }
-                                        openWithLocalRuntimeFallback();
-                                      })
-                                      .catch(openWithLocalRuntimeFallback);
+                                    void window.electron.llamacpp
+                                      .getModelPreferences()
+                                      .then(preferences => {
+                                        const preference = preferences[model.id];
+                                        handleEditModel(
+                                          model.id,
+                                          model.name,
+                                          model.supportsImage,
+                                          { ...model.capabilities, ...preference?.capabilities },
+                                          undefined,
+                                          preference?.ctxSize ?? model.contextWindow,
+                                          preference?.maxTokens ?? model.maxTokens,
+                                        );
+                                      });
                                   }}
                                   aria-label={`${i18nService.t('editModel')} ${model.name}`}
                                   title={i18nService.t('editModel')}
-                                  className="text-muted-foreground hover:text-foreground"
+                                  className="theme-page-settings-button-10 [&_svg]:size-3.5"
                                 >
                                   <Pencil />
                                 </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon-xs"
-                                  onClick={() => handleDeleteModel(model.id)}
-                                  aria-label={`${i18nService.t('delete')} ${model.name}`}
-                                  title={i18nService.t('delete')}
-                                  className="text-muted-foreground hover:text-destructive"
-                                >
-                                  <Trash2 />
-                                </Button>
-                              </>
-                            )}
-                            {activeProvider === ProviderName.LlamaCpp && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-xs"
-                                onClick={() => {
-                                  void window.electron.llamacpp.getModelPreferences().then(preferences => {
-                                    const preference = preferences[model.id];
-                                    handleEditModel(
-                                      model.id,
-                                      model.name,
-                                      model.supportsImage,
-                                      { ...model.capabilities, ...preference?.capabilities },
-                                      undefined,
-                                      preference?.ctxSize ?? model.contextWindow,
-                                      preference?.maxTokens ?? model.maxTokens,
-                                    );
-                                  });
-                                }}
-                                aria-label={`${i18nService.t('editModel')} ${model.name}`}
-                                title={i18nService.t('editModel')}
-                                className="size-5 text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
-                              >
-                                <Pencil />
-                              </Button>
-                            )}
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
 
-                    {(!providers[activeProvider].models ||
-                      providers[activeProvider].models.length === 0) && (
-                      <div className="p-3 text-center">
-                        <p
-                          className={cn(
-                            'text-muted-foreground',
-                            'text-sm',
-                          )}
-                        >
-                          {i18nService.t('noModelsAvailable')}
-                        </p>
-                      </div>
-                    )}
+                      {(!providers[activeProvider].models ||
+                        providers[activeProvider].models.length === 0) && (
+                        <div className="p-3 text-center">
+                          <p className={cn('text-muted-foreground', 'text-sm')}>
+                            {i18nService.t('noModelsAvailable')}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
               }
-
             </div>
           </div>
         );
@@ -4965,7 +4859,7 @@ const Settings: React.FC<SettingsProps> = ({
                       rules: { ...config.rules, cooldownRounds: value },
                     });
                   }}
-                  className="w-20 text-sm text-center shrink-0"
+                  className="theme-page-settings-input-2 text-center shrink-0"
                 />
               </div>
 
@@ -4992,7 +4886,7 @@ const Settings: React.FC<SettingsProps> = ({
                         rules: { ...config.rules, maxConversationRoundsForTriage: value },
                       });
                     }}
-                    className="w-20 text-sm text-center"
+                    className="theme-page-settings-input-3 text-center"
                   />
                 </div>
               </div>
@@ -5048,7 +4942,7 @@ const Settings: React.FC<SettingsProps> = ({
                     placeholder={
                       i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'
                     }
-                    className="w-full max-w-xs text-sm"
+                    className="theme-page-settings-input-4 w-full max-w-xs"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     {i18nService.t('modelTriageModelNameNote') ||
@@ -5089,7 +4983,10 @@ const Settings: React.FC<SettingsProps> = ({
           <div className="flex flex-col h-full space-y-4">
             <FluidTabs
               aria-label={activeTabLabel}
-              items={bootstrapTabs.map(tab => ({ value: tab.key, label: i18nService.t(tab.titleKey) }))}
+              items={bootstrapTabs.map(tab => ({
+                value: tab.key,
+                label: i18nService.t(tab.titleKey),
+              }))}
               value={activeItem.key}
               onValueChange={setBootstrapTab}
             />
@@ -5101,7 +4998,7 @@ const Settings: React.FC<SettingsProps> = ({
                 key={activeItem.key}
                 value={activeItem.value}
                 onChange={e => activeItem.setter(e.target.value)}
-                className="w-full flex-1 min-h-[280px] rounded-lg border px-3 py-2 text-sm leading-relaxed border-border bg-surface text-foreground resize-none"
+                className="theme-page-settings-textarea-1 w-full flex-1 resize-none"
                 placeholder={i18nService.t('coworkBootstrapPlaceholder')}
               />
             </div>
@@ -5249,7 +5146,9 @@ const Settings: React.FC<SettingsProps> = ({
                           window.dispatchEvent(
                             new CustomEvent('app:showToast', {
                               detail: {
-                                message: normalizeError(result.error || i18nService.t('updateInstallFailed')),
+                                message: normalizeError(
+                                  result.error || i18nService.t('updateInstallFailed'),
+                                ),
                                 isError: true,
                               },
                             }),
@@ -5318,7 +5217,7 @@ const Settings: React.FC<SettingsProps> = ({
                   href="https://github.com/rongxinzy/RongxinAI"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="theme-surface-settings-link"
                 >
                   {i18nService.t('mcpViewOnGithub')}
                 </a>
@@ -5334,7 +5233,7 @@ const Settings: React.FC<SettingsProps> = ({
                     void window.electron.shell.openExternal(OFFICIAL_WEBSITE_URL);
                   }}
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="theme-surface-settings-link"
                 >
                   {OFFICIAL_WEBSITE_URL}
                 </a>
@@ -5345,7 +5244,7 @@ const Settings: React.FC<SettingsProps> = ({
                   href="http://www.rongxzy.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="theme-surface-settings-link"
                 >
                   北京容芯致远科技有限公司
                 </a>
@@ -5364,7 +5263,7 @@ const Settings: React.FC<SettingsProps> = ({
                     void handleExportLogs();
                   }}
                   disabled={isExportingLogs}
-                  className="text-muted-foreground hover:text-primary"
+                  className="theme-action-muted-accent"
                 >
                   {isExportingLogs
                     ? i18nService.t('aboutExportingLogs')
@@ -5385,10 +5284,10 @@ const Settings: React.FC<SettingsProps> = ({
     <Modal
       onClose={onClose}
       disablePointerDismissal
-      className="w-auto sm:max-w-none p-0 ring-0! bg-transparent"
+      className="theme-settings-modal-shell w-auto sm:max-w-none p-0"
     >
       <div
-        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content bg-surface shadow-modal border border-border"
+        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 overflow-hidden modal-content theme-settings-modal-frame"
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
@@ -5406,10 +5305,10 @@ const Settings: React.FC<SettingsProps> = ({
                 onMouseEnter={() => startSettingsIconAnimation(tab.key)}
                 onMouseLeave={() => stopSettingsIconAnimation(tab.key)}
                 className={cn(
-                  'flex w-full items-center justify-start gap-3 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-medium !transition-colors !duration-200 ease-out',
+                  'theme-page-settings-button-variant-7 flex w-full items-center justify-start',
                   activeTab === tab.key
-                    ? 'border-border bg-card text-foreground hover:border-border hover:!bg-card hover:!text-foreground'
-                    : 'text-muted-foreground hover:border-border hover:!bg-card hover:!text-foreground',
+                    ? 'theme-page-settings-button-variant-8'
+                    : 'theme-page-settings-button-variant-9',
                 )}
               >
                 {tab.icon}
@@ -5429,7 +5328,7 @@ const Settings: React.FC<SettingsProps> = ({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg"
+              className="theme-page-settings-button-11"
             >
               <X className="h-5 w-5" />
             </Button>
@@ -5532,14 +5431,16 @@ const Settings: React.FC<SettingsProps> = ({
           isOpen={isAddingModel || isEditingModel}
           isEditing={isEditingModel}
           providerName={activeProvider}
-          draft={{
-            id: newModelId,
-            name: newModelName,
-            contextWindow: newModelContextWindow,
-            maxTokens: newModelMaxTokens,
-            capabilities: newModelCapabilities,
-            piRuntime: newModelPiRuntime,
-          } satisfies ProviderModelEditorDraft}
+          draft={
+            {
+              id: newModelId,
+              name: newModelName,
+              contextWindow: newModelContextWindow,
+              maxTokens: newModelMaxTokens,
+              capabilities: newModelCapabilities,
+              piRuntime: newModelPiRuntime,
+            } satisfies ProviderModelEditorDraft
+          }
           error={modelFormError}
           onDraftChange={patch => {
             if (patch.id !== undefined) setNewModelId(patch.id);
@@ -5553,7 +5454,6 @@ const Settings: React.FC<SettingsProps> = ({
           onClose={handleCancelModelEdit}
           onSave={handleSaveNewModel}
         />
-
       </div>
     </Modal>
   );

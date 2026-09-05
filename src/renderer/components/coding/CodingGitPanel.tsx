@@ -292,7 +292,7 @@ export const CodingGitPanel = ({
           {status?.isRepository ? (
             <>
               <Card size="sm">
-                <CardHeader className="px-0">
+                <CardHeader className="theme-control-sizing-6">
                   <CardTitle>{i18nService.t('codingGitEnvironment')}</CardTitle>
                   <CardDescription className="truncate" title={status.repositoryRoot ?? undefined}>
                     {status.repositoryRoot}
@@ -301,7 +301,7 @@ export const CodingGitPanel = ({
                     <Laptop className="size-4 text-muted-foreground" />
                   </CardAction>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-2 px-0">
+                <CardContent className="theme-control-sizing-6 flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="text-muted-foreground">{i18nService.t('codingGitLocal')}</span>
                     <span className="truncate font-medium">
@@ -319,7 +319,7 @@ export const CodingGitPanel = ({
                     </span>
                   </div>
                 </CardContent>
-                <CardFooter className="-mx-3 justify-between gap-3 px-3 py-2">
+                <CardFooter className="theme-control-sizing-2 -mx-3 justify-between gap-3">
                   <span className="text-xs text-muted-foreground">
                     {formatCount('codingGitChangesSummary', status.files.length)}
                   </span>
@@ -395,7 +395,7 @@ export const CodingGitPanel = ({
               )}
 
               <Card size="sm">
-                <CardHeader className="px-0">
+                <CardHeader className="theme-control-sizing-6">
                   <CardTitle>{i18nService.t('codingGitCommit')}</CardTitle>
                   <CardDescription>
                     {staged.length > 0
@@ -403,7 +403,7 @@ export const CodingGitPanel = ({
                       : i18nService.t('codingGitNoStagedChanges')}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="px-0">
+                <CardContent className="theme-control-sizing-6">
                   <FieldGroup>
                     <Field>
                       <FieldLabel htmlFor="coding-git-commit-message">
@@ -423,7 +423,7 @@ export const CodingGitPanel = ({
                     </Field>
                   </FieldGroup>
                 </CardContent>
-                <CardFooter className="-mx-3 justify-end gap-2 px-3 py-2">
+                <CardFooter className="theme-control-sizing-2 -mx-3 justify-end gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -531,7 +531,7 @@ const GitFileGroup = ({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="h-auto min-w-0 flex-1 justify-start px-2 py-2"
+                  className="theme-control-sizing-7 theme-control-content-height min-w-0 flex-1 justify-start"
                   onClick={() => onDiff({ path: file.path, scope })}
                 >
                   <FileDiff className="shrink-0" />

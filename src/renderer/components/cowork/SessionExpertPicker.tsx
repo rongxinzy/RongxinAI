@@ -79,12 +79,12 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
           side="top"
           align="start"
           sideOffset={4}
-          className="w-80 rounded-md! bg-surface! p-0 shadow-md ring-0! outline-none!"
+          className="theme-page-session-expert-picker-popover-content-1"
         >
-          <Command className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none!">
+          <Command className="theme-part-session-expert-picker-command-1">
             <CommandInput
               placeholder={i18nService.t('searchSessionExperts')}
-              className="bg-transparent"
+              className="theme-control-transparent"
             />
             <CommandList>
               <CommandEmpty>{i18nService.t('noSessionExperts')}</CommandEmpty>
@@ -96,7 +96,7 @@ const SessionExpertPicker: React.FC<SessionExpertPickerProps> = ({
                       key={expert.id}
                       value={`${expert.name} ${expert.id}`}
                       onSelect={() => toggleExpert(expert.id)}
-                      className="items-start gap-2 px-3 py-2"
+                      className="theme-control-sizing-2 items-start gap-2"
                     >
                       <Check className={isSelected ? 'opacity-100' : 'opacity-0'} />
                       <span className="min-w-0 flex-1 truncate">{expert.name}</span>

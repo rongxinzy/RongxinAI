@@ -147,7 +147,7 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                     {question.header}
                   </span>
                 )}
-                <QueueItemContent className="line-clamp-none text-foreground">
+                <QueueItemContent className="theme-queue-question-content line-clamp-none">
                   {question.question}
                 </QueueItemContent>
               </div>
@@ -235,7 +235,7 @@ const AskUserQuestionCard = ({ permission, onRespond }: AskUserQuestionCardProps
                     updateOtherAnswer(question.question, question.multiSelect, event.target.value)
                   }
                   placeholder={i18nService.t('coworkQuestionWizardOtherPlaceholder')}
-                  className="min-h-16 max-h-48 resize-y text-sm"
+                  className="theme-page-ask-user-question-card-textarea-1 max-h-48 resize-y"
                   disabled={isSubmitting}
                 />
               </div>

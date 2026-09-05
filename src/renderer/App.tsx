@@ -907,11 +907,7 @@ const App: React.FC = () => {
         className="h-screen overflow-hidden flex flex-col bg-surface-raised outline-none"
       >
         {toastMessage && (
-          <Toast
-            message={toastMessage}
-            isError={isToastError}
-            isSuccess={isToastSuccess}
-          />
+          <Toast message={toastMessage} isError={isToastError} isSuccess={isToastSuccess} />
         )}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           <Sidebar
@@ -939,7 +935,10 @@ const App: React.FC = () => {
           <div
             className={`flex-1 min-w-0 py-1.5 px-1.5 transition-[padding] duration-200 ease-out`}
           >
-            <div className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]">
+            <div
+              data-main-canvas
+              className="relative h-full min-h-0 rounded-xl bg-background overflow-hidden contain-[layout_style_paint]"
+            >
               {hasMountedLocalInference && !managedModelsOnly && (
                 <div
                   className={

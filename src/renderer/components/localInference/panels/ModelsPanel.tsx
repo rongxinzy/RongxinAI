@@ -297,14 +297,11 @@ export function ModelsPanel({
     onDelete(modelName);
   };
 
-  const handleCardDragStart = useCallback(
-    (event: DragEvent<HTMLDivElement>, modelName: string) => {
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', modelName);
-      setDraggedModelName(modelName);
-    },
-    [],
-  );
+  const handleCardDragStart = useCallback((event: DragEvent<HTMLDivElement>, modelName: string) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', modelName);
+    setDraggedModelName(modelName);
+  }, []);
 
   const handleCardDrop = useCallback(
     (event: DragEvent<HTMLDivElement>, targetModelName: string) => {
@@ -398,7 +395,7 @@ export function ModelsPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-9 min-w-28 cursor-pointer px-4 transition-[background-color,border-color] duration-200 ease-out"
+                  className="theme-control-sizing-24 min-w-28 cursor-pointer transition-[background-color,border-color] duration-200 ease-out"
                   onClick={onOpenMarketplace}
                 >
                   {i18nService.t('localInferenceLocalModelsEmptyAction')}
@@ -485,10 +482,10 @@ const ModelCard = memo(function ModelCard({
         onDrop={event => onDrop(event, model.name)}
         onDragEnd={onDragEnd}
         className={cn(
-          'relative h-full w-full cursor-grab select-none rounded-lg border border-border/70 bg-card p-0 shadow-sm ring-0 transition-[background-color,border-color] duration-200 active:cursor-grabbing',
-          'hover:border-border hover:bg-muted/20',
-          (loadingModel || unloading) && 'bg-muted/30',
-          dragging && 'opacity-50',
+          'theme-page-models-panel-card-variant-1 relative h-full w-full cursor-grab select-none active:cursor-grabbing',
+          'theme-page-models-panel-card-variant-2',
+          (loadingModel || unloading) && 'theme-page-models-panel-card-variant-3',
+          dragging && 'theme-page-models-panel-card-variant-4',
         )}
       >
         {loadingModel || unloading ? (
@@ -514,12 +511,7 @@ const ModelCard = memo(function ModelCard({
               </span>
             </Button>
             {loadingModel ? (
-              <Button
-                type="button"
-                size="lg"
-                variant="outline"
-                onClick={handleOpenLaunchLog}
-              >
+              <Button type="button" size="lg" variant="outline" onClick={handleOpenLaunchLog}>
                 <ScrollText data-icon="inline-start" />
                 {i18nService.t('localInferenceModelLaunchLogAction')}
               </Button>
@@ -538,7 +530,7 @@ const ModelCard = memo(function ModelCard({
           </span>
         ) : null}
 
-        <CardHeader className="flex flex-col gap-2 p-4">
+        <CardHeader className="theme-control-sizing-21 flex flex-col gap-2">
           <div className="flex min-w-0 w-full items-center gap-2">
             <span
               aria-hidden="true"
@@ -548,7 +540,7 @@ const ModelCard = memo(function ModelCard({
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <div className="flex min-w-0 items-center gap-2">
-                <CardTitle className="truncate text-base font-semibold leading-6 text-foreground">
+                <CardTitle className="theme-page-models-panel-card-title-1 truncate">
                   {displayName}
                 </CardTitle>
               </div>
@@ -567,7 +559,7 @@ const ModelCard = memo(function ModelCard({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="text-muted-foreground"
+                      className="theme-control-muted"
                       disabled={buttonsDisabled}
                       aria-label={i18nService.t('coworkSessionActions')}
                       title={i18nService.t('coworkSessionActions')}
@@ -611,7 +603,7 @@ const ModelCard = memo(function ModelCard({
                       </Badge>
                     }
                   />
-                  <HoverCardContent side="right" align="start" className="w-auto min-w-52 p-3">
+                  <HoverCardContent side="right" align="start" className="theme-control-sizing-10 w-auto min-w-52">
                     <div className="flex flex-col gap-2">
                       {details.map(item => (
                         <MetadataRow key={item.label} label={item.label} value={item.value} />
@@ -683,10 +675,10 @@ const ModelCard = memo(function ModelCard({
 function MetadataRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="grid grid-cols-[68px_minmax(0,1fr)] items-start gap-2.5">
-      <div className={cn('pt-0.5 text-[11px] font-medium leading-4', localInferenceMutedTextClass)}>
+      <div className={cn('pt-0.5 text-xs font-medium leading-4', localInferenceMutedTextClass)}>
         {label}
       </div>
-      <div className="min-w-0 text-[13px] font-medium leading-5 text-foreground">
+      <div className="min-w-0 text-sm font-medium leading-5 text-foreground">
         <span className="block break-all">{value}</span>
       </div>
     </div>

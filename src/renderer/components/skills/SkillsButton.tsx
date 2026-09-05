@@ -21,7 +21,7 @@ const SkillsButton: React.FC<SkillsButtonProps> = ({
     <SkillsPopover onSelectSkill={onSelectSkill} onManageSkills={onManageSkills}>
       <PromptInputButton
         className={cn(
-          'text-muted-foreground hover:bg-surface-raised hover:text-primary',
+          'theme-prompt-skills-action',
           className,
         )}
         title="Skills"

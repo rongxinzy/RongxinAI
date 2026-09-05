@@ -330,7 +330,7 @@ const ModelRenderer: React.FC<ModelRendererProps> = ({ artifact }) => {
             <Button
               variant="secondary"
               size="sm"
-              className="px-2 py-1 text-xs"
+              className="theme-page-model-renderer-button-1"
               onClick={() => setResetKey(value => value + 1)}
             >
               Reset view

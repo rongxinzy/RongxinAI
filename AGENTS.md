@@ -183,7 +183,7 @@ Artifacts support HTML, SVG, Mermaid, React/JSX, and code through explicit `arti
 
 项目使用两套 UI 组件库。**所有 UI 代码必须优先使用这些组件，禁止自造轮子。**
 
-**设计标准见 `DESIGN.md`——它是宪法级约束（见本文顶部「设计宪法」）。** 主题只保留浅色 / 深色 / 跟随系统。
+**设计标准见 `DESIGN.md`——它是宪法级约束（见本文顶部「设计宪法」）。** 用户只能选择整套主题，以及浅色 / 深色 / 跟随系统模式；其他样式不提供单独设置。
 
 ### shadcn/ui（基础组件）
 
@@ -203,14 +203,43 @@ Artifacts support HTML, SVG, Mermaid, React/JSX, and code through explicit `arti
 6. **三个唯一实现。** 页面级标签页用 `PageTabs`（放 PageHeader 的 tabs 槽位）、分段/筛选控件用 `FluidTabs`、删除确认用 `DestructiveConfirmDialog`。禁止手搓 tab、自造分段条、自写确认框——细则与选中态语言见 DESIGN.md 对应章节。
 7. **Button 覆写守纪律。** className 只许布局类（`w-full`、`justify-start`、`gap-*`）；颜色、圆角、阴影、字重、字号、高度一律走 variant/size 枚举。行级可点区域不得用裸 `div onClick`（完整范式见 DESIGN.md「Button 使用纪律」）。
 
-Use Tailwind `className` for component composition and `cn()` from `@shared/lib/utils` for class merging; do not add standalone CSS.
+Use Tailwind `className` for structural composition and `cn()` from `@shared/lib/utils` for class merging. Control appearance belongs to theme recipes; do not add page-local CSS or appearance utilities to bypass them.
+
+## 主题系统开发约束
+
+设计边界以 `DESIGN.md` 为准；本节规定实现流程。当前主题包是仓库内注册的展示数据，不是可执行插件或用户自定义 CSS。
+
+### 事实来源与职责
+
+- `src/renderer/theme/themes/plugins.ts`：主题包注册，提供版本、唯一 ID、中英文名称及 light/dark 两套完整外观。新增风格必须同时提供两套，不得复制页面分支。
+- `src/renderer/theme/themes/types.ts`：`ThemeDefinition` 包含 `tokens`、`components` 和可选 `background`。token 契约在 `tokens/contract.ts`，组件 hook、状态和属性白名单在 `components/contract.ts`。
+- `src/renderer/theme/components/`：按钮、输入框、选择器、标签、卡片、弹层及其组合控件的外观数据；包含固定尺寸、内边距、字体、边框、圆角、阴影、透明度和状态动效。共享组件只绑定稳定 hook、语义 variant/size 与真实状态。
+- 共享组件和页面保留 DOM、布局关系、响应式排列、滚动、命中区域、键盘、焦点、禁用语义及业务逻辑。父容器填充、flex 收缩和弹层可用视口尺寸属于布局；控件自己的固定高宽、图标尺寸、内边距属于外观。
+- `engine/` 和 `components/css.ts` 负责变量、规则生成与原位应用。`css/themes.css` 必须由 `bun run theme:generate` 生成，禁止手改或用全局覆盖修补生成结果。
+
+### 修改与扩展规则
+
+1. 修改外观先定位现有 recipe；新增视觉语义时扩展共享 variant/size 或注册组件 hook，再补齐所有已注册主题外观。不得在页面、包装组件、原生控件或运行时生成的 DOM 中写局部颜色、圆角、阴影、字号、尺寸或状态样式来绕过契约；使用语义色 utility 也不能绕过控件 recipe。
+2. 每个 hook 必须声明 `COMPONENT_STATES` 的全部状态；使用 `recipe()` 补齐空状态。无独立视觉用空对象继承，不能漏字段。状态选择器和优先级由引擎统一定义，主题只能填写白名单外观属性；禁止任意选择器、脚本、事件、IPC、任意 CSS 注入及未登记变量。
+3. 组合组件、portal、伪元素和第三方控件也必须验证主题生效。稳定 hook 不能依赖会被包装层替换的 `data-slot`。第三方样式优先级适配只能放在引擎固定集成点，不在主题包中提高选择器权重或加入 `!important`。
+4. 切换主题不得改 React key、重建编辑器或清空草稿；不得改变焦点顺序、滚动、选中项、打开中的弹层、事件和持久化行为。动效遵守 `prefers-reduced-motion`；主题定义视觉参数，共享组件保留布局测量与交互时序。
+5. 背景的颜色、本地图片、内置绘制纹理和图层透明度由主题包统一提供。不得新增用户背景、颜色、字体、圆角、透明度等独立设置、存储键或覆盖入口。用户仅选择整套主题和明暗模式。
+6. 当前 Codex 外观继续遵守 `DESIGN.md` 的视觉刻度；新增主题在完整包中定义自己的外观，保留通用可访问性、功能与性能约束。内容图片、品牌标识和第三方文档预览不强制重着色。
+
+### 验证要求
+
+- 修改 token、recipe 或生成器后运行 `bun run theme:generate`；提交代码前运行 `npm run lint`（包含 `theme:check` 与 `theme:audit`）。不得用关闭审计、放宽白名单或随意增加例外代替迁移。
+- 按影响范围运行测试；共享主题契约或引擎改动运行 `npx vitest run src/renderer src/shared`、`npm run build` 和 `npm run test:bundle-budget`。仅修改文档时核对路径、命令与规则一致性，并运行 `git diff --check`。
+- 实际渲染验证覆盖 light/dark、键盘焦点、适用的 hover/pressed/selected/disabled/invalid/open 状态及减少动效。修改组合控件时同时验证包装层、portal 和动态内容。
+- 用一个修改了组件 recipe 的主题验证热切换，确认新值实际生效，草稿、焦点、选中项和弹层保留。检查实际尺寸与内容溢出，不能以截图相似或编译通过推断功能不变。
+- 源码审计是防回退检查，不能证明所有样式及第三方生成器都已覆盖。报告实际运行的验证及边界；组件浏览器测试不等于打包 Electron/IPC 全流程验证。
 
 ## Coding Style & Naming Conventions
 
 - Use TypeScript, functional React components, and Hooks; keep logic in `src/renderer/services/` when it is not UI-specific.
 - Match existing formatting: 2-space indentation, single quotes, and semicolons.
 - Naming: `PascalCase` for components (e.g., `Chat.tsx`), `camelCase` for functions/vars, and `*Slice.ts` for Redux slices.
-- Tailwind CSS v4 is the primary styling approach; prefer utility classes over bespoke CSS. Configuration is CSS-first via `@theme` in `src/renderer/index.css` (no `tailwind.config.js`).
+- Tailwind CSS v4 supplies layout utilities and semantic token mappings. Control appearance is compiled from theme recipes, not assembled with local appearance utilities. CSS configuration starts in `src/renderer/index.css` and `src/renderer/theme/css/tailwind.css` (no `tailwind.config.js`).
 
 ### File Length Limit
 
@@ -435,9 +464,7 @@ These global skills complement, not replace, the conventions in this file.
 - Read `high-end-visual-design` only when premium visual treatment or complex motion is an explicit requirement, and adapt its ideas to the project's tokens, components, accessibility, and performance rules.
 - Conflict precedence is: `AGENTS.md` / `DESIGN.md` > project UI skills (`frontend-ui-change-strategy`, `rongxinai-ui-adapter`) > `design-taste-frontend` > `high-end-visual-design`.
 
-> **主题 token 架构（已更新，旧的 hex/HSL 不兼容问题不复存在）**
->
-> 颜色现在是双真源：`src/renderer/theme/css/shadcn-token-bridge.css` 的 `:root`/`.dark` **直写 oklch**（shadcn 语义层），`themes.css` 的 `--zy-*` 为兼容层。`bg-primary`、`bg-card`、`text-muted-foreground` 等 shadcn 语义 utility 可直接使用，不会再出现 `hsl(#hex)` 失效问题。以 DESIGN.md「色彩 → 事实来源」为准；新建组件优先使用 shadcn 语义 utility，减少新增 `--zy-*` 依赖。
+> **主题开发入口：** 遵守本文「主题系统开发约束」与 `DESIGN.md` 的主题章节；契约、注册方法和验证边界见 `src/renderer/theme/README.md`。
 >
 > **CRITICAL: Tailwind v4 Variant Syntax**
 >

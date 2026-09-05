@@ -1,13 +1,11 @@
+import { classicLight } from '../../theme/themes/classic-light';
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { i18nService } from '../../services/i18n';
-import {
-  CoworkAttachmentMediaType,
-  CoworkAttachmentMediaTypeByExtension,
-} from './constants';
+import { CoworkAttachmentMediaType, CoworkAttachmentMediaTypeByExtension } from './constants';
 import { CoworkInlineAttachments } from './CoworkInlineAttachments';
 
 describe('CoworkInlineAttachments', () => {
@@ -53,17 +51,16 @@ describe('CoworkInlineAttachments', () => {
     expect(attachment).toHaveClass('h-8');
 
     const removeButton = screen.getByLabelText(i18nService.t('coworkAttachmentRemove'));
-    expect(removeButton).toHaveClass('group-hover:opacity-100');
-    expect(attachment?.firstElementChild?.firstElementChild).toHaveClass(
-      'group-hover:opacity-0',
+    expect(removeButton).toHaveClass('theme-page-attachments-button-variant-6');
+    expect(classicLight.components['page-attachments-button-variant-6'].parentHover.opacity).toBe(
+      '1',
     );
+    expect(attachment?.firstElementChild?.firstElementChild).toHaveClass('group-hover:opacity-0');
 
     fireEvent.focus(attachment!);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(CoworkAttachmentMediaTypeByExtension.pdf),
-      ).toBeInTheDocument();
+      expect(screen.getByText(CoworkAttachmentMediaTypeByExtension.pdf)).toBeInTheDocument();
     });
   });
 

@@ -1,11 +1,5 @@
 import { Button } from '@shared/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@shared/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@shared/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -39,8 +33,7 @@ const RuntimeMetadataStatus = {
   Ready: 'ready',
   Error: 'error',
 } as const;
-type RuntimeMetadataStatus =
-  (typeof RuntimeMetadataStatus)[keyof typeof RuntimeMetadataStatus];
+type RuntimeMetadataStatus = (typeof RuntimeMetadataStatus)[keyof typeof RuntimeMetadataStatus];
 
 const RuntimeDownloadPhase = {
   Downloading: 'downloading',
@@ -61,11 +54,7 @@ type RuntimeInstallCardProps = {
   installRequestId?: string;
   runtimeInstallSnapshot: LlamaCppRuntimeInstallSnapshot;
   onInstallRequestHandled?: (requestId: string) => void;
-  onNotify?: (
-    message: string,
-    kind: LocalInferenceToastKind,
-    autoDismiss?: boolean,
-  ) => void;
+  onNotify?: (message: string, kind: LocalInferenceToastKind, autoDismiss?: boolean) => void;
 };
 
 function isInstalled(status: LlamaCppStatusSnapshot | null): boolean {
@@ -79,14 +68,16 @@ function isActive(progress: LlamaCppInstallProgress | null): boolean {
 }
 
 function canCancel(progress: LlamaCppInstallProgress | null): boolean {
-  return Boolean(progress && ['starting', 'downloading', 'downloading-progress'].includes(progress.phase));
+  return Boolean(
+    progress && ['starting', 'downloading', 'downloading-progress'].includes(progress.phase),
+  );
 }
 
 function isRuntimeDownloadProgress(progress: LlamaCppInstallProgress | null): boolean {
   return Boolean(
     progress &&
-      (progress.phase === RuntimeDownloadPhase.Downloading ||
-        progress.phase === RuntimeDownloadPhase.DownloadingProgress),
+    (progress.phase === RuntimeDownloadPhase.Downloading ||
+      progress.phase === RuntimeDownloadPhase.DownloadingProgress),
   );
 }
 
@@ -121,10 +112,7 @@ export function RuntimeInstallCard({
     [backends, selectedKey],
   );
   // The select may point to a candidate; only current marks the version already enabled.
-  const currentBackend = useMemo(
-    () => backends.find(backend => backend.current),
-    [backends],
-  );
+  const currentBackend = useMemo(() => backends.find(backend => backend.current), [backends]);
 
   const loadMetadata = useCallback(async (): Promise<LlamaCppBackendInfo | undefined> => {
     const [nextStatus, list] = await Promise.all([
@@ -162,7 +150,9 @@ export function RuntimeInstallCard({
           ? await window.electron.llamacpp.installBackend(backend)
           : await window.electron.llamacpp.install();
         if (!result.success && !result.cancelled) {
-          setError(translateRuntimeError(result.error) || i18nService.t('localInferenceRuntimeMissing'));
+          setError(
+            translateRuntimeError(result.error) || i18nService.t('localInferenceRuntimeMissing'),
+          );
         }
         await loadMetadata();
         if (result.success) {
@@ -218,8 +208,10 @@ export function RuntimeInstallCard({
   const downloading = active && isRuntimeDownloadProgress(progress);
   const downloadName = progress?.modelName || selectedBackend?.versionBackend || '';
   // The manifest may omit sizes, so wait for the downloader's server-confirmed total.
-  const downloadTotal = progress?.total && progress.total > 0 ? formatBytes(progress.total) : undefined;
-  const downloadSpeed = progress?.speed && progress.speed > 0 ? formatBytes(progress.speed) : undefined;
+  const downloadTotal =
+    progress?.total && progress.total > 0 ? formatBytes(progress.total) : undefined;
+  const downloadSpeed =
+    progress?.speed && progress.speed > 0 ? formatBytes(progress.speed) : undefined;
   const downloadProgress =
     progress?.completed !== undefined && downloadTotal
       ? i18nService
@@ -247,7 +239,7 @@ export function RuntimeInstallCard({
   };
 
   return (
-    <Card className="relative gap-2 border-primary/20 bg-primary/[0.03]">
+    <Card className="theme-page-runtime-install-card-card-1 relative">
       <Tooltip>
         <TooltipTrigger
           render={
@@ -260,12 +252,10 @@ export function RuntimeInstallCard({
           {serviceStatusLabel}
         </TooltipContent>
       </Tooltip>
-      <CardHeader className="gap-3 px-0">
+      <CardHeader className="theme-control-sizing-6 gap-3">
         <div className="min-w-0">
           <CardTitle className="flex items-center gap-2">
-            {!ready ? (
-              <Download className="size-4" />
-            ) : null}
+            {!ready ? <Download className="size-4" /> : null}
             {i18nService.t('localInferenceRuntimeCardTitle')}
           </CardTitle>
         </div>
@@ -332,14 +322,16 @@ export function RuntimeInstallCard({
         </div>
       </CardHeader>
       {downloading ? (
-        <CardContent className="space-y-2 px-0">
+        <CardContent className="theme-control-sizing-6 space-y-2">
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="min-w-0 truncate font-medium text-foreground">
               {i18nService.t('localInferenceRuntimeDownloading').replace('{name}', downloadName)}
             </span>
             {downloadTotal ? (
               <span className="shrink-0 tabular-nums text-muted-foreground">
-                {i18nService.t('localInferenceRuntimeDownloadTotal').replace('{size}', downloadTotal)}
+                {i18nService
+                  .t('localInferenceRuntimeDownloadTotal')
+                  .replace('{size}', downloadTotal)}
               </span>
             ) : (
               <Skeleton className="h-4 w-20 shrink-0" />
@@ -348,7 +340,9 @@ export function RuntimeInstallCard({
           <div className="flex items-center justify-between gap-3 text-xs tabular-nums text-muted-foreground">
             {downloadSpeed ? (
               <span>
-                {i18nService.t('localInferenceRuntimeDownloadSpeed').replace('{speed}', downloadSpeed)}
+                {i18nService
+                  .t('localInferenceRuntimeDownloadSpeed')
+                  .replace('{speed}', downloadSpeed)}
               </span>
             ) : (
               <Skeleton className="h-3 w-24" />
@@ -358,7 +352,7 @@ export function RuntimeInstallCard({
           <InstallProgressBar progress={progress ?? undefined} />
         </CardContent>
       ) : null}
-      <CardFooter className="justify-between gap-2 border-0 bg-transparent p-0 pb-2">
+      <CardFooter className="theme-page-runtime-install-card-card-footer-1 justify-between">
         <div className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
           {metadataLoading ? (
             <Skeleton className="h-4 w-36" />
@@ -411,7 +405,12 @@ export function RuntimeInstallCard({
                   : i18nService.t('localInferenceInstall')}
               </Button>
               {selectedInstalled && !selectedCurrent ? (
-                <Button type="button" variant="outline" size="sm" onClick={() => void startInstall()}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void startInstall()}
+                >
                   <ArrowRightLeft data-icon="inline-start" />
                   {i18nService.t('localInferenceRuntimeEnableVersion')}
                 </Button>

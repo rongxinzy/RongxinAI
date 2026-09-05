@@ -41,7 +41,7 @@ export function ModelLibrarySettingsModal({
       }}
     >
       <DialogContent className="w-[min(32rem,calc(100%-2rem))] max-h-[80vh] gap-4 overflow-y-auto sm:max-w-lg">
-        <DialogHeader className="gap-1 pr-8">
+        <DialogHeader className="theme-control-sizing-19 gap-1">
           <div className="flex items-start gap-3">
             <div className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Settings2 className="size-4" />

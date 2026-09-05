@@ -48,14 +48,14 @@ export function InstalledSkillGrid({
           <Card
             key={skill.id}
             size="sm"
-            className="group relative min-h-20 flex-row items-center gap-3 border border-border bg-card p-4 ring-0 transition-colors hover:bg-muted"
+            className="theme-page-installed-skill-grid-card-1 group relative flex-row items-center"
           >
             {!batchMode && (
               <Button
                 type="button"
                 variant="ghost"
                 aria-label={name}
-                className="absolute inset-0 z-0 h-auto w-auto rounded-[inherit] border-0 p-0 hover:bg-transparent dark:hover:bg-transparent"
+                className="theme-page-installed-skill-grid-button-1 absolute inset-0 z-0"
                 onClick={() => onSelect(skill)}
               />
             )}

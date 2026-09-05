@@ -86,7 +86,7 @@ export const CodingComposerConfigControls = ({
           nativeButton
           render={
             <PromptInputButton
-              className="max-w-48 gap-1 px-2 text-sm hover:bg-surface-raised"
+              className="theme-prompt-compact-action max-w-48 gap-1"
               aria-label={option.name}
             >
               <span className="truncate">{selectedOptionLabel(option)}</span>
@@ -110,7 +110,7 @@ export const CodingComposerConfigControls = ({
     ) : (
       <PromptInputButton
         key={option.id}
-        className="max-w-48 gap-1 px-2 text-sm hover:bg-surface-raised"
+        className="theme-prompt-compact-action max-w-48 gap-1"
         aria-label={option.name}
         aria-pressed={option.currentValue === true}
         tooltip={option.description ?? option.name}

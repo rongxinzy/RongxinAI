@@ -484,7 +484,7 @@ const createMarkdownComponents = (
           <a
             href={toFileHref(filePath)}
             onClick={handleClick}
-            className="text-primary hover:text-primary-hover underline decoration-primary/50 hover:decoration-primary transition-colors cursor-pointer inline-flex items-center gap-1"
+            className="theme-surface-markdown-link cursor-pointer inline-flex items-center gap-1"
             title={filePath}
             {...props}
           >
@@ -501,7 +501,7 @@ const createMarkdownComponents = (
               variant="ghost"
               size="icon"
               onClick={handleRevealInFolder}
-              className="inline-flex items-center justify-center rounded-md p-0.5 h-auto w-auto text-muted-foreground hover:text-primary hover:bg-surface-raised opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto"
+              className="theme-page-markdown-content-button-1 inline-flex items-center justify-center pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto"
               title={i18nService.t('showInFolder')}
               aria-label={i18nService.t('showInFolder')}
             >
@@ -532,7 +532,7 @@ const createMarkdownComponents = (
           target="_blank"
           rel="noopener noreferrer"
           onClick={handleExternalClick}
-          className="text-primary hover:text-primary-hover underline decoration-primary/50 hover:decoration-primary transition-colors"
+          className="theme-surface-markdown-link"
           {...props}
         >
           {children}
@@ -545,7 +545,7 @@ const createMarkdownComponents = (
         href={hrefValue}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-primary hover:text-primary-hover underline decoration-primary/50 hover:decoration-primary transition-colors"
+        className="theme-surface-markdown-link"
         {...props}
       >
         {children}
@@ -578,7 +578,7 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
     [content],
   );
   return (
-    <div className={`markdown-content text-[15px] leading-[23px] ${className}`}>
+    <div className={`markdown-content text-sm leading-[23px] ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}

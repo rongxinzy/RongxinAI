@@ -56,7 +56,7 @@ export function LocalInferenceToastView({
           variant="ghost"
           size="icon-sm"
           onClick={onClose}
-          className="shrink-0 text-foreground/70 hover:text-foreground"
+          className="theme-page-common-button-1 shrink-0"
           aria-label={i18nService.t('close')}
         >
           <X />

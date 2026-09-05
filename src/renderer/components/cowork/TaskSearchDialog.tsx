@@ -77,7 +77,7 @@ export function TaskSearchDialog({
       <DialogContent
         showCloseButton={false}
         initialFocus={inputRef}
-        className="max-h-[calc(100dvh-2rem)] gap-0 overflow-hidden rounded-2xl p-1 sm:max-w-lg"
+        className="theme-task-search-dialog max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-lg"
       >
         <DialogTitle className="sr-only">{labels.title}</DialogTitle>
         <DialogDescription className="sr-only">{labels.description}</DialogDescription>

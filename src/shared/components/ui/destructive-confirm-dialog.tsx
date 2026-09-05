@@ -51,16 +51,13 @@ function DestructiveConfirmDialog({
     >
       <DialogContent
         showCloseButton={false}
-        className={cn(
-          'w-full max-w-sm rounded-2xl border border-border bg-surface p-0 shadow-2xl',
-          className,
-        )}
+        className={cn('theme-confirm-dialog w-full max-w-sm', className)}
       >
         <div className="flex w-full min-w-0 flex-col gap-5 p-6">
           <div className="flex min-w-0 flex-col gap-2">
-            <DialogTitle className="text-base font-semibold text-foreground">{title}</DialogTitle>
+            <DialogTitle className="theme-confirm-title">{title}</DialogTitle>
             <DialogDescription
-              className="min-w-0 truncate text-sm leading-6 text-muted-foreground"
+              className="theme-confirm-description min-w-0 truncate"
               title={description}
             >
               {description}
@@ -70,7 +67,7 @@ function DestructiveConfirmDialog({
             <Button
               type="button"
               variant="ghost"
-              className="h-8 min-w-16 cursor-pointer !border-0 px-3 text-muted-foreground shadow-none hover:bg-surface-raised hover:text-foreground"
+              className="theme-confirm-cancel min-w-16"
               data-destructive-confirm-cancel-button="true"
               disabled={isConfirming}
               onClick={onCancel}
@@ -81,7 +78,7 @@ function DestructiveConfirmDialog({
               <Button
                 type="button"
                 variant="ghost"
-                className="h-8 min-w-16 cursor-pointer !border-0 px-3 text-destructive shadow-none hover:bg-surface-raised"
+                className="theme-confirm-secondary min-w-16"
                 data-destructive-confirm-secondary-button="true"
                 disabled={isConfirming}
                 onClick={onSecondaryConfirm}
@@ -92,7 +89,7 @@ function DestructiveConfirmDialog({
             <Button
               type="button"
               variant={confirmVariant}
-              className="h-8 min-w-16 cursor-pointer px-3 shadow-none"
+              className="theme-confirm-button min-w-16"
               data-destructive-confirm-button="true"
               disabled={confirmDisabled || isConfirming}
               onClick={onConfirm}

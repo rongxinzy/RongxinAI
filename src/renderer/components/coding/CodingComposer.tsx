@@ -150,7 +150,7 @@ export const CodingComposer = ({
           />
         ) : null}
         <PromptInput
-          className="input-aura rounded-3xl shadow-elevated transition-shadow **:data-[slot=input-group]:rounded-3xl"
+          className="theme-composer-surface input-aura"
           onSubmit={(_message, event) => {
             event.preventDefault();
             if (!disabled && !isSubmitting && prompt.trim()) onSend();
@@ -224,7 +224,7 @@ export const CodingComposer = ({
                   <PromptInputButton
                     key={attachment.path}
                     type="button"
-                    className="max-w-48 gap-1 px-2 text-sm hover:bg-surface-raised"
+                    className="theme-prompt-compact-action max-w-48 gap-1"
                     tooltip={i18nService.t('codingAttachmentRemove')}
                     onClick={() => onRemoveAttachment(attachment.path)}
                   >

@@ -16,7 +16,12 @@ import {
   groupMarketplaceVariants,
   MARKETPLACE_GGUF_FORMAT,
 } from '../utils/marketplace';
-import { formatBytes, formatPullProgress, isPullInProgress, progressBarPercent } from '../utils/progress';
+import {
+  formatBytes,
+  formatPullProgress,
+  isPullInProgress,
+  progressBarPercent,
+} from '../utils/progress';
 
 const MARKETPLACE_DOWNLOAD_SIDEBAR_MIN_WIDTH = 320;
 const MARKETPLACE_DOWNLOAD_SIDEBAR_MAX_WIDTH = 480;
@@ -78,7 +83,8 @@ export function MarketplaceDownloadSidebar({
     setSidebarWidth(current => Math.min(current, getMaxSidebarWidth(containerWidth)));
   }, [containerWidth]);
 
-  const isCompact = containerWidth > 0 && containerWidth < MARKETPLACE_DOWNLOAD_SIDEBAR_COMPACT_BREAKPOINT;
+  const isCompact =
+    containerWidth > 0 && containerWidth < MARKETPLACE_DOWNLOAD_SIDEBAR_COMPACT_BREAKPOINT;
   const visibleWidth = visible ? sidebarWidth : 0;
 
   const handleResizePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -177,16 +183,21 @@ function MarketplaceDownloadSidebarContent({
 }) {
   const displayName = getMarketplaceDisplayName(model.repoId);
   const variants = groupMarketplaceVariants(model.files);
-  const selectedVariant = variants.find(variant => variant.files.some(file => file.path === model.filePath)) ?? variants[0];
+  const selectedVariant =
+    variants.find(variant => variant.files.some(file => file.path === model.filePath)) ??
+    variants[0];
   const phase = progress?.phase;
-  const hasFailed = phase === MarketplaceDownloadProgressPhase.Failed || phase === MarketplaceDownloadProgressPhase.Cancelled;
+  const hasFailed =
+    phase === MarketplaceDownloadProgressPhase.Failed ||
+    phase === MarketplaceDownloadProgressPhase.Cancelled;
   const isComplete = phase === MarketplaceDownloadProgressPhase.Done;
   const isVerifying = phase === MarketplaceDownloadProgressPhase.Detecting;
-  const downloadStatus = isComplete || isVerifying
-    ? MarketplaceDownloadStageStatus.Complete
-    : hasFailed
-      ? MarketplaceDownloadStageStatus.Failed
-      : MarketplaceDownloadStageStatus.Active;
+  const downloadStatus =
+    isComplete || isVerifying
+      ? MarketplaceDownloadStageStatus.Complete
+      : hasFailed
+        ? MarketplaceDownloadStageStatus.Failed
+        : MarketplaceDownloadStageStatus.Active;
   const verificationStatus = isComplete
     ? MarketplaceDownloadStageStatus.Complete
     : hasFailed
@@ -212,7 +223,9 @@ function MarketplaceDownloadSidebarContent({
       <header className="flex min-h-16 items-start justify-between gap-3 border-b border-border px-4 py-3">
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate text-base font-semibold leading-6 text-foreground">{displayName}</h2>
+            <h2 className="truncate text-base font-semibold leading-6 text-foreground">
+              {displayName}
+            </h2>
             {model.metadataStatus === 'verified' ? (
               <Badge variant="secondary" className="shrink-0 gap-1 text-success">
                 <BadgeCheck className="size-3.5" aria-hidden="true" />
@@ -236,18 +249,27 @@ function MarketplaceDownloadSidebarContent({
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="flex flex-wrap gap-1.5">
           {tags.map(tag => (
-            <Badge key={tag} variant="outline" className="h-6 rounded-md px-2 py-0 text-xs font-normal">
+            <Badge
+              key={tag}
+              variant="outline"
+              className="theme-page-marketplace-download-sidebar-badge-1"
+            >
               {tag}
             </Badge>
           ))}
         </div>
 
-        <div className="mt-6 flex flex-col gap-1" aria-label={i18nService.t('marketplaceDownloadPipeline')}>
+        <div
+          className="mt-6 flex flex-col gap-1"
+          aria-label={i18nService.t('marketplaceDownloadPipeline')}
+        >
           <MarketplaceDownloadStage
             status={downloadStatus}
             icon={Download}
             title={i18nService.t('marketplaceDownloadStageDownload')}
-            detail={progress ? formatPullProgress(progress) : i18nService.t('marketplaceInstallPulling')}
+            detail={
+              progress ? formatPullProgress(progress) : i18nService.t('marketplaceInstallPulling')
+            }
             progress={progressBarPercent(progress)}
             showConnector
           />
@@ -296,18 +318,27 @@ function MarketplaceDownloadStage({
   const statusClassName = {
     [MarketplaceDownloadStageStatus.Active]: 'border-primary/30 bg-primary/10 text-primary',
     [MarketplaceDownloadStageStatus.Complete]: 'border-success/30 bg-success/10 text-success',
-    [MarketplaceDownloadStageStatus.Failed]: 'border-destructive/30 bg-destructive/10 text-destructive',
+    [MarketplaceDownloadStageStatus.Failed]:
+      'border-destructive/30 bg-destructive/10 text-destructive',
     [MarketplaceDownloadStageStatus.Pending]: 'border-border bg-muted text-muted-foreground',
   } satisfies Record<MarketplaceDownloadStageStatus, string>;
 
   return (
     <div className="relative flex gap-3 pb-5 last:pb-0">
       <div className="relative z-10 flex flex-col items-center">
-        <span className={cn('flex size-9 shrink-0 items-center justify-center rounded-full border', statusClassName[status])}>
+        <span
+          className={cn(
+            'flex size-9 shrink-0 items-center justify-center rounded-full border',
+            statusClassName[status],
+          )}
+        >
           <Icon className="size-4" />
         </span>
         {showConnector ? (
-          <span aria-hidden="true" className="absolute top-9 h-[calc(100%-2.25rem)] w-px bg-border" />
+          <span
+            aria-hidden="true"
+            className="absolute top-9 h-[calc(100%-2.25rem)] w-px bg-border"
+          />
         ) : null}
       </div>
       <div className="min-w-0 flex-1 pt-1">
@@ -320,15 +351,20 @@ function MarketplaceDownloadStage({
 }
 
 function getVerificationDetail(status: MarketplaceDownloadStageStatus): string {
-  if (status === MarketplaceDownloadStageStatus.Active) return i18nService.t('localInferenceInstallVerifying');
-  if (status === MarketplaceDownloadStageStatus.Complete) return i18nService.t('marketplaceDownloadCompleted');
-  if (status === MarketplaceDownloadStageStatus.Failed) return i18nService.t('marketplaceInstallFailed');
+  if (status === MarketplaceDownloadStageStatus.Active)
+    return i18nService.t('localInferenceInstallVerifying');
+  if (status === MarketplaceDownloadStageStatus.Complete)
+    return i18nService.t('marketplaceDownloadCompleted');
+  if (status === MarketplaceDownloadStageStatus.Failed)
+    return i18nService.t('marketplaceInstallFailed');
   return i18nService.t('marketplaceDownloadQueued');
 }
 
 function getReadyDetail(status: MarketplaceDownloadStageStatus): string {
-  if (status === MarketplaceDownloadStageStatus.Complete) return i18nService.t('marketplaceInstalled');
-  if (status === MarketplaceDownloadStageStatus.Failed) return i18nService.t('marketplaceInstallFailed');
+  if (status === MarketplaceDownloadStageStatus.Complete)
+    return i18nService.t('marketplaceInstalled');
+  if (status === MarketplaceDownloadStageStatus.Failed)
+    return i18nService.t('marketplaceInstallFailed');
   return i18nService.t('marketplaceDownloadWaiting');
 }
 
@@ -337,7 +373,9 @@ function clampSidebarWidth(width: number, maxWidth: number): number {
 }
 
 function getMaxSidebarWidth(containerWidth = 0): number {
-  const availableWidth = containerWidth || (typeof window === 'undefined' ? MARKETPLACE_DOWNLOAD_SIDEBAR_MAX_WIDTH : window.innerWidth);
+  const availableWidth =
+    containerWidth ||
+    (typeof window === 'undefined' ? MARKETPLACE_DOWNLOAD_SIDEBAR_MAX_WIDTH : window.innerWidth);
   if (availableWidth < MARKETPLACE_DOWNLOAD_SIDEBAR_COMPACT_BREAKPOINT) {
     return Math.min(MARKETPLACE_DOWNLOAD_SIDEBAR_MAX_WIDTH, availableWidth);
   }

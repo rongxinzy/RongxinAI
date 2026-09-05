@@ -207,7 +207,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           }
         }}
       >
-        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="theme-control-sizing-4 flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{i18nService.t('scheduledTasksNewTask')}</DialogTitle>
             <DialogDescription>{i18nService.t('scheduledTasksNewTask')}</DialogDescription>
@@ -234,7 +234,7 @@ const ScheduledTasksView: React.FC<ScheduledTasksViewProps> = ({
           }
         }}
       >
-        <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="theme-control-sizing-4 flex max-h-[85vh] flex-col gap-0 overflow-hidden sm:max-w-2xl">
           <DialogHeader className="sr-only">
             <DialogTitle>{editingTask?.name ?? i18nService.t('scheduledTasksTitle')}</DialogTitle>
             <DialogDescription>{editingTask?.name ?? ''}</DialogDescription>

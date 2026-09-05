@@ -231,7 +231,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
         render={
           <PromptInputButton
             disabled={disabled}
-            className="sidebar-interactive-surface hover:shadow-subtle data-popup-open:shadow-subtle"
+            className="sidebar-interactive-surface theme-prompt-raised-action"
             aria-label={i18nService.t('filesAndImages')}
           >
             <Plus className="h-4 w-4" />
@@ -303,7 +303,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
                         dispatch(toggleActiveSkill(skill.id));
                         setOpen(false);
                       }}
-                      className="items-start gap-2 py-2 pr-8 pl-2"
+                      className="theme-control-sizing-15 items-start gap-2"
                     >
                       <Avatar className="size-8 shrink-0 rounded-md bg-muted after:rounded-md">
                         {skill.iconUrl && (
@@ -331,7 +331,7 @@ const PromptPlusMenu: React.FC<PromptPlusMenuProps> = ({
               )}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onManageSkills} className="py-2.5">
+            <DropdownMenuItem onClick={onManageSkills} className="theme-control-sizing-16">
               <PlusMenuManageIcon className="size-4" />
               <span className="truncate">{i18nService.t('manageSkills')}</span>
             </DropdownMenuItem>

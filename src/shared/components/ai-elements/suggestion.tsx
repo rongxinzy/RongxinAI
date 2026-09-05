@@ -35,7 +35,7 @@ export const Suggestion = ({
 
   return (
     <Button
-      className={cn('cursor-pointer rounded-full px-4', className)}
+      className={cn('theme-page-suggestion-button-variant-1 cursor-pointer', className)}
       onClick={handleClick}
       size={size}
       type="button"
