@@ -163,7 +163,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 1. 同一容器内，子元素圆角 ≤ 父元素圆角，视觉上保持同心。
 2. 禁止任意值圆角（`rounded-[7px]` 等）；刻度不满足时优先改设计，其次扩展刻度。
 3. 拼接控件（ButtonGroup 等）相邻边圆角归零，由统一的 CSS 规则处理（参考 `index.css` 中 button-group 段），禁止用 `rounded-none` 手搓拼接。
-4. **唯一例外：主输入框（hero prompt input）容器允许 `rounded-3xl`。** 它是产品的中心舞台元素，更大的圆角是有意的识别特征；此例外不推广到其他容器。
+4. **特定场景例外：主输入框（hero prompt input）容器允许 `rounded-3xl`。** 它是产品的中心舞台元素，更大的圆角是有意的识别特征；此例外不推广到其他容器。任务搜索弹层另按用户提供的 Codex 参考图使用 `rounded-2xl`，见 Shell 展示模块边界。
 5. **按钮圆角以组件库为准**：Button 默认尺寸 `rounded-lg`（10px），xs/sm 档 8px。禁止在调用点用 className 改按钮圆角——`rounded-xl` 按钮、`rounded-full` 圆形按钮（非头像/滑块/胶囊本体）、4px `rounded` 均属违规。
 
 ## 阴影
@@ -422,6 +422,9 @@ src/shared/components/ui/page-tabs.tsx
 
 
 ## Shell 展示模块边界
+
+- 侧栏搜索复用 `SidebarSearchTrigger` 与居中 `TaskSearchDialog`：按参考图采用无边框输入栏、单行任务、右侧归属与快捷键、底部快捷操作。宽度使用 `max-w-lg`，行高 32px，按用户提供的 Codex 截图使用 `rounded-2xl` 弹层与 `rounded-full` 结果高亮（仅限任务搜索弹层）。查询与跳转留在 `CoworkSearchModal` 控制层，侧栏树不随搜索过滤或重建。方向键 / Enter 与 Cmd/Ctrl+1–9 可选任务，Escape 关闭并恢复焦点；快捷操作只呈现已有功能。
+- 侧栏收起时内容保持挂载并设置 `inert`，同时退出键盘顺序和可访问树；展开后恢复原有控件及树状态。
 
 - 侧栏导航使用共享 `SidebarNavigationView` / `SidebarNavigationItem`：32px 行高、8px 圆角、统一图标槽和文字省略；选中态使用 `card`、`border` 与正文色，悬停使用同一语义表面。状态、可见性策略、预加载与新任务回调由原控制组件提供。
 - `Button` 的 `navigation` variant / size 负责导航视觉；`toolbar` variant 配合 `icon` size 负责侧栏及顶栏的 32px 图标按钮。页面不再覆盖这些按钮的颜色、圆角和高度。
