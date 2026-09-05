@@ -2,98 +2,87 @@ name: Security Scan
 
 on:
   schedule:
-    - cron: '0 0 * * 1' # ???
+    - cron: '0 0 * * 1'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # ========== ?????? ==========
   secrets-scan:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Run TruffleHog
+      - name: Scan repository history for verified secrets
         uses: trufflesecurity/trufflehog@v3.88.30
         with:
           path: ./
-          base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-          head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           extra_args: --only-verified
 
-  # ========== ?????? ==========
   dependency-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '24.x'
-      - uses: actions/cache@v5
+          bun-version: '1.4.0'
+      - name: Audit the checked-in Bun graph
+        run: |
+          mkdir -p security-reports
+          bun audit --audit-level=high --json > security-reports/bun-audit.json 2> security-reports/bun-audit.stderr
+      - name: Preserve the audit report even on failure
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
-          path: ~/.npm
-          key: npm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: npm-${{ runner.os }}-
+          name: security-bun-audit
+          path: security-reports/
+          if-no-files-found: error
+          retention-days: 3
 
-      # Keep the audited dependency graph identical to the checked-in lockfile.
-      - run: npm ci --ignore-scripts
-
-      # npm audit
-      - name: Run npm audit
-        run: |
-          echo "Running npm audit..."
-          npm audit --audit-level=high || echo "? npm audit found issues (non-blocking)"
-
-      # ?? better-npm-audit ??????
-      - name: Run better-npm-audit
-        run: |
-          npx better-npm-audit audit --level=high || echo "? better-npm-audit found issues (non-blocking)"
-
-  # ========== Skill ???? ==========
   skills-audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      npm_config_fetch_retries: '2'
+      npm_config_fetch_timeout: '60000'
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: '24.x'
+      - name: Audit all nested Skills and locked npm tool projects
+        run: bash scripts/ci/audit-npm-projects.sh "$RUNNER_TEMP/security-npm-reports"
+      - name: Preserve graphs and reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: security-npm-audit
+          path: ${{ runner.temp }}/security-npm-reports/
+          if-no-files-found: error
+          retention-days: 3
 
-      - name: Audit Skills
-        run: |
-          set +e  # Don't exit on error
-
-          for skill in SKILLs/*/; do
-            if [ -f "$skill/package.json" ]; then
-              echo ""
-              echo "=== Auditing $skill ==="
-              (cd "$skill" && npm install --package-lock-only 2>/dev/null && npm audit --audit-level=moderate 2>/dev/null) || echo "? Audit issues found in $skill (non-blocking)"
-            fi
-          done
-
-          echo ""
-          echo "=== Skill audit complete ==="
-
-  # ========== ???? (CodeQL) ==========
   codeql:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       actions: read
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v6
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@v4
         with:
-          languages: javascript, typescript
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+          languages: javascript-typescript
+      - uses: github/codeql-action/autobuild@v4
+      - uses: github/codeql-action/analyze@v4
