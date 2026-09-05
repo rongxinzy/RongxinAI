@@ -63,9 +63,16 @@ jobs:
             echo '- external publication: disabled'
           } >> "$GITHUB_STEP_SUMMARY"
 
+  memory-regression:
+    needs: prepare-candidate
+    uses: ./.github/workflows/memory-regression.yml
+    with:
+      source-ref: ${{ needs.prepare-candidate.outputs.commit }}
+
   quality:
     needs: prepare-candidate
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with:
@@ -104,13 +111,22 @@ jobs:
           bun run check:openclaw-decoupling
           bun run check:supply-chain-inputs
           bun run lint
+      - name: Typecheck and enforce renderer bundle budgets
+        run: |
+          bun run build:tsc
+          bun run build:vite
+          bun run test:bundle-budget
+        env:
+          VITE_SKIP_ELECTRON: '1'
+      - name: Verify Presentation Studio compiler and validator
+        run: npm test --prefix SKILLs/presentation-studio
       - name: Compile and test
         run: |
           bun run compile:electron
           bun run test
 
   build-candidate:
-    needs: [prepare-candidate, quality]
+    needs: [prepare-candidate, quality, memory-regression]
     strategy:
       fail-fast: true
       matrix:
@@ -279,6 +295,9 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Qualify Windows compression before candidate assembly
+        if: ${{ matrix.platform == 'windows' }}
+        uses: ./.github/actions/verify-windows-compression
       - name: Verify Windows cold install, cache-hit upgrade, and uninstall
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
@@ -289,6 +308,24 @@ jobs:
       - name: Verify the Linux renderer
         if: ${{ matrix.platform == 'linux' }}
         run: xvfb-run -a node scripts/verify-linux-renderer.mjs release/linux-unpacked release/linux-render-smoke.png
+      - name: Install and start the exact Linux candidate deb
+        if: ${{ matrix.platform == 'linux' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          debs=(release/*.deb)
+          [[ ${#debs[@]} -eq 1 ]] || { echo 'Expected exactly one Linux deb package' >&2; exit 1; }
+          sudo apt-get install -y "$(realpath "${debs[0]}")"
+          node scripts/verify-linux-renderer.mjs '/opt/知远/知远' release/linux-deb-install-smoke.png
+      - name: Upload Linux candidate startup diagnostics
+        if: ${{ always() && matrix.platform == 'linux' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: candidate-linux-startup-diagnostics
+          path: release/*smoke.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Assemble Windows candidate payload
         if: ${{ matrix.platform == 'windows' }}
         shell: bash

@@ -299,6 +299,9 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-runtime-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
+      - name: Qualify Windows compression before publication
+        if: ${{ matrix.platform == 'windows' }}
+        uses: ./.github/actions/verify-windows-compression
       - name: Verify the packaged renderer in a virtual Ubuntu desktop
         if: ${{ matrix.platform == 'linux' }}
         run: >-

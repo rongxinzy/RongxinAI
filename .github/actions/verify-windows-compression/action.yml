@@ -1,0 +1,20 @@
+name: Verify Windows compression qualification
+description: Require compression size, extraction time, content identity and Python probes before publication
+runs:
+  using: composite
+  steps:
+    - name: Qualify the packaged Skill Python archive
+      shell: powershell
+      run: >-
+        powershell -NoProfile -ExecutionPolicy Bypass
+        -File scripts/ci/benchmark-skill-python-compression.ps1
+        -ProjectRoot '${{ github.workspace }}'
+        -RequireQualified
+    - name: Preserve compression qualification report
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: windows-compression-${{ github.job }}
+        path: build-tar/windows-components/skill-python-compression-benchmark.json
+        if-no-files-found: warn
+        retention-days: 3

@@ -1,27 +1,13 @@
 name: Windows installer gate
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/windows-installer-pr.yml"
-      - "bun.lock"
-      - "package.json"
-      - "electron-builder.json"
-      - "vite.config.ts"
-      - "build/icons/**"
-      - "build/installer-assets/**"
-      - "scripts/**"
-      - "MCPs/**"
-      - "SKILLs/**"
-      - "resources/vc_redist.x64.exe"
+  schedule:
+    - cron: '23 2 * * 1'
+  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
-
-concurrency:
-  group: windows-installer-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -36,12 +22,13 @@ jobs:
         run: node scripts/ci/check-openclaw-decoupling.mjs
       - uses: actions/setup-node@v6
         with:
-          node-version: "24.x"
+          node-version: '24.x'
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: "1.4.0"
+          bun-version: '1.4.0'
       - name: Restore packaging caches
-        uses: actions/cache@v5
+        id: packaging-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.bun/install/cache
@@ -72,8 +59,8 @@ jobs:
             -TimeoutMinutes 55 `
             -HeartbeatSeconds 60
         env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          NODE_OPTIONS: '--max-old-space-size=4096'
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       - name: Check offline installer size
         shell: powershell
         run: >-
@@ -81,13 +68,8 @@ jobs:
           -File scripts/ci/windows-installer-size-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
       - name: Benchmark shared Skill Python solid compression
-        id: skill-python-compression
-        shell: powershell
-        run: >-
-          powershell -NoProfile -ExecutionPolicy Bypass
-          -File scripts/ci/benchmark-skill-python-compression.ps1
-          -ProjectRoot ${{ github.workspace }}
-          -RequireQualified
+        if: ${{ github.event_name != 'pull_request' }}
+        uses: ./.github/actions/verify-windows-compression
       - name: Verify embedded runtimes with a clean PATH
         shell: powershell
         run: >-
@@ -100,6 +82,18 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass
           -File scripts/ci/windows-installer-smoke.ps1
           -ProjectRoot ${{ github.workspace }}
+      - name: Save shared packaging caches from verified main builds
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && steps.packaging-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.bun/install/cache
+            ~/.npm
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+            vendor/engram-runtime
+            vendor/channel-runtime
+          key: ${{ steps.packaging-cache.outputs.cache-primary-key }}
       - name: Collect installer diagnostics
         if: ${{ failure() }}
         shell: powershell
@@ -119,4 +113,4 @@ jobs:
             installer-diagnostics/install-timing.log
             ${{ runner.temp }}/zhiyuan-build-logs
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 3
