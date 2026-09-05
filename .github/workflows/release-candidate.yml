@@ -295,6 +295,9 @@ jobs:
         run: |
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-installer-size-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
           powershell -NoProfile -ExecutionPolicy Bypass -File scripts/ci/windows-runtime-smoke.ps1 -ProjectRoot '${{ github.workspace }}'
+      - name: Qualify Windows compression before candidate assembly
+        if: ${{ matrix.platform == 'windows' }}
+        uses: ./.github/actions/verify-windows-compression
       - name: Verify Windows cold install, cache-hit upgrade, and uninstall
         if: ${{ matrix.platform == 'windows' }}
         shell: powershell
