@@ -36,6 +36,28 @@ After this workflow is available on main, use **CI → Run workflow** on a selec
 to force all expensive checks. Individual Linux/Windows manual workflows remain available.
 Manual checks supplement the PR checks; they do not replace the PR merge-commit check.
 
+## Windows PR latency
+
+PR installation checks retain installer size, clean-PATH runtime probes, cold install,
+cache-hit upgrade and uninstall. Compression qualification runs on manual and weekly
+Windows builds, and is mandatory before both candidate assembly and tag publication.
+The shared action retains its JSON report and enforces the existing size, extraction
+time, content identity and Python import criteria.
+
+PRs only restore packaging caches; they do not archive and upload them after testing.
+Monday's Windows build (02:23 UTC) and manual builds on main save missing cache entries
+after all installation checks succeed. Other branches never write the shared cache.
+The restore/save paths and key match; frozen dependency installation still runs on a
+cache hit. Before the first successful main warmup, PRs can run cold. A cache miss
+affects speed only and does not skip installation or verification.
+
+The reference Windows job in run 33942412961 took 22m11s: compression qualification
+was 3m28s and cache saving was 3m50s (662 MB compressed cache, mostly local archiving
+time). The next-run acceptance target is under 17 minutes with every retained gate
+passing. Record restore time and cache hit/miss alongside the final duration; a single
+run is directional evidence, not a median/P95 claim. If the target is missed, report
+the miss and investigate the measured bottleneck without relaxing installation tests.
+
 ## Required-check rollout and measurement
 
 The main ruleset requires `merge-gate` from GitHub Actions (app ID 15368), with the
