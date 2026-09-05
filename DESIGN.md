@@ -320,6 +320,8 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 禁止：给工具栏触发按钮加 `border`（包括 `border-input`）、用 `rounded-full` 胶囊、用阴影作为 hover 反馈——这些是已被否决的变体。
 
+选择器菜单共用 `SelectorOptionContent`：前置图标 `size-4`，主标题 `text-sm`，说明 `text-xs text-muted-foreground`；长标题允许换行。模型行显示供应商并在右侧预留当前模型勾选位置，键盘游标用 `bg-muted` 表达，与当前模型标记独立。权限菜单保留原生单选语义与右侧指示器。菜单外壳沿用共享 Popover、Command 的语义色与圆角，不在业务组件强制覆盖。
+
 ## Button 使用纪律
 
 1. **一切按钮走组件库**：`Button`（`src/shared/components/ui/button.tsx`）或工具栏场景的 `PromptInputButton`。原生 `<button>` 仅允许用于 Button 无法表达的复合内容（如缩略图选择卡），且必须自行补齐完整状态链（hover / focus-visible ring / active / disabled）。
