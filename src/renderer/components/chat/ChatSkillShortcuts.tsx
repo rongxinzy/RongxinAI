@@ -139,10 +139,10 @@ const ChatSkillShortcuts: React.FC = () => {
                 }}
                 onClick={() => handleSelect(entry)}
                 className={cn(
-                  'chat-skill-shortcut w-full justify-start gap-2 border border-transparent bg-transparent px-3 text-left !transition-colors !duration-200 ease-out hover:border-border hover:!bg-card hover:!text-foreground',
+                  'theme-page-chat-skill-shortcuts-button-variant-1 chat-skill-shortcut w-full justify-start text-left',
                   isActive
-                    ? 'border-border bg-card font-medium text-foreground hover:border-border hover:!bg-card hover:!text-foreground'
-                    : 'text-muted-foreground',
+                    ? 'theme-page-chat-skill-shortcuts-button-variant-2'
+                    : 'theme-page-chat-skill-shortcuts-button-variant-3',
                 )}
               >
                 {animatedIcon?.icon ?? (

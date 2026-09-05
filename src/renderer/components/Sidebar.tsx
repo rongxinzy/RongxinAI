@@ -590,7 +590,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   size="sm"
                   onClick={handleBatchDeleteClick}
                   disabled={selectedIds.size === 0}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors"
+                  className="theme-page-sidebar-button-1 inline-flex items-center"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   {selectedIds.size > 0 ? `${selectedIds.size}` : ''}
@@ -600,7 +600,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   variant="outline"
                   size="sm"
                   onClick={handleExitBatchMode}
-                  className="px-3 py-1.5 text-sm font-medium rounded-lg text-muted-foreground hover:bg-surface-raised transition-colors"
+                  className="theme-page-sidebar-button-2"
                 >
                   {i18nService.t('batchCancel')}
                 </Button>

@@ -133,7 +133,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
             {i18nService.t('piRuntimeApi')}
           </FieldLabel>
           <Select value={value?.api ?? PiRuntimeSelectValue.Auto} onValueChange={updateApi}>
-            <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectTrigger className="theme-page-pi-runtime-model-config-select-trigger-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger>
@@ -166,7 +166,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
         </Field>
 
         <Collapsible defaultOpen={false} className="col-span-2">
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-1 py-1 text-xs font-medium text-foreground hover:bg-muted">
+          <CollapsibleTrigger className="theme-fold-compact flex w-full items-center justify-between">
             {i18nService.t('piRuntimeCompat')}
             <ChevronDown className="size-4 text-muted-foreground" />
           </CollapsibleTrigger>
@@ -187,7 +187,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                         )
                       }
                     >
-                      <SelectTrigger className="h-8 w-24 shrink-0 text-xs">
+                      <SelectTrigger className="theme-page-pi-runtime-model-config-select-trigger-2 shrink-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent alignItemWithTrigger>
@@ -227,7 +227,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger>
@@ -263,7 +263,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger>
@@ -299,7 +299,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger>

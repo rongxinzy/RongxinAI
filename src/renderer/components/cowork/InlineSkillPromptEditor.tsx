@@ -71,7 +71,7 @@ const createSkillToken = (skillId: string, label: string, iconUrl?: string): HTM
   token.contentEditable = 'false';
   token.dataset.skillToken = skillId;
   token.className =
-    'group mx-0.5 inline-flex h-6 select-none items-center gap-1 rounded-full bg-(--zy-skill-blue-background) px-2 text-sm font-medium leading-none text-(--zy-skill-blue-foreground) transition-colors hover:bg-(--zy-skill-blue-background)';
+    'theme-surface-skill-token group mx-0.5 inline-flex h-6 select-none items-center gap-1 px-2';
 
   const iconSlot = document.createElement('span');
   iconSlot.className = 'relative inline-flex size-3 shrink-0 items-center justify-center';
@@ -80,11 +80,11 @@ const createSkillToken = (skillId: string, label: string, iconUrl?: string): HTM
     const icon = document.createElement('img');
     icon.src = iconUrl;
     icon.alt = '';
-    icon.className = 'size-3 object-contain transition-opacity group-hover:opacity-0';
+    icon.className = 'theme-surface-skill-icon size-3 object-contain';
     iconSlot.append(icon);
   } else {
     const fallback = document.createElement('span');
-    fallback.className = 'text-xs leading-none transition-opacity group-hover:opacity-0';
+    fallback.className = 'theme-surface-skill-icon theme-surface-skill-fallback';
     fallback.textContent = '✦';
     iconSlot.append(fallback);
   }
@@ -96,7 +96,7 @@ const createSkillToken = (skillId: string, label: string, iconUrl?: string): HTM
   remove.setAttribute('aria-label', `${i18nService.t('clearSkill')} ${label}`);
   remove.title = i18nService.t('clearSkill');
   remove.className =
-    'pointer-events-none absolute inset-0 inline-flex items-center justify-center rounded-full text-base font-normal leading-none opacity-0 transition-opacity hover:bg-(--zy-skill-blue-foreground)/10 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none';
+    'theme-surface-skill-remove pointer-events-none absolute inset-0 inline-flex items-center justify-center group-hover:pointer-events-auto focus-visible:pointer-events-auto';
   remove.textContent = '×';
   iconSlot.append(remove);
   token.append(iconSlot);
@@ -368,7 +368,7 @@ const InlineSkillPromptEditor = forwardRef<HTMLDivElement, InlineSkillPromptEdit
         onMouseUp={captureSelection}
         onPaste={handleEditorPaste}
         className={cn(
-          'min-h-20 w-full whitespace-pre-wrap break-words px-3 py-2 text-sm leading-6 text-foreground outline-none empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)] disabled:cursor-not-allowed disabled:opacity-50',
+          'theme-surface-skill-editor min-h-20 w-full whitespace-pre-wrap break-words px-3 py-2 empty:before:pointer-events-none empty:before:content-[attr(data-placeholder)] disabled:cursor-not-allowed',
           className,
         )}
       />

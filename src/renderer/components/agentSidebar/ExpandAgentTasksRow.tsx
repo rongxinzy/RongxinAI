@@ -16,7 +16,7 @@ const ExpandAgentTasksRow: React.FC<ExpandAgentTasksRowProps> = ({ isLoading, la
       variant="ghost"
       onClick={onClick}
       disabled={isLoading}
-      className="sidebar-interactive-surface ml-[-6px] flex h-7 w-[calc(100%+12px)] items-center justify-start rounded-md pl-[38px] pr-2.5 text-left text-sm font-normal text-foreground opacity-[0.28] disabled:cursor-not-allowed disabled:opacity-60"
+      className="theme-page-expand-agent-tasks-row-button-1 sidebar-interactive-surface ml-[-6px] flex items-center justify-start text-left disabled:cursor-not-allowed"
     >
       {isLoading ? i18nService.t('loading') : label}
     </Button>

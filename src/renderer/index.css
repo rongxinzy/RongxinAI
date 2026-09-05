@@ -1,3 +1,6 @@
+/* Establish cascade order before generated component recipes declare their layer. */
+@layer theme, base, components, utilities;
+
 /* Theme system: CSS variable definitions for the light/dark themes */
 @import './theme/css/themes.css';
 @import './theme/css/base.css';

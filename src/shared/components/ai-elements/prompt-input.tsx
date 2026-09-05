@@ -980,7 +980,7 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      className={cn('field-sizing-content max-h-48 min-h-16', className)}
+      className={cn("theme-control-sizing-20 field-sizing-content max-h-48", className)}
       name="message"
       onCompositionEnd={handleCompositionEnd}
       onCompositionStart={handleCompositionStart}
@@ -1150,10 +1150,7 @@ export const PromptInputSubmit = ({
   return (
     <InputGroupButton
       aria-label={isGenerating ? 'Stop' : 'Submit'}
-      className={cn(
-        'rounded-full transition-transform duration-150 ease-out hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none',
-        className,
-      )}
+      className={cn('theme-input-submit', className)}
       onClick={handleClick}
       size={size}
       type={isGenerating && onStop ? 'button' : 'submit'}
@@ -1177,8 +1174,8 @@ export const PromptInputSelectTrigger = ({
 }: PromptInputSelectTriggerProps) => (
   <SelectTrigger
     className={cn(
-      'border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors',
-      'hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground',
+      'theme-page-prompt-input-select-trigger-variant-1',
+      'theme-page-prompt-input-select-trigger-variant-2',
       className,
     )}
     {...props}

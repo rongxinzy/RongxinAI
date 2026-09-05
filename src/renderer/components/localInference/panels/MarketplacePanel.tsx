@@ -1,16 +1,16 @@
 import { Alert, AlertDescription, AlertTitle } from '@shared/components/ui/alert';
 import { Button } from '@shared/components/ui/button';
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from '@shared/components/ui/input-group';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@shared/components/ui/input-group';
 import { Monitor, RefreshCw, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { MarketplaceModelCardSkeleton } from '../components/MarketplaceCardLayout';
 
-import { type MarketplaceModel, type MarketplaceSearchParams, type MarketplaceTaskFilter } from '../../../../shared/marketplace';
+import {
+  type MarketplaceModel,
+  type MarketplaceSearchParams,
+  type MarketplaceTaskFilter,
+} from '../../../../shared/marketplace';
 import {
   formatMarketplaceHardwareSummaryParts,
   type MarketplaceHardwareProfile,
@@ -29,15 +29,11 @@ import {
   SelectValue,
 } from '@shared/components/ui/select';
 import { ListPagination } from '../../common/ListPagination';
-import {
-  localInferenceCompactButtonClass,
-  MARKETPLACE_PAGE_SIZE,
-} from '../constants';
-import {
-  getInstallableMarketplaceModels,
-} from '../utils/marketplace';
+import { localInferenceCompactButtonClass, MARKETPLACE_PAGE_SIZE } from '../constants';
+import { getInstallableMarketplaceModels } from '../utils/marketplace';
 
-const marketplaceGridClassName = 'grid w-full grid-cols-1 auto-rows-min content-start gap-4 @3xl/marketplace:grid-cols-2';
+const marketplaceGridClassName =
+  'grid w-full grid-cols-1 auto-rows-min content-start gap-4 @3xl/marketplace:grid-cols-2';
 
 export function MarketplacePanel({
   loading,
@@ -103,12 +99,14 @@ export function MarketplacePanel({
   const currentPage = page;
   const visibleModels = showAllModels ? models : installableModels;
   const hardwareSummaryParts = formatMarketplaceHardwareSummaryParts(hardwareSummary);
-  const hardwareGpuValue = hardwareSummaryParts.gpuCount > 0
-    ? `${hardwareSummaryParts.gpuCount} · ${hardwareSummaryParts.totalVramGiB}GB${hardwareSummaryParts.gpuNames.length > 0 ? ` ${hardwareSummaryParts.gpuNames.join(' / ')}` : ''}`
-    : i18nService.t('marketplaceHardwareNotDetected');
-  const hardwareMemoryValue = hardwareSummaryParts.systemMemoryGiB !== null
-    ? `${hardwareSummaryParts.systemMemoryGiB}GB`
-    : i18nService.t('marketplaceHardwareNotDetected');
+  const hardwareGpuValue =
+    hardwareSummaryParts.gpuCount > 0
+      ? `${hardwareSummaryParts.gpuCount} · ${hardwareSummaryParts.totalVramGiB}GB${hardwareSummaryParts.gpuNames.length > 0 ? ` ${hardwareSummaryParts.gpuNames.join(' / ')}` : ''}`
+      : i18nService.t('marketplaceHardwareNotDetected');
+  const hardwareMemoryValue =
+    hardwareSummaryParts.systemMemoryGiB !== null
+      ? `${hardwareSummaryParts.systemMemoryGiB}GB`
+      : i18nService.t('marketplaceHardwareNotDetected');
 
   useEffect(() => {
     pageRef.current = 1;
@@ -220,7 +218,7 @@ export function MarketplacePanel({
         }}
       >
         <div className="flex gap-2">
-          <InputGroup className="h-9 min-w-0 flex-1">
+          <InputGroup className="theme-control-sizing-23 min-w-0 flex-1">
             <InputGroupAddon>
               <Search />
             </InputGroupAddon>
@@ -228,7 +226,7 @@ export function MarketplacePanel({
               value={query}
               onChange={event => handleQueryChange(event.target.value)}
               placeholder={i18nService.t('marketplaceSearchPlaceholder')}
-              className="text-xs"
+              className="theme-part-marketplace-panel-input-group-input-1"
             />
           </InputGroup>
           <Button
@@ -237,9 +235,7 @@ export function MarketplacePanel({
             className={`${localInferenceCompactButtonClass} self-center`}
             variant="outline"
           >
-            <RefreshCw
-              data-icon="inline-start"
-            />
+            <RefreshCw data-icon="inline-start" />
             {i18nService.t('marketplaceSearch')}
           </Button>
         </div>
@@ -267,26 +263,41 @@ export function MarketplacePanel({
             />
           </div>
           <div className="inline-flex h-10 items-center gap-1 rounded-lg border border-border-subtle bg-muted/80 px-1 py-0.5">
-              <span className="px-2 text-sm leading-5 font-normal text-muted-foreground">
-                {i18nService.t('marketplaceFilterFit')}
-              </span>
-              <Select value={fitFilter} onValueChange={value => setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)}>
-                <SelectTrigger size="default" aria-label={i18nService.t('marketplaceFilterFit')} className="min-w-32 border-border-subtle bg-surface">
-                  <SelectValue className="font-medium text-foreground">{fitFilterLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent
-                  side="bottom"
-                  sideOffset={4}
-                  alignItemWithTrigger={false}
-                  collisionAvoidance={{ side: 'none', align: 'shift', fallbackAxisSide: 'none' }}
-                  >
-                  <SelectGroup>
-                    <SelectItem value="recommended">{i18nService.t('marketplaceFitExcellent')}</SelectItem>
-                    <SelectItem value="compatible">{i18nService.t('marketplaceFitCompatible')}</SelectItem>
-                    <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
+            <span className="px-2 text-sm leading-5 font-normal text-muted-foreground">
+              {i18nService.t('marketplaceFilterFit')}
+            </span>
+            <Select
+              value={fitFilter}
+              onValueChange={value =>
+                setFitFilter(value as NonNullable<MarketplaceSearchParams['fit']>)
+              }
+            >
+              <SelectTrigger
+                size="default"
+                aria-label={i18nService.t('marketplaceFilterFit')}
+                className="theme-page-marketplace-panel-select-trigger-1 min-w-32"
+              >
+                <SelectValue className="theme-part-marketplace-panel-select-value-1">
+                  {fitFilterLabel}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent
+                side="bottom"
+                sideOffset={4}
+                alignItemWithTrigger={false}
+                collisionAvoidance={{ side: 'none', align: 'shift', fallbackAxisSide: 'none' }}
+              >
+                <SelectGroup>
+                  <SelectItem value="recommended">
+                    {i18nService.t('marketplaceFitExcellent')}
+                  </SelectItem>
+                  <SelectItem value="compatible">
+                    {i18nService.t('marketplaceFitCompatible')}
+                  </SelectItem>
+                  <SelectItem value="all">{i18nService.t('marketplaceFilterFitAll')}</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="inline-flex min-w-0 max-w-full items-center gap-2 self-center text-sm text-muted-foreground">
@@ -314,12 +325,17 @@ export function MarketplacePanel({
               ? i18nService.t('marketplaceSearchStatusCatalogUnavailable')
               : i18nService.t('marketplaceSearchStatusWarning')}
           </AlertTitle>
-          <AlertDescription>{marketplaceError.replace(/^(?:CATALOG_ERROR|AUTH_ERROR):\s*/, '')}</AlertDescription>
+          <AlertDescription>
+            {marketplaceError.replace(/^(?:CATALOG_ERROR|AUTH_ERROR):\s*/, '')}
+          </AlertDescription>
         </Alert>
       ) : null}
 
       {marketplaceLoading && models.length === 0 ? (
-        <div ref={marketplaceGridViewportRef} className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
+        <div
+          ref={marketplaceGridViewportRef}
+          className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable"
+        >
           <MarketplaceGridSkeleton pageSize={MARKETPLACE_PAGE_SIZE} />
         </div>
       ) : !hasSearched ? null : visibleModels.length === 0 ? (
@@ -340,10 +356,11 @@ export function MarketplacePanel({
           }
         />
       ) : (
-        <div ref={marketplaceGridViewportRef} className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable">
-          <div
-            className={marketplaceGridClassName}
-          >
+        <div
+          ref={marketplaceGridViewportRef}
+          className="@container/marketplace relative min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden scrollbar-gutter-stable"
+        >
+          <div className={marketplaceGridClassName}>
             {visibleModels.map(model => {
               return (
                 <MarketplaceModelCard
@@ -379,10 +396,7 @@ export function MarketplacePanel({
 // not full-screen spinners).
 function MarketplaceGridSkeleton({ pageSize }: { pageSize: number }) {
   return (
-    <div
-      aria-hidden="true"
-      className={marketplaceGridClassName}
-    >
+    <div aria-hidden="true" className={marketplaceGridClassName}>
       {Array.from({ length: pageSize }, (_, index) => (
         <MarketplaceModelCardSkeleton key={index} />
       ))}

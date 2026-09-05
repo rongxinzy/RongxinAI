@@ -161,7 +161,7 @@ export const UserBubble: React.FC<{
 
         {hasTextContent && (
           <Message from="user" className="ml-auto items-end">
-            <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
+            <MessageContent className="theme-message-cowork-user whitespace-pre-wrap wrap-break-word">
               <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
                 {messageSkills.map(skill => (
                   <MessageSkillSummary key={skill.id} skill={skill} />

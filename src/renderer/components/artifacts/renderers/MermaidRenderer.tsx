@@ -126,7 +126,7 @@ const MermaidRenderer: React.FC<MermaidRendererProps> = ({ artifact }) => {
           variant="secondary"
           size="sm"
           onClick={resetZoom}
-          className="absolute bottom-3 right-3 z-10 px-2 py-1 text-xs"
+          className="theme-page-mermaid-renderer-button-1 absolute bottom-3 right-3 z-10"
         >
           {Math.round(scale * 100)}%
         </Button>

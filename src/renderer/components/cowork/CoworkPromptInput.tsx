@@ -89,7 +89,7 @@ const GoalModeChip: React.FC<{ onRemove: () => void; compact?: boolean }> = ({
       onClick={onRemove}
       aria-label={i18nService.t('clearGoalMode')}
       title={i18nService.t('clearGoalMode')}
-      className="group/goal relative ml-0.5 size-4 rounded-full p-0 hover:bg-transparent"
+      className="theme-page-cowork-prompt-input-button-1 group/goal relative ml-0.5"
     >
       <Target className="size-3.5 transition-opacity group-hover/goal:opacity-0" />
       <X className="absolute size-3.5 opacity-0 transition-opacity group-hover/goal:opacity-100" />
@@ -1179,8 +1179,8 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
         <PromptInput
           multiple
           className={cn(
-            'input-aura shadow-elevated rounded-3xl transition-shadow **:data-[slot=input-group]:rounded-3xl',
-            isDraggingFiles && 'ring-2 ring-primary',
+            'theme-composer-surface input-aura',
+            isDraggingFiles && 'theme-composer-drop-active',
           )}
           onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
@@ -1373,7 +1373,7 @@ const CoworkPromptInputInner = React.forwardRef<CoworkPromptInputRef, CoworkProm
               initialDirectory={workingDirectory}
             >
               <PromptInputButton
-                className={`sidebar-interactive-surface gap-1 px-2 text-sm hover:shadow-subtle data-popup-open:shadow-subtle ${showFolderRequiredWarning ? 'ring-1 ring-warning text-warning animate-shake' : ''}`}
+                className={`sidebar-interactive-surface theme-prompt-folder-action gap-1 ${showFolderRequiredWarning ? 'theme-prompt-folder-warning animate-shake' : ''}`}
               >
                 <Folder className="size-4 shrink-0" />
                 <span>{workingDirectoryName || i18nService.t('enterProjectWork')}</span>

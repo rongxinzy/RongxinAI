@@ -110,7 +110,7 @@ const TodoTaskDetail: React.FC<TodoTaskDetailProps> = ({
           onChange={event => setTitle(event.target.value)}
           onBlur={() => void saveDetails()}
           aria-label={i18nService.t('todoTitleLabel')}
-          className="h-10 text-base font-medium"
+          className="theme-page-todo-task-detail-input-1"
         />
 
         <div className="flex flex-wrap gap-2 border-b border-border-subtle pb-4">

@@ -337,28 +337,6 @@ select::-ms-expand {
   background-color: var(--zy-surface-raised);
 }
 
-/* Sidebar interactive surfaces follow the active application theme. */
-.sidebar-interactive-surface:hover,
-.sidebar-interactive-surface[data-popup-open],
-.sidebar-interactive-surface[data-state='open'],
-.sidebar-interactive-surface-active {
-  background-color: color-mix(in srgb, var(--zy-text-primary) 4%, transparent);
-}
-
-/* Workspace rows use the outer row for hover feedback. Button expansion must
-   not create a second, persistent surface inside the row. */
-[data-slot='workspace-tree-row'] > [data-slot='button'],
-[data-slot='workspace-tree-row'] > [data-slot='button']:hover,
-[data-slot='workspace-tree-row'] > [data-slot='button'][aria-expanded='true'] {
-  background-color: transparent;
-}
-
-[data-active-view]:not([data-active-view='cowork'])
-  .sidebar-session-row.sidebar-interactive-surface-active {
-  background-color: transparent;
-  color: var(--zy-text-secondary);
-}
-
 /* Sidebar width transition */
 .sidebar-transition {
   transition: width 200ms ease-out;
@@ -371,17 +349,6 @@ select::-ms-expand {
   border-top-width: 1px;
 }
 
-/* Modal backdrop: dim only, no blur (Kimi-style — the content stays sharp) */
-.modal-backdrop {
-  @apply bg-black/10;
-  animation: fade-in 0.2s ease-out;
-}
-
-/* Modal content entrance */
-.modal-content {
-  animation: scale-in 0.2s ease-out;
-}
-
 /* ModelSelector — hide dialog overlay so list appears as a dropdown */
 [data-slot='dialog-portal']:has([data-slot='model-selector-content']) [data-slot='dialog-overlay'] {
   display: none;
@@ -392,78 +359,14 @@ select::-ms-expand {
   animation: fade-in-down 0.2s ease-out;
 }
 
-/* Composer focus aura: a layered halo around the chat composer while its
-   control is focused. ::before is the crisp near-field light, ::after is the
-   wide breathing halo. Only opacity/transform animate. The aura tracks
-   :focus-visible of the textarea or contenteditable control, so toolbar
-   buttons inside the composer never light it up. */
-.input-aura {
-  position: relative;
-}
-
+/* Composer effect geometry and hit testing stay outside theme data. */
+.input-aura { position: relative; }
 .input-aura::before,
 .input-aura::after {
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   pointer-events: none;
-  opacity: 0;
-  transform: scale(0.985);
-  transition:
-    opacity 520ms cubic-bezier(0.4, 0, 0.2, 1),
-    transform 520ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Near field: edge definition + tight glow + soft downward bloom for depth */
-.input-aura::before {
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--zy-primary) 38%, transparent),
-    0 0 10px color-mix(in srgb, var(--zy-primary) 15%, transparent),
-    0 4px 14px -6px color-mix(in srgb, var(--zy-primary) 16%, transparent);
-}
-
-/* Far field: two stacked halos that carry the breath */
-.input-aura::after {
-  box-shadow:
-    0 0 22px 1px color-mix(in srgb, var(--zy-primary) 10%, transparent),
-    0 0 52px 8px color-mix(in srgb, var(--zy-primary) 5%, transparent);
-}
-
-.dark .input-aura::after {
-  box-shadow:
-    0 0 26px 2px color-mix(in srgb, var(--zy-primary) 14%, transparent),
-    0 0 60px 10px color-mix(in srgb, var(--zy-primary) 8%, transparent);
-}
-
-/* Cinematic entrance: fast expo-in while focused, slow filmic fade on blur */
-.input-aura:has([data-slot='input-group-control']:focus-visible)::before,
-.input-aura:has([data-slot='input-group-control']:focus-visible)::after,
-.input-aura:has([contenteditable]:focus-visible)::before,
-.input-aura:has([contenteditable]:focus-visible)::after {
-  opacity: 1;
-  transform: scale(1);
-  transition-duration: 340ms;
-  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes aura-breathe {
-  from {
-    opacity: 0.6;
-    transform: scale(0.995);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1.005);
-  }
-}
-
-/* The halo breathes only while focused, and never under reduced motion */
-@media (prefers-reduced-motion: no-preference) {
-  .input-aura:has([data-slot='input-group-control']:focus-visible)::after,
-  .input-aura:has([contenteditable]:focus-visible)::after {
-    animation: aura-breathe 5.2s cubic-bezier(0.45, 0, 0.55, 1) 340ms infinite alternate;
-  }
 }
 
 /* Skeleton loading */
@@ -546,127 +449,9 @@ select::-ms-expand {
   background-color: var(--zy-primary);
 }
 
-/* Dialog shadow — provides elevated depth for all dialogs.
-   Background and text colors are handled by shadcn utility classes (bg-popover, etc.)
-   via the Tailwind plugin which uses var(--zy-*) directly. */
-[data-slot='dialog-content'] {
-  box-shadow: var(--shadow-modal);
-}
-[data-slot='dialog-footer'] {
-  background-color: var(--zy-surface);
-  border-top-color: var(--zy-border);
-}
-[data-local-inference-model-action-button='true'] {
-  transition-property: background-color, border-color, box-shadow, filter, transform;
-  transition-duration: 200ms, 200ms, 200ms, 200ms, 120ms;
-  transition-timing-function: ease-out;
-}
-[data-local-inference-model-action-button='true']:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-[data-local-inference-launch-status] {
-  align-items: center;
-  height: 22px;
-  padding-top: 0;
-  padding-bottom: 0;
-  border-color: var(--zy-border);
-  background-color: var(--zy-surface-raised);
-  color: var(--zy-text-muted);
-  line-height: 1;
-}
-[data-local-inference-launch-status='starting'] {
-  border-color: color-mix(in srgb, var(--zy-primary) 32%, transparent);
-  background-color: color-mix(in srgb, var(--zy-primary) 12%, var(--zy-background));
-  color: var(--zy-primary);
-}
-[data-local-inference-launch-status='succeeded'] {
-  border-color: color-mix(in srgb, var(--zy-success) 32%, transparent);
-  background-color: color-mix(in srgb, var(--zy-success) 12%, var(--zy-background));
-  color: var(--zy-success);
-}
-[data-local-inference-launch-status='failed'] {
-  border-color: color-mix(in srgb, var(--zy-destructive) 32%, transparent);
-  background-color: color-mix(in srgb, var(--zy-destructive) 12%, var(--zy-background));
-  color: var(--zy-destructive);
-}
-
-[data-slot='button'][data-local-inference-launch-close-button='true'] {
-  transition:
-    background-color 200ms ease,
-    color 200ms ease;
-}
-[data-slot='button'][data-local-inference-launch-close-button='true']:hover:not(:disabled) {
-  background-color: var(--lobster-destructive);
-  color: var(--lobster-destructive-foreground);
-}
-[data-slot='button'][data-local-inference-launch-close-button='true']:hover:not(:disabled) svg {
-  color: var(--lobster-destructive-foreground);
-}
-[data-local-inference-secondary-action-button='true'],
-[data-local-inference-secondary-action-button='true']:hover:not(:disabled),
-[data-local-inference-secondary-action-button='true'] svg,
-[data-local-inference-secondary-action-button='true']:hover:not(:disabled) svg {
-  color: var(--zy-text-secondary);
-}
-[data-slot='button'][data-local-inference-unload-button='true'] {
-  background-color: var(--lobster-destructive);
-  border-color: var(--lobster-destructive);
-  color: var(--lobster-destructive-foreground);
-}
-[data-slot='button'][data-local-inference-unload-button='true']:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
-  border-color: color-mix(in srgb, var(--zy-destructive) 88%, black);
-  color: var(--zy-destructive-foreground);
-}
-[data-slot='button'][data-local-inference-delete-confirm-button='true'] {
-  --local-inference-delete-color: var(--zy-style-destructive-confirm);
-  background-color: var(--local-inference-delete-color);
-  border-color: var(--local-inference-delete-color);
-  color: var(--zy-destructive-foreground);
-}
-[data-slot='button'][data-local-inference-delete-confirm-action-button='true']:hover:not(
-  :disabled
-) {
-  box-shadow: none;
-}
-[data-slot='button'][data-local-inference-delete-confirm-action-button='true']:not(
-  [data-local-inference-delete-confirm-button='true']
-):hover:not(:disabled) {
-  background-color: var(--zy-surface-raised);
-  border-color: transparent;
-  color: var(--zy-foreground);
-}
-[data-slot='button'][data-local-inference-delete-confirm-button='true']:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--local-inference-delete-color) 88%, black);
-  border-color: color-mix(in srgb, var(--local-inference-delete-color) 88%, black);
-  color: var(--zy-destructive-foreground);
-}
-[data-slot='button'][data-destructive-confirm-button='true'] {
-  --destructive-confirm-color: var(--zy-style-destructive-confirm);
-  background-color: var(--destructive-confirm-color);
-  border-color: var(--destructive-confirm-color);
-  color: var(--zy-destructive-foreground);
-}
-[data-slot='button'][data-destructive-confirm-button='true']:hover:not(:disabled) {
-  background-color: color-mix(in srgb, var(--destructive-confirm-color) 88%, black);
-  border-color: color-mix(in srgb, var(--destructive-confirm-color) 88%, black);
-  color: var(--zy-destructive-foreground);
-}
-[data-slot='button'][data-destructive-confirm-cancel-button='true']:hover:not(:disabled) {
-  background-color: var(--zy-surface-raised);
-  color: var(--zy-foreground);
-}
 [data-slot='toggle'][aria-pressed='true'] {
   background-color: var(--zy-surface-raised);
   color: var(--zy-foreground);
-}
-
-/* The todo trigger stays visually continuous with its surface in every state. */
-[data-todo-queue-trigger='true'],
-[data-todo-queue-trigger='true']:hover,
-[data-todo-queue-trigger='true'][aria-expanded='true'] {
-  background-color: transparent !important;
 }
 
 /* Base UI select popup dimensions use runtime CSS variables. */
@@ -721,28 +506,6 @@ select::-ms-expand {
   top: -2px;
   transform: none;
   translate: none !important;
-}
-
-/* ButtonGroup: joined buttons — Tailwind v4 *:data-slot: variant chain. */
-[data-slot='button-group'] > [data-slot] {
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-}
-[data-slot='button-group'] > [data-slot]:not(:has(~ [data-slot])) {
-  border-top-right-radius: var(--zy-radius) !important;
-  border-bottom-right-radius: var(--zy-radius) !important;
-}
-[data-slot='button-group'] > [data-slot] ~ [data-slot] {
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-  border-left-width: 0 !important;
-}
-
-/* Select: match dropdown width to trigger. */
-[data-slot='select-content'] {
-  width: var(--anchor-width) !important;
-  max-height: var(--available-height) !important;
-  transform-origin: var(--transform-origin) !important;
 }
 
 /* Marketplace model selector: keep the five-row popup and scrollbar inside its rounded surface. */

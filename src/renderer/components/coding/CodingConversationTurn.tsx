@@ -65,7 +65,7 @@ const CodingConversationTurnComponent = ({
   >
     {turn.userMessage && (
       <Message from="user" className="animate-message-in">
-        <MessageContent className="rounded-xl rounded-br-md bg-primary/10 px-4 py-3 leading-relaxed whitespace-pre-wrap">
+        <MessageContent className="theme-message-code-user whitespace-pre-wrap">
           {turn.userMessage.content}
         </MessageContent>
       </Message>

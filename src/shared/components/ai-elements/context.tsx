@@ -150,7 +150,7 @@ export function ContextTrigger({ children, ...props }: ContextTriggerProps) {
 export type ContextContentProps = ComponentProps<typeof HoverCardContent>;
 
 export function ContextContent({ className, ...props }: ContextContentProps) {
-  return <HoverCardContent className={cn('min-w-60 divide-y overflow-hidden p-0', className)} {...props} />;
+  return <HoverCardContent className={cn("theme-control-sizing-4 min-w-60 divide-y overflow-hidden", className)} {...props} />;
 }
 
 export type ContextContentHeaderProps = ComponentProps<'div'>;

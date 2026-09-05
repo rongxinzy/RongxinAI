@@ -1,3 +1,4 @@
+import { classicComponentAppearances } from '../components/classic';
 import type { ThemeDefinition } from './types';
 export const classicLight: ThemeDefinition = {
   meta: {
@@ -6,6 +7,7 @@ export const classicLight: ThemeDefinition = {
     description: 'Neutral content-first desktop theme',
     appearance: 'light',
   },
+  components: classicComponentAppearances(false),
   tokens: {
     primary: 'oklch(0.564 0.218 259.8)',
     'primary-foreground': 'oklch(0.985 0.001 106.423)',

@@ -137,7 +137,9 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
           },
           {
             value: 'raw',
-            label: i18nService.t('scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0]),
+            label: i18nService.t(
+              'scheduledTasksFormCronModeRaw' as Parameters<typeof i18nService.t>[0],
+            ),
           },
         ]}
       />
@@ -161,7 +163,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
               value={builder.minute}
               onValueChange={value => value && patchBuilder('minute', value)}
             >
-              <SelectTrigger className="w-full min-w-20 text-sm">
+              <SelectTrigger className="theme-control-small-text w-full min-w-20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -184,7 +186,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
               value={builder.hour}
               onValueChange={value => value && patchBuilder('hour', value)}
             >
-              <SelectTrigger className="w-full min-w-20 text-sm">
+              <SelectTrigger className="theme-control-small-text w-full min-w-20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -207,7 +209,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
               value={builder.dom}
               onValueChange={value => value && patchBuilder('dom', value)}
             >
-              <SelectTrigger className="w-full min-w-20 text-sm">
+              <SelectTrigger className="theme-control-small-text w-full min-w-20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -226,7 +228,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
               value={builder.month}
               onValueChange={value => value && patchBuilder('month', value)}
             >
-              <SelectTrigger className="w-full min-w-20 text-sm">
+              <SelectTrigger className="theme-control-small-text w-full min-w-20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -245,7 +247,7 @@ const CronBuilder: React.FC<CronBuilderProps> = ({
               value={builder.dow}
               onValueChange={value => value && patchBuilder('dow', value)}
             >
-              <SelectTrigger className="w-full min-w-20 text-sm">
+              <SelectTrigger className="theme-control-small-text w-full min-w-20">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

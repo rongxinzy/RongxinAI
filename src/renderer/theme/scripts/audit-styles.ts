@@ -48,6 +48,52 @@ function scan(dir: string): void {
 }
 scan(resolve(root, 'src/renderer/components'));
 scan(resolve(root, 'src/shared/components'));
+
+// Migrated primitives must not reintroduce state appearance utilities. Keep
+// cursor, pointer-events, positioning and other interaction/layout rules local.
+const recipePrimitives = [
+  'button',
+  'button-group',
+  'input',
+  'textarea',
+  'input-group',
+  'select',
+  'badge',
+  'card',
+  'dialog',
+  'popover',
+  'command',
+  'dropdown-menu',
+  'sheet',
+  'tooltip',
+  'hover-card',
+  'tabs',
+  'page-tabs',
+];
+const stateAppearance =
+  /(?:hover|focus-visible|focus|active|disabled|aria-invalid|aria-selected|aria-pressed|data-checked|data-selected|data-highlighted)[^\s"'`]*:(?:bg-|text-|border-|ring-|opacity-|shadow-|rounded-|font-)/;
+for (const primitive of recipePrimitives) {
+  const name = `src/shared/components/ui/${primitive}.tsx`;
+  readFileSync(resolve(root, name), 'utf8')
+    .split('\n')
+    .forEach((line, index) => {
+      if (stateAppearance.test(line)) {
+        violations.push(`${name}:${index + 1}: state appearance must belong to a component recipe`);
+      }
+    });
+}
+const editorSource = readFileSync(resolve(root, 'src/renderer/components/CodeBlock.tsx'), 'utf8');
+for (const match of editorSource.matchAll(/'(\.cm-search-[^']+)'\s*:\s*\{([^}]+)\}/g)) {
+  if (
+    /\b(?:background(?:Color)?|color|border(?:Color|Radius|Bottom)?|font(?:Size|Family|VariantNumeric)|outline|accentColor|transition)\s*:/.test(
+      match[2],
+    )
+  ) {
+    violations.push(
+      `CodeBlock.tsx ${match[1]}: search control appearance must belong to an editor recipe`,
+    );
+  }
+}
 if (violations.length) throw new Error(violations.join('\n'));
 console.log(
   `[Theme] ${scanned} component modules audited; color sources belong to theme plugins or documented content artwork.`,

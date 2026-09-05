@@ -1,3 +1,4 @@
+import { classicLight } from '../../theme/themes/classic-light';
 /**
  * Source-structure guard for the compact MCP control beside the prompt plus
  * button. Rendering needs Electron IPC and browser-only renderer services, so
@@ -41,7 +42,12 @@ test('opens the MCP configuration menu above the prompt input', () => {
 });
 
 test('does not highlight the first MCP until the pointer enters its row while preserving keyboard focus', () => {
-  expect(source).toContain(
-    'className="focus:bg-transparent focus-visible:bg-muted hover:bg-muted focus:hover:bg-muted"',
-  );
+  expect(source).toContain('className="theme-page-active-mcp-badge-dropdown-menu-item-1"');
+});
+
+test('MCP row recipes preserve pointer focus versus keyboard highlight', () => {
+  const row = classicLight.components['page-active-mcp-badge-dropdown-menu-item-1'];
+  expect(row.focused['background-color']).toBe('transparent');
+  expect(row.focus['background-color']).toBe('var(--muted)');
+  expect(row.focusHover['background-color']).toBe('var(--muted)');
 });

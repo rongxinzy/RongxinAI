@@ -297,14 +297,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       return undefined;
     }
 
-    const service = new ArtifactDetectionService(
-      detected => {
-        for (const { artifact } of detected) {
-          // Keep path-backed artifacts visible while their file contents remain deferred.
-          dispatch(addArtifact({ sessionId, artifact }));
-        }
-      },
-    );
+    const service = new ArtifactDetectionService(detected => {
+      for (const { artifact } of detected) {
+        // Keep path-backed artifacts visible while their file contents remain deferred.
+        dispatch(addArtifact({ sessionId, artifact }));
+      }
+    });
     artifactDetectionServiceRef.current = service;
 
     return () => {
@@ -1125,7 +1123,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           onClick={() => setShowExportOptions(false)}
         >
           <div
-            className="w-full max-w-xs mx-4 dark:bg-claude-darkSurface bg-claude-surface rounded-2xl shadow-modal overflow-hidden modal-content"
+            className="w-full max-w-xs mx-4 overflow-hidden modal-content"
             onClick={e => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b dark:border-claude-darkBorder border-claude-border">
@@ -1136,7 +1134,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             <div className="py-1">
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
+                className="theme-action-row-large w-full justify-start gap-3"
                 onClick={e => {
                   setShowExportOptions(false);
                   handleShareClick(e);
@@ -1153,7 +1151,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
+                className="theme-action-row-large w-full justify-start gap-3"
                 onClick={() => {
                   setShowExportOptions(false);
                   handleExportText('md');
@@ -1169,7 +1167,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
+                className="theme-action-row-large w-full justify-start gap-3"
                 onClick={() => {
                   setShowExportOptions(false);
                   handleExportText('json');
@@ -1270,14 +1268,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`mb-2 mr-[-5px] size-5 text-muted-foreground [&_svg]:size-3.5
-                ${
-                  !isRailHovered
-                    ? 'pointer-events-none opacity-0'
-                    : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
-                      ? 'opacity-30 cursor-default'
-                      : 'cursor-pointer hover:text-foreground'
-                }`}
+                  className={` theme-page-cowork-session-detail-button-variant-4 mb-2 mr-[-5px] [&_svg]:size-3.5 ${
+                    !isRailHovered
+                      ? 'theme-page-cowork-session-detail-button-variant-1 pointer-events-none'
+                      : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <=
+                          0
+                        ? 'theme-page-cowork-session-detail-button-variant-2 cursor-default'
+                        : 'theme-page-cowork-session-detail-button-variant-3 cursor-pointer'
+                  }`}
                 >
                   <ChevronUp />
                 </Button>
@@ -1394,7 +1392,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                             });
                           }}
                           onMouseLeave={() => setRailTooltip(null)}
-                          className="h-auto w-5 cursor-pointer justify-end px-0 py-[5px]"
+                          className="theme-control-sizing-12 theme-control-content-height w-5 cursor-pointer justify-end"
                         >
                           <div
                             className={`h-[2px] w-4 origin-right rounded-full transition-[transform,background-color] ${
@@ -1429,15 +1427,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`mt-2 mr-[-5px] size-5 text-muted-foreground [&_svg]:size-3.5
-                ${
-                  !isRailHovered
-                    ? 'pointer-events-none opacity-0'
-                    : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
-                        railItemCountRef.current - 1
-                      ? 'opacity-30 cursor-default'
-                      : 'cursor-pointer hover:text-foreground'
-                }`}
+                  className={` theme-page-cowork-session-detail-button-variant-8 mt-2 mr-[-5px] [&_svg]:size-3.5 ${
+                    !isRailHovered
+                      ? 'theme-page-cowork-session-detail-button-variant-5 pointer-events-none'
+                      : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
+                          railItemCountRef.current - 1
+                        ? 'theme-page-cowork-session-detail-button-variant-6 cursor-default'
+                        : 'theme-page-cowork-session-detail-button-variant-7 cursor-pointer'
+                  }`}
                 >
                   <ChevronDown />
                 </Button>

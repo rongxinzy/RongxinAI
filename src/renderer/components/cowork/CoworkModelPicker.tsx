@@ -89,7 +89,7 @@ export function CoworkModelPicker({
         }
       />
       <PopoverContent
-        className="w-72 max-w-[calc(100vw-2rem)] p-0"
+        className="theme-model-menu w-72 max-w-[calc(100vw-2rem)]"
         side="bottom"
         align="start"
         sideOffset={4}
@@ -97,7 +97,6 @@ export function CoworkModelPicker({
         <Command shouldFilter={false} label={i18nService.t('searchModels')}>
           <CommandInput
             placeholder={i18nService.t('searchModels')}
-            className="bg-transparent"
             value={searchQuery}
             onValueChange={setSearchQuery}
           />

@@ -115,7 +115,7 @@ const LocationChip = ({ location }: { location: CodingToolCallLocation }) => (
     type="button"
     title={i18nService.t('codingAgentShowInFolder')}
     onClick={() => revealLocation(location.path)}
-    className="flex max-w-full cursor-pointer items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+    className="theme-native-activity-button flex max-w-full cursor-pointer items-center gap-1 px-2 py-0.5"
   >
     <FolderOpen className="size-3 shrink-0" />
     <span className="truncate">
@@ -163,7 +163,7 @@ const PlanActivityBody = ({ activity }: { activity: CodingConversationActivity }
           {entry.priority && (
             <Badge
               variant={PLAN_PRIORITY_VARIANT[entry.priority] ?? 'outline'}
-              className="shrink-0 text-xs"
+              className="theme-page-coding-activity-view-badge-1 shrink-0"
             >
               {i18nService.t(PLAN_PRIORITY_I18N_KEY[entry.priority] ?? entry.priority)}
             </Badge>
@@ -196,7 +196,10 @@ const ToolActivityBody = ({ activity }: { activity: CodingConversationActivity }
           </h4>
           <div className="flex flex-wrap gap-1.5">
             {view.locations.map((location, index) => (
-              <LocationChip key={`${location.path}:${location.line ?? index}`} location={location} />
+              <LocationChip
+                key={`${location.path}:${location.line ?? index}`}
+                location={location}
+              />
             ))}
           </div>
         </div>

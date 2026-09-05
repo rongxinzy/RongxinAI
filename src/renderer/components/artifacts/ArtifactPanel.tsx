@@ -186,8 +186,8 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
       variant="ghost"
       size="icon"
       onClick={() => setShowIntermediateArtifacts(value => !value)}
-      className={`h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface ${
-        showIntermediateArtifacts ? 'text-primary bg-primary/10' : ''
+      className={` theme-page-artifact-panel-button-variant-2 ${
+        showIntermediateArtifacts ? 'theme-page-artifact-panel-button-variant-1' : ''
       }`}
       title={t(showIntermediateArtifacts ? 'artifactHideIntermediate' : 'artifactShowIntermediate')}
       aria-label={t(
@@ -410,7 +410,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => dispatch(setPanelView(ArtifactPanelView.Files))}
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                className="theme-action-icon-muted"
                 title={t('back')}
                 aria-label={t('back')}
               >
@@ -425,7 +425,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleRefresh}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  className="theme-action-icon-muted"
                   title={t('artifactRefresh')}
                 >
                   <RefreshIcon />
@@ -436,7 +436,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleCopy}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  className="theme-action-icon-muted"
                   title={t('artifactCopyCode')}
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -447,7 +447,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleOpenInBrowser}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  className="theme-action-icon-muted"
                   title={t('artifactOpenInBrowser')}
                 >
                   <BrowserIcon />
@@ -458,7 +458,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleOpenWithApp}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  className="theme-action-icon-muted"
                   title={t('artifactOpenWithApp')}
                 >
                   <OpenExternalIcon />
@@ -469,7 +469,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleRevealInFolder}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  className="theme-action-icon-muted"
                   title={t('artifactOpenFolder')}
                 >
                   <FolderIcon />
@@ -479,7 +479,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => void handleToggleWorkspace()}
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                className="theme-action-icon-muted"
                 title={t(
                   layoutMode === ArtifactLayoutMode.Workspace
                     ? 'artifactExitFullWindow'
@@ -502,7 +502,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={() => void handleToggleFullscreen()}
-                  className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                  className="theme-action-icon-muted"
                   title={t(isFullscreen ? 'artifactExitFullscreen' : 'artifactEnterFullscreen')}
                   aria-label={t(
                     isFullscreen ? 'artifactExitFullscreen' : 'artifactEnterFullscreen',
@@ -521,10 +521,10 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowFileList(v => !v)}
-                className={`h-8 w-8 rounded-lg transition-colors ${
+                className={` theme-page-artifact-panel-button-variant-5 ${
                   showFileList
-                    ? 'text-primary bg-primary/10'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-surface'
+                    ? 'theme-page-artifact-panel-button-variant-3'
+                    : 'theme-page-artifact-panel-button-variant-4'
                 }`}
                 title={t('artifactFileList')}
               >
@@ -534,7 +534,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={handleClose}
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                className="theme-action-icon-muted"
                 title={t('close')}
                 aria-label={t('close')}
               >
@@ -598,7 +598,7 @@ const ArtifactPanel: React.FC<ArtifactPanelProps> = ({
                 variant="ghost"
                 size="icon"
                 onClick={handleClose}
-                className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface"
+                className="theme-action-icon-muted"
               >
                 <CloseIcon />
               </Button>

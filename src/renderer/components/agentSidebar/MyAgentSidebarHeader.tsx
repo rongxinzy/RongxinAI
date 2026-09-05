@@ -19,7 +19,7 @@ const MyAgentSidebarHeader: React.FC<MyAgentSidebarHeaderProps> = ({ onCreateAge
         variant="ghost"
         size="icon-sm"
         onClick={onCreateAgent}
-        className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
+        className="theme-action-faint"
         aria-label={i18nService.t('createNewAgent')}
       >
         <Plus className="h-4 w-4" />

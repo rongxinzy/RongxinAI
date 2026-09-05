@@ -522,7 +522,7 @@ export const CodeBlockLanguageSelectorTrigger = ({
   ...props
 }: CodeBlockLanguageSelectorTriggerProps) => (
   <SelectTrigger
-    className={cn('h-7 border-none bg-transparent px-2 text-xs shadow-none', className)}
+    className={cn('theme-page-code-block-select-trigger-variant-1', className)}
     size="sm"
     {...props}
   />

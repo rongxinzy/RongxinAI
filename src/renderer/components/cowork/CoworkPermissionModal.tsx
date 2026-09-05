@@ -362,8 +362,8 @@ const CoworkPermissionModal: React.FC<CoworkPermissionModalProps> = ({
       <div
         className={
           inline
-            ? 'w-full bg-surface-raised border border-border rounded-2xl shadow-sm overflow-hidden'
-            : 'modal-content w-full max-w-lg mx-4 bg-surface rounded-2xl shadow-modal overflow-hidden'
+            ? 'theme-permission-inline-surface w-full overflow-hidden'
+            : 'modal-content w-full max-w-lg mx-4 overflow-hidden'
         }
       >
         {!inline && (

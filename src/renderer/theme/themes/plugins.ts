@@ -1,3 +1,4 @@
+import { validateComponentAppearances } from '../components/contract';
 import { classicDark } from './classic-dark';
 import { classicLight } from './classic-light';
 import type { ThemeDefinition } from './types';
@@ -23,6 +24,7 @@ export function validateTheme(theme: ThemeDefinition): void {
       throw new Error(`Invalid theme token: ${token}`);
     }
   }
+  validateComponentAppearances(theme.components);
   const extra = Object.keys(theme.tokens).find(key => !TOKEN_NAMES.includes(key as never));
   if (extra) throw new Error(`Unknown theme token: ${extra}`);
 }

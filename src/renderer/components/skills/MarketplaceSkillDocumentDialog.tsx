@@ -125,7 +125,7 @@ export function MarketplaceSkillDocumentDialog({
                     <Button
                       type="button"
                       variant="link"
-                      className="h-auto min-w-0 justify-start whitespace-normal p-0 text-left"
+                      className="theme-control-sizing-4 theme-control-content-height min-w-0 justify-start whitespace-normal text-left"
                       onClick={() => window.electron.shell.openExternal(skill.source.url)}
                     >
                       {skill.source.url}

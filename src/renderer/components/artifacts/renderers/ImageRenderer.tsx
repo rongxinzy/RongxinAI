@@ -54,7 +54,7 @@ const ImageRenderer: React.FC<ImageRendererProps> = ({ artifact }) => {
           variant="secondary"
           size="sm"
           onClick={resetZoom}
-          className="absolute bottom-3 right-3 px-2 py-1 text-xs"
+          className="theme-action-overlay-compact absolute bottom-3 right-3"
         >
           {Math.round(scale * 100)}%
         </Button>

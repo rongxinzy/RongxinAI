@@ -599,13 +599,7 @@ const ShortcutRecorder: React.FC<{ value: string; onChange: (v: string) => void 
       onKeyDown={handleKeyDown}
       onClick={() => setRecording(true)}
       onBlur={() => setRecording(false)}
-      className={`w-36 justify-center px-3 py-1.5 text-sm font-normal select-none transition-colors
-        bg-surface-raised text-foreground
-        ${
-          recording
-            ? 'border-primary ring-1 ring-primary/30 text-muted-foreground'
-            : 'border-border hover:border-primary/50'
-        }`}
+      className={`theme-shortcut-input w-36 justify-center select-none ${recording ? 'theme-shortcut-recording' : ''}`}
     >
       {value ? formatShortcutLabel(value, isMacPlatform) : i18nService.t('shortcutNotSet')}
     </Button>
@@ -624,21 +618,17 @@ const SendShortcutSelect: React.FC<{ value: string; onChange: (v: string) => voi
 
   return (
     <Select value={value} onValueChange={newValue => onChange(newValue ?? value)}>
-      <SelectTrigger
-        className="w-36 border border-border
-          bg-surface-raised text-foreground
-          px-3 py-1.5 text-sm"
-      >
+      <SelectTrigger className="theme-send-shortcut-trigger w-36">
         <SelectValue placeholder={currentLabel} />
       </SelectTrigger>
-      <SelectContent className="bg-surface-raised">
+      <SelectContent className="theme-send-shortcut-popup">
         {SEND_SHORTCUT_OPTIONS.map(option => {
           const label = isMacPlatform ? option.labelMac : option.label;
           return (
             <SelectItem
               key={option.value}
               value={option.value}
-              className="text-sm text-foreground focus:bg-primary/10 focus:text-primary"
+              className="theme-send-shortcut-option"
             >
               {label}
             </SelectItem>
@@ -3225,10 +3215,10 @@ const Settings: React.FC<SettingsProps> = ({
                       handleProviderChange(providerKey);
                     }}
                     className={cn(
-                      'group flex items-center p-2 rounded-xl cursor-pointer transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 border',
+                      'theme-surface-provider-row group flex items-center p-2 cursor-pointer',
                       activeProvider === provider
-                        ? 'bg-surface shadow-elevated border-border'
-                        : 'bg-surface hover:bg-surface-raised border-transparent',
+                        ? 'theme-surface-provider-selected'
+                        : 'theme-surface-provider-idle',
                     )}
                   >
                     <div className="flex flex-1 items-center min-w-0">
@@ -3252,7 +3242,7 @@ const Settings: React.FC<SettingsProps> = ({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive h-auto w-auto p-0.5"
+                          className="theme-page-settings-button-1"
                           onClick={e => {
                             e.stopPropagation();
                             handleDeleteCustomProvider(providerKey);
@@ -3282,7 +3272,7 @@ const Settings: React.FC<SettingsProps> = ({
                   type="button"
                   variant="outline"
                   onClick={handleAddCustomProvider}
-                  className="w-full border-dashed border-border text-muted-foreground hover:border-primary hover:text-primary"
+                  className="theme-page-settings-button-2 w-full"
                 >
                   {i18nService.t('addCustomProvider')}
                 </Button>
@@ -3326,7 +3316,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 ProviderRegistry.get(activeProvider)!.website!,
                               )
                             }
-                            className="text-muted-foreground hover:text-primary"
+                            className="theme-action-muted-accent"
                             title={i18nService.t('visitOfficialSite')}
                             aria-label={i18nService.t('visitOfficialSite')}
                           >
@@ -3362,7 +3352,8 @@ const Settings: React.FC<SettingsProps> = ({
                           }));
                           setMinimaxOAuthPhase({ kind: 'idle' });
                         }}
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${!minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        aria-pressed={!minimaxIsOAuthMode}
+                        className="theme-auth-choice flex-1 text-left"
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Key className="h-4 w-4 text-foreground shrink-0" />
@@ -3386,7 +3377,8 @@ const Settings: React.FC<SettingsProps> = ({
                             },
                           }))
                         }
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${minimaxIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        aria-pressed={minimaxIsOAuthMode}
+                        className="theme-auth-choice flex-1 text-left"
                       >
                         <div className="flex items-center justify-center gap-2">
                           <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
@@ -3419,7 +3411,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 ProviderRegistry.get('minimax')!.apiKeyUrl!,
                               )
                             }
-                            className="h-auto px-0 py-0 text-xs text-primary hover:underline"
+                            className="theme-action-inline-link"
                           >
                             {i18nService.t('getApiKey')}
                           </Button>
@@ -3433,7 +3425,7 @@ const Settings: React.FC<SettingsProps> = ({
                           onChange={e =>
                             handleProviderConfigChange('minimax', 'apiKey', e.target.value)
                           }
-                          className="pr-20 text-sm"
+                          className="theme-control-sizing-3 theme-control-small-text"
                           placeholder={i18nService.t('apiKeyPlaceholder')}
                         />
                         <div className="absolute right-2 inset-y-0 flex items-center gap-1">
@@ -3497,7 +3489,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                              className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
                             </Button>
@@ -3506,7 +3498,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleMiniMaxOAuthLogout}
-                              className="h-auto px-2.5 py-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                              className="theme-action-compact-danger"
                             >
                               {i18nService.t('minimaxOAuthLogout')}
                             </Button>
@@ -3537,7 +3529,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <Button
                             type="button"
                             onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                            className="w-full py-2 text-sm h-auto"
+                            className="theme-page-settings-button-3 w-full"
                           >
                             {i18nService.t('minimaxOAuthLogin')}
                           </Button>
@@ -3578,7 +3570,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 minimaxOAuthPhase.verificationUri,
                               );
                             }}
-                            className="block text-xs text-primary underline truncate"
+                            className="theme-surface-provider-link block truncate"
                           >
                             {minimaxOAuthPhase.verificationUri}
                           </a>
@@ -3590,7 +3582,7 @@ const Settings: React.FC<SettingsProps> = ({
                             variant="outline"
                             size="sm"
                             onClick={handleCancelMiniMaxLogin}
-                            className="h-auto px-2.5 py-1 text-xs"
+                            className="theme-action-compact"
                           >
                             {i18nService.t('minimaxOAuthCancel')}
                           </Button>
@@ -3621,7 +3613,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => handleMiniMaxDeviceLogin(minimaxOAuthRegion)}
-                              className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('minimaxOAuthRelogin')}
                             </Button>
@@ -3630,7 +3622,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setMinimaxOAuthPhase({ kind: 'idle' })}
-                              className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('minimaxOAuthCancel')}
                             </Button>
@@ -3664,7 +3656,7 @@ const Settings: React.FC<SettingsProps> = ({
                           }));
                           setOpenaiOAuthPhase({ kind: 'idle' });
                         }}
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${!openaiIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        className={` theme-page-settings-button-variant-3 flex-1 text-left ${!openaiIsOAuthMode ? 'theme-page-settings-button-variant-1' : 'theme-page-settings-button-variant-2'}`}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <Key className="h-4 w-4 text-foreground shrink-0" />
@@ -3685,7 +3677,7 @@ const Settings: React.FC<SettingsProps> = ({
                             },
                           }))
                         }
-                        className={`flex-1 p-3 rounded-lg border text-left transition-[background-color,border-color,opacity] ${openaiIsOAuthMode ? 'border-primary bg-primary/5' : 'border-border opacity-60 hover:opacity-80'}`}
+                        className={` theme-page-settings-button-variant-6 flex-1 text-left ${openaiIsOAuthMode ? 'theme-page-settings-button-variant-4' : 'theme-page-settings-button-variant-5'}`}
                       >
                         <div className="flex items-center justify-center gap-2">
                           <ShieldCheck className="h-4 w-4 text-foreground shrink-0" />
@@ -3713,7 +3705,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                              className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
                             </Button>
@@ -3724,7 +3716,7 @@ const Settings: React.FC<SettingsProps> = ({
                               onClick={() => {
                                 void handleOpenAIOAuthLogout();
                               }}
-                              className="h-auto px-2.5 py-1 text-xs border-destructive/30 text-destructive hover:bg-destructive/10"
+                              className="theme-action-compact-danger"
                             >
                               {i18nService.t('openaiOAuthLogout')}
                             </Button>
@@ -3740,7 +3732,7 @@ const Settings: React.FC<SettingsProps> = ({
                             <Button
                               type="button"
                               onClick={handleOpenAIOAuthLogin}
-                              className="w-full py-2 text-xs h-auto"
+                              className="theme-page-settings-button-4 w-full"
                             >
                               {i18nService.t('openaiOAuthLogin')}
                             </Button>
@@ -3766,7 +3758,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onClick={() => {
                               void handleCancelOpenAIOAuthLogin();
                             }}
-                            className="h-auto px-2.5 py-1 text-xs"
+                            className="theme-action-compact"
                           >
                             {i18nService.t('openaiOAuthCancel')}
                           </Button>
@@ -3797,7 +3789,7 @@ const Settings: React.FC<SettingsProps> = ({
                               type="button"
                               size="sm"
                               onClick={handleOpenAIOAuthLogin}
-                              className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('openaiOAuthRelogin')}
                             </Button>
@@ -3806,7 +3798,7 @@ const Settings: React.FC<SettingsProps> = ({
                               variant="outline"
                               size="sm"
                               onClick={() => setOpenaiOAuthPhase({ kind: 'idle' })}
-                              className="h-auto px-2.5 py-1 text-xs"
+                              className="theme-action-compact"
                             >
                               {i18nService.t('openaiOAuthCancel')}
                             </Button>
@@ -3853,7 +3845,7 @@ const Settings: React.FC<SettingsProps> = ({
                                     ProviderRegistry.get(activeProvider)!.apiKeyUrl!,
                                   )
                                 }
-                                className="h-auto px-0 py-0 text-xs text-primary hover:underline"
+                                className="theme-action-inline-link"
                               >
                                 {i18nService.t('getApiKey')}
                               </Button>
@@ -3868,7 +3860,7 @@ const Settings: React.FC<SettingsProps> = ({
                                 handleApiKeyInputChange(activeProvider, e.target.value)
                               }
                               onBlur={() => handleApiKeyBlur(activeProvider)}
-                              className="pr-20 text-sm"
+                              className="theme-control-sizing-3 theme-control-small-text"
                               placeholder={i18nService.t('apiKeyPlaceholder')}
                             />
                             <div className="absolute right-2 inset-y-0 flex items-center gap-1">
@@ -3937,7 +3929,7 @@ const Settings: React.FC<SettingsProps> = ({
                                     ProviderRegistry.get('qwen')!.apiKeyUrl!,
                                   )
                                 }
-                                className="h-auto px-0 py-0 text-xs text-primary hover:underline"
+                                className="theme-action-inline-link"
                               >
                                 {i18nService.t('getApiKey')}
                               </Button>
@@ -3950,7 +3942,7 @@ const Settings: React.FC<SettingsProps> = ({
                               value={providers.qwen.apiKey}
                               onChange={e => handleApiKeyInputChange('qwen', e.target.value)}
                               onBlur={() => handleApiKeyBlur('qwen')}
-                              className="pr-20 text-sm"
+                              className="theme-control-sizing-3 theme-control-small-text"
                               placeholder={i18nService.t('apiKeyPlaceholder')}
                             />
                             <div className="absolute right-2 inset-y-0 flex items-center gap-1">
@@ -4013,7 +4005,7 @@ const Settings: React.FC<SettingsProps> = ({
                           <Button
                             type="button"
                             onClick={handleCopilotSignIn}
-                            className="flex items-center gap-2 px-4 py-2 text-xs h-auto"
+                            className="theme-page-settings-button-5 flex items-center"
                           >
                             <GitHubCopilotIcon className="w-4 h-4" />
                             {i18nService.t('githubCopilotSignIn')}
@@ -4062,7 +4054,7 @@ const Settings: React.FC<SettingsProps> = ({
                               onClick={() => {
                                 navigator.clipboard.writeText(copilotUserCode);
                               }}
-                              className="h-auto px-2 py-0.5 text-xs"
+                              className="theme-page-settings-button-6"
                             >
                               {i18nService.t('copy') || 'Copy'}
                             </Button>
@@ -4074,7 +4066,7 @@ const Settings: React.FC<SettingsProps> = ({
                             onClick={() =>
                               window.electron.shell.openExternal(copilotVerificationUri)
                             }
-                            className="mt-2 h-auto px-0 py-0 text-xs"
+                            className="theme-page-settings-button-7 mt-2"
                           >
                             {copilotVerificationUri}
                           </Button>
@@ -4103,7 +4095,7 @@ const Settings: React.FC<SettingsProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={handleCopilotCancelAuth}
-                            className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-destructive"
+                            className="theme-action-inline-danger"
                           >
                             {i18nService.t('cancel')}
                           </Button>
@@ -4130,7 +4122,7 @@ const Settings: React.FC<SettingsProps> = ({
                             variant="ghost"
                             size="sm"
                             onClick={handleCopilotSignOut}
-                            className="h-auto px-0 py-0 text-xs text-muted-foreground hover:text-destructive"
+                            className="theme-action-inline-danger"
                           >
                             {i18nService.t('githubCopilotSignOut')}
                           </Button>
@@ -4154,7 +4146,7 @@ const Settings: React.FC<SettingsProps> = ({
                       onChange={e =>
                         handleProviderConfigChange(activeProvider, 'displayName', e.target.value)
                       }
-                      className="text-sm"
+                      className="theme-page-settings-input-1"
                       placeholder={i18nService.t('customDisplayNamePlaceholder')}
                     />
                   </div>
@@ -4196,9 +4188,10 @@ const Settings: React.FC<SettingsProps> = ({
                           onBlur={() => handleBaseUrlBlur(activeProvider)}
                           disabled={isBaseUrlLocked}
                           className={cn(
-                            'pr-10',
-                            'text-sm',
-                            isBaseUrlLocked && 'cursor-not-allowed opacity-50',
+                            'theme-page-settings-input-variant-1',
+                            'theme-page-settings-input-variant-2',
+                            isBaseUrlLocked &&
+                              'theme-page-settings-input-variant-3 cursor-not-allowed',
                           )}
                           placeholder={
                             activeProvider === 'qwen'
@@ -4612,7 +4605,7 @@ const Settings: React.FC<SettingsProps> = ({
                           role="button"
                           tabIndex={0}
                           aria-label={`${i18nService.t('testConnection')} ${model.name}`}
-                          className="flex min-h-12 cursor-pointer items-center px-3 py-2 transition-colors duration-150 ease-out hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 active:translate-y-px"
+                          className="theme-surface-settings-row flex min-h-12 cursor-pointer items-center px-3 py-2"
                           onClick={event => {
                             if (event.target instanceof Element && event.target.closest('button')) {
                               return;
@@ -4751,7 +4744,7 @@ const Settings: React.FC<SettingsProps> = ({
                                     }}
                                     aria-label={`${i18nService.t('editModel')} ${model.name}`}
                                     title={i18nService.t('editModel')}
-                                    className="text-muted-foreground hover:text-foreground"
+                                    className="theme-page-settings-button-8"
                                   >
                                     <Pencil />
                                   </Button>
@@ -4762,7 +4755,7 @@ const Settings: React.FC<SettingsProps> = ({
                                     onClick={() => handleDeleteModel(model.id)}
                                     aria-label={`${i18nService.t('delete')} ${model.name}`}
                                     title={i18nService.t('delete')}
-                                    className="text-muted-foreground hover:text-destructive"
+                                    className="theme-page-settings-button-9"
                                   >
                                     <Trash2 />
                                   </Button>
@@ -4791,7 +4784,7 @@ const Settings: React.FC<SettingsProps> = ({
                                   }}
                                   aria-label={`${i18nService.t('editModel')} ${model.name}`}
                                   title={i18nService.t('editModel')}
-                                  className="size-5 text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
+                                  className="theme-page-settings-button-10 [&_svg]:size-3.5"
                                 >
                                   <Pencil />
                                 </Button>
@@ -4854,7 +4847,7 @@ const Settings: React.FC<SettingsProps> = ({
                       rules: { ...config.rules, cooldownRounds: value },
                     });
                   }}
-                  className="w-20 text-sm text-center shrink-0"
+                  className="theme-page-settings-input-2 text-center shrink-0"
                 />
               </div>
 
@@ -4881,7 +4874,7 @@ const Settings: React.FC<SettingsProps> = ({
                         rules: { ...config.rules, maxConversationRoundsForTriage: value },
                       });
                     }}
-                    className="w-20 text-sm text-center"
+                    className="theme-page-settings-input-3 text-center"
                   />
                 </div>
               </div>
@@ -4937,7 +4930,7 @@ const Settings: React.FC<SettingsProps> = ({
                     placeholder={
                       i18nService.t('modelTriageModelNamePlaceholder') || '例如: qwen2.5-0.5b'
                     }
-                    className="w-full max-w-xs text-sm"
+                    className="theme-page-settings-input-4 w-full max-w-xs"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     {i18nService.t('modelTriageModelNameNote') ||
@@ -4993,7 +4986,7 @@ const Settings: React.FC<SettingsProps> = ({
                 key={activeItem.key}
                 value={activeItem.value}
                 onChange={e => activeItem.setter(e.target.value)}
-                className="w-full flex-1 min-h-[280px] rounded-lg border px-3 py-2 text-sm leading-relaxed border-border bg-surface text-foreground resize-none"
+                className="theme-page-settings-textarea-1 w-full flex-1 resize-none"
                 placeholder={i18nService.t('coworkBootstrapPlaceholder')}
               />
             </div>
@@ -5212,7 +5205,7 @@ const Settings: React.FC<SettingsProps> = ({
                   href="https://github.com/rongxinzy/RongxinAI"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="theme-surface-settings-link"
                 >
                   {i18nService.t('mcpViewOnGithub')}
                 </a>
@@ -5228,7 +5221,7 @@ const Settings: React.FC<SettingsProps> = ({
                     void window.electron.shell.openExternal(OFFICIAL_WEBSITE_URL);
                   }}
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="theme-surface-settings-link"
                 >
                   {OFFICIAL_WEBSITE_URL}
                 </a>
@@ -5239,7 +5232,7 @@ const Settings: React.FC<SettingsProps> = ({
                   href="http://www.rongxzy.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary hover:underline transition-colors"
+                  className="theme-surface-settings-link"
                 >
                   北京容芯致远科技有限公司
                 </a>
@@ -5258,7 +5251,7 @@ const Settings: React.FC<SettingsProps> = ({
                     void handleExportLogs();
                   }}
                   disabled={isExportingLogs}
-                  className="text-muted-foreground hover:text-primary"
+                  className="theme-action-muted-accent"
                 >
                   {isExportingLogs
                     ? i18nService.t('aboutExportingLogs')
@@ -5279,10 +5272,10 @@ const Settings: React.FC<SettingsProps> = ({
     <Modal
       onClose={onClose}
       disablePointerDismissal
-      className="w-auto sm:max-w-none p-0 ring-0! bg-transparent"
+      className="theme-settings-modal-shell w-auto sm:max-w-none p-0"
     >
       <div
-        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 rounded-[inherit] overflow-hidden modal-content bg-surface shadow-modal border border-border"
+        className="relative flex h-[min(80vh,calc(100vh-24px))] w-[min(900px,calc(100vw-24px))] min-w-0 overflow-hidden modal-content theme-settings-modal-frame"
         onClick={handleSettingsClick}
       >
         {/* Left sidebar */}
@@ -5300,10 +5293,10 @@ const Settings: React.FC<SettingsProps> = ({
                 onMouseEnter={() => startSettingsIconAnimation(tab.key)}
                 onMouseLeave={() => stopSettingsIconAnimation(tab.key)}
                 className={cn(
-                  'flex w-full items-center justify-start gap-3 rounded-lg border border-transparent bg-transparent px-3 py-2 text-sm font-medium !transition-colors !duration-200 ease-out',
+                  'theme-page-settings-button-variant-7 flex w-full items-center justify-start',
                   activeTab === tab.key
-                    ? 'border-border bg-card text-foreground hover:border-border hover:!bg-card hover:!text-foreground'
-                    : 'text-muted-foreground hover:border-border hover:!bg-card hover:!text-foreground',
+                    ? 'theme-page-settings-button-variant-8'
+                    : 'theme-page-settings-button-variant-9',
                 )}
               >
                 {tab.icon}
@@ -5323,7 +5316,7 @@ const Settings: React.FC<SettingsProps> = ({
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-muted-foreground hover:text-foreground p-1.5 hover:bg-surface-raised rounded-lg"
+              className="theme-page-settings-button-11"
             >
               <X className="h-5 w-5" />
             </Button>

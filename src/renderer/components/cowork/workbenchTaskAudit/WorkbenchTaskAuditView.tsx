@@ -164,7 +164,7 @@ function TaskDetailsDisclosure({ task }: { task: WorkbenchTask }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen(current => !current)}
-        className="flex w-fit items-center gap-1 rounded-sm text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="theme-native-audit-link flex w-fit items-center gap-1"
       >
         <ChevronRight
           className={cn(

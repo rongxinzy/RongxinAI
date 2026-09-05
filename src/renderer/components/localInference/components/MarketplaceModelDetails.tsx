@@ -65,7 +65,7 @@ export function MarketplaceModelDetails({
       <PopoverContent
         side="bottom"
         align="end"
-        className="max-h-96 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto p-4"
+        className="theme-control-sizing-21 max-h-96 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto"
       >
         <PopoverTitle>{i18nService.t('marketplaceDetails')}</PopoverTitle>
         <p className="break-all text-xs text-muted-foreground">{model.repoId}</p>

@@ -392,7 +392,7 @@ function buildSearchPanel(view: EditorView): Panel {
   prevBtn.className = buttonVariants({
     variant: 'outline',
     size: 'icon-sm',
-    className: 'cm-search-nav-btn [&_svg]:size-3.5',
+    className: 'cm-search-nav-btn',
   });
   prevBtn.title = t('codeSearchPrev');
   prevBtn.innerHTML =
@@ -403,7 +403,7 @@ function buildSearchPanel(view: EditorView): Panel {
   nextBtn.className = buttonVariants({
     variant: 'outline',
     size: 'icon-sm',
-    className: 'cm-search-nav-btn [&_svg]:size-3.5',
+    className: 'cm-search-nav-btn',
   });
   nextBtn.title = t('codeSearchNext');
   nextBtn.innerHTML =
@@ -435,7 +435,7 @@ function buildSearchPanel(view: EditorView): Panel {
   closeBtn.className = buttonVariants({
     variant: 'ghost',
     size: 'icon-sm',
-    className: 'cm-search-close-btn [&_svg]:size-3.5',
+    className: 'cm-search-close-btn',
   });
   closeBtn.title = t('codeSearchClose');
   closeBtn.setAttribute('aria-label', t('codeSearchClose'));
@@ -571,108 +571,30 @@ const baseTheme = EditorView.theme({
   '.cm-insertedChunk': { backgroundColor: 'var(--zy-component-editor-inserted-chunk)' },
   '.cm-changedText': { backgroundColor: 'var(--zy-component-editor-changed)' },
   // Custom search panel
-  '.cm-search-custom': {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '5px 10px',
-    borderBottom: '1px solid var(--zy-border)',
-    background: 'var(--zy-surface-raised)',
-    fontFamily: 'var(--zy-style-font-mono)',
-    fontSize: 'var(--zy-component-text-xs)',
-  },
-  '.cm-search-input': {
-    flex: '0 0 160px',
-    height: '26px',
-    padding: '0 8px',
-    borderRadius: 'var(--zy-style-radius-sm)',
-    border: '1px solid var(--zy-border)',
-    background: 'var(--zy-surface)',
-    color: 'var(--zy-foreground)',
-    fontSize: 'var(--zy-component-text-xs)',
-    outline: 'none',
-  },
-  '.cm-search-input:focus': {
-    borderColor: 'var(--zy-primary)',
-  },
-  '.cm-search-count': {
-    flex: '0 0 auto',
-    minWidth: '36px',
-    fontSize: 'var(--zy-component-text-xs)',
-    color: 'var(--zy-text-secondary)',
-    textAlign: 'center',
-    fontVariantNumeric: 'tabular-nums',
-  },
-  '.cm-search-count--none': {
-    color: 'var(--zy-component-editor-error)',
-  },
+  '.cm-search-custom': { display: 'flex', alignItems: 'center' },
+  '.cm-search-input': { flex: '0 0 160px' },
+  '.cm-search-count': { flex: '0 0 auto', minWidth: '36px', textAlign: 'center' },
   '.cm-search-nav-btn': {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '26px',
-    height: '26px',
-    padding: '0',
-    borderRadius: 'var(--zy-style-radius-sm)',
-    border: '1px solid var(--zy-border)',
-    background: 'var(--zy-surface-raised)',
-    color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s',
   },
-  '.cm-search-nav-btn:hover': {
-    background: 'var(--zy-surface-tertiary)',
-    color: 'var(--zy-foreground)',
-  },
-  '.cm-search-sep': {
-    width: '1px',
-    height: '16px',
-    background: 'var(--zy-border)',
-    margin: '0 2px',
-    flex: '0 0 auto',
-  },
+  '.cm-search-sep': { margin: '0 2px', flex: '0 0 auto' },
   '.cm-search-opt': {
     display: 'inline-flex',
     alignItems: 'center',
-    gap: '4px',
-    height: '26px',
-    padding: '0 6px',
-    borderRadius: 'var(--zy-style-radius-sm)',
-    border: '1px solid transparent',
-    fontSize: 'var(--zy-component-text-xs)',
-    color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
     userSelect: 'none',
-    transition: 'background 0.15s, border-color 0.15s, color 0.15s',
     whiteSpace: 'nowrap',
   },
-  '.cm-search-opt:hover': {
-    background: 'var(--zy-surface-raised)',
-    color: 'var(--zy-foreground)',
-  },
-  '.cm-search-opt input[type="checkbox"]': {
-    margin: '0',
-    cursor: 'pointer',
-    accentColor: 'var(--zy-primary)',
-  },
+  '.cm-search-opt input[type="checkbox"]': { margin: '0', cursor: 'pointer' },
   '.cm-search-close-btn': {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: '26px',
-    height: '26px',
-    padding: '0',
     marginLeft: 'auto',
-    borderRadius: 'var(--zy-style-radius-sm)',
-    border: 'none',
-    background: 'transparent',
-    color: 'var(--zy-text-secondary)',
     cursor: 'pointer',
-    transition: 'background 0.15s, color 0.15s',
-  },
-  '.cm-search-close-btn:hover': {
-    background: 'var(--zy-surface-raised)',
-    color: 'var(--zy-foreground)',
   },
   '.cm-searchMatch': {
     backgroundColor: 'var(--zy-component-editor-search)',
@@ -912,7 +834,7 @@ const CodeFullscreenModal: React.FC<CodeFullscreenModalProps> = ({
     >
       {/* Modal container */}
       <div
-        className="flex flex-col m-8 rounded-xl overflow-hidden border border-border shadow-2xl"
+        className="theme-surface-code-preview flex flex-col m-8 overflow-hidden"
         style={{ flex: 1, minHeight: 0, backgroundColor: 'var(--zy-component-editor-background)' }}
         onClick={e => e.stopPropagation()}
       >
@@ -998,11 +920,7 @@ const CodeBlockTooltip: React.FC<{
   <TooltipProvider delay={300}>
     <Tooltip>
       <TooltipTrigger render={<div className={className}>{children}</div>} />
-      <TooltipContent
-        side="bottom"
-        align="end"
-        className="bg-surface-overlay text-foreground border-border shadow-lg"
-      >
+      <TooltipContent side="bottom" align="end" className="theme-code-hint">
         {content}
       </TooltipContent>
     </Tooltip>
@@ -1021,12 +939,8 @@ const HeaderButton: React.FC<{
     variant="ghost"
     size="icon"
     onClick={onClick}
-    className={[
-      'h-7 w-7 rounded-md transition-colors transform-gpu',
-      active
-        ? 'bg-surface text-foreground'
-        : 'text-muted-foreground hover:bg-surface hover:text-foreground',
-    ].join(' ')}
+    data-active={active || undefined}
+    className="theme-code-header-button transform-gpu"
     aria-label={ariaLabel}
   >
     {children}
@@ -1442,7 +1356,7 @@ const CodeBlock: React.FC<CodeBlockProps> = ({ node, className, children, ...pro
               variant="ghost"
               size="icon"
               onClick={handleCopy}
-              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors transform-gpu"
+              className="theme-page-code-block-button-1 inline-flex items-center justify-center transform-gpu"
               aria-label={i18nService.t('copyToClipboard')}
             >
               {isCopied ? (

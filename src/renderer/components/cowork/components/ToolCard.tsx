@@ -187,7 +187,7 @@ export const ToolCard: React.FC<{
                   size="sm"
                   aria-expanded={isResultExpanded}
                   onClick={() => setIsResultExpanded(!isResultExpanded)}
-                  className="inline-flex items-center gap-1 self-start text-xs text-muted-foreground"
+                  className="theme-page-tool-card-button-1 inline-flex items-center self-start"
                 >
                   <ChevronDown
                     className={cn(

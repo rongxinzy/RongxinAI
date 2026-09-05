@@ -20,7 +20,12 @@ interface RunSessionModalProps {
 const MAX_RETRIES = 5;
 const RETRY_INTERVAL_MS = 3000;
 
-const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey, title, onClose }) => {
+const RunSessionModal: React.FC<RunSessionModalProps> = ({
+  sessionId,
+  sessionKey,
+  title,
+  onClose,
+}) => {
   const [session, setSession] = useState<CoworkSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -150,9 +155,9 @@ const RunSessionModal: React.FC<RunSessionModalProps> = ({ sessionId, sessionKey
         if (!open) onClose();
       }}
     >
-      <DialogContent className="flex max-h-[72vh] w-[min(56rem,calc(100%-2rem))] flex-col gap-0 overflow-hidden bg-card p-0 sm:max-w-[56rem]">
-        <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b border-border shrink-0">
-          <DialogTitle className="text-sm font-semibold truncate">
+      <DialogContent className="theme-page-run-session-modal-dialog-content-1 flex max-h-[72vh] flex-col overflow-hidden sm:max-w-[56rem]">
+        <DialogHeader className="theme-part-run-session-modal-dialog-header-1 flex flex-row items-center justify-between shrink-0">
+          <DialogTitle className="theme-part-run-session-modal-dialog-title-1 truncate">
             {title || session?.title || i18nService.t('scheduledTasksViewSession')}
           </DialogTitle>
         </DialogHeader>

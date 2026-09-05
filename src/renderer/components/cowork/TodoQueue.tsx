@@ -100,7 +100,7 @@ export function TodoQueue({ isDismissing = false, todos }: TodoQueueProps) {
                 variant="ghost"
                 size="sm"
                 data-todo-queue-trigger="true"
-                className="w-full px-3"
+                className="theme-control-sizing-9 w-full"
               >
                 {isComplete ? (
                   <CircleCheck data-icon="inline-start" className="text-muted-foreground" />

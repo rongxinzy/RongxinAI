@@ -85,14 +85,14 @@ export function MarketplaceModelCardView({
             <MarketplaceModelIcon name={displayName} />
           </span>
           <div className="min-w-0 flex-1">
-            <CardTitle className="text-sm font-semibold leading-5">
+            <CardTitle className="theme-market-card-title">
               {model.detailUrl ? (
                 <a
                   href={model.detailUrl}
                   target="_blank"
                   rel="noreferrer"
                   title={displayName}
-                  className="line-clamp-2 break-all rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+                  className="theme-surface-market-link line-clamp-2 break-all"
                   onClick={event => {
                     event.preventDefault();
                     onOpenModel();
@@ -106,7 +106,7 @@ export function MarketplaceModelCardView({
                 </span>
               )}
             </CardTitle>
-            <CardDescription className="mt-1 flex min-w-0 items-center gap-1.5 text-xs">
+            <CardDescription className="theme-market-card-description mt-1 flex min-w-0 items-center gap-1.5">
               <span className="truncate" title={publisher ?? undefined}>
                 {publisher
                   ? `${i18nService.t('marketplacePublisherLabel')}${publisher}`

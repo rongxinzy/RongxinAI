@@ -51,7 +51,12 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
           />
         }
       />
-      <DropdownMenuContent side="bottom" align="start" sideOffset={4} className="w-56 p-2">
+      <DropdownMenuContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        className="theme-permission-menu w-56"
+      >
         <DropdownMenuRadioGroup
           value={value}
           onValueChange={nextValue => onChange(nextValue as CoworkPermissionMode)}
@@ -70,7 +75,7 @@ const PermissionModeMenu: React.FC<PermissionModeMenuProps> = ({
             <DropdownMenuRadioItem
               key={mode}
               value={mode}
-              className="items-start gap-2 rounded-lg pl-2 pr-8 py-2.5 data-checked:bg-surface-raised"
+              className="theme-permission-option items-start"
             >
               <SelectorOptionContent
                 icon={

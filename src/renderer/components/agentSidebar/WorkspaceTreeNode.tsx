@@ -112,7 +112,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
       >
         <Button
           variant="ghost"
-          className="h-full min-w-0 flex-1 justify-start gap-2 rounded-md py-0 pl-3 pr-2 text-left text-sm font-normal text-foreground hover:bg-transparent aria-expanded:bg-transparent"
+          className="theme-page-workspace-tree-node-button-1 h-full min-w-0 flex-1 justify-start text-left"
           onClick={() => onToggleExpanded(workspace.id)}
           onMouseEnter={() => {
             if (!prefersReducedMotion) folderIconRef.current?.startAnimation();
@@ -139,7 +139,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 if (!prefersReducedMotion) createTaskIconRef.current?.startAnimation();
               }}
               onMouseLeave={() => createTaskIconRef.current?.stopAnimation()}
-              className="text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
+              className="theme-action-muted"
               aria-label={i18nService.t('myAgentSidebarNewTask')}
             >
               <SidebarAnimatedMessageCirclePlusIcon
@@ -157,8 +157,9 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                     variant="ghost"
                     size="icon-xs"
                     className={cn(
-                      'pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]',
-                      menuOpen && 'pointer-events-auto opacity-[0.46]',
+                      'theme-page-workspace-tree-node-button-variant-1 pointer-events-none group-hover:pointer-events-auto',
+                      menuOpen &&
+                        'theme-page-workspace-tree-node-button-variant-2 pointer-events-auto',
                     )}
                     aria-label={i18nService.t('workspaceActions')}
                   >
@@ -214,7 +215,7 @@ const WorkspaceTreeNode: React.FC<WorkspaceTreeNodeProps> = ({
                 <Button
                   variant="ghost"
                   onClick={() => onRetryLoadTasks(workspace.id)}
-                  className="ml-[-6px] flex h-7 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-sm font-normal text-destructive hover:bg-destructive/10"
+                  className="theme-page-workspace-tree-node-button-2 ml-[-6px] flex justify-start"
                 >
                   {i18nService.t('myAgentSidebarLoadFailed')}
                 </Button>

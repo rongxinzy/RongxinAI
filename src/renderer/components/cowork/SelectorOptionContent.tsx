@@ -16,9 +16,9 @@ export function SelectorOptionContent({
         {icon}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-sm wrap-anywhere">{title}</span>
+        <span className="theme-selector-option-title wrap-anywhere">{title}</span>
         {description && (
-          <span className="text-xs text-muted-foreground wrap-anywhere">{description}</span>
+          <span className="theme-selector-option-description wrap-anywhere">{description}</span>
         )}
       </span>
     </span>

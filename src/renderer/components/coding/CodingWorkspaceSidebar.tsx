@@ -232,7 +232,7 @@ export const CodingWorkspaceSidebar = ({
               type="button"
               variant="ghost"
               size="icon-sm"
-              className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
+              className="theme-action-faint"
               aria-label={i18nService.t('codingAgentManageAgents')}
               onClick={() => onManageAgents(selectedWorkspace.primaryRoot)}
             >
@@ -243,7 +243,7 @@ export const CodingWorkspaceSidebar = ({
             type="button"
             variant="ghost"
             size="icon-sm"
-            className="text-foreground opacity-[0.34] hover:opacity-[0.5]"
+            className="theme-action-faint"
             aria-label={i18nService.t('codingWorkspaceAdd')}
             onClick={() => {
               setError(null);
@@ -259,7 +259,7 @@ export const CodingWorkspaceSidebar = ({
         {workspaces.length === 0 ? (
           <button
             type="button"
-            className="sidebar-interactive-surface w-full rounded-md px-2 py-8 text-center text-sm text-muted-foreground"
+            className="theme-native-workspace-action w-full px-2 py-8 text-center"
             onClick={() => setWorkspaceDialogOpen(true)}
           >
             <Folder className="mx-auto mb-2 size-8 opacity-50" />
@@ -388,10 +388,7 @@ const WorkspaceNode = ({
       });
     } else {
       setIsSessionGroupVisible(false);
-      timeout = window.setTimeout(
-        () => setShouldRenderSessions(false),
-        SESSIONS_TRANSITION_MS,
-      );
+      timeout = window.setTimeout(() => setShouldRenderSessions(false), SESSIONS_TRANSITION_MS);
     }
     return () => {
       if (frame) cancelAnimationFrame(frame);
@@ -410,7 +407,7 @@ const WorkspaceNode = ({
       >
         <Button
           variant="ghost"
-          className="h-full min-w-0 flex-1 justify-start gap-2 rounded-md py-0 pl-3 pr-2 text-left text-sm font-normal text-foreground hover:bg-transparent"
+          className="theme-page-coding-workspace-sidebar-button-1 h-full min-w-0 flex-1 justify-start text-left"
           onClick={() => {
             onToggleExpanded(workspace.id, !expanded);
             onSelectionChange({
@@ -447,7 +444,7 @@ const WorkspaceNode = ({
               if (!prefersReducedMotion) createSessionIconRef.current?.startAnimation();
             }}
             onMouseLeave={() => createSessionIconRef.current?.stopAnimation()}
-            className="text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
+            className="theme-action-muted"
             aria-label={i18nService.t('codingSessionCreate')}
           >
             <SidebarAnimatedMessageCirclePlusIcon
@@ -463,8 +460,9 @@ const WorkspaceNode = ({
                   variant="ghost"
                   size="icon-xs"
                   className={cn(
-                    'pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]',
-                    menuOpen && 'pointer-events-auto opacity-[0.46]',
+                    'theme-page-coding-workspace-sidebar-button-variant-1 pointer-events-none group-hover:pointer-events-auto',
+                    menuOpen &&
+                      'theme-page-coding-workspace-sidebar-button-variant-2 pointer-events-auto',
                   )}
                   aria-label={i18nService.t('codingWorkspaceEdit')}
                 >
@@ -476,10 +474,7 @@ const WorkspaceNode = ({
               <DropdownMenuItem onClick={() => onEditWorkspace(workspace)}>
                 {i18nService.t('codingWorkspaceEdit')}
               </DropdownMenuItem>
-              <DropdownMenuItem
-                variant="destructive"
-                onClick={() => onRemoveWorkspace(workspace)}
-              >
+              <DropdownMenuItem variant="destructive" onClick={() => onRemoveWorkspace(workspace)}>
                 <Trash2 className="h-3.5 w-3.5" />
                 {i18nService.t('codingWorkspaceRemove')}
               </DropdownMenuItem>
@@ -508,9 +503,7 @@ const WorkspaceNode = ({
                 <SessionRow
                   active
                   name={i18nService.t('codingSessionDraft')}
-                  agentName={
-                    profiles.find(profile => profile.id === draft.profileId)?.name
-                  }
+                  agentName={profiles.find(profile => profile.id === draft.profileId)?.name}
                   status={CodingLaneStatus.Idle}
                   nested={false}
                   onClick={() => undefined}
@@ -520,7 +513,7 @@ const WorkspaceNode = ({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="sidebar-interactive-surface ml-[-6px] h-8 w-[calc(100%+12px)] justify-start rounded-md pl-[38px] pr-2.5 text-sm font-normal text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  className="theme-page-coding-workspace-sidebar-button-2 sidebar-interactive-surface ml-[-6px] justify-start"
                   onClick={() => onCreateSession(workspace)}
                 >
                   {i18nService.t('codingSessionNew')}
@@ -605,11 +598,13 @@ const SessionRow = ({
       type="button"
       variant="ghost"
       className={cn(
-        'ml-[-6px] h-8 w-[calc(100%+12px)] min-w-0 justify-start gap-2 rounded-md py-0 pr-2.5 text-left text-sm font-normal transition-colors hover:bg-transparent',
-        nested ? 'pl-[46px]' : 'pl-[38px]',
+        'theme-page-coding-workspace-sidebar-button-variant-3 ml-[-6px] min-w-0 justify-start text-left',
+        nested
+          ? 'theme-page-coding-workspace-sidebar-button-variant-4'
+          : 'theme-page-coding-workspace-sidebar-button-variant-5',
         active
-          ? 'sidebar-interactive-surface-active text-foreground'
-          : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground',
+          ? 'theme-page-coding-workspace-sidebar-button-variant-6 sidebar-interactive-surface-active'
+          : 'theme-page-coding-workspace-sidebar-button-variant-7 sidebar-interactive-surface',
       )}
       onClick={onClick}
       role="treeitem"
@@ -635,7 +630,7 @@ const SessionRow = ({
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]"
+          className="theme-page-coding-workspace-sidebar-button-3 group-hover:pointer-events-auto"
           aria-label={i18nService.t('codingSessionRemove')}
           onClick={onDelete}
         >
