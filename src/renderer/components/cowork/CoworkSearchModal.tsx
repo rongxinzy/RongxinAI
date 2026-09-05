@@ -1,167 +1,184 @@
 import { AgentId } from '@shared/agent';
-import {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@shared/components/ui/command';
-import { Spinner } from '@shared/components/ui/spinner';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
 import { coworkService } from '../../services/cowork';
+import { DEFAULT_SHORTCUTS } from '../../config';
+import { configService } from '../../services/config';
+import { matchesShortcut } from '../../services/shortcuts';
+import { formatShortcutLabel } from '../../services/shortcutLabel';
 import { i18nService } from '../../services/i18n';
-import { RootState } from '../../store';
+import type { RootState } from '../../store';
+import { WorkMode } from '../../store/workMode/constants';
 import { CoworkSessionStatusValue, type CoworkSessionSummary } from '../../types/cowork';
 import { getAgentDisplayNameById } from '../../utils/agentDisplay';
+import { TaskSearchDialog } from './TaskSearchDialog';
 
 const SEARCH_SESSION_LIMIT = 100;
-
-const getSessionAgentId = (session: CoworkSessionSummary) => {
-  return session.agentId?.trim() || AgentId.Main;
-};
-
+const SearchError = { Load: 'searchLoadError', Open: 'searchOpenError' } as const;
 interface CoworkSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
   sessions: CoworkSessionSummary[];
   currentSessionId: string | null;
-  onSelectSession: (session: CoworkSessionSummary) => void | Promise<void>;
-  workMode?: 'work' | 'chat';
+  onSelectSession: (session: CoworkSessionSummary) => boolean | void | Promise<boolean | void>;
+  workMode?: WorkMode;
+  onNewChat?: () => void;
 }
 
 const CoworkSearchModal: React.FC<CoworkSearchModalProps> = ({
   isOpen,
   onClose,
   sessions,
-  currentSessionId: _currentSessionId,
+  currentSessionId,
   onSelectSession,
-  workMode = 'work',
+  workMode = WorkMode.Work,
+  onNewChat,
 }) => {
   const agents = useSelector((state: RootState) => state.agent.agents);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchSessions, setSearchSessions] = useState<CoworkSessionSummary[]>(sessions);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const modeFilteredSessions = useMemo(() => {
-    return searchSessions.filter(s =>
-      workMode === 'chat' ? s.mode === 'chat' : s.mode !== 'chat',
-    );
-  }, [searchSessions, workMode]);
-
-  const agentNameBySessionId = useMemo(() => {
-    const names = new Map<string, string>();
-    searchSessions.forEach(session => {
-      const agentId = getSessionAgentId(session);
-      names.set(session.id, getAgentDisplayNameById(agentId, agents) ?? agentId);
-    });
-    return names;
-  }, [agents, searchSessions]);
-
-  const filteredSessions = useMemo(() => {
-    const trimmedQuery = searchQuery.trim().toLowerCase();
-    if (!trimmedQuery) return modeFilteredSessions;
-    return modeFilteredSessions.filter(session => {
-      const agentName = agentNameBySessionId.get(session.id) ?? '';
-      return (
-        session.title.toLowerCase().includes(trimmedQuery) ||
-        agentName.toLowerCase().includes(trimmedQuery)
-      );
-    });
-  }, [agentNameBySessionId, searchQuery, modeFilteredSessions]);
+  const workspaces = useSelector((state: RootState) => state.workspace.workspaces);
+  const [query, setQuery] = useState('');
+  const [searchSessions, setSearchSessions] = useState(sessions);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<(typeof SearchError)[keyof typeof SearchError] | null>(null);
+  const [retry, setRetry] = useState(0);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
+  const selecting = useRef(false);
+  const dialogLifetime = useRef({ active: false });
+  const sessionsRef = useRef(sessions);
+  sessionsRef.current = sessions;
+  const isChat = workMode === WorkMode.Chat;
+  const isMac = window.electron.platform === 'darwin';
+  const newTaskShortcut = configService.getConfig().shortcuts?.newChat ?? DEFAULT_SHORTCUTS.newChat;
 
   useEffect(() => {
-    if (!isOpen) setSearchQuery('');
-  }, [isOpen]);
-  useEffect(() => {
-    if (!isOpen) setSearchSessions(sessions);
-  }, [isOpen, sessions]);
-
-  useEffect(() => {
-    if (!isOpen) return;
+    const lifetime = { active: isOpen };
+    dialogLifetime.current = lifetime;
+    if (!isOpen) {
+      setQuery('');
+      setError(null);
+      return;
+    }
     let cancelled = false;
-    setIsLoading(true);
+    setLoading(true);
+    setError(null);
+    setSearchSessions(sessionsRef.current);
     void coworkService
       .listSessionsForSearch(SEARCH_SESSION_LIMIT, 0)
       .then(result => {
         if (cancelled) return;
-        setSearchSessions(result?.success ? (result.sessions ?? []) : []);
+        if (result?.success) setSearchSessions(result.sessions ?? []);
+        else setError(SearchError.Load);
+      })
+      .catch(() => {
+        if (!cancelled) setError(SearchError.Load);
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      lifetime.active = false;
     };
-  }, [isOpen, workMode]);
+  }, [isOpen, workMode, retry]);
 
-  const handleSelectSession = async (session: CoworkSessionSummary) => {
-    await onSelectSession(session);
-    onClose();
+  const { items, sessionById } = useMemo(() => {
+    const names = new Map(
+      workspaces
+        .filter(workspace => !workspace.isHidden)
+        .map(workspace => [workspace.id, workspace.name]),
+    );
+    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const sessionById = new Map<string, CoworkSessionSummary>();
+    const items = searchSessions
+      .filter(session => (isChat ? session.mode === WorkMode.Chat : session.mode !== WorkMode.Chat))
+      .slice()
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .flatMap(session => {
+        const agentId = session.agentId?.trim() || AgentId.Main;
+        const agentName = getAgentDisplayNameById(agentId, agents) ?? agentId;
+        const context = names.get(session.workspaceId ?? '') ?? (isChat ? undefined : agentName);
+        if (
+          normalizedQuery &&
+          ![session.title, agentName, context ?? ''].some(value =>
+            value.toLocaleLowerCase().includes(normalizedQuery),
+          )
+        )
+          return [];
+        sessionById.set(session.id, session);
+        return [
+          {
+            id: session.id,
+            title: session.title,
+            context,
+            current: session.id === currentSessionId,
+            running: session.status === CoworkSessionStatusValue.Running,
+          },
+        ];
+      });
+    return { items, sessionById };
+  }, [searchSessions, agents, workspaces, query, isChat, currentSessionId]);
+
+  const handleSelect = async (id: string) => {
+    const session = sessionById.get(id);
+    if (!session || selecting.current) return;
+    selecting.current = true;
+    setError(null);
+    setSelectingId(id);
+    const lifetime = dialogLifetime.current;
+    try {
+      const opened = await onSelectSession(session);
+      if (opened === false) {
+        if (lifetime.active) setError(SearchError.Open);
+        return;
+      }
+      if (lifetime.active) onClose();
+    } catch {
+      if (lifetime.active) setError(SearchError.Open);
+    } finally {
+      selecting.current = false;
+      setSelectingId(null);
+    }
   };
 
   return (
-    <CommandDialog
+    <TaskSearchDialog
       open={isOpen}
-      onOpenChange={open => {
-        if (!open) onClose();
+      query={query}
+      items={items}
+      loading={loading}
+      error={error ? i18nService.t(error) : null}
+      selectingId={selectingId}
+      isMac={isMac}
+      newTaskShortcut={{
+        label: formatShortcutLabel(newTaskShortcut, isMac),
+        matches: event => matchesShortcut(event, newTaskShortcut),
       }}
-      title={i18nService.t(workMode === 'chat' ? 'searchChatConversations' : 'searchConversations')}
-      description={i18nService.t(workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks')}
-      className="bg-background"
-    >
-      <Command shouldFilter={false} className="bg-background">
-        <CommandInput
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-          placeholder={i18nService.t(
-            workMode === 'chat' ? 'searchChatConversations' : 'searchConversations',
-          )}
-        />
-        <CommandList className="**:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-10">
-              <Spinner />
-            </div>
-          ) : filteredSessions.length === 0 ? (
-            <CommandEmpty>
-              {i18nService.t(workMode === 'chat' ? 'searchChatNoResults' : 'searchNoResults')}
-            </CommandEmpty>
-          ) : (
-            <CommandGroup
-              heading={i18nService.t(
-                workMode === 'chat' ? 'searchRecentChats' : 'searchRecentTasks',
-              )}
-            >
-              {filteredSessions.map(session => {
-                const isRunning = session.status === CoworkSessionStatusValue.Running;
-                const agentName =
-                  agentNameBySessionId.get(session.id) ?? getSessionAgentId(session);
-                return (
-                  <CommandItem
-                    key={session.id}
-                    value={session.title}
-                    onSelect={() => void handleSelectSession(session)}
-                    className="hover:bg-black/3 dark:hover:bg-white/4"
-                  >
-                    {isRunning && <Spinner />}
-                    <span className="min-w-0 flex-1 truncate">{session.title}</span>
-                    {workMode !== 'chat' && (
-                      <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-                        {agentName}
-                      </span>
-                    )}
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          )}
-        </CommandList>
-      </Command>
-    </CommandDialog>
+      labels={{
+        title: i18nService.t(isChat ? 'searchChatConversations' : 'searchConversations'),
+        description: i18nService.t(isChat ? 'searchRecentChats' : 'searchRecentTasks'),
+        group: i18nService.t(isChat ? 'conversations' : 'searchRecentTasks'),
+        empty: i18nService.t(isChat ? 'searchChatNoResults' : 'searchNoResults'),
+        loading: i18nService.t('loading'),
+        quickActions: i18nService.t('searchQuickActions'),
+        newTask: i18nService.t(isChat ? 'newChat' : 'newTask'),
+        retry: i18nService.t('searchRetry'),
+      }}
+      onQueryChange={setQuery}
+      onClose={onClose}
+      onSelect={id => void handleSelect(id)}
+      onRetry={error === SearchError.Load ? () => setRetry(value => value + 1) : undefined}
+      onNewChat={
+        onNewChat
+          ? () => {
+              if (!selecting.current) {
+                onClose();
+                onNewChat();
+              }
+            }
+          : undefined
+      }
+    />
   );
 };
 
