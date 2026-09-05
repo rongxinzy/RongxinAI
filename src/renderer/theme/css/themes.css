@@ -9,6 +9,7 @@
   --zy-primary-hover: oklch(0.514 0.207 260.5);
   --zy-primary-muted: oklch(0.95 0.025 258);
   --zy-primary-strong: oklch(0.564 0.218 259.8);
+  --zy-switch-thumb-foreground: oklch(0.366 0.008 253);
   --zy-switch-track-checked: var(--zy-primary);
   --zy-switch-track-checked-hover: var(--zy-primary-hover);
   --zy-accent: oklch(0.97 0.001 106.424);
@@ -74,6 +75,7 @@
   --zy-primary-hover: oklch(0.74 0.14 259);
   --zy-primary-muted: oklch(0.3 0.05 259);
   --zy-primary-strong: oklch(0.564 0.218 259.8);
+  --zy-switch-thumb-foreground: oklch(0.366 0.008 253);
   --zy-switch-track-checked: var(--zy-primary);
   --zy-switch-track-checked-hover: var(--zy-primary-hover);
   --zy-accent: oklch(0.268 0.007 34.298);

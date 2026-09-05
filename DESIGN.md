@@ -312,7 +312,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 输入框工具栏上的选择器/触发按钮（参照实现：`PermissionModeMenu`、`CoworkModelPicker`）是**工具栏按钮的质感基准**，新做同类按钮（下拉选择器、菜单触发器、工具栏动作）时一律使用，不自造变体：
 
-1. **统一用 ghost `PromptInputButton`**（ai-elements）：无边框、无背景、无阴影，静止时完全融入工具栏。
+1. **统一用 `PromptInputButton`**（ai-elements）：无边框、无背景、无阴影，静止时完全融入工具栏。普通动作使用 ghost；模型、权限下拉使用共享 `PromptSelectorButton`，由 `prompt-selector` variant 统一提供以下 hover 和展开状态。
 2. **hover 用背景表达**：`hover:bg-surface-raised`，200ms 内过渡；不用边框、阴影或颜色变化做 hover 信号。
 3. **下拉触发器带尾部箭头**：`ChevronDown`（`h-3.5 w-3.5 text-muted-foreground`），表明"点开有菜单"；纯动作按钮（如「+」）只放图标，不加箭头。
 4. **内容从左到右**：可选的前置图标（`size-4` 或供应商标识）→ `text-sm` 文字 → 尾部箭头；文字过长用 `max-w` + `truncate` 截断。
@@ -419,3 +419,14 @@ src/shared/components/ui/page-tabs.tsx
 - 系统提示统一复用 `src/renderer/components/Toast.tsx` 的视觉：内容自适应宽度、顶部居中；失败使用深色底配红色圆形 X，成功使用浅色底配绿色圆形对勾，信息提示使用蓝色信息图标；不显示右侧关闭图标。
 - 新增提示不得自行实现 Toast 容器或另起视觉分支；跨页面通知使用 `app:showToast`，第三方 Toast 仅通过共享 Sonner 宿主调用。
 - 用户可见错误必须经过错误归一化和 i18n。已知错误显示明确中文类别；未知错误显示“操作失败：原因摘要”，同时将原始错误写入日志供开发者定位。
+
+
+## Shell 展示模块边界
+
+- 侧栏导航使用共享 `SidebarNavigationView` / `SidebarNavigationItem`：32px 行高、8px 圆角、统一图标槽和文字省略；选中态使用 `card`、`border` 与正文色，悬停使用同一语义表面。状态、可见性策略、预加载与新任务回调由原控制组件提供。
+- `Button` 的 `navigation` variant / size 负责导航视觉；`toolbar` variant 配合 `icon` size 负责侧栏及顶栏的 32px 图标按钮。页面不再覆盖这些按钮的颜色、圆角和高度。
+- `PageHeaderLayout` 只排列导航、标题、操作、系统窗口控制与 tabs 槽位。导航和操作不压缩，标题允许省略；macOS 原生窗口按钮预留区继续保留，交互控件继续位于不可拖动区域。
+- 输入区模型、权限触发器复用 `PromptSelectorButton`，保留 `PromptInputButton` 的无背景外观和 sm 尺寸，使用共享 `prompt-selector` variant；统一图标槽、箭头、截断与紧凑模式。菜单状态、搜索、权限及模型选择回调留在原组件。
+- 展示层不新增 IPC、持久化或业务状态，不通过主题 key 重建编辑器。工作/对话开关只有一个变更入口；沿用原有受控 Switch 与浅深主题。
+
+- 工作/对话开关保留白色滑块；选中文字使用 `switch-thumb-foreground`，浅深色均为深色，避免深色主题的正文白色落到白色滑块上。该语义 token 同步登记到主题契约、共享默认值、静态 CSS 与 Tailwind 映射。

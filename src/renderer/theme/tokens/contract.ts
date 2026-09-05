@@ -15,6 +15,7 @@ export const TOKEN_CONTRACT = {
   // Button-grade primary: deep enough for AA white text even in dark themes
   // where `primary` is brightened for text/icon legibility.
   'primary-strong': '--zy-primary-strong',
+  'switch-thumb-foreground': '--zy-switch-thumb-foreground',
   'switch-track-checked': '--zy-switch-track-checked',
   'switch-track-checked-hover': '--zy-switch-track-checked-hover',
 
