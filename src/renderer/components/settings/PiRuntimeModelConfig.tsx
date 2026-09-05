@@ -129,11 +129,11 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
     <FieldSet className="rounded-lg border border-border bg-surface-raised p-3">
       <FieldGroup className="grid grid-cols-2 gap-3">
         <Field orientation="horizontal" className="items-center justify-between gap-2">
-          <FieldLabel className="text-[11px] text-muted-foreground">
+          <FieldLabel className="text-xs text-muted-foreground">
             {i18nService.t('piRuntimeApi')}
           </FieldLabel>
           <Select value={value?.api ?? PiRuntimeSelectValue.Auto} onValueChange={updateApi}>
-            <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectTrigger className="theme-page-pi-runtime-model-config-select-trigger-1">
               <SelectValue />
             </SelectTrigger>
             <SelectContent alignItemWithTrigger>
@@ -154,7 +154,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
         <Field orientation="horizontal" className="items-center justify-between gap-2">
           <FieldLabel
             htmlFor="custom-model-pi-runtime-reasoning"
-            className="text-[11px] text-muted-foreground"
+            className="text-xs text-muted-foreground"
           >
             {i18nService.t('piRuntimeReasoning')}
           </FieldLabel>
@@ -166,7 +166,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
         </Field>
 
         <Collapsible defaultOpen={false} className="col-span-2">
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-1 py-1 text-xs font-medium text-foreground hover:bg-muted">
+          <CollapsibleTrigger className="theme-fold-compact flex w-full items-center justify-between">
             {i18nService.t('piRuntimeCompat')}
             <ChevronDown className="size-4 text-muted-foreground" />
           </CollapsibleTrigger>
@@ -187,7 +187,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                         )
                       }
                     >
-                      <SelectTrigger className="h-8 w-24 shrink-0 text-xs">
+                      <SelectTrigger className="theme-page-pi-runtime-model-config-select-trigger-2 shrink-0">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent alignItemWithTrigger>
@@ -210,7 +210,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
 
               <div className="grid grid-cols-2 gap-2">
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
-                  <FieldLabel className="text-[11px] text-muted-foreground">
+                  <FieldLabel className="text-xs text-muted-foreground">
                     {i18nService.t('piRuntimeMaxTokensField')}
                   </FieldLabel>
                   <Select
@@ -227,7 +227,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger>
@@ -246,7 +246,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                 </Field>
 
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
-                  <FieldLabel className="text-[11px] text-muted-foreground">
+                  <FieldLabel className="text-xs text-muted-foreground">
                     {i18nService.t('piRuntimeThinkingFormat')}
                   </FieldLabel>
                   <Select
@@ -263,7 +263,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger>
@@ -282,7 +282,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                 </Field>
 
                 <Field orientation="horizontal" className="items-center justify-between gap-2">
-                  <FieldLabel className="text-[11px] text-muted-foreground">
+                  <FieldLabel className="text-xs text-muted-foreground">
                     {i18nService.t('piRuntimeCacheControlFormat')}
                   </FieldLabel>
                   <Select
@@ -299,7 +299,7 @@ export function PiRuntimeModelConfig({ value, onChange }: PiRuntimeModelConfigPr
                       )
                     }
                   >
-                    <SelectTrigger className="h-8 w-32 shrink-0 text-xs">
+                    <SelectTrigger className="theme-control-compact-field w-32 shrink-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger>

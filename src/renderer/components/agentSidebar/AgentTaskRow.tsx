@@ -8,15 +8,7 @@ import {
 } from '@shared/components/ui/dropdown-menu';
 import { Input } from '@shared/components/ui/input';
 import { cn } from '@shared/lib/utils';
-import {
-  Ellipsis,
-  ListChecks,
-  Loader,
-  Pencil,
-  Pin,
-  Share,
-  Trash2,
-} from 'lucide-react';
+import { Ellipsis, ListChecks, Loader, Pencil, Pin, Share, Trash2 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { i18nService } from '../../services/i18n';
@@ -112,14 +104,14 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
 
   return (
     <div
-      className={`sidebar-session-row group relative ${
+      className={`theme-surface-agent-row sidebar-session-row group relative ${
         isNested ? 'ml-[-6px] w-[calc(100%+12px)]' : 'ml-0 w-full'
-      } flex h-[30px] cursor-pointer items-center gap-2 rounded-md ${
+      } flex h-[30px] cursor-pointer items-center gap-2 ${
         isBatchMode ? 'pl-4' : isNested ? 'pl-[38px]' : 'pl-3'
-      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} text-[14px] font-normal transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+      } ${!isBatchMode && !isRenaming ? 'pr-[58px]' : 'pr-2.5'} ${
         isSelected
-          ? 'sidebar-interactive-surface-active text-foreground'
-          : 'sidebar-interactive-surface text-muted-foreground hover:text-foreground'
+          ? 'theme-surface-agent-selected'
+          : 'theme-surface-agent-idle'
       }`}
       onClick={handleRowClick}
       onKeyDown={e => {
@@ -149,7 +141,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
             if (e.key === 'Enter') void handleRenameSave();
             if (e.key === 'Escape') handleRenameCancel();
           }}
-          className="min-w-0 flex-1 border border-border bg-background px-1.5 py-0.5 text-[14px] font-normal"
+          className="theme-page-agent-task-row-input-1 min-w-0 flex-1"
         />
       ) : (
         <>
@@ -166,7 +158,7 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
         <div className="absolute right-1 top-1/2 flex h-6 w-[52px] -translate-y-1/2 items-center justify-end">
           {showRelativeTime && (
             <span
-              className="absolute inset-y-0 right-0 flex items-center whitespace-nowrap text-[12px] font-normal text-foreground opacity-[0.28] transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
+              className="absolute inset-y-0 right-0 flex items-center whitespace-nowrap text-xs font-normal text-foreground opacity-[0.28] transition-opacity group-hover:pointer-events-none group-hover:opacity-0"
               title={relativeTime.full}
             >
               {relativeTime.compact}
@@ -198,8 +190,8 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                 void onTogglePin(!task.pinned);
               }}
               className={cn(
-                'pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]',
-                task.pinned && 'text-foreground group-hover:opacity-[0.46]',
+                'theme-page-agent-task-row-button-variant-1 pointer-events-none group-hover:pointer-events-auto',
+                task.pinned && 'theme-page-agent-task-row-button-variant-2',
               )}
               aria-label={pinLabel}
               title={pinLabel}
@@ -213,8 +205,8 @@ const AgentTaskRow: React.FC<AgentTaskRowProps> = ({
                     variant="ghost"
                     size="icon-xs"
                     className={cn(
-                      'pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-[0.3]',
-                      menuOpen && 'pointer-events-auto opacity-[0.46]',
+                      'theme-page-agent-task-row-button-variant-3 pointer-events-none group-hover:pointer-events-auto',
+                      menuOpen && 'theme-page-agent-task-row-button-variant-4 pointer-events-auto',
                     )}
                     aria-label={i18nService.t('coworkSessionActions')}
                   >

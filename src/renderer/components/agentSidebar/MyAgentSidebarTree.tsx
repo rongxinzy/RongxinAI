@@ -254,7 +254,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
             if (!prefersReducedMotion) folderPlusIconRef.current?.startAnimation();
           }}
           onMouseLeave={() => folderPlusIconRef.current?.stopAnimation()}
-          className="text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground"
+          className="theme-action-muted"
           aria-label={i18nService.t('workspaceAdd')}
         >
           <AnimatedFolderPlusIcon ref={folderPlusIconRef} />
@@ -269,7 +269,7 @@ const MyAgentSidebarTree: React.FC<MyAgentSidebarTreeProps> = ({
           <Button
             type="button"
             onClick={() => void handleCreateWorkspace()}
-            className="mt-3 h-auto px-3 py-1.5 text-xs"
+            className="theme-page-my-agent-sidebar-tree-button-1 mt-3"
           >
             {i18nService.t('workspaceAdd')}
           </Button>

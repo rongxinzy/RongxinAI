@@ -250,7 +250,7 @@ const TodoView: React.FC<TodoViewProps> = ({
   const parsedNewTodo = parseTodoInput(newTodoTitle);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div data-page-canvas className="flex h-full min-h-0 flex-col bg-background">
       <PageHeader
         title={i18nService.t('todoTitle')}
         isSidebarCollapsed={isSidebarCollapsed}
@@ -308,7 +308,7 @@ const TodoView: React.FC<TodoViewProps> = ({
                   onChange={event => setQuery(event.target.value)}
                   placeholder={i18nService.t('todoSearchPlaceholder')}
                   aria-label={i18nService.t('todoSearchPlaceholder')}
-                  className="pl-8"
+                  className="theme-control-sizing-30"
                 />
               </div>
             </div>
@@ -421,7 +421,7 @@ const TodoView: React.FC<TodoViewProps> = ({
                     onChange={event => setNewTodoTitle(event.target.value)}
                     placeholder={i18nService.t('todoAddTaskPlaceholder')}
                     aria-label={i18nService.t('todoNewTask')}
-                    className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                    className="theme-page-todo-view-input-1"
                   />
                 </div>
                 {parsedNewTodo.dueAt !== null || parsedNewTodo.important ? (

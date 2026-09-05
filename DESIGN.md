@@ -19,11 +19,13 @@
 
 ## 设计方向
 
-以 **Kimi、Codex 这一代 AI 产品的质感**为基准：中性、克制、内容优先。
+当前内置 Codex 主题以 **Kimi、Codex 这一代 AI 产品的质感**为基准：中性、克制、内容优先。
+
+下文的具体色板、字体、圆角和动效刻度描述当前 Codex 主题。未来主题可在整套包中定义不同的视觉语言；主题归属、可访问性、功能保留和性能约束适用于所有主题，不得在业务页面为某个主题分叉实现。
 
 - **界面退后，内容向前。** 界面骨架由中性灰构成，颜色只出现在该出现的地方（品牌强调、状态语义）。不做炫技的渐变、发光、彩色装饰。
 - **用留白和字重建立层级，而不是用颜色和边框。** 分组靠间距，强调靠字重，分隔优先用空白，其次用 1px 细线，最后才是阴影。
-- **暗色与亮色是同一套设计的两个面。** 主题只保留：浅色 / 深色 / 跟随系统。不再新增彩色主题。所有设计决策必须同时在两种外观下成立。
+- **暗色与亮色是同一套设计的两个面。** 明暗模式保留浅色 / 深色 / 跟随系统；风格由主题插件独立提供。所有设计决策必须同时在两种外观下成立。
 
 ### 质感目标：轻盈、流畅、有呼吸感
 
@@ -36,23 +38,18 @@
 
 ## 色彩
 
-### 事实来源（过渡期双真源）
+### 事实来源：主题插件
 
-颜色只允许通过语义 token 使用。当前存在**两层变量，值同步**：
+`theme/themes` 中的 TypeScript 主题定义是唯一值来源；契约覆盖兼容变量、shadcn 语义变量、字体、圆角、阴影与组件外观。`themes.css` 由生成器生成，禁止手工维护。桥接 CSS 只保留基础规则。
 
-1. **shadcn 语义层** —— `src/renderer/theme/css/shadcn-token-bridge.css`
-   `:root` / `.dark`（并挂 `[data-theme]` 别名）直写 oklch。这是与标准 shadcn 语义表逐值一致的真源，含 `--sidebar-primary` 品牌蓝、`--chart-1..5`、`--radius: 0.625rem`。
-2. **项目兼容层** —— `src/renderer/theme/css/themes.css` 的 `--zy-*`（oklch）
-   供仍使用 `var(--zy-*)` / `bg-surface` 等的存量组件消费；`tokens/contract.ts`、`themes/classic-light.ts`、`themes/classic-dark.ts` 与之同步。
+主题插件提供版本、唯一 ID、显示名称与浅色/深色定义。明暗模式与风格分离；当前内置 Codex 风格，未来风格通过相同契约注册。插件仅提供展示数据，不持有 React 组件、事件处理器、IPC 或业务状态。切换时原位更新 CSS 变量、组件外观规则及背景层，保留 DOM、草稿、焦点、滚动和打开中的弹层。
 
-Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: var(--zy-background)` 等映射到 `--zy-*`，shadcn 语义名（`card`、`popover`、`secondary`、`muted` 等）映射到 bridge 的 `var(--语义名)`。组件可通过 `bg-background` / `bg-card` / `text-muted-foreground` 等 utility 消费，也可直接用 `var(--zy-*)`。
-
-> **过渡说明**：两层构成双真源。彻底单层需将存量组件的 `var(--zy-*)` / `bg-surface` 全部迁到 shadcn 语义名，留待后续重构。新建组件**应优先使用 shadcn 语义 utility**（`bg-card`、`text-muted-foreground` 等），减少对 `--zy-*` 的新增依赖。
+Tailwind 的语义颜色、字体、圆角和阴影映射到插件变量。页面仍负责布局和状态；交互外观由主题包的组件状态规范管理，共享组件的 variant 只声明语义。品牌标识、用户文档内容与第三方预览不随主题重着色。
 
 **禁止：**
 
 - 在组件中直接写 hex / rgb / hsl 色值（如 `bg-[#3B82F6]`、`text-gray-500`、`bg-white`）。
-- 使用 Tailwind 默认彩色刻度（`blue-*`、`gray-*`、`slate-*` 等）。唯一的例外是灰度语义化之前的临时迁移代码。
+- 使用 Tailwind 默认彩色刻度（`blue-*`、`gray-*`、`slate-*` 等）。内容与品牌图稿例外必须有明确的内容归属，不得作为新增控件样式的先例。
 - 新增一次性颜色。需要新颜色时，先加到 token 契约，再在明暗两套主题中各给出一个值。
 
 ### 色板角色
@@ -100,14 +97,14 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 1. **强调色唯一。** 一个屏幕内，`primary` 只出现在一个主要动作和少数激活态上。禁止用强调色给普通图标、普通文本"提色"。
 2. **状态色不装饰。** 红/绿/黄只表达危险、成功、警告。
 3. **层级公式：** 背景每浮起一层（background → surface → surface-raised → overlay），明暗差异缩小一档；不要跳档制造高反差色块。
-4. 明暗主题共用同一套 token 名，组件代码不得出现 `dark:` 前缀的单独配色——差异必须在 token 层解决。个别结构性例外（如纯黑遮罩 `bg-black/40`、nav 悬浮的透明度叠加 `hover:bg-black/3 dark:hover:bg-white/4`）允许保留。
+4. 明暗主题共用同一套 token 名，组件代码不得出现 `dark:` 前缀的单独配色——差异必须由主题 token 或组件 recipe 提供。遮罩、导航悬停叠色和透明度也属于主题外观，不作为局部配色例外。
 5. **搜索空结果使用次文本。** 关键词无匹配、无可选项等紧凑空态使用 `text-sm text-muted-foreground`，不使用主文本、状态色或额外边框；完整空状态页面再按空状态组件规范处理。
 
 ## 字体
 
 ### 字体族
 
-- **界面字体：** 系统字体栈（`index.css` 中 `:root` 已定义：SF Pro / PingFang SC / Microsoft YaHei / Inter / system-ui 等）。禁止引入 Web 字体文件。
+- **界面字体：** 系统字体栈（`theme/themes` 定义、`theme/css/components.css` 消费：SF Pro / PingFang SC / Microsoft YaHei / Inter / system-ui 等）。禁止引入 Web 字体文件。
 - **代码字体：** `'SF Mono', 'Fira Code', Menlo, Monaco, 'Courier New', monospace`。所有代码块、行内代码、终端、diff 统一使用。
 - 全局统一，禁止在组件上用 `font-family` 覆盖。
 
@@ -124,7 +121,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | 展示 | `text-xl`   | 20px | 仅用于空状态/欢迎页等展示场景，一张屏幕至多一处 |
 | 超大 | `text-xxl`  | 22px | 页面 hero 主标题，一张屏幕至多一处              |
 
-刻度为等差数列（公差 2px）。`text-xxl` 非 Tailwind 原生类，由 `index.css` `@theme` 中的 `--text-xxl: 22px`（行高 1.375）定义。
+刻度为等差数列（公差 2px）。`text-xxl` 非 Tailwind 原生类，由主题插件通过 `@theme inline` 映射（默认 22px、行高 1.375）。
 
 ### 字重
 
@@ -149,7 +146,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 ## 圆角
 
-基准值 `--zy-radius` = **10px**（0.625rem），同步于 `shadcn-token-bridge.css` 的 `--radius: 0.625rem`。派生刻度：
+基准值 `--zy-radius` = **10px**（0.625rem），由主题插件同时提供 shadcn 兼容别名。派生刻度：
 
 | 圆角    | 类名                        | 用途                                                        |
 | ------- | --------------------------- | ----------------------------------------------------------- |
@@ -164,11 +161,11 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 2. 禁止任意值圆角（`rounded-[7px]` 等）；刻度不满足时优先改设计，其次扩展刻度。
 3. 拼接控件（ButtonGroup 等）相邻边圆角归零，由统一的 CSS 规则处理（参考 `index.css` 中 button-group 段），禁止用 `rounded-none` 手搓拼接。
 4. **特定场景例外：主输入框（hero prompt input）容器允许 `rounded-3xl`。** 它是产品的中心舞台元素，更大的圆角是有意的识别特征；此例外不推广到其他容器。任务搜索弹层另按用户提供的 Codex 参考图使用 `rounded-2xl`，见 Shell 展示模块边界。
-5. **按钮圆角以组件库为准**：Button 默认尺寸 `rounded-lg`（10px），xs/sm 档 8px。禁止在调用点用 className 改按钮圆角——`rounded-xl` 按钮、`rounded-full` 圆形按钮（非头像/滑块/胶囊本体）、4px `rounded` 均属违规。
+5. **按钮圆角由主题 recipe 提供**：当前 Codex 包默认尺寸使用 10px，xs/sm 档 8px。禁止在调用点用 className 改按钮圆角——`rounded-xl` 按钮、`rounded-full` 圆形按钮（非头像/滑块/胶囊本体）、4px `rounded` 均属违规。
 
 ## 阴影
 
-定义于 `index.css` `@theme` 块中，将 Tailwind 内置 `--shadow-sm/md/lg/xl/2xl` 以字面值映射到项目档位（保证 v4 `@theme` 下确定生效，无 var 链），并额外提供 `--shadow-inset` 用于内嵌态。**禁止手写 `shadow-[...]` 任意值**：
+定义于主题插件中，由 `theme/css/tailwind.css` 的 `@theme inline` 块映射，将 Tailwind 内置 `--shadow-sm/md/lg/xl/2xl` 映射到主题插件的阴影变量，并额外提供 `--shadow-inset` 用于内嵌态。**禁止手写 `shadow-[...]` 任意值**：
 
 | 级别                 | 类名                               | 用途 |
 | -------------------- | ---------------------------------- | ---- |
@@ -195,7 +192,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 | ------------ | ----------------------------------------------------------------- |
 | 侧边栏分组   | 水平 `px-3`，组内项间距 `space-y-0.5`，组间 `space-y-2` 或 `mt-2` |
 | 导航/列表项  | `px-3 py-1.5`，圆角 `rounded-lg`                                  |
-| 按钮（默认） | 组件库默认（`h-9 px-4`），小号 `h-8 px-3`                         |
+| 按钮（默认） | Codex recipe：默认高 32px、小号 28px，水平内边距均为 10px                         |
 | 图标按钮     | `h-8 w-8`，图标 `h-4 w-4`                                         |
 | 卡片         | `p-4`；密集卡片 `p-3`                                             |
 | 对话框       | 内容区 `p-6`， footer `px-6 py-4`                                 |
@@ -212,15 +209,15 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 ## 透明度
 
-透明度只用于**状态**，不用于**配色**：
+控件透明度由主题 recipe 定义，用于状态与遮罩；正文弱化优先使用语义色。主界面背景图层透明度另按「主界面背景」管理。下表是当前 Codex 包的外观要求，不是在调用点添加 utility 的许可：
 
 | 场景                       | 做法                                                                                                |
 | -------------------------- | --------------------------------------------------------------------------------------------------- |
-| 禁用态                     | `opacity-50`（配合 `pointer-events-none`）                                                          |
-| 非激活的分段选项           | `opacity-50` + 激活时恢复（参见下方范例）                                                           |
+| 禁用态                     | recipe 提供 0.5 透明度，组件保留禁用语义与事件保护                                                          |
+| 非激活的分段选项           | 由主题定义非激活透明度及选中后的恢复值                                                           |
 | 加载骨架闪烁               | `animate-shimmer` 内置                                                                              |
-| 模态遮罩                   | `bg-black/10`（`.modal-backdrop` 与共享 Dialog/Sheet overlay），只变暗、**不使用 backdrop-blur**     |
-| hover 背景反馈             | 只用 token 换档（`hover:bg-muted` / `hover:bg-surface-raised`）；透明度叠加仅保留 nav 悬浮的 `hover:bg-black/3 dark:hover:bg-white/4` 这一结构性例外。禁止 `hover:bg-primary/10`、`hover:bg-red-500/10` 等裸色叠加——需要的浅色反馈必须先定义为 token |
+| 模态遮罩                   | 由对应 overlay recipe 定义遮罩色和透明度；当前 Codex 遮罩只变暗，**不使用 backdrop-blur**     |
+| hover 背景反馈             | 由 recipe 引用中性表面 token；导航悬停叠色同样属于主题。禁止在组件中直接叠加裸色或单独覆写 hover 配色 |
 | 其余一切"让颜色变浅"的需求 | **禁止用 opacity 实现**，改用对应的弱档 token（`text-secondary`、`border-subtle`、`primary-muted`） |
 
 原因：opacity 会让元素与背后的内容混色，在明暗两套主题下表现不一致；token 才能在两套主题中各自取到正确的值。
@@ -230,7 +227,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 - 时长：普通交互 **100–250ms**；具备明确语义过程的动态图标 **400–600ms**，统一 `ease-out`（或 `transitionTimingFunction.smooth`）。超过 600ms 的动画需要理由。
 - 可动属性只有 `opacity` 和 `transform`；禁止动画化 width/height/top/left（布局抖动）。结构性位移（如侧边栏宽度）沿用已有的受控例外，缓动同样统一 `ease-out`/`smooth`，不得用 `ease-in-out`。
 - **禁止 `transition-all`**：过渡必须限定属性（`transition-colors` / `transition-opacity` / `transition-transform`，或显式属性列表）。`transition-all` 会把布局属性卷进动画，是 width/height 被隐式动画化的主要来源。
-- 入场动画用 `index.css` `@theme` 中已有的：`animate-fade-in` / `fade-in-up` / `fade-in-down` / `scale-in` / `message-in`。不新增 keyframes，除非现有组合确实无法表达。
+- 控件入场、退场和装饰动效由组件 recipe 提供，复用现有外观规范；不得在调用点新增动画 utility 或 keyframes。共享布局动画保留在组件内，主题不接管布局测量与交互流程。
 - 必须遵守 `prefers-reduced-motion`（全局 CSS 已处理，新增自定义动画时验证）。
 
 ### 动效语言
@@ -320,9 +317,11 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 禁止：给工具栏触发按钮加 `border`（包括 `border-input`）、用 `rounded-full` 胶囊、用阴影作为 hover 反馈——这些是已被否决的变体。
 
+选择器菜单共用 `SelectorOptionContent`：前置图标 `size-4`，主标题 `text-sm`，说明 `text-xs text-muted-foreground`；长标题允许换行。模型行显示供应商并在右侧预留当前模型勾选位置，键盘游标用 `bg-muted` 表达，与当前模型标记独立。权限菜单保留原生单选语义与右侧指示器。菜单外壳沿用共享 Popover、Command 的语义色与圆角，不在业务组件强制覆盖。
+
 ## Button 使用纪律
 
-1. **一切按钮走组件库**：`Button`（`src/shared/components/ui/button.tsx`）或工具栏场景的 `PromptInputButton`。原生 `<button>` 仅允许用于 Button 无法表达的复合内容（如缩略图选择卡），且必须自行补齐完整状态链（hover / focus-visible ring / active / disabled）。
+1. **一切按钮走组件库**：`Button`（`src/shared/components/ui/button.tsx`）或工具栏场景的 `PromptInputButton`。原生 `<button>` 仅允许用于 Button 无法表达的复合内容（如缩略图选择卡），且必须通过注册的主题 hook 提供完整状态外观（hover / focus-visible ring / active / disabled），交互和可访问性由组件补齐。
 2. **className 覆写白名单**：只允许布局类——`w-full`、`justify-start`、`gap-*`、`mt-*` 等。**黑名单**：颜色（`bg-*`/`text-*`/`border-*`）、圆角、阴影、字重、字号、高度（`h-*`/`p-*` 尺寸重置）。需要新视觉时扩展 `buttonVariants` 的 variant，不在调用点覆写。`size="icon*"` 上再叠 `p-1` / `rounded-*` / `hover:bg-*` 属于"写了 Button 但没信任 Button"，直接删除。
 3. **行级/卡片级可点区域**（会话项、任务行、设置项、文件列表行）：优先 `Button variant="ghost"` + 布局类覆写；Button 确实无法表达时，必须满足统一范式——`role` + `tabIndex` + Enter/Space 键盘处理 + hover 背景换档 + `active:translate-y-px` + focus-visible ring。**禁止裸 `div onClick`**：无 role、无 tabIndex、无键盘处理的可点 div 视同 broken。
 4. **按压反馈不可连坐**：可点卡片保留 `active` 反馈；覆盖卡片内嵌图标按钮时不得用 `active:translate-y-0` 把整片卡片的按压手感一并关掉。
@@ -332,10 +331,10 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 
 所有可交互元素必须具备完整状态链，缺一不可：
 
-- **hover**：背景变浅一档（`hover:bg-surface-raised`）或文字变深一档；200ms 内过渡。
+- **hover**：recipe 使用背景换档或文字层级变化；200ms 内过渡。
 - **active/pressed**：可省略，由 hover 延续。
-- **focus-visible**：统一 focus ring（`.focus-ring` 或组件库默认），颜色取 `primary`，不得移除焦点样式而不提供替代。
-- **disabled**：`opacity-50` + 禁止指针事件，不改变配色结构。
+- **focus-visible**：由主题 recipe 提供统一焦点反馈，当前 Codex 包采用 focus ring；不得移除焦点样式而不提供可见替代。
+- **disabled**：当前 Codex 包在 recipe 中提供降低透明度的反馈；组件负责禁用语义与事件阻止，主题不控制点击能力。
 
 ### 鼠标指针分配
 
@@ -353,7 +352,7 @@ Tailwind 工具类经 `index.css` 中 `@theme` 块桥接：`--color-background: 
 提交 UI 代码前逐项自查：
 
 - [ ] 没有直接写死的色值 / Tailwind 默认彩色刻度；全部走 `--zy-*` token 或其桥接工具类
-- [ ] 没有 `dark:` 前缀的单独配色（主题差异在 token 层解决；结构性例外如透明度叠加 `hover:bg-black/3 dark:hover:bg-white/4`、模态遮罩等允许）
+- [ ] 没有 `dark:` 前缀的单独配色；包括遮罩和透明度在内的明暗差异均由 token / recipe 提供
 - [ ] 字号在五档之内，字重在 400/500/600 之内
 - [ ] 圆角、阴影只用本文件定义的刻度，无任意值
 - [ ] 边框 1px，颜色用 token
@@ -433,3 +432,40 @@ src/shared/components/ui/page-tabs.tsx
 - 展示层不新增 IPC、持久化或业务状态，不通过主题 key 重建编辑器。工作/对话开关只有一个变更入口；沿用原有受控 Switch 与浅深主题。
 
 - 工作/对话开关保留白色滑块；选中文字使用 `switch-thumb-foreground`，浅深色均为深色，避免深色主题的正文白色落到白色滑块上。该语义 token 同步登记到主题契约、共享默认值、静态 CSS 与 Tailwind 映射。
+
+## 主界面背景
+
+背景属于开发者定义的主题包，不暴露单独的用户设置，不写入个人背景配置。主题可提供纯色、本地打包图片或程序化纹理，并指定图层不透明度与图片显示方式。切换主题时整体应用，未提供背景的主题恢复原有画布。图层位于内容后方，不接收点击、不改变滚动或页面挂载；不透明度不影响文字、输入框、卡片及弹层。纹理由主题模块绘制，不执行外部脚本。
+
+用户设置仅允许选择整套主题及白天 / 夜间（含跟随系统）模式。背景、颜色、字体、纹理、透明度、圆角、阴影均由主题包统一定义，不提供任何单独调节入口。
+
+## 主题包组件状态规范
+
+### 外观归属
+
+按钮、输入框、选择器、标签、卡片与弹层的完整状态外观统一由 `src/renderer/theme/components` 契约管理。范围包括共享基础控件、业务包装、原生控件适配、动态生成的控件、组合输入区、菜单、搜索、Tabs/PageTabs，以及第三方控件的已注册集成点。不能只迁移基础 Button 而保留包装层的局部覆写。
+
+| 层级 | 负责内容 |
+| --- | --- |
+| 主题包 | token、组件各状态外观、固定尺寸刻度、图标尺寸、内边距、字体、边框、圆角、阴影、透明度、视觉动效、背景 |
+| 共享组件 | DOM、语义 variant/size、真实状态、键盘与焦点管理、禁用行为、可访问性、布局测量与交互流程 |
+| 页面与业务 | 排列与布局关系、响应式列数、父容器填充、滚动和视口约束、业务数据与事件 |
+| 主题引擎 | 固定 hook 与状态选择器、属性校验、规则顺序、portal 与第三方优先级适配、样式原位替换、减少动效约束 |
+
+调用点仅使用共享组件的语义接口、已注册 hook 与布局类。控件的颜色、字号、圆角、阴影、高度、内边距或状态反馈，即使引用语义 token，也不得在调用点单独覆盖。新增需求先扩展外观规范并补齐主题；不能借 `style`、`dark:`、任意值、全局 CSS、包装组件或 DOM 字符串绕过契约。
+
+父容器填充（如 `h-full`）、允许 flex 收缩（如 `min-h-0`）、可用视口高度和指示器定位属于布局关系，可以保留在组件中；固定的控件尺寸和内边距必须由主题提供。
+
+### 完整状态与动效
+
+所有 hook 均声明 `COMPONENT_STATES` 中的全部状态；`recipe()` 将无独立视觉的状态补为空对象。空对象继承已有外观，不代表可以省略禁用语义、键盘支持或错误反馈。适用状态包括悬停、按下、选中、勾选、展开、焦点、错误、禁用、占位、进入/退出及组合控件状态。
+
+状态选择器和实际优先级以 `components/contract.ts`、`components/css.ts` 为准；引擎先输出基础规则，再统一输出状态规则，避免 variant 常态遮盖焦点或错误反馈。hover 仅适用于支持悬停的设备；禁用控件的直接 hover、pressed 和 focus 规则由引擎保护。必须验证状态组合，尤其是 invalid + focus、selected + hover 和 disabled。
+
+主题只能填写允许的 CSS 外观属性，不能提供任意选择器、执行代码或控制命中区域。动效可通过 `motionStart` / `motionEnd` 与 `animation-name: component-motion` 定义；引擎生成隔离的 keyframe 名称。当前帧属性仅支持 opacity、scale、translate，减少动效由引擎统一处理。共享布局动画继续保留测量和交互职责，不能通过主题改变功能时序。
+
+### 整套主题切换与验收
+
+每个主题包必须同时提供浅色、深色的完整 token 与组件状态定义，并按需提供背景。选择整套主题后，控件、portal 弹层与背景整体应用。禁止通过主题 ID 改 React key、重挂载组件、关闭弹层、重置草稿或改变选中状态。用户仅可选择整套主题及白天 / 夜间 / 跟随系统，任何其他样式都不单独设置。
+
+验收既检查当前 Codex 外观，也使用修改过组件 recipe 的主题验证真正的外观替换。覆盖明暗、焦点和键盘、错误与禁用、展开状态、减少动效，以及切换过程中的草稿、焦点、滚动和选中状态保留。生成文件一致性、源码审计和构建通过不能代替实际渲染与交互验证；运行命令及验证范围遵循 `AGENTS.md`「主题系统开发约束」。

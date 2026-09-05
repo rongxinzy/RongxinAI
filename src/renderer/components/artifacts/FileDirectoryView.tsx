@@ -102,7 +102,7 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder={t('artifactSearchPlaceholder')}
-          className="w-full text-xs"
+          className="theme-page-file-directory-view-input-1 w-full"
         />
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -117,7 +117,7 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
             return (
               <React.Fragment key={artifact.id}>
                 {showGroupHeader && (
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <div className="px-3 pt-2 pb-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {t(TYPE_LABEL_KEYS[artifact.type] || 'artifactCode')}
                   </div>
                 )}
@@ -130,8 +130,8 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
                     e.preventDefault();
                     onSelect(artifact.id);
                   }}
-                  className={`flex items-center gap-2 px-3 py-2 cursor-pointer text-sm transition-colors active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50
-                    ${artifact.id === selectedId ? 'bg-primary/10 text-primary' : 'hover:bg-surface text-foreground'}`}
+                  className={`theme-surface-file-row flex items-center gap-2 px-3 py-2 cursor-pointer
+                    ${artifact.id === selectedId ? 'theme-surface-file-selected' : 'theme-surface-file-idle'}`}
                 >
                   {!compact && (
                     <span className="shrink-0 text-base">{TYPE_ICONS[artifact.type] || '📄'}</span>
@@ -139,12 +139,12 @@ const FileDirectoryView: React.FC<FileDirectoryViewProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="truncate">{artifact.fileName || artifact.title}</div>
                     {!compact && artifact.filePath && (
-                      <div className="text-[10px] text-muted-foreground truncate">
+                      <div className="text-xs text-muted-foreground truncate">
                         {getShortPath(artifact.filePath)}
                       </div>
                     )}
                     {!compact && !artifact.filePath && artifact.source === 'codeblock' && (
-                      <div className="text-[10px] text-muted-foreground">code block</div>
+                      <div className="text-xs text-muted-foreground">code block</div>
                     )}
                   </div>
                   {!compact && (

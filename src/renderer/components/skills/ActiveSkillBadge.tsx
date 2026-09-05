@@ -49,7 +49,7 @@ const SkillChip: React.FC<SkillChipProps> = ({ skillId, skill, onRemove }) => {
         onClick={onRemove}
         aria-label={`${i18nService.t('clearSkill')} ${label}`}
         title={i18nService.t('clearSkill')}
-        className="size-4 rounded-full hover:bg-background"
+        className="theme-page-active-skill-badge-button-1"
       >
         <X />
       </Button>

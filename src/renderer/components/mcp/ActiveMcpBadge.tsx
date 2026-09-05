@@ -132,7 +132,9 @@ const ActiveMcpBadge: React.FC = () => {
         window.dispatchEvent(
           new CustomEvent('app:showToast', {
             detail: {
-              message: normalizeError(error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed')),
+              message: normalizeError(
+                error instanceof Error ? error.message : i18nService.t('mcpUpdateFailed'),
+              ),
               isError: true,
             },
           }),
@@ -152,7 +154,7 @@ const ActiveMcpBadge: React.FC = () => {
         nativeButton
         render={
           <PromptInputButton
-            className="sidebar-interactive-surface hover:shadow-subtle"
+            className="sidebar-interactive-surface theme-prompt-hover-action"
             aria-label={i18nService.t('connectors')}
           >
             <span className="flex h-7 items-center rounded-md bg-transparent px-1">
@@ -178,7 +180,7 @@ const ActiveMcpBadge: React.FC = () => {
             key={server.id}
             closeOnClick={false}
             disabled={pendingServerId !== null}
-            className="focus:bg-transparent focus-visible:bg-muted hover:bg-muted focus:hover:bg-muted"
+            className="theme-page-active-mcp-badge-dropdown-menu-item-1"
             onClick={() => {
               void handleToggleServer(server.id, !server.enabled);
             }}

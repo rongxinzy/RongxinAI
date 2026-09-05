@@ -44,12 +44,14 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
       : null;
 
   return (
-    <Card className="flex-row items-center gap-3 rounded-lg border border-border bg-card p-3">
-      <CardContent className="flex min-w-0 flex-1 items-center gap-3 p-0">
+    <Card className="theme-page-task-list-card-1 flex-row items-center">
+      <CardContent className="theme-control-sizing-4 flex min-w-0 flex-1 items-center gap-3">
         <CardTitle
           className={cn(
             'min-w-0 flex-1 truncate',
-            task.enabled ? 'text-foreground' : 'text-muted-foreground',
+            task.enabled
+              ? 'theme-page-task-list-card-title-variant-1'
+              : 'theme-page-task-list-card-title-variant-2',
           )}
         >
           {task.name}
@@ -86,14 +88,14 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
         >
           <EllipsisVertical />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="bg-card">
+        <DropdownMenuContent align="end" className="theme-control-card-surface">
           {task.state.runningAtMs ? (
             <DropdownMenuItem disabled>
               {i18nService.t('scheduledTasksStatusRunning')}
             </DropdownMenuItem>
           ) : (
             <DropdownMenuItem
-              className="text-muted-foreground"
+              className="theme-control-muted"
               onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 void scheduledTaskService.runManually(task.id);
@@ -103,7 +105,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({ task, onRequestDelete, onRe
             </DropdownMenuItem>
           )}
           <DropdownMenuItem
-            className="text-muted-foreground"
+            className="theme-control-muted"
             onClick={(e: React.MouseEvent) => {
               e.stopPropagation();
               onRequestEdit(task.id);

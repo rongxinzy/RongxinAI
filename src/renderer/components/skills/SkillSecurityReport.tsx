@@ -92,8 +92,8 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
   return createPortal(
     <Modal
       onClose={() => onAction('cancel')}
-      overlayClassName="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      className="w-full max-w-xl mx-4 rounded-2xl bg-surface shadow-xl border border-border overflow-hidden"
+      overlayClassName="theme-skill-modal-backdrop fixed inset-0 z-50 flex items-center justify-center"
+      className="theme-skill-security-modal w-full max-w-xl mx-4 overflow-hidden"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -108,7 +108,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
           variant="ghost"
           size="icon-sm"
           onClick={() => onAction('cancel')}
-          className="rounded-lg hover:bg-surface-raised transition-colors"
+          className="theme-page-skill-security-report-button-1"
         >
           <X className="h-4 w-4 text-muted-foreground" />
         </Button>
@@ -143,7 +143,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                   type="button"
                   variant="ghost"
                   onClick={() => toggleDimension(dimension)}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 h-auto hover:bg-surface-raised transition-colors"
+                  className="theme-page-skill-security-report-button-2 w-full flex items-center justify-between"
                 >
                   <div className="flex items-center gap-2">
                     {isExpanded ? (
@@ -178,7 +178,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
                               {finding.line ? `:${finding.line}` : ''}
                             </p>
                             {finding.matchedPattern && (
-                              <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px] text-muted-foreground break-all overflow-x-auto max-h-16">
+                              <p className="mt-1 px-2 py-1 rounded bg-black/5 dark:bg-white/5 font-mono text-xs text-muted-foreground break-all overflow-x-auto max-h-16">
                                 {finding.matchedPattern}
                               </p>
                             )}
@@ -205,11 +205,7 @@ const SkillSecurityReport: React.FC<SkillSecurityReportProps> = ({
           {i18nService.t('cancel')}
         </Button>
         <div className="flex gap-2">
-          <Button
-            type="button"
-            onClick={() => onAction('installDisabled')}
-            disabled={isLoading}
-          >
+          <Button type="button" onClick={() => onAction('installDisabled')} disabled={isLoading}>
             {i18nService.t('securityInstallDisabled')}
           </Button>
           <Button

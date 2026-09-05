@@ -93,15 +93,12 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
         side="top"
         align="start"
         sideOffset={4}
-        className="w-72 rounded-md! border! border-border! bg-surface! p-0 shadow-md ring-0! outline-none!"
+        className="theme-page-skills-popover-popover-content-1"
       >
-        <Command
-          shouldFilter={false}
-          className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:data-[slot=input-group]:shadow-none!"
-        >
+        <Command shouldFilter={false} className="theme-part-skills-popover-command-1">
           <CommandInput
             placeholder={i18nService.t('searchSkills')}
-            className="bg-transparent"
+            className="theme-control-transparent"
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
@@ -120,7 +117,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
                       value={`${skill.name} ${localizedDescription}`}
                       onSelect={() => handleSelectSkill(skill.id)}
                       data-checked={isActive || undefined}
-                      className="flex items-start gap-3 px-3 py-2.5"
+                      className="theme-control-sizing-1 flex items-start gap-3"
                     >
                       <div
                         className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
@@ -158,7 +155,7 @@ const SkillsPopover: React.FC<SkillsPopoverProps> = ({
             <Button
               variant="ghost"
               onClick={handleManageSkills}
-              className="w-full flex items-center justify-between rounded-md px-4 py-3 text-sm text-muted-foreground hover:bg-surface-raised hover:text-foreground transition-colors"
+              className="theme-page-skills-popover-button-1 w-full flex items-center justify-between"
             >
               <span>{i18nService.t('manageSkills')}</span>
               <Cog className="h-4 w-4 text-muted-foreground" />

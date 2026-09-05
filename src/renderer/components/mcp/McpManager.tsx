@@ -268,7 +268,8 @@ const McpManager: React.FC<McpManagerProps> = ({
         if (isActive) setIsFeishuCliReady(installed);
       })
       .catch(error => {
-        if (isActive) setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
+        if (isActive)
+          setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
       });
     return () => {
       isActive = false;
@@ -285,9 +286,7 @@ const McpManager: React.FC<McpManagerProps> = ({
 
   const getRegistryEntryDescription = useCallback(
     (entry: McpRegistryEntry): string => {
-      const presentationLocale = entry.presentation?.[
-        currentLanguage === 'zh' ? 'zh' : 'en'
-      ];
+      const presentationLocale = entry.presentation?.[currentLanguage === 'zh' ? 'zh' : 'en'];
       if (presentationLocale?.description) return presentationLocale.description;
       const remoteDescription =
         currentLanguage === 'zh' ? entry.description_zh : entry.description_en;
@@ -383,9 +382,13 @@ const McpManager: React.FC<McpManagerProps> = ({
 
   const filteredMarketplace = useMemo(() => {
     let entries = filterMcpItems(dynamicRegistry, searchQuery, entry =>
-      [entry.id, entry.name, entry.transportType, entry.category, getRegistryEntryDescription(entry)].join(
-        ' ',
-      ),
+      [
+        entry.id,
+        entry.name,
+        entry.transportType,
+        entry.category,
+        getRegistryEntryDescription(entry),
+      ].join(' '),
     );
     if (activeCategory !== 'all') {
       entries = entries.filter(e => e.category === activeCategory);
@@ -631,7 +634,9 @@ const McpManager: React.FC<McpManagerProps> = ({
       const servers = result.servers;
       dispatch(setMcpServers(servers));
     } catch (error) {
-      setTokenConnectError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
+      setTokenConnectError(
+        error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'),
+      );
       setActionError(error instanceof Error ? error.message : i18nService.t('mcpCreateFailed'));
     } finally {
       setIsTokenConnecting(false);
@@ -831,7 +836,10 @@ const McpManager: React.FC<McpManagerProps> = ({
                           />
                         </div>
                         {isDeletingServer ? (
-                          <div className="flex size-8 shrink-0 items-center justify-center" aria-label={i18nService.t('mcpUninstall')}>
+                          <div
+                            className="flex size-8 shrink-0 items-center justify-center"
+                            aria-label={i18nService.t('mcpUninstall')}
+                          >
                             <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
                           </div>
                         ) : (
@@ -840,18 +848,29 @@ const McpManager: React.FC<McpManagerProps> = ({
                               type="button"
                               size="sm"
                               onClick={() => handleUseMcp(server)}
-                              className="h-8 px-3 text-xs"
+                              className="theme-page-mcp-manager-button-1"
                             >
                               {i18nService.t('mcpUse')}
                             </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger
-                                render={<Button type="button" variant="ghost" size="icon" className="size-8" aria-label={i18nService.t('mcpMoreActions')} />}
+                                render={
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="size-8"
+                                    aria-label={i18nService.t('mcpMoreActions')}
+                                  />
+                                }
                               >
                                 <MoreHorizontal className="size-4" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem variant="destructive" onClick={() => handleRequestDelete(server)}>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => handleRequestDelete(server)}
+                                >
                                   <Trash2 />
                                   {i18nService.t('mcpUninstall')}
                                 </DropdownMenuItem>
@@ -967,17 +986,22 @@ const McpManager: React.FC<McpManagerProps> = ({
                           )}
                         </div>
                       </div>
-                      <div className={`flex shrink-0 items-center gap-1.5 transition-opacity ${installingRegistryId === entry.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100'}`}>
+                      <div
+                        className={`flex shrink-0 items-center gap-1.5 transition-opacity ${installingRegistryId === entry.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 group-has-[:focus-visible]:opacity-100'}`}
+                      >
                         {pendingOfficialAuthorizationRegistryId === entry.id ? (
                           <div className="flex items-center gap-1">
-                            <div className="flex size-7 items-center justify-center" aria-label={i18nService.t('mcpWaitingForAuthorization')}>
+                            <div
+                              className="flex size-7 items-center justify-center"
+                              aria-label={i18nService.t('mcpWaitingForAuthorization')}
+                            >
                               <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
                             </div>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="size-7 text-muted-foreground hover:text-foreground"
+                              className="theme-action-icon-small-muted"
                               aria-label={i18nService.t('cancel')}
                               title={i18nService.t('cancel')}
                               onClick={handleCancelOfficialAuthorization}
@@ -986,7 +1010,10 @@ const McpManager: React.FC<McpManagerProps> = ({
                             </Button>
                           </div>
                         ) : installingRegistryId === entry.id ? (
-                          <div className="flex size-7 items-center justify-center" aria-label={i18nService.t('mcpInstall')}>
+                          <div
+                            className="flex size-7 items-center justify-center"
+                            aria-label={i18nService.t('mcpInstall')}
+                          >
                             <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
                           </div>
                         ) : installedRegistryIds.has(entry.id) ? (
@@ -997,7 +1024,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                           <Button
                             type="button"
                             onClick={() => handleInstallFromRegistry(entry)}
-                            className="h-7 px-2.5 text-xs"
+                            className="theme-page-mcp-manager-button-2"
                           >
                             {i18nService.t('mcpInstall')}
                           </Button>
@@ -1055,7 +1082,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                       type="button"
                       variant="outline"
                       onClick={handleOpenCreateForm}
-                      className="h-auto min-h-32 border-dashed text-muted-foreground"
+                      className="theme-page-mcp-manager-button-3"
                     >
                       <Plus data-icon="inline-start" />
                       {i18nService.t('addMcpServer')}
@@ -1080,7 +1107,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                               variant="ghost"
                               size="icon"
                               onClick={() => handleOpenEditForm(server)}
-                              className="h-7 w-7 text-muted-foreground hover:text-primary dark:hover:text-primary"
+                              className="theme-page-mcp-manager-button-4"
                               title={i18nService.t('editMcpServer')}
                             >
                               <Pencil className="h-3.5 w-3.5" />
@@ -1090,7 +1117,7 @@ const McpManager: React.FC<McpManagerProps> = ({
                               variant="ghost"
                               size="icon"
                               onClick={() => handleRequestDelete(server)}
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              className="theme-page-mcp-manager-button-5"
                               title={i18nService.t('deleteMcpServer')}
                             >
                               <Trash2 className="h-3.5 w-3.5" />

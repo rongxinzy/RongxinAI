@@ -31,14 +31,16 @@ import type {
   MarketplaceSearchParams,
   MarketplaceSearchResult,
 } from '../../../shared/marketplace';
-import { createMarketplaceHardwareProfile, withMarketplaceScore, type MarketplaceHardwareProfile } from '../../../shared/marketplace/scoring';
+import {
+  createMarketplaceHardwareProfile,
+  withMarketplaceScore,
+  type MarketplaceHardwareProfile,
+} from '../../../shared/marketplace/scoring';
 import { notifyLlamaCppRunningModelsChanged } from '../../services/availableModels';
 import { i18nService } from '../../services/i18n';
 import { LocalInferenceAnimatedFolderDownIcon } from '../icons/LocalInferenceAnimatedFolderDownIcon';
 import { LocalInferenceAnimatedWifiPenIcon } from '../icons/LocalInferenceAnimatedWifiPenIcon';
-import {
-  GalleryThumbnailsIcon,
-} from '../icons/GalleryThumbnailsIcon';
+import { GalleryThumbnailsIcon } from '../icons/GalleryThumbnailsIcon';
 import { SidebarAnimatedCpuIcon } from '../icons/SidebarAnimatedCpuIcon';
 import { SettingsAnimatedSlidersHorizontalIcon } from '../icons/SettingsAnimatedSlidersHorizontalIcon';
 import PageHeader from '../PageHeader';
@@ -203,7 +205,9 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [activePullName, setActivePullName] = useState<string | null>(null);
   const [isMarketplaceInstallPending, setIsMarketplaceInstallPending] = useState(false);
   const [pullProgress, setPullProgress] = useState<InstallProgressState>({});
-  const [marketplaceDownloadModel, setMarketplaceDownloadModel] = useState<MarketplaceModel | null>(null);
+  const [marketplaceDownloadModel, setMarketplaceDownloadModel] = useState<MarketplaceModel | null>(
+    null,
+  );
   const [marketplaceDownloadPanelProgress, setMarketplaceDownloadPanelProgress] =
     useState<LlamaCppInstallProgress>();
   const [marketplaceDownloadPanelVisible, setMarketplaceDownloadPanelVisible] = useState(false);
@@ -217,18 +221,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   const [marketplaceHasSearched, setMarketplaceHasSearched] = useState(false);
   const [marketplaceTotalCount, setMarketplaceTotalCount] = useState<number>();
   const [marketplaceHasNextPage, setMarketplaceHasNextPage] = useState(false);
-  const [marketplaceSearchParams, setMarketplaceSearchParams] =
-    useState<MarketplaceSearchParams>({});
+  const [marketplaceSearchParams, setMarketplaceSearchParams] = useState<MarketplaceSearchParams>(
+    {},
+  );
   const [marketplaceHardware, setMarketplaceHardware] = useState<MarketplaceHardwareProfile>();
   const [marketplaceHardwareChecked, setMarketplaceHardwareChecked] = useState(false);
   useI18nLanguage();
   const launchLogs = useModelLaunchLogs();
   // Destructure the stable (useCallback-backed) controls so memoized children
   // and hook dependency arrays can reference them without the unstable wrapper object.
-  const {
-    state: launchLogState,
-    closePanel: closeLaunchLogPanel,
-  } = launchLogs;
+  const { state: launchLogState, closePanel: closeLaunchLogPanel } = launchLogs;
   const runtimeInstallProgress = useRuntimeInstallProgress();
   const { notifyBackgroundContinuation } = useRuntimeInstallBackgroundNotifications({
     isVisible,
@@ -280,15 +282,16 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     );
     const isRecommendationBrowse =
       marketplaceSearchParams.featuredOnly || marketplaceSearchParams.fit === 'recommended';
-    const filtered = marketplaceSearchParams.fit === 'all'
-      ? scored
-      : isRecommendationBrowse
-        ? filterMarketplaceModelsForRecommendation(scored)
-        : filterMarketplaceModelsForDevice(
-            scored,
-            marketplaceSearchParams.fit,
-            marketplaceSearchParams.minStars,
-          );
+    const filtered =
+      marketplaceSearchParams.fit === 'all'
+        ? scored
+        : isRecommendationBrowse
+          ? filterMarketplaceModelsForRecommendation(scored)
+          : filterMarketplaceModelsForDevice(
+              scored,
+              marketplaceSearchParams.fit,
+              marketplaceSearchParams.minStars,
+            );
     return filtered;
   }, [marketplaceHardware, marketplaceModels, marketplaceSearchParams]);
 
@@ -384,11 +387,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
       // Cursor pagination is sequential: the second prefetched page can only be
       // requested after the first prefetched response provides its next cursor.
-      for (
-        let offset = 0;
-        offset < MARKETPLACE_PREFETCH_PAGE_COUNT && nextCursor;
-        offset += 1
-      ) {
+      for (let offset = 0; offset < MARKETPLACE_PREFETCH_PAGE_COUNT && nextCursor; offset += 1) {
         cache.cursors.set(nextPage, nextCursor);
         const cachedNextResult = cache.pages.get(nextPage);
         if (cachedNextResult) {
@@ -434,78 +433,84 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     [],
   );
 
-  const searchMarketplace = useCallback(async (params: MarketplaceSearchParams) => {
-    const id = ++marketplaceSearchRef.current;
-    const cacheKey = marketplacePageCacheKey(params);
-    cancelMarketplacePrefetches();
-    if (!marketplacePageCacheRef.current || marketplacePageCacheRef.current.key !== cacheKey) {
-      marketplacePageCacheRef.current = { key: cacheKey, pages: new Map(), cursors: new Map() };
-    }
-    const pageNumber = params.pageNumber ?? 1;
-    const cache = marketplacePageCacheRef.current;
-    const cursor = pageNumber > 1 ? cache?.cursors.get(pageNumber) : undefined;
-    if (pageNumber > 1 && !cursor) {
-      setMarketplaceLoading(false);
-      return;
-    }
-    const requestParams = pageNumber > 1 ? { ...params, cursor } : params;
-    const cachedResult = pageNumber > 1 ? cache?.pages.get(pageNumber) : undefined;
-    if (cachedResult) {
-      setMarketplaceSearchParams(params);
-      setMarketplaceModels(cachedResult.models);
-      if (pageNumber <= 1) {
-        setMarketplaceTotalCount(cachedResult.totalCount);
+  const searchMarketplace = useCallback(
+    async (params: MarketplaceSearchParams) => {
+      const id = ++marketplaceSearchRef.current;
+      const cacheKey = marketplacePageCacheKey(params);
+      cancelMarketplacePrefetches();
+      if (!marketplacePageCacheRef.current || marketplacePageCacheRef.current.key !== cacheKey) {
+        marketplacePageCacheRef.current = { key: cacheKey, pages: new Map(), cursors: new Map() };
       }
-      setMarketplaceHasNextPage(hasMarketplaceNextPage(cachedResult));
-      setMarketplaceError(cachedResult.warning ?? null);
-      setMarketplaceLoading(false);
-      void preloadMarketplacePage(cacheKey, requestParams, cachedResult, id);
-      return;
-    }
-    const requestId =
-      globalThis.crypto?.randomUUID?.() ??
-      `marketplace-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    marketplaceRequestIdRef.current = requestId;
-    setMarketplaceLoading(true);
-    setMarketplaceError(null);
-    try {
-      const result = await window.electron.marketplace.search({ requestId, params: requestParams });
-      if (id === marketplaceSearchRef.current) {
-        cache?.pages.set(pageNumber, result);
-        cache?.cursors.set(pageNumber, cursor);
-        const nextPage = hasMarketplaceNextPage(result) ? pageNumber + 1 : undefined;
-        if (cache && nextPage && result.nextCursor) {
-          cache.cursors.set(nextPage, result.nextCursor);
-          const lastPrefetchedPage = pageNumber + MARKETPLACE_PREFETCH_PAGE_COUNT;
-          for (const cachedPage of cache.pages.keys()) {
-            if (cachedPage < pageNumber || cachedPage > lastPrefetchedPage) {
-              cache.pages.delete(cachedPage);
+      const pageNumber = params.pageNumber ?? 1;
+      const cache = marketplacePageCacheRef.current;
+      const cursor = pageNumber > 1 ? cache?.cursors.get(pageNumber) : undefined;
+      if (pageNumber > 1 && !cursor) {
+        setMarketplaceLoading(false);
+        return;
+      }
+      const requestParams = pageNumber > 1 ? { ...params, cursor } : params;
+      const cachedResult = pageNumber > 1 ? cache?.pages.get(pageNumber) : undefined;
+      if (cachedResult) {
+        setMarketplaceSearchParams(params);
+        setMarketplaceModels(cachedResult.models);
+        if (pageNumber <= 1) {
+          setMarketplaceTotalCount(cachedResult.totalCount);
+        }
+        setMarketplaceHasNextPage(hasMarketplaceNextPage(cachedResult));
+        setMarketplaceError(cachedResult.warning ?? null);
+        setMarketplaceLoading(false);
+        void preloadMarketplacePage(cacheKey, requestParams, cachedResult, id);
+        return;
+      }
+      const requestId =
+        globalThis.crypto?.randomUUID?.() ??
+        `marketplace-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      marketplaceRequestIdRef.current = requestId;
+      setMarketplaceLoading(true);
+      setMarketplaceError(null);
+      try {
+        const result = await window.electron.marketplace.search({
+          requestId,
+          params: requestParams,
+        });
+        if (id === marketplaceSearchRef.current) {
+          cache?.pages.set(pageNumber, result);
+          cache?.cursors.set(pageNumber, cursor);
+          const nextPage = hasMarketplaceNextPage(result) ? pageNumber + 1 : undefined;
+          if (cache && nextPage && result.nextCursor) {
+            cache.cursors.set(nextPage, result.nextCursor);
+            const lastPrefetchedPage = pageNumber + MARKETPLACE_PREFETCH_PAGE_COUNT;
+            for (const cachedPage of cache.pages.keys()) {
+              if (cachedPage < pageNumber || cachedPage > lastPrefetchedPage) {
+                cache.pages.delete(cachedPage);
+              }
             }
           }
+          setMarketplaceSearchParams(params);
+          setMarketplaceModels(result.models);
+          if (pageNumber <= 1) {
+            setMarketplaceTotalCount(result.totalCount);
+          }
+          setMarketplaceHasNextPage(hasMarketplaceNextPage(result));
+          setMarketplaceError(result.warning ?? null);
+          void preloadMarketplacePage(cacheKey, requestParams, result, id);
         }
-        setMarketplaceSearchParams(params);
-        setMarketplaceModels(result.models);
-        if (pageNumber <= 1) {
-          setMarketplaceTotalCount(result.totalCount);
+      } catch (searchError) {
+        if (id === marketplaceSearchRef.current) {
+          setMarketplaceHasNextPage(false);
+          setMarketplaceError(getLocalInferenceUserFacingErrorMessage(searchError));
         }
-        setMarketplaceHasNextPage(hasMarketplaceNextPage(result));
-        setMarketplaceError(result.warning ?? null);
-        void preloadMarketplacePage(cacheKey, requestParams, result, id);
+      } finally {
+        if (id === marketplaceSearchRef.current) {
+          setMarketplaceLoading(false);
+        }
+        if (marketplaceRequestIdRef.current === requestId) {
+          marketplaceRequestIdRef.current = null;
+        }
       }
-    } catch (searchError) {
-      if (id === marketplaceSearchRef.current) {
-        setMarketplaceHasNextPage(false);
-        setMarketplaceError(getLocalInferenceUserFacingErrorMessage(searchError));
-      }
-    } finally {
-      if (id === marketplaceSearchRef.current) {
-        setMarketplaceLoading(false);
-      }
-      if (marketplaceRequestIdRef.current === requestId) {
-        marketplaceRequestIdRef.current = null;
-      }
-    }
-  }, [cancelMarketplacePrefetches, preloadMarketplacePage]);
+    },
+    [cancelMarketplacePrefetches, preloadMarketplacePage],
+  );
   const clearMarketplaceState = useCallback(() => {
     marketplaceSearchRef.current += 1;
     cancelMarketplacePrefetches();
@@ -538,18 +543,21 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     clearMarketplaceState();
   }, [activeTab, clearMarketplaceState]);
 
-  const handleMarketplaceSearch = useCallback((overrides: MarketplaceSearchParams = {}) => {
-    const params = buildMarketplaceSearchParams({
-      ...overrides,
-      query: overrides.query ?? marketplaceQueryRef.current,
-    });
-    if (!params) {
-      clearMarketplaceState();
-      return;
-    }
-    setMarketplaceHasSearched(true);
-    void searchMarketplace(params);
-  }, [clearMarketplaceState, searchMarketplace]);
+  const handleMarketplaceSearch = useCallback(
+    (overrides: MarketplaceSearchParams = {}) => {
+      const params = buildMarketplaceSearchParams({
+        ...overrides,
+        query: overrides.query ?? marketplaceQueryRef.current,
+      });
+      if (!params) {
+        clearMarketplaceState();
+        return;
+      }
+      setMarketplaceHasSearched(true);
+      void searchMarketplace(params);
+    },
+    [clearMarketplaceState, searchMarketplace],
+  );
 
   const handleMarketplaceQueryChange = useCallback((value: string) => {
     marketplaceQueryRef.current = value;
@@ -585,9 +593,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     const models = await window.electron.llamacpp.listRunningModels();
     // Polling rebuilds this array every tick; keep the previous reference when
     // nothing visible changed so memoized model cards skip re-rendering.
-    setRunningModels(current =>
-      sameRunningModelSnapshot(current, models) ? current : models,
-    );
+    setRunningModels(current => (sameRunningModelSnapshot(current, models) ? current : models));
     return models;
   }, []);
 
@@ -841,7 +847,10 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
           scheduleInstallProgressDismiss(name, progress.phase);
           void refreshLocalModels()
             .then(localModels => {
-              if (progress.phase === 'done' && !isSuccessfulMarketplaceInstallProgress(progress, localModels)) {
+              if (
+                progress.phase === 'done' &&
+                !isSuccessfulMarketplaceInstallProgress(progress, localModels)
+              ) {
                 setPullProgress(current => ({
                   ...current,
                   [name]: {
@@ -884,44 +893,47 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
     return () => window.clearInterval(timer);
   }, [isRunning, refreshRunningModels]);
 
-  const handleLoadModel = useCallback((model: OllamaModel) => {
-    const modelName = model.name;
-    if (loadingModelNameRef.current) return;
-    loadingModelNameRef.current = modelName;
-    cancelledModelLoadRef.current = false;
-    setLoadingModelName(modelName);
-    launchLogs.beginModelLaunch(modelName, { visible: false });
-    void runAction(async () => {
-      try {
-        const input: LlamaCppModelLaunchInput = {
-          model: modelName,
-          ...(model.path ? { modelPath: model.path } : {}),
-        };
-        const result = await window.electron.llamacpp.loadModel(input);
-        setRunningModels(result.runningModels);
-        launchLogs.markModelLaunchSucceeded();
-        notifyLlamaCppRunningModelsChanged();
-        // Only direct user launches prompt for configuration; background restoration remains silent.
-        setStartedModelName(modelName);
-        if (result.warning) {
-          showToast(result.warning, LocalInferenceToastKind.Info);
-        }
-      } catch (loadError) {
-        launchLogs.markModelLaunchFailed();
-        if (cancelledModelLoadRef.current) {
-          await refreshRunningModels();
+  const handleLoadModel = useCallback(
+    (model: OllamaModel) => {
+      const modelName = model.name;
+      if (loadingModelNameRef.current) return;
+      loadingModelNameRef.current = modelName;
+      cancelledModelLoadRef.current = false;
+      setLoadingModelName(modelName);
+      launchLogs.beginModelLaunch(modelName, { visible: false });
+      void runAction(async () => {
+        try {
+          const input: LlamaCppModelLaunchInput = {
+            model: modelName,
+            ...(model.path ? { modelPath: model.path } : {}),
+          };
+          const result = await window.electron.llamacpp.loadModel(input);
+          setRunningModels(result.runningModels);
+          launchLogs.markModelLaunchSucceeded();
           notifyLlamaCppRunningModelsChanged();
-          return;
+          // Only direct user launches prompt for configuration; background restoration remains silent.
+          setStartedModelName(modelName);
+          if (result.warning) {
+            showToast(result.warning, LocalInferenceToastKind.Info);
+          }
+        } catch (loadError) {
+          launchLogs.markModelLaunchFailed();
+          if (cancelledModelLoadRef.current) {
+            await refreshRunningModels();
+            notifyLlamaCppRunningModelsChanged();
+            return;
+          }
+          throw loadError;
+        } finally {
+          loadingModelNameRef.current = null;
+          setLoadingModelName(current => (current === modelName ? null : current));
+          setCancellingModelLoad(false);
+          cancelledModelLoadRef.current = false;
         }
-        throw loadError;
-      } finally {
-        loadingModelNameRef.current = null;
-        setLoadingModelName(current => (current === modelName ? null : current));
-        setCancellingModelLoad(false);
-        cancelledModelLoadRef.current = false;
-      }
-    });
-  }, [launchLogs, refreshRunningModels, runAction, showToast]);
+      });
+    },
+    [launchLogs, refreshRunningModels, runAction, showToast],
+  );
 
   const handleCancelModelLoad = useCallback(() => {
     const modelName = loadingModelNameRef.current;
@@ -984,7 +996,14 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
         }
       });
     },
-    [closeLaunchLogPanel, launchLogState, runAction, showToast, unloadingModelName, waitForUnloadSettle],
+    [
+      closeLaunchLogPanel,
+      launchLogState,
+      runAction,
+      showToast,
+      unloadingModelName,
+      waitForUnloadSettle,
+    ],
   );
 
   const handleDelete = useCallback(
@@ -1089,7 +1108,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
   );
 
   return (
-    <div className="relative flex h-full flex-1 flex-col bg-background">
+    <div data-page-canvas className="relative flex h-full flex-1 flex-col bg-background">
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
@@ -1144,7 +1163,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                         <Button
                           type="button"
                           variant="outline"
-                          className={`${localInferenceCompactButtonClass} min-w-32 hover:bg-background dark:hover:bg-background`}
+                          className={`${localInferenceCompactButtonClass} theme-page-local-inference-view-button-variant-1 min-w-32 `}
                           size="default"
                         >
                           <SettingsAnimatedSlidersHorizontalIcon className="size-4" size={16} />
@@ -1244,7 +1263,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                   installedModelPathMap={installedModelPathMap}
                   hardwareSummary={marketplaceHardware}
                   hardwareSummaryReady={marketplaceHardwareChecked}
-                  activeDownloadModelId={pulling ? activePullName ?? undefined : undefined}
+                  activeDownloadModelId={pulling ? (activePullName ?? undefined) : undefined}
                   onQueryChange={handleMarketplaceQueryChange}
                   onSearch={handleMarketplaceSearch}
                   onInstall={handleMarketplaceInstall}
@@ -1293,7 +1312,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
                 .replace('{name}', startedModelName ?? '')}
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="border-t-0 pt-0">
+          <DialogFooter className="theme-control-sizing-18 border-t-0">
             <Button
               type="button"
               variant="outline"
@@ -1319,7 +1338,7 @@ const LocalInferenceView: React.FC<LocalInferenceViewProps> = ({
 
       <Dialog open={runtimeSettingsOpen} onOpenChange={handleRuntimeSettingsOpenChange}>
         <DialogContent className="w-[min(48rem,calc(100%-2rem))] max-h-[85vh] gap-4 overflow-y-auto sm:max-w-2xl">
-          <DialogHeader className="gap-1 pr-8">
+          <DialogHeader className="theme-control-sizing-19 gap-1">
             <DialogTitle>{i18nService.t('localInferenceRuntimeSettings')}</DialogTitle>
           </DialogHeader>
           <RuntimeInstallCard

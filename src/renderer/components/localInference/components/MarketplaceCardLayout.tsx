@@ -18,15 +18,15 @@ export function MarketplaceCardLayout({
     <Card
       data-marketplace-model-card={loading ? undefined : 'true'}
       aria-hidden={loading || undefined}
-      className="h-full min-w-0 gap-4 rounded-lg border border-border bg-card p-4 shadow-none ring-0 has-data-[slot=card-footer]:pb-4"
+      className="theme-market-card h-full min-w-0 gap-4"
     >
-      <CardHeader className="flex min-h-16 min-w-0 flex-row items-start gap-3 p-0">
+      <CardHeader className="theme-control-sizing-20 theme-market-card-header flex min-w-0 flex-row items-start gap-3">
         {header}
       </CardHeader>
-      <CardContent className="flex min-w-0 flex-wrap items-center justify-between gap-2 p-0">
+      <CardContent className="theme-market-card-content flex min-w-0 flex-wrap items-center justify-between gap-2">
         {children}
       </CardContent>
-      <CardFooter className="mt-auto flex min-w-0 flex-wrap items-center gap-2 border-0 bg-transparent p-0">
+      <CardFooter className="theme-market-card-footer mt-auto flex min-w-0 flex-wrap items-center gap-2">
         {footer}
       </CardFooter>
     </Card>

@@ -76,7 +76,7 @@ export const QueueItemContent = ({
   <span
     className={cn(
       'line-clamp-1 grow wrap-break-word',
-      completed ? 'text-muted-foreground/50 line-through' : 'text-muted-foreground',
+      completed ? 'theme-queue-body-completed' : 'theme-queue-body',
       className,
     )}
     {...props}
@@ -112,10 +112,7 @@ export type QueueItemActionProps = Omit<ComponentProps<typeof Button>, 'variant'
 
 export const QueueItemAction = ({ className, ...props }: QueueItemActionProps) => (
   <Button
-    className={cn(
-      'size-auto rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted-foreground/10 hover:text-foreground group-hover:opacity-100',
-      className,
-    )}
+    className={cn('theme-page-queue-button-variant-1', className)}
     size="icon"
     type="button"
     variant="ghost"
@@ -183,7 +180,7 @@ export const QueueSectionTrigger = ({
       <Button
         variant="ghost"
         className={cn(
-          'group h-auto w-full justify-between bg-muted/40 px-3 py-2 text-left text-muted-foreground hover:bg-muted',
+          'theme-page-queue-button-variant-2 group w-full justify-between text-left',
           className,
         )}
         type="button"

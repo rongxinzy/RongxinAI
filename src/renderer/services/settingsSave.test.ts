@@ -1,10 +1,7 @@
 import { expect, test } from 'vitest';
 
 import { defaultConfig } from '../config';
-import {
-  buildAppSettingsSavePatch,
-  getSettingsSaveErrorMessage,
-} from './settingsSave';
+import { buildAppSettingsSavePatch, getSettingsSaveErrorMessage } from './settingsSave';
 
 const translate = (key: string): string =>
   ({
@@ -67,4 +64,21 @@ test('includes API and model configuration only when providers changed', () => {
   });
 
   expect(patch).toMatchObject({ providers, api: { key: 'test-key' }, model: defaultConfig.model });
+});
+
+test('saves a style change independently from appearance and model settings', () => {
+  const input = {
+    current: defaultConfig,
+    theme: defaultConfig.theme,
+    themeStyle: 'paper',
+    language: defaultConfig.language,
+    useSystemProxy: defaultConfig.useSystemProxy,
+    sqliteAutoBackupEnabled: defaultConfig.sqliteAutoBackupEnabled ?? false,
+    shortcuts: defaultConfig.shortcuts!,
+    providers: defaultConfig.providers,
+    api: defaultConfig.api,
+    model: defaultConfig.model,
+  };
+  expect(buildAppSettingsSavePatch(input)).toEqual({ themeStyle: 'paper' });
+  expect(buildAppSettingsSavePatch({ ...input, themeStyle: 'codex' })).toEqual({});
 });

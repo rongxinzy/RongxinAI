@@ -73,7 +73,7 @@ export const ChainOfThoughtHeader = memo(
       <Collapsible onOpenChange={setIsOpen} open={isOpen}>
         <CollapsibleTrigger
           className={cn(
-            'flex w-full items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground',
+            'theme-fold-reasoning flex w-full items-center gap-2',
             className,
           )}
           {...props}
@@ -147,7 +147,7 @@ export type ChainOfThoughtSearchResultProps = ComponentProps<typeof Badge>;
 export const ChainOfThoughtSearchResult = memo(
   ({ className, children, ...props }: ChainOfThoughtSearchResultProps) => (
     <Badge
-      className={cn('gap-1 px-2 py-0.5 font-normal text-xs', className)}
+      className={cn('theme-page-chain-of-thought-badge-variant-1', className)}
       variant="secondary"
       {...props}
     >

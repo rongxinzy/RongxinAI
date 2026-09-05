@@ -146,14 +146,14 @@ interface DiffViewProps {
 
 const LINE_COLORS: Record<DiffLineType, { bg: string; text: string; gutter: string }> = {
   added: {
-    bg: 'bg-green-500/10 dark:bg-green-500/15',
-    text: 'text-green-700 dark:text-green-400',
-    gutter: 'text-green-600/60 dark:text-green-400/50',
+    bg: 'bg-diff-added-background',
+    text: 'text-diff-added',
+    gutter: 'text-diff-added/60',
   },
   removed: {
-    bg: 'bg-red-500/10 dark:bg-red-500/15',
-    text: 'text-red-700 dark:text-red-400',
-    gutter: 'text-red-600/60 dark:text-red-400/50',
+    bg: 'bg-diff-removed-background',
+    text: 'text-diff-removed',
+    gutter: 'text-diff-removed/60',
   },
   context: {
     bg: '',
@@ -230,16 +230,16 @@ const DiffView: React.FC<DiffViewProps> = ({ oldStr, newStr, filePath }) => {
       <div className="flex items-center justify-between px-3 py-1.5 dark:bg-claude-darkSurface bg-claude-surfaceInset border-b dark:border-claude-darkBorder border-claude-border">
         <div className="flex items-center gap-2 min-w-0">
           {filePath && (
-            <span className="text-[11px] font-mono dark:text-claude-darkTextSecondary text-claude-textSecondary truncate">
+            <span className="text-xs font-mono dark:text-claude-darkTextSecondary text-claude-textSecondary truncate">
               {filePath}
             </span>
           )}
-          <span className="flex items-center gap-1.5 text-[10px] shrink-0">
+          <span className="flex items-center gap-1.5 text-xs shrink-0">
             {stats.added > 0 && (
-              <span className="text-green-600 dark:text-green-400 font-medium">+{stats.added}</span>
+              <span className="text-diff-added font-medium">+{stats.added}</span>
             )}
             {stats.removed > 0 && (
-              <span className="text-red-500 dark:text-red-400 font-medium">-{stats.removed}</span>
+              <span className="text-diff-removed font-medium">-{stats.removed}</span>
             )}
           </span>
         </div>

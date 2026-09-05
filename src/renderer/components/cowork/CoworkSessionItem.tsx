@@ -260,10 +260,10 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
         }
         onSelect();
       }}
-      className={`group relative p-3 rounded-lg cursor-pointer transition-colors duration-150 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
+      className={`theme-surface-session-row group relative p-3 cursor-pointer ${
         isSelected || isActive
-          ? 'bg-black/4 dark:bg-white/5'
-          : 'hover:bg-black/4 dark:hover:bg-white/5'
+          ? 'theme-surface-session-selected'
+          : 'theme-surface-session-idle'
       }`}
     >
       {/* Content area */}
@@ -310,7 +310,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                   }
                 }}
                 onBlur={handleRenameBlur}
-                className="flex-1 min-w-0 rounded-lg border border-input bg-background px-2 py-1 text-sm font-medium text-foreground transition-colors outline-none hover:ring-1 hover:ring-ring/40 focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring/40"
+                className="theme-native-field theme-native-rename-field flex-1 min-w-0 px-2 py-1"
               />
             ) : (
               <div className="flex min-w-0 items-center gap-2">
@@ -332,7 +332,7 @@ const CoworkSessionItem: React.FC<CoworkSessionItemProps> = ({
                   {relativeTime.compact}
                 </span>
               )}
-              <span className="text-[10px] uppercase tracking-wider whitespace-nowrap">
+              <span className="text-xs uppercase tracking-wider whitespace-nowrap">
                 {i18nService.t(statusLabels[session.status])}
               </span>
             </div>

@@ -49,21 +49,21 @@ export function PageTabs<Value extends string>({
   const instanceId = useId();
 
   const list = (
-    <TabsList variant="line" className={cn('h-9 gap-0 p-0', bare && className)}>
+    <TabsList variant="line" className={cn('theme-page-tabs-list gap-0', bare && className)}>
       {items.map(item => (
         <TabsTrigger
           key={item.value}
           value={item.value}
           disabled={item.disabled}
           onClick={() => onItemClick?.(item.value)}
-          className="relative h-9 flex-none rounded-none bg-transparent px-3 text-sm font-medium text-muted-foreground shadow-none transition-colors duration-150 after:hidden hover:text-foreground data-active:bg-transparent data-active:text-foreground data-active:shadow-none dark:data-active:bg-transparent"
+          className="theme-page-tabs-trigger relative flex-none after:hidden"
         >
           {item.label}
           {item.badge}
           {item.value === value ? (
             <motion.span
               layoutId={`page-tabs-indicator-${instanceId}`}
-              className="absolute inset-x-1 -bottom-px h-0.5 rounded-full bg-foreground"
+              className="theme-page-tabs-indicator absolute inset-x-1 -bottom-px"
               transition={
                 prefersReducedMotion
                   ? { duration: 0 }

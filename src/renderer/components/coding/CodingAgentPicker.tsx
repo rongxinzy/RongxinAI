@@ -79,7 +79,7 @@ export const CodingAgentPicker = ({
           </Button>
         }
       />
-      <PopoverContent align="start" className="w-80 p-0">
+      <PopoverContent align="start" className="theme-control-sizing-4 w-80">
         <Command>
           <CommandInput placeholder={i18nService.t('codingAgentChooseAgent')} />
           <CommandList>

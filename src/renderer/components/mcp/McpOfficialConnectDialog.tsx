@@ -71,10 +71,10 @@ export function McpOfficialConnectDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-[26rem] gap-0 overflow-hidden p-0 sm:max-w-[26rem]" showCloseButton>
+      <DialogContent className="theme-control-sizing-4 max-w-[26rem] gap-0 overflow-hidden sm:max-w-[26rem]" showCloseButton>
         {entry && (
           <>
-            <DialogHeader className="items-center px-4 pt-6 pb-4 text-center">
+            <DialogHeader className="theme-control-sizing-25 items-center text-center">
               <div className="flex items-center">
                 <div className="flex size-14 items-center justify-center overflow-hidden rounded-xl border border-border bg-card">
                   {iconSrc ? <img src={iconSrc} alt="" className="size-full object-contain" /> : <Cable className="size-8 text-foreground" />}

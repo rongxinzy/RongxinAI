@@ -297,14 +297,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       return undefined;
     }
 
-    const service = new ArtifactDetectionService(
-      detected => {
-        for (const { artifact } of detected) {
-          // Keep path-backed artifacts visible while their file contents remain deferred.
-          dispatch(addArtifact({ sessionId, artifact }));
-        }
-      },
-    );
+    const service = new ArtifactDetectionService(detected => {
+      for (const { artifact } of detected) {
+        // Keep path-backed artifacts visible while their file contents remain deferred.
+        dispatch(addArtifact({ sessionId, artifact }));
+      }
+    });
     artifactDetectionServiceRef.current = service;
 
     return () => {
@@ -1125,7 +1123,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
           onClick={() => setShowExportOptions(false)}
         >
           <div
-            className="w-full max-w-xs mx-4 dark:bg-claude-darkSurface bg-claude-surface rounded-2xl shadow-modal overflow-hidden modal-content"
+            className="w-full max-w-xs mx-4 overflow-hidden modal-content"
             onClick={e => e.stopPropagation()}
           >
             <div className="px-5 py-4 border-b dark:border-claude-darkBorder border-claude-border">
@@ -1136,7 +1134,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             <div className="py-1">
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
+                className="theme-action-row-large w-full justify-start gap-3"
                 onClick={e => {
                   setShowExportOptions(false);
                   handleShareClick(e);
@@ -1153,7 +1151,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
+                className="theme-action-row-large w-full justify-start gap-3"
                 onClick={() => {
                   setShowExportOptions(false);
                   handleExportText('md');
@@ -1169,7 +1167,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start gap-3 px-5 py-3 h-auto text-sm"
+                className="theme-action-row-large w-full justify-start gap-3"
                 onClick={() => {
                   setShowExportOptions(false);
                   handleExportText('json');
@@ -1192,6 +1190,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
       <div ref={contentRowRef} className="flex-1 flex overflow-hidden">
         <div
           ref={detailRootRef}
+          data-page-canvas
           className={`relative min-w-0 flex-1 flex flex-col bg-background h-full ${
             !isSessionSwitching && isArtifactWorkspace ? 'hidden' : ''
           }`}
@@ -1269,14 +1268,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`mb-2 mr-[-5px] size-5 text-muted-foreground [&_svg]:size-3.5
-                ${
-                  !isRailHovered
-                    ? 'pointer-events-none opacity-0'
-                    : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <= 0
-                      ? 'opacity-30 cursor-default'
-                      : 'cursor-pointer hover:text-foreground'
-                }`}
+                  className={` theme-page-cowork-session-detail-button-variant-4 mb-2 mr-[-5px] [&_svg]:size-3.5 ${
+                    !isRailHovered
+                      ? 'theme-page-cowork-session-detail-button-variant-1 pointer-events-none'
+                      : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) <=
+                          0
+                        ? 'theme-page-cowork-session-detail-button-variant-2 cursor-default'
+                        : 'theme-page-cowork-session-detail-button-variant-3 cursor-pointer'
+                  }`}
                 >
                   <ChevronUp />
                 </Button>
@@ -1393,7 +1392,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                             });
                           }}
                           onMouseLeave={() => setRailTooltip(null)}
-                          className="h-auto w-5 cursor-pointer justify-end px-0 py-[5px]"
+                          className="theme-control-sizing-12 theme-control-content-height w-5 cursor-pointer justify-end"
                         >
                           <div
                             className={`h-[2px] w-4 origin-right rounded-full transition-[transform,background-color] ${
@@ -1428,15 +1427,14 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onMouseEnter={() => {
                     setHoveredRailIndex(null);
                   }}
-                  className={`mt-2 mr-[-5px] size-5 text-muted-foreground [&_svg]:size-3.5
-                ${
-                  !isRailHovered
-                    ? 'pointer-events-none opacity-0'
-                    : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
-                        railItemCountRef.current - 1
-                      ? 'opacity-30 cursor-default'
-                      : 'cursor-pointer hover:text-foreground'
-                }`}
+                  className={` theme-page-cowork-session-detail-button-variant-8 mt-2 mr-[-5px] [&_svg]:size-3.5 ${
+                    !isRailHovered
+                      ? 'theme-page-cowork-session-detail-button-variant-5 pointer-events-none'
+                      : (currentRailIndex < 0 ? railItemCountRef.current - 1 : currentRailIndex) >=
+                          railItemCountRef.current - 1
+                        ? 'theme-page-cowork-session-detail-button-variant-6 cursor-default'
+                        : 'theme-page-cowork-session-detail-button-variant-7 cursor-pointer'
+                  }`}
                 >
                   <ChevronDown />
                 </Button>
@@ -1447,12 +1445,12 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
               railTooltip &&
               createPortal(
                 <div
-                  className={`fixed z-100 px-3.5 py-2 text-[13px] leading-snug pointer-events-none overflow-hidden
+                  className={`fixed z-100 px-3.5 py-2 text-sm leading-snug pointer-events-none overflow-hidden
               max-w-[240px] shadow-elevated
               border
               ${
                 railTooltip.isUser
-                  ? 'rounded-[12px_12px_4px_12px] bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
+                  ? 'rounded-xl rounded-br-sm bg-white border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
                   : 'rounded-xl bg-neutral-50 border-neutral-200/80 dark:bg-neutral-800 dark:border-neutral-700'
               }`}
                   style={{
@@ -1462,7 +1460,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   }}
                 >
                   {!railTooltip.isUser && (
-                    <div className="text-[12px] font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
+                    <div className="text-xs font-medium mb-0.5 text-neutral-800 dark:text-neutral-200">
                       知远智能体：
                     </div>
                   )}
@@ -1540,7 +1538,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
                   onCancelTaskResume={onCancelTaskResume}
                   sessionId={displayedSessionId ?? currentSession?.id}
                 />
-                <p className="text-center text-[11px] text-muted opacity-85 mt-2 mb-[-8px] select-none">
+                <p className="text-center text-xs text-muted opacity-85 mt-2 mb-[-8px] select-none">
                   {i18nService.t('aiGeneratedDisclaimer')}
                 </p>
               </div>

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { expect, test } from 'vitest';
+import { classicLight } from '../../theme/themes/classic-light';
 
 const source = readFileSync(
   fileURLToPath(new URL('./InlineSkillPromptEditor.tsx', import.meta.url)),
@@ -10,7 +11,7 @@ const source = readFileSync(
 
 test('uses one editable surface for skill tokens and prompt text', () => {
   expect(source).toContain('contentEditable={!disabled}');
-  expect(source).toContain("token.dataset.skillToken = skillId");
+  expect(source).toContain('token.dataset.skillToken = skillId');
   expect(source).toContain('range.insertNode(token);');
 });
 
@@ -27,9 +28,15 @@ test('restores the mixed token and text DOM when a send is rejected', () => {
 });
 
 test('shows removal in the icon slot only while hovering a token', () => {
-  expect(source).toContain('bg-(--zy-skill-blue-background)');
+  expect(source).toContain('theme-surface-skill-token');
+  expect(classicLight.components['surface-skill-token'].base['background-color']).toBe(
+    'var(--zy-skill-blue-background)',
+  );
   expect(source).toContain('inline-flex h-6');
-  expect(source).toContain('group-hover:opacity-0');
+  expect(source).toContain('theme-surface-skill-icon');
+  expect(classicLight.components['surface-skill-icon'].parentHover.opacity).toBe('0');
+  expect(classicLight.components['surface-skill-remove'].base.opacity).toBe('0');
+  expect(classicLight.components['surface-skill-remove'].parentHover.opacity).toBe('1');
   expect(source).toContain('group-hover:pointer-events-auto');
 });
 

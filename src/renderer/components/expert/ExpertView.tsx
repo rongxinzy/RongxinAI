@@ -64,7 +64,7 @@ const ExpertView: React.FC<ExpertViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-background h-full">
+    <div data-page-canvas className="flex-1 flex flex-col bg-background h-full">
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}

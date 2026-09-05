@@ -336,7 +336,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
           )}
         </div>
 
-        <Card className="h-96 min-h-0">
+        <Card className="theme-control-sizing-28 min-h-0">
           <CardHeader className="shrink-0">
             <CardTitle className="flex items-center gap-2">
               <span>{i18nService.t('managedMemoryTitle')}</span>
@@ -355,7 +355,7 @@ export function ManagedMemorySettings({ workingDirectory }: ManagedMemorySetting
           </CardContent>
         </Card>
 
-        <Card className="h-80 min-h-0">
+        <Card className="theme-control-sizing-29 min-h-0">
           <CardHeader className="shrink-0">
             <CardTitle className="flex items-center gap-2">
               <span>{i18nService.t('managedMemoryTabSessions')}</span>

@@ -289,7 +289,7 @@ const McpServerFormModal: React.FC<McpServerFormModalProps> = ({
       }}
     >
       <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
-        <DialogHeader className="pr-8">
+        <DialogHeader className="theme-control-sizing-19">
           <DialogTitle>{modalTitle}</DialogTitle>
         </DialogHeader>
 

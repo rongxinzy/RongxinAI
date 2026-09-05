@@ -198,7 +198,9 @@ export function ModelLaunchLogWindow() {
           <LocalInferenceLogViewer
             toolbar={<ModelLaunchLogWindowToolbar pageTitle={pageTitle} state={state} />}
             key={state.sessionId ?? state.modelName ?? 'local-inference-log'}
-            text={logOutput} className="min-h-0 flex-1" />
+            text={logOutput}
+            className="min-h-0 flex-1"
+          />
         </div>
       </main>
     </div>
@@ -284,7 +286,7 @@ function shouldFollowLaunchLogEvent(
 function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }) {
   if (!state.session) {
     return (
-      <Badge variant="secondary" className="border-border bg-muted text-muted-foreground">
+      <Badge variant="secondary" className="theme-page-model-launch-log-window-badge-1">
         {i18nService.t('localInferenceModelLaunchNotStarted')}
       </Badge>
     );
@@ -292,29 +294,20 @@ function LaunchWindowStatusBadge({ state }: { state: ModelLaunchLogWindowState }
 
   if (state.session.status === LlamaCppModelLaunchLogSessionStatus.Succeeded) {
     return (
-      <Badge
-        variant="outline"
-        className="border-[color-mix(in_srgb,var(--zy-success)_28%,transparent)] bg-[color-mix(in_srgb,var(--zy-success)_12%,transparent)] text-(--zy-success)"
-      >
+      <Badge variant="outline" className="theme-page-model-launch-log-window-badge-2">
         {i18nService.t('localInferenceModelLaunchSucceeded')}
       </Badge>
     );
   }
   if (state.session.status === LlamaCppModelLaunchLogSessionStatus.Failed) {
     return (
-      <Badge
-        variant="outline"
-        className="border-[color-mix(in_srgb,var(--zy-destructive)_28%,transparent)] bg-[color-mix(in_srgb,var(--zy-destructive)_12%,transparent)] text-(--zy-destructive)"
-      >
+      <Badge variant="outline" className="theme-page-model-launch-log-window-badge-3">
         {i18nService.t('localInferenceModelLaunchFailed')}
       </Badge>
     );
   }
   return (
-    <Badge
-      variant="outline"
-      className="border-[color-mix(in_srgb,var(--zy-primary)_28%,transparent)] bg-(--zy-primary-muted) text-(--zy-primary)"
-    >
+    <Badge variant="outline" className="theme-page-model-launch-log-window-badge-4">
       {i18nService.t('localInferenceModelLaunchStarting')}
     </Badge>
   );

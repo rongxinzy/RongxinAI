@@ -46,7 +46,7 @@ const TodoWriteInputView: React.FC<{ items: ParsedTodoItem[] }> = ({ items }) =>
     {items.map((item, index) => (
       <div key={`todo-item-${index}`} className="flex items-start gap-2">
         <span
-          className={`mt-0.5 size-4 rounded-[4px] border shrink-0 inline-flex items-center justify-center ${
+          className={`mt-0.5 size-4 rounded-sm border shrink-0 inline-flex items-center justify-center ${
             item.status === 'completed'
               ? 'bg-green-500/10 border-green-500 text-green-500'
               : item.status === 'in_progress'
@@ -187,7 +187,7 @@ export const ToolCard: React.FC<{
                   size="sm"
                   aria-expanded={isResultExpanded}
                   onClick={() => setIsResultExpanded(!isResultExpanded)}
-                  className="inline-flex items-center gap-1 self-start text-xs text-muted-foreground"
+                  className="theme-page-tool-card-button-1 inline-flex items-center self-start"
                 >
                   <ChevronDown
                     className={cn(

@@ -138,7 +138,7 @@ export function ModelCapabilitySettingsModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      className="w-full max-w-md rounded-xl border border-border bg-surface p-4 shadow-modal"
+      className="theme-local-capability-modal w-full max-w-md p-4"
     >
       <div>
         <div className="mb-3 flex items-center justify-between">
@@ -149,7 +149,7 @@ export function ModelCapabilitySettingsModal({
             size="icon"
             onClick={onClose}
             aria-label={i18nService.t('cancel')}
-            className="size-7 text-muted-foreground hover:text-foreground"
+            className="theme-action-icon-small-muted"
           >
             <X className="size-4" />
           </Button>

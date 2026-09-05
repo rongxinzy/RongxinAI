@@ -15,8 +15,8 @@ interface CodingDiffViewProps {
 }
 
 const ROW_CLASS: Record<CodingDiffRowType, string> = {
-  [CodingDiffRowType.Add]: 'bg-green-500/10 text-green-700 dark:text-green-400',
-  [CodingDiffRowType.Del]: 'bg-red-500/10 text-red-700 dark:text-red-400',
+  [CodingDiffRowType.Add]: 'bg-diff-added-background text-diff-added',
+  [CodingDiffRowType.Del]: 'bg-diff-removed-background text-diff-removed',
   [CodingDiffRowType.Context]: 'text-muted-foreground',
 };
 

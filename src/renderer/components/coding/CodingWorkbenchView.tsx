@@ -696,6 +696,7 @@ export const CodingWorkbenchView = ({
 
   return (
     <div
+      data-page-canvas
       className={cn(
         'grid h-full min-h-0 bg-background',
         desktopSidePanelOpen ? 'grid-cols-[minmax(0,1fr)_360px] max-lg:grid-cols-1' : 'grid-cols-1',
@@ -884,7 +885,7 @@ export const CodingWorkbenchView = ({
                 >
                   <GitBranch />
                 </SheetTrigger>
-                <SheetContent side="bottom" className="h-[80dvh] p-0">
+                <SheetContent side="bottom" className="theme-control-sizing-4 h-[80dvh]">
                   <SheetHeader className="sr-only">
                     <SheetTitle>{i18nService.t('codingGitPanel')}</SheetTitle>
                   </SheetHeader>
@@ -929,7 +930,7 @@ export const CodingWorkbenchView = ({
                         </Button>
                       }
                     />
-                    <SheetContent side="bottom" className="h-[70dvh] p-0">
+                    <SheetContent side="bottom" className="theme-control-sizing-4 h-[70dvh]">
                       <SheetHeader>
                         <SheetTitle>{i18nService.t('codingAgentInspector')}</SheetTitle>
                       </SheetHeader>
@@ -1028,7 +1029,7 @@ export const CodingWorkbenchView = ({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-6 px-2"
+                  className="theme-control-sizing-8"
                   onClick={() => activeProfile && void probeAgent(activeProfile.id)}
                 >
                   {i18nService.t('codingAgentProbeAgent')}

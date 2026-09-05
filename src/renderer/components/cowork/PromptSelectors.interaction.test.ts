@@ -88,3 +88,31 @@ test.each([false, true])(
     expect(onChange).toHaveBeenCalledTimes(1);
   },
 );
+
+test('distinguishes identical model names and IDs across providers with keyboard selection', async () => {
+  const user = userEvent.setup();
+  const onSelect = vi.fn();
+  const duplicates = [
+    { id: 'shared', name: 'Same model', providerKey: 'openai' },
+    { id: 'shared', name: 'Same model', providerKey: 'anthropic' },
+  ];
+  function Picker() {
+    const [open, setOpen] = useState(false);
+    return createElement(CoworkModelPicker, {
+      models: duplicates,
+      selectedModel: duplicates[1],
+      open,
+      onOpenChange: setOpen,
+      onSelect,
+    });
+  }
+  render(createElement(Picker));
+  await user.click(screen.getByRole('button', { name: 'Same model' }));
+  const options = screen.getAllByRole('option', { name: 'Same model' });
+  expect(options[0]).toHaveAttribute('aria-description', 'OpenAI');
+  expect(options[1]).toHaveAttribute('aria-description', 'Anthropic, currentModel');
+  expect(options[0].getAttribute('data-value')).not.toBe(options[1].getAttribute('data-value'));
+  await user.click(screen.getByRole('combobox', { name: 'searchModels' }));
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith(duplicates[1]);
+});

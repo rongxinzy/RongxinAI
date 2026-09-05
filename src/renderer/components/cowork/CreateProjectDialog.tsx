@@ -137,7 +137,7 @@ const CreateProjectDialog: React.FC<CreateProjectDialogProps> = ({
                 value={baseDir}
                 readOnly
                 disabled={isSaving}
-                className="flex-1 truncate text-muted-foreground"
+                className="theme-page-create-project-dialog-input-1 flex-1 truncate"
               />
               <Button
                 type="button"

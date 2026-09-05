@@ -35,7 +35,7 @@ export const ModelSelectorContent = ({
 }: ModelSelectorContentProps) => (
   <DialogContent
     aria-describedby={undefined}
-    className={cn('outline! border-none! p-0 outline-border! outline-solid!', className)}
+    className={cn('theme-control-sizing-4 theme-composition-model-outline', className)}
     data-slot="model-selector-content"
     {...props}
   >
@@ -53,7 +53,7 @@ export const ModelSelectorDialog = (props: ModelSelectorDialogProps) => (
 export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>;
 
 export const ModelSelectorInput = ({ className, ...props }: ModelSelectorInputProps) => (
-  <CommandInput className={cn('h-auto py-3.5', className)} {...props} />
+  <CommandInput className={cn('theme-control-sizing-31 theme-control-content-height', className)} {...props} />
 );
 
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;

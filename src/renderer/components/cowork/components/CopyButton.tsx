@@ -26,7 +26,11 @@ export const CopyButton: React.FC<{
       variant="ghost"
       size="icon-sm"
       onClick={handleCopy}
-      className={visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+      className={
+        visible
+          ? 'theme-page-copy-button-button-variant-1'
+          : 'theme-page-copy-button-button-variant-2 pointer-events-none'
+      }
       tabIndex={visible ? 0 : -1}
       title={i18nService.t('copyToClipboard')}
       aria-label={i18nService.t('copyToClipboard')}
@@ -48,7 +52,11 @@ export const ReEditButton: React.FC<{
       e.stopPropagation();
       onClick();
     }}
-    className={visible ? 'opacity-100' : 'opacity-0 pointer-events-none'}
+    className={
+      visible
+        ? 'theme-page-copy-button-button-variant-3'
+        : 'theme-page-copy-button-button-variant-4 pointer-events-none'
+    }
     tabIndex={visible ? 0 : -1}
     title={i18nService.t('coworkReEdit')}
     aria-label={i18nService.t('coworkReEdit')}

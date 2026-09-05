@@ -1,4 +1,3 @@
-import { ModelSelectorName } from '@shared/components/ai-elements/model-selector';
 import {
   Command,
   CommandEmpty,
@@ -8,12 +7,18 @@ import {
   CommandList,
 } from '@shared/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@shared/components/ui/popover';
-import { Bot } from 'lucide-react';
+import { Bot, Check } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ProviderIcon } from '../../providers/uiRegistry';
 import { i18nService } from '../../services/i18n';
-import type { Model } from '../../store/slices/modelSlice';
+import {
+  getModelIdentityKey,
+  isSameModelIdentity,
+  type Model,
+} from '../../store/slices/modelSlice';
+import { getProviderDisplayName } from '../../config';
+import { SelectorOptionContent } from './SelectorOptionContent';
 import { PromptSelectorButton } from './PromptSelectorButton';
 
 type CoworkModelPickerProps = {
@@ -84,18 +89,14 @@ export function CoworkModelPicker({
         }
       />
       <PopoverContent
-        className="w-72 rounded-md! border! border-border! bg-surface! p-0 shadow-md ring-0! outline-none!"
+        className="theme-model-menu w-72 max-w-[calc(100vw-2rem)]"
         side="bottom"
         align="start"
         sideOffset={4}
       >
-        <Command
-          shouldFilter={false}
-          className="rounded-md! bg-surface! **:data-[slot=input-group]:bg-transparent! **:[[cmdk-group-heading]]:px-2 **:[[cmdk-group-heading]]:py-2 **:[[cmdk-group-heading]]:text-xs **:[[cmdk-group-heading]]:text-muted-foreground"
-        >
+        <Command shouldFilter={false} label={i18nService.t('searchModels')}>
           <CommandInput
             placeholder={i18nService.t('searchModels')}
-            className="bg-transparent"
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
@@ -112,15 +113,43 @@ export function CoworkModelPicker({
               <CommandGroup heading={i18nService.t('availableModels')}>
                 {matchingModels.map(model => (
                   <CommandItem
-                    key={model.id}
-                    value={model.name}
+                    key={getModelIdentityKey(model)}
+                    value={getModelIdentityKey(model)}
+                    variant="selector"
+                    aria-label={model.name}
+                    aria-description={[
+                      model.provider || getProviderDisplayName(model.providerKey || 'openai'),
+                      displayedSelectedModel && isSameModelIdentity(model, displayedSelectedModel)
+                        ? i18nService.t('currentModel')
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(', ')}
                     onSelect={() => {
                       onSelect(model);
                       handleOpenChange(false);
                     }}
                   >
-                    <ModelProviderIcon provider={model.providerKey || model.provider || 'openai'} />
-                    <ModelSelectorName>{model.name}</ModelSelectorName>
+                    <SelectorOptionContent
+                      icon={
+                        <ModelProviderIcon
+                          provider={model.providerKey || model.provider || 'openai'}
+                        />
+                      }
+                      title={model.name}
+                      description={
+                        model.provider || getProviderDisplayName(model.providerKey || 'openai')
+                      }
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="flex size-4 shrink-0 items-center justify-center"
+                    >
+                      {displayedSelectedModel &&
+                        isSameModelIdentity(model, displayedSelectedModel) && (
+                          <Check className="size-4" />
+                        )}
+                    </span>
                   </CommandItem>
                 ))}
               </CommandGroup>

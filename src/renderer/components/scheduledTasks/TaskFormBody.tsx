@@ -241,7 +241,7 @@ const TaskFormBody: React.FC<TaskFormBodyProps> = React.memo(
             id="scheduled-task-prompt"
             value={payloadText}
             onChange={event => onPayloadTextChange(event.target.value)}
-            className="min-h-20"
+            className="theme-control-sizing-5"
             placeholder={i18nService.t('scheduledTasksFormPromptPlaceholder')}
             aria-invalid={Boolean(errors.payloadText)}
           />

@@ -80,7 +80,7 @@ export function ProviderModelEditorDialog({
             void onSave();
           }
         }}
-        className="w-full max-w-md rounded-xl border border-border bg-background p-4 shadow-xl"
+        className="theme-surface-provider-dialog w-full max-w-md p-4"
       >
         <div className="mb-3 flex items-center justify-between">
           <h4 className="text-sm font-semibold text-foreground">

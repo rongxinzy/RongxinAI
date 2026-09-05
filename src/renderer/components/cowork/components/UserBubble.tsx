@@ -161,7 +161,7 @@ export const UserBubble: React.FC<{
 
         {hasTextContent && (
           <Message from="user" className="ml-auto items-end">
-            <MessageContent className="px-4 py-3 rounded-2xl rounded-br-md bg-primary/10 dark:bg-primary/15 text-sm text-foreground leading-relaxed whitespace-pre-wrap wrap-break-word">
+            <MessageContent className="theme-message-cowork-user whitespace-pre-wrap wrap-break-word">
               <div className="flex flex-wrap items-center gap-1.5 whitespace-normal">
                 {messageSkills.map(skill => (
                   <MessageSkillSummary key={skill.id} skill={skill} />
@@ -173,7 +173,7 @@ export const UserBubble: React.FC<{
         )}
 
         <div
-          className={`flex items-center gap-2 mt-1 text-[11px] text-muted-foreground select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`flex items-center gap-2 mt-1 text-xs text-muted-foreground select-none transition-opacity duration-200 justify-end ${isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
           aria-hidden={!isHovered}
         >
           <span>{formatMessageDateTime(message.timestamp)}</span>

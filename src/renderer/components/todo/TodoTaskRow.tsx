@@ -39,7 +39,7 @@ const TodoTaskRow: React.FC<TodoTaskRowProps> = ({
           onOpen();
         }
       }}
-      className="group flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-border-subtle bg-card px-3 py-2 text-left transition-colors duration-150 hover:bg-muted focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:translate-y-px"
+      className="theme-surface-todo-row group flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 text-left"
     >
       <Checkbox
         checked={todo.status === TodoStatus.Completed}

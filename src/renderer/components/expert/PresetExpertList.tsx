@@ -90,13 +90,13 @@ const PresetExpertList: React.FC<PresetExpertListProps> = ({ onChatWithExpert })
             <Card
               key={expert.name}
               size="sm"
-              className="group relative min-h-20 flex-row items-center gap-3 border border-border bg-card p-4 ring-0 transition-colors hover:bg-muted"
+              className="theme-page-preset-expert-list-card-1 group relative flex-row items-center"
             >
               <Button
                 type="button"
                 variant="ghost"
                 aria-label={displayName}
-                className="absolute inset-0 z-0 h-auto w-auto rounded-[inherit] border-0 p-0 hover:bg-transparent dark:hover:bg-transparent"
+                className="theme-page-preset-expert-list-button-1 absolute inset-0 z-0"
                 onClick={() => setSelectedExpert(expert)}
               />
 

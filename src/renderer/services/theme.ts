@@ -1,17 +1,13 @@
+import { DEFAULT_THEME_PLUGIN_ID, resolveThemePlugin, themePlugins } from '../theme/themes/plugins';
 import { allThemes, ThemeManager } from '../theme';
 import { configService } from './config';
 
 type ThemeType = 'light' | 'dark' | 'system';
 
-/** Theme setting → concrete theme definition ID. */
-const THEME_IDS: Record<'light' | 'dark', string> = {
-  light: 'classic-light',
-  dark: 'classic-dark',
-};
-
 class ThemeService {
   private mediaQuery: MediaQueryList | null = null;
   private currentTheme: ThemeType = 'system';
+  private currentStyle = DEFAULT_THEME_PLUGIN_ID;
   private initialized = false;
   private mediaQueryListener: ((event: MediaQueryListEvent) => void) | null = null;
   private manager: ThemeManager;
@@ -22,7 +18,7 @@ class ThemeService {
     }
     this.manager = new ThemeManager(allThemes, {
       storageKey: 'zhiyuan-theme-id',
-      defaultTheme: THEME_IDS.light,
+      defaultTheme: resolveThemePlugin(DEFAULT_THEME_PLUGIN_ID).appearances.light.meta.id,
       followSystem: false,
     });
   }
@@ -36,6 +32,7 @@ class ThemeService {
 
     try {
       const config = configService.getConfig();
+      this.currentStyle = resolveThemePlugin(config.themeStyle ?? DEFAULT_THEME_PLUGIN_ID).id;
       this.setTheme(config.theme);
 
       // 监听系统主题变化
@@ -75,8 +72,23 @@ class ThemeService {
     return theme?.meta.appearance ?? 'light';
   }
 
+  getStyle(): string {
+    return this.currentStyle;
+  }
+
+  getStyles() {
+    return themePlugins;
+  }
+
+  setStyle(id: string): void {
+    this.currentStyle = resolveThemePlugin(id).id;
+    this.setTheme(this.currentTheme);
+  }
+
   private applyAppearance(appearance: 'light' | 'dark'): void {
-    void this.manager.setTheme(THEME_IDS[appearance]);
+    void this.manager
+      .setTheme(resolveThemePlugin(this.currentStyle).appearances[appearance].meta.id)
+      .catch(error => console.error('[Theme] Failed to persist theme:', error));
   }
 }
 
