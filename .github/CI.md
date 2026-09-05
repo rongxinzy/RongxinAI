@@ -1,6 +1,6 @@
 # CI gate ownership
 
-Every PR runs lint, renderer type checking/build/bundle budgets, Electron compilation,
+Every PR runs workflow validation, lint, renderer type checking/build/bundle budgets, Electron compilation,
 unit tests, and Presentation Studio tests. Documentation-only PRs retain these baseline
 checks in this first rollout. Unknown paths never skip the baseline.
 
@@ -38,9 +38,37 @@ Manual checks supplement the PR checks; they do not replace the PR merge-commit 
 
 ## Required-check rollout and measurement
 
-After a real PR run confirms the `merge-gate` check name, configure it as a required
-status check in the main ruleset. Do not require the conditional platform jobs directly.
-This change does not modify repository rules or production environment permissions.
+The main ruleset requires `merge-gate` from GitHub Actions (app ID 15368), with the
+branch up to date before merging. This was enabled on September 5, 2026 after verifying
+the merged workflow's real check. Existing role bypasses remain unchanged; they can
+still bypass this requirement. Do not require conditional platform jobs directly.
+
+The lint job checks all workflows with actionlint 1.7.12 before installing application
+dependencies. Its Linux binary is verified against a pinned SHA-256. This validates
+workflow syntax, expressions, reusable-workflow inputs and job dependencies; ShellCheck
+is not enabled by this gate.
+
+## Security audit operation
+
+Weekly/manual Security Scan audits the root `bun.lock` using Bun 1.4.0. It audits
+every tracked nested Skill package and other child projects with npm lockfiles in
+isolated report directories. Existing locks are copied unchanged; lockless Skills
+resolve a fresh dependency graph with lifecycle scripts disabled. Their reports are
+labelled `unlocked-resolution` and are not evidence of the exact graph in a shipped
+installer. Root development dependencies are included because build tools and some
+bundled runtime dependencies live there.
+
+High/critical findings and audit/registry failures return nonzero. All child projects
+are attempted even if one fails; JSON reports, stderr, copied locks and a summary TSV
+are uploaded on failure as well as success. Artifact retention is seven days, matching
+the repository's existing artifact cleanup policy. A red audit with valid findings
+requires vulnerability triage; it must not be silenced with an unconditional success.
+Known vulnerability remediation is separate from repairing the scanning mechanism.
+This full scheduled scan is not an additional heavy PR gate.
+
+Reproduce child audits with `bash scripts/ci/audit-npm-projects.sh /tmp/npm-audit-report`.
+
+## Latency measurement
 
 Before rollout, the sampled successful PR runs had Linux median 16.2 minutes and CI
 median 6.3 minutes (short sample from September 4, 2026; queue time included). These
